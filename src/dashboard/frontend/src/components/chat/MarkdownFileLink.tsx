@@ -9,16 +9,19 @@ import {
   FileText,
   Loader2,
 } from 'lucide-react';
-import { EDITORS, type EditorId, WS_METHODS } from '@overdeck/contracts';
+import { BROWSERS, EDITORS, type BrowserEntry, type BrowserId, type EditorId, WS_METHODS } from '@overdeck/contracts';
 import { toast } from 'sonner';
-import type { DiffsThemeNames } from '@pierre/diffs';
 
 import { showContextMenu, type ContextMenuFallbackItem } from '../../contextMenuFallback';
 import { getMarkdownOpenTarget, getPreferredEditor, setMarkdownOpenTarget, setPreferredEditor } from '../../editorPreferences';
 import { cn } from '../../lib/utils';
 import { getTransport, type PanRpcProtocolClient } from '../../lib/wsTransport';
+import { ensureSyntaxTheme, highlight, syntaxThemeName } from '../../lib/syntaxTheme';
+import { useTheme } from '../../hooks/useTheme';
+import { useColorTheme } from '../../hooks/useColorTheme';
 import type { MarkdownFileLinkMeta } from '../../markdown-links';
 import { useStageDeck } from '../Stage/StageDeckContext';
+import { useCitationTarget } from '../../lib/composerCitations';
 import { usePickerPosition } from './usePickerPosition';
 
 type FileLinkIcon = ComponentType<SVGProps<SVGSVGElement>>;
@@ -73,12 +76,9 @@ const IMAGE_EXTENSIONS = new Set(['avif', 'gif', 'jpeg', 'jpg', 'png', 'svg', 'w
 const ARCHIVE_EXTENSIONS = new Set(['7z', 'gz', 'rar', 'tar', 'tgz', 'zip']);
 const CONFIG_EXTENSIONS = new Set(['env', 'toml', 'yaml', 'yml']);
 
-let sharedQuickviewHighlighterPromise: Promise<unknown> | null = null;
-
 // PAN-3260 — module-level cache for the right-click menu's external-editor
-// list, same pattern as sharedQuickviewHighlighterPromise above. On fetch
-// failure the cache is cleared (so the next open retries) and the menu
-// proceeds with an empty external list rather than blocking.
+// list. On fetch failure the cache is cleared (so the next open retries) and
+// the menu proceeds with an empty external list rather than blocking.
 let sharedAvailableEditorsPromise: Promise<readonly EditorId[]> | null = null;
 
 async function fetchAvailableEditors(): Promise<readonly EditorId[]> {
@@ -95,6 +95,24 @@ async function fetchAvailableEditors(): Promise<readonly EditorId[]> {
   }
 }
 
+// PAN-4762 — module-level cache for the browsers the right-click menu offers,
+// same contract as fetchAvailableEditors: clear on failure, show no browsers.
+let sharedAvailableBrowsersPromise: Promise<readonly BrowserId[]> | null = null;
+
+async function fetchAvailableBrowsers(): Promise<readonly BrowserId[]> {
+  try {
+    if (!sharedAvailableBrowsersPromise) {
+      sharedAvailableBrowsersPromise = getTransport()
+        .request((client) => (client as PanRpcProtocolClient)[WS_METHODS.getAvailableBrowsers]())
+        .then((result) => (result as { browsers: readonly BrowserId[] }).browsers);
+    }
+    return await sharedAvailableBrowsersPromise;
+  } catch {
+    sharedAvailableBrowsersPromise = null;
+    return [];
+  }
+}
+
 function extensionOfPath(path: string): string {
   const basename = path.replace(/\\/g, '/').split('/').at(-1) ?? '';
   const dotIndex = basename.lastIndexOf('.');
@@ -105,6 +123,13 @@ const MARKDOWN_EXTENSIONS = new Set(['md', 'mdx', 'markdown']);
 
 function isMarkdownPath(path: string): boolean {
   return MARKDOWN_EXTENSIONS.has(extensionOfPath(path));
+}
+
+// PAN-4762 — file types a browser can render; only these chips get browser items.
+const BROWSER_EXTENSIONS = new Set(['avif', 'gif', 'htm', 'html', 'jpeg', 'jpg', 'md', 'pdf', 'png', 'svg', 'txt', 'webp', 'xhtml']);
+
+function isBrowserRenderablePath(path: string): boolean {
+  return BROWSER_EXTENSIONS.has(extensionOfPath(path));
 }
 
 export function fileLinkIconForPath(path: string): FileLinkIcon {
@@ -145,17 +170,9 @@ function escapeHtml(value: string): string {
     .replace(/>/g, '&gt;');
 }
 
-async function highlightQuickviewCode(code: string, lang: string): Promise<string> {
+async function highlightQuickviewCode(code: string, lang: string, themeName: string): Promise<string> {
   try {
-    if (!sharedQuickviewHighlighterPromise) {
-      sharedQuickviewHighlighterPromise = import('@pierre/diffs').then((m) =>
-        m.getSharedHighlighter({ themes: ['github-dark' as DiffsThemeNames], langs: [] }),
-      );
-    }
-    const highlighter = await sharedQuickviewHighlighterPromise as {
-      codeToHtml: (code: string, options: { lang: string; theme: string }) => string;
-    };
-    return highlighter.codeToHtml(code, { lang: lang || 'text', theme: 'github-light' });
+    return await highlight(code, lang, themeName);
   } catch {
     return `<pre><code>${escapeHtml(code)}</code></pre>`;
   }
@@ -187,7 +204,9 @@ export const MarkdownFileLink = memo(function MarkdownFileLink({
   const Icon = fileLinkIconForPath(filePath);
   const label = displayLabel({ filePath, targetPath, displayPath, basename, line, column });
   const isMarkdown = isMarkdownPath(filePath);
+  const canOpenInBrowser = isBrowserRenderablePath(filePath);
   const deck = useStageDeck();
+  const citeTarget = useCitationTarget();
   const containerRef = useRef<HTMLSpanElement>(null);
   const requestIdRef = useRef(0);
   const hoveredRef = useRef(false);
@@ -199,6 +218,8 @@ export const MarkdownFileLink = memo(function MarkdownFileLink({
   });
   const previewIssueId = issueId ?? issueIdFromPath(targetPath);
   const previewRelativePath = useMemo(() => relativePathForPreview(displayPath), [displayPath]);
+  const mode = useTheme((s) => s.resolvedTheme);
+  const activeTheme = useColorTheme((s) => s.activeTheme(mode));
 
   const handleOpen = useCallback(() => {
     void resolvePreferredEditor()
@@ -247,6 +268,28 @@ export const MarkdownFileLink = memo(function MarkdownFileLink({
       });
   }, [filePath]);
 
+  // PAN-4762 — opens the file in a browser by its real path (filePath, never
+  // the `:line[:column]`-suffixed targetPath).
+  const openInBrowser = useCallback((browser: BrowserEntry) => {
+    void getTransport()
+      .request((client) => (client as PanRpcProtocolClient)[WS_METHODS.shellOpenInBrowser]({
+        path: filePath,
+        browser: browser.id,
+      }))
+      .then(() => {
+        toast.success(`Opened in ${browser.label}`);
+      })
+      .catch((error) => {
+        toast.error(`Failed to open in browser: ${error instanceof Error ? error.message : String(error)}`);
+      });
+  }, [filePath]);
+
+  const browserMenuItems = useCallback((availableBrowsers: readonly BrowserId[]): ContextMenuFallbackItem[] =>
+    BROWSERS.filter((entry) => availableBrowsers.includes(entry.id)).map((entry) => ({
+      label: `Open in ${entry.label}`,
+      onClick: () => openInBrowser(entry),
+    })), [openInBrowser]);
+
   // PAN-3260 — markdown chips default to the internal editor pane; the
   // persisted overdeck:markdown-open-target preference (set from the
   // right-click menu) can override to a specific external editor. Outside a
@@ -260,14 +303,14 @@ export const MarkdownFileLink = memo(function MarkdownFileLink({
         // real file path — targetPath may carry a trailing `:line[:column]`
         // suffix for external-editor goto syntax, which would make
         // extname() see e.g. ".md:12" and reject the file as unsupported.
-        deck.openOrFocusEditorPane(filePath, basename);
+        deck.openOrFocusEditorPane(filePath, basename, citeTarget);
         return;
       }
       handleOpen();
       return;
     }
     openWithExternalEditor(target);
-  }, [deck, filePath, basename, handleOpen, openWithExternalEditor]);
+  }, [deck, filePath, basename, citeTarget, handleOpen, openWithExternalEditor]);
 
   const closeQuickview = useCallback(() => {
     requestIdRef.current++;
@@ -288,34 +331,38 @@ export const MarkdownFileLink = memo(function MarkdownFileLink({
     setQuickviewState({ status: 'loading' });
     setQuickviewOpen(true);
 
-    void getTransport().request((client) =>
-      (client as PanRpcProtocolClient)[WS_METHODS.readWorkspaceFile]({
-        issueId: activeIssueId,
-        relativePath: previewRelativePath,
-        ...(line ? { line } : {}),
-        contextLines: QUICKVIEW_CONTEXT_LINES,
-      }),
-    )
-      .then((result) => highlightQuickviewCode(
-        (result as WorkspaceFilePreviewResult).text,
-        (result as WorkspaceFilePreviewResult).lang,
-      ).then((html) => ({ html, result: result as WorkspaceFilePreviewResult })))
-      .then(({ html, result }) => {
-        if (requestId !== requestIdRef.current) return;
-        setQuickviewState({
-          status: 'ready',
-          html,
-          truncated: result.truncated,
-          totalLines: result.totalLines,
+    void ensureSyntaxTheme(activeTheme).then(() => {
+      const themeName = syntaxThemeName(activeTheme);
+      return getTransport().request((client) =>
+        (client as PanRpcProtocolClient)[WS_METHODS.readWorkspaceFile]({
+          issueId: activeIssueId,
+          relativePath: previewRelativePath,
+          ...(line ? { line } : {}),
+          contextLines: QUICKVIEW_CONTEXT_LINES,
+        }),
+      )
+        .then((result) => highlightQuickviewCode(
+          (result as WorkspaceFilePreviewResult).text,
+          (result as WorkspaceFilePreviewResult).lang,
+          themeName,
+        ).then((html) => ({ html, result: result as WorkspaceFilePreviewResult })))
+        .then(({ html, result }) => {
+          if (requestId !== requestIdRef.current) return;
+          setQuickviewState({
+            status: 'ready',
+            html,
+            truncated: result.truncated,
+            totalLines: result.totalLines,
+          });
         });
-      })
+    })
       .catch((error) => {
         if (requestId !== requestIdRef.current) return;
         const message = error instanceof Error ? error.message : String(error);
         setQuickviewState({ status: 'error', message });
         toast.error(`Failed to load Quickview: ${message}`);
       });
-  }, [line, previewIssueId, previewRelativePath]);
+  }, [line, previewIssueId, previewRelativePath, activeTheme]);
 
   const copyPath = useCallback((value: string, label: string) => {
     void navigator.clipboard.writeText(value)
@@ -332,7 +379,10 @@ export const MarkdownFileLink = memo(function MarkdownFileLink({
   // any open action persists it as the markdown open target so a later
   // left click reuses the choice.
   const openMarkdownContextMenu = useCallback((x: number, y: number) => {
-    void fetchAvailableEditors().then((availableEditors) => {
+    void Promise.all([
+      fetchAvailableEditors(),
+      canOpenInBrowser ? fetchAvailableBrowsers() : Promise.resolve<readonly BrowserId[]>([]),
+    ]).then(([availableEditors, availableBrowsers]) => {
       const items: ContextMenuFallbackItem[] = [
         {
           label: 'Open in internal editor',
@@ -340,7 +390,7 @@ export const MarkdownFileLink = memo(function MarkdownFileLink({
             setMarkdownOpenTarget('internal');
             // PAN-3260 review fix: use filePath, not targetPath — see the
             // matching note in handleMarkdownClick.
-            if (deck) deck.openOrFocusEditorPane(filePath, basename);
+            if (deck) deck.openOrFocusEditorPane(filePath, basename, citeTarget);
             else handleOpen();
           },
         },
@@ -351,13 +401,14 @@ export const MarkdownFileLink = memo(function MarkdownFileLink({
             openWithExternalEditor(entry.id);
           },
         })),
+        ...browserMenuItems(availableBrowsers),
         { label: 'Open containing folder', onClick: revealInFileManager },
         { label: 'Copy relative path', onClick: () => copyPath(displayPath, 'relative path') },
         { label: 'Copy full path', onClick: () => copyPath(targetPath, 'full path') },
       ];
       showContextMenu({ x, y, items });
     });
-  }, [deck, filePath, targetPath, basename, handleOpen, openWithExternalEditor, revealInFileManager, displayPath, copyPath]);
+  }, [deck, filePath, targetPath, basename, citeTarget, handleOpen, openWithExternalEditor, revealInFileManager, displayPath, copyPath, canOpenInBrowser, browserMenuItems]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -415,16 +466,22 @@ export const MarkdownFileLink = memo(function MarkdownFileLink({
             openMarkdownContextMenu(event.clientX, event.clientY);
             return;
           }
-          showContextMenu({
-            x: event.clientX,
-            y: event.clientY,
+          const { clientX: x, clientY: y } = event;
+          const showGenericMenu = (availableBrowsers: readonly BrowserId[]) => showContextMenu({
+            x,
+            y,
             items: [
               { label: 'Open in editor', onClick: handleOpen },
+              ...browserMenuItems(availableBrowsers),
               { label: 'Open containing folder', onClick: revealInFileManager },
               { label: 'Copy relative path', onClick: () => copyPath(displayPath, 'relative path') },
               { label: 'Copy full path', onClick: () => copyPath(targetPath, 'full path') },
             ],
           });
+          // Only browser-renderable files wait for the browser list; every
+          // other chip keeps the synchronous menu.
+          if (canOpenInBrowser) void fetchAvailableBrowsers().then(showGenericMenu);
+          else showGenericMenu([]);
         }}
       >
         <Icon className={FILE_ICON_CLASS_NAME} aria-hidden="true" data-testid="markdown-file-link-icon" />

@@ -1,0 +1,95 @@
+{
+  "version": "1",
+  "issueId": "PAN-4828",
+  "created": "2026-11-03T04:08:00.094Z",
+  "updated": "2026-11-03T04:35:02.163Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "contract-frames": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4828",
+      "claimedAt": "2026-11-03T04:08:00.094Z",
+      "doneAt": "2026-11-03T04:22:15.195Z"
+    },
+    "push-stub-test": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4828",
+      "claimedAt": "2026-11-03T04:22:22.095Z",
+      "doneAt": "2026-11-03T04:23:33.570Z"
+    },
+    "contract-tests": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4828",
+      "claimedAt": "2026-11-03T04:23:40.862Z",
+      "doneAt": "2026-11-03T04:25:37.478Z"
+    },
+    "typecheck-contracts": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4828",
+      "claimedAt": "2026-11-03T04:25:45.883Z",
+      "doneAt": "2026-11-03T04:27:03.517Z"
+    },
+    "connect-doc-line": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4828",
+      "claimedAt": "2026-11-03T04:27:09.726Z",
+      "doneAt": "2026-11-03T04:27:51.849Z"
+    },
+    "contract-frames.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T04:30:08.435Z"
+    },
+    "contract-frames.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T04:30:40.162Z"
+    },
+    "contract-frames.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T04:31:04.796Z"
+    },
+    "contract-frames.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T04:31:28.183Z"
+    },
+    "push-stub-test.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T04:31:56.453Z"
+    },
+    "push-stub-test.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T04:32:17.225Z"
+    },
+    "contract-tests.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T04:32:39.736Z"
+    },
+    "contract-tests.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T04:33:00.588Z"
+    },
+    "contract-tests.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T04:33:23.817Z"
+    },
+    "typecheck-contracts.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T04:33:51.619Z"
+    },
+    "typecheck-contracts.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T04:34:15.023Z"
+    },
+    "connect-doc-line.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T04:34:39.962Z"
+    },
+    "connect-doc-line.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T04:35:02.163Z"
+    }
+  }
+}

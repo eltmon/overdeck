@@ -36,6 +36,16 @@ describe('agent start route pan start args', () => {
     })).toEqual(['start', 'PAN-1787', '--local', '--model', 'gpt-5.5', '--off-book']);
   });
 
+  // PAN-4683: a consent-bearing spawn whose planning request asked for remote
+  // starts through `pan start --remote`; the default stays --local.
+  it('emits --remote instead of --local for a remote location', () => {
+    expect(buildPanStartArgs({ issueId: 'PAN-4683', location: 'remote' })).toEqual(['start', 'PAN-4683', '--remote']);
+  });
+
+  it('emits --local for an explicit local location', () => {
+    expect(buildPanStartArgs({ issueId: 'PAN-4683', location: 'local' })).toEqual(['start', 'PAN-4683', '--local']);
+  });
+
   // PAN-3857: without an explicit operator-chosen model no --model is emitted,
   // so `pan start` runs tier/role resolution instead of treating a forwarded
   // default as an explicit override (and stamping it as record.workModel).

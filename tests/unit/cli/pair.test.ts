@@ -16,7 +16,7 @@ vi.mock('../../../src/cli/exit.js', () => ({
   exitCli: async (code: number) => { throw new Error(`exit ${code}`); },
 }));
 
-const { runPair } = await import('../../../src/cli/commands/pair.js');
+const { requestPairingLink, runPair } = await import('../../../src/cli/commands/pair.js');
 
 const CREDENTIAL = `odp_${'a'.repeat(64)}`;
 const EXPIRES_AT = '2026-09-29T12:10:00.000Z';
@@ -80,9 +80,32 @@ describe('pan pair (PAN-3762)', () => {
     expect(stderr.join('\n')).toContain('Overdeck dashboard is not running; start it with `pan up`.');
   });
 
-  it('explains pan up on a 401', async () => {
+  it('explains a token mismatch on a 401', async () => {
     answer(401, { error: 'unauthorized' });
     await expect(runPair({})).rejects.toThrow('exit 1');
-    expect(stderr.join('\n')).toContain('`pan pair` needs a dashboard started by `pan up`');
+    const output = stderr.join('\n');
+    expect(output).toContain('The running dashboard holds a different token');
+    expect(output).not.toContain('pan serve');
+  });
+
+  it('requestPairingLink builds the link on the base it is given (PAN-4656)', async () => {
+    answer(200, { credential: CREDENTIAL, expiresAt: EXPIRES_AT });
+    await expect(requestPairingLink({ base: 'http://203.0.113.7:3011' })).resolves.toEqual({
+      ok: true,
+      url: `http://203.0.113.7:3011/#pair=${CREDENTIAL}`,
+      credential: CREDENTIAL,
+      expiresAt: EXPIRES_AT,
+      base: 'http://203.0.113.7:3011',
+    });
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('http://localhost:3011/api/pairing/credentials');
+    expect(stdout).toEqual([]);
+  });
+
+  it('requestPairingLink resolves { ok: false } with the token message on a 401 (PAN-4656)', async () => {
+    answer(401, { error: 'unauthorized' });
+    const result = await requestPairingLink({ base: 'http://203.0.113.7:3011' });
+    expect(result.ok).toBe(false);
+    expect(result.ok ? '' : result.message).toContain('The running dashboard holds a different token');
+    expect(stderr).toEqual([]);
   });
 });

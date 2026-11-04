@@ -1,0 +1,409 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-03T04:02:38Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4828: Phone app: contracts for the directory client role and sealed push frames",
+    "updated": "2026-11-03T04:06:57.462Z"
+  },
+  "plan": {
+    "id": "pan-4828",
+    "title": "Phone app: contracts for the directory client role and sealed push frames",
+    "status": "running",
+    "uid": "77a8b5cd-13f1-437d-ba88-15b0c59c9000",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-03T04:02:38Z",
+    "updated": "2026-11-03T04:06:57.462Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4828",
+        "label": "PAN-4828",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4823",
+        "label": "PAN-4823 (epic, W-CON1)",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4828.md",
+        "label": "PRD",
+        "type": "prd"
+      },
+      {
+        "uri": ".pan/drafts/pan-4823.md",
+        "label": "Epic PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "anywhere",
+      "phone-app",
+      "contracts",
+      "connect",
+      "protocol"
+    ],
+    "narratives": {
+      "Problem": "The phone app epic (PAN-4823) needs shared wire types before the directory (W-CON2, W-CON3), the machine (W-MAC3) and the phone (W-WEB1) can be built in parallel. packages/contracts/src/connect.ts has only machine frames. Adding a push member to MachineToDirectoryFrame also breaks typecheck:connect, because the directory reducer's frame() switch is exhaustive with no default. And contracts test files are not typechecked in CI, so type-level rejection tests would be unenforced.",
+      "Proposal": "Add ClientToDirectoryFrame, DirectoryToClientFrame, the machine push frame and the directory push-result pair to connect.ts, with CLIENT_LIMIT, CLIENT_LIMIT_MESSAGE, PUSH_RATE_PER_MINUTE, PUSH_SEALED_MAX_CHARS, PUSH_PLAINTEXT_MAX_BYTES, close code clientLimit 4013 and error code client_limit. Add an explicit case 'push' stub in services/connect/src/directory-state.ts that answers like today's bad_frame path. Test the reducer stub, round-trip every new frame, prove rejections with @ts-expect-error, add typecheck:contracts to the root typecheck so those rejections are CI-enforced, and add one sentence to docs/CONNECT-SERVICE.md. CONNECT_PROTOCOL_VERSION stays 1. Exact code is in .pan/drafts/PAN-4828.md.",
+      "NonGoals": "- No change to the decoder services/connect/src/protocol.ts (W-CON2 PAN-4829, W-CON3 PAN-4830)\n- No clients table, socket roles or overdeck.bearer subprotocol auth (W-CON2 PAN-4829)\n- No APNs/FCM delivery, push rate limiting or real push handler (W-CON3 PAN-4830)\n- No machine-side push-result handling or native push provider (W-MAC3 PAN-4843)\n- No phone-side directory client (W-WEB1 PAN-4833)\n- No push-activity frame or liveActivityToken (W-IOS2 PAN-4839)\n- No runtime validators, Effect Schema or runtime imports in connect.ts (it must stay runtime-import-free)\n- No change to the shape of any existing frame and no change to CONNECT_PROTOCOL_VERSION\n- No docs beyond the one CONNECT-SERVICE.md paragraph and the connect.ts header (W-DOC PAN-4842)\n- Never commit packages/contracts/dist/"
+    },
+    "autoDecisions": [
+      {
+        "summary": "push joins MachineToDirectoryFrame now, with an explicit case 'push' stub in directory-state.ts frame() that answers error bad_frame 'malformed frame' plus a log effect (no default branch).",
+        "rationale": "The machine's directory port sends MachineToDirectoryFrame, so push must be in that union for W-MAC3; frame() has no default, so typecheck:connect fails (TS2366) without a case. The stub mirrors today's runtime answer for an undecodable frame from a registered machine."
+      },
+      {
+        "summary": "push-result is typed as a discriminated pair { ok: true } | { ok: false; error: PushResultError } instead of the epic's { ok: boolean; error? }.",
+        "rationale": "Same JSON on the wire; the type additionally rejects ok:false without an error and ok:true with one (verified with tsc 5.9.3)."
+      },
+      {
+        "summary": "PUSH_SEALED_MAX_CHARS stays 3,072 (epic W-CON1) and a new PUSH_PLAINTEXT_MAX_BYTES = 2,256 is exported; the epic NFR-5 trim of 2,900 bytes is superseded for W-MAC3.",
+        "rationale": "2,900 bytes seal to 3,932 base64 chars (over the cap) and an APNs body of 4,091 of 4,096 bytes; 2,256 bytes seal to exactly 3,072 chars with ~860 bytes of headroom. Recorded as a hazard and posted on PAN-4843."
+      },
+      {
+        "summary": "CONNECT_CLOSE_CODES.clientLimit = 4013 and ConnectErrorCode 'client_limit' land here, not in W-CON2.",
+        "rationale": "Zero-runtime contract additions next to CLIENT_LIMIT_MESSAGE; W-CON2 then never edits CONNECT_CLOSE_CODES or its exact-match test on a sibling branch."
+      },
+      {
+        "summary": "Client signal.purpose is the literal 'link'; client ice-servers and relay-usage reuse the machine members via Extract.",
+        "rationale": "The epic says a client's purpose must be link and that ice-servers/relay-usage follow the machine rules unchanged; literal and Extract typing encode both and cannot drift."
+      },
+      {
+        "summary": "Add typecheck:contracts (tsc -p packages/contracts/tsconfig.json) to the root typecheck chain.",
+        "rationale": "Root tsc excludes *.test.ts and packages/, and the effect-diagnostics lint counts only effect() rows, so @ts-expect-error rejection tests are unenforced in CI today. The contracts tsconfig passes today in about 10 s."
+      },
+      {
+        "summary": "Documentation is one paragraph in docs/CONNECT-SERVICE.md plus the connect.ts module header.",
+        "rationale": "W-DOC (PAN-4842) rewrites CONNECT-SERVICE.md for the client role and push; a larger edit here would only conflict."
+      },
+      {
+        "summary": "The PAN-4774 sequencing gate is treated as satisfied.",
+        "rationale": "gh issue view 4774 reports state CLOSED on 2026-11-02."
+      }
+    ],
+    "items": [
+      {
+        "id": "contract-frames",
+        "title": "Add client and push frame types, constants and the directory push stub",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T04:02:38Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4828",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "push-stub-test",
+            "contract-tests",
+            "connect-doc-line"
+          ],
+          "files_scope": [
+            "packages/contracts/src/connect.ts",
+            "services/connect/src/directory-state.ts",
+            "packages/contracts/src/__tests__/connect.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:connect",
+            "npx tsc --noEmit -p packages/contracts/tsconfig.json",
+            "npx vitest run packages/contracts/src/__tests__/connect.test.ts tests/unit/services/connect/directory-state.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "typecheck:connect completes without errors (no TS2366 in directory-state.ts)",
+            "contracts tsc completes without errors",
+            "connect.test.ts and directory-state.test.ts pass, including the close-codes test with clientLimit 4013",
+            "root typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-4828.md work item W-1 steps 1-11 exactly. In packages/contracts/src/connect.ts: extend the module header; add CLIENT_LIMIT = 5, PUSH_RATE_PER_MINUTE = 30, PUSH_SEALED_MAX_CHARS = 3_072, PUSH_PLAINTEXT_MAX_BYTES = 2_256 after APPROVAL_TTL_MS; add CLIENT_LIMIT_MESSAGE = \"This account already has 5 phones. Remove one in the app or on a machine.\" after RELAY_CAP_MESSAGE; add clientLimit: 4013 to CONNECT_CLOSE_CODES and \"client_limit\" to ConnectErrorCode; add types ClientPlatform, ApsEnvironment, PushUrgency, PushResultError after SignalPurpose; add the push member to MachineToDirectoryFrame after inbox-nack; add the two push-result members to DirectoryToMachineFrame before error; append ClientToDirectoryFrame (hello-client, signal with purpose literal \"link\", Extract of machine ice-servers|relay-usage, push-register, push-unregister, forget-client) and DirectoryToClientFrame (welcome-client | Extract<DirectoryToMachineFrame, directory|signal|ice-servers|relay-status|error>). Only `import type` is allowed in connect.ts. In services/connect/src/directory-state.ts frame(): add `case 'push':` after the approval-cancel block returning { state, effects: [send self errorFrame('bad_frame', 'malformed frame'), log { type: f.type, environmentId: self, outcome: 'bad_frame' }] } with the PAN-4830 comment; never add a default branch. In packages/contracts/src/__tests__/connect.test.ts update only the close-codes expectation to include clientLimit: 4013."
+        },
+        "items": [
+          {
+            "id": "contract-frames.ac1",
+            "title": "Given connect.ts, ClientToDirectoryFrame accepts exactly the seven types hello-client, signal, ice-servers, relay-usage, push-register, push-unregister, forget-client, and DirectoryToClientFrame accepts welcome-client plus directory, signal, ice-servers, relay-status and error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contract-frames.ac2",
+            "title": "MachineToDirectoryFrame includes push { requestId, to, sealed, urgency, collapseId }, DirectoryToMachineFrame includes push-result as { ok: true } or { ok: false; error }, and CONNECT_PROTOCOL_VERSION still returns 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contract-frames.ac3",
+            "title": "connect.ts exports CLIENT_LIMIT 5, PUSH_RATE_PER_MINUTE 30, PUSH_SEALED_MAX_CHARS 3072, PUSH_PLAINTEXT_MAX_BYTES 2256, the exact CLIENT_LIMIT_MESSAGE text, CONNECT_CLOSE_CODES.clientLimit 4013 and ConnectErrorCode 'client_limit', and contains no runtime import",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contract-frames.ac4",
+            "title": "When npm run typecheck:connect runs, it exits 0, and frame() in directory-state.ts has an explicit case 'push' and no default branch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "push-stub-test",
+        "title": "Test that the directory still refuses push frames before PAN-4830",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T04:02:38Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4828",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/services/connect/directory-state.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/services/connect/directory-state.test.ts"
+          ],
+          "expected_outputs": [
+            "directory-state.test.ts passes, including the two new 'push before PAN-4830' tests"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W-2. In tests/unit/services/connect/directory-state.test.ts add describe('directory reducer: push before PAN-4830 (PAN-4828)') with two tests using the file's existing register, sends, closes, env and NOW helpers. Test 1: state = register(1); reduce(state, { kind: 'frame', registeredAs: env(1), frame: { type: 'push', requestId: '0'.repeat(32), to: '00000000-0000-4000-8000-0000000000aa', sealed: 'AAAA', urgency: 'high', collapseId: '1'.repeat(32) } }, { now: NOW, online: new Set(), stunUrls: [], relayCapBytes: RELAY_MONTHLY_CAP_BYTES, turnConfigured: false }); expect result.state toBe state, sends equal one error bad_frame 'malformed frame' to self, closes equal [], and a log effect { kind: 'log', type: 'push', environmentId: env(1), outcome: 'bad_frame' }. Test 2: decodeMachineFrame(JSON.stringify(a push frame)) toEqual { ok: false, reason: 'bad_frame' }. No timers are involved."
+        },
+        "items": [
+          {
+            "id": "push-stub-test.ac1",
+            "title": "Given a directory with one registered machine, when the reducer receives a push frame event from it, then it emits error bad_frame 'malformed frame' to self, a log with outcome bad_frame, no close, and returns the same state object",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "push-stub-test.ac2",
+            "title": "Given the JSON text of a push frame, decodeMachineFrame returns { ok: false, reason: 'bad_frame' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "contract-tests",
+        "title": "Round-trip and type-level rejection tests for the new frames",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T04:02:38Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4828",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/__tests__/connect.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run packages/contracts/src/__tests__/connect.test.ts",
+            "npx tsc --noEmit -p packages/contracts/tsconfig.json"
+          ],
+          "expected_outputs": [
+            "connect.test.ts passes, including the 'phone client and push frames (PAN-4828)' describe block",
+            "contracts tsc completes without errors and reports no TS2578 unused @ts-expect-error directive"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W-3. In packages/contracts/src/__tests__/connect.test.ts: assert CLIENT_LIMIT_MESSAGE text; assert CLIENT_LIMIT 5, PUSH_RATE_PER_MINUTE 30, PUSH_SEALED_MAX_CHARS 3072, PUSH_PLAINTEXT_MAX_BYTES 2256 and 4 * Math.ceil((PUSH_PLAINTEXT_MAX_BYTES + 48) / 3) === PUSH_SEALED_MAX_CHARS. Add describe('phone client and push frames (PAN-4828)') with typed fixtures (one of each of the seven ClientToDirectoryFrame types; a welcome-client and a directory DirectoryToClientFrame; a push MachineToDirectoryFrame; push-result ok:true and ok:false error 'rate_limited'); a test that the sorted client types equal the seven names; a JSON round-trip test over every fixture; a compile-time rejection test with seven single-line declarations each preceded by // @ts-expect-error (hello-client platform 'web'; hello-client without clientId; client signal purpose 'approval'; push urgency 'low'; push-result ok:false without error; push-result ok:true with error; DirectoryToClientFrame of approval-cancel) collected into an array asserted toHaveLength(7); and an assignability test from Extract<DirectoryToMachineFrame, { type: 'directory' }> to DirectoryToClientFrame. Keep each rejected object literal on one line so the directive covers the error line."
+        },
+        "items": [
+          {
+            "id": "contract-tests.ac1",
+            "title": "When vitest runs connect.test.ts, every new frame fixture survives JSON.parse(JSON.stringify(frame)) unchanged and the client fixtures cover exactly the seven client frame types",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contract-tests.ac2",
+            "title": "When npx tsc --noEmit -p packages/contracts/tsconfig.json runs, it exits 0 with seven @ts-expect-error rejection cases in connect.test.ts, so each listed malformed frame is rejected by the types",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contract-tests.ac3",
+            "title": "When vitest runs the constants tests, they pass and assert CLIENT_LIMIT returns 5, PUSH_RATE_PER_MINUTE 30, PUSH_SEALED_MAX_CHARS 3072, PUSH_PLAINTEXT_MAX_BYTES 2256, the base64 derivation equality and CONNECT_PROTOCOL_VERSION 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "typecheck-contracts",
+        "title": "Run the contracts tsconfig in the root typecheck",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T04:02:38Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "infra",
+          "issueLabel": "pan-4828",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "package.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:contracts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "typecheck:contracts completes without errors",
+            "root typecheck completes without errors and its output includes the typecheck:contracts step"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W-4. In package.json add \"typecheck:contracts\": \"tsc --noEmit -p packages/contracts/tsconfig.json\" next to typecheck:connect, and append \" && npm run typecheck:contracts\" to the end of the \"typecheck\" script after npm run typecheck:connect. Change nothing else in package.json."
+        },
+        "items": [
+          {
+            "id": "typecheck-contracts.ac1",
+            "title": "When npm run typecheck runs, it executes typecheck:contracts (tsc --noEmit -p packages/contracts/tsconfig.json) after typecheck:connect and exits 0 on the clean branch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "typecheck-contracts.ac2",
+            "title": "Given a type error in a file under packages/contracts/src/__tests__/, npm run typecheck exits non-zero; on the clean branch it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "connect-doc-line",
+        "title": "Document the new frames in docs/CONNECT-SERVICE.md",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-11-03T04:02:38Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4828",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/CONNECT-SERVICE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c ClientToDirectoryFrame docs/CONNECT-SERVICE.md",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "grep prints 1",
+            "lint:docs completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W-5. In docs/CONNECT-SERVICE.md, directly after the paragraph starting 'The wire protocol is `packages/contracts/src/connect.ts`' (line 24), add the paragraph quoted in the PRD: connect.ts also carries the phone app's frames (PAN-4823): ClientToDirectoryFrame, DirectoryToClientFrame, the machine's push and the directory's push-result, with CLIENT_LIMIT, PUSH_RATE_PER_MINUTE and PUSH_SEALED_MAX_CHARS; the service does not serve them yet: the decoder refuses each one as bad_frame until the client role (PAN-4829) and push delivery (PAN-4830) land. Edit nothing else in the file; W-DOC (PAN-4842) owns the full rewrite."
+        },
+        "items": [
+          {
+            "id": "connect-doc-line.ac1",
+            "title": "docs/CONNECT-SERVICE.md names ClientToDirectoryFrame, DirectoryToClientFrame, push and push-result directly after the wire-protocol paragraph and states the decoder refuses them as bad_frame until PAN-4829 and PAN-4830 land",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "connect-doc-line.ac2",
+            "title": "When npm run lint:docs runs, it exits 0, and git diff shows no other change to docs/CONNECT-SERVICE.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "contract-frames",
+        "to": "push-stub-test",
+        "type": "blocks"
+      },
+      {
+        "from": "contract-frames",
+        "to": "contract-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "contract-frames",
+        "to": "connect-doc-line",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-03-PAN-4828-phone-app-contracts-for-the-directory-client-role-and-sealed-push-frames.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}

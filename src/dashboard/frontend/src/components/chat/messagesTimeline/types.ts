@@ -61,6 +61,8 @@ export interface MessagesTimelineProps {
   onTargetMessageHandled?: () => void;
   /** PAN-4498 — main conversation timeline only: role icons bookmark messages. */
   bookmarksEnabled?: boolean;
+  /** PAN-4642 — main timeline only: selected message text can be cited into the composer. */
+  citationsEnabled?: boolean;
   /** PAN-4558 — older history state: more rows exist before the first loaded row. */
   history?: { hasOlder: boolean; loadingOlder: boolean; loadedOlder?: boolean };
   /** PAN-4558 — load the next older page (scroll near the top). */

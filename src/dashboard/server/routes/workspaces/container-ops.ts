@@ -20,18 +20,26 @@ import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { buildChildEnvWithoutTmux } from '../../../../lib/child-env.js';
+import { reserveDiskFloor } from '../../../../lib/disk-floor.js';
 import { extractPrefix, parseIssueId } from '../../../../lib/issue-id.js';
 import { generateDailySummary } from '../../../../lib/memory/cli.js';
 import {
   extractTeamPrefix,
   findProjectByTeam,
+  getProjectSync,
   listProjectsSync,
+  resolveProjectFromIssueSync,
 } from '../../../../lib/projects.js';
 import {
   DatabaseProvisionerError,
   getDatabaseProvisioner,
 } from '../../../../lib/db-provisioners/index.js';
 import { DEVCONTAINER_DIRNAME } from '../../../../lib/workspace/devcontainer-renderer.js';
+import {
+  estimateWorkspaceDiskCost,
+  invalidateWorkspaceDiskCostMemo,
+  SEED_STACK_DISK_COST_BYTES,
+} from '../../../../lib/workspace/disk-cost.js';
 import type { DatabaseConfig } from '../../../../lib/workspace-config.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { httpHandler } from '../http-handler.js';
@@ -101,6 +109,27 @@ const postWorkspaceContainerizeRoute = HttpRouter.add(
       );
     }
 
+    // PAN-4961: this door creates a whole workspace and its stack. It always
+    // starts containers (./dev all), even when the project config has no
+    // compose_template, so the stack cost is at least the seed.
+    const resolved = resolveProjectFromIssueSync(issueId);
+    const projectConfig = (resolved ? getProjectSync(resolved.projectKey) : null) ?? { path: projectPath };
+    const cost = yield* Effect.promise(() => estimateWorkspaceDiskCost(projectConfig));
+    const admission = yield* Effect.promise(() => reserveDiskFloor({
+      path: projectPath,
+      bytes: cost.hostBytes + Math.max(cost.stackBytes, SEED_STACK_DISK_COST_BYTES),
+      label: `containerize:${issueLower}`,
+    }));
+    if (!admission.ok) {
+      return jsonResponse({ success: false, blocked: true, diskLow: true, error: admission.error }, { status: 507 });
+    }
+    let diskReleased = false;
+    const releaseDisk = () => {
+      if (diskReleased) return;
+      diskReleased = true;
+      void admission.reservation.release().then(() => invalidateWorkspaceDiskCostMemo(projectConfig.path));
+    };
+
     const featureName = issueLower;
     const activityId = Date.now().toString();
 
@@ -164,19 +193,23 @@ const postWorkspaceContainerizeRoute = HttpRouter.add(
             `[${new Date().toISOString()}] ./dev all exited with code ${devCode}`
           );
           updateActivity(activityId, { status: devCode === 0 ? 'completed' : 'failed' });
+          releaseDisk();
         });
         devUp.on('error', (err) => {
           appendActivityOutput(activityId, `[error] ${err.message}`);
           updateActivity(activityId, { status: 'failed' });
+          releaseDisk();
         });
       } else {
         updateActivity(activityId, { status: 'failed' });
+        releaseDisk();
       }
     });
 
     child.on('error', (err) => {
       appendActivityOutput(activityId, `[error] ${err.message}`);
       updateActivity(activityId, { status: 'failed' });
+      releaseDisk();
     });
 
     return jsonResponse({

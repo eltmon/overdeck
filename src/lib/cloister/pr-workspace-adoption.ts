@@ -20,7 +20,12 @@
  * The journal records only what happened inside a workspace: success appends
  * `workspace.adopted`; a failure that left a workspace behind appends
  * `workspace.adoption-failed` with the fix. A refusal with no workspace cannot
- * be journaled; the derived `pr-outside-pipeline` attention surfaces it.
+ * be journaled; the derived `pr-outside-pipeline` attention surfaces it, and
+ * `pr-adoption-review.ts` comments it on the PR (PAN-4785).
+ *
+ * PAN-4785: the checks that need no network (`preflightPrAdoption`) run first,
+ * both here and synchronously in `pan review request`, so a request that
+ * adoption would refuse is answered with the refusal instead of "queued".
  */
 import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
@@ -47,6 +52,9 @@ export type AdoptionRefusal =
   | 'not-feature-branch' | 'head-unknown' | 'no-project' | 'polyrepo'
   | 'fetch-failed' | 'head-moved' | 'checked-out-elsewhere'
   | 'local-branch-diverged' | 'create-failed' | 'workspace-head-mismatch';
+
+/** An adoption refusal, as {@link adoptPrWorkspace} and {@link preflightPrAdoption} answer it. */
+export type AdoptionRefusalOutcome = Extract<AdoptionOutcome, { adopted: false }>;
 
 export type AdoptionOutcome =
   | { readonly adopted: true; readonly workspacePath: string }
@@ -139,6 +147,68 @@ function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
+function refusalFor(
+  pr: AdoptablePr,
+  projectPath: string,
+  reason: AdoptionRefusal,
+  detail: string,
+  extra: Omit<AdoptionFixContext, 'issueId' | 'prNumber' | 'projectPath'> = {},
+): AdoptionRefusalOutcome {
+  const issueId = pr.issueId.toUpperCase();
+  const fix = adoptionRefusalFix(reason, {
+    issueId, prNumber: pr.number, projectPath, headRef: pr.headRef, ...(pr.headSha ? { headSha: pr.headSha } : {}), detail, ...extra,
+  });
+  return {
+    adopted: false, reason, detail, fix,
+    ...(extra.worktreePath ? { worktreePath: extra.worktreePath } : {}),
+    ...(extra.workspacePath ? { workspacePath: extra.workspacePath } : {}),
+  };
+}
+
+export type AdoptionPreflight =
+  | {
+    readonly ok: true;
+    readonly headSha: string;
+    readonly project: { projectPath: string; projectName: string; polyrepo: boolean };
+    readonly canonical: string;
+  }
+  | { readonly ok: false; readonly refusal: AdoptionRefusalOutcome };
+
+/**
+ * PAN-4785: the adoption checks that need no network: the pipeline branch, a
+ * known head, an owning non-polyrepo project, and the branch not checked out
+ * in another worktree. Cheap enough to run inside `POST /api/review/:id/request`
+ * before it answers. `adoptPrWorkspace` runs it first, so the two never drift.
+ * Only `git worktree prune` and `git worktree list` run.
+ */
+export async function preflightPrAdoption(
+  pr: AdoptablePr,
+  deps: Partial<Pick<AdoptionDeps, 'git' | 'resolveProject'>> = {},
+): Promise<AdoptionPreflight> {
+  const git = deps.git ?? defaultGit;
+  const resolveProject = deps.resolveProject ?? defaultResolveProject;
+  const issueId = pr.issueId.toUpperCase();
+  const branch = pipelineBranchFor(issueId);
+  const refuse = (projectPath: string, ...args: [AdoptionRefusal, string, Omit<AdoptionFixContext, 'issueId' | 'prNumber' | 'projectPath'>?]) =>
+    ({ ok: false as const, refusal: refusalFor(pr, projectPath, ...args) });
+
+  if (pr.headRef !== branch) return refuse('', 'not-feature-branch', `PR #${pr.number} is on ${pr.headRef}, not ${branch}`);
+  const headSha = pr.headSha;
+  if (!headSha) return refuse('', 'head-unknown', `PR #${pr.number} has no head commit in the payload`);
+
+  const project = resolveProject(issueId);
+  if (!project) return refuse('', 'no-project', `no project owns ${issueId}`);
+  const { projectPath } = project;
+  if (project.polyrepo) return refuse(projectPath, 'polyrepo', `${project.projectName} is a polyrepo project`);
+
+  const canonical = join(projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
+  await git(['worktree', 'prune'], projectPath);
+  const worktreePath = findBranchWorktree(await git(['worktree', 'list', '--porcelain'], projectPath), branch, canonical);
+  if (worktreePath) return refuse(projectPath, 'checked-out-elsewhere', `${branch} is checked out in ${worktreePath}`, { worktreePath });
+
+  return { ok: true, headSha, project, canonical };
+}
+
 /**
  * Create the pipeline workspace on an outside PR's head, or refuse with a fix.
  * Never throws for an expected refusal; an unexpected git error rejects.
@@ -149,24 +219,17 @@ export async function adoptPrWorkspace(pr: AdoptablePr, deps: Partial<AdoptionDe
   const resolveProject = deps.resolveProject ?? defaultResolveProject;
 
   const issueId = pr.issueId.toUpperCase();
-  const lower = issueId.toLowerCase();
   const branch = pipelineBranchFor(issueId);
 
-  let projectPath = '';
+  const preflight = await preflightPrAdoption(pr, { git, resolveProject });
+  if (!preflight.ok) return preflight.refusal;
+  const { headSha, project, canonical } = preflight;
+  const projectPath = project.projectPath;
   const refuse = (
     reason: AdoptionRefusal,
     detail: string,
     extra: Omit<AdoptionFixContext, 'issueId' | 'prNumber' | 'projectPath'> = {},
-  ): AdoptionOutcome => {
-    const fix = adoptionRefusalFix(reason, {
-      issueId, prNumber: pr.number, projectPath, headRef: pr.headRef, ...(pr.headSha ? { headSha: pr.headSha } : {}), detail, ...extra,
-    });
-    return {
-      adopted: false, reason, detail, fix,
-      ...(extra.worktreePath ? { worktreePath: extra.worktreePath } : {}),
-      ...(extra.workspacePath ? { workspacePath: extra.workspacePath } : {}),
-    };
-  };
+  ): AdoptionOutcome => refusalFor(pr, projectPath, reason, detail, extra);
   const journalFailure = (workspacePath: string, outcome: AdoptionOutcome): AdoptionOutcome => {
     if (!outcome.adopted) {
       appendPipelineEntry(workspacePath, {
@@ -179,17 +242,6 @@ export async function adoptPrWorkspace(pr: AdoptablePr, deps: Partial<AdoptionDe
     return outcome;
   };
 
-  if (pr.headRef !== branch) return refuse('not-feature-branch', `PR #${pr.number} is on ${pr.headRef}, not ${branch}`);
-  const headSha = pr.headSha;
-  if (!headSha) return refuse('head-unknown', `PR #${pr.number} has no head commit in the payload`);
-
-  const project = resolveProject(issueId);
-  if (!project) return refuse('no-project', `no project owns ${issueId}`);
-  projectPath = project.projectPath;
-  if (project.polyrepo) return refuse('polyrepo', `${project.projectName} is a polyrepo project`);
-
-  const canonical = join(projectPath, 'workspaces', `feature-${lower}`);
-
   try {
     await git(['fetch', 'origin', `+refs/heads/${branch}:refs/remotes/origin/${branch}`], projectPath);
   } catch (err) {
@@ -198,10 +250,6 @@ export async function adoptPrWorkspace(pr: AdoptablePr, deps: Partial<AdoptionDe
 
   const remote = await git(['rev-parse', `refs/remotes/origin/${branch}`], projectPath);
   if (remote !== headSha) return refuse('head-moved', `origin/${branch} is at ${remote}, PR #${pr.number} reports ${headSha}`);
-
-  await git(['worktree', 'prune'], projectPath);
-  const worktreePath = findBranchWorktree(await git(['worktree', 'list', '--porcelain'], projectPath), branch, canonical);
-  if (worktreePath) return refuse('checked-out-elsewhere', `${branch} is checked out in ${worktreePath}`, { worktreePath });
 
   const localSha = await git(['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`], projectPath).catch(() => null);
   if (!localSha) {

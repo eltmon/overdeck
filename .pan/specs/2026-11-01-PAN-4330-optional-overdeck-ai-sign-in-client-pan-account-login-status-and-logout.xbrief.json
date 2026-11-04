@@ -1,0 +1,825 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-01T05:30:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4330: Optional overdeck.ai sign-in client: pan account login, status and logout",
+    "updated": "2026-11-01T04:59:16.008Z"
+  },
+  "plan": {
+    "id": "pan-4330",
+    "title": "Optional overdeck.ai sign-in client: pan account login, status and logout",
+    "status": "running",
+    "uid": "9e7d0de4-261a-4452-b676-adc2fa1e03a8",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-01T05:30:00Z",
+    "updated": "2026-11-01T04:59:16.008Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4330",
+        "label": "PAN-4330",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4330.md",
+        "label": "PRD PAN-4330",
+        "type": "prd"
+      },
+      {
+        "uri": ".pan/drafts/pan-2350.md",
+        "label": "Parent PRD (Overdeck Anywhere rev 5, W-LINK4)",
+        "type": "prd"
+      },
+      {
+        "uri": "docs/ACCOUNT-SERVICE.md",
+        "label": "Account service docs",
+        "type": "doc"
+      }
+    ],
+    "tags": [
+      "anywhere",
+      "account",
+      "cli",
+      "device-flow",
+      "services-account"
+    ],
+    "metadata": {
+      "sizeJustification": "The real code surface is four areas (services/account, src/lib/account, src/cli/commands/account, their tests) and 24 files. The subsystem count reaches 9 only because the lint treats each root-level doc file (docs.json, anywhere.mdx, cli/account.mdx, docs/ACCOUNT-SERVICE.md) and the operator hand-off fallback draft as its own subsystem. The three verbs share one token store and one client, so splitting them into sibling issues would ship a verb group missing login or logout.",
+      "canonicalFilename": "2026-11-01-PAN-4330-optional-overdeck-ai-sign-in-client-pan-account-login-status-and-logout.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "PAN-4293 built the overdeck.ai account service (services/account) but no machine can sign in to it, it is not deployed, and AccountRpc.verifyDevice does not return the GitHub login that the directory (PAN-2356) and Shared Sessions need. There is no pan account verb.",
+      "Proposal": "Add githubLogin to the ok branch of AccountRpc.verifyDevice. Build a light client under src/lib/account (token store at ${OVERDECK_HOME}/account.json, 0600, atomic; RFC 8628 device-flow client honoring slow_down and 429) and three light CLI verbs pan account login|status|logout registered as an on-demand command group. Document them in cli/account.mdx and docs/ACCOUNT-SERVICE.md. Hand the deploy (OAuth app, D1, DNS, wrangler deploy) to the operator through a checklist comment on PAN-4330 after proving the Worker bundle builds. Full detail, decisions D-1..D-14 and exact strings live in .pan/drafts/PAN-4330.md.",
+      "NonGoals": "- Deploying services/account, creating the GitHub OAuth app, the D1 database or DNS (operator-only; agents run only wrangler dev --local, local migrations and deploy --dry-run)\n- The PKCE loopback flow, any /api/account/* dashboard route, Settings → Anywhere account panel, the first-run 'Continue from another machine' card\n- pan account devices / revoke, pan vault setup --hosted, the hosted vault (PAN-4297), billing (PAN-4294)\n- Directory registration (W-LINK5, PAN-2356) or any other reader of the token file\n- Any change under services/share/ (githubLogin stays optional there on purpose)\n- Any change to the /oauth/token response shape\n- Browser auto-open, a pan-account wrapper skill, telemetry changes\n- Printing, logging or returning the device token in any output, including --json"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Scope is W-LINK4 only (githubLogin, pan account login|status|logout, operator deploy hand-off); the old body's PKCE dashboard flow, Settings → Anywhere, first-run card, devices/revoke and vault --hosted are non-goals.",
+        "rationale": "The rewritten issue body says it owns W-LINK4 and marks the old body 'kept for history'; the 2026-09-30 comment about the first-run card predates the revision-5 rewrite, so this is supersession, not a contradiction."
+      },
+      {
+        "summary": "Device flow is the only login flow; no --device-code flag.",
+        "rationale": "The parent PRD's W-LINK4 names the device flow; PKCE needs a dashboard callback route, which is out of scope."
+      },
+      {
+        "summary": "Base URL precedence for login: --base-url, then OVERDECK_ACCOUNT_URL, then https://account.overdeck.ai; https required except loopback http; status and logout use the base URL stored in the token file.",
+        "rationale": "Lets agents and the operator test against wrangler dev --local, while a token is always used against the service that issued it."
+      },
+      {
+        "summary": "Login calls GET /v1/me after the token arrives and caches githubLogin and githubId in account.json.",
+        "rationale": "The /oauth/token response carries no login (device-flow.ts exchangeDeviceCode), and the done-when requires showing the GitHub login."
+      },
+      {
+        "summary": "pan account status exits 0 when not signed in; exits 1 on an invalid token or an unreachable service.",
+        "rationale": "Sign-in is optional (parent NFR-8), matching pan vault status when the vault is off; real failures still exit non-zero for scripts."
+      },
+      {
+        "summary": "Logout deletes the local token file even when the server revoke fails, and then exits 1 with a warning.",
+        "rationale": "The user asked to sign out; keeping a token they meant to drop is worse than an unrevoked server row they can revoke from another machine."
+      },
+      {
+        "summary": "Documentation is a new cli/account.mdx plus edits to docs.json, docs/ACCOUNT-SERVICE.md and anywhere.mdx, despite the issue's 'Docs: None'.",
+        "rationale": "A new CLI verb and a changed RPC contract are documented surfaces; the finalize docs gate requires a docs item."
+      },
+      {
+        "summary": "The import-graph guard extends ENTRY_DIRS in the existing tests/unit/lib/vault/import-graph.test.ts instead of adding a new test file.",
+        "rationale": "A new walker file with readFileSync fails lint:source-introspection, and importing a .test.ts re-registers its suites."
+      }
+    ],
+    "items": [
+      {
+        "id": "verify-github-login",
+        "title": "Return githubLogin from AccountRpc.verifyDevice",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T05:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4330",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "services/account/src/contract.ts",
+            "services/account/src/devices.ts",
+            "tests/unit/services/account/devices.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:account",
+            "npx vitest run tests/unit/services/account/"
+          ],
+          "expected_outputs": [
+            "typecheck:account completes without errors",
+            "tests/unit/services/account/devices.test.ts passes including the githubLogin assertions"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-1. In services/account/src/contract.ts add `githubLogin: string` to the ok:true branch of VerifyResult (after githubId). In services/account/src/devices.ts verifyDeviceToken, destructure githubLogin from found.auth and include it in the returned object. In tests/unit/services/account/devices.test.ts update the toEqual at the 'ok: true carries the grant's storage cap' test to include githubLogin: 'user100' (seedUser sets github_login to `user${githubId}`), and add a test that updates users.github_login and asserts verifyDeviceToken returns the new login. Do not touch services/share/."
+        },
+        "items": [
+          {
+            "id": "verify-github-login.ac1",
+            "title": "Given a seeded user with github id 100, verifyDeviceToken returns { ok: true, userId, githubId: 100, githubLogin: 'user100', deviceId, entitlement }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verify-github-login.ac2",
+            "title": "When the users row's github_login changes to a new value, the next verifyDeviceToken call returns the new login",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verify-github-login.ac3",
+            "title": "npm run typecheck:account exits 0 and git diff main -- services/share shows no changes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "account-token-store",
+        "title": "Token store at ${OVERDECK_HOME}/account.json (src/lib/account/store.ts)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T05:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4330",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "account-login",
+            "account-status",
+            "account-logout"
+          ],
+          "files_scope": [
+            "src/lib/account/store.ts",
+            "tests/unit/lib/account/store.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/account/store.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "tests/unit/lib/account/store.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-2 and D-6. Create src/lib/account/store.ts exporting ACCOUNT_FILENAME, AccountRecord ({ v: 1, baseUrl, accessToken, deviceId, label, githubLogin: string|null, githubId: number|null, signedInAt }), accountPath(), readAccount() (null on ENOENT, throws 'Cannot read <path>: <reason>. Delete it to sign out locally.' on unreadable/non-JSON/wrong shape; accessToken must match /^odd_[0-9a-f]{64}$/), writeAccount(record) (mkdir -p OVERDECK_HOME, write a temp file with a randomUUID suffix in the same directory with mode 0o600, then rename), removeAccount() (true if removed, false on ENOENT). Imports only node:* and ../paths.js; the module header states that rule (copy the wording style of src/lib/environment-identity.ts). Tests use a temp OVERDECK_HOME per test; the file-mode assertion branches on process.platform (no skipIf)."
+        },
+        "items": [
+          {
+            "id": "account-token-store.ac1",
+            "title": "writeAccount then readAccount returns an identical record, and on POSIX the file mode is 0o600",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-token-store.ac2",
+            "title": "Given account.json contains invalid JSON or a token not matching odd_ + 64 hex, readAccount throws an Error whose message contains the file path and 'Delete it to sign out locally'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-token-store.ac3",
+            "title": "After writeAccount the directory contains no leftover temp file, and removeAccount returns false when no file exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "account-client",
+        "title": "Account service HTTP client with RFC 8628 polling (src/lib/account/client.ts)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T05:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4330",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "account-login",
+            "account-status",
+            "account-logout"
+          ],
+          "files_scope": [
+            "src/lib/account/client.ts",
+            "tests/unit/lib/account/client.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/account/client.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "tests/unit/lib/account/client.test.ts passes under fake timers"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "NFR-4",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-3 with D-2, D-3, D-5. Create src/lib/account/client.ts exporting DEFAULT_ACCOUNT_BASE_URL ('https://account.overdeck.ai'), resolveBaseUrl(flag, env) (precedence flag > OVERDECK_ACCOUNT_URL > default; https only, http only for 127.0.0.1/localhost/[::1]; no path other than '/', no query, no fragment; else throw AccountClientError('Invalid account service URL: <url>')), platformString(platform, arch) (null unless it matches ^(linux|darwin|win32)-(x64|arm64)$), requestDeviceCode, pollForToken, getMe, revokeDevice, AccountClientError, with the exact signatures in the PRD. Every function takes an optional injected fetch. Poll rules exactly as D-5 (wait `interval` before the FIRST poll, per RFC 8628 §3.4; pending → wait interval; slow_down → use response interval or interval+5; 429 → Retry-After seconds or interval; access_denied/expired_token → terminal reasons; thrown fetch or 5xx retried, three in a row → 'unreachable'; local expiry after expiresIn). Waits are setTimeout promises. Read services/account/src/api.ts for the /v1/me JSON before typing Me. No error message may contain the token. Imports only node:*. Tests use vi.useFakeTimers() and vi.advanceTimersByTimeAsync; never real waits; never AbortSignal.timeout."
+        },
+        "items": [
+          {
+            "id": "account-client.ac1",
+            "title": "Given scripted answers pending, pending, token, pollForToken waits one interval before its first poll and resolves ok only after three intervals of fake time, and a slow_down with interval 10 sends no poll before 10 seconds elapse",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-client.ac2",
+            "title": "Given a 429 with Retry-After: 7, the client waits 7 seconds of fake time before polling again, and access_denied, expired_token and three consecutive thrown fetches each returns reason access_denied, expired_token and unreachable respectively",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-client.ac3",
+            "title": "resolveBaseUrl returns the flag over OVERDECK_ACCOUNT_URL over the default, accepts http://127.0.0.1:8787, and rejects http://example.com, a URL with a path and a URL with a query",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-client.ac4",
+            "title": "platformString('freebsd', 'x64') returns null, and getMe maps a 401 {error:'device_revoked'} to { ok: false, kind: 'unauthorized', error: 'device_revoked' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "account-login",
+        "title": "pan account login verb (device flow, /v1/me, token file)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T05:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4330",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/account/shared.ts",
+            "src/cli/commands/account/login.ts",
+            "tests/unit/cli/account/login.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/cli/account/login.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "tests/unit/cli/account/login.test.ts passes including the in-process end-to-end test"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-4",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-4 with D-1, D-4, D-7, D-8. Create src/cli/commands/account/shared.ts with AccountIo { out(line), err(line), exit(code): Promise<never> } and defaultAccountIo (console + exitCli from ../../exit.js); do not import src/cli/commands/vault/shared.ts. Create login.ts exporting loginCommand(options: { baseUrl?: string }, io = defaultAccountIo, deps: { fetch?: typeof fetch } = {}): resolveBaseUrl → platformString (unsupported → exit 1 with the D-3 message, no network) → ensureEnvironmentIdentity() (throw → print message, exit 1) → if readAccount() returns a record print the D-7 'Already signed in as …' line → requestDeviceCode → print the four lines from the PRD (verification_uri from the response, never a hardcoded host) → pollForToken → getMe → writeAccount (githubLogin/githubId null and exit 1 with the D-8 message when getMe fails) → print 'Signed in to <baseUrl> as <githubLogin> (device <label>, <deviceId>).'. Tests: (a) end to end through the real account service: injected fetch routes TEST_BASE_URL requests to handle() from services/account/src/routes.ts with makeEnv()/makeDeps({ fetch: githubMock({ identity: OWNER }).fetch }) from tests/unit/services/account/helpers; copy approveInBrowser from tests/unit/services/account/device-flow.test.ts; drive time with fake timers; (b) non-allowlisted identity → invite message, exit 1, no file; (c) unsupported platform → exit 1, zero fetch calls; (d) no output line contains 'odd_'. Reuse captureIo/runCli from tests/unit/cli/vault/helpers.ts. CLOCK RULE for test (a): the service's makeDeps() clock is static (it moves only via deps.clock.advance), while the client's waits run on vi fake timers, so a static server clock answers every poll after the first with slow_down. Build the service deps as makeDeps({ now: Date.now(), fetch: githubMock(...).fetch }) and then override deps.now = () => Date.now() (fake timers mock Date, so client and server share one clock), or call deps.clock.advance(ms) in lockstep with each vi.advanceTimersByTimeAsync(ms). Expected sequence: request code → approveInBrowser → advance 5 s → one poll → token."
+        },
+        "items": [
+          {
+            "id": "account-login.ac1",
+            "title": "Given an allowlisted GitHub identity, when the in-process device flow is approved, loginCommand stores a 0600 account.json with an odd_ token and githubLogin 'owner' and prints a line containing 'as owner'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-login.ac2",
+            "title": "Given a non-allowlisted GitHub identity, loginCommand exits 1 with the invite-list message and creates no account.json",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-login.ac3",
+            "title": "Given platform freebsd-x64, loginCommand exits 1 with the unsupported-platform message and the injected fetch receives zero calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-login.ac4",
+            "title": "No captured stdout or stderr line from any login test contains the substring 'odd_'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "account-status",
+        "title": "pan account status verb (human and --json)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4330",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/account/status.ts",
+            "tests/unit/cli/account/status.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/cli/account/status.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "tests/unit/cli/account/status.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-5 with D-9. Create src/cli/commands/account/status.ts exporting statusCommand(options: { json?: boolean }, io = defaultAccountIo, deps = {}). No file → 'Not signed in. Run: pan account login', exit 0 (JSON {\"signedIn\": false}). Otherwise getMe against the stored baseUrl: ok → the four human lines in the PRD (Access: active, or 'expired on <date>; ask the operator to renew the invite.' for grant_expired), exit 0; unauthorized → \"This machine's sign-in is no longer valid (<error>). Run: pan account login\", exit 1, file kept; unreachable → cached login plus '(account service unreachable: <reason>)', exit 1. --json prints { signedIn, baseUrl, githubLogin, githubId, deviceId, label, access, reachable } and never accessToken. A corrupt token file → the store's error message, exit 1."
+        },
+        "items": [
+          {
+            "id": "account-status.ac1",
+            "title": "Given no account.json, statusCommand prints 'Not signed in. Run: pan account login' and exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-status.ac2",
+            "title": "Given a stored token and a 200 /v1/me, statusCommand prints 'Signed in as <login>' and exits 0; with --json the output contains signedIn true and does not contain accessToken or 'odd_'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-status.ac3",
+            "title": "Given /v1/me returns 401 device_revoked, statusCommand exits 1 with the 'no longer valid (device_revoked)' message and account.json still exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-status.ac4",
+            "title": "Given fetch throws, statusCommand prints the cached login with 'account service unreachable' and exits 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "account-logout",
+        "title": "pan account logout verb (server revoke, local delete)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4330",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/account/logout.ts",
+            "tests/unit/cli/account/logout.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/cli/account/logout.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "tests/unit/cli/account/logout.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-6 with D-10. Create src/cli/commands/account/logout.ts exporting logoutCommand(options: Record<string, never> = {}, io = defaultAccountIo, deps = {}). No file → 'Not signed in.', exit 0, no fetch. Otherwise revokeDevice(baseUrl, token, deviceId): 204/401/404 → removeAccount, print 'Signed out. This machine's device token was revoked.', exit 0; network error or 5xx → removeAccount, stderr 'Signed out locally, but could not revoke the device on <baseUrl>: <reason>. Revoke it from another signed-in machine or ask the operator.', exit 1. Deletes nothing but account.json. Test pre-creates OVERDECK_HOME/vault/key and environment-id.json and asserts they are byte-identical after logout."
+        },
+        "items": [
+          {
+            "id": "account-logout.ac1",
+            "title": "Given a stored token, when DELETE /v1/devices/<deviceId> returns 204, 401 or 404, logoutCommand deletes account.json, prints 'Signed out.' and exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-logout.ac2",
+            "title": "Given fetch throws, logoutCommand deletes account.json, prints the 'Signed out locally, but could not revoke' warning to stderr and exits 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-logout.ac3",
+            "title": "After logout, pre-existing OVERDECK_HOME/vault/key and environment-id.json are byte-identical, and with no account.json logout prints 'Not signed in.' and makes zero fetch calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "account-cli-wiring",
+        "title": "Register the pan account command group (login, status, logout)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T05:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4330",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/account/index.ts",
+            "src/cli/command-groups.ts",
+            "src/cli/index.ts",
+            "tests/unit/cli/account/cli-wiring.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/cli/account/cli-wiring.test.ts tests/unit/cli/command-groups.test.ts",
+            "npm run build && node dist/cli/index.js account --help"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "cli-wiring.test.ts and command-groups.test.ts pass",
+            "account --help lists login, status and logout"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-5",
+            "FR-6",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-7. Create src/cli/commands/account/index.ts exporting registerAccountCommands(program) with the exact command/option/description text in the PRD, using an accountAction helper copied from vaultAction in src/cli/commands/vault/index.ts (drops Commander's trailing Command argument) and lazyAction imports of ./login.js, ./status.js, ./logout.js. Add an `account` entry to COMMAND_GROUPS in src/cli/command-groups.ts (names ['account'], load ./commands/account/index.js, register via mod.registerAccountCommands(program)) next to the vault entry. Add `await groups.register('account');` on the line after `await groups.register('vault');` in src/cli/index.ts. Write tests/unit/cli/account/cli-wiring.test.ts following tests/unit/cli/vault/cli-wiring.test.ts: mock the three verb modules and assert each argv reaches its function with the parsed options (login --base-url, status --json)."
+        },
+        "items": [
+          {
+            "id": "account-cli-wiring.ac1",
+            "title": "When argv is ['account','login','--base-url','http://127.0.0.1:8787'], the parser routes to loginCommand with { baseUrl: 'http://127.0.0.1:8787' }, and ['account','status','--json'] routes to statusCommand with { json: true }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-cli-wiring.ac2",
+            "title": "After npm run build, node dist/cli/index.js account --help prints login, status and logout",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-cli-wiring.ac3",
+            "title": "tests/unit/cli/command-groups.test.ts passes unchanged with the new account group registered",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "account-import-guard",
+        "title": "Extend the standalone import-graph guard to the pan account modules",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:30:00Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "test",
+          "issueLabel": "pan-4330",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/lib/vault/import-graph.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/vault/import-graph.test.ts",
+            "bash scripts/lint-source-introspection.sh"
+          ],
+          "expected_outputs": [
+            "import-graph.test.ts passes with zero violations",
+            "lint-source-introspection exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-8. In tests/unit/lib/vault/import-graph.test.ts change `const ENTRY_DIRS = ['src/cli/commands/vault', 'src/lib/vault'];` to include 'src/cli/commands/account' and 'src/lib/account' with a one-line PAN-4330 comment, and mention pan account in the header comment. Add no readFile/readFileSync call and create no new walker test file. listTsFiles returns [] for a missing directory, so this item has no ordering dependency; the guard checks whatever account files exist when the test runs."
+        },
+        "items": [
+          {
+            "id": "account-import-guard.ac1",
+            "title": "ENTRY_DIRS in tests/unit/lib/vault/import-graph.test.ts contains src/cli/commands/account and src/lib/account, and the test passes with zero violations",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-import-guard.ac2",
+            "title": "bash scripts/lint-source-introspection.sh exits 0 on the branch (no new or increased readFile offender)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "account-docs",
+        "title": "Document pan account and the githubLogin RPC field",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4330",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/account.mdx",
+            "docs.json",
+            "docs/ACCOUNT-SERVICE.md",
+            "anywhere.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node -e \"const d=require('./docs.json');if(!JSON.stringify(d).includes('cli/account'))process.exit(1)\"",
+            "grep -n 'githubLogin: string' docs/ACCOUNT-SERVICE.md",
+            "grep -n 'OVERDECK_ACCOUNT_URL' cli/account.mdx"
+          ],
+          "expected_outputs": [
+            "docs.json parses and lists cli/account",
+            "ACCOUNT-SERVICE.md shows githubLogin in the VerifyResult snippet",
+            "cli/account.mdx documents OVERDECK_ACCOUNT_URL"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-5",
+            "FR-6",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-9. Create cli/account.mdx (frontmatter title 'pan account', description) following cli/devices.mdx: purpose (optional sign-in for the directory and hosted features), login (device flow, printed URLs, --base-url, OVERDECK_ACCOUNT_URL, invite-only message), status (fields, --json, exit codes per D-9), logout (server revoke + local delete, never touches vault or environment-id.json, the offline case per D-10), where the token lives (${OVERDECK_HOME}/account.json, 0600) and what the account never holds (vault key, passphrase, conversation content). Copy the output strings verbatim from the shipped verb modules. Add \"cli/account\" after \"cli/token\" in the 'Overdeck Anywhere' group of docs.json. In docs/ACCOUNT-SERVICE.md add githubLogin: string to the VerifyResult snippet under 'RPC contract' and replace the closing 'After deploying, the local client (PAN-4330) needs…' paragraph with a 'Client' section naming pan account login|status|logout, src/lib/account/, the token file and the base URL precedence. In anywhere.mdx's 'Hosted services on overdeck.ai' step add one sentence that machines sign in with pan account login, linking /cli/account."
+        },
+        "items": [
+          {
+            "id": "account-docs.ac1",
+            "title": "cli/account.mdx exists and contains sections for login, status and logout plus the strings OVERDECK_ACCOUNT_URL and account.json",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-docs.ac2",
+            "title": "docs.json parses as JSON and its 'Overdeck Anywhere' group contains \"cli/account\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-docs.ac3",
+            "title": "docs/ACCOUNT-SERVICE.md contains 'githubLogin: string' in the VerifyResult snippet and a 'Client' heading that names pan account login",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "account-deploy-handoff",
+        "title": "Operator checkpoint: prove the Worker builds and post the deploy checklist",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T05:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-4330",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/drafts/pan-4330-deploy-handoff.md"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm --prefix services/account run build:dry",
+            "npm run typecheck:account",
+            "gh issue view 4330 --comments"
+          ],
+          "expected_outputs": [
+            "build:dry exits 0 with no Cloudflare credentials",
+            "typecheck:account completes without errors",
+            "issue 4330 shows the deploy checklist comment"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-10. The work agent never deploys and never runs wrangler login, d1 create, remote migrations, secret put or wrangler deploy. Run `npm --prefix services/account run build:dry` (must exit 0) and `npm run typecheck:account`. Write the checklist to a temp file in the scratch area and post it with `gh issue comment 4330 --body-file <file>`: the eight Deploy steps from docs/ACCOUNT-SERVICE.md (OAuth app with callback https://account.overdeck.ai/auth/github/callback; npx wrangler login; npx wrangler d1 create overdeck-account and commit the database_id into services/account/wrangler.jsonc; npx wrangler d1 migrations apply overdeck-account --remote; secrets GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, OWNER_GITHUB_ID; npx wrangler deploy; smoke test curl https://account.overdeck.ai/healthz shows configured:true; rollback npx wrangler rollback), then the post-deploy acceptance check (fresh OVERDECK_HOME: pan account login → approve at the printed URL → pan account status prints 'Signed in as <login>' → pan account logout prints 'Signed out.'). Then run pan tell flywheel-orchestrator \"work PAN-4330: account service deploy needs the operator (OAuth app, D1, DNS); checklist posted on #4330\" (sandbox disabled). Implementation checkpoint: if gh issue comment fails, commit the same text to .pan/drafts/pan-4330-deploy-handoff.md and name that path in the PR body. readiness is sequential because it must run once, after the shipped verbs and RPC change exist."
+        },
+        "items": [
+          {
+            "id": "account-deploy-handoff.ac1",
+            "title": "npm --prefix services/account run build:dry exits 0 on the feature branch with no Cloudflare credentials",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-deploy-handoff.ac2",
+            "title": "Issue 4330 contains a comment that includes 'wrangler d1 create overdeck-account', 'wrangler deploy' and 'pan account login' (or, when gh fails, .pan/drafts/pan-4330-deploy-handoff.md contains them and the PR body names that path)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-deploy-handoff.ac3",
+            "title": "git diff main -- services/account/wrangler.jsonc shows no change, so the all-zero database_id stays for the operator to replace",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "account-token-store",
+        "to": "account-login",
+        "type": "blocks"
+      },
+      {
+        "from": "account-token-store",
+        "to": "account-status",
+        "type": "blocks"
+      },
+      {
+        "from": "account-token-store",
+        "to": "account-logout",
+        "type": "blocks"
+      },
+      {
+        "from": "account-client",
+        "to": "account-login",
+        "type": "blocks"
+      },
+      {
+        "from": "account-client",
+        "to": "account-status",
+        "type": "blocks"
+      },
+      {
+        "from": "account-client",
+        "to": "account-logout",
+        "type": "blocks"
+      },
+      {
+        "from": "account-login",
+        "to": "account-status",
+        "type": "blocks"
+      },
+      {
+        "from": "account-login",
+        "to": "account-logout",
+        "type": "blocks"
+      },
+      {
+        "from": "account-login",
+        "to": "account-cli-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "account-status",
+        "to": "account-cli-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "account-logout",
+        "to": "account-cli-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "account-cli-wiring",
+        "to": "account-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "verify-github-login",
+        "to": "account-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "verify-github-login",
+        "to": "account-deploy-handoff",
+        "type": "blocks"
+      },
+      {
+        "from": "account-cli-wiring",
+        "to": "account-deploy-handoff",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

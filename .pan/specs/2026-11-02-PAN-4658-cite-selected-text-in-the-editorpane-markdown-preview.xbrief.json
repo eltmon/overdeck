@@ -1,0 +1,815 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-02T04:19:56Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4658: Cite selected text in the EditorPane markdown preview",
+    "updated": "2026-11-02T04:25:21.811Z"
+  },
+  "plan": {
+    "id": "pan-4658",
+    "title": "Cite selected text in the EditorPane markdown preview",
+    "status": "running",
+    "uid": "40a6c09e-2313-477f-97f6-ef38476209ec",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-02T04:19:56Z",
+    "updated": "2026-11-02T04:25:21.811Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4658",
+        "label": "PAN-4658",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4642",
+        "label": "PAN-4642",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4658.md",
+        "label": "PRD",
+        "type": "document"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "citations",
+      "stage",
+      "editor-pane",
+      "composer"
+    ],
+    "narratives": {
+      "Problem": "PAN-4642 lets the operator cite selected conversation text into the next prompt, but the Stage editor pane's markdown Preview cannot cite: an editor tab has no notion of which conversation's composer should receive the citation, and the citation type, store validation, serializer and cite layer only know message citations.",
+      "Proposal": "Record the origin conversation on the editor pane when a conversation's file chip opens it (CitationTargetContext provided by MessagesTimeline, gated on citationsEnabled; re-focus from another conversation re-targets; null never clears). Add a { kind: 'file'; path } citation source accepted by the store, serialize file citations as one 'Notes on `<path>`:' block per path after the unchanged reply block, generalize CiteSelectionLayer with a selection resolver and onSaved callback, and mount it over the editor Preview (hidden in Edit, without a target, or while dirty) with a toast that opens the target conversation. Chips show the file name, pending quotes highlight in the Preview, and archiving a conversation clears it as a cite target. Exact bytes, signatures and tests are in .pan/drafts/PAN-4658.md.",
+      "NonGoals": "- Citing in the Stage BrowserPane (sandboxed iframe; #2685)\n- Citing from the Edit textarea, or while the editor draft has unsaved changes\n- A target-conversation picker, or guessing a target (most recently active conversation) for editor tabs with no origin\n- Giving editor tabs opened from issue-overview, PRD-viewer or other non-conversation markdown a cite target\n- Mapping a rendered-text quote back to raw markdown source or line numbers\n- Any server, contracts, delivery-path change, or any edit to ConversationPanel.tsx\n- Cross-window live sync of pending citations\n- Changing the message-citation format, row gate, chips or highlight behavior"
+    },
+    "autoDecisions": [
+      {
+        "summary": "The cite target is the conversation whose file chip opened (or last re-focused) the editor pane, stored as WorkspacePane.citeConversationName.",
+        "rationale": "It is deterministic and testable; the 'most recently active conversation' candidate can silently send a note to the wrong agent, and a picker is new UI the issue does not require. MarkdownFileLink is the only caller of openOrFocusEditorPane, so recording at that call site covers every path."
+      },
+      {
+        "summary": "Editor panes with no recorded origin show no Cite button.",
+        "rationale": "No guessing of a destination agent; tabs opened from issue-overview or PRD markdown simply opt out."
+      },
+      {
+        "summary": "The origin is provided by MessagesTimeline via CitationTargetContext, valued only when citationsEnabled.",
+        "rationale": "MessagesTimeline already receives the PAN-4642/PAN-4681 composer gate, so read-only and subagent transcripts record no target, and ConversationPanel.tsx (11 lines under its file-size cap) is untouched."
+      },
+      {
+        "summary": "Re-opening a file from a different conversation re-targets the existing pane; a null origin never clears a target.",
+        "rationale": "Latest conversational intent wins, while browsing from non-conversation surfaces cannot wipe a deliberate target."
+      },
+      {
+        "summary": "File citations serialize as one 'Notes on `<absolute path>`:' block per path, after the unchanged 'Notes on your previous reply:' block.",
+        "rationale": "The reply header is wrong for file quotes; grouping states each path once; keeping message output byte-identical protects PAN-4642's contract for every harness."
+      },
+      {
+        "summary": "Cite is hidden while the editor draft is dirty.",
+        "rationale": "Preview renders the unsaved draft; a quote the agent cannot find on disk is a misleading citation."
+      },
+      {
+        "summary": "Saving a file citation shows a toast with an 'Open conversation' action (StageDeckContext gains openOrFocusAgentPane).",
+        "rationale": "The target conversation is usually another tab, so the operator otherwise gets no visible confirmation."
+      },
+      {
+        "summary": "Include highlight parity, chip file labels, and archive-time target clearing.",
+        "rationale": "Each is a small leaf that keeps file citations behaving like PAN-4642 message citations and prevents citations reaching an archived conversation; the plan stays at 24 files."
+      },
+      {
+        "summary": "Extend the existing EditorPane, MarkdownFileLink and panesStore test files and add them to scripts/frontend-test-subset.txt.",
+        "rationale": "All three pass on this branch (66 tests, verified 2026-11-01); listing them is the only way the new assertions run in CI."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "24 files across one frontend subsystem plus docs and the CI test list; every item is a small vertical slice of one feature that cannot ship usefully in parts.",
+      "canonicalFilename": "2026-11-02-PAN-4658-cite-selected-text-in-the-editorpane-markdown-preview.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "file-citation-type",
+        "title": "Add the file citation source, accept it in the store, and add CitationTargetContext",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T04:19:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4658",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "file-citation-format",
+            "cite-layer-resolver",
+            "chip-passes-target",
+            "file-citation-highlight",
+            "chips-file-label",
+            "editor-preview-cite"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/citationFormat.ts",
+            "src/dashboard/frontend/src/lib/composerCitations.ts",
+            "src/dashboard/frontend/src/lib/__tests__/composerCitations.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/lib/__tests__/composerCitations.test.ts src/lib/__tests__/citationFormat.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "composerCitations.test.ts and citationFormat.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Widen CitationSource in lib/citationFormat.ts to the union { kind: 'message'; messageId; role } | { kind: 'file'; path: string }. Rewrite isCitationSource in lib/composerCitations.ts to accept kind 'file' only with a non-empty string path. Add CitationTargetContext = createContext<string | null>(null) and useCitationTarget() to lib/composerCitations.ts (plain .ts, no JSX). Add the WI-1 tests to composerCitations.test.ts."
+        },
+        "items": [
+          {
+            "id": "file-citation-type.ac1",
+            "title": "Given a file citation { kind: 'file', path: '/repo/docs/a.md' } added via addCitation, when resetCitationStore() runs, then getConversationCitations returns it unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "file-citation-type.ac2",
+            "title": "Given stored entries with { kind: 'file', path: '' }, { kind: 'file' } and { kind: 'note' }, when the store hydrates, then it drops all three and keeps valid entries",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "file-citation-type.ac3",
+            "title": "lib/composerCitations.ts exports CitationTargetContext (default value null) and useCitationTarget(), and npm run typecheck exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "file-citation-format",
+        "title": "Serialize file citations as one block per path after the reply block",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T04:19:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4658",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/citationFormat.ts",
+            "src/dashboard/frontend/src/lib/__tests__/citationFormat.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/lib/__tests__/citationFormat.test.ts src/components/chat/__tests__/ComposerFooter.citations.test.tsx"
+          ],
+          "expected_outputs": [
+            "citationFormat.test.ts passes including the new mixed fixture and the unchanged PAN-4642 fixture",
+            "ComposerFooter.citations.test.tsx passes unchanged"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Extract formatEntries from formatCitationBlock, add fileCitationHeader(path) returning 'Notes on `' + path + '`:', and rebuild formatCitationBlock: message citations first under CITATION_BLOCK_HEADER, then one block per file path in first-appearance order, each numbered from 1 with the PAN-4642 entry rules, blocks joined by '\\n\\n'. composePromptWithCitations is unchanged. Add the PRD's verbatim mixed fixture test."
+        },
+        "items": [
+          {
+            "id": "file-citation-format.ac1",
+            "title": "Given the PRD WI-2 four-citation list and prompt 'Please fix.', composePromptWithCitations returns exactly the PRD fixture string (reply block, then the /repo/docs/guide.md block, then the /repo/README.md block, then the prompt)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "file-citation-format.ac2",
+            "title": "Given only file citations, formatCitationBlock produces no 'Notes on your previous reply:' line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "file-citation-format.ac3",
+            "title": "Given a list containing only message citations, composePromptWithCitations returns exactly the PAN-4642 messages-only fixture string asserted by the pre-existing test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cite-layer-resolver",
+        "title": "Let CiteSelectionLayer take a selection resolver and an onSaved callback",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T04:19:56Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4658",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "editor-preview-cite"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/citations/resolveSelectionCitation.ts",
+            "src/dashboard/frontend/src/components/chat/citations/CiteSelectionToolbar.tsx",
+            "src/dashboard/frontend/src/components/chat/citations/__tests__/CiteSelectionToolbar.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/chat/citations/__tests__/CiteSelectionToolbar.test.tsx src/components/chat/citations/__tests__/resolveSelectionCitation.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "CiteSelectionToolbar.test.tsx and resolveSelectionCitation.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. In resolveSelectionCitation.ts export MinimalSelection, SelectionCitation, SelectionCitationResolver, resolveMessageSelection and fileSelectionResolver(path). In CiteSelectionToolbar.tsx change CiteSnapshot to { source, quotedText, rect }; useCiteSelection(rootRef, resolve = resolveMessageSelection) keeps resolve in a ref and requires both anchorNode and focusNode inside the root; the toolbar saves snapshot.source and calls onSaved(citation) when addCitation returns one; CiteSelectionLayer accepts optional resolve and onSaved. MessagesTimeline.tsx call site stays unchanged. Update the test snapshot() fixture and add the file-resolver tests."
+        },
+        "items": [
+          {
+            "id": "cite-layer-resolver.ac1",
+            "title": "Given a CiteSelectionLayer with resolve={fileSelectionResolver('/repo/docs/a.md')} over a plain <p>, when the paragraph is selected and Cite then Save are clicked, then the store holds one citation with source { kind: 'file', path: '/repo/docs/a.md' } and onSaved was called once with it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cite-layer-resolver.ac2",
+            "title": "Given a selection whose focus node lies outside the layer's root, the layer renders no Cite button",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cite-layer-resolver.ac3",
+            "title": "Given a CiteSelectionLayer with the default resolver over a [data-cite-message-id] row, selecting the row renders the Cite button and Save stores a citation with source kind 'message' (the snapshot() fixture carries source)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pane-cite-target",
+        "title": "Record the cite target on editor panes in the Stage",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T04:19:56Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4658",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/panesStore.ts",
+            "src/dashboard/frontend/src/components/Stage/StageDeckContext.tsx",
+            "src/dashboard/frontend/src/components/Stage/index.tsx",
+            "src/dashboard/frontend/src/components/Stage/panes/EditorPane.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Stage/panes/EditorPane.test.tsx src/components/Stage/Stage.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "EditorPane.test.tsx and Stage.test.tsx pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. Add citeConversationName?: string to WorkspacePane. Change StageDeckContextValue.openOrFocusEditorPane to (filePath, label, citeConversationName?: string | null) — optional so MarkdownFileLink.tsx still compiles before chip-passes-target lands — and add openOrFocusAgentPane. In Stage/index.tsx implement the D4 rule with usePanesStore's updatePane (existing pane + different non-empty target => updatePane; null never clears; new pane gets the field only when non-null) and expose openOrFocusAgentPane in deckContextValue. Add a Stage-mounting test block to EditorPane.test.tsx whose DeckProbe (rendered via renderHome) captures useStageDeck() into a test-scoped variable; tests call the captured API inside act(), because HOME unmounts once an editor pane is active."
+        },
+        "items": [
+          {
+            "id": "pane-cite-target.ac1",
+            "title": "Given an empty deck, when openOrFocusEditorPane('/repo/a.md', 'a.md', 'conv-a') runs, then panesStore holds one editor pane with citeConversationName 'conv-a'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pane-cite-target.ac2",
+            "title": "Given that pane, when the same file is opened with 'conv-b', then the same single editor pane has citeConversationName 'conv-b'; when opened again with null, it still has 'conv-b'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pane-cite-target.ac3",
+            "title": "Given an empty deck, when openOrFocusEditorPane is called with null, then the created pane has no citeConversationName field",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pane-cite-target.ac4",
+            "title": "When useStageDeck().openOrFocusAgentPane('conv-a', 'Agent') is called inside the Stage, then the deck contains an agent pane with conversationId 'conv-a'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "chip-passes-target",
+        "title": "Pass the origin conversation from file chips through CitationTargetContext",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T04:19:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4658",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/messagesTimeline/MessagesTimeline.tsx",
+            "src/dashboard/frontend/src/components/chat/MarkdownFileLink.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/MarkdownFileLink.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/chat/__tests__/MarkdownFileLink.test.tsx src/components/chat/messagesTimeline/messageRows.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "MarkdownFileLink.test.tsx and messageRows.test.tsx pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. Wrap MessagesTimeline's tree, directly inside ChatMarkdownSettingsProvider, in <CitationTargetContext.Provider value={citationsEnabled && conversationName ? conversationName : null}>. In MarkdownFileLink read useCitationTarget() and always call deck.openOrFocusEditorPane(filePath, basename, citeTarget) at both call sites (click and right-click 'Open in internal editor'), adding citeTarget to both dependency arrays. Update MarkdownFileLink.test.tsx: renderWithDeck fills openOrFocusAgentPane, the four existing assertions gain a third argument null, and new provider tests are added. ConversationPanel.tsx must not change."
+        },
+        "items": [
+          {
+            "id": "chip-passes-target.ac1",
+            "title": "Given a markdown chip rendered inside <CitationTargetContext.Provider value=\"conv-a\"> and a deck, when it is clicked, then openOrFocusEditorPane is called with (filePath, basename, 'conv-a'); the right-click 'Open in internal editor' item produces the same call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "chip-passes-target.ac2",
+            "title": "Given no provider, when the chip is clicked, then openOrFocusEditorPane is called with (filePath, basename, null)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "chip-passes-target.ac3",
+            "title": "MessagesTimeline.tsx renders CitationTargetContext.Provider with value citationsEnabled && conversationName ? conversationName : null, and git diff main shows no change to ConversationPanel.tsx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "archive-clears-target",
+        "title": "Clear an archived conversation from editor panes' cite targets",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T04:19:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4658",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/panesStore.ts",
+            "src/dashboard/frontend/src/lib/panesStore.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/lib/panesStore.test.ts"
+          ],
+          "expected_outputs": [
+            "panesStore.test.ts passes including the new closeConversationPanes cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. In closeConversationPanes(conversationId): for hydrated workspaces call store.updatePane(workspaceId, paneId, { citeConversationName: undefined }) on editor panes whose citeConversationName equals conversationId; in the cold pan-panes:* sweep, drop the field from such editor panes and write the key when a pane was removed or a target was cleared. Add tests to the existing closeConversationPanes describe in panesStore.test.ts."
+        },
+        "items": [
+          {
+            "id": "archive-clears-target.ac1",
+            "title": "Given a hydrated editor pane with citeConversationName 'conv-archived', when closeConversationPanes('conv-archived') runs, then the pane stays open and has no citeConversationName",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "archive-clears-target.ac2",
+            "title": "Given a cold pan-panes:cold-workspace entry with such an editor pane, when closeConversationPanes('conv-archived') runs, then the persisted entry is rewritten without citeConversationName",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "archive-clears-target.ac3",
+            "title": "An editor pane targeting a different conversation preserves its citeConversationName",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "editor-preview-cite",
+        "title": "Mount the Cite layer over the editor Preview with a confirmation toast",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T04:19:56Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4658",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/panes/EditorPane.tsx",
+            "src/dashboard/frontend/src/components/Stage/panes/EditorPane.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Stage/panes/EditorPane.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "EditorPane.test.tsx passes including the new Preview cite cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-10",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. In EditorPane add previewRootRef (above the early returns) on the styles.subBody div, wrap the Preview MarkdownTab in CitationTargetContext.Provider value={pane.citeConversationName ?? null}, and render a local EditorPreviewCite component only when activeTab === 'preview' && pane.citeConversationName && !dirty. EditorPreviewCite renders CiteSelectionLayer with resolve={useMemo(() => fileSelectionResolver(path))} and onSaved showing toast.success('Citation added', { description, action: { label: 'Open conversation', onClick: () => deck?.openOrFocusAgentPane(conversationName, 'Agent') } }). Add the PRD WI-7 tests (beforeEach also clears localStorage and calls resetCitationStore())."
+        },
+        "items": [
+          {
+            "id": "editor-preview-cite.ac1",
+            "title": "Given an editor pane with citeConversationName 'conv-a' on the Preview tab, when the preview text is selected and Cite, a comment and Save are used, then getConversationCitations('conv-a') holds one citation with source { kind: 'file', path: '/repo/docs/flywheel-brief.md' } and toast.success was called with 'Citation added' and an action labeled 'Open conversation'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "editor-preview-cite.ac2",
+            "title": "No Cite button renders when the pane has no citeConversationName, when the draft is dirty, or on the Edit tab",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "editor-preview-cite.ac3",
+            "title": "Given an isolated Playwright profile (UAT), when a markdown chip in a conversation with a composer opens an editor tab and a Preview sentence is cited with a comment and a prompt is sent from that conversation, then the transcript's user message contains 'Notes on `<absolute path>`:' with the quote and comment before the prompt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "file-citation-highlight",
+        "title": "Highlight pending file-citation quotes in the editor Preview",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T04:19:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4658",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/citations/citationHighlight.ts",
+            "src/dashboard/frontend/src/components/chat/citations/__tests__/citationHighlight.test.ts",
+            "src/dashboard/frontend/src/components/Stage/panes/EditorPane.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/chat/citations/__tests__/citationHighlight.test.ts src/components/Stage/panes/EditorPane.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "citationHighlight.test.ts and EditorPane.test.tsx pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. Add useFileCitationHighlight(ref, conversationName, path, text) to citationHighlight.ts, mirroring useCitationHighlight but filtering source.kind === 'file' && source.path === path with registry key `${conversationName}:file:${path}`. Give EditorPreviewCite a text prop (the draft) and call the hook with its rootRef. Add the hook tests using the file's existing CSS.highlights/Highlight stubs."
+        },
+        "items": [
+          {
+            "id": "file-citation-highlight.ac1",
+            "title": "Given a pending file citation for '/a.md' quoting 'wide' and a probe calling useFileCitationHighlight over <p>Hello wide world</p>, then CSS.highlights registers 'overdeck-citation' with one range",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "file-citation-highlight.ac2",
+            "title": "A message citation with the same quoted text registers no range through useFileCitationHighlight, and unmounting the probe deletes the 'overdeck-citation' entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "chips-file-label",
+        "title": "Show the file name on file-citation chips",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T04:19:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4658",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/citations/CitationChips.tsx",
+            "src/dashboard/frontend/src/components/chat/citations/__tests__/CitationChips.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/chat/citations/__tests__/CitationChips.test.tsx"
+          ],
+          "expected_outputs": [
+            "CitationChips.test.tsx passes including the file-chip cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. In CitationChip, for source.kind === 'file' render '<basename> · ' in a composerImageStatus span before the quote excerpt (collapsed) and the full path in a text-muted-foreground div above the blockquote (expanded). Message chips are unchanged. No new CSS classes or colors."
+        },
+        "items": [
+          {
+            "id": "chips-file-label.ac1",
+            "title": "Given a pending file citation for '/repo/docs/guide.md', the collapsed chip renders 'guide.md' and the expanded chip renders '/repo/docs/guide.md'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "chips-file-label.ac2",
+            "title": "A message citation chip renders no ' · ' file prefix and no path line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document citing from the editor Preview for operators and developers",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T04:19:56Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4658",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/conversations.mdx",
+            "docs/MARKDOWN-EDITOR-PANE.md",
+            "docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n '### Citing a markdown file' features/conversations.mdx",
+            "grep -n 'Citing from the Preview (PAN-4658)' docs/MARKDOWN-EDITOR-PANE.md",
+            "grep -n \"kind: 'file'\" docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "each grep prints at least one matching line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10. features/conversations.mdx: add '### Citing a markdown file' under '## Citations' covering origin targeting, Preview-only, hidden while unsaved, the toast, re-targeting, the per-file block (WI-2 fixture output) and rendered-text quotes. docs/MARKDOWN-EDITOR-PANE.md: update the StageDeckContext section to { deckKey, openOrFocusEditorPane, openOrFocusAgentPane } and the three-argument signature with the D4 rule; add '## Citing from the Preview (PAN-4658)'. docs/DASHBOARD-ARCHITECTURE.md: the 'Composer citations (PAN-4642)' bullet names both source kinds and the per-path file block."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "features/conversations.mdx contains a '### Citing a markdown file' section that shows the block header 'Notes on `/repo/docs/guide.md`:' and states Cite is not offered in Edit or while the file has unsaved changes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "docs/MARKDOWN-EDITOR-PANE.md contains '## Citing from the Preview (PAN-4658)' naming citeConversationName and CitationTargetContext, and its StageDeckContext section shows openOrFocusEditorPane(filePath, label, citeConversationName)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "The 'Composer citations' bullet in docs/DASHBOARD-ARCHITECTURE.md contains the kind: 'file' source with an absolute path and the per-path 'Notes on `<path>`:' block",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ci-subset",
+        "title": "Add the extended EditorPane, MarkdownFileLink and panesStore tests to the CI frontend subset",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T04:19:56Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "infra",
+          "issueLabel": "pan-4658",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node scripts/run-frontend-test-subset.mjs --dry-run"
+          ],
+          "expected_outputs": [
+            "the printed args include src/components/Stage/panes/EditorPane.test.tsx, src/components/chat/__tests__/MarkdownFileLink.test.tsx and src/lib/panesStore.test.ts"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-11. Insert src/components/Stage/panes/EditorPane.test.tsx, src/components/chat/__tests__/MarkdownFileLink.test.tsx and src/lib/panesStore.test.ts into scripts/frontend-test-subset.txt in sorted position."
+        },
+        "items": [
+          {
+            "id": "ci-subset.ac1",
+            "title": "node scripts/run-frontend-test-subset.mjs --dry-run prints an argument list containing all three test paths",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-subset.ac2",
+            "title": "scripts/frontend-test-subset.txt contains each of the three paths on its own line in sorted position, with no duplicate lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "file-citation-type",
+        "to": "file-citation-format",
+        "type": "blocks"
+      },
+      {
+        "from": "file-citation-type",
+        "to": "cite-layer-resolver",
+        "type": "blocks"
+      },
+      {
+        "from": "file-citation-type",
+        "to": "chip-passes-target",
+        "type": "blocks"
+      },
+      {
+        "from": "file-citation-type",
+        "to": "file-citation-highlight",
+        "type": "blocks"
+      },
+      {
+        "from": "file-citation-type",
+        "to": "chips-file-label",
+        "type": "blocks"
+      },
+      {
+        "from": "pane-cite-target",
+        "to": "chip-passes-target",
+        "type": "blocks"
+      },
+      {
+        "from": "pane-cite-target",
+        "to": "archive-clears-target",
+        "type": "blocks"
+      },
+      {
+        "from": "pane-cite-target",
+        "to": "editor-preview-cite",
+        "type": "blocks"
+      },
+      {
+        "from": "cite-layer-resolver",
+        "to": "editor-preview-cite",
+        "type": "blocks"
+      },
+      {
+        "from": "editor-preview-cite",
+        "to": "file-citation-highlight",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

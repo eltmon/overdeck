@@ -57,9 +57,17 @@ export function getKimiAnthropicBaseUrl(apiKey: string): string {
     : KIMI_PLATFORM_BASE_URL;
 }
 
-/** Translate configured Kimi tiers only for the coding endpoint. */
+/** Platform-endpoint ids for models whose coding-endpoint id is shorter. */
+export const KIMI_PLATFORM_MODEL_IDS: Readonly<Record<string, string>> = {
+  'k3.1-pro': 'kimi-k3.1-pro',
+  'k3.1-pro-highspeed': 'kimi-k3.1-pro-highspeed',
+};
+
+/** Translate a Kimi model id to the id the selected Anthropic-compatible endpoint expects. */
 export function resolveKimiModelForEndpoint(model: string, baseUrl: string): string {
-  if (baseUrl.replace(/\/$/, '') !== KIMI_CODING_BASE_URL) return model;
+  const endpoint = baseUrl.replace(/\/$/, '');
+  if (endpoint === KIMI_PLATFORM_BASE_URL) return KIMI_PLATFORM_MODEL_IDS[model] ?? model;
+  if (endpoint !== KIMI_CODING_BASE_URL) return model;
   if (model === 'k3') return 'k3-256k';
   return model === 'kimi-k2.7-code' ? 'kimi-for-coding' : model;
 }
@@ -87,7 +95,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     displayName: 'Anthropic',
     compatibility: 'direct',
     defaultHarness: 'claude-code',
-    models: ['claude-fable-5-1', 'claude-fable-5', 'claude-opus-5-5', 'claude-opus-5', 'claude-opus-4-8', 'claude-opus-4-7', 'claude-opus-4-6', 'claude-sonnet-5-5', 'claude-sonnet-5', 'claude-sonnet-4-6', 'claude-sonnet-4-5', 'claude-haiku-5-5', 'claude-haiku-4-5'],
+    models: ['claude-fable-5-1', 'claude-fable-5', 'claude-opus-5-5', 'claude-opus-5', 'claude-opus-4-8', 'claude-opus-4-7', 'claude-opus-4-6', 'claude-sonnet-5-5', 'claude-sonnet-5', 'claude-sonnet-4-6', 'claude-haiku-5-5', 'claude-haiku-4-5'],
     tested: true,
     description: 'Native Claude API',
   },
@@ -119,7 +127,8 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     // stay in MODEL_DEPRECATIONS and in getProviderForModelSync so old configs
     // migrate and historical cost lookups still resolve.
     models: [
-      'k3', 'k3[1m]', 'kimi-k2.7-code',
+      'k3.1-pro', 'k3.1-pro-highspeed', 'k3', 'k3[1m]', 'kimi-k2.7-code',
+      'kimi-code/k3.1-pro', 'kimi-code/k3.1-pro-highspeed',
       'kimi-code/k3', 'kimi-code/k3-256k', 'kimi-code/kimi-for-coding', 'kimi-code/kimi-for-coding-highspeed',
     ],
     tierModels: { opus: 'k3[1m]', sonnet: 'k3', haiku: 'kimi-k2.7-code' },
@@ -132,7 +141,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     displayName: 'OpenAI',
     compatibility: 'direct',
     defaultHarness: 'codex',
-    models: ['gpt-6-astra', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-5.6-sol[372k]', 'gpt-5.6-terra[372k]', 'gpt-5.6-luna[372k]', 'gpt-6-sol', 'gpt-6-luna', 'gpt-6.1-sol', 'gpt-6.1-terra'],
+    models: ['gpt-6-astra', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-5.6-sol[372k]', 'gpt-5.6-terra[372k]', 'gpt-5.6-luna[372k]', 'gpt-6-sol', 'gpt-6-luna', 'gpt-6.1-sol', 'gpt-6.1-terra', 'gpt-6-rosalind', 'gpt-6-astra-law'],
     tierModels: { opus: 'gpt-5.6-sol', sonnet: 'gpt-5.6-terra', haiku: 'gpt-5.6-luna' },
     tested: true,
     description: 'First-party Codex CLI harness (default) using ChatGPT-subscription or API-key auth. The local CLIProxyAPI sidecar remains a legacy alternate for routing GPT models into claude-code.',
@@ -143,8 +152,8 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     displayName: 'Google (Gemini)',
     compatibility: 'direct',
     defaultHarness: 'ohmypi',
-    models: ['gemini-4-argon', 'gemini-3.8-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-pro-preview', 'gemini-3-flash-preview', 'gemini-3.1-flash-lite-preview'],
-    tierModels: { opus: 'gemini-3.1-pro-preview', sonnet: 'gemini-3-flash-preview', haiku: 'gemini-3.1-flash-lite-preview' },
+    models: ['gemini-4-argon', 'gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-pro-preview', 'gemini-3-flash-preview', 'gemini-3.1-flash-lite'],
+    tierModels: { opus: 'gemini-3.1-pro-preview', sonnet: 'gemini-3-flash-preview', haiku: 'gemini-3.1-flash-lite' },
     tested: true,
     description: 'Route via local CLIProxyAPI Gemini backend using GOOGLE_API_KEY',
   },
@@ -156,7 +165,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     defaultHarness: 'ohmypi',
     baseUrl: 'https://api.minimax.io/anthropic',
     authType: 'static',
-    models: ['minimax-m2.7', 'minimax-m2.7-highspeed', 'MiniMax-M3'],
+    models: ['minimax-m2.7', 'minimax-m2.7-highspeed', 'MiniMax-M3', 'MiniMax-M3.1-Flash'],
     haikuModel: 'minimax-m2.7-highspeed',
     tierModels: { opus: 'MiniMax-M3', sonnet: 'minimax-m2.7', haiku: 'minimax-m2.7-highspeed' },
     tested: true,
@@ -170,9 +179,9 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     defaultHarness: 'ohmypi',
     baseUrl: 'https://api.z.ai/api/anthropic',
     authType: 'static',
-    models: ['glm-5.3', 'glm-5.2', 'glm-5.1', 'glm-4.7', 'glm-4.7-flash'],
-    haikuModel: 'glm-4.7-flash',
-    tierModels: { opus: 'glm-5.2', sonnet: 'glm-4.7', haiku: 'glm-4.7-flash' },
+    models: ['glm-5.3', 'glm-5.3-flash', 'glm-5.3-flashx', 'glm-5.2', 'glm-5.1', 'glm-4.7', 'glm-4.7-flash'],
+    haikuModel: 'glm-5.3-flash',
+    tierModels: { opus: 'glm-5.3', sonnet: 'glm-5.3', haiku: 'glm-5.3-flash' },
     tested: true,
     description: 'Route directly to Z.AI Anthropic-compatible endpoint using ZHIPU_API_KEY.',
   },
@@ -184,9 +193,9 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     defaultHarness: 'ohmypi',
     baseUrl: 'https://token-plan-sgp.xiaomimimo.com/anthropic',
     authType: 'static',
-    models: ['mimo-v2.5-pro', 'mimo-v2.5'],
-    haikuModel: 'mimo-v2.5',
-    tierModels: { opus: 'mimo-v2.5-pro', sonnet: 'mimo-v2.5-pro', haiku: 'mimo-v2.5' },
+    models: ['mimo-v2.6-pro', 'mimo-v2.6-flash', 'mimo-v2.6-pro-ultraspeed'],
+    haikuModel: 'mimo-v2.6-flash',
+    tierModels: { opus: 'mimo-v2.6-pro', sonnet: 'mimo-v2.6-pro', haiku: 'mimo-v2.6-flash' },
     tested: true,
     description: 'Route directly to Xiaomi MiMo Anthropic-compatible endpoint using MIMO_API_KEY.',
   },
@@ -228,9 +237,9 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     defaultHarness: 'ohmypi',
     baseUrl: getOpenAICompatibleProxyBaseUrl('dashscope'),
     authType: 'static',
-    models: ['qwen3.7-plus', 'qwen3.8-flash', 'qwen3-max', 'qwen3-coder-plus', 'qwen3-plus', 'qwen3.7-max', 'qwen3.8-max'],
-    haikuModel: 'qwen3-plus',
-    tierModels: { opus: 'qwen3-max', sonnet: 'qwen3-coder-plus', haiku: 'qwen3-plus' },
+    models: ['qwen3.7-plus', 'qwen3.8-flash', 'qwen3.7-max', 'qwen3.8-max'],
+    haikuModel: 'qwen3.8-flash',
+    tierModels: { opus: 'qwen3.8-max', sonnet: 'qwen3.7-plus', haiku: 'qwen3.8-flash' },
     tested: false,
     description: "Route Alibaba DashScope Qwen models through Overdeck's local Anthropic-compatible adapter using DASHSCOPE_API_KEY against the Singapore intl endpoint (ap-southeast-1).",
   },
@@ -242,7 +251,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     defaultHarness: 'ohmypi',
     baseUrl: 'https://api.x.ai/v1',
     authType: 'static',
-    models: ['grok-build-0.1'] as GrokModel[],
+    models: ['grok-build-0.1', 'grok-4.7', 'grok-4.3'] as GrokModel[],
     tierModels: { opus: 'grok-build-0.1', sonnet: 'grok-build-0.1', haiku: 'grok-build-0.1' },
     tested: false,
     description: 'Route directly to xAI Anthropic-compatible endpoint using XAI_API_KEY. Model: grok-build-0.1 (256K ctx, $1/M in, $2/M out).',
@@ -254,9 +263,9 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     compatibility: 'direct',
     defaultHarness: 'ohmypi',
     authType: 'static',
-    models: ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'qwen-qwq-32b', 'gemma2-9b-it'],
-    haikuModel: 'llama-3.1-8b-instant',
-    tierModels: { opus: 'llama-3.3-70b-versatile', sonnet: 'llama-3.3-70b-versatile', haiku: 'llama-3.1-8b-instant' },
+    models: ['openai/gpt-oss-120b', 'openai/gpt-oss-20b'],
+    haikuModel: 'openai/gpt-oss-20b',
+    tierModels: { opus: 'openai/gpt-oss-120b', sonnet: 'openai/gpt-oss-120b', haiku: 'openai/gpt-oss-20b' },
     tested: false,
     description: 'Route via omp using GROQ_API_KEY. Ultra-low-latency inference on open-weight models.',
   },
@@ -267,9 +276,9 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     compatibility: 'direct',
     defaultHarness: 'ohmypi',
     authType: 'static',
-    models: ['llama3.3-70b', 'llama3.1-70b', 'llama3.1-8b'],
-    haikuModel: 'llama3.1-8b',
-    tierModels: { opus: 'llama3.3-70b', sonnet: 'llama3.1-70b', haiku: 'llama3.1-8b' },
+    models: ['gpt-oss-120b'],
+    haikuModel: 'gpt-oss-120b',
+    tierModels: { opus: 'gpt-oss-120b', sonnet: 'gpt-oss-120b', haiku: 'gpt-oss-120b' },
     tested: false,
     description: 'Route via omp using CEREBRAS_API_KEY. Hardware-accelerated inference on Cerebras wafer-scale chips.',
   },
@@ -280,7 +289,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     compatibility: 'direct',
     defaultHarness: 'ohmypi',
     authType: 'static',
-    models: ['mistral-large-latest', 'mistral-small-latest', 'codestral-latest'],
+    models: ['mistral-large-latest', 'mistral-small-latest', 'codestral-latest', 'mistral-large-4-0'],
     haikuModel: 'mistral-small-latest',
     tierModels: { opus: 'mistral-large-latest', sonnet: 'mistral-large-latest', haiku: 'mistral-small-latest' },
     tested: false,
@@ -331,7 +340,10 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
  * maxContextSize=1048576 (matches the claude-routed k3[1m] alias's 1M
  * context), kimi-code/k3-256k reports maxContextSize=262144 (matches the
  * claude-routed k3 alias's 256K context) — so the context tiers, not the
- * bare-string similarity, decide the mapping.
+ * bare-string similarity, decide the mapping. kimi-code/k3.1-pro and
+ * kimi-code/k3.1-pro-highspeed report maxContextSize=1048576 (kimi 2.0.2,
+ * 2026-11-02); K3.1 has one context tier, so each bare id maps to its
+ * same-named alias.
  *
  * This table must stay in sync with KIMI_ACP_MODEL_IDS in src/lib/acp/kimi.ts.
  * Both translate a claude-code-routed id into the same CLI catalog, because
@@ -339,6 +351,8 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
  * and the other rejects is a bug, not a harness difference.
  */
 const KIMI_LEGACY_MODEL_TO_NATIVE_ALIAS: Record<string, string> = {
+  'k3.1-pro': 'kimi-code/k3.1-pro',
+  'k3.1-pro-highspeed': 'kimi-code/k3.1-pro-highspeed',
   'k3': 'kimi-code/k3-256k',
   'k3[1m]': 'kimi-code/k3',
   'kimi-k2.7-code': 'kimi-code/kimi-for-coding',
@@ -362,7 +376,8 @@ export function resolveKimiCodeModelAlias(model: string): string {
   if (mapped) return mapped;
   throw new Error(
     `Model "${model}" has no native kimi-code CLI equivalent — the installed binary's catalog only exposes `
-    + `kimi-code/k3, kimi-code/k3-256k, kimi-code/kimi-for-coding, and kimi-code/kimi-for-coding-highspeed. `
+    + `kimi-code/k3.1-pro, kimi-code/k3.1-pro-highspeed, kimi-code/k3, kimi-code/k3-256k, kimi-code/kimi-for-coding, `
+    + `and kimi-code/kimi-for-coding-highspeed. `
     + `Pick one of those models, or set providerHarnesses.kimi to 'claude-code' or 'acp' in config.yaml to keep using "${model}".`,
   );
 }
@@ -437,6 +452,11 @@ export function getProviderForModel(modelId: ModelId | string): ProviderConfig {
   if (['qwen/qwen3.6-plus'].includes(modelId)) {
     return PROVIDERS.nous;
   }
+  // Groq-native ids carry an `openai/` vendor prefix (console.groq.com/docs/models);
+  // carve them out before the slash-delimited OpenRouter catch-all.
+  if (['openai/gpt-oss-120b', 'openai/gpt-oss-20b'].includes(modelId)) {
+    return PROVIDERS.groq;
+  }
   if (['qwen3.7-plus', 'qwen3.8-flash', 'qwen3-max', 'qwen3-coder-plus', 'qwen3-plus', 'qwen3.7-max', 'qwen3.8-max'].includes(modelId)) {
     return PROVIDERS.dashscope;
   }
@@ -459,38 +479,38 @@ export function getProviderForModel(modelId: ModelId | string): ProviderConfig {
 
   // Check OpenAI models — supported set + retired IDs (still routed so the
   // deprecation-migration path can fire warnings before remap).
-  if (['gpt-6-astra', 'gpt-6-sol', 'gpt-6-luna', 'gpt-6.1-sol', 'gpt-6.1-terra', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-5.6-sol[372k]', 'gpt-5.6-terra[372k]', 'gpt-5.6-luna[372k]', 'gpt-5.5', 'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.3-codex', 'gpt-5.3-codex-spark', 'gpt-5.2', 'gpt-5.5-pro', 'gpt-5.4-pro', 'o3', 'o4-mini', 'o3-deep-research', 'gpt-4o', 'gpt-4o-mini'].includes(modelId)) {
+  if (['gpt-6-astra', 'gpt-6-sol', 'gpt-6-luna', 'gpt-6.1-sol', 'gpt-6.1-terra', 'gpt-6-rosalind', 'gpt-6-astra-law', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-5.6-sol[372k]', 'gpt-5.6-terra[372k]', 'gpt-5.6-luna[372k]', 'gpt-5.5', 'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.3-codex', 'gpt-5.3-codex-spark', 'gpt-5.2', 'gpt-5.5-pro', 'gpt-5.4-pro', 'o3', 'o4-mini', 'o3-deep-research', 'gpt-4o', 'gpt-4o-mini'].includes(modelId)) {
     return PROVIDERS.openai;
   }
 
   // Check Google models
-  if (['gemini-4-argon', 'gemini-3.8-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite-preview', 'gemini-3-pro-preview', 'gemini-3-flash-preview', 'gemini-2.5-pro', 'gemini-2.5-flash'].includes(modelId)) {
+  if (['gemini-4-argon', 'gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite', 'gemini-3.1-flash-lite-preview', 'gemini-3-pro-preview', 'gemini-3-flash-preview', 'gemini-2.5-pro', 'gemini-2.5-flash'].includes(modelId)) {
     return PROVIDERS.google;
   }
 
   // Check MiniMax models
-  if (['minimax-m2.7', 'minimax-m2.7-highspeed', 'MiniMax-M3'].includes(modelId)) {
+  if (['minimax-m2.7', 'minimax-m2.7-highspeed', 'MiniMax-M3', 'MiniMax-M3.1-Flash'].includes(modelId)) {
     return PROVIDERS.minimax;
   }
 
   // Check Kimi models — supported set + retired K2.5/K2.6-generation ids
   // (still routed so the deprecation-migration path can fire before remap).
-  if (['k3', 'k3-256k', 'k3[1m]', 'kimi-k2.7-code', 'kimi-k2.6', 'kimi-k2.5', 'kimi-k2', 'K2.6-code-preview'].includes(modelId)) {
+  if (['k3.1-pro', 'k3.1-pro-highspeed', 'k3', 'k3-256k', 'k3[1m]', 'kimi-k2.7-code', 'kimi-k2.6', 'kimi-k2.5', 'kimi-k2', 'K2.6-code-preview'].includes(modelId)) {
     return PROVIDERS.kimi;
   }
 
   // Check xAI models
-  if (['grok-build-0.1'].includes(modelId)) {
+  if (['grok-build-0.1', 'grok-4.7', 'grok-4.3'].includes(modelId)) {
     return PROVIDERS.xai;
   }
 
   // Check Z.AI models
-  if (['glm-5.3', 'glm-5.2', 'glm-5.1', 'glm-4.7', 'glm-4.7-flash'].includes(modelId)) {
+  if (['glm-5.3', 'glm-5.3-flash', 'glm-5.3-flashx', 'glm-5.2', 'glm-5.1', 'glm-4.7', 'glm-4.7-flash'].includes(modelId)) {
     return PROVIDERS.zai;
   }
 
   // Check MiMo models
-  if (['mimo-v2.5-pro', 'mimo-v2.5'].includes(modelId)) {
+  if (['mimo-v2.6-pro', 'mimo-v2.6-flash', 'mimo-v2.6-pro-ultraspeed', 'mimo-v2.5-pro', 'mimo-v2.5'].includes(modelId)) {
     return PROVIDERS.mimo;
   }
 
@@ -500,12 +520,12 @@ export function getProviderForModel(modelId: ModelId | string): ProviderConfig {
   }
 
   // Check Cerebras models
-  if (['llama3.3-70b', 'llama3.1-70b', 'llama3.1-8b'].includes(modelId)) {
+  if (['gpt-oss-120b', 'llama3.3-70b', 'llama-3.3-70b', 'llama3.1-70b', 'llama3.1-8b'].includes(modelId)) {
     return PROVIDERS.cerebras;
   }
 
   // Check Mistral models
-  if (['mistral-large-latest', 'mistral-small-latest', 'codestral-latest'].includes(modelId)) {
+  if (['mistral-large-latest', 'mistral-small-latest', 'codestral-latest', 'mistral-large-4-0'].includes(modelId)) {
     return PROVIDERS.mistral;
   }
 

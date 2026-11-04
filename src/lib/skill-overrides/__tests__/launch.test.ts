@@ -5,17 +5,24 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { loadSkillOverrideLayers, listPackCatalog, overdeckHome, getSupervisedConversationByTmuxSession } = await vi.hoisted(async () => {
+const { loadSkillOverrideLayers, listPackCatalog, overdeckHome, getSupervisedConversationByTmuxSession, readIssuePipeline } = await vi.hoisted(async () => {
   const fs = await import('node:fs');
   const os = await import('node:os');
   const path = await import('node:path');
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-launch-home-'));
   process.env.OVERDECK_HOME = home;
-  return { loadSkillOverrideLayers: vi.fn(), listPackCatalog: vi.fn(), overdeckHome: home, getSupervisedConversationByTmuxSession: vi.fn() };
+  return {
+    loadSkillOverrideLayers: vi.fn(),
+    listPackCatalog: vi.fn(),
+    overdeckHome: home,
+    getSupervisedConversationByTmuxSession: vi.fn(),
+    readIssuePipeline: vi.fn(async () => 'overdeck'),
+  };
 });
 
 vi.mock('../store.js', () => ({ loadSkillOverrideLayers }));
 vi.mock('../catalog.js', () => ({ listPackCatalog }));
+vi.mock('../../deft/issue-pipeline.js', () => ({ readIssuePipeline }));
 vi.mock('../../overdeck/conversations.js', () => ({ getSupervisedConversationByTmuxSession }));
 vi.mock('../../projects.js', () => ({ resolveProjectKeyForCwdAsync: vi.fn(async () => 'proj') }));
 vi.mock('node:child_process', async importOriginal => {
@@ -23,7 +30,7 @@ vi.mock('node:child_process', async importOriginal => {
   return { ...actual, execFile: vi.fn(actual.execFile), spawn: vi.fn(actual.spawn) };
 });
 
-import { packExtractDir } from '../../skill-packs/sources.js';
+import { packExtractDir, packRenderDir, writePackEntry } from '../../skill-packs/sources.js';
 import {
   applyClaudePacks,
   applyCodexPacks,
@@ -201,7 +208,7 @@ describe('launcherSkillOverrideLines', () => {
     expect(line).toBe(
       `pan skills launch-settings --harness codex --cwd '/w' --issue 'PAN-1' --codex-home "$CODEX_HOME" || echo "[launcher] WARNING: skill overrides not applied" >&2`,
     );
-    expect(deft).toBe(deftEnvReadLine('"$CODEX_HOME/overdeck-deft.env"'));
+    expect(deft).toBe(deftEnvReadLine('"$CODEX_HOME/overdeck-deft.env"', '/w'));
   });
 
   it('exports only the two allowlisted Deft assignments and never sources the file (PAN-3943)', async () => {
@@ -210,7 +217,7 @@ describe('launcherSkillOverrideLines', () => {
     const canary = join(dir, 'pwned');
     const report = `printf '%s|%s|%s' "\${DEFT_DIRECTIVE_DISABLE-unset}" "\${DEFT_ORCHESTRATOR-unset}" "\${EVIL-unset}"`;
     const read = (): string =>
-      execFileSync('bash', ['-c', `${deftEnvReadLine(`'${file}'`)}\n${report}`], {
+      execFileSync('bash', ['-c', `${deftEnvReadLine(`'${file}'`, dir)}\n${report}`], {
         encoding: 'utf8',
         env: { PATH: process.env.PATH ?? '' },
       });
@@ -224,6 +231,26 @@ describe('launcherSkillOverrideLines', () => {
       await writeFile(file, 'DEFT_DIRECTIVE_DISABLE=1\nDEFT_ORCHESTRATOR=overdeck\n');
       expect(read()).toBe('1|overdeck|unset');
       expect(existsSync(canary)).toBe(false);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('maps only the literal run-summary token to the working dir, not $PWD (PAN-4820)', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'deft-env-'));
+    const file = join(dir, 'deft.env');
+    const read = (): string =>
+      execFileSync('bash', ['-c', `${deftEnvReadLine(`'${file}'`, dir)}\nprintf '%s' "\${DEFT_RUN_SUMMARY_PATH-unset}"`], {
+        encoding: 'utf8',
+        cwd: tmpdir(),
+        env: { PATH: process.env.PATH ?? '' },
+      });
+    try {
+      await writeFile(file, 'DEFT_RUN_SUMMARY_PATH=/etc/passwd\nDEFT_RUN_SUMMARY_PATH=overdeck2\n');
+      expect(read()).toBe('unset');
+      await writeFile(file, 'DEFT_RUN_SUMMARY_PATH=overdeck\n');
+      expect(read()).toBe(join(dir, '.overdeck', 'deft-run-summary.jsonl'));
+      expect(deftEnvReadLine('f', '/w').match(/\) export /g)).toHaveLength(3);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
@@ -257,7 +284,7 @@ describe('launcherSkillOverrideLines', () => {
     expect(lines[2]).toBe(
       `if [ -d '/h/launch/k/skill-packs' ]; then PAN_SKILL_PLUGIN_DIR='/h/launch/k/skill-packs'; else PAN_SKILL_PLUGIN_DIR=''; fi`,
     );
-    expect(lines[3]).toBe(deftEnvReadLine(`'/h/launch/k/deft.env'`));
+    expect(lines[3]).toBe(deftEnvReadLine(`'/h/launch/k/deft.env'`, '/w'));
     const codex = launcherSkillOverrideLines({ harness: 'codex', workingDir: '/w', pluginLink: '/h/x' });
     expect(codex.join('\n')).not.toContain('--plugin-link');
   });
@@ -368,6 +395,27 @@ describe('skill pack launch (PAN-4334)', () => {
     expect(text).toContain('<!-- overdeck:deft-host-notice v1 -->');
   });
 
+  it('leaves the deft pack out for an issue on Deft\'s pipeline (PAN-4820)', async () => {
+    const base = catalogEntry(true);
+    listPackCatalog.mockResolvedValue([
+      base,
+      {
+        ...base,
+        id: 'deft',
+        url: 'https://github.com/eltmon/directive',
+        adapter: 'deft-readonly',
+        manifest: { ...base.manifest!, skills: [skill('glossary', 'content/skills/deft-directive-glossary')], pluginName: null },
+      },
+    ]);
+    loadSkillOverrideLayers.mockResolvedValue({ global: {}, packs: { global: { deft: true, mattpocock: true } } });
+    readIssuePipeline.mockResolvedValueOnce('deft');
+
+    const { selection } = await resolveLaunchPackSelection(ctx);
+
+    expect(readIssuePipeline).toHaveBeenCalledWith('PAN-1');
+    expect(selection.packs.map(pack => pack.id)).toEqual(['mattpocock']);
+  });
+
   it('removes the link when the issue turns the pack off', async () => {
     loadSkillOverrideLayers.mockResolvedValue({ global: {}, packs: { global: { mattpocock: true } } });
     await applyClaudePacks(ctx, link);
@@ -395,10 +443,166 @@ describe('skill pack launch (PAN-4334)', () => {
     expect(await applyClaudePacks(ctx, link, new Set(['mattpocock']))).toEqual([]);
   });
 
+  it('mounts pstack skills with the Claude Code adapter doc (PAN-4728)', async () => {
+    const root = packExtractDir('pstack', COMMIT);
+    mkdirSync(join(root, 'harness', 'pstack', 'claude-code', 'skills', 'tdd'), { recursive: true });
+    writeFileSync(join(root, 'harness', 'pstack', 'claude-code', 'skills', 'tdd', 'SKILL.md'), '---\nname: tdd\ndescription: x\n---\n');
+    mkdirSync(join(root, 'harness', 'pstack', 'claude-code', 'docs', 'harness'), { recursive: true });
+    writeFileSync(join(root, 'harness', 'pstack', 'claude-code', 'docs', 'harness', 'claude-code.md'), '# Adapter\n');
+    const base = catalogEntry(true);
+    listPackCatalog.mockResolvedValue([
+      {
+        ...base,
+        id: 'pstack',
+        adapter: 'claude-plugin',
+        manifest: {
+          ...base.manifest!,
+          skills: [skill('tdd', 'harness/pstack/claude-code/skills/tdd')],
+          pluginName: 'pstack',
+        },
+      },
+    ]);
+    loadSkillOverrideLayers.mockResolvedValue({ global: {}, packs: { project: { pstack: true } } });
+    expect(await applyClaudePacks(ctx, link)).toEqual([]);
+    expect(existsSync(join(link, 'pstack', 'skills', 'tdd', 'SKILL.md'))).toBe(true);
+    expect(existsSync(join(link, 'pstack', 'docs', 'harness', 'claude-code.md'))).toBe(true);
+  });
+
   it('stays quiet about an uncached pack that nothing turns on', async () => {
     listPackCatalog.mockResolvedValue([catalogEntry(false)]);
     loadSkillOverrideLayers.mockResolvedValue({ global: {} });
     expect(await applyClaudePacks(ctx, link)).toEqual([]);
+  });
+
+  describe('gstack-runtime pack (PAN-4727)', () => {
+    const GSTACK_COMMIT = 'e'.repeat(40);
+    const renderRoot = packRenderDir('gstack', GSTACK_COMMIT);
+    const gstackEntry = (cached: boolean) => {
+      const base = catalogEntry(true);
+      return {
+        ...base,
+        id: 'gstack',
+        url: 'https://github.com/eltmon/gstack',
+        ref: 'main',
+        commit: GSTACK_COMMIT,
+        adapter: 'gstack-runtime',
+        cached,
+        manifest: cached ? { ...base.manifest!, skills: [skill('review', 'review')], pluginName: null } : null,
+      };
+    };
+
+    beforeEach(() => {
+      // The extraction and the render hold different text, so the mount shows which one it copied.
+      mkdirSync(join(packExtractDir('gstack', GSTACK_COMMIT), 'review'), { recursive: true });
+      writeFileSync(join(packExtractDir('gstack', GSTACK_COMMIT), 'review', 'SKILL.md'), '---\nname: review\n---\nextraction copy\n');
+      mkdirSync(join(renderRoot, 'review'), { recursive: true });
+      writeFileSync(join(renderRoot, 'review', 'SKILL.md'), `---\nname: review\n---\nrender copy: ${renderRoot}/bin/gstack-skill-start\n`);
+    });
+
+    it('mounts gstack skills from the render when the pack is on for the project', async () => {
+      listPackCatalog.mockResolvedValue([gstackEntry(true)]);
+      loadSkillOverrideLayers.mockResolvedValue({ global: {}, packs: { project: { gstack: true } } });
+      expect(await applyClaudePacks(ctx, link)).toEqual([]);
+      const text = await readFile(join(link, 'gstack', 'skills', 'review', 'SKILL.md'), 'utf8');
+      expect(text).toContain(`render copy: ${renderRoot}/bin/gstack-skill-start`);
+      expect(text).not.toContain('extraction copy');
+    });
+
+    it('skips gstack with the sync warning when its render is not ready', async () => {
+      listPackCatalog.mockResolvedValue([gstackEntry(false)]);
+      loadSkillOverrideLayers.mockResolvedValue({ global: {}, packs: { project: { gstack: true } } });
+      expect(await applyClaudePacks(ctx, link)).toEqual([
+        '[launcher] WARNING: skill pack gstack not cached; run pan skills pack sync gstack',
+      ]);
+      expect(() => lstatSync(link)).toThrow();
+    });
+
+    it('lists gstack in the Codex pack block when on', async () => {
+      const codexHome = join(overdeckHome, 'codex-gstack');
+      listPackCatalog.mockResolvedValue([gstackEntry(true)]);
+      loadSkillOverrideLayers.mockResolvedValue({ global: {}, packs: { project: { gstack: true } } });
+      await applyCodexPacks(ctx, codexHome);
+      expect(await readFile(join(codexHome, 'config.toml'), 'utf8')).toContain('[plugins."gstack@overdeck-packs"]');
+    });
+
+    it('catalog reports gstack cached only once the trusted commit is rendered', async () => {
+      const { listPackCatalog: realListPackCatalog } = await vi.importActual<typeof import('../catalog.js')>('../catalog.js');
+      await writePackEntry({ id: 'gstack', url: 'https://github.com/eltmon/gstack', ref: 'main', commit: GSTACK_COMMIT });
+      const gstackRow = async () => (await realListPackCatalog()).find((pack) => pack.id === 'gstack');
+      expect(await gstackRow()).toMatchObject({ adapter: 'gstack-runtime', cached: false, manifest: null });
+      writeFileSync(join(renderRoot, '.gstack-pack.json'), '{"packMode":1}\n');
+      const ready = await gstackRow();
+      expect(ready).toMatchObject({ adapter: 'gstack-runtime', cached: true });
+      expect(ready?.manifest?.skills.map((s) => s.name)).toEqual(['review']);
+    });
+
+    describe('browser runtime (PAN-4730)', () => {
+      const browserMarker = join(renderRoot, '.gstack-pack-browser.json');
+
+      /** A rendered gstack pack holding review, qa (browser) and ship (browser-opt-in); the real catalog reads it. */
+      async function browserFixture(opts: { consent: boolean; built: boolean }): Promise<void> {
+        for (const root of [packExtractDir('gstack', GSTACK_COMMIT), renderRoot]) {
+          for (const name of ['review', 'qa', 'ship']) {
+            mkdirSync(join(root, name), { recursive: true });
+            writeFileSync(join(root, name, 'SKILL.md'), `---\nname: ${name}\ndescription: ${name}.\n---\n`);
+          }
+        }
+        writeFileSync(join(renderRoot, '.gstack-pack.json'), '{"packMode":1}\n');
+        if (opts.built) writeFileSync(browserMarker, '{"packBrowser":1}\n');
+        else rmSync(browserMarker, { force: true });
+        await writePackEntry({
+          id: 'gstack',
+          url: 'https://github.com/eltmon/gstack',
+          ref: 'main',
+          commit: GSTACK_COMMIT,
+          ...(opts.consent ? { browser: true as const } : {}),
+        });
+        const { listPackCatalog: real } = await vi.importActual<typeof import('../catalog.js')>('../catalog.js');
+        listPackCatalog.mockImplementation(real);
+      }
+      const mounted = (name: string) => existsSync(join(link, 'gstack', 'skills', name, 'SKILL.md'));
+
+      it('consent and a built runtime mount browser skills with the pack, browser-opt-in ones stay off', async () => {
+        await browserFixture({ consent: true, built: true });
+        loadSkillOverrideLayers.mockResolvedValue({ global: {}, packs: { project: { gstack: true } } });
+        expect(await applyClaudePacks(ctx, link)).toEqual([]);
+        expect([mounted('review'), mounted('qa'), mounted('ship')]).toEqual([true, true, false]);
+      });
+
+      it('a per-skill on mounts a browser-opt-in skill', async () => {
+        await browserFixture({ consent: true, built: true });
+        loadSkillOverrideLayers.mockResolvedValue({ global: { 'gstack/ship': true }, packs: { project: { gstack: true } } });
+        expect(await applyClaudePacks(ctx, link)).toEqual([]);
+        expect([mounted('qa'), mounted('ship')]).toEqual([true, true]);
+      });
+
+      it('consent without a built runtime mounts no browser skill and warns', async () => {
+        await browserFixture({ consent: true, built: false });
+        loadSkillOverrideLayers.mockResolvedValue({ global: {}, packs: { project: { gstack: true } } });
+        expect(await applyClaudePacks(ctx, link)).toEqual([
+          '[launcher] WARNING: gstack browser runtime not built; run pan skills pack sync gstack',
+        ]);
+        expect([mounted('review'), mounted('qa')]).toEqual([true, false]);
+      });
+
+      it('a built runtime without consent mounts no browser skill and does not warn', async () => {
+        await browserFixture({ consent: false, built: true });
+        loadSkillOverrideLayers.mockResolvedValue({ global: {}, packs: { project: { gstack: true } } });
+        expect(await applyClaudePacks(ctx, link)).toEqual([]);
+        expect([mounted('review'), mounted('qa')]).toEqual([true, false]);
+      });
+
+      it('catalog reports the browser state', async () => {
+        const { listPackCatalog: real } = await vi.importActual<typeof import('../catalog.js')>('../catalog.js');
+        const row = async () => (await real()).find((pack) => pack.id === 'gstack')?.browser;
+        await browserFixture({ consent: false, built: true });
+        expect(await row()).toBe('off');
+        await browserFixture({ consent: true, built: false });
+        expect(await row()).toBe('missing');
+        await browserFixture({ consent: true, built: true });
+        expect(await row()).toBe('ready');
+      });
+    });
   });
 
   it('writes the Codex pack block for the same selection', async () => {

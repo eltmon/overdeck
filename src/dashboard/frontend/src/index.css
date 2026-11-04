@@ -412,6 +412,8 @@
   --body-foreground: #4b5563; /* gray-600 — between foreground (gray-800) and muted (gray-500) */
   --faint-foreground: #9ca3af; /* gray-400 — one step past muted, toward background */
   --primary-ink: oklch(0.42 0.19 264); /* darkened --primary, ~8.9:1 on Ledger's #ffffff */
+  /* PAN-4650 D-4650-19: title bar and banner surface of a conversation another machine owns. */
+  --surface-remote: color-mix(in srgb, var(--card), var(--foreground) 5%);
 }
 
 /* Broadsheet, light — F-1 warms the neutral hue from cool blue-gray
@@ -445,6 +447,8 @@
   --body-foreground: hsl(35 8% 28%);
   --faint-foreground: hsl(35 3% 62%);
   --primary-ink: oklch(0.42 0.19 264);
+  /* PAN-4650 D-4650-19: title bar and banner surface of a conversation another machine owns. */
+  --surface-remote: color-mix(in srgb, var(--card), var(--foreground) 5%);
 }
 
 /* Ledger, dark — byte-identical restatement of the .dark block above. */
@@ -469,6 +473,8 @@
   --body-foreground: #d1d5db; /* gray-300 — between foreground (gray-200) and muted (gray-400) */
   --faint-foreground: #4b5563; /* gray-600 — one step past muted, toward background */
   --primary-ink: oklch(0.7 0.19 264); /* lightened --primary, ~6.9:1 on Ledger's #080b10 */
+  /* PAN-4650 D-4650-19: title bar and banner surface of a conversation another machine owns. */
+  --surface-remote: color-mix(in srgb, var(--card), var(--foreground) 5%);
 }
 
 /* Broadsheet, dark — same F-1/F-2/F-3 warm-ramp and surface-stepping as the
@@ -499,6 +505,8 @@
   --body-foreground: hsl(30 2% 88%);
   --faint-foreground: hsl(30 1% 48%);
   --primary-ink: oklch(0.7 0.19 264);
+  /* PAN-4650 D-4650-19: title bar and banner surface of a conversation another machine owns. */
+  --surface-remote: color-mix(in srgb, var(--card), var(--foreground) 5%);
 }
 
 /* ─── F-6: body typography — 13px/1.6 antialiased body copy under
@@ -765,6 +773,42 @@
   --shadow-overlay: 0 16px 48px rgba(0, 0, 0, 0.45), 0 4px 12px rgba(0, 0, 0, 0.25);
 }
 
+/* ─── PAN-4755: overlay surface tokens — the modal panel, its inset field
+     wells, its border and its scrim. --surface-overlay sits LIGHTER than
+     --background in both modes so a dialog rises off the page. Ledger
+     restates today's look (popover panel, background fields, border,
+     black scrim) by reference; Broadsheet gets new values. Read only by
+     components/shared/Modal and the dialogs built on it. ─── */
+[data-theme="ledger"] {
+  --surface-overlay: var(--popover);
+  --surface-overlay-field: var(--background);
+  --border-overlay: var(--border);
+  --overlay-scrim: rgb(0 0 0 / 0.4);
+}
+
+[data-theme="broadsheet"] {
+  --surface-overlay: hsl(40 18% 99.3%);
+  --surface-overlay-field: hsl(30 10% 96.8%);
+  --border-overlay: hsl(30 5% 82%);
+  --overlay-scrim: hsl(35 14% 9% / 0.44);
+}
+
+.dark[data-theme="ledger"],
+.dark [data-theme="ledger"] {
+  --surface-overlay: var(--popover);
+  --surface-overlay-field: var(--background);
+  --border-overlay: var(--border);
+  --overlay-scrim: rgb(0 0 0 / 0.56);
+}
+
+.dark[data-theme="broadsheet"],
+.dark [data-theme="broadsheet"] {
+  --surface-overlay: hsl(30 3% 18.5%);
+  --surface-overlay-field: hsl(0 0% 14.5%);
+  --border-overlay: hsl(30 3% 27%);
+  --overlay-scrim: hsl(0 0% 0% / 0.56);
+}
+
 /* ─── F-9: motion vocabulary — tokens only, no rewiring. Landing the
      easing/duration vocabulary so a follow-on task can adopt it
      site-by-site; the @keyframes and animation shorthand elsewhere in this
@@ -861,7 +905,9 @@
 
   #root {
     height: 100vh;
-    width: 100vw;
+    /* 100%, not 100vw: on a phone 100vw can exceed the page width, so the
+       browser zooms out and the /m shell pans (PAN-2355). */
+    width: 100%;
     overflow-y: hidden;
     overflow-x: hidden;
     overscroll-behavior-y: none;
@@ -1165,6 +1211,32 @@ body::after {
   .dot-metadata {
     @apply inline-flex items-center gap-1.5 text-xs font-mono text-muted-foreground;
   }
+
+  /* Grouped list (Skills page, Broadsheet): collapsible groups of single-line rows.
+     The tints are color-mix() because Tailwind opacity modifiers on the
+     var()-based color tokens (bg-muted/40) compile to nothing here.
+     .list-group-bar tints a group header, .list-row gives a row its
+     hover, .list-meta tints a metadata strip under an open group. */
+  .list-group-bar {
+    background-color: color-mix(in srgb, var(--muted) 55%, transparent);
+  }
+  .list-row {
+    @apply transition-colors duration-150;
+  }
+  .list-row:hover {
+    background-color: color-mix(in srgb, var(--muted) 45%, transparent);
+  }
+  .list-meta {
+    background-color: color-mix(in srgb, var(--muted) 30%, transparent);
+  }
+
+  /* Switch tracks for role="switch" buttons: on, and on-but-locked. */
+  .switch-track-on {
+    background-color: color-mix(in srgb, var(--foreground) 62%, transparent);
+  }
+  .switch-track-locked {
+    background-color: color-mix(in srgb, var(--foreground) 28%, transparent);
+  }
 }
 
 @keyframes drawer-task-current-ping {
@@ -1335,3 +1407,6 @@ body::after {
                           background: color-mix(in srgb, currentColor 10%, transparent);
                           padding: 0.1em 0.3em; border-radius: 3px; }
 .prose-notes a          { color: var(--primary); text-decoration: underline; }
+
+/* PAN-4642: highlights a pending citation's quoted text in its message row. */
+::highlight(overdeck-citation) { background-color: color-mix(in srgb, var(--primary) 22%, transparent); }

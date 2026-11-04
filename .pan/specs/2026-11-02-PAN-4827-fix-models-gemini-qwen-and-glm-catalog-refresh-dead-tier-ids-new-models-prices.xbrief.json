@@ -1,0 +1,973 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-02T16:29:38Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4827: fix(models): Gemini, Qwen and GLM catalog refresh (dead tier ids, new models, prices)",
+    "updated": "2026-11-02T16:35:49.640Z"
+  },
+  "plan": {
+    "id": "pan-4827",
+    "title": "fix(models): Gemini, Qwen and GLM catalog refresh (dead tier ids, new models, prices)",
+    "status": "running",
+    "uid": "b9358ea9-3c30-43d3-915c-c4c653fefb95",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-02T16:29:38Z",
+    "updated": "2026-11-02T16:35:49.640Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4827",
+        "label": "PAN-4827",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4844",
+        "label": "PAN-4844 (follow-up: GLM/Qwen cost-parser routing)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "models",
+      "catalog",
+      "providers",
+      "google",
+      "dashscope",
+      "zai",
+      "pricing"
+    ],
+    "metadata": {
+      "sizeJustification": "One provider group of a catalog audit already split into three sibling issues by provider (PAN-4825/4826/4827). The 24 files are the fixed set of catalog tables every model id must appear in, their tests, three docs and the frontend CI test list. The subsystem count is 8 only because each doc file under docs/ and scripts/frontend-test-subset.txt counts as its own subsystem; the code spans src/lib and src/dashboard.",
+      "canonicalFilename": "2026-11-02-PAN-4827-fix-models-gemini-qwen-and-glm-catalog-refresh-dead-tier-ids-new-models-prices.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "PROVIDERS.google.tierModels.haiku names gemini-3.1-flash-lite-preview (shut down 2026-05-25), all three PROVIDERS.dashscope tier ids are dead or never existed (qwen3-coder-plus deprecated 2026-10-10, qwen3-max absent from the Singapore list, qwen3-plus never real), and PROVIDERS.zai tiers name the operator-retired glm-4.7/glm-4.7-flash. Claude Code exports these as tier env vars, so subagents on these providers fail. Several prices are wrong or $0 placeholders, glm-5.3 has no cost row, qwen3.8-max's window is wrong, and new models (gemini-3.6-flash, gemini-3.1-flash-lite, glm-5.3-flash, glm-5.3-flashx) are missing.",
+      "Proposal": "Lowered from .pan/drafts/PAN-4827.md. Per provider, as a serialized chain of small vertical slices over the shared catalog files: retire dead ids through MODEL_DEPRECATIONS and move tiers to live ids; register the new models across providers.ts, settings.ts, capability additions, class, fallback, cost.ts, the omp registry and the Settings catalog; correct prices to the official pages fetched 2026-11-02. Independently, fix the dead ids in the dashboard Settings key-test route (line-neutral) and update docs. Finish with a general test that no provider's tier ids or haikuModel are MODEL_DEPRECATIONS keys.",
+      "NonGoals": "- Do not change any provider other than google, dashscope and zai; PROVIDERS.nous (qwen/qwen3.6-plus) stays as is\n- Do not edit changelog.mdx, docs/prds/, docs/research/ or src/lib/model-research/research-prompt.md\n- Do not change parser routing in src/lib/cost-parsers/jsonl-parser.ts or ohmypi-parser.ts (follow-up PAN-4844)\n- Do not retire gemini-3-flash-preview or gemini-3.1-pro-preview (no shutdown date on the official page) and do not change their tiers\n- Do not touch the operator-retired gemini-2.5-* rows\n- Do not remove glm-4.7/glm-4.7-flash from PROVIDERS.zai.models\n- Do not backfill FALLBACK_MAP rows for existing ids (gemini-3.8-flash, gemini-3.5-flash-lite, glm-5.3, qwen3.7-plus, qwen3.8-flash)\n- Do not change qwen3.7-max's context window (unverified)\n- Do not raise any entry in scripts/file-size-allowlist.txt and do not add lines to model-capabilities.ts or routes/settings.ts\n- Do not add any hardcoded model fallback"
+    },
+    "autoDecisions": [
+      {
+        "summary": "qwen3-max migrates to qwen3.7-max, not qwen3.8-max as the issue suggested",
+        "rationale": "Rule 1 (official page wins): Alibaba's 2026-10-10 notice names qwen3.7-max as the replacement for the qwen3-max snapshots, and the bare alias is absent from the Singapore price list. The opus tier still becomes qwen3.8-max as the issue asked."
+      },
+      {
+        "summary": "glm-5.3-flashx is added alongside glm-5.3-flash",
+        "rationale": "The issue adds flashx only if the official page lists it; docs.z.ai pricing lists GLM-5.3-FlashX at $0.37/$1.25."
+      },
+      {
+        "summary": "Z.AI opus tier moves to glm-5.3",
+        "rationale": "docs.z.ai/guides/llm/glm-5.3 calls GLM-5.3 'Z.ai's latest flagship model', which is the issue's condition."
+      },
+      {
+        "summary": "Google sonnet tier stays gemini-3-flash-preview",
+        "rationale": "The deprecations page lists no shutdown date for it (only a recommended replacement); the issue retires it only on a listed shutdown."
+      },
+      {
+        "summary": "Google haiku tier is gemini-3.1-flash-lite, with its 2027-05-07 shutdown in a dated comment",
+        "rationale": "The issue names it and Google lists it as the preview's replacement; gemini-3.5-flash-lite was the considered alternative."
+      },
+      {
+        "summary": "qwen3.8-max context window is 1,000,000",
+        "rationale": "Official model page (model-studio/qwen3-8-max) states Context Window 1000000."
+      },
+      {
+        "summary": "Qwen cost rows go into cost.ts under provider 'custom'; parser routing is filed as PAN-4844",
+        "rationale": "The pi reconciler maps dashscope to custom, so the rows price pi sessions now; changing jsonl-parser/ohmypi-parser routing would push the plan past 25 files and is a separate behavior change."
+      },
+      {
+        "summary": "Dashboard settings route dead ids are fixed in this issue with line-neutral edits",
+        "rationale": "The Google model test probes gemini-1.5-flash and the DashScope test probes qwen3-max, both dead; these are this issue's providers and the file is at its 1104-line cap, so only in-place edits are allowed."
+      },
+      {
+        "summary": "src/lib/ohmypi-models.ts registry rows are updated to match the catalog",
+        "rationale": "google and dashscope default to the ohmypi harness, so these rows decide what omp can launch and how it prices; the edits are data-only."
+      },
+      {
+        "summary": "glm-4.7 and glm-4.7-flash stay in PROVIDERS.zai.models",
+        "rationale": "tier-table.ts validates tiered-execution ids against provider.models and agents-spawn-tier-fitness.test.ts uses glm-4.7-flash as a retired tier model; the issue only requires the tiers to move."
+      },
+      {
+        "summary": "The general invariant test covers tierModels and haikuModel only",
+        "rationale": "A planning probe shows anthropic.models contains the deprecated claude-sonnet-4-5 (PAN-4826's work), so a models-list assertion would fail for reasons outside this issue."
+      }
+    ],
+    "items": [
+      {
+        "id": "google-flash-lite-ga",
+        "title": "Retire gemini-3.1-flash-lite-preview to gemini-3.1-flash-lite and move the Google haiku tier",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T16:29:38Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4827",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/model-deprecations.ts",
+            "src/lib/providers.ts",
+            "src/lib/settings.ts",
+            "src/lib/model-capabilities.ts",
+            "src/lib/model-capability-additions.ts",
+            "src/lib/model-capability-class.ts",
+            "src/lib/model-fallback.ts",
+            "src/lib/cost.ts",
+            "src/lib/ohmypi-models.ts",
+            "src/dashboard/frontend/src/components/Settings/modelCatalog.ts",
+            "src/lib/__tests__/model-catalog-audit.test.ts",
+            "tests/lib/providers.test.ts",
+            "tests/lib/settings.test.ts",
+            "tests/lib/model-fallback.test.ts",
+            "src/dashboard/frontend/src/components/Settings/__tests__/SettingsPage.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/model-catalog-audit.test.ts tests/lib/providers.test.ts tests/lib/settings.test.ts tests/lib/model-fallback.test.ts src/lib/__tests__/model-capability-class.test.ts",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Settings/__tests__/SettingsPage.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the named vitest files pass, including the new PAN-4827 retirement test"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1 exactly: add the MODEL_DEPRECATIONS row gemini-3.1-flash-lite-preview → gemini-3.1-flash-lite with the dated comment; replace the preview with the GA id in PROVIDERS.google.models, tierModels.haiku, the settings.ts Google available list and the Settings-page catalog; add the GA id to the Google lookup list, GoogleModel union, capability additions (Decision 7 values), class 'small', MODEL_PROVIDERS, FALLBACK_MAP (claude-haiku-4-5), cost.ts and the omp google registry; mark the preview capability row '(deprecated)' in place (model-capabilities.ts is at its 1422-line cap). Update the tests listed in WI-1 step 11."
+        },
+        "items": [
+          {
+            "id": "google-flash-lite-ga.ac1",
+            "title": "Given the Google provider, when getProviderEnv(PROVIDERS.google, key) runs, then ANTHROPIC_DEFAULT_HAIKU_MODEL, ANTHROPIC_SMALL_FAST_MODEL and CLAUDE_CODE_SUBAGENT_MODEL each equal 'gemini-3.1-flash-lite' (tests/lib/providers.test.ts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "google-flash-lite-ga.ac2",
+            "title": "resolveModelId('gemini-3.1-flash-lite-preview') returns 'gemini-3.1-flash-lite', and PROVIDERS.google.models contains the GA id but not the preview id (model-catalog-audit PAN-4827 block)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "google-flash-lite-ga.ac3",
+            "title": "MODEL_CAPABILITIES['gemini-3.1-flash-lite'] has contextWindow 1048576 and getPricing('google','gemini-3.1-flash-lite') returns inputPer1k 0.00025 and outputPer1k 0.0015",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "google-flash-lite-ga.ac4",
+            "title": "getAvailableModels(new Set(['anthropic','google'])) returns a list that contains 'gemini-3.1-flash-lite' and does not contain 'gemini-3.1-flash-lite-preview' (tests/lib/model-fallback.test.ts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "google-flash-lite-ga.ac5",
+            "title": "wc -l src/lib/model-capabilities.ts prints at most 1422 after the change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "google-add-3-6-flash",
+        "title": "Register gemini-3.6-flash across the catalog as an opt-in model",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T16:29:38Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4827",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/providers.ts",
+            "src/lib/settings.ts",
+            "src/lib/model-capability-additions.ts",
+            "src/lib/model-capability-class.ts",
+            "src/lib/model-fallback.ts",
+            "src/lib/cost.ts",
+            "src/lib/ohmypi-models.ts",
+            "src/dashboard/frontend/src/components/Settings/modelCatalog.ts",
+            "src/lib/__tests__/model-catalog-audit.test.ts",
+            "tests/lib/settings.test.ts",
+            "tests/lib/model-fallback.test.ts",
+            "src/dashboard/frontend/src/components/Settings/__tests__/gemini-qwen-glm-catalog.test.ts",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/model-catalog-audit.test.ts tests/lib/settings.test.ts tests/lib/model-fallback.test.ts src/lib/__tests__/model-capability-class.test.ts",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Settings/__tests__/gemini-qwen-glm-catalog.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the named vitest files pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2: add gemini-3.6-flash after gemini-3.8-flash in PROVIDERS.google.models, the Google lookup list, GoogleModel, the settings.ts Google available list, the capability additions (Decision 7 values and the dated price note), class 'workhorse', MODEL_PROVIDERS, FALLBACK_MAP (claude-haiku-4-5), cost.ts ($0.75/$3.75/$0.075), the omp google registry and the Settings-page catalog (cost 2.25). Do not change tierModels. Create the frontend test file gemini-qwen-glm-catalog.test.ts modeled on kimi-k31-catalog.test.ts. Add the line 'src/components/Settings/__tests__/gemini-qwen-glm-catalog.test.ts' to scripts/frontend-test-subset.txt in sorted position so CI runs it."
+        },
+        "items": [
+          {
+            "id": "google-add-3-6-flash.ac1",
+            "title": "getProviderForModel('gemini-3.6-flash').name returns 'google' and MODEL_CAPABILITIES['gemini-3.6-flash'].contextWindow equals 1048576 (it.each context table)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "google-add-3-6-flash.ac2",
+            "title": "getPricing('google','gemini-3.6-flash') returns inputPer1k 0.00075 and outputPer1k 0.00375",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "google-add-3-6-flash.ac3",
+            "title": "MODELS_BY_PROVIDER.google renders a gemini-3.6-flash row with costPer1MTokens 2.25 (gemini-qwen-glm-catalog.test.ts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "google-add-3-6-flash.ac4",
+            "title": "PROVIDERS.google.tierModels returns opus 'gemini-3.1-pro-preview', sonnet 'gemini-3-flash-preview' and haiku 'gemini-3.1-flash-lite', so no tier slot contains gemini-3.6-flash",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "google-add-3-6-flash.ac5",
+            "title": "scripts/frontend-test-subset.txt contains the line src/components/Settings/__tests__/gemini-qwen-glm-catalog.test.ts, so npm run test:frontend-subset runs the new test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "google-reprice-flash",
+        "title": "Reprice gemini-3.8-flash and gemini-3-flash-preview to the official rates",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T16:29:38Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4827",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cost.ts",
+            "src/lib/model-capabilities.ts",
+            "src/lib/model-capability-additions.ts",
+            "src/lib/ohmypi-models.ts",
+            "src/dashboard/frontend/src/components/Settings/modelCatalog.ts",
+            "src/lib/__tests__/model-catalog-audit.test.ts",
+            "src/dashboard/frontend/src/components/Settings/__tests__/gemini-qwen-glm-catalog.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/model-catalog-audit.test.ts tests/lib/ohmypi-models.test.ts",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Settings/__tests__/gemini-qwen-glm-catalog.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the named vitest files pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3: gemini-3.8-flash becomes $0.75/$3.75/$0.075 (cost.ts with the 2027-01-01 dated comment, capability costPer1MTokens 2.25, omp registry, Settings catalog cost 2.25 and description); gemini-3-flash-preview becomes $0.50/$3.00/$0.05 (cost.ts, capability costPer1MTokens 1.75 edited in place). gemini-4-argon is verified correct and must not be edited."
+        },
+        "items": [
+          {
+            "id": "google-reprice-flash.ac1",
+            "title": "getPricing('google','gemini-3.8-flash') returns inputPer1k 0.00075, outputPer1k 0.00375 and cacheReadPer1k 0.000075",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "google-reprice-flash.ac2",
+            "title": "getPricing('google','gemini-3-flash-preview') returns inputPer1k 0.0005 and outputPer1k 0.003",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "google-reprice-flash.ac3",
+            "title": "MODEL_CAPABILITIES['gemini-3.8-flash'].costPer1MTokens returns 2.25 and MODEL_CAPABILITIES['gemini-3-flash-preview'].costPer1MTokens returns 1.75",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "google-reprice-flash.ac4",
+            "title": "git diff for this item shows no change to the gemini-4-argon rows in cost.ts or model-capability-additions.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dashscope-retire-tier-ids",
+        "title": "Retire qwen3-coder-plus, qwen3-max and qwen3-plus and move the DashScope tiers",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T16:29:38Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4827",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/model-deprecations.ts",
+            "src/lib/providers.ts",
+            "src/lib/settings.ts",
+            "src/lib/model-capabilities.ts",
+            "src/lib/ohmypi-models.ts",
+            "src/dashboard/frontend/src/components/Settings/modelCatalog.ts",
+            "src/lib/__tests__/model-catalog-audit.test.ts",
+            "tests/lib/providers.test.ts",
+            "tests/lib/settings.test.ts",
+            "tests/lib/ohmypi-models.test.ts",
+            "src/dashboard/frontend/src/components/Settings/__tests__/SettingsPage.test.ts",
+            "src/dashboard/frontend/src/components/Settings/__tests__/gemini-qwen-glm-catalog.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/model-catalog-audit.test.ts tests/lib/providers.test.ts tests/lib/settings.test.ts tests/lib/ohmypi-models.test.ts tests/dashboard/settings-api-model-ids.test.ts",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Settings/__tests__/SettingsPage.test.ts src/components/Settings/__tests__/gemini-qwen-glm-catalog.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the named vitest files pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-5",
+            "FR-6",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-4: add MODEL_DEPRECATIONS rows qwen3-coder-plus → qwen3.7-plus, qwen3-max → qwen3.7-max (official replacement, not qwen3.8-max), qwen3-plus → qwen3.8-flash with the cited comment; PROVIDERS.dashscope.models becomes ['qwen3.7-plus','qwen3.8-flash','qwen3.7-max','qwen3.8-max'], haikuModel 'qwen3.8-flash', tierModels opus qwen3.8-max / sonnet qwen3.7-plus / haiku qwen3.8-flash; same list in settings.ts; mark the three capability rows '(deprecated)' in place; delete their omp registry rows and Settings-catalog rows. Keep them in the DashScope lookup list and the DashScopeModel union. Do not touch PROVIDERS.nous."
+        },
+        "items": [
+          {
+            "id": "dashscope-retire-tier-ids.ac1",
+            "title": "Given PROVIDERS.dashscope, when getProviderEnv runs, then ANTHROPIC_DEFAULT_OPUS_MODEL is 'qwen3.8-max', ANTHROPIC_DEFAULT_SONNET_MODEL is 'qwen3.7-plus', and the haiku, small-fast and subagent vars are 'qwen3.8-flash'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashscope-retire-tier-ids.ac2",
+            "title": "resolveModelId returns 'qwen3.7-plus' for qwen3-coder-plus, 'qwen3.7-max' for qwen3-max and 'qwen3.8-flash' for qwen3-plus, and none of the three appears in PROVIDERS.dashscope.models",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashscope-retire-tier-ids.ac3",
+            "title": "getProviderForModel('qwen3-max') still returns PROVIDERS.dashscope and getProviderForModel('qwen/qwen3.6-plus') still returns PROVIDERS.nous",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashscope-retire-tier-ids.ac4",
+            "title": "Given provisionOhmypiProviderForModel('qwen3.8-max', dir) runs, then the written dashscope registry contains no qwen3-max, qwen3-coder-plus or qwen3-plus model id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashscope-retire-tier-ids.ac5",
+            "title": "MODELS_BY_PROVIDER.dashscope renders no qwen3-max, qwen3-coder-plus or qwen3-plus row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dashscope-real-prices",
+        "title": "Replace the $0 Qwen placeholders with Singapore prices and fix the qwen3.8-max window",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T16:29:38Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4827",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/model-capabilities.ts",
+            "src/lib/model-capability-additions.ts",
+            "src/lib/cost.ts",
+            "src/lib/ohmypi-models.ts",
+            "src/dashboard/frontend/src/components/Settings/modelCatalog.ts",
+            "src/lib/__tests__/model-catalog-audit.test.ts",
+            "src/lib/costs/__tests__/reconciler-pi.test.ts",
+            "src/dashboard/frontend/src/components/Settings/__tests__/gemini-qwen-glm-catalog.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/model-catalog-audit.test.ts src/lib/costs/__tests__/reconciler-pi.test.ts tests/lib/ohmypi-models.test.ts",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Settings/__tests__/gemini-qwen-glm-catalog.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the named vitest files pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-8",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-5: capability costPer1MTokens qwen3.7-max 5 and qwen3.8-max 4 (in place, model-capabilities.ts), qwen3.8-flash 0.31 (additions), qwen3.7-plus stays 1 with the limited-time-discount note; qwen3.8-max contextWindow 1000000 in the capability row and the omp registry; add the four 'custom' Qwen cost rows to cost.ts with the cited comment; set omp registry costs; set Settings-catalog costs and descriptions. Leave qwen3.7-max's contextWindow at 262144."
+        },
+        "items": [
+          {
+            "id": "dashscope-real-prices.ac1",
+            "title": "MODEL_CAPABILITIES costPer1MTokens returns 1 for qwen3.7-plus, 0.31 for qwen3.8-flash, 5 for qwen3.7-max and 4 for qwen3.8-max, so no live Qwen row is 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashscope-real-prices.ac2",
+            "title": "MODEL_CAPABILITIES['qwen3.8-max'].contextWindow equals 1000000 and getClaudeCodeContextPolicyForModel('qwen3.8-max') returns autoCompactWindow 1000000",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashscope-real-prices.ac3",
+            "title": "getPricing('custom','qwen3.8-max') returns inputPer1k 0.002 and outputPer1k 0.006, and the other three Qwen rows return the PRD WI-5 step-3 values",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashscope-real-prices.ac4",
+            "title": "Given a pi transcript line for model qwen3.8-max with provider dashscope, when extractPiCostEvents runs, then it emits one event with provider 'custom' and cost greater than 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashscope-real-prices.ac5",
+            "title": "MODELS_BY_PROVIDER.dashscope renders no row with costPer1MTokens 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "zai-add-glm-5-3-flash",
+        "title": "Register glm-5.3-flash and glm-5.3-flashx across the catalog",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T16:29:38Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4827",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/providers.ts",
+            "src/lib/settings.ts",
+            "src/lib/model-capability-additions.ts",
+            "src/lib/model-capability-class.ts",
+            "src/lib/model-fallback.ts",
+            "src/lib/cost.ts",
+            "src/dashboard/frontend/src/components/Settings/modelCatalog.ts",
+            "src/lib/__tests__/model-catalog-audit.test.ts",
+            "src/dashboard/frontend/src/components/Settings/__tests__/gemini-qwen-glm-catalog.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/model-catalog-audit.test.ts tests/lib/model-fallback.test.ts src/lib/__tests__/model-capability-class.test.ts",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Settings/__tests__/gemini-qwen-glm-catalog.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the named vitest files pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-6: add both ids to PROVIDERS.zai.models and the Z.AI lookup list after glm-5.3, ZAIModel union, capability additions (Decision 7: 1M context, effort ['low','high','max'], supportsImages true), class 'small', MODEL_PROVIDERS, FALLBACK_MAP (claude-haiku-4-5), cost.ts rows ordered flashx, flash above any glm-5.3 row, and Settings-catalog rows. Tiers stay unchanged in this item."
+        },
+        "items": [
+          {
+            "id": "zai-add-glm-5-3-flash.ac1",
+            "title": "getProviderForModel returns 'zai' for glm-5.3-flash and glm-5.3-flashx and both capability rows have contextWindow 1000000",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "zai-add-glm-5-3-flash.ac2",
+            "title": "MODEL_CAPABILITIES returns effortLevels ['low','high','max'] and supportsImages true for both glm-5.3-flash and glm-5.3-flashx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "zai-add-glm-5-3-flash.ac3",
+            "title": "getPricing('custom','glm-5.3-flash') returns inputPer1k 0.00015 and outputPer1k 0.0005, and getPricing('custom','glm-5.3-flashx-legal') falls back to the flashx row (inputPer1k 0.00037)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "zai-add-glm-5-3-flash.ac4",
+            "title": "MODELS_BY_PROVIDER.zai renders glm-5.3-flash at cost 0.325 and glm-5.3-flashx at cost 0.81",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "zai-tiers",
+        "title": "Move the Z.AI tiers and haikuModel to glm-5.3 and glm-5.3-flash",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T16:29:38Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4827",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/providers.ts",
+            "tests/lib/providers.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/lib/providers.test.ts src/lib/__tests__/agents-spawn-tier-fitness.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "tests/lib/providers.test.ts and agents-spawn-tier-fitness.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-7: PROVIDERS.zai haikuModel 'glm-5.3-flash' and tierModels { opus: 'glm-5.3', sonnet: 'glm-5.3', haiku: 'glm-5.3-flash' }. Keep glm-4.7 and glm-4.7-flash in PROVIDERS.zai.models (tier-table validation and agents-spawn-tier-fitness.test.ts depend on them). Update the Z.AI env test."
+        },
+        "items": [
+          {
+            "id": "zai-tiers.ac1",
+            "title": "Given PROVIDERS.zai, when getProviderEnv(PROVIDERS.zai, key) runs, then ANTHROPIC_DEFAULT_OPUS_MODEL and ANTHROPIC_DEFAULT_SONNET_MODEL equal 'glm-5.3'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "zai-tiers.ac2",
+            "title": "The same env returns ANTHROPIC_DEFAULT_HAIKU_MODEL, ANTHROPIC_SMALL_FAST_MODEL and CLAUDE_CODE_SUBAGENT_MODEL equal to 'glm-5.3-flash'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "zai-tiers.ac3",
+            "title": "PROVIDERS.zai.models still contains 'glm-4.7-flash', and npx vitest run src/lib/__tests__/agents-spawn-tier-fitness.test.ts exits 0 with no edit to that file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "zai-reprice",
+        "title": "Correct GLM cost rows and add the missing glm-5.3 row",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T16:29:38Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4827",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cost.ts",
+            "src/lib/model-capabilities.ts",
+            "src/lib/costs/__tests__/reconciler-pi.test.ts",
+            "src/lib/__tests__/model-catalog-audit.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/costs/__tests__/reconciler-pi.test.ts src/lib/__tests__/model-catalog-audit.test.ts tests/lib/model-fallback.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the named vitest files pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-8: replace the ~7% approximation comment with the cited one; add a glm-5.3 row ($1.40/$4.40/$0.26) below the flash rows; set cacheReadPer1k 0.00026 on glm-5.2 and glm-5.1; glm-4.7 becomes $0.60/$2.20/$0.11; glm-4.7-flash becomes 0/0 and moves above glm-4.7; capability costPer1MTokens glm-4.7 1.4 and glm-4.7-flash 0, in place."
+        },
+        "items": [
+          {
+            "id": "zai-reprice.ac1",
+            "title": "getPricing('custom','glm-5.3') returns inputPer1k 0.0014, outputPer1k 0.0044 and cacheReadPer1k 0.00026",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "zai-reprice.ac2",
+            "title": "getPricing('custom','glm-5.2') and getPricing('custom','glm-5.1') each returns cacheReadPer1k 0.00026",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "zai-reprice.ac3",
+            "title": "getPricing('custom','glm-4.7') returns inputPer1k 0.0006 and outputPer1k 0.0022, and getPricing('custom','glm-4.7-flash') returns 0 for both",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "zai-reprice.ac4",
+            "title": "MODEL_CAPABILITIES costPer1MTokens returns 1.4 for glm-4.7 and 0 for glm-4.7-flash",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-route-dead-ids",
+        "title": "Settings key test and key validation name no dead Google or DashScope id",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T16:29:38Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4827",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/settings.ts",
+            "tests/dashboard/settings-api-model-ids.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/dashboard/settings-api-model-ids.test.ts",
+            "wc -l src/dashboard/server/routes/settings.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "settings-api-model-ids.test.ts passes",
+            "wc prints 1104"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-9 with line-neutral edits only (the file is at its 1104-line cap): retarget the four legacy Google MODEL_API_IDS rows and the three retired Qwen rows to live ids; change the Google and DashScope model-test lookups to fall through to the selected model (|| model) with probes 'gemini-3.5-flash-lite' and 'qwen3.8-flash' when no model is given; replace the Google validation list and the DashScope validation fallback list with live ids. Leave Z.AI lines alone."
+        },
+        "items": [
+          {
+            "id": "settings-route-dead-ids.ac1",
+            "title": "MODEL_API_IDS['gemini-2.5-flash'].apiModel returns 'gemini-3-flash-preview' and no MODEL_API_IDS value has an apiModel starting with 'gemini-1.5'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-route-dead-ids.ac2",
+            "title": "MODEL_API_IDS returns apiModel 'qwen3.7-max' for qwen3-max, 'qwen3.7-plus' for qwen3-coder-plus and 'qwen3.8-flash' for qwen3-plus",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-route-dead-ids.ac3",
+            "title": "The diff of the google and dashscope model-test cases shows the selected model passed through when MODEL_API_IDS has no row, and the validation lists name only live ids",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-route-dead-ids.ac4",
+            "title": "wc -l src/dashboard/server/routes/settings.ts prints 1104",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tier-invariant-test",
+        "title": "General test: no provider's tier ids or haikuModel name a retired model",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T16:29:38Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4827",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/__tests__/model-catalog-audit.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/model-catalog-audit.test.ts"
+          ],
+          "expected_outputs": [
+            "model-catalog-audit.test.ts passes with one generated case per PROVIDERS entry"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-10: add the it.each over Object.entries(PROVIDERS) asserting every tierModels value and haikuModel is not a MODEL_DEPRECATIONS key. Do not assert anything about provider models lists (anthropic.models contains a deprecated id that PAN-4826 owns)."
+        },
+        "items": [
+          {
+            "id": "tier-invariant-test.ac1",
+            "title": "Given every provider in PROVIDERS, when the test collects tierModels values and haikuModel, then Object.hasOwn(MODEL_DEPRECATIONS, id) returns false for each id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tier-invariant-test.ac2",
+            "title": "The it.each emits one case per PROVIDERS entry, reads only tierModels and haikuModel, and returns false from Object.hasOwn(MODEL_DEPRECATIONS, id) for every id even though PROVIDERS.anthropic.models still contains claude-sonnet-4-5",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-catalog-refresh",
+        "title": "Docs list only live Google and Z.AI ids and cite the new sources",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T16:29:38Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4827",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/USAGE.md",
+            "docs/TESTING-PROVIDERS.md",
+            "docs/MODEL-CONTEXT-AUDIT.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "git grep -n -E 'gemini-3\\.1-flash-lite-preview|qwen3-coder-plus|qwen3-max|qwen3-plus|glm-4\\.7' -- '*.mdx' ':!changelog.mdx'",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "git grep prints nothing",
+            "lint:docs completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-11: rewrite the Google and Z.AI lists in docs/USAGE.md 'Supported Providers and Models' to the live ids; change --model glm-4.7 to --model glm-5.3 at docs/TESTING-PROVIDERS.md lines 83 and 197; add the Gemini 3.6 Flash, 3.1 Flash Lite, pricing and deprecations links, a GLM 5.3 Flash/FlashX bullet, and the Qwen 3.8 Max, Model Studio pricing and deprecation links to docs/MODEL-CONTEXT-AUDIT.md. Do not edit changelog.mdx, docs/prds/, docs/research/ or research-prompt.md."
+        },
+        "items": [
+          {
+            "id": "docs-catalog-refresh.ac1",
+            "title": "docs/USAGE.md's Google list shows gemini-3.1-flash-lite and gemini-3.6-flash and no longer shows gemini-3-pro-preview; its Z.AI list shows glm-5.3, glm-5.3-flash and glm-5.3-flashx and no longer shows glm-4.7",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-catalog-refresh.ac2",
+            "title": "docs/TESTING-PROVIDERS.md shows 'pan start PAN-998 --model glm-5.3' and 'pan start PAN-996 --model glm-5.3'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-catalog-refresh.ac3",
+            "title": "docs/MODEL-CONTEXT-AUDIT.md contains links to ai.google.dev/gemini-api/docs/deprecations, docs.z.ai/guides/llm/glm-5.3-flash and alibabacloud.com/help/en/model-studio/qwen3-8-max",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-catalog-refresh.ac4",
+            "title": "git grep over *.mdx (excluding changelog.mdx) for the retired ids prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "google-flash-lite-ga",
+        "to": "google-add-3-6-flash",
+        "type": "blocks"
+      },
+      {
+        "from": "google-add-3-6-flash",
+        "to": "google-reprice-flash",
+        "type": "blocks"
+      },
+      {
+        "from": "google-reprice-flash",
+        "to": "dashscope-retire-tier-ids",
+        "type": "blocks"
+      },
+      {
+        "from": "dashscope-retire-tier-ids",
+        "to": "dashscope-real-prices",
+        "type": "blocks"
+      },
+      {
+        "from": "dashscope-real-prices",
+        "to": "zai-add-glm-5-3-flash",
+        "type": "blocks"
+      },
+      {
+        "from": "zai-add-glm-5-3-flash",
+        "to": "zai-tiers",
+        "type": "blocks"
+      },
+      {
+        "from": "zai-tiers",
+        "to": "zai-reprice",
+        "type": "blocks"
+      },
+      {
+        "from": "zai-reprice",
+        "to": "tier-invariant-test",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

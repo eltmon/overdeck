@@ -1,0 +1,260 @@
+{
+  "version": "1",
+  "issueId": "PAN-4833",
+  "created": "2026-11-03T04:52:36.921Z",
+  "updated": "2026-11-03T06:31:40.672Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "golden-vectors": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4833",
+      "claimedAt": "2026-11-03T04:52:36.921Z",
+      "doneAt": "2026-11-03T04:53:53.495Z"
+    },
+    "package-scaffold": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4833",
+      "claimedAt": "2026-11-03T04:56:06.828Z",
+      "doneAt": "2026-11-03T04:58:01.244Z"
+    },
+    "move-protocol": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4833",
+      "claimedAt": "2026-11-03T04:58:09.296Z",
+      "doneAt": "2026-11-03T05:08:25.637Z"
+    },
+    "shared-initiator": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4833",
+      "claimedAt": "2026-11-03T05:08:31.348Z",
+      "doneAt": "2026-11-03T05:15:46.901Z"
+    },
+    "web-port-parity": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4833",
+      "claimedAt": "2026-11-03T05:15:53.095Z",
+      "doneAt": "2026-11-03T05:17:03.182Z"
+    },
+    "web-secure-channel": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4833",
+      "claimedAt": "2026-11-03T05:17:10.645Z",
+      "doneAt": "2026-11-03T05:19:19.756Z"
+    },
+    "directory-web": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4833",
+      "claimedAt": "2026-11-03T05:19:28.387Z",
+      "doneAt": "2026-11-03T05:23:45.773Z"
+    },
+    "rtc-duplex-web": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4833",
+      "claimedAt": "2026-11-03T05:23:52.713Z",
+      "doneAt": "2026-11-03T05:27:02.685Z"
+    },
+    "dial-machine": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4833",
+      "claimedAt": "2026-11-03T05:27:11.426Z",
+      "doneAt": "2026-11-03T05:31:25.450Z"
+    },
+    "cp1-harness": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4833",
+      "claimedAt": "2026-11-03T05:33:25.349Z",
+      "doneAt": "2026-11-03T05:45:00.176Z"
+    },
+    "docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4833",
+      "claimedAt": "2026-11-03T05:45:07.550Z",
+      "doneAt": "2026-11-03T05:46:26.873Z"
+    },
+    "golden-vectors.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:08:36.769Z"
+    },
+    "golden-vectors.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:08:58.393Z"
+    },
+    "golden-vectors.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:09:20.053Z"
+    },
+    "package-scaffold.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:09:43.315Z"
+    },
+    "package-scaffold.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:10:04.818Z"
+    },
+    "package-scaffold.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:10:30.309Z"
+    },
+    "package-scaffold.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:10:55.576Z"
+    },
+    "move-protocol.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:11:19.345Z"
+    },
+    "move-protocol.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:11:43.197Z"
+    },
+    "move-protocol.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:12:02.711Z"
+    },
+    "move-protocol.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:12:24.555Z"
+    },
+    "move-protocol.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:12:44.542Z"
+    },
+    "shared-initiator.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:13:03.838Z"
+    },
+    "shared-initiator.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:13:21.685Z"
+    },
+    "shared-initiator.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:13:39.953Z"
+    },
+    "shared-initiator.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:13:56.706Z"
+    },
+    "shared-initiator.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:14:14.878Z"
+    },
+    "web-port-parity.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:14:32.721Z"
+    },
+    "web-port-parity.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:14:51.487Z"
+    },
+    "web-secure-channel.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:15:11.264Z"
+    },
+    "web-secure-channel.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:15:33.059Z"
+    },
+    "web-secure-channel.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:15:54.651Z"
+    },
+    "web-secure-channel.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:16:15.282Z"
+    },
+    "directory-web.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:16:35.839Z"
+    },
+    "directory-web.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:16:56.496Z"
+    },
+    "directory-web.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:17:17.445Z"
+    },
+    "directory-web.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:17:36.569Z"
+    },
+    "directory-web.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:17:55.613Z"
+    },
+    "rtc-duplex-web.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:18:14.785Z"
+    },
+    "rtc-duplex-web.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:18:35.519Z"
+    },
+    "rtc-duplex-web.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:18:55.830Z"
+    },
+    "rtc-duplex-web.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:19:19.830Z"
+    },
+    "dial-machine.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:19:45.869Z"
+    },
+    "dial-machine.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:20:13.702Z"
+    },
+    "dial-machine.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:20:47.193Z"
+    },
+    "dial-machine.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:21:20.328Z"
+    },
+    "dial-machine.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:22:13.039Z"
+    },
+    "cp1-harness.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:22:40.843Z"
+    },
+    "cp1-harness.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:23:01.917Z"
+    },
+    "cp1-harness.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:23:21.425Z"
+    },
+    "cp1-harness.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:23:43.011Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:24:03.241Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:24:31.475Z"
+    },
+    "docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:24:57.229Z"
+    },
+    "docs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:25:20.297Z"
+    }
+  },
+  "feedback": []
+}

@@ -17,6 +17,7 @@ import { deliverAgentMessage, injectPiConversationMemory } from '../agents.js';
 import type { DeliveryResult } from '../agents/delivery.js';
 import { ensureMainInputTarget, type EnsureMainResult } from '../agents/input-target.js';
 import { conversationPendingPermission, type PendingPermission } from './conversation-permission.js';
+import { conversationWriteRefusal } from './conversation-release.js';
 import {
   ComposerCommandConfirmationError,
   composerCommandConfirmationFromBody,
@@ -414,6 +415,7 @@ export async function handleConversationMessage(
 ): Promise<ReturnType<typeof jsonResponse>> {
   const conv = getConversationByName(name);
   if (!conv) return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+  const refusal = conversationWriteRefusal(conv); if (refusal) return refusal;
   if (conv.status === 'ended') {
     return jsonResponse({ error: 'Session has ended — start a new run to interact' }, { status: 422 });
   }
@@ -529,7 +531,7 @@ export async function handleConversationMessage(
 
   if (droppedImageCount > 0 && !outboundMessage && effectiveAttachmentPaths.length === 0) {
     return jsonResponse(
-      { error: `${conv.model ?? 'This model'} can't read images. Switch to a vision-capable model (e.g. mimo-v2.5) to send images.` },
+      { error: `${conv.model ?? 'This model'} can't read images. Switch to a vision-capable model to send images.` },
       { status: 422 },
     );
   }

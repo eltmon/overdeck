@@ -1,8 +1,8 @@
 /**
  * Skill pack sources (PAN-4334): the pack registry and the pack cache paths.
  *
- * - registry: `~/.overdeck/config.yaml` → `skills.packs.<id>: { url, ref, commit, adapter? }`
- *   (the trusted commit is an operator decision, so it is stored)
+ * - registry: `~/.overdeck/config.yaml` → `skills.packs.<id>: { url, ref, commit, adapter?, browser? }`
+ *   (the trusted commit and the browser-runtime consent are operator decisions, so they are stored)
  * - cache:    `~/.overdeck/packs/<id>/` (derived; deletable at any time)
  *
  * Server-reachable: every fs and git call is async. Nothing here imports
@@ -10,7 +10,7 @@
  */
 import { execFile } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { lstat, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { chmod, lstat, mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 import { isMap, isScalar, parse as parseYaml, parseDocument, type Document } from 'yaml';
@@ -25,10 +25,20 @@ import {
   type PackAdapterId,
   type PackManifest,
 } from './adapters.js';
+import {
+  assertBrowserBuildable,
+  BrowserError,
+  browserCommand,
+  browserDownloads,
+  buildBrowserRuntime,
+  isBrowserReady,
+} from './browser.js';
+import { assertGoAvailable, buildOx, isOxBuildReady, OxBuildError, oxBuildCommands, oxBuildDownloads } from './ox-build.js';
+import { assertRenderable, isRenderReady, RenderError, renderCommand, renderRuntimePack } from './render.js';
 
 export const PACK_ID_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
 const COMMIT_PATTERN = /^[0-9a-f]{40}$/;
-const ADAPTERS: readonly PackAdapterId[] = ['plain', 'claude-plugin', 'deft-readonly'];
+const ADAPTERS: readonly PackAdapterId[] = ['plain', 'claude-plugin', 'deft-readonly', 'gstack-runtime'];
 const LS_REMOTE_TIMEOUT_MS = 5000;
 
 const execFileAsync = promisify(execFile);
@@ -39,6 +49,8 @@ export interface PackRegistryEntry {
   ref: string;
   commit: string;
   adapter?: PackAdapterId;
+  /** gstack-runtime only: the operator trusted the browser runtime (PAN-4730). */
+  browser?: true;
 }
 
 function assertPackId(id: string): void {
@@ -62,9 +74,30 @@ export function packRepoDir(id: string): string {
   return join(packCacheDir(id), 'repo.git');
 }
 
+/** PAN-4852 AD-5: Go's caches and config for the sageox build. */
+export function packGoDir(id: string): string {
+  return join(packCacheDir(id), 'go');
+}
+
 export function packExtractDir(id: string, commit: string): string {
   assertCommit(commit);
   return join(packCacheDir(id), commit);
+}
+
+/** A gstack-runtime pack's render of one commit (eltmon/gstack pack mode). */
+export function packRenderDir(id: string, commit: string): string {
+  assertCommit(commit);
+  return join(packCacheDir(id), 'render', commit);
+}
+
+/** A runtime pack's state root, shared across commits; removed with the pack. */
+export function packStateDir(id: string): string {
+  return join(packCacheDir(id), 'state');
+}
+
+/** A runtime pack's browser cache (bun package cache and Chromium), shared across commits; removed with the pack. */
+export function packBrowserDir(id: string): string {
+  return join(packCacheDir(id), 'browser');
 }
 
 async function readTextOrEmpty(path: string): Promise<string> {
@@ -78,11 +111,19 @@ async function readTextOrEmpty(path: string): Promise<string> {
 
 function toEntry(id: string, raw: unknown): PackRegistryEntry | null {
   if (!PACK_ID_PATTERN.test(id) || !raw || typeof raw !== 'object') return null;
-  const { url, ref, commit, adapter } = raw as Record<string, unknown>;
+  const { url, ref, commit, adapter, browser } = raw as Record<string, unknown>;
   if (typeof url !== 'string' || !url || typeof ref !== 'string' || !ref) return null;
   if (typeof commit !== 'string' || !COMMIT_PATTERN.test(commit)) return null;
   if (adapter !== undefined && !ADAPTERS.includes(adapter as PackAdapterId)) return null;
-  return { id, url, ref, commit, ...(adapter ? { adapter: adapter as PackAdapterId } : {}) };
+  // Only `browser: true` records consent; any other value is ignored, not a malformed entry.
+  return {
+    id,
+    url,
+    ref,
+    commit,
+    ...(adapter ? { adapter: adapter as PackAdapterId } : {}),
+    ...(browser === true ? { browser: true as const } : {}),
+  };
 }
 
 /** Registered packs sorted by id; malformed entries are skipped. */
@@ -99,6 +140,30 @@ export async function listPacks(): Promise<PackRegistryEntry[]> {
     .map(([id, raw]) => toEntry(id, raw))
     .filter((entry): entry is PackRegistryEntry => entry !== null)
     .sort((a, b) => a.id.localeCompare(b.id));
+}
+
+/**
+ * The registry as gc must read it (PAN-4727): every `skills.packs` key counts as registered, with its
+ * trusted commit, or null when the entry is malformed; `readable` is false when config.yaml cannot be
+ * read or parsed, or `skills.packs` is not a map. Unlike listPacks, nothing is silently dropped, so gc
+ * never mistakes a registered pack for an orphan.
+ */
+export async function readPackRegistry(): Promise<{ readable: boolean; packs: Map<string, string | null> }> {
+  const packs = new Map<string, string | null>();
+  let doc: Document;
+  try {
+    doc = parseDocument(await readTextOrEmpty(getGlobalConfigPath()));
+  } catch {
+    return { readable: false, packs };
+  }
+  if (doc.errors.length > 0) return { readable: false, packs };
+  const raw = (doc.toJS() as { skills?: { packs?: unknown } } | null)?.skills?.packs;
+  if (raw === undefined || raw === null) return { readable: true, packs };
+  if (typeof raw !== 'object' || Array.isArray(raw)) return { readable: false, packs };
+  for (const [id, value] of Object.entries(raw as Record<string, unknown>)) {
+    packs.set(id, toEntry(id, value)?.commit ?? null);
+  }
+  return { readable: true, packs };
 }
 
 export async function getPack(id: string): Promise<PackRegistryEntry | null> {
@@ -137,6 +202,7 @@ export async function writePackEntry(entry: PackRegistryEntry): Promise<void> {
     ref: entry.ref,
     commit: entry.commit,
     ...(entry.adapter ? { adapter: entry.adapter } : {}),
+    ...(entry.browser === true ? { browser: true } : {}),
   };
   await editGlobalConfig((doc) => {
     doc.setIn(['skills', 'packs', entry.id], doc.createNode(value));
@@ -221,15 +287,40 @@ export async function resolveRef(id: string, ref: string): Promise<string> {
   return commit;
 }
 
-/** Extract a commit into `packs/<id>/<commit>/` (temp dir, then rename); reuses an existing extraction. */
-export async function extractCommit(id: string, commit: string): Promise<string> {
+async function isDirAt(path: string): Promise<boolean> {
+  try {
+    return (await lstat(path)).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Extract a commit into `packs/<id>/<commit>/` (temp dir, then rename);
+ * reuses an existing extraction, unless `pluginRoot` is given and missing
+ * from it, in which case the stale extraction is removed and rebuilt.
+ */
+export async function extractCommit(id: string, commit: string, pluginRoot?: string): Promise<string> {
+  if (pluginRoot !== undefined) assertOperand('plugin root', pluginRoot);
   const dir = packExtractDir(id, commit);
-  if (await exists(dir)) return dir;
+  if (await exists(dir)) {
+    if (!pluginRoot || (await isDirAt(join(dir, pluginRoot)))) return dir;
+    await rm(dir, { recursive: true, force: true });
+  }
   const tmp = `${dir}.tmp-${randomBytes(6).toString('hex')}`;
   const tar = `${tmp}.tar`;
   try {
     await mkdir(tmp, { recursive: true });
-    await git(['--git-dir', packRepoDir(id), 'archive', '--format=tar', '-o', tar, commit]);
+    await git([
+      '--git-dir',
+      packRepoDir(id),
+      'archive',
+      '--format=tar',
+      '-o',
+      tar,
+      commit,
+      ...(pluginRoot ? ['--', pluginRoot] : []),
+    ]);
     await execFileAsync('tar', ['-xf', tar, '-C', tmp]);
     try {
       await rename(tmp, dir);
@@ -281,7 +372,7 @@ export async function packUpdateAvailable(entry: PackRegistryEntry): Promise<str
   return remote && remote !== entry.commit ? remote : null;
 }
 
-export type PackSourceErrorCode = 'bad-id' | 'exists' | 'unknown-pack' | 'git';
+export type PackSourceErrorCode = 'bad-id' | 'exists' | 'unknown-pack' | 'git' | 'render';
 
 export class PackSourceError extends Error {
   constructor(
@@ -300,8 +391,15 @@ export interface PackPreview {
   commit: string;
   adapter: PackAdapterId;
   manifest: PackManifest;
+  pluginRoot?: string;
   previousCommit?: string;
   diff?: { added: string[]; removed: string[]; changed: string[]; newCapabilities: string[] };
+  /** Runtime packs: the render command trusting runs once, with `cwd` = the extraction. */
+  runtime?: { command: string[] };
+  /** gstack browser runtime (PAN-4730): the build command, every download, and every path it writes. */
+  browser?: { command: string[]; downloads: string[]; writes: string[] };
+  /** sageox (PAN-4852 AD-8): the `go build` commands, every path they write, and what they download. */
+  oxBuild?: { commands: string[][]; writes: string[]; downloads: string[] };
 }
 
 export type ConfirmPack = (preview: PackPreview) => Promise<boolean>;
@@ -322,8 +420,89 @@ async function packAdapter(id: string, dir: string, explicit?: PackAdapterId): P
   return explicit ?? KNOWN_PACKS[id]?.adapter ?? (await detectAdapter(dir));
 }
 
-async function manifestAt(id: string, dir: string, adapter: PackAdapterId): Promise<PackManifest> {
-  return gitStep(id, () => readPackManifest(dir, adapter, { optIn: KNOWN_PACKS[id]?.optIn ?? [], skillsRoot: KNOWN_PACKS[id]?.skillsRoot }));
+const pluginRootOf = (id: string): string | undefined => KNOWN_PACKS[id]?.pluginRoot;
+
+async function manifestAt(id: string, dir: string, adapter: PackAdapterId, browser = false): Promise<PackManifest> {
+  return gitStep(id, () =>
+    readPackManifest(dir, adapter, {
+      optIn: KNOWN_PACKS[id]?.optIn ?? [],
+      skillsRoot: KNOWN_PACKS[id]?.skillsRoot,
+      pluginRoot: pluginRootOf(id),
+      browser,
+    }),
+  );
+}
+
+async function renderStep<T>(step: () => Promise<T>): Promise<T> {
+  try {
+    return await step();
+  } catch (error) {
+    if (error instanceof RenderError || error instanceof BrowserError || error instanceof OxBuildError) {
+      throw new PackSourceError('render', error.message);
+    }
+    throw error;
+  }
+}
+
+/** Before consent: the commit supports pack mode and bun is on PATH; returns the command trusting runs. */
+async function runtimePreview(id: string, dir: string, commit: string): Promise<{ command: string[] }> {
+  await renderStep(() => assertRenderable(dir, commit));
+  return { command: renderCommand(packRenderDir(id, commit), packStateDir(id)) };
+}
+
+/** After consent, before the registry write: render the commit unless its render is already ready. */
+async function renderPack(id: string, dir: string, commit: string): Promise<void> {
+  const renderDir = packRenderDir(id, commit);
+  if (await isRenderReady(renderDir)) return;
+  await renderStep(() => renderRuntimePack({ extractDir: dir, commit, renderDir, stateDir: packStateDir(id) }));
+}
+
+/** Before consent: the commit has the browser step and bun is on PATH; returns what trusting runs, downloads and writes. */
+async function browserPreview(id: string, dir: string, commit: string): Promise<NonNullable<PackPreview['browser']>> {
+  await renderStep(() => assertBrowserBuildable(dir, commit));
+  const renderDir = packRenderDir(id, commit);
+  const cacheDir = packBrowserDir(id);
+  return {
+    command: browserCommand(renderDir, cacheDir),
+    downloads: await browserDownloads(dir),
+    writes: [
+      `${renderDir}/node_modules`,
+      `${renderDir}/browse/dist`,
+      `${renderDir}/design/dist`,
+      `${renderDir}/make-pdf/dist`,
+      `${cacheDir}/bun-cache`,
+      `${cacheDir}/playwright`,
+      `${cacheDir}/xdg-cache`,
+    ],
+  };
+}
+
+/** After consent: build the browser runtime into the commit's ready render. */
+async function buildPackBrowser(id: string, dir: string, commit: string): Promise<void> {
+  await renderStep(() =>
+    buildBrowserRuntime({ extractDir: dir, commit, renderDir: packRenderDir(id, commit), cacheDir: packBrowserDir(id) }),
+  );
+}
+
+/** PAN-4852 D5: Overdeck builds `ox` (and its session adapters) for the sageox pack. */
+const buildsOx = (id: string): boolean => id === 'sageox';
+
+/** Before consent (AD-8/AD-9): go is on PATH; returns the build commands, writes and downloads. */
+async function oxBuildPreview(id: string, dir: string): Promise<NonNullable<PackPreview['oxBuild']>> {
+  const goDir = packGoDir(id);
+  await renderStep(() => assertGoAvailable(undefined, goDir));
+  const binDir = join(dir, 'bin');
+  return {
+    commands: oxBuildCommands(binDir),
+    writes: [`${binDir}/`, `${goDir}/`],
+    downloads: await oxBuildDownloads(dir, undefined, goDir),
+  };
+}
+
+/** After consent, before the registry write: build the commit unless its build is already ready. */
+async function buildPackOx(id: string, dir: string, commit: string): Promise<void> {
+  if (await isOxBuildReady(dir, commit)) return;
+  await renderStep(() => buildOx({ extractDir: dir, commit, goDir: packGoDir(id) }));
 }
 
 async function requirePack(id: string): Promise<PackRegistryEntry> {
@@ -352,10 +531,23 @@ export async function addPack(
     await fetchPackSource(id, url);
     return resolveRef(id, ref);
   });
-  const dir = await gitStep(id, () => extractCommit(id, commit));
+  const dir = await gitStep(id, () => extractCommit(id, commit, pluginRootOf(id)));
   const adapter = await packAdapter(id, dir, input.adapter);
-  const preview: PackPreview = { id, url, ref, commit, adapter, manifest: await manifestAt(id, dir, adapter) };
+  const runtime = adapter === 'gstack-runtime' ? await runtimePreview(id, dir, commit) : undefined;
+  const preview: PackPreview = {
+    id,
+    url,
+    ref,
+    commit,
+    adapter,
+    manifest: await manifestAt(id, dir, adapter),
+    ...(runtime ? { runtime } : {}),
+    ...(pluginRootOf(id) ? { pluginRoot: pluginRootOf(id) } : {}),
+  };
+  if (buildsOx(id)) preview.oxBuild = await oxBuildPreview(id, dir);
   if (!(await confirm(preview))) return { written: false, preview };
+  if (runtime) await renderPack(id, dir, commit);
+  if (buildsOx(id)) await buildPackOx(id, dir, commit);
   await writePackEntry({ id, url, ref, commit, ...(input.adapter ? { adapter: input.adapter } : {}) });
   return { written: true, preview };
 }
@@ -364,6 +556,8 @@ export async function addPack(
  * Fetch the pack's ref (or a new one), preview the difference from the
  * trusted commit, and move the trusted commit only when `confirm` resolves
  * true. Nothing is asked or written when the commit and ref are unchanged.
+ * With browser consent recorded, the new commit's browser runtime is built too,
+ * and the commit moves only when both the render and the build succeed.
  */
 export async function updatePack(
   id: string,
@@ -376,11 +570,13 @@ export async function updatePack(
     await fetchPackSource(id, entry.url);
     return resolveRef(id, ref);
   });
-  const dir = await gitStep(id, () => extractCommit(id, commit));
-  const oldDir = await gitStep(id, () => extractCommit(id, entry.commit));
+  const dir = await gitStep(id, () => extractCommit(id, commit, pluginRootOf(id)));
+  const oldDir = await gitStep(id, () => extractCommit(id, entry.commit, pluginRootOf(id)));
   const adapter = await packAdapter(id, dir, entry.adapter);
-  const manifest = await manifestAt(id, dir, adapter);
-  const oldManifest = await manifestAt(id, oldDir, adapter);
+  // With browser consent recorded, both sides list the browser skills that mount.
+  const browser = adapter === 'gstack-runtime' && entry.browser === true;
+  const manifest = await manifestAt(id, dir, adapter, browser);
+  const oldManifest = await manifestAt(id, oldDir, adapter, browser);
 
   const oldByName = new Map(oldManifest.skills.map((skill) => [skill.name, skill]));
   const newNames = new Set(manifest.skills.map((skill) => skill.name));
@@ -399,6 +595,7 @@ export async function updatePack(
     commit,
     adapter,
     manifest,
+    ...(pluginRootOf(id) ? { pluginRoot: pluginRootOf(id) } : {}),
     previousCommit: entry.commit,
     diff: {
       added: manifest.skills.map((skill) => skill.name).filter((name) => !oldByName.has(name)),
@@ -408,30 +605,141 @@ export async function updatePack(
     },
   };
   if (commit === entry.commit && ref === entry.ref) return { written: false, preview };
+  // Checked only when there is something to move to, so an up-to-date pack needs no bun.
+  const runtime = adapter === 'gstack-runtime' ? await runtimePreview(id, dir, commit) : undefined;
+  if (runtime) preview.runtime = runtime;
+  // PAN-4730 D10: consent is recorded, so the new commit's browser runtime joins the same preview and confirmation.
+  if (browser) preview.browser = await browserPreview(id, dir, commit);
+  if (buildsOx(id)) preview.oxBuild = await oxBuildPreview(id, dir);
   if (!(await confirm(preview))) return { written: false, preview };
+  if (runtime) await renderPack(id, dir, commit);
+  if (browser && !(await isBrowserReady(packRenderDir(id, commit)))) await buildPackBrowser(id, dir, commit);
+  if (buildsOx(id)) await buildPackOx(id, dir, commit);
   await writePackEntry({ ...entry, ref, commit });
   return { written: true, preview };
+}
+
+async function requireBrowserPack(id: string): Promise<PackRegistryEntry> {
+  const entry = await requirePack(id);
+  if ((entry.adapter ?? KNOWN_PACKS[id]?.adapter) !== 'gstack-runtime') {
+    throw new PackSourceError('bad-id', `pack ${id} has no browser runtime`);
+  }
+  return entry;
+}
+
+/**
+ * PAN-4730 D8/D10: preview the browser runtime for the trusted commit's ready
+ * render and build it only when `confirm` resolves true; record consent
+ * (`browser: true`) only after the build succeeded. Nothing is asked when
+ * consent is recorded and the runtime is ready.
+ */
+export async function enablePackBrowser(
+  id: string,
+  confirm: ConfirmPack,
+): Promise<{ written: boolean; preview?: PackPreview; alreadyOn?: boolean }> {
+  const entry = await requireBrowserPack(id);
+  const dir = await gitStep(id, () => extractCommit(id, entry.commit, pluginRootOf(id)));
+  const renderDir = packRenderDir(id, entry.commit);
+  if (!(await isRenderReady(renderDir))) {
+    throw new PackSourceError('render', `pack ${id} is not rendered; run pan skills pack sync ${id}`);
+  }
+  if (entry.browser && (await isBrowserReady(renderDir))) return { written: false, alreadyOn: true };
+  const browser = await browserPreview(id, dir, entry.commit);
+  const preview: PackPreview = {
+    id,
+    url: entry.url,
+    ref: entry.ref,
+    commit: entry.commit,
+    adapter: 'gstack-runtime',
+    manifest: await manifestAt(id, dir, 'gstack-runtime', true),
+    browser,
+  };
+  if (!(await confirm(preview))) return { written: false, preview };
+  await buildPackBrowser(id, dir, entry.commit);
+  await writePackEntry({ ...entry, browser: true });
+  return { written: true, preview };
+}
+
+/**
+ * PAN-4730 D11: clear the consent, render the trusted commit again without the
+ * browser runtime, and delete the browser cache. Browse daemons are left
+ * running (the CLI reports them).
+ */
+export async function disablePackBrowser(id: string): Promise<{ changed: boolean; renderDir: string; cacheDir: string }> {
+  const entry = await requireBrowserPack(id);
+  const renderDir = packRenderDir(id, entry.commit);
+  const changed = entry.browser === true || (await isBrowserReady(renderDir));
+  if (entry.browser) {
+    const { url, ref, commit, adapter } = entry;
+    await writePackEntry({ id, url, ref, commit, ...(adapter ? { adapter } : {}) });
+  }
+  const dir = await gitStep(id, () => extractCommit(id, entry.commit, pluginRootOf(id)));
+  await rm(renderDir, { recursive: true, force: true });
+  await renderPack(id, dir, entry.commit);
+  const cacheDir = packBrowserDir(id);
+  await rm(cacheDir, { recursive: true, force: true });
+  return { changed, renderDir, cacheDir };
+}
+
+/**
+ * Give the owner write access to every directory under `path` (never following
+ * symlinks), so a recursive rm can unlink their entries. The Go toolchain that
+ * GOTOOLCHAIN=auto unpacks into the sageox pack's module cache has read-only
+ * directories even with -modcacherw.
+ */
+async function makeDirsWritable(path: string): Promise<void> {
+  const stats = await lstat(path).catch(() => null);
+  if (!stats?.isDirectory()) return;
+  if ((stats.mode & 0o700) !== 0o700) await chmod(path, stats.mode | 0o700);
+  for (const entry of await readdir(path, { withFileTypes: true })) {
+    if (entry.isDirectory()) await makeDirsWritable(join(path, entry.name));
+  }
+}
+
+async function rmPackTree(path: string): Promise<void> {
+  await makeDirsWritable(path);
+  await rm(path, { recursive: true, force: true });
 }
 
 /**
  * PD-11: unregister a pack, clear its global toggle and global per-skill
  * overrides, and delete its cache. Project and issue entries stay (inert).
+ * PAN-4852 AD-10: the sageox cache keeps its `bindings/` (SageOx link files need `ox login` and the
+ * network to recreate); everything else in it is derived and goes.
  */
-export async function removePack(id: string): Promise<{ removed: boolean }> {
+export async function removePack(id: string): Promise<{ removed: boolean; keptBindings?: string }> {
   if (!PACK_ID_PATTERN.test(id)) throw new PackSourceError('bad-id', `invalid pack id: ${JSON.stringify(id)}`);
   const removed = (await getPack(id)) !== null;
   if (removed) await deletePackEntry(id);
-  await rm(packCacheDir(id), { recursive: true, force: true });
+  const cacheDir = packCacheDir(id);
+  const bindings = join(cacheDir, 'bindings');
+  if (id === 'sageox' && (await lstat(bindings).then((s) => s.isDirectory(), () => false))) {
+    for (const child of await readdir(cacheDir)) {
+      if (child !== 'bindings') await rmPackTree(join(cacheDir, child));
+    }
+    return { removed, keptBindings: bindings };
+  }
+  await rmPackTree(cacheDir);
   return { removed };
 }
 
-/** Re-fetch a registered pack and make sure its trusted commit is extracted. Never moves the commit. */
+/**
+ * Re-fetch a registered pack and make sure its trusted commit is extracted, and for a runtime pack
+ * rendered (and, with browser consent, its browser runtime built). Never moves the commit.
+ */
 export async function syncPack(id: string): Promise<{ commit: string; dir: string }> {
   const entry = await requirePack(id);
   const dir = await gitStep(id, async () => {
     await fetchPackSource(id, entry.url);
     await resolveRef(id, entry.commit);
-    return extractCommit(id, entry.commit);
+    return extractCommit(id, entry.commit, pluginRootOf(id));
   });
+  if ((entry.adapter ?? KNOWN_PACKS[id]?.adapter) === 'gstack-runtime') {
+    await renderPack(id, dir, entry.commit);
+    // PAN-4730 D8: consent is recorded, so sync builds a missing browser runtime without asking.
+    if (entry.browser && !(await isBrowserReady(packRenderDir(id, entry.commit)))) await buildPackBrowser(id, dir, entry.commit);
+  }
+  // PAN-4852 AD-8: sync builds the already-trusted commit without asking.
+  if (buildsOx(id)) await buildPackOx(id, dir, entry.commit);
   return { commit: entry.commit, dir };
 }

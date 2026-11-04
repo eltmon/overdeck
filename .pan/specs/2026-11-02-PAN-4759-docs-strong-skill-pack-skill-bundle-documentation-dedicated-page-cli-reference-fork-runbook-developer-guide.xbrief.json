@@ -1,0 +1,1472 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-02T01:04:53Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4759: Docs: strong skill pack (\"skill bundle\") documentation — dedicated page, CLI reference, fork runbook, developer guide",
+    "updated": "2026-11-02T01:10:18.990Z"
+  },
+  "plan": {
+    "id": "pan-4759",
+    "title": "Docs: strong skill pack (\"skill bundle\") documentation — dedicated page, CLI reference, fork runbook, developer guide",
+    "status": "running",
+    "uid": "6c691e3d-7309-492d-8ae3-19b186671d6c",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 4,
+    "created": "2026-11-02T01:04:53Z",
+    "updated": "2026-11-02T01:10:18.990Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4759",
+        "label": "PAN-4759",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "docs",
+      "skill-packs",
+      "skills",
+      "cli-reference",
+      "mintlify"
+    ],
+    "metadata": {
+      "sizeJustification": "Documentation-only change over ten files. The projected-surface lint counts each top-level doc file as its own subsystem (features/skill-packs.mdx, features/skills.mdx, docs.json, CHANGELOG.md, docs/USAGE.md, ...), so one documentation surface reads as ten subsystems. The issue defines the page, CLI reference, developer guide and small edits as one cross-linked set; split sibling issues would ship pages that link to pages that do not exist yet.",
+      "canonicalFilename": "2026-11-02-PAN-4759-docs-strong-skill-pack-skill-bundle-documentation-dedicated-page-cli-reference-fork-runbook-developer-guide.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "All skill pack documentation is appended per pack inside features/skills.mdx (lines 282-748): no overview, quickstart, catalog, consolidated trust model, fork runbook, troubleshooting, pan skills CLI reference, or developer guide to src/lib/skill-packs and src/lib/skill-overrides.",
+      "Proposal": "Create features/skill-packs.mdx with ten fixed sections and move every pack section into it (cut, never copy, verified by a mechanical fact-preservation check against base commit 312f4f2c496), leaving a short stub in features/skills.mdx. Add cli/skills-commands.mdx from the branch --help output, docs/SKILL-PACKS.md verified by git grep, a pointer in reference/template-conversations.mdx, links from docs/USAGE.md and the codebase map, and a CHANGELOG.md Unreleased entry. Full detail: .pan/drafts/PAN-4759.md.",
+      "NonGoals": "- No change to skill pack behavior, CLI flags, adapters, or the dashboard (the only source edit is the stale comment at src/cli/commands/skills.ts:9)\n- No new lint script or test for links or fact preservation; the PRD section 8 commands are run by hand and by review\n- No edit to changelog.mdx, CLAUDE.md, features/conversations.mdx, or docs.json redirects\n- No fork sync, upstream fetch, gh repo sync, or pack add/remove/gc run on the host for this issue\n- No contact of any kind with upstream repositories (garrytan/*, mattpocock/*, cursor/*, deftai/*, sageox/*)\n- No screenshots or images\n- No build of the pan bundle proposal (PAN-1357)\n- No documentation of the hidden pan skills launch-settings command on the CLI page"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Move the whole ## Deft Directive H2 (lines 639-748) into ## Packs as ### Deft Directive and merge the ### Deft stub into it.",
+        "rationale": "The issue lists Deft among per-pack sections and its 470-line count includes this H2; keeping the heading text keeps the #deft-directive anchor."
+      },
+      {
+        "summary": "Correct the line-307 known-pack sentence during the move (gstack has a default url; only pstack has a default ref).",
+        "rationale": "Verified in skills.ts:321-331 and KNOWN_PACKS; the issue forbids invented behavior, so a wrong sentence is fixed and listed as intentional rewrite R1."
+      },
+      {
+        "summary": "Document hidden pan skills launch-settings only in docs/SKILL-PACKS.md.",
+        "rationale": "It is registered with { hidden: true } and is a launcher-internal step."
+      },
+      {
+        "summary": "Use npx tsx src/cli/index.ts skills ... --help from the workspace as the flag oracle.",
+        "rationale": "The workspace has no dist/; tsx help was verified to print the branch's commands."
+      },
+      {
+        "summary": "Leave changelog.mdx, features/conversations.mdx and the CLAUDE.md topic index unchanged.",
+        "rationale": "changelog.mdx is release-owned; the conversations link targets on/off levels that stay in features/skills.mdx; the issue names the exact small edits."
+      },
+      {
+        "summary": "Use a fixed H2 '## Packs' wrapper with one H3 per pack so the page has exactly ten H2 sections.",
+        "rationale": "The issue's structure has ten sections with per-pack sections as one of them; existing H3/H4 nesting moves without relevelling except Deft."
+      },
+      {
+        "summary": "No per-row anchor links in the catalog table.",
+        "rationale": "The slug of a heading with an apostrophe cannot be verified without a Mintlify build."
+      }
+    ],
+    "items": [
+      {
+        "id": "page-skeleton",
+        "title": "Create features/skill-packs.mdx skeleton with sections 1 and 10 and list it in docs.json",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T01:04:53Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4759",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/skill-packs.mdx",
+            "features/skills.mdx",
+            "docs.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node scripts/lint-docs.js",
+            "node -e 'const fs=require(\"fs\");const j=JSON.parse(fs.readFileSync(\"docs.json\",\"utf8\"));const pages=new Set();const walk=l=>{for(const e of l||[]){if(typeof e===\"string\")pages.add(e);else if(e&&e.pages)walk(e.pages)}};for(const t of j.navigation.tabs)for(const g of t.groups||[])walk(g.pages);let bad=0;for(const f of process.argv.slice(1)){const s=fs.readFileSync(f,\"utf8\");for(const m of s.matchAll(/\\]\\(\\/((?:features|cli|reference)\\/[a-z0-9-]+)/g)){if(!pages.has(m[1])){console.log(f+\": \"+m[1]);bad++}}}console.log(bad?\"broken links: \"+bad:\"links ok\");process.exit(bad?1:0)' features/skill-packs.mdx features/skills.mdx",
+            "grep -n \"^## \" features/skill-packs.mdx",
+            "git show 312f4f2c496:features/skills.mdx | sed -n '284,284p' | grep -v '^\\s*$' | grep -v '^```' | sed -E 's/^#+ //' | while IFS= read -r l; do grep -qF -- \"$l\" features/skill-packs.mdx || echo \"MISSING: $l\"; done"
+          ],
+          "expected_outputs": [
+            "node scripts/lint-docs.js exits 0 and prints \"docs lint passed\"",
+            "link check prints \"links ok\"",
+            "ten H2 lines in PRD D1 order",
+            "move check for line 284 prints nothing"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-12",
+            "NFR-3",
+            "NFR-6"
+          ],
+          "foundationFor": [
+            "move-toggles",
+            "move-adding-not-applied",
+            "trust-model",
+            "move-pinning",
+            "fork-runbook",
+            "move-mattpocock-pstack",
+            "move-gstack",
+            "move-deft",
+            "move-sageox",
+            "move-state-apply",
+            "quickstart-catalog",
+            "troubleshooting-stub",
+            "cli-page",
+            "template-pointer"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4759.md WI-1, sections 7.1 and D1. Create features/skill-packs.mdx with the frontmatter, H1 and the ten H2 headings of D1 in that exact order and text. Write section 1 (cut the line-284 intro paragraph of features/skills.mdx into it, then the one sentence \"Operators also call skill packs **skill bundles**; these docs use \\\"skill pack\\\".\" and 2-4 sentences on why packs exist) and section 10 (terminology note, PRD 7.1). Leave the other H2 sections empty. In docs.json add \"features/skill-packs\" directly after \"features/skills\" in the Features group. Restated rule: a $ or a < before a digit in prose fails lint-docs; use backticks, &#36; or &lt;."
+        },
+        "items": [
+          {
+            "id": "page-skeleton.ac1",
+            "title": "Given the item commit, then `grep -c \"^## \" features/skill-packs.mdx` prints 10 and the headings match PRD D1 in order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-skeleton.ac2",
+            "title": "Given docs.json, when the Features group pages are read, then \"features/skill-packs\" resolves at the index right after \"features/skills\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-skeleton.ac3",
+            "title": "Given features/skill-packs.mdx, then it contains the phrase \"skill bundles\" exactly once outside the \"## Terminology: skill packs and skill bundles\" section",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "page-skeleton.ac4",
+            "title": "When `node scripts/lint-docs.js` runs, then it exits 0, and the PRD section 8 link check over features/skill-packs.mdx prints \"links ok\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "move-toggles",
+        "title": "Move pack names and on/off resolution content into section 4",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T01:04:53Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4759",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/skill-packs.mdx",
+            "features/skills.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node scripts/lint-docs.js",
+            "git show 312f4f2c496:features/skills.mdx | sed -n '386,410p' | grep -v '^\\s*$' | grep -v '^```' | sed -E 's/^#+ //' | while IFS= read -r l; do grep -qF -- \"$l\" features/skill-packs.mdx || echo \"MISSING: $l\"; done",
+            "grep -n \"### Names\\|### Turning packs and pack skills on\" features/skills.mdx"
+          ],
+          "expected_outputs": [
+            "move check prints nothing",
+            "grep returns no lines",
+            "node scripts/lint-docs.js exits 0 and prints \"docs lint passed\""
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2, D5. Cut features/skills.mdx base lines 386-410 (\"### Names: `pack/skill` and `pack:skill`\", \"### Turning packs and pack skills on\", its resolution table and the opt-in paragraph) into \"## How packs turn on and off\". Keep heading text and every sentence verbatim (D3). Remove them from features/skills.mdx in the same commit."
+        },
+        "items": [
+          {
+            "id": "move-toggles.ac1",
+            "title": "When the PRD move check runs over base lines 386-410, then it prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "move-toggles.ac2",
+            "title": "When `grep -n \"### Names\\|### Turning packs and pack skills on\" features/skills.mdx` runs, then it returns no lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "move-toggles.ac3",
+            "title": "Given features/skill-packs.mdx, then the resolution table rows sit under \"## How packs turn on and off\" and the section contains `pack:skill`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "move-toggles.ac4",
+            "title": "When `node scripts/lint-docs.js` runs, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "move-adding-not-applied",
+        "title": "Move \"Adding a pack\" and \"What is not applied\" into section 5",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T01:04:53Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4759",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/skill-packs.mdx",
+            "features/skills.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node scripts/lint-docs.js",
+            "git show 312f4f2c496:features/skills.mdx | sed -n '286,306p' | grep -v '^\\s*$' | grep -v '^```' | sed -E 's/^#+ //' | while IFS= read -r l; do grep -qF -- \"$l\" features/skill-packs.mdx || echo \"MISSING: $l\"; done",
+            "git show 312f4f2c496:features/skills.mdx | sed -n '412,416p' | grep -v '^\\s*$' | grep -v '^```' | sed -E 's/^#+ //' | while IFS= read -r l; do grep -qF -- \"$l\" features/skill-packs.mdx || echo \"MISSING: $l\"; done",
+            "grep -n \"### Adding a pack\\|### What is not applied\" features/skills.mdx"
+          ],
+          "expected_outputs": [
+            "move check prints nothing",
+            "grep returns no lines",
+            "node scripts/lint-docs.js exits 0 and prints \"docs lint passed\""
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3, D5, D6 R1. Cut base lines 286-307 (\"### Adding a pack\") and 412-416 (\"### What is not applied\") into \"## Trust and safety\". Apply intentional rewrite R1 to the line-307 known-pack sentence exactly as PRD D6 states (known packs mattpocock, pstack, gstack, deft, sageox; only pstack has a default ref). Remove the moved lines from features/skills.mdx in the same commit."
+        },
+        "items": [
+          {
+            "id": "move-adding-not-applied.ac1",
+            "title": "When the PRD move check runs over base lines 286-306 and 412-416, then it prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "move-adding-not-applied.ac2",
+            "title": "Given features/skill-packs.mdx, then it contains the R1 sentence naming `mattpocock`, `pstack`, `gstack`, `deft` and `sageox` as known packs and stating that only `pstack` has a default ref",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "move-adding-not-applied.ac3",
+            "title": "When `grep -n \"### Adding a pack\\|### What is not applied\" features/skills.mdx` runs, then it returns no lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "move-adding-not-applied.ac4",
+            "title": "When `node scripts/lint-docs.js` runs, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "trust-model",
+        "title": "Write the consolidated trust model in section 5",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T01:04:53Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-4759",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/skill-packs.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node scripts/lint-docs.js",
+            "grep -n \"### The trust model\" features/skill-packs.mdx",
+            "grep -c \"SageOx records agent sessions on this machine\" features/skill-packs.mdx"
+          ],
+          "expected_outputs": [
+            "node scripts/lint-docs.js exits 0 and prints \"docs lint passed\"",
+            "one \"### The trust model\" line",
+            "disclosure grep count is at least 1"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4, section 7.4. Add \"### The trust model\" under \"## Trust and safety\" after the moved subsections, with the bullets of PRD 7.4. Quote SAGEOX_DISCLOSURE (src/lib/sageox/disclosure.ts) and GSTACK_DISCLOSURE (src/lib/skill-packs/gstack.ts:150) verbatim, with the code-span backticks the SageOx text already has. Each bullet links to the section with the detail (in-page anchors only where the heading has no punctuation, PRD D16). Verify every claim against the moved text; add no behavior that is not in the code."
+        },
+        "items": [
+          {
+            "id": "trust-model.ac1",
+            "title": "Given features/skill-packs.mdx, then \"### The trust model\" sits under \"## Trust and safety\" and contains the sentence \"A launch never touches the network\" or an equivalent stating that launches mount from the cache only",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "trust-model.ac2",
+            "title": "Given the trust model, then it contains the full SAGEOX_DISCLOSURE and GSTACK_DISCLOSURE texts, each matching the source constant word for word",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "trust-model.ac3",
+            "title": "Given the trust model, then it covers each PRD 7.4 bullet: one-commit trust, no self-registration, not-applied capabilities, the runtime-pack exception, the browser consent, opt-in skills, no copies in ~/.claude/skills, Deft host notice, and remove cleanup",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "trust-model.ac4",
+            "title": "When `node scripts/lint-docs.js` runs, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "move-pinning",
+        "title": "Move \"Pinning and updates\" into section 6",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T01:04:53Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4759",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/skill-packs.mdx",
+            "features/skills.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node scripts/lint-docs.js",
+            "git show 312f4f2c496:features/skills.mdx | sed -n '309,318p' | grep -v '^\\s*$' | grep -v '^```' | sed -E 's/^#+ //' | while IFS= read -r l; do grep -qF -- \"$l\" features/skill-packs.mdx || echo \"MISSING: $l\"; done",
+            "grep -n \"### Pinning and updates\" features/skills.mdx"
+          ],
+          "expected_outputs": [
+            "move check prints nothing",
+            "grep returns no lines",
+            "node scripts/lint-docs.js exits 0 and prints \"docs lint passed\""
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5, D5. Cut base lines 309-318 (\"### Pinning and updates\") into \"## Pinning, updates and forks\", verbatim. Remove them from features/skills.mdx in the same commit."
+        },
+        "items": [
+          {
+            "id": "move-pinning.ac1",
+            "title": "When the PRD move check runs over base lines 309-318, then it prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "move-pinning.ac2",
+            "title": "When `grep -n \"### Pinning and updates\" features/skills.mdx` runs, then it returns no lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "move-pinning.ac3",
+            "title": "When `node scripts/lint-docs.js` runs, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fork-runbook",
+        "title": "Write the fork-first policy and per-fork sync runbook in section 6",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T01:04:53Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-4759",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/skill-packs.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node scripts/lint-docs.js",
+            "grep -n \"^### \" features/skill-packs.mdx",
+            "grep -c \"eltmon/ox\" features/skill-packs.mdx"
+          ],
+          "expected_outputs": [
+            "node scripts/lint-docs.js exits 0 and prints \"docs lint passed\"",
+            "the four section-6 H3 headings are listed",
+            "eltmon/ox count is at least 1"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-2",
+            "NFR-3",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6, section 7.5, D14. Add \"### Fork-first policy\", \"### Syncing a fork\" (table: eltmon/skills, eltmon/plugins, eltmon/directive, eltmon/gstack, eltmon/ox with upstream, carries-changes, sync and then columns), \"### Syncing the gstack fork\" (the six numbered steps, including the exact bun test command and the empty-HOME render check), and \"### When upstream is fine\". State that no agent opens issues, pull requests or comments on an upstream repository or pushes to one. State never to run `gh repo sync --force` on eltmon/gstack or eltmon/ox. Do not state commit counts. The work agent does not run any fork, sync or upstream command itself."
+        },
+        "items": [
+          {
+            "id": "fork-runbook.ac1",
+            "title": "Given features/skill-packs.mdx, then section 6 contains the four H3 headings \"Fork-first policy\", \"Syncing a fork\", \"Syncing the gstack fork\" and \"When upstream is fine\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-runbook.ac2",
+            "title": "Given the gstack steps, then they contain the exact command `bun test test/pack-mode.test.ts test/pack-browser.test.ts test/pack-browser-guards.test.ts test/pack-env.test.ts test/state-root-parity.test.ts` and an empty-HOME render check whose pass condition is that `ls -A` prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-runbook.ac3",
+            "title": "Given the fork table, then it shows one row for each of eltmon/skills, eltmon/plugins, eltmon/directive, eltmon/gstack and eltmon/ox with the upstream named in PRD section 3 and a `pan skills pack update` command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-runbook.ac4",
+            "title": "Given section 6, then it contains a sentence stating that agents never open issues, pull requests or comments on upstream repositories and a warning against `gh repo sync --force` on eltmon/gstack and eltmon/ox",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-runbook.ac5",
+            "title": "When `node scripts/lint-docs.js` runs, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "move-mattpocock-pstack",
+        "title": "Move the Matt Pocock and pstack sections under \"## Packs\"",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T01:04:53Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4759",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/skill-packs.mdx",
+            "features/skills.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node scripts/lint-docs.js",
+            "git show 312f4f2c496:features/skills.mdx | sed -n '320,384p' | grep -v '^\\s*$' | grep -v '^```' | sed -E 's/^#+ //' | while IFS= read -r l; do grep -qF -- \"$l\" features/skill-packs.mdx || echo \"MISSING: $l\"; done",
+            "grep -n \"### Matt Pocock's skills from a fork\\|### pstack\" features/skills.mdx"
+          ],
+          "expected_outputs": [
+            "move check prints nothing",
+            "grep returns no lines",
+            "node scripts/lint-docs.js exits 0 and prints \"docs lint passed\""
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI for move-mattpocock-pstack, D3, D5. Cut base lines 320-384 of features/skills.mdx into features/skill-packs.mdx verbatim, keeping heading text. Place them first under \"## Packs\", in that order. Remove the lines from features/skills.mdx in the same commit."
+        },
+        "items": [
+          {
+            "id": "move-mattpocock-pstack.ac1",
+            "title": "When the PRD move check runs over base lines 320-384, then it prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "move-mattpocock-pstack.ac2",
+            "title": "When `grep -n \"### Matt Pocock's skills from a fork\\|### pstack\" features/skills.mdx` runs, then it returns no lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "move-mattpocock-pstack.ac3",
+            "title": "When `node scripts/lint-docs.js` runs, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "move-gstack",
+        "title": "Move the gstack section with its browser runtime subsections under \"## Packs\"",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T01:04:53Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4759",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/skill-packs.mdx",
+            "features/skills.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node scripts/lint-docs.js",
+            "git show 312f4f2c496:features/skills.mdx | sed -n '512,633p' | grep -v '^\\s*$' | grep -v '^```' | sed -E 's/^#+ //' | while IFS= read -r l; do grep -qF -- \"$l\" features/skill-packs.mdx || echo \"MISSING: $l\"; done",
+            "grep -n \"### gstack\" features/skills.mdx"
+          ],
+          "expected_outputs": [
+            "move check prints nothing",
+            "grep returns no lines",
+            "node scripts/lint-docs.js exits 0 and prints \"docs lint passed\""
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI for move-gstack, D3, D5. Cut base lines 512-633 of features/skills.mdx into features/skill-packs.mdx verbatim, keeping heading text. Place it after pstack. Keep the \"####\" subsections and the \"[below](#browser-design-and-pdf-skills)\" link. Remove the lines from features/skills.mdx in the same commit."
+        },
+        "items": [
+          {
+            "id": "move-gstack.ac1",
+            "title": "When the PRD move check runs over base lines 512-633, then it prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "move-gstack.ac2",
+            "title": "When `grep -n \"### gstack\" features/skills.mdx` runs, then it returns no lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "move-gstack.ac3",
+            "title": "When `node scripts/lint-docs.js` runs, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "move-deft",
+        "title": "Move the Deft stub and the Deft Directive H2 under \"## Packs\" as \"### Deft Directive\"",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T01:04:53Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4759",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/skill-packs.mdx",
+            "features/skills.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node scripts/lint-docs.js",
+            "git show 312f4f2c496:features/skills.mdx | sed -n '635,748p' | grep -v '^\\s*$' | grep -v '^```' | sed -E 's/^#+ //' | while IFS= read -r l; do grep -qF -- \"$l\" features/skill-packs.mdx || echo \"MISSING: $l\"; done",
+            "grep -n \"Deft Directive\" features/skills.mdx"
+          ],
+          "expected_outputs": [
+            "move check prints at most the R2/R4 lines",
+            "grep returns no lines",
+            "node scripts/lint-docs.js exits 0 and prints \"docs lint passed\""
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9, D3, D4, D6 R2 and R4. Cut base lines 635-748 of features/skills.mdx (the \"### Deft\" stub and the whole \"## Deft Directive\" section) into \"## Packs\" after gstack. Change \"## Deft Directive\" to \"### Deft Directive\" and its \"###\" children to \"####\". Merge the stub: its sentence becomes the first paragraph of \"### Deft Directive\" without the self-link; the \"### Deft\" heading line disappears. Every other sentence stays verbatim. Remove the lines from features/skills.mdx in the same commit; \"## Subagents\" in features/skills.mdx stays."
+        },
+        "items": [
+          {
+            "id": "move-deft.ac1",
+            "title": "When the PRD move check runs over base lines 635-748, then it prints at most the \"Deft\" heading line and the line-637 stub sentence (R2, R4)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "move-deft.ac2",
+            "title": "When `grep -n \"Deft Directive\" features/skills.mdx` runs, then it returns no lines, and `grep -n \"^## Subagents\" features/skills.mdx` returns one line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "move-deft.ac3",
+            "title": "Given features/skill-packs.mdx, then \"### Deft Directive\" sits under \"## Packs\" and its former H3 subsections render as \"####\" headings",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "move-deft.ac4",
+            "title": "When `node scripts/lint-docs.js` runs, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "move-sageox",
+        "title": "Move the SageOx section under \"## Packs\"",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T01:04:53Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4759",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/skill-packs.mdx",
+            "features/skills.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node scripts/lint-docs.js",
+            "git show 312f4f2c496:features/skills.mdx | sed -n '439,510p' | grep -v '^\\s*$' | grep -v '^```' | sed -E 's/^#+ //' | while IFS= read -r l; do grep -qF -- \"$l\" features/skill-packs.mdx || echo \"MISSING: $l\"; done",
+            "grep -n \"### SageOx\" features/skills.mdx"
+          ],
+          "expected_outputs": [
+            "move check prints nothing",
+            "grep returns no lines",
+            "node scripts/lint-docs.js exits 0 and prints \"docs lint passed\""
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI for move-sageox, D3, D5. Cut base lines 439-510 of features/skills.mdx into features/skill-packs.mdx verbatim, keeping heading text. Place it last under \"## Packs\", after Deft Directive. Remove the lines from features/skills.mdx in the same commit."
+        },
+        "items": [
+          {
+            "id": "move-sageox.ac1",
+            "title": "When the PRD move check runs over base lines 439-510, then it prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "move-sageox.ac2",
+            "title": "When `grep -n \"### SageOx\" features/skills.mdx` runs, then it returns no lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "move-sageox.ac3",
+            "title": "When `node scripts/lint-docs.js` runs, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "move-state-apply",
+        "title": "Move \"Where pack state is stored\" and \"When pack changes apply\" into section 8",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T01:04:53Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4759",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/skill-packs.mdx",
+            "features/skills.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node scripts/lint-docs.js",
+            "git show 312f4f2c496:features/skills.mdx | sed -n '418,437p' | grep -v '^\\s*$' | grep -v '^```' | sed -E 's/^#+ //' | while IFS= read -r l; do grep -qF -- \"$l\" features/skill-packs.mdx || echo \"MISSING: $l\"; done",
+            "grep -n \"### Where pack state is stored\\|### When pack changes apply\" features/skills.mdx"
+          ],
+          "expected_outputs": [
+            "move check prints nothing",
+            "grep returns no lines",
+            "node scripts/lint-docs.js exits 0 and prints \"docs lint passed\""
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI for move-state-apply, D3, D5. Cut base lines 418-437 of features/skills.mdx into features/skill-packs.mdx verbatim, keeping heading text. Place them under \"## Where state lives and when changes apply\". Remove the lines from features/skills.mdx in the same commit."
+        },
+        "items": [
+          {
+            "id": "move-state-apply.ac1",
+            "title": "When the PRD move check runs over base lines 418-437, then it prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "move-state-apply.ac2",
+            "title": "When `grep -n \"### Where pack state is stored\\|### When pack changes apply\" features/skills.mdx` runs, then it returns no lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "move-state-apply.ac3",
+            "title": "When `node scripts/lint-docs.js` runs, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "quickstart-catalog",
+        "title": "Write the quickstart (section 2) and the pack catalog table (section 3)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T01:04:53Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-4759",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/skill-packs.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node scripts/lint-docs.js",
+            "grep -n \"pan skills pack add mattpocock --ref v1.2.3\" features/skill-packs.mdx",
+            "grep -c \"^| \" features/skill-packs.mdx"
+          ],
+          "expected_outputs": [
+            "node scripts/lint-docs.js exits 0 and prints \"docs lint passed\"",
+            "quickstart add command found",
+            "table row count increased by at least 8"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-12, sections 7.2, 7.3, D15, D16. Write the six-command quickstart exactly as PRD 7.2 (mattpocock with --ref v1.2.3, project myapp, /mattpocock:grilling) and the one catalog table with the seven rows and values of PRD 7.3, plus the counts note. No anchor links in id cells; link only \"#packs\"."
+        },
+        "items": [
+          {
+            "id": "quickstart-catalog.ac1",
+            "title": "Given section 2, then it contains `pan skills pack add mattpocock --ref v1.2.3`, `pan skills set --pack mattpocock on --project myapp`, `/mattpocock:grilling` and `pan skills pack remove mattpocock`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "quickstart-catalog.ac2",
+            "title": "Given section 3, then the table has the columns id, upstream, source Overdeck uses, adapter, skills (default / opt-in), runs pack code?, notes, and rows for mattpocock, pstack, gstack, gstack browser runtime, deft, sageox and impeccable",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "quickstart-catalog.ac3",
+            "title": "Given the catalog, then every value matches PRD section 3 and 7.3 (for example gstack `gstack-runtime` 22 / 14, sageox `plain` 15 / 9, impeccable `skill-v4.7.0`)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "quickstart-catalog.ac4",
+            "title": "When `node scripts/lint-docs.js` runs, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "troubleshooting-stub",
+        "title": "Write the troubleshooting table and replace the features/skills.mdx pack section with the stub",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T01:04:53Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-4759",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/skill-packs.mdx",
+            "features/skills.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node scripts/lint-docs.js",
+            "git show 312f4f2c496:features/skills.mdx | sed -n '282,748p' | grep -v '^\\s*$' | grep -v '^```' | sed -E 's/^#+ //' | while IFS= read -r l; do grep -qF -- \"$l\" features/skill-packs.mdx || echo \"MISSING: $l\"; done",
+            "node -e 'const fs=require(\"fs\");const j=JSON.parse(fs.readFileSync(\"docs.json\",\"utf8\"));const pages=new Set();const walk=l=>{for(const e of l||[]){if(typeof e===\"string\")pages.add(e);else if(e&&e.pages)walk(e.pages)}};for(const t of j.navigation.tabs)for(const g of t.groups||[])walk(g.pages);let bad=0;for(const f of process.argv.slice(1)){const s=fs.readFileSync(f,\"utf8\");for(const m of s.matchAll(/\\]\\(\\/((?:features|cli|reference)\\/[a-z0-9-]+)/g)){if(!pages.has(m[1])){console.log(f+\": \"+m[1]);bad++}}}console.log(bad?\"broken links: \"+bad:\"links ok\");process.exit(bad?1:0)' features/skill-packs.mdx features/skills.mdx",
+            "grep -nE \"^#+ (pstack|gstack|SageOx|Deft Directive|Matt Pocock)\" features/skills.mdx"
+          ],
+          "expected_outputs": [
+            "node scripts/lint-docs.js exits 0 and prints \"docs lint passed\"",
+            "fact check prints at most the R1-R4 lines",
+            "link check prints \"links ok\"",
+            "grep returns no lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11",
+            "FR-13",
+            "NFR-1",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-13, sections 7.6, 7.7, D7. Write \"## Troubleshooting\" as a Symptom / Cause / Fix table with at least the eight rows of PRD 7.6, quoting message text verbatim in code spans. Replace what remains under \"## Skill packs\" in features/skills.mdx with the PRD 7.7 stub (3-5 sentences, link /features/skill-packs). Then run the full fact-preservation check over base lines 282-748."
+        },
+        "items": [
+          {
+            "id": "troubleshooting-stub.ac1",
+            "title": "Given section 9, then the table contains rows whose message cells match the source strings `not cached; run pan skills pack sync`, `gstack browser runtime not built`, `pack gstack needs bun on PATH`, `skills will appear twice` and `supports Claude Code launches only`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "troubleshooting-stub.ac2",
+            "title": "When the full PRD fact-preservation check runs over base lines 282-748, then it prints at most the R1-R4 lines of PRD D6 (R1 and R2 are expected)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "troubleshooting-stub.ac3",
+            "title": "Given features/skills.mdx, then `grep -nE \"^#+ (pstack|gstack|SageOx|Deft Directive|Matt Pocock)\" features/skills.mdx` returns no lines and the file contains \"## Turning skills on and off\" and a link to /features/skill-packs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "troubleshooting-stub.ac4",
+            "title": "When `node scripts/lint-docs.js` and the PRD link check over features/skill-packs.mdx and features/skills.mdx run, then both exit 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-page",
+        "title": "Write cli/skills-commands.mdx, list it in docs.json, and fix the skills.ts header comment",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T01:04:53Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-4759",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/skills-commands.mdx",
+            "docs.json",
+            "src/cli/commands/skills.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node scripts/lint-docs.js",
+            "node -e 'const fs=require(\"fs\");const j=JSON.parse(fs.readFileSync(\"docs.json\",\"utf8\"));const pages=new Set();const walk=l=>{for(const e of l||[]){if(typeof e===\"string\")pages.add(e);else if(e&&e.pages)walk(e.pages)}};for(const t of j.navigation.tabs)for(const g of t.groups||[])walk(g.pages);let bad=0;for(const f of process.argv.slice(1)){const s=fs.readFileSync(f,\"utf8\");for(const m of s.matchAll(/\\]\\(\\/((?:features|cli|reference)\\/[a-z0-9-]+)/g)){if(!pages.has(m[1])){console.log(f+\": \"+m[1]);bad++}}}console.log(bad?\"broken links: \"+bad:\"links ok\");process.exit(bad?1:0)' cli/skills-commands.mdx",
+            "npx tsx src/cli/index.ts skills pack --help",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "node scripts/lint-docs.js exits 0 and prints \"docs lint passed\"",
+            "link check prints \"links ok\"",
+            "pack help lists add, update, browser, list, remove, sync, gc, sageox",
+            "typecheck exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-14",
+            "FR-17",
+            "NFR-2",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-14, section 7.8, D8, D9, FR-17. Write cli/skills-commands.mdx with one H2 per visible command in the PRD 7.8 order, each with a synopsis, an options table copied from `npx tsx src/cli/index.ts skills <sub> --help`, one example, and non-zero exit behavior from src/cli/commands/skills.ts and skills-deft.ts. Do not document hidden launch-settings. Use no --flag token that is not a pan skills flag. Add \"cli/skills-commands\" after \"cli/review-commands\" in the docs.json CLI Reference group. Change src/cli/commands/skills.ts line 9 to list `plain|claude-plugin|deft-readonly|gstack-runtime`."
+        },
+        "items": [
+          {
+            "id": "cli-page.ac1",
+            "title": "When the PRD section 8 flag check runs over cli/skills-commands.mdx, then it prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-page.ac2",
+            "title": "Given cli/skills-commands.mdx, then it contains one H2 for each of the 14 commands named in PRD 7.8 and no \"launch-settings\" text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-page.ac3",
+            "title": "Given docs.json, then \"cli/skills-commands\" resolves at the index right after \"cli/review-commands\" in the CLI Reference group",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-page.ac4",
+            "title": "Given src/cli/commands/skills.ts line 9, then it contains `deft-readonly|gstack-runtime`, and `npm run typecheck` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-page.ac5",
+            "title": "When `node scripts/lint-docs.js` and the PRD link check over cli/skills-commands.mdx run, then both exit 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "devdoc-map-flow",
+        "title": "Write docs/SKILL-PACKS.md: overview, module map, data flow, adapter contract, KnownPack fields",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T01:04:53Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-4759",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/SKILL-PACKS.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node scripts/lint-docs.js",
+            "git grep -n \"export const KNOWN_PACKS\" -- src/lib/skill-packs/adapters.ts"
+          ],
+          "expected_outputs": [
+            "node scripts/lint-docs.js exits 0 and prints \"docs lint passed\"",
+            "KNOWN_PACKS grep returns one hit"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-15",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-15, section 7.9 parts 1-5, D10. Create docs/SKILL-PACKS.md (ends with a newline). Module map tables for src/lib/skill-packs/ and src/lib/skill-overrides/ from each file header; numbered data flow from add to launch flags; adapter contract (PackManifest, PackCapabilities, PackSkill) and the four adapters; KnownPack field table with the packs that use each field (PRD section 3). Verify every path and symbol with git grep before writing it."
+        },
+        "items": [
+          {
+            "id": "devdoc-map-flow.ac1",
+            "title": "When the PRD section 8 dev doc path check runs over docs/SKILL-PACKS.md, then it prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "devdoc-map-flow.ac2",
+            "title": "Given docs/SKILL-PACKS.md, then the KnownPack table contains the fields url, ref, adapter, pluginRoot, skillsRoot, optIn, mountExtras and disclosure, each naming the packs from PRD section 3",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "devdoc-map-flow.ac3",
+            "title": "Given the data flow, then it lists the steps add, fetch and resolve, extract, adapter manifest, consent, registry, resolve at launch, mount, and the Claude `--plugin-dir` and Codex `overdeck-packs` launch outputs in that order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "devdoc-map-flow.ac4",
+            "title": "Given every backticked exported symbol in the module map, when `git grep -n \"export .*<symbol>\" -- src` runs, then it returns at least one hit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "devdoc-howto-invariants",
+        "title": "Write docs/SKILL-PACKS.md: adding a known pack, writing an adapter, invariants, hidden launch step, test map",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T01:04:53Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-4759",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/SKILL-PACKS.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node scripts/lint-docs.js",
+            "ls src/lib/skill-packs/__tests__ src/lib/skill-overrides/__tests__"
+          ],
+          "expected_outputs": [
+            "node scripts/lint-docs.js exits 0 and prints \"docs lint passed\"",
+            "both test directories list their test files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-15",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-16, section 7.9 parts 6-10, D10. Append the two numbered how-to sections, the invariants with the code that enforces each (D10 wording for copies vs the launch link and for render writes), the hidden `pan skills launch-settings` synopsis from src/cli/commands/skills.ts:632-637, and the test map table."
+        },
+        "items": [
+          {
+            "id": "devdoc-howto-invariants.ac1",
+            "title": "Given docs/SKILL-PACKS.md, then the invariants section contains \"the launch link is the only symlink\" wording and names `src/lib/agents/state-dir-removal.ts` and `npm run lint:agent-dir-removal`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "devdoc-howto-invariants.ac2",
+            "title": "Given the invariants, then the render-write invariant is scoped to the render and browser build, matching PRD D10, so it does not contradict the project .gstack/ and /tmp/browse-* writes in features/skill-packs.mdx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "devdoc-howto-invariants.ac3",
+            "title": "When the PRD section 8 dev doc path check runs over docs/SKILL-PACKS.md, then it prints nothing, and every test file in the test map resolves with `ls`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "devdoc-howto-invariants.ac4",
+            "title": "When `node scripts/lint-docs.js` runs, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "template-pointer",
+        "title": "Add the skill pack pointer note at the top of reference/template-conversations.mdx",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T01:04:53Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4759",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "reference/template-conversations.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node scripts/lint-docs.js",
+            "node -e 'const fs=require(\"fs\");const j=JSON.parse(fs.readFileSync(\"docs.json\",\"utf8\"));const pages=new Set();const walk=l=>{for(const e of l||[]){if(typeof e===\"string\")pages.add(e);else if(e&&e.pages)walk(e.pages)}};for(const t of j.navigation.tabs)for(const g of t.groups||[])walk(g.pages);let bad=0;for(const f of process.argv.slice(1)){const s=fs.readFileSync(f,\"utf8\");for(const m of s.matchAll(/\\]\\(\\/((?:features|cli|reference)\\/[a-z0-9-]+)/g)){if(!pages.has(m[1])){console.log(f+\": \"+m[1]);bad++}}}console.log(bad?\"broken links: \"+bad:\"links ok\");process.exit(bad?1:0)' reference/template-conversations.mdx"
+          ],
+          "expected_outputs": [
+            "node scripts/lint-docs.js exits 0 and prints \"docs lint passed\"",
+            "link check prints \"links ok\""
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-16",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-17, section 7.10 first bullet. Insert the <Note> after the H1 and before the existing <Warning>, linking /features/skill-packs."
+        },
+        "items": [
+          {
+            "id": "template-pointer.ac1",
+            "title": "Given reference/template-conversations.mdx, then a <Note> containing \"skill packs\" and a link to /features/skill-packs appears before the existing <Warning>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "template-pointer.ac2",
+            "title": "When the PRD link check over reference/template-conversations.mdx runs, then it prints \"links ok\" and exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "template-pointer.ac3",
+            "title": "When `node scripts/lint-docs.js` runs, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "devdoc-links",
+        "title": "Link docs/SKILL-PACKS.md from docs/USAGE.md and the codebase map",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T01:04:53Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4759",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/USAGE.md",
+            ".overdeck/context/codebase/architecture.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node scripts/lint-docs.js",
+            "grep -c \"last-verified\" .overdeck/context/codebase/architecture.md",
+            "grep -n \"SKILL-PACKS\" docs/USAGE.md .overdeck/context/codebase/architecture.md"
+          ],
+          "expected_outputs": [
+            "node scripts/lint-docs.js exits 0 and prints \"docs lint passed\"",
+            "prints 1",
+            "one hit in each file"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-16"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-18, section 7.10 bullets 2 and 3. Add the pointer line under \"### Skills Commands\" in docs/USAGE.md. Append \"Developer guide: `docs/SKILL-PACKS.md`.\" to the skill packs paragraph of .overdeck/context/codebase/architecture.md (line 210) and update its single trailing <!-- last-verified: --> line to the edit date with PAN-4759 added; keep exactly one such line."
+        },
+        "items": [
+          {
+            "id": "devdoc-links.ac1",
+            "title": "Given docs/USAGE.md, then the \"### Skills Commands\" section contains a link to SKILL-PACKS.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "devdoc-links.ac2",
+            "title": "Given .overdeck/context/codebase/architecture.md, then it contains `docs/SKILL-PACKS.md` and `grep -c \"last-verified\" .overdeck/context/codebase/architecture.md` prints 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "devdoc-links.ac3",
+            "title": "When `node scripts/lint-docs.js` runs, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "changelog",
+        "title": "Add the skill pack docs entry to CHANGELOG.md Unreleased",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T01:04:53Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4759",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "CHANGELOG.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n \"### Docs: skill packs\" CHANGELOG.md"
+          ],
+          "expected_outputs": [
+            "one matching line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-16"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-19, section 7.10 bullet 4. Add \"### Docs: skill packs\" under \"## Unreleased\" with three bullets: the Skill Packs page, the pan skills CLI reference page, the docs/SKILL-PACKS.md developer guide. Do not edit changelog.mdx."
+        },
+        "items": [
+          {
+            "id": "changelog.ac1",
+            "title": "Given CHANGELOG.md, then the \"## Unreleased\" section contains a \"### Docs: skill packs\" heading with three bullets naming features/skill-packs, cli/skills-commands and docs/SKILL-PACKS.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "changelog.ac2",
+            "title": "When `git diff --name-only origin/main -- changelog.mdx` runs, then it returns no lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "page-skeleton",
+        "to": "move-toggles",
+        "type": "blocks"
+      },
+      {
+        "from": "move-toggles",
+        "to": "move-adding-not-applied",
+        "type": "blocks"
+      },
+      {
+        "from": "move-adding-not-applied",
+        "to": "trust-model",
+        "type": "blocks"
+      },
+      {
+        "from": "trust-model",
+        "to": "move-pinning",
+        "type": "blocks"
+      },
+      {
+        "from": "move-pinning",
+        "to": "fork-runbook",
+        "type": "blocks"
+      },
+      {
+        "from": "fork-runbook",
+        "to": "move-mattpocock-pstack",
+        "type": "blocks"
+      },
+      {
+        "from": "move-mattpocock-pstack",
+        "to": "move-gstack",
+        "type": "blocks"
+      },
+      {
+        "from": "move-gstack",
+        "to": "move-deft",
+        "type": "blocks"
+      },
+      {
+        "from": "move-deft",
+        "to": "move-sageox",
+        "type": "blocks"
+      },
+      {
+        "from": "move-sageox",
+        "to": "move-state-apply",
+        "type": "blocks"
+      },
+      {
+        "from": "move-state-apply",
+        "to": "quickstart-catalog",
+        "type": "blocks"
+      },
+      {
+        "from": "quickstart-catalog",
+        "to": "troubleshooting-stub",
+        "type": "blocks"
+      },
+      {
+        "from": "page-skeleton",
+        "to": "cli-page",
+        "type": "blocks"
+      },
+      {
+        "from": "page-skeleton",
+        "to": "template-pointer",
+        "type": "blocks"
+      },
+      {
+        "from": "devdoc-map-flow",
+        "to": "devdoc-howto-invariants",
+        "type": "blocks"
+      },
+      {
+        "from": "devdoc-map-flow",
+        "to": "devdoc-links",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

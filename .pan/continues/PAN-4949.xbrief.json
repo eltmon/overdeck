@@ -1,0 +1,190 @@
+{
+  "version": "1",
+  "issueId": "PAN-4949",
+  "created": "2026-11-04T01:31:58.132Z",
+  "updated": "2026-11-04T03:15:42.191Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "connector-record": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4949",
+      "claimedAt": "2026-11-04T01:31:58.132Z",
+      "doneAt": "2026-11-04T01:50:35.952Z"
+    },
+    "connector-credential": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4949",
+      "claimedAt": "2026-11-04T01:50:43.595Z",
+      "doneAt": "2026-11-04T02:03:28.358Z"
+    },
+    "connector-pair-link": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4949",
+      "claimedAt": "2026-11-04T02:03:33.948Z",
+      "doneAt": "2026-11-04T02:04:31.679Z"
+    },
+    "connector-intents": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4949",
+      "claimedAt": "2026-11-04T02:04:37.180Z",
+      "doneAt": "2026-11-04T02:16:02.318Z"
+    },
+    "connector-operator-routes": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4949",
+      "claimedAt": "2026-11-04T02:16:03.508Z",
+      "doneAt": "2026-11-04T02:25:57.716Z"
+    },
+    "connector-exchange": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4949",
+      "claimedAt": "2026-11-04T02:26:23.301Z",
+      "doneAt": "2026-11-04T02:38:31.329Z"
+    },
+    "connector-code-refusal": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4949",
+      "claimedAt": "2026-11-04T02:38:33.488Z",
+      "doneAt": "2026-11-04T02:50:39.181Z"
+    },
+    "docs": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4949",
+      "claimedAt": "2026-11-04T02:50:41.199Z"
+    },
+    "connector-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4949",
+      "claimedAt": "2026-11-04T02:50:56.807Z",
+      "doneAt": "2026-11-04T02:51:24.278Z"
+    },
+    "connector-record.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:07:00.706Z"
+    },
+    "connector-record.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:07:21.792Z"
+    },
+    "connector-record.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:07:43.212Z"
+    },
+    "connector-record.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:08:03.840Z"
+    },
+    "connector-credential.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:08:22.399Z"
+    },
+    "connector-credential.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:08:40.103Z"
+    },
+    "connector-credential.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:08:59.363Z"
+    },
+    "connector-credential.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:09:15.693Z"
+    },
+    "connector-credential.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:09:32.603Z"
+    },
+    "connector-pair-link.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:09:49.284Z"
+    },
+    "connector-pair-link.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:10:06.981Z"
+    },
+    "connector-pair-link.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:10:25.564Z"
+    },
+    "connector-intents.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:10:43.438Z"
+    },
+    "connector-intents.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:11:00.594Z"
+    },
+    "connector-intents.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:11:17.324Z"
+    },
+    "connector-intents.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:11:33.105Z"
+    },
+    "connector-operator-routes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:11:48.841Z"
+    },
+    "connector-operator-routes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:12:04.388Z"
+    },
+    "connector-operator-routes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:12:19.394Z"
+    },
+    "connector-operator-routes.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:12:36.062Z"
+    },
+    "connector-operator-routes.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:12:51.422Z"
+    },
+    "connector-exchange.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:13:06.911Z"
+    },
+    "connector-exchange.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:13:23.038Z"
+    },
+    "connector-exchange.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:13:40.693Z"
+    },
+    "connector-exchange.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:13:58.376Z"
+    },
+    "connector-exchange.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:14:18.045Z"
+    },
+    "connector-code-refusal.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:14:35.001Z"
+    },
+    "connector-code-refusal.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:14:51.479Z"
+    },
+    "connector-code-refusal.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:15:08.064Z"
+    },
+    "connector-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:15:25.503Z"
+    },
+    "connector-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:15:42.191Z"
+    }
+  }
+}

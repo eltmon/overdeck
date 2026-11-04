@@ -57,6 +57,18 @@ describe('review-convergence', () => {
       expect(evaluateReviewConvergence([0, 0, 0])).toBe('converging');
       expect(evaluateReviewConvergence([3, 0, 0])).toBe('converging');
     });
+
+    it('judges only the rounds after the last 0-blocker round (PAN-4993)', () => {
+      // Blockers after an approved round come from new code, not a reversal.
+      expect(evaluateReviewConvergence([0, 0, 2])).toBe('converging');
+      expect(evaluateReviewConvergence([0, 0, 2, 2])).toBe('converging');
+      expect(evaluateReviewConvergence([3, 0, 2, 2])).toBe('converging');
+      // A non-converging episode is still caught.
+      expect(evaluateReviewConvergence([3, 4, 5])).toBe('not-converging');
+      expect(evaluateReviewConvergence([0, 2, 3, 4])).toBe('not-converging');
+      expect(evaluateReviewConvergence([0, 5, 3, 4])).toBe('not-converging');
+      expect(evaluateReviewConvergence([0, 2, 2, 2])).toBe('not-converging');
+    });
   });
 
   describe('countBlockingFindingsForRun', () => {

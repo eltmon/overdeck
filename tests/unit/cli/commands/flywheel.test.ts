@@ -169,6 +169,23 @@ describe('pan flywheel verbs (PAN-3964 FR-6)', () => {
     expect(line).toContain('(tracker unknown)');
   });
 
+  it('status marks a strike row (PAN-4752)', async () => {
+    mocks.deriveFlywheelStatus.mockResolvedValue({
+      ...status,
+      inFlight: [{ ...status.inFlight[0]!, strike: true }],
+    });
+    await run('status');
+    const line = log.mock.calls.map((c) => String(c[0])).join('\n').split('\n').find((l) => l.startsWith('    PAN-1'));
+    expect(line).toContain('strike');
+  });
+
+  it('status shows no strike marker on a plain row (PAN-4752)', async () => {
+    mocks.deriveFlywheelStatus.mockResolvedValue(status);
+    await run('status');
+    const line = log.mock.calls.map((c) => String(c[0])).join('\n').split('\n').find((l) => l.startsWith('    PAN-1'));
+    expect(line).not.toContain('strike');
+  });
+
   it('status counts feature workspaces when the source is the census (PAN-4199 ac3)', async () => {
     mocks.deriveFlywheelStatus.mockResolvedValue({
       ...status,

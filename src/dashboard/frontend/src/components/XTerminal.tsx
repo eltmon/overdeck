@@ -7,6 +7,8 @@ import { Sun, Moon, SunMoon } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from '../hooks/useTheme';
 import { useDesignLanguage } from '../hooks/useDesignLanguage';
+import { useColorTheme } from '../hooks/useColorTheme';
+import type { TerminalPalette } from '@overdeck/contracts';
 import {
   createReconnectJitter,
   nextReconnectDelay,
@@ -16,33 +18,11 @@ import { ensureDashboardSession } from '../lib/wsTransport';
 import { DashboardSessionUnauthorizedError } from '../lib/dashboardSessionError';
 import { parseTerminalControlFrame, TERMINAL_CONTROL_PREFIX, TERMINAL_PONG_MESSAGE } from './terminal/terminalControlFrames';
 
-// Terminal background, exported so embedders can match the surrounding chrome.
-// Must match TERMINAL_BG in src/lib/ui-theme.ts — new tmux sessions stamp
-// their pane background with that value so Claude Code's `theme: auto`
-// detects the dashboard theme via OSC 11 at startup, even headless.
-export const XTERM_BG = { dark: '#1a1a2e', light: '#ffffff' } as const;
-
-// xterm palette that follows the app's light/dark theme (PAN-1561). The ANSI
-// colors are tuned per-mode for contrast against the background.
-function xtermTheme(isDark: boolean): ITheme {
-  if (isDark) {
-    return {
-      background: XTERM_BG.dark, foreground: '#eaeaea', cursor: '#eaeaea', cursorAccent: '#1a1a2e',
-      selectionBackground: '#3a3a5e',
-      black: '#1a1a2e', red: '#ff5555', green: '#50fa7b', yellow: '#f1fa8c', blue: '#6272a4',
-      magenta: '#ff79c6', cyan: '#8be9fd', white: '#f8f8f2',
-      brightBlack: '#6272a4', brightRed: '#ff6e6e', brightGreen: '#69ff94', brightYellow: '#ffffa5',
-      brightBlue: '#d6acff', brightMagenta: '#ff92df', brightCyan: '#a4ffff', brightWhite: '#ffffff',
-    };
-  }
-  return {
-    background: XTERM_BG.light, foreground: '#24292e', cursor: '#24292e', cursorAccent: '#ffffff',
-    selectionBackground: '#bcd3f5',
-    black: '#24292e', red: '#d73a49', green: '#22863a', yellow: '#b08800', blue: '#0366d6',
-    magenta: '#6f42c1', cyan: '#1b7c83', white: '#6a737d',
-    brightBlack: '#959da5', brightRed: '#cb2431', brightGreen: '#28a745', brightYellow: '#dbab09',
-    brightBlue: '#2188ff', brightMagenta: '#8a63d2', brightCyan: '#3192aa', brightWhite: '#24292e',
-  };
+// xterm's ITheme keys are named identically to TerminalPalette's (PAN-4644),
+// so this is a direct pass-through — the active color theme's effective
+// terminal palette (useColorTheme) decides the actual colors.
+function xtermTheme(palette: TerminalPalette): ITheme {
+  return { ...palette };
 }
 
 // xterm renders glyphs into its own canvas (WebGL) or DOM cells it styles
@@ -93,6 +73,8 @@ interface XTerminalProps {
   /** When embedded in a host that owns its own chrome (e.g. the terminal
    * drawer), hide the built-in settings gear to avoid duplicate controls. */
   embedded?: boolean;
+  /** PAN-4650: the terminal WebSocket path; a linked conversation uses `/ws/linked/<env>/terminal`. */
+  wsPath?: string;
 }
 
 type ConnectionStatus = 'connected' | 'reconnecting' | 'restarting' | 'failed';
@@ -115,7 +97,7 @@ const CTRLV_PASTE_STORAGE_KEY = 'overdeck.terminal.ctrlVPaste';
 // Check if platform is Mac
 const isMac = navigator.platform.toLowerCase().includes('mac');
 
-export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: autoCopyProp, embedded }: XTerminalProps) {
+export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: autoCopyProp, embedded, wsPath = '/ws/terminal' }: XTerminalProps) {
   const isDark = useTheme((s) => s.resolvedTheme) !== 'light';
   const designLanguage = useDesignLanguage((s) => s.designLanguage);
   // Per-pane theme override (PAN-1520). 'auto' follows the dashboard; 'dark'/'light'
@@ -128,8 +110,9 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
     return stored === 'dark' || stored === 'light' ? stored : 'auto';
   });
   const effectiveIsDark = themeOverride === 'auto' ? isDark : themeOverride === 'dark';
-  const effectiveIsDarkRef = useRef(effectiveIsDark);
-  effectiveIsDarkRef.current = effectiveIsDark;
+  const palette = useColorTheme((s) => s.terminalPalette(effectiveIsDark ? 'dark' : 'light'));
+  const paletteRef = useRef(palette);
+  paletteRef.current = palette;
   // Cycle auto → light → dark → auto. Without the 'auto' step the toggle was a
   // one-way trip out of follow mode — once clicked, a pane could never
   // auto-follow the dashboard again. Pure updater so rapid clicks compound
@@ -471,7 +454,7 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
         allowProposedApi: true,
         macOptionClickForcesSelection: true,
         rightClickSelectsWord: false,
-        theme: xtermTheme(effectiveIsDarkRef.current),
+        theme: xtermTheme(paletteRef.current),
       });
 
       fit = new FitAddon();
@@ -565,7 +548,7 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
 
     // Connect to WebSocket on same port as the page (frontend and API are served together)
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    let wsUrl = `${protocol}//${window.location.host}/ws/terminal?session=${encodeURIComponent(sessionName)}&heartbeat=1`;
+    let wsUrl = `${protocol}//${window.location.host}${wsPath}?session=${encodeURIComponent(sessionName)}&heartbeat=1`;
     if (token) {
       wsUrl += `&token=${encodeURIComponent(token)}`;
     }
@@ -830,7 +813,7 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
     };
     connectionCleanupRef.current = cleanupConnection;
     })();
-  }, [sessionName, token, autoCopyOnSelect, reconnectJitterMs, handleKeyEvent, handleContextMenu, handleTerminalWheel, handleForcedSelectionMouseDown, handleSelectionContextMouseDown, getMeasuredSize, sendResizeIfNeeded]);
+  }, [sessionName, token, wsPath, autoCopyOnSelect, reconnectJitterMs, handleKeyEvent, handleContextMenu, handleTerminalWheel, handleForcedSelectionMouseDown, handleSelectionContextMouseDown, getMeasuredSize, sendResizeIfNeeded]);
   connectRef.current = connect;
 
   useEffect(() => {
@@ -889,13 +872,15 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
     };
   }, [sendResizeIfNeeded]);
 
-  // Recolor a live terminal when the effective theme changes — either the app
-  // theme toggles (PAN-1561) or the per-pane override is flipped (PAN-1520).
+  // Recolor a live terminal when the effective palette changes — the app
+  // theme toggles (PAN-1561), the per-pane override is flipped (PAN-1520),
+  // or the selected color theme for that slot changes (PAN-4644) — without
+  // remounting the terminal.
   useEffect(() => {
     if (terminalInstance.current) {
-      terminalInstance.current.options.theme = xtermTheme(effectiveIsDark);
+      terminalInstance.current.options.theme = xtermTheme(palette);
     }
-  }, [effectiveIsDark]);
+  }, [palette]);
 
   // Re-font a live terminal when the Overdeck Theme (Ledger/Broadsheet)
   // changes — resolveMonoFontFamily() only ran once, at Terminal construction,
@@ -993,7 +978,7 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
         onClick={handleClick}
         tabIndex={0}
         style={{
-          backgroundColor: effectiveIsDark ? XTERM_BG.dark : XTERM_BG.light,
+          backgroundColor: palette.background,
           overflow: 'hidden',
           outline: 'none',
         }}

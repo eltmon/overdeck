@@ -40,6 +40,8 @@ describe('conversation list worker costs', () => {
       compacting: false, contextUsage: null, lastActivityAt: null, branch: 'feature/example',
       isWorktree: true, pullRequest: null, pullRequestCount: 0, pendingInputCount: 0, pendingInputKinds: [], pendingAskUserQuestion: undefined,
       transcriptMissing: true, needsTerminal: false, providerError: null,
+      settledAt: null, settleReason: null, snoozedUntil: null, autoSettleOverride: 'inherit',
+      nextScheduledRunAt: null, scheduleCount: 0,
     })));
     expect(ledger).toHaveBeenCalledOnce();
     expect(list).toHaveBeenCalledWith({ limit: 500, offset: 0 });

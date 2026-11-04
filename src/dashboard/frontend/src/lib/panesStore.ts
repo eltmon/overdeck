@@ -60,6 +60,9 @@ export interface WorkspacePane {
   browserInitialUrl?: string
   // editor pane (PAN-3260) — absolute path of the file being edited
   editorFilePath?: string
+  // editor pane (PAN-4658) — the conversation whose composer receives citations
+  // from this pane's Preview; absent = Preview offers no Cite.
+  citeConversationName?: string
 }
 
 /** Fields a caller supplies when opening a pane; paneId/createdAt are generated. */
@@ -203,6 +206,8 @@ export function closeConversationPanes(conversationId: string): void {
     for (const pane of panes) {
       if (pane.paneType === 'agent' && pane.conversationId === conversationId) {
         store.closePane(workspaceId, pane.paneId)
+      } else if (pane.paneType === 'editor' && pane.citeConversationName === conversationId) {
+        store.updatePane(workspaceId, pane.paneId, { citeConversationName: undefined })
       }
     }
   }
@@ -215,7 +220,14 @@ export function closeConversationPanes(conversationId: string): void {
       if (!Array.isArray(parsed)) continue
       const panes = parsed.filter(isValidPane)
       const kept = panes.filter((p) => !(p.paneType === 'agent' && p.conversationId === conversationId))
-      if (kept.length !== panes.length) localStorage.setItem(key, JSON.stringify(kept))
+      const cleared = kept.map((p) => {
+        if (p.paneType !== 'editor' || p.citeConversationName !== conversationId) return p
+        const { citeConversationName: _drop, ...rest } = p
+        return rest
+      })
+      if (kept.length !== panes.length || cleared.some((p, i) => p !== kept[i])) {
+        localStorage.setItem(key, JSON.stringify(cleared))
+      }
     }
   } catch {
     /* ignore — persistence is best-effort */

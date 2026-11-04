@@ -105,6 +105,11 @@ export function renderSupervisorUnit(options: RenderSupervisorUnitOptions = {}):
     'Restart=on-failure',
     `RestartSec=${restartSec}`,
     '',
+    // PAN-4656: lets `pan connect` enable the unit so a connected server starts
+    // at boot. `pan up` never enables it (PAN-2253: no boot start elsewhere).
+    '[Install]',
+    'WantedBy=default.target',
+    '',
   ].join('\n');
 }
 
@@ -221,18 +226,31 @@ async function userDbusSessionExists(): Promise<boolean> {
   return pathExists(`${runtimeDir}/bus`);
 }
 
-export async function systemdUserAvailable(): Promise<boolean> {
-  try {
-    if (process.platform !== 'linux') return false;
-    if (process.env.CI) return false;
-    if (await runningInContainer()) return false;
-    if (!(await userDbusSessionExists())) return false;
+export type SystemdUserUnavailableReason =
+  | 'not-linux' | 'ci' | 'container' | 'no-runtime-dir' | 'no-session-bus' | 'systemctl-unusable' | 'manager-not-running';
 
+/** null when systemdUserAvailable() would return true. Same checks, same order. */
+export async function explainSystemdUserUnavailable(): Promise<SystemdUserUnavailableReason | null> {
+  if (process.platform !== 'linux') return 'not-linux';
+  if (process.env.CI) return 'ci';
+  if (await runningInContainer()) return 'container';
+  if (!process.env.XDG_RUNTIME_DIR?.trim()) return 'no-runtime-dir';
+  if (!(await userDbusSessionExists())) return 'no-session-bus';
+
+  try {
     await execAsync('systemctl --user --version', {
       encoding: 'utf-8',
       timeout: SYSTEMCTL_TIMEOUT_MS,
     });
-    return USABLE_MANAGER_STATES.has(await userManagerState());
+  } catch {
+    return 'systemctl-unusable';
+  }
+  return USABLE_MANAGER_STATES.has(await userManagerState()) ? null : 'manager-not-running';
+}
+
+export async function systemdUserAvailable(): Promise<boolean> {
+  try {
+    return (await explainSystemdUserUnavailable()) === null;
   } catch {
     return false;
   }

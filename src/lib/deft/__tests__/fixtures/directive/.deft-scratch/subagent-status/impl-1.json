@@ -1,0 +1,7 @@
+{
+  "agent_id": "impl-1",
+  "parent_id": "deft-root",
+  "last_heartbeat_at": "2026-11-02T17:55:00Z",
+  "last_message": "Implementing the UI scope",
+  "phase": "implementing"
+}

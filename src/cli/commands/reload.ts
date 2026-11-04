@@ -6,8 +6,10 @@ import {
   activateDashboardDeployment,
   buildDashboardFromOriginMain,
   dashboardDeploymentRoots,
+  isAncestorCommit,
   liveDashboardDeploymentRoots,
   removeDashboardDeployment,
+  resolveOriginMainSha,
   runGitAsync,
   selectDashboardDeploymentRoot,
   sweepDashboardDeployments,
@@ -19,7 +21,8 @@ import {
   writeActiveDashboardBundle,
 } from '../../lib/deploy/active-dashboard-bundle.js';
 import { repointGlobalCliToDeployment } from '../../lib/deploy/global-cli-link.js';
-import { readRunningDashboardBootGates } from '../../lib/deploy/running-boot-gates.js';
+import { acquireReloadLock, reloadSupersedeDetail } from '../../lib/deploy/reload-supersede.js';
+import { readRunningBuildCommit, readRunningDashboardBootGates } from '../../lib/deploy/running-boot-gates.js';
 import { formatBootGateState, type BootGateState } from '../../lib/boot-gates.js';
 import { supervisorDeploymentFailure } from '../../lib/channels/pty-supervisor-locate.js';
 import { dashboardServerBootFailure } from '../../lib/deploy/dashboard-bundle-integrity.js';
@@ -133,8 +136,8 @@ export async function reloadCommand(options: ReloadOptions): Promise<void> {
     reportComposerReloadProgress(phase, activityId, logPath);
   await progress('building');
   try {
-    await runReload(options, progress);
-    await progress(process.exitCode ? 'failed' : 'completed');
+    const outcome = await runReload(options, progress);
+    await progress(outcome === 'superseded' ? 'superseded' : process.exitCode ? 'failed' : 'completed');
   } catch (error) {
     await progress('failed');
     throw error;
@@ -144,7 +147,7 @@ export async function reloadCommand(options: ReloadOptions): Promise<void> {
 async function runReload(
   options: ReloadOptions,
   progress: (phase: Parameters<typeof reportComposerReloadProgress>[0]) => Promise<void>,
-): Promise<void> {
+): Promise<'superseded' | void> {
   let startedAt = Date.now();
   let healthTimeoutMs: number;
   try {
@@ -179,28 +182,29 @@ async function runReload(
     ));
   }
 
-  const lock = await acquireRestartLock('pan reload');
-  if (!lock) {
-    const holder = await readRestartLockHolder();
-    const heldBy = holder ? `held by PID ${holder.pid} (${holder.caller})` : 'held by another process';
-    const error = `restart in progress (${heldBy})`;
-    console.error(chalk.yellow(error));
-    await recordReloadStatus(startedAt, false, error);
-    process.exitCode = 2;
-    return;
-  }
-
-  try {
-    // PAN-1662: when a `pan dev` session owns the dashboard, don't refuse — signal
-    // it (SIGUSR2) to rebuild the server bundle and hot-restart the API child in
-    // place. This applies merged/edited server code without tearing down the
-    // interactive dev session or hijacking it into detached production mode. The
-    // frontend recovers via its graceful reconnect (PAN-1580). This is also the
-    // path the flywheel uses to apply its own merged server changes.
-    {
-      const { readDevSupervisorMarker } = await import('../../lib/dev-supervisor.js');
-      const dev = readDevSupervisorMarker();
-      if (dev) {
+  // PAN-1662: when a `pan dev` session owns the dashboard, don't refuse — signal
+  // it (SIGUSR2) to rebuild the server bundle and hot-restart the API child in
+  // place. This applies merged/edited server code without tearing down the
+  // interactive dev session or hijacking it into detached production mode. The
+  // frontend recovers via its graceful reconnect (PAN-1580). This is also the
+  // path the flywheel uses to apply its own merged server changes. It runs
+  // before any target resolution, so an unreachable origin never blocks a dev
+  // hot-restart (PAN-4888 D12).
+  {
+    const { readDevSupervisorMarker } = await import('../../lib/dev-supervisor.js');
+    const dev = readDevSupervisorMarker();
+    if (dev) {
+      const devLock = await acquireRestartLock('pan reload');
+      if (!devLock) {
+        const holder = await readRestartLockHolder();
+        const heldBy = holder ? `held by PID ${holder.pid} (${holder.caller})` : 'held by another process';
+        const error = `restart in progress (${heldBy})`;
+        console.error(chalk.yellow(error));
+        await recordReloadStatus(startedAt, false, error);
+        process.exitCode = 2;
+        return;
+      }
+      try {
         try {
           process.kill(dev.pid, 'SIGUSR2');
         } catch (err: any) {
@@ -221,17 +225,55 @@ async function runReload(
           return;
         }
         return;
+      } finally {
+        await devLock.release();
       }
     }
+  }
 
+  // PAN-4888: resolve the origin/main commit this reload builds before taking
+  // the lock, record it there, and build exactly it. A newer reload can then
+  // replace a waiting one, and an equal or older one has nothing to add.
+  let repoRoot = process.cwd();
+  let targetSha: string | undefined;
+  if (!options.skipBuild) {
+    try {
+      repoRoot = await resolvePrimaryRepoRoot(process.cwd());
+      targetSha = await resolveOriginMainSha(repoRoot);
+    } catch (error) {
+      const message = `${(error as Error)?.message || String(error)} — old dashboard left running`;
+      console.error(chalk.red(message));
+      await recordReloadStatus(startedAt, false, message);
+      process.exitCode = 1;
+      return;
+    }
+  }
+
+  const acquired = await acquireReloadLock(targetSha, {
+    isAncestor: (ancestor, descendant) => isAncestorCommit(repoRoot, ancestor, descendant),
+  });
+  if (acquired.kind === 'covered') {
+    console.log(chalk.green(
+      `✓ A reload of origin/main ${acquired.holder.targetSha?.slice(0, 12)} is already building or waiting for approval (PID ${acquired.holder.pid}). `
+      + 'It already contains origin/main ' + (targetSha ?? '').slice(0, 12) + ', so this reload has nothing to add.',
+    ));
+    return;
+  }
+  if (acquired.kind === 'refused') {
+    console.error(chalk.yellow(acquired.message));
+    await recordReloadStatus(startedAt, false, acquired.message);
+    process.exitCode = 2;
+    return;
+  }
+  const lock = acquired.lock;
+
+  try {
     const config = readPlatformConfig();
-    let repoRoot = process.cwd();
     let deployment: DashboardDeployment | null = null;
     let activation: DashboardDeploymentActivation | null = null;
     const previousBundle = readActiveDashboardBundle();
     if (!options.skipBuild) {
       try {
-        repoRoot = await resolvePrimaryRepoRoot(process.cwd());
         const generationRoots = dashboardDeploymentRoots();
         await sweepDashboardDeployments(repoRoot, [
           ...generationRoots,
@@ -255,6 +297,7 @@ async function runReload(
         }
         deployment = await buildDashboardFromOriginMain(repoRoot, {
           deploymentRoot: () => nextDeployRoot,
+          targetSha,
         });
         const deployedMtime = dashboardBundleMtimeMs(deployment.serverPath);
         if (deployedMtime <= 0) {
@@ -312,7 +355,35 @@ async function runReload(
         ? `post-merge deploy for ${postMergeIssue}`
         : 'pan reload — put the freshly built dashboard live',
       ...(deployment?.builtSha ? { builtSha: deployment.builtSha } : {}),
-    });
+    }, { shouldYield: () => reloadSupersedeDetail() });
+    if (!gate.proceed && gate.reason === 'superseded') {
+      // PAN-4888: a newer reload builds a newer origin/main. Record no status:
+      // this is not a failure.
+      const runningCommit = deployment?.builtSha
+        ? await readRunningBuildCommit(config.dashboardApiPort)
+        : null;
+      if (deployment && runningCommit === deployment.builtSha) {
+        // Another restart already put this build live: it is the running
+        // server's code, so keep it exactly as the satisfied branch does.
+        await activation?.commit();
+        const repointError = await reportCliRepoint(deployment.deployRoot);
+        if (repointError) {
+          await recordReloadStatus(startedAt, false, repointError);
+          process.exitCode = 1;
+          return;
+        }
+        await sweepDashboardDeployments(repoRoot, dashboardDeploymentRoots()).catch(() => undefined);
+        console.log(chalk.green(`✓ Stepped aside — ${gate.detail}. Another restart already put this build live, so it stays.`));
+        return 'superseded';
+      }
+      // Undo this build the way a failed restart does, so the record and dist/
+      // never name a build that will not run.
+      await writeActiveDashboardBundle(previousBundle).catch(() => undefined);
+      await activation?.rollback();
+      if (deployment) await removeDashboardDeployment(repoRoot, deployment.deployRoot);
+      console.log(chalk.green(`✓ Stepped aside — ${gate.detail}. Nothing was restarted; this build was discarded.`));
+      return 'superseded';
+    }
     if (!gate.proceed) {
       // Same disposition as a restart that left the old dashboard running: the
       // build is good and stays the recorded active deployment, so whichever

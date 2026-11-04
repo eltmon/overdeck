@@ -1,3 +1,4 @@
+import { EventEmitter } from 'node:events';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { Effect } from 'effect';
@@ -87,5 +88,46 @@ describe('dashboard requests before serve attaches', () => {
 
     expect(response.status).toBe(503);
     expect(response.headers.get('retry-after')).toBe('5');
+  });
+});
+
+describe('startup hold after its timeout', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function fakeResponse() {
+    return { headersSent: false, writeHead: vi.fn(), end: vi.fn() };
+  }
+
+  it('keeps answering 503 after the timeout until a handler attaches, then serves', async () => {
+    const server = new EventEmitter() as unknown as Server;
+    const heldCount = holdRequestsUntilServed(server, 1000);
+    const early = fakeResponse();
+    server.emit('request', { url: '/a' }, early);
+    expect(heldCount()).toBe(1);
+
+    vi.advanceTimersByTime(1000);
+    expect(early.writeHead).toHaveBeenCalledWith(503, { 'Content-Type': 'text/plain', 'Retry-After': '5' });
+
+    const late = fakeResponse();
+    server.emit('request', { url: '/b' }, late);
+    expect(late.writeHead).toHaveBeenCalledWith(503, { 'Content-Type': 'text/plain', 'Retry-After': '5' });
+    expect(heldCount()).toBe(0);
+    expect(server.listenerCount('request')).toBe(1);
+
+    const handler = vi.fn();
+    server.on('request', handler);
+    await new Promise<void>((resolve) => queueMicrotask(resolve)); // the hold releases in a microtask
+    expect(server.listenerCount('request')).toBe(1);
+
+    const served = fakeResponse();
+    server.emit('request', { url: '/c' }, served);
+    expect(handler).toHaveBeenCalledWith({ url: '/c' }, served);
+    expect(served.writeHead).not.toHaveBeenCalled();
   });
 });

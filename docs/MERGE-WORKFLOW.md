@@ -24,6 +24,15 @@ verdict, every time it's asked.
 > `flywheel.require_uat_before_merge` on — the default) still gets a batch
 > when it is the only one: that batch is the UAT stack the operator tests on.
 > An `auto-merge` label releases the feature in a held project.
+>
+> **Each ready feature has one merge path (PAN-4970).** When the per-PR
+> auto-merge train is active for the project (GitHub forge, single repo,
+> `OVERDECK_DISABLE_AUTO_MERGE` unset) and the feature is not held for UAT,
+> or it already has a `pending`/`merging` auto-merge row (and is not held),
+> the train merges it and no batch includes it. Held features, Deft
+> human-merge features, a cancelled auto-merge, an auto-merge that failed at
+> the current PR head, GitLab and polyrepo projects, and every feature while
+> the kill switch is set stay on the batch path.
 
 ### Merging from the Flywheel UAT card (PAN-4598)
 
@@ -35,17 +44,31 @@ The Flywheel page's UAT BATCHES card (`MergeTrainView`) is the merge control.
    lands exactly the tree you tested. The small "Merge one feature to main…"
    escape hatch stays below the rows for the rare case where one feature must
    go first.
+
+   The checklist is each member's xBRIEF acceptance criteria. Because a
+   member's spec is committed on its feature branch and reaches `main` only
+   when its PR merges, the lookup tries the batch worktree first (every
+   member merged in), then the member's own feature workspace, then the
+   project root, so an already-merged member still resolves there (PAN-4799).
+   A member with no spec anywhere shows "Plan not found for \<ID>".
 2. **No tested batch exists.** This covers a batch that is still assembling,
    a lone feature in a project that does not hold for UAT, and a failed
    assembly. Each ready row then shows its own **Merge** button. It posts
    `/api/merge-train/merge-next` with `{ n: 1, project, issueId }`, so the
    merge gate re-checks that one feature and the issue closes out through the
    normal post-merge flow. An `issueId` outside the project's ready set gets
-   a 409.
+   a 409. When every ready feature in the project owns its own merge path
+   through the per-PR auto-merge train (PAN-4970), the card says so instead
+   and offers no **Retry batch assembly** button — a forced reassembly could
+   not build anything from that set.
 3. **The last assembly failed.** The card names the failed batch and its time
    instead of promising a batch. It offers **Retry batch assembly**, which is
    a forced `/api/merge-train/assemble` for that project, next to the row
    Merge buttons.
+
+A promote of a batch that is no longer `ready` or `superseded` (PAN-4970)
+returns 409 `wrong-status` before any forge read; the card shows the refusal
+reason and disappears.
 
 **Failed assemblies stop blocking after six hours.** After three consecutive
 failed assemblies, the reconciler stops and logs `BLOCKED` instead of burning
@@ -94,7 +117,9 @@ bypasses it.
    workspace (the PR was pushed from a handoff worktree), the webhook adopts
    the PR branch into one through
    [`src/lib/cloister/pr-adoption-review.ts`](../src/lib/cloister/pr-adoption-review.ts)
-   and then starts the pipeline. When adoption is refused (the branch is
+   and then starts the pipeline. Verification skips the plan checklist for an
+   adopted PR with no xBRIEF (PAN-4786); every other check still runs. When
+   adoption is refused (the branch is
    checked out in another worktree, the head moved, or the local branch
    diverged), the issue shows "Review never started" under Needs you with the
    exact fix. See
@@ -287,8 +312,11 @@ repository read-only to bypass a real stranded branch.
 
 ## After another feature merges
 
-A merge does not rebase sibling branches. When another merge (or a direct
-push to `main`) makes an approved PR conflict, the forge reports it
+With the merge train enabled, a merge rebases the project's approved sibling
+branches onto the new main and re-reviews them (see "The merge-train roll"
+below). A rebase that conflicts is left to the conflict-repair patrol. When
+another merge (or a direct push to `main`) makes an approved PR conflict, the
+forge reports it
 non-mergeable and the merge gate refuses it. The conflict-repair patrol
 (PAN-4384) finds it within one 60-second tick and sends the issue's work agent
 one repair per PR head: run `pan sync-main <id>`, resolve the conflict, push,
@@ -302,21 +330,72 @@ CI on a conflicting PR, so the patrol does not wait for CI before the repair
 after the merge, treat the failing check as the evidence: fix it and let
 review and verification run again.
 
-Two files are union-merged in `.gitattributes`:
-`.overdeck/context/codebase/concerns.md` and `.beads/issues.jsonl`. When two
-PRs append to them, git keeps both sides' lines, so the merge door's server
-rebase and a local `git merge` or `git merge-tree` report no conflict. Git does
-not dedupe, so a concerns.md merge can leave two `<!-- last-verified -->` lines
-when both PRs stamped different dates. A `pan sync-main` merge into a branch
-created before the attribute landed (PAN-4614) can still conflict once.
-GitHub's own mergeable check may ignore the attribute and still report the PR
-conflicting; that path is tracked in PAN-4616. JSON state files under `.pan/`
-never get union.
+Three files are union-merged in `.gitattributes`:
+`.overdeck/context/codebase/concerns.md`, `.beads/issues.jsonl`, and
+`scripts/frontend-test-subset.txt` (the CI frontend test list, PAN-4697). When
+two PRs append to them, git keeps both sides' lines, so the merge door's
+server rebase and a local `git merge` or `git merge-tree` report no conflict.
+Git does not dedupe, so a concerns.md merge can leave two
+`<!-- last-verified -->` lines when both PRs stamped different dates. A
+`pan sync-main` merge into a branch created before the attribute landed
+(PAN-4614) can still conflict once. GitHub's own mergeable check may ignore
+the attribute and still report the PR conflicting; that path is tracked in
+PAN-4616. For the frontend test list this residual case needs two PRs that
+add tests sorting into the same gap; inserts into different gaps merge
+cleanly even without union. JSON state files under `.pan/` never get union.
 
 An agent that parked an item with `pan task block <issue> <item> --on <ref>...`
 gets one `BLOCKERS MERGED` message within about two minutes of the last of
 those issues or PRs merging. See
 [Blocker wake](PIPELINE-GATES.md#blocker-wake-pan-4451).
+
+### The merge-train roll (PAN-4801)
+
+After a verified merge, `postMergeLifecycle` starts the merge-train reconcile
+(`runMergeTrainReconcile` in
+[`src/lib/cloister/merge-train.ts`](../src/lib/cloister/merge-train.ts)) once,
+when the lifecycle settles. Every merge door reaches `postMergeLifecycle`: the
+Merge button, the auto-merge executor and the merge queue (all through
+`triggerMerge`), the merge specialist's report, UAT batch promotion and the
+`pull_request` webhook. Its once-per-issue guards make this the single call
+site. The reconcile is not awaited, so a merge response and the auto-merge tick
+never wait for sibling rebases. It is a no-op unless the merge train is
+enabled (`merge_train.enabled`, or `merge_train: enabled|disabled` per project
+in `projects.yaml`).
+
+The reconcile
+([`merge-train-deps.ts`](../src/lib/cloister/merge-train-deps.ts)) works
+through the merged issue's own project only:
+
+1. **Siblings.** An in-flight issue with an open PR is a sibling when the merge
+   gate passes it, or when it is approved at its head, open, not a draft, has
+   no changes requested, no failed UAT and no red checks, whatever the cached
+   `mergeable` flag says. Right after a merge GitHub still reports a
+   just-conflicted PR as mergeable, or has not computed it yet.
+2. **Rebase.** The workspace must be on `feature/<issue>`, have no uncommitted
+   changes to tracked files, and have the PR head checked out. When main has
+   new commits, the branch is rebased onto `origin/main` and pushed with a lease
+   on the PR head. A workspace in any other state, or a failed push, is an
+   `error` outcome; a failed push also restores the workspace to the PR head.
+3. **Approval carry or re-review.** A rebase moves the head, so the old
+   approval no longer stands at it. When the rebase was clean and the PR's own
+   patch is unchanged (`git patch-id --stable` of the merge-base..head diff is
+   the same before and after), the approval is carried: an approving review
+   pinned to the new head (the reviews API's `commit_id`, or a
+   `<!-- overdeck-verdict: APPROVED sha=<new head> -->` marker when GitHub
+   refuses a self-review) is posted, and the workspace journal records
+   `review.approval-carried` with both heads. The merge gate accepts it at the
+   new head; CI still re-runs there, so checks stay authoritative. A changed
+   patch-id, a head that moved again, a non-GitHub forge or a refused post
+   falls back to a re-review through the guarded review door (source
+   `merge-train`).
+4. **Conflicts.** A rebase that conflicts is aborted and left to the
+   conflict-repair patrol ([PIPELINE-GATES.md](PIPELINE-GATES.md), "Conflict
+   repair"), which messages the issue's work agent once per conflicting head.
+
+Each run logs `[merge-train] reconciled N sibling(s) after <ISSUE>` with one
+`<ISSUE>=unaffected|approval-carried|rebased|conflict|error` entry per sibling, including runs
+with no siblings.
 
 ## Stash Discipline
 
@@ -364,6 +443,13 @@ Docker cleanup happens at merge time because orphaned networks from merged
 workspaces accumulate and eventually block new workspace creation ("all
 predefined address pools have been fully subnetted" — Docker's default pool
 supports ~31 bridge networks). NEVER remove this cleanup step.
+
+An Overdeck workspace stack creates one bridge network (`_devnet`); before
+PAN-4663 the template's `init-perms` service also created an empty `_default`
+network, which halved how many stacks fit in the pool. Existing `_default`
+networks are removed on the stack's next rebuild (its `down` runs against the
+old compose file) or by teardown's `removeComposeProjectNetworks`;
+`pan workspace reap` leaves them alone while the workspace directory exists.
 
 Every workspace teardown path removes the stack's compose networks, not only
 its containers (PAN-3900). `docker compose down` alone leaks the network when
@@ -416,6 +502,13 @@ Close-out's DoD row 8 (deploy) probes the dashboard's `/api/health` up to 3 time
 5 s timeout per attempt and a 2 s pause between attempts, because the dashboard event loop
 can stall for several seconds right after a close-out. The row reports `dashboard not
 reachable` only when every attempt fails, and the observed text says `after 3 attempts`.
+
+Close-out's DoD rows 1 (review) and 2 (tests) read the issue's PR from the forge, retrying once after
+1 s (`src/lib/lifecycle/dod-pr-read.ts`). A read that fails twice is a `MISS` whose observed text is
+`pull request read failed on the forge after 2 attempts: <error>` — never `no pull request found`, which
+now means only that the forge answered and no PR exists. A failed read is never waived by the strike
+path or by tracker-closed settlement. Each failed attempt prints a `[dod-gate] … pull request read
+failed (attempt n of 2)` warning. `fetchIssuePullRequest` never caches a failed read (PAN-4821).
 
 Close-out prunes only regenerable agent-directory weight: `pending.lock`,
 `*.sock`, and each `codex-home*/` entry except `sessions/`. It keeps
@@ -484,7 +577,13 @@ builds nothing, even on a forced rebuild — unless that feature is held for
 UAT (`issueHoldsForUat` in `cloister/auto-merge-eligibility.ts`: the issue's
 label, then the project default, then the global flag — the same tiers
 auto-merge eligibility applies), in which case the one-feature batch
-assembles as before.
+assembles as before. Before any of that, the reconciler drops every feature
+`mergePathOwner` (`src/dashboard/server/services/merge-path-owner.ts`,
+PAN-4970) assigns to the per-PR auto-merge train from its ready set, so it
+never bundles a feature the train already owns. A live batch that already
+holds such a feature is invalidated with the reason "\<ID> merges through
+the per-PR auto-merge train", not "left the ready queue" — the feature
+never left the ready queue, it just merges through a different path.
 
 ## Deploy progress on the project row
 
@@ -511,6 +610,36 @@ project is the one containing the reload's cwd, else the active dashboard
 bundle's source repo. It publishes `project.deploy_changed` with `emitOnly`
 when the projection changes, and the frontend reads `deployByProjectKey` from
 the snapshot and those events. The frontend never polls.
+
+### A newer reload replaces a waiting one (PAN-4888)
+
+`pan reload` resolves `origin/main` before it takes the restart lock, writes
+that commit (`targetSha`) and `supersedable: true` into the lock record, and
+builds exactly that commit. A reload that finds the lock held runs the
+protocol in [`reload-supersede.ts`](../src/lib/deploy/reload-supersede.ts).
+It compares the two commits by git ancestry. When its own commit equals, or is
+an ancestor of, the holder's, it is covered: it exits 0 without building and
+records no restart status, so an older invocation that resumes late never
+replaces a newer build. When the holder's commit is a strict ancestor of its
+own, it writes its own marker, `~/.overdeck/reload-supersede/<pid>.json`,
+naming the holder's pid, rewrites it every 2 seconds, and waits up to 20
+minutes for the lock. Diverged history is refused with exit 2 and nothing is
+replaced. A holder that is not a supersedable `pan reload` (`pan restart`, the
+supervisor, `pan connect`, a reload from an older CLI) is refused with exit 2
+exactly as before.
+
+The holder checks for a fresh marker from a live writer that names its pid
+before each restart-gate poll. It steps aside only after
+`POST /api/restart-gate/withdraw` removes its request; the server refuses
+that withdraw once an approval epoch covers the request, in the same
+synchronous transition `approve` uses, so an approval is never discarded and
+the holder restarts as approved instead. A holder that steps aside restores
+the previous active-bundle record and primary `dist/` and removes its
+generation, unless `/api/health` `buildCommit` shows the dashboard already
+runs its build, in which case it keeps it. It records no restart-status
+entry, so no `Deploy ✗` chip appears, and it exits 0. The first deploy of this
+change still runs the installed CLI as the holder, so that one reload is
+refused the old way.
 
 ### Boot preflight before switchover
 

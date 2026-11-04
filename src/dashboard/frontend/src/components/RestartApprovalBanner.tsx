@@ -116,7 +116,12 @@ export function RestartApprovalBanner() {
   if (!gate) return null;
 
   const count = gate.pending.length;
-  const reasons = gate.pending.map((request) => request.reason || request.kind).join('; ');
+  // PAN-4888: name the build each approval ships, so the operator never approves blind.
+  const describeRequest = (request: (typeof gate.pending)[number]) => {
+    const label = request.reason || request.kind;
+    return request.builtSha ? `${label} · build ${request.builtSha.slice(0, 12)}` : label;
+  };
+  const reasons = gate.pending.map(describeRequest).join('; ');
 
   if (gate.status === 'pending' && count > 0) {
     const explanation =

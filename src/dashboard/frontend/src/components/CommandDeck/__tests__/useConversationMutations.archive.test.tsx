@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 
 vi.mock('sonner', () => ({
@@ -144,5 +144,34 @@ describe('useConversationMutations — archive (PAN-4584)', () => {
     act(() => { view.result.current.archive('a'); });
 
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Failed to archive conversation', { duration: 6000 }));
+  });
+
+  it('stays pending until the conversations refetch resolves', async () => {
+    const target = conv({ name: 'a', title: 'Alpha' });
+    let resolveRefetch: ((rows: Conversation[]) => void) | null = null;
+    const queryFn = vi.fn(() => new Promise<Conversation[]>((resolve) => { resolveRefetch = resolve; }));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    client.setQueryData(['conversations'], [target]);
+    const onSuccess = vi.fn();
+    const view = renderHook(() => {
+      useQuery({ queryKey: ['conversations'], queryFn, staleTime: Infinity });
+      return useConversationMutations(null, vi.fn());
+    }, { wrapper: wrapper(client) });
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ success: true }), { status: 200 }));
+
+    act(() => { view.result.current.archive('a', { onSuccess }); });
+    await waitFor(() => expect(queryFn).toHaveBeenCalledTimes(1));
+
+    expect(view.result.current.isArchivePending('a')).toBe(true);
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(closeConversationPanes).not.toHaveBeenCalled();
+    expect(onSuccess).not.toHaveBeenCalled();
+
+    act(() => { resolveRefetch?.([]); });
+
+    await waitFor(() => expect(view.result.current.isArchivePending('a')).toBe(false));
+    expect(toast.success).toHaveBeenCalledWith('Archived "Alpha"', { duration: 4000 });
+    expect(closeConversationPanes).toHaveBeenCalledWith('a');
+    expect(onSuccess).toHaveBeenCalledTimes(1);
   });
 });

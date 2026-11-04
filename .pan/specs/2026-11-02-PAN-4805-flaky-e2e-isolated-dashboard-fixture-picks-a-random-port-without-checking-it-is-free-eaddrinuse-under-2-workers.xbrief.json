@@ -1,0 +1,420 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-02T06:38:54Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4805: Flaky e2e: isolated-dashboard fixture picks a random port without checking it is free (EADDRINUSE under 2 workers)",
+    "updated": "2026-11-02T06:47:06.729Z"
+  },
+  "plan": {
+    "id": "pan-4805",
+    "title": "Flaky e2e: isolated-dashboard fixture picks a random port without checking it is free (EADDRINUSE under 2 workers)",
+    "status": "running",
+    "uid": "1f138840-ddae-421b-9d24-e4676c9eb05a",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-02T06:38:54Z",
+    "updated": "2026-11-02T06:47:06.729Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4805",
+        "label": "PAN-4805",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4805.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "e2e",
+      "playwright",
+      "flaky-test",
+      "test-fixture"
+    ],
+    "narratives": {
+      "Problem": "src/dashboard/frontend/tests/fixtures/isolated-dashboard.ts picks the child dashboard's port as 39000 + random(900) and never checks it is free. Under two or more Playwright workers, two fixtures can draw the same port; the loser's child server exits with EADDRINUSE (main CI #12576, pan-4523-river-bands.spec.ts:166).",
+      "Proposal": "pickPort becomes an exported async function that listens on port 0, reads the OS-assigned port, releases it, and rejects 3011 and any excluded port (bounded to 5 probes). waitForHealth accepts only a health response whose pid equals the spawned child's pid. startIsolatedDashboard retries the boot once, on a port excluding the first one and with the same home, when it chose the port itself, the child exited, and its output holds the fatal 'listen EADDRINUSE: address already in use' line; an explicit opts.port never gets a substitute. A root-vitest unit test covers pickPort, waitForHealth and the EADDRINUSE detector, and docs/TESTING.md documents the behavior. Full detail and before/after code: .pan/drafts/PAN-4805.md.",
+      "NonGoals": "- Pinning `workers` in src/dashboard/frontend/playwright.config.ts\n- Changing the server's own bind retry in src/dashboard/server/server-bind.ts\n- Moving browser specs to a serial lane (PAN-4733)\n- Reading the host's configured api_port from config.toml inside the fixture\n- Importing anything outside node:* built-ins into the fixture\n- Editing any spec file that imports the fixture\n- Retrying with a different port when the caller passed opts.port\n- Retrying more than once, or retrying on failures other than EADDRINUSE\n- Retrying on the server's transient 'HTTP bind failed with EADDRINUSE; retry N/3' warning alone"
+    },
+    "autoDecisions": [
+      {
+        "summary": "The free-port probe calls server.listen(0) with no host argument.",
+        "rationale": "Node then binds the unspecified address (dual-stack :: or 0.0.0.0), which is at least as strict as the child's own 0.0.0.0 bind and matches the issue's acceptance check net.createServer().listen(port) exactly."
+      },
+      {
+        "summary": "The fixture rejects only port 3011 explicitly and does not read the host's config.toml api_port.",
+        "rationale": "An OS-assigned port can never equal a port the running host dashboard holds, and Linux's ephemeral range never contains 3011; importing readHostDashboardApiPort would drag src/lib/paths.ts, @iarna/toml and build-info into every fixture load."
+      },
+      {
+        "summary": "EADDRINUSE is detected from the child's captured stdout/stderr chunks after waiting (max 2 s) for the close event, not from server.log.",
+        "rationale": "The bind error goes to stderr; server.log in the temp home is not guaranteed to exist, and exitCode is set on 'exit', which can precede the last stderr chunk."
+      },
+      {
+        "summary": "Retry exactly once, on the same home, and only when the fixture chose the port.",
+        "rationale": "Callers pass pre-seeded homes that must survive a retry, and pan-4279-degraded-mode.spec.ts:50 restarts on an explicit port the open page depends on, so a substitute port would break that spec."
+      },
+      {
+        "summary": "The unit test lives in root vitest at tests/unit/dashboard/frontend/isolated-dashboard-port.test.ts.",
+        "rationale": "The frontend vitest config excludes **/tests/** and runs happy-dom; root vitest runs node, discovers tests/**, and already imports frontend files from that directory (issue-view-no-loss.test.ts)."
+      },
+      {
+        "summary": "Accepted all three plan-critic findings: PID-matched health, fatal-line-only retry eligibility, and an exclude list for the retry port.",
+        "rationale": "Each finding names a concrete race or misfire in the original design; the fixes are small and keep the fixture self-contained."
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-02-PAN-4805-flaky-e2e-isolated-dashboard-fixture-picks-a-random-port-without-checking-it-is-free-eaddrinuse-under-2-workers.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "pickport-os-assigned",
+        "title": "pickPort returns an OS-assigned free port that is never 3011 or an excluded port",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T06:38:54Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4805",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/tests/fixtures/isolated-dashboard.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'Math.random' src/dashboard/frontend/tests/fixtures/isolated-dashboard.ts || echo none",
+            "grep -n 'export async function pickPort' src/dashboard/frontend/tests/fixtures/isolated-dashboard.ts"
+          ],
+          "expected_outputs": [
+            "the Math.random grep prints 'none'",
+            "the pickPort grep prints exactly one line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-6",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1 in .pan/drafts/PAN-4805.md. In src/dashboard/frontend/tests/fixtures/isolated-dashboard.ts: import createServer from node:net; replace the random pickPort (lines 60-63) with a private probeFreePort() that listens on port 0 with no host, reads address().port, closes, and resolves it; add `export interface PickPortOptions { probe?; exclude? }` and `export async function pickPort({ probe = probeFreePort, exclude = [] }: PickPortOptions = {}): Promise<number>` that probes up to 5 times, returns the first port that is > 0, !== 3011 and not in exclude, and otherwise throws Error('pickPort: no usable free port after 5 probes'); change line 100 to `await pickPort()`; rewrite the header bullet at lines 18-20 to describe the OS-assigned port, the 3011 exclusion, the PID-checked health wait, and the one retry."
+        },
+        "items": [
+          {
+            "id": "pickport-os-assigned.ac1",
+            "title": "Given the fixture file, when grepped for Math.random, then it returns no match, and it exports `async function pickPort` that resolves a port from listen(0)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pickport-os-assigned.ac2",
+            "title": "Given a probe that returns 3011 or a port listed in exclude, when pickPort runs, then it probes again and returns the next allowed port; after 5 disallowed probes it rejects with an error containing 'no usable free port'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pickport-os-assigned.ac3",
+            "title": "The fixture's import list contains only node:* modules (node:net createServer added) and no import from src/lib or src/dashboard/server",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "health-pid-match",
+        "title": "waitForHealth accepts only a health response whose pid is the spawned child's",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T06:38:54Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4805",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/tests/fixtures/isolated-dashboard.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'export async function waitForHealth' src/dashboard/frontend/tests/fixtures/isolated-dashboard.ts",
+            "grep -n 'body.pid === child.pid' src/dashboard/frontend/tests/fixtures/isolated-dashboard.ts"
+          ],
+          "expected_outputs": [
+            "the waitForHealth grep prints exactly one line",
+            "the pid comparison grep prints exactly one line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1b in .pan/drafts/PAN-4805.md. Export waitForHealth with signature (baseUrl, child: HealthWaitChild { pid?: number; exitCode: number | null }, opts: { logPath?, timeoutMs = BOOT_TIMEOUT_MS, pollMs = 500 }). On a 200 response, parse the JSON body and return only when body.pid === child.pid; a different or missing pid, or an unparsable body, counts as not ready and polling continues. Keep the exact error prefixes 'Fixture dashboard exited early (code N).' and 'Fixture dashboard did not become healthy.'. The health body's pid comes from getDashboardIdentity() (src/dashboard/server/identity.ts) via src/dashboard/server/health-response.ts; do not import those files."
+        },
+        "items": [
+          {
+            "id": "health-pid-match.ac1",
+            "title": "Given a server on the fixture's port answering 200 with a pid different from the child's, when waitForHealth polls, then it does not resolve and rejects with 'exited early' once the child's exitCode becomes non-null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "health-pid-match.ac2",
+            "title": "Given a server answering 200 with the child's pid, when waitForHealth polls, then it resolves",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "health-pid-match.ac3",
+            "title": "waitForHealth accepts a pollMs option that defaults to 500 and a timeoutMs option that defaults to BOOT_TIMEOUT_MS (120000)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "boot-retry-eaddrinuse",
+        "title": "startIsolatedDashboard retries once on a fresh port when its own port was taken",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T06:38:54Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4805",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/tests/fixtures/isolated-dashboard.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'listen EADDRINUSE: address already in use' src/dashboard/frontend/tests/fixtures/isolated-dashboard.ts",
+            "grep -n 'keepHome: true' src/dashboard/frontend/tests/fixtures/isolated-dashboard.ts",
+            "npm run build && cd src/dashboard/frontend && npx playwright test tests/pan-4523-river-bands.spec.ts tests/pan-2355-mobile.spec.ts tests/pan-4661-mobile-pipeline.spec.ts --workers=4 --repeat-each=2"
+          ],
+          "expected_outputs": [
+            "the grep prints the isAddressInUseOutput pattern line",
+            "keepHome: true grep prints the failed-attempt stop call",
+            "Playwright reports all tests passed and no 'Fixture dashboard exited early' error"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2 in .pan/drafts/PAN-4805.md. Add `export function isAddressInUseOutput(output: string): boolean` that tests /listen EADDRINUSE: address already in use/ (the fatal Node error; it must NOT match the server's '[overdeck] HTTP bind failed with EADDRINUSE; retry N/3' warning). Move the spawn/health body of startIsolatedDashboard into a private bootOnce(home, port, env) that calls waitForHealth(baseUrl, child, { logPath }) and, on failure, awaits the child's 'close' event capped at 2000 ms, calls stop({ keepHome: true }), and throws a FixtureBootError(message, output, exited) where output is the captured chunks and exited is child.exitCode !== null (or a signal code). startIsolatedDashboard picks firstPort = opts.port ?? await pickPort(), boots once; if that throws a FixtureBootError with exited === true and isAddressInUseOutput(output) AND opts.port was undefined, it boots once more on await pickPort({ exclude: [firstPort] }) with the same home. Any other failure or a second failure prints the last 40 output lines, rmSyncs the home, and rethrows. Interfaces IsolatedDashboard and IsolatedDashboardOptions stay unchanged."
+        },
+        "items": [
+          {
+            "id": "boot-retry-eaddrinuse.ac1",
+            "title": "Given the fixture chose the port and the child exited with the fatal 'listen EADDRINUSE: address already in use' line in its output, when startIsolatedDashboard handles the failure, then it stops the child with keepHome: true and boots exactly once more on pickPort({ exclude: [firstPort] }) with the same home",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "boot-retry-eaddrinuse.ac2",
+            "title": "Given the caller passed opts.port, when the boot fails for any reason, then the fixture rethrows without choosing a different port (the retry branch tests explicitPort before calling pickPort)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "boot-retry-eaddrinuse.ac3",
+            "title": "Given a failure whose output holds only the 'HTTP bind failed with EADDRINUSE; retry' warning, a health timeout, or a failed retry, when the fixture gives up, then it does not retry, prints the last 40 lines of server output, removes the home directory, and rethrows the original error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "boot-retry-eaddrinuse.ac4",
+            "title": "After npm run build, `npx playwright test tests/pan-4523-river-bands.spec.ts tests/pan-2355-mobile.spec.ts tests/pan-4661-mobile-pipeline.spec.ts --workers=4 --repeat-each=2` in src/dashboard/frontend exits 0 with no 'Fixture dashboard exited early' failure",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pickport-unit-test",
+        "title": "Root vitest unit test for pickPort, waitForHealth and isAddressInUseOutput",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T06:38:54Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4805",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/dashboard/frontend/isolated-dashboard-port.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/frontend/isolated-dashboard-port.test.ts"
+          ],
+          "expected_outputs": [
+            "vitest reports 8 passed tests in isolated-dashboard-port.test.ts"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3 in .pan/drafts/PAN-4805.md. Create tests/unit/dashboard/frontend/isolated-dashboard-port.test.ts importing { isAddressInUseOutput, pickPort, waitForHealth } from '../../../../src/dashboard/frontend/tests/fixtures/isolated-dashboard'. Eight named tests: (1) pickPort returns a port that net.createServer().listen(port) accepts; (2) a stub probe returning 3011 then 45123 yields 45123 with two probe calls; (3) a stub always returning 3011 rejects with /no usable free port/ after 5 calls; (3b) stub 45123, 45123, 45200 with exclude [45123] yields 45200 after three calls; (4) 8 parallel pickPort calls each return a bindable port (bind one after another; do not assert distinctness); (5) isAddressInUseOutput is true for 'Error: listen EADDRINUSE: address already in use 0.0.0.0:39366' and false for '[overdeck] HTTP bind failed with EADDRINUSE; retry 1/3 in 250ms\\nFixture dashboard did not become healthy.'; (6) a node:http server on 127.0.0.1:0 answering /api/health with 200 {pid: 1} and setting fakeChild.exitCode = 1 in its handler makes waitForHealth(baseUrl, { pid: 4242, exitCode: null }, { pollMs: 10, timeoutMs: 5000 }) reject with /exited early \\(code 1\\)/; (7) the same server answering {pid: 4242} makes waitForHealth resolve. Close every server in finally. No .only, no skipIf, no fake timers (they would gate real socket I/O). Do not add the file to scripts/frontend-test-subset.txt."
+        },
+        "items": [
+          {
+            "id": "pickport-unit-test.ac1",
+            "title": "Given a port returned by pickPort, when a fresh net.createServer() listens on it, then the listening event fires and no error is emitted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pickport-unit-test.ac2",
+            "title": "`npx vitest run tests/unit/dashboard/frontend/isolated-dashboard-port.test.ts` exits 0 with the eight named tests passing, including the 3011-rejection, exclude, and five-probe-limit cases",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pickport-unit-test.ac3",
+            "title": "isAddressInUseOutput returns true for 'listen EADDRINUSE: address already in use 0.0.0.0:39366' and false for the server's 'HTTP bind failed with EADDRINUSE; retry' warning followed by a health-timeout message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pickport-unit-test.ac4",
+            "title": "Given a local server answering health with pid 1, when waitForHealth runs for a fake child with pid 4242, then the test observes a rejection with 'exited early (code 1)' instead of a resolve",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-testing-fixture-port",
+        "title": "docs/TESTING.md documents the fixture's OS-assigned port and one-retry rule",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T06:38:54Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4805",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/TESTING.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'OS-assigned free port' docs/TESTING.md"
+          ],
+          "expected_outputs": [
+            "grep prints the new bullet in the Dashboard UI Testing rules list"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-4 in .pan/drafts/PAN-4805.md. In docs/TESTING.md, section 'Dashboard UI Testing', append one bullet to the **Rules:** list (after the PAN-4767 bullet about tests/e2e/*.spec.ts): the isolated-dashboard fixture binds an OS-assigned free port, never 3011, and accepts health only from its own child's PID, so specs run under any worker count; if the child still loses the port (EADDRINUSE) the fixture retries once on a fresh port with the same home; passing `port` to startIsolatedDashboard turns that retry off (PAN-4805). Use the exact text in the PRD. docs/DASHBOARD-ARCHITECTURE.md needs no change."
+        },
+        "items": [
+          {
+            "id": "docs-testing-fixture-port.ac1",
+            "title": "`grep -n 'OS-assigned free port' docs/TESTING.md` returns one bullet inside the Dashboard UI Testing rules list that names src/dashboard/frontend/tests/fixtures/isolated-dashboard.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-testing-fixture-port.ac2",
+            "title": "Given docs/TESTING.md, when a reader opens the new bullet, then it renders the sentence that the fixture retries once on a fresh port after EADDRINUSE and that passing an explicit `port` disables that retry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "pickport-os-assigned",
+        "to": "health-pid-match",
+        "type": "blocks"
+      },
+      {
+        "from": "health-pid-match",
+        "to": "boot-retry-eaddrinuse",
+        "type": "blocks"
+      },
+      {
+        "from": "pickport-os-assigned",
+        "to": "boot-retry-eaddrinuse",
+        "type": "blocks"
+      },
+      {
+        "from": "boot-retry-eaddrinuse",
+        "to": "pickport-unit-test",
+        "type": "blocks"
+      },
+      {
+        "from": "health-pid-match",
+        "to": "pickport-unit-test",
+        "type": "blocks"
+      },
+      {
+        "from": "boot-retry-eaddrinuse",
+        "to": "docs-testing-fixture-port",
+        "type": "informs"
+      }
+    ]
+  },
+  "status": "active"
+}

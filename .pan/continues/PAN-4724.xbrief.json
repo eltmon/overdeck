@@ -1,0 +1,123 @@
+{
+  "version": "1",
+  "issueId": "PAN-4724",
+  "created": "2026-11-01T16:06:34.998Z",
+  "updated": "2026-11-01T16:27:19.002Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "rollup-install": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4724",
+      "claimedAt": "2026-11-01T16:06:34.998Z",
+      "doneAt": "2026-11-01T16:11:01.823Z"
+    },
+    "rollup-update-trigger": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4724",
+      "claimedAt": "2026-11-01T16:11:08.124Z",
+      "doneAt": "2026-11-01T16:13:09.580Z"
+    },
+    "rollup-read": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4724",
+      "claimedAt": "2026-11-01T16:12:49.547Z",
+      "doneAt": "2026-11-01T16:15:12.661Z"
+    },
+    "rollup-bench": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4724",
+      "claimedAt": "2026-11-01T16:15:17.472Z",
+      "doneAt": "2026-11-01T16:16:11.636Z"
+    },
+    "rollup-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4724",
+      "claimedAt": "2026-11-01T16:16:13.144Z",
+      "doneAt": "2026-11-01T16:16:54.768Z"
+    },
+    "rollup-install.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:22:53.285Z"
+    },
+    "rollup-install.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:23:07.270Z"
+    },
+    "rollup-install.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:23:21.698Z"
+    },
+    "rollup-install.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:23:35.925Z"
+    },
+    "rollup-install.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:23:50.784Z"
+    },
+    "rollup-update-trigger.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:24:02.376Z"
+    },
+    "rollup-update-trigger.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:24:14.921Z"
+    },
+    "rollup-update-trigger.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:24:27.242Z"
+    },
+    "rollup-update-trigger.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:24:39.438Z"
+    },
+    "rollup-update-trigger.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:24:51.611Z"
+    },
+    "rollup-read.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:25:06.761Z"
+    },
+    "rollup-read.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:25:23.031Z"
+    },
+    "rollup-read.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:25:39.492Z"
+    },
+    "rollup-read.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:25:54.160Z"
+    },
+    "rollup-bench.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:26:09.750Z"
+    },
+    "rollup-bench.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:26:23.405Z"
+    },
+    "rollup-bench.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:26:37.957Z"
+    },
+    "rollup-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:26:50.498Z"
+    },
+    "rollup-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:27:04.292Z"
+    },
+    "rollup-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:27:19.001Z"
+    }
+  }
+}

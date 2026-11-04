@@ -6,6 +6,9 @@ import { FitAddon } from '@xterm/addon-fit';
 import { PATIENT_WINDOW_MS } from '../lib/terminalReconnectPolicy';
 import { ensureDashboardSession } from '../lib/wsTransport';
 import { DashboardSessionUnauthorizedError } from '../lib/dashboardSessionError';
+import { BUILTIN_COLOR_THEMES, type ColorTheme } from '@overdeck/contracts';
+import { useTheme } from '../hooks/useTheme';
+import { useColorTheme } from '../hooks/useColorTheme';
 import { XTerminal } from './XTerminal';
 
 // XTerminal awaits the session mint before opening a socket (PAN-1166 W8).
@@ -41,7 +44,8 @@ vi.mock('@xterm/xterm', () => ({
     scrollToBottom = vi.fn();
     buffer = { active: { viewportY: 0, length: 0 } };
     modes = { mouseTrackingMode: 'none' };
-    constructor() {
+    constructor(options?: Record<string, unknown>) {
+      this.options = { ...options };
       (this.constructor as typeof this.constructor & { instances: unknown[] }).instances.push(this);
     }
     wheelHandler: ((event: WheelEvent) => boolean) | null = null;
@@ -307,6 +311,16 @@ describe('XTerminal', () => {
     // Should use prop value (true) instead of reading the auto-copy key.
     // (Unrelated localStorage reads — e.g. the optional profiling flag — are fine.)
     expect(localStorageMock.getItem).not.toHaveBeenCalledWith('overdeck.terminal.autoCopyOnSelect');
+  });
+
+  it('opens a linked conversation terminal on its /ws/linked path (PAN-4650)', async () => {
+    render(<XTerminal sessionName="conv-x" wsPath="/ws/linked/env-desk/terminal" />);
+
+    await waitFor(() => {
+      expect(MockWebSocket.instances).toHaveLength(1);
+      expect(new URL(MockWebSocket.instances[0].url).pathname).toBe('/ws/linked/env-desk/terminal');
+      expect(new URL(MockWebSocket.instances[0].url).searchParams.get('session')).toBe('conv-x');
+    });
   });
 
   it('sends attach with measured dimensions on connect', async () => {
@@ -1084,5 +1098,92 @@ describe('XTerminal - Clipboard Functionality', () => {
     expect(localStorageMock.setItem).toHaveBeenCalled();
 
     consoleErrorSpy.mockRestore();
+  });
+});
+
+describe('XTerminal color theme palette (PAN-4644)', () => {
+  const defaultActive = () => ({ light: BUILTIN_COLOR_THEMES['overdeck-light'], dark: BUILTIN_COLOR_THEMES['overdeck-dark'] });
+
+  function theme(overrides: Partial<ColorTheme> & { id: string; type: 'light' | 'dark' }): ColorTheme {
+    return { builtin: false, name: overrides.id, ...overrides };
+  }
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(ensureDashboardSession).mockResolvedValue(undefined);
+    MockWebSocket.instances = [];
+    (Terminal as unknown as { instances: unknown[] }).instances = [];
+    (FitAddon as unknown as { instances: unknown[] }).instances = [];
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', { configurable: true, value: 800 });
+    Object.defineProperty(HTMLElement.prototype, 'clientHeight', { configurable: true, value: 600 });
+    useColorTheme.setState({ active: defaultActive() });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    useColorTheme.setState({ active: defaultActive() });
+  });
+
+  it('ac1: renders with the dark selection effective palette', async () => {
+    vi.mocked(localStorageMock.getItem).mockReturnValue(null);
+    useTheme.setState({ theme: 'dark', resolvedTheme: 'dark' });
+    useColorTheme.setState({
+      active: { ...defaultActive(), dark: theme({ id: 'ayu-dark', type: 'dark', terminal: { background: '#0d1017', red: '#f06b73' } }) },
+    });
+
+    render(<XTerminal sessionName="ac1-session" />);
+
+    const terminalMock = Terminal as unknown as { instances: Array<{ options: { theme?: { background?: string; red?: string } } }> };
+    await waitFor(() => {
+      expect(MockWebSocket.instances).toHaveLength(1);
+      expect(MockWebSocket.instances[0].send).toHaveBeenCalledWith(JSON.stringify({ type: 'attach', cols: 100, rows: 30 }));
+    });
+    expect(terminalMock.instances[0].options.theme?.background).toBe('#0d1017');
+    expect(terminalMock.instances[0].options.theme?.red).toBe('#f06b73');
+  });
+
+  it('ac2: a per-pane light override uses the light slot effective palette', async () => {
+    vi.mocked(localStorageMock.getItem).mockImplementation((key: string) => (key.startsWith('overdeck.terminal.theme.') ? 'light' : null));
+    useTheme.setState({ theme: 'dark', resolvedTheme: 'dark' });
+    useColorTheme.setState({
+      active: { ...defaultActive(), light: theme({ id: 'ayu-light', type: 'light', terminal: { background: '#fafafa' } }) },
+    });
+
+    render(<XTerminal sessionName="ac2-session" />);
+
+    const terminalMock = Terminal as unknown as { instances: Array<{ options: { theme?: { background?: string } } }> };
+    await waitFor(() => {
+      expect(MockWebSocket.instances).toHaveLength(1);
+      expect(MockWebSocket.instances[0].send).toHaveBeenCalledWith(JSON.stringify({ type: 'attach', cols: 100, rows: 30 }));
+    });
+    expect(terminalMock.instances[0].options.theme?.background).toBe('#fafafa');
+  });
+
+  it('ac3: a dark selection change updates a live terminal without remounting', async () => {
+    vi.mocked(localStorageMock.getItem).mockReturnValue(null);
+    useTheme.setState({ theme: 'dark', resolvedTheme: 'dark' });
+    useColorTheme.setState({
+      active: { ...defaultActive(), dark: theme({ id: 'first', type: 'dark', terminal: { background: '#111111' } }) },
+    });
+
+    render(<XTerminal sessionName="ac3-session" />);
+
+    const terminalMock = Terminal as unknown as { instances: Array<{ options: { theme?: { background?: string } } }> };
+    await waitFor(() => {
+      expect(MockWebSocket.instances).toHaveLength(1);
+      expect(MockWebSocket.instances[0].send).toHaveBeenCalledWith(JSON.stringify({ type: 'attach', cols: 100, rows: 30 }));
+    });
+    expect(terminalMock.instances[0].options.theme?.background).toBe('#111111');
+
+    act(() => {
+      useColorTheme.setState((state) => ({
+        active: { ...state.active, dark: theme({ id: 'second', type: 'dark', terminal: { background: '#222222' } }) },
+      }));
+    });
+
+    await waitFor(() => {
+      expect(terminalMock.instances[0].options.theme?.background).toBe('#222222');
+    });
+    expect(terminalMock.instances).toHaveLength(1);
   });
 });

@@ -1,0 +1,1092 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-01T04:48:30Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4644: Import VS Code themes and support custom color themes in the dashboard",
+    "updated": "2026-11-01T04:54:32.835Z"
+  },
+  "plan": {
+    "id": "pan-4644",
+    "title": "Import VS Code themes and support custom color themes in the dashboard",
+    "status": "running",
+    "uid": "57ddb572-e714-4637-a164-6e3b5237aea8",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-01T04:48:30Z",
+    "updated": "2026-11-01T04:54:32.835Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4644",
+        "label": "PAN-4644",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4659",
+        "label": "PAN-4659 (.vsix import, split out)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4660",
+        "label": "PAN-4660 (theme editor, split out)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "theming",
+      "terminal",
+      "config"
+    ],
+    "metadata": {
+      "sizeJustification": "One color-theme pipeline spans the shared contracts model, the server store/config/tmux stamp, four routes, and the frontend consumers (terminal, chat syntax, UI tokens, pickers, import); the no-loss matrix (tests/unit) and the frontend CI test list (package.json) are mandatory touch points, and each doc file counts as its own subsystem. The separable entry points (.vsix import #4659, editor UI #4660) were already split into sibling issues; what remains is the minimum end-to-end feature — removing any consumer would leave a selectable theme that does nothing visible.",
+      "canonicalFilename": "2026-11-01-PAN-4644-import-vs-code-themes-and-support-custom-color-themes-in-the-dashboard.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "The dashboard has a light/dark mode and a design language (Ledger/Broadsheet) but no way to change colors. The terminal palette and the tmux OSC 11 background are hardcoded pairs, chat code blocks always use github-light, and there is no way to import a VS Code theme or define a custom one.",
+      "Proposal": "Add a color theme model (name, type, optional terminal/syntax/ui groups) in @overdeck/contracts with two built-ins that carry today's palettes; store user themes in ~/.overdeck/themes/<id>.json; store the per-mode selection in config.yaml ui.color_theme.{light,dark} with warn-and-fallback resolution; import single VS Code theme .json files (JSONC) through a preview route; apply the active theme to xterm.js, the tmux window-style stamp, chat syntax highlighting (content-hashed registered shiki themes) and a fenced UI token subset; add light/dark pickers and an import preview to Settings > Appearance. Full design: .pan/drafts/PAN-4644.md.",
+      "NonGoals": "- .vsix import (moved to #4659) and the duplicate-and-edit theme editor UI (moved to #4660)\n- A Herdr background stamp; COLORFGBG and launcher-generator.ts stay unchanged\n- Diff viewer syntax colors (stay pierre-dark / pierre-light)\n- Deleting or renaming themes from the UI\n- Overriding signal or state colors (--state-*, --success*, --warning*, --destructive*, --info*, --signal-*), fonts, density, radius, or chat width\n- Curated built-in themes beyond overdeck-dark and overdeck-light\n- Recoloring already-running tmux sessions\n- VS Code include resolution and .tmTheme token files for single-file import\n- Raising any scripts/file-size-allowlist.txt cap or growing src/lib/tmux.ts or src/dashboard/server/routes/settings.ts"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Split .vsix import into #4659 and the duplicate-and-edit editor into #4660; edited the PAN-4644 body with a scope note",
+        "rationale": "The core alone exceeds the plan surface lint (37 files, 8 subsystems); both are independent entry points onto this issue's store and import route and can pass review and UAT on their own."
+      },
+      {
+        "summary": "Register theme syntax with @pierre/diffs registerCustomTheme under a content-hashed name",
+        "rationale": "Verified registerCustomTheme exists and refuses duplicate names; hashing makes edited or re-imported themes take effect."
+      },
+      {
+        "summary": "No Herdr background stamp in this issue",
+        "rationale": "Verified no stamp exists in src/lib/terminal-backends and herdr pane/tab expose no color option; COLORFGBG already gives Claude Code light/dark for both backends."
+      },
+      {
+        "summary": "UI group uses the issue's six keys but never overrides signal/state tokens; ui.foreground reads editor.foreground before foreground",
+        "rationale": "Keeps the pan-style-guide color law; VS Code foreground is dim chrome text in many themes (Ayu Dark #5a6378)."
+      },
+      {
+        "summary": "Missing terminal colors fall back to the built-in palette of the same type, with no panel.background inference",
+        "rationale": "The issue states this rule and its acceptance criterion depends on it."
+      },
+      {
+        "summary": "Each mode slot accepts only themes of its type",
+        "rationale": "Keeps the mode-based COLORFGBG consistent with the active theme without touching launcher-generator.ts."
+      },
+      {
+        "summary": "Add jsonc-parser as a root dependency",
+        "rationale": "VS Code themes allow comments and trailing commas; no JSONC parser is installed and hand-rolled stripping is error-prone."
+      },
+      {
+        "summary": "Upload as JSON { fileName, contentBase64 } with a 2 MB cap",
+        "rationale": "No multipart handling exists in dashboard routes; theme files are small."
+      },
+      {
+        "summary": "Diff viewer keeps pierre themes; only chat code blocks and the file-link quickview follow the theme syntax",
+        "rationale": "The issue acceptance criteria name chat code blocks; diff colors depend on pierre theme internals."
+      },
+      {
+        "summary": "Fixtures are Ayu Dark and Ayu Light (vscode-ayu, MIT) generated from @shikijs/themes",
+        "rationale": "Both define terminal.background/foreground and all 16 ANSI keys (verified); GitHub Default themes lack terminal.background."
+      },
+      {
+        "summary": "Selection resolved server-side from config.yaml + ui-theme.json mode + theme files; the frontend never writes on load",
+        "rationale": "State is derived where possible, and a fresh browser profile cannot clobber the operator's selection."
+      }
+    ],
+    "items": [
+      {
+        "id": "contracts-color-theme",
+        "title": "Add the color theme model and built-in themes to @overdeck/contracts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:48:30Z",
+        "metadata": {
+          "issueLabel": "pan-4644",
+          "inspectionDepth": "deep",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "api",
+          "requiresInspection": true,
+          "foundationFor": [
+            "theme-store",
+            "selection-resolve",
+            "terminal-background",
+            "vscode-json-mapper",
+            "color-theme-routes",
+            "frontend-color-theme-store",
+            "xterm-palette",
+            "chat-syntax-theme"
+          ],
+          "files_scope": [
+            "packages/contracts/src/color-theme.ts",
+            "packages/contracts/src/index.ts",
+            "packages/contracts/src/__tests__/color-theme.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run packages/contracts/src/__tests__/color-theme.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "color-theme.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-4644.md \"Theme file shape\", \"Validation rules\", \"Effective values\" and work item 1. Create packages/contracts/src/color-theme.ts exporting the types ColorTheme (wire: file fields + id + builtin), ColorThemeFile, TerminalPalette (21 keys: background, foreground, cursor, cursorAccent, selectionBackground, black..brightWhite), ColorThemeUi (background, surface, border, foreground, muted, accent), ColorThemeSyntax ({ colors?: { editor.background?, editor.foreground? }, tokenColors }), ColorThemesListResponse, ColorThemeImportPreviewResponse; constants COLOR_THEME_ID_RE = /^[a-z0-9][a-z0-9-]{0,63}$/, RESERVED_COLOR_THEME_IDS = [overdeck-dark, overdeck-light], BUILTIN_COLOR_THEMES (overdeck-dark and overdeck-light whose terminal palettes are copied byte-for-byte from src/dashboard/frontend/src/components/XTerminal.tsx xtermTheme(), no syntax, no ui); functions builtinFor(type), normalizeColorTheme(raw, id) returning { theme, warnings } or { errors }, effectiveTerminalPalette(theme), toOpaqueHex(hex), readableForeground(hex), slugifyThemeId(name). Export everything from packages/contracts/src/index.ts. Pure TypeScript, no Node or DOM imports."
+        },
+        "items": [
+          {
+            "id": "contracts-color-theme.ac1",
+            "title": "Given a raw theme with one invalid hex in terminal.red, when normalizeColorTheme runs, then it returns the theme without terminal.red and a warning naming terminal.red",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-color-theme.ac2",
+            "title": "Given a raw theme without type, normalizeColorTheme returns errors and no theme",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-color-theme.ac3",
+            "title": "effectiveTerminalPalette of a dark theme with no terminal group returns exactly BUILTIN overdeck-dark terminal palette (background #1a1a2e)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-color-theme.ac4",
+            "title": "toOpaqueHex returns #0d1017 for #0d1017cc and #aabbcc for #abc; slugifyThemeId returns ayu-dark for \"Ayu Dark\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "theme-store",
+        "title": "Store user color themes in ~/.overdeck/themes",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:48:30Z",
+        "metadata": {
+          "issueLabel": "pan-4644",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/color-themes/store.ts",
+            "src/lib/color-themes/__tests__/store.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/color-themes/__tests__/store.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "store.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD \"Server modules\" store.ts bullet and work item 2. getColorThemesDir() = join(getOverdeckHome(), \"themes\"); listColorThemes() reads the directory on every call with fs/promises (built-ins first, then files sorted by name; invalid files skipped with a warning naming the file; missing dir = built-ins only); getColorTheme(id); saveColorTheme(file, { preferredId? }) normalizes via normalizeColorTheme, derives id from preferredId ?? slugifyThemeId(name), appends -2, -3 ... until the id is neither reserved nor an existing file, writes with writeFileAtomic from src/lib/model-presets/state.js (mode 0o644), never overwrites. The id is the file name and is not stored in the file. Tests use a temp OVERDECK_HOME."
+        },
+        "items": [
+          {
+            "id": "theme-store.ac1",
+            "title": "Given a saved theme, a fresh listColorThemes() call returns it after the built-ins (restart-equivalent read from disk)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "theme-store.ac2",
+            "title": "Saving two themes named \"Ayu Dark\" persists ayu-dark.json and ayu-dark-2.json and never overwrites the first",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "theme-store.ac3",
+            "title": "saveColorTheme with preferredId overdeck-dark persists overdeck-dark-2.json and never creates a file named overdeck-dark.json",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "theme-store.ac4",
+            "title": "A malformed JSON file in the themes directory is skipped and listColorThemes returns a warning naming that file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "config-color-theme",
+        "title": "Parse ui.color_theme in config.yaml and keep it through general settings saves",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:48:30Z",
+        "metadata": {
+          "issueLabel": "pan-4644",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/config-yaml/schema.ts",
+            "src/lib/config-yaml/defaults.ts",
+            "src/lib/config-yaml/merge.ts",
+            "src/lib/settings-api.ts",
+            "src/lib/__tests__/config-yaml-color-theme.test.ts",
+            "src/lib/__tests__/settings-api.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/config-yaml-color-theme.test.ts src/lib/__tests__/settings-api.test.ts src/lib/__tests__/config-yaml-ui-theme.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "all three test files pass",
+            "typecheck completes without errors",
+            "file-size guard passed"
+          ],
+          "traces": [
+            "FR-6",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD \"Config layer\". schema.ts UiConfig gains color_theme?: { light?: string; dark?: string }; normalized ui gains colorTheme: { light: string | null; dark: string | null }. defaults.ts ui gains colorTheme: { light: null, dark: null }. merge.ts (after the ui.theme block at ~:893), using an inline regex literal (do not import COLOR_THEME_ID_RE from contracts, so this item runs in parallel with contracts-color-theme): copy string ids matching /^[a-z0-9][a-z0-9-]{0,63}$/; any other present value console.warn(\"config.yaml: ui.color_theme.<mode> must be a theme id; ignoring\") and stays null; never throw. settings-api.ts saveSettingsApiPromiseUnlocked ui carry-forward condition (~:989) adds currentConfig.ui.colorTheme.light !== null || currentConfig.ui.colorTheme.dark !== null so writeYamlConfigPreservingComments never runs doc.deleteIn([\"ui\"]) while a selection exists. Fix any typing fallout of the new normalized field (e.g. the ui merge at ~:1118). Do not add lines past the file-size allowance (settings-api.ts 1508, merge.ts 1045, schema.ts 1114)."
+        },
+        "items": [
+          {
+            "id": "config-color-theme.ac1",
+            "title": "Loading config.yaml with ui.color_theme { light: ayu-light, dark: ayu-dark } returns config.ui.colorTheme { light: \"ayu-light\", dark: \"ayu-dark\" }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-color-theme.ac2",
+            "title": "Loading config.yaml with ui.color_theme.dark: 42 does not throw, emits a console.warn naming ui.color_theme.dark, and yields colorTheme.dark null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-color-theme.ac3",
+            "title": "Given a config.yaml whose ui block holds only color_theme, when saveSettingsApi(loadSettingsApi()) runs, then the file still contains ui.color_theme with both ids",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "selection-resolve",
+        "title": "Resolve and save the light/dark color theme selection",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:48:30Z",
+        "metadata": {
+          "issueLabel": "pan-4644",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/color-themes/selection.ts",
+            "src/lib/color-themes/selection-write.ts",
+            "src/lib/color-themes/__tests__/selection.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/color-themes/__tests__/selection.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "selection.test.ts passes",
+            "typecheck completes without errors",
+            "no new circular dependency reported"
+          ],
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD \"Server modules\" selection.ts and selection-write.ts bullets. selection.ts (read side, must NOT import settings-api.ts because tmux.ts reaches it): resolveColorThemeSelection() reads (await loadGlobalConfigNoMigration()).config.ui.colorTheme and getColorTheme(id); null, missing, or wrong-type ids fall back to the built-in of that mode; a fallback for a non-null id logs console.warn once per (mode, id) per process with the exact text from the PRD. selection-write.ts: saveColorThemeSelection(mode, id) inside runSettingsWriteSerialized parses the global config with yaml parseDocument (ENOENT = empty doc), setIn([\"ui\",\"color_theme\",mode], id), writeFileAtomic, clearConfigCache(). Copy the structure of src/lib/jev/settings.ts."
+        },
+        "items": [
+          {
+            "id": "selection-resolve.ac1",
+            "title": "Given ui.color_theme.dark names an id with no file, resolveColorThemeSelection returns overdeck-dark for dark and console.warn fires exactly once across two calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "selection-resolve.ac2",
+            "title": "Given ui.color_theme.dark names a light-type theme, resolveColorThemeSelection falls back to overdeck-dark and warns that it is a light theme",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "selection-resolve.ac3",
+            "title": "saveColorThemeSelection(\"dark\", \"ayu-dark\") persists ui.color_theme.dark: ayu-dark and preserves an existing YAML comment and an unrelated top-level key byte-for-byte",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "terminal-background",
+        "title": "Stamp new tmux sessions with the active color theme terminal background",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:48:30Z",
+        "metadata": {
+          "issueLabel": "pan-4644",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/color-themes/terminal-background.ts",
+            "src/lib/color-themes/__tests__/terminal-background.test.ts",
+            "src/lib/tmux.ts",
+            "src/lib/ui-theme.ts",
+            "tests/unit/lib/ui-theme.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/color-themes/__tests__/terminal-background.test.ts tests/unit/lib/ui-theme.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors",
+            "file-size guard passed (tmux.ts stays at 1167 lines)",
+            "no new circular dependency reported"
+          ],
+          "traces": [
+            "FR-8",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD \"Server modules\" terminal-background.ts bullet and the tmux.ts before/after snippet. resolveTerminalBackground(): mode = await getUiTheme(); theme = (await resolveColorThemeSelection())[mode]; return effectiveTerminalPalette(theme).background; on any error return TERMINAL_BG[mode] (TERMINAL_BG.dark if the mode read failed). tmux.ts: replace the import at line 36 and the two lines in createSession (~:951, ~:955) exactly as the PRD after-snippet shows; the line count of tmux.ts must stay 1167. Leave launcher-generator.ts and COLORFGBG untouched. Update the ui-theme.ts doc comment so TERMINAL_BG is described as the fallback and points at BUILTIN_COLOR_THEMES instead of XTERM_BG; rename the ui-theme.test.ts case \"exposes pane backgrounds matching the frontend XTERM_BG values\" to compare TERMINAL_BG against BUILTIN_COLOR_THEMES terminal backgrounds."
+        },
+        "items": [
+          {
+            "id": "terminal-background.ac1",
+            "title": "Given mode dark and ui.color_theme.dark ayu-dark saved with terminal.background #0d1017, resolveTerminalBackground returns #0d1017",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "terminal-background.ac2",
+            "title": "Given no selection, resolveTerminalBackground returns #1a1a2e in dark mode and #ffffff in light mode",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "terminal-background.ac3",
+            "title": "Given a selected dark theme without terminal.background, resolveTerminalBackground falls back to #1a1a2e",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "terminal-background.ac4",
+            "title": "Given tmuxExecAsync is mocked, when createSession runs, then it emits set-option window-style bg=<the resolveTerminalBackground() result> for the new session",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "vscode-json-mapper",
+        "title": "Map a VS Code theme JSON file to a color theme",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:48:30Z",
+        "metadata": {
+          "issueLabel": "pan-4644",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "package.json",
+            "bun.lock",
+            "src/lib/color-themes/vscode-import.ts",
+            "src/lib/color-themes/__tests__/vscode-import.test.ts",
+            "src/lib/color-themes/__tests__/fixtures/*"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/color-themes/__tests__/vscode-import.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vscode-import.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD \"VS Code mapping\" table and rules, \"Fixture generation\". Add jsonc-parser ^3.3.1 to root package.json dependencies (bun install updates bun.lock). mapVsCodeTheme(text, fileName) parses with jsonc-parser parse(text, errors, { allowTrailingComma: true }), throws ColorThemeImportError naming the first error offset, maps keys exactly per the table (ui.foreground = editor.foreground ?? foreground), derives type per the PRD rule, warns on include and on string tokenColors, then runs normalizeColorTheme. It never fills fallback colors into the result. Generate fixtures ayu-dark.jsonc and ayu-light.jsonc from @shikijs/themes with the PRD command (keep the attribution comment line); hand-write no-terminal.jsonc with a comment and a trailing comma."
+        },
+        "items": [
+          {
+            "id": "vscode-json-mapper.ac1",
+            "title": "mapVsCodeTheme on the ayu-dark fixture returns terminal.background #0d1017, terminal.red #f06b73, all 16 ANSI keys, 66 syntax.tokenColors, ui.foreground #bfbdb6 and ui.accent #e6b450",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vscode-json-mapper.ac2",
+            "title": "mapVsCodeTheme on the ayu-light fixture returns type light",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vscode-json-mapper.ac3",
+            "title": "mapVsCodeTheme on the no-terminal fixture returns a theme with no terminal group and its two tokenColors, without throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vscode-json-mapper.ac4",
+            "title": "Text with a syntax error rejects with ColorThemeImportError naming the offset; a theme with include returns a warning mentioning include",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "color-theme-routes",
+        "title": "Serve color theme list, selection, import preview and save routes",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:48:30Z",
+        "metadata": {
+          "issueLabel": "pan-4644",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "api",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/server/routes/color-themes.ts",
+            "src/dashboard/server/server.ts",
+            "src/dashboard/server/__tests__/color-themes-routes.test.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/color-themes-routes.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors",
+            "file-size guard passed (routes/settings.ts untouched)"
+          ],
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-6",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD \"Server modules\" routes bullet. New file modeled on src/dashboard/server/routes/jev.ts exporting colorThemesRouteLayer with GET /api/color-themes, PUT /api/color-themes/selection, POST /api/color-themes/import/preview, POST /api/color-themes; register it in server.ts next to jevRouteLayer. Every PUT/POST calls rejectUnsafeDashboardMutationRequest first. Response bodies use the contracts wire types. Preview: .json only (other extensions 400 with the #4659 message), decoded base64 size cap 2 MB (413), writes nothing. Add four rows to tests/unit/lib/overdeck/no-loss-matrix.ts. Do not touch routes/settings.ts. Route test follows src/dashboard/server/__tests__/environment-route.test.ts for request plumbing and src/dashboard/server/__tests__/access-tokens-routes.test.ts for passing the mutation session/CSRF check, with a temp OVERDECK_HOME."
+        },
+        "items": [
+          {
+            "id": "color-theme-routes.ac1",
+            "title": "POST /api/color-themes/import/preview with the ayu-dark fixture returns the mapped theme with id ayu-dark and the themes directory stays empty",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "color-theme-routes.ac2",
+            "title": "POST /api/color-themes saves a file under <OVERDECK_HOME>/themes/ and a following GET /api/color-themes lists it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "color-theme-routes.ac3",
+            "title": "PUT /api/color-themes/selection with mode dark and a light theme id answers 400; with a dark theme id it persists ui.color_theme.dark",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "color-theme-routes.ac4",
+            "title": "Preview rejects theme.vsix with 400 naming #4659 and a 3 MB payload with 413",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-color-theme-store",
+        "title": "Add the useColorTheme store that applies the active theme",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:48:30Z",
+        "metadata": {
+          "issueLabel": "pan-4644",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "frontend",
+          "requiresInspection": true,
+          "foundationFor": [
+            "xterm-palette",
+            "chat-syntax-theme",
+            "appearance-pickers",
+            "import-preview-ui"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/src/hooks/useColorTheme.ts",
+            "src/dashboard/frontend/src/hooks/__tests__/useColorTheme.test.ts",
+            "src/dashboard/frontend/src/main.tsx"
+          ],
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/hooks/__tests__/useColorTheme.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "useColorTheme.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-5",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD \"Frontend modules\" useColorTheme.ts bullet and the UI token table. Zustand store with themes, selection, warnings, loaded; reconcileFromServer() (GET /api/color-themes, apply, mirror), select(mode, id) (PUT with dashboardMutationJsonHeaders(), then apply), previewImport(file) (reads the File as base64, POST import/preview), saveImported(theme) (POST /api/color-themes, then reconcile); selectors activeTheme(mode) and terminalPalette(mode) (effectiveTerminalPalette). Mirror { light, dark } themes in localStorage key overdeck.ui.colorThemes.active with every access in try/catch; default to built-ins. Subscribe to useTheme so a mode toggle re-applies UI tokens. applyUiTokens implements the token table exactly, removes every property it set before applying the next theme, and never sets signal/state tokens. No server write on load. main.tsx calls reconcileFromServer() after the design-language reconcile."
+        },
+        "items": [
+          {
+            "id": "frontend-color-theme-store.ac1",
+            "title": "Given the dark theme has ui.background #10141c and the light theme has ui.background #fcfcfc, when the mode toggles dark to light, then the inline --background on <html> updates to #fcfcfc without a reload",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-color-theme-store.ac2",
+            "title": "Given the light theme has no ui group, when the mode toggles dark to light, then the inline --background on <html> is removed (the stylesheet value applies)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-color-theme-store.ac3",
+            "title": "When the active theme switches to one without a ui group, every inline token the previous theme set is removed from <html>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-color-theme-store.ac4",
+            "title": "Given a theme whose ui group sets all six keys, when applyUiTokens runs, then <html> inline style contains no --state-live, --success, --warning, --destructive or --signal-* property",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-color-theme-store.ac5",
+            "title": "reconcileFromServer applies the server selection and sends no PUT or POST request",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "xterm-palette",
+        "title": "Render xterm.js with the active color theme terminal palette",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:48:30Z",
+        "metadata": {
+          "issueLabel": "pan-4644",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/components/XTerminal.tsx",
+            "src/dashboard/frontend/src/components/XTerminal.test.tsx"
+          ],
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/XTerminal.test.tsx",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "XTerminal.test.tsx passes",
+            "typecheck completes without errors",
+            "file-size guard passed (XTerminal.tsx at most 1075 lines)"
+          ],
+          "traces": [
+            "FR-7",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD \"Frontend modules\" XTerminal bullet. Delete XTERM_BG and the two hardcoded palettes (no other importer); xtermTheme(palette: TerminalPalette): ITheme maps the 21 keys; read the palette with useColorTheme((s) => s.terminalPalette(effectiveIsDark ? \"dark\" : \"light\")) and keep a ref for construction (~:474); the recolor effect (~:896) depends on the palette. The per-pane auto/dark/light override keeps its meaning (dark = dark slot palette). XTerminal.tsx must end at or under 1075 lines."
+        },
+        "items": [
+          {
+            "id": "xterm-palette.ac1",
+            "title": "Given ayu-dark is the dark selection, when a terminal mounts in dark mode, then it renders with options.theme.background #0d1017 and red #f06b73",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "xterm-palette.ac2",
+            "title": "Given the per-pane override is light, when the terminal renders, then options.theme.background equals the light slot effective palette background",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "xterm-palette.ac3",
+            "title": "When the dark selection changes, a live terminal updates options.theme to the new palette without remounting",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "chat-syntax-theme",
+        "title": "Highlight chat code blocks with the active theme token colors",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:48:30Z",
+        "metadata": {
+          "issueLabel": "pan-4644",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/syntaxTheme.ts",
+            "src/dashboard/frontend/src/lib/__tests__/syntaxTheme.test.ts",
+            "src/dashboard/frontend/src/components/chat/ChatMarkdown.tsx",
+            "src/dashboard/frontend/src/components/chat/MarkdownFileLink.tsx"
+          ],
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/lib/__tests__/syntaxTheme.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "syntaxTheme.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD \"Frontend modules\" syntaxTheme.ts bullet. syntaxThemeName(theme) returns github-light without syntax, else overdeck-<id>-<fnv1a32(JSON.stringify(theme.syntax)).toString(36)> (fnv1a32 from lib/diffRendering.ts); ensureSyntaxTheme registers each name once through @pierre/diffs registerCustomTheme with { name, type, colors, tokenColors }; highlight(code, lang, themeName) uses getSharedHighlighter({ themes: [themeName], langs: [] }). ChatMarkdown and MarkdownFileLink replace their private highlighter code with it; the ChatMarkdown cache key includes the theme name; CodeBlock re-highlights when the active theme name changes. Keep the .shikiOutput pre background rule. Tests mock @pierre/diffs."
+        },
+        "items": [
+          {
+            "id": "chat-syntax-theme.ac1",
+            "title": "Given a theme with syntax, when highlight runs twice, then getSharedHighlighter receives a theme name starting overdeck-ayu-dark- and registerCustomTheme records exactly one registration",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "chat-syntax-theme.ac2",
+            "title": "Given a theme without syntax, syntaxThemeName returns github-light and preserves the current highlight output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "chat-syntax-theme.ac3",
+            "title": "Changing the theme syntax produces a different theme name and a new registration",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "appearance-pickers",
+        "title": "Add light and dark color theme pickers to Settings > Appearance",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:48:30Z",
+        "metadata": {
+          "issueLabel": "pan-4644",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/sections/ColorThemeSection.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/AppearanceSection.tsx",
+            "src/dashboard/frontend/src/components/Settings/__tests__/ColorThemeSection.test.tsx"
+          ],
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Settings/__tests__/ColorThemeSection.test.tsx src/components/Settings/__tests__/AppearanceSection.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD \"Frontend modules\" ColorThemeSection bullet. ColorThemeSection renders under the Overdeck Theme cards in AppearanceSection: heading \"Color theme\", a select data-testid color-theme-light listing only light themes and a select data-testid color-theme-dark listing only dark themes, each showing the current selection; changing one calls useColorTheme select(mode, id) and toasts on failure. The existing src/dashboard/frontend/src/components/Settings/__tests__/AppearanceSection.test.tsx now mounts ColorThemeSection: mock fetch there (or rely on the store defaulting to built-ins) so it keeps passing. Leave the import button to item import-preview-ui, which adds it to this same component. Follow pan-style-guide."
+        },
+        "items": [
+          {
+            "id": "appearance-pickers.ac1",
+            "title": "The dark select renders only dark-type themes and the light select renders only light-type themes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "appearance-pickers.ac2",
+            "title": "Choosing ayu-dark in the dark select sends PUT /api/color-themes/selection with { mode: \"dark\", id: \"ayu-dark\" }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "appearance-pickers.ac3",
+            "title": "A failed selection save renders a toast error and keeps the previous selection",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "import-preview-ui",
+        "title": "Import a VS Code theme JSON with a preview in Settings > Appearance",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:48:30Z",
+        "metadata": {
+          "issueLabel": "pan-4644",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/sections/ColorThemeImportPreview.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/ColorThemeSection.tsx",
+            "src/dashboard/frontend/src/components/Settings/__tests__/ColorThemeImportPreview.test.tsx",
+            "package.json"
+          ],
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Settings/__tests__/ColorThemeImportPreview.test.tsx src/components/Settings/__tests__/ColorThemeSection.test.tsx src/hooks/__tests__/useColorTheme.test.ts src/lib/__tests__/syntaxTheme.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "all four frontend test files pass",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD \"Frontend modules\" ColorThemeImportPreview bullet and work item 12. An \"Import VS Code theme\" button with a hidden input type=file accept=.json; on choose, previewImport(file) and render each previewed theme: name, type, background/foreground plus 16 ANSI swatches, six UI swatches, a short highlighted code sample, and the warnings list; Save calls saveImported for each theme and toasts the saved id; Cancel discards. Append the four new frontend test files listed in the PRD to root package.json test:frontend-subset (this item is the only one editing that script)."
+        },
+        "items": [
+          {
+            "id": "import-preview-ui.ac1",
+            "title": "Choosing a .json file renders the preview with the theme name, 16 ANSI swatches and any warnings before anything is saved",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "import-preview-ui.ac2",
+            "title": "When Save is clicked, the UI sends POST /api/color-themes with the theme and the matching select then renders the new theme",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "import-preview-ui.ac3",
+            "title": "Cancel closes the preview and sends no POST",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "import-preview-ui.ac4",
+            "title": "root package.json test:frontend-subset contains the four new frontend test file paths",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-color-themes",
+        "title": "Document color themes in appearance.mdx and DASHBOARD-ARCHITECTURE.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:48:30Z",
+        "metadata": {
+          "issueLabel": "pan-4644",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "docs",
+          "requiresInspection": false,
+          "files_scope": [
+            "configuration/appearance.mdx",
+            "docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs completes without errors"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "FR-9",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item 13. configuration/appearance.mdx: remove the sentence \"This is a typography, texture, and scale change — not a color change.\" and add a \"Color themes\" section covering the two pickers, a ui.color_theme YAML example, the import flow and the VS Code mapping table, hand-editing ~/.overdeck/themes/<id>.json (picked up on reload), the fallback rules (missing colors and unknown ids), the signal and state colors that themes never change, and links to #4659 (.vsix) and #4660 (editor). docs/DASHBOARD-ARCHITECTURE.md terminal section: the xterm palette comes from the active color theme and new tmux sessions are stamped from resolveTerminalBackground(); list the four /api/color-themes routes."
+        },
+        "items": [
+          {
+            "id": "docs-color-themes.ac1",
+            "title": "configuration/appearance.mdx renders a ui.color_theme YAML example with light and dark ids and the VS Code mapping table",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-color-themes.ac2",
+            "title": "configuration/appearance.mdx no longer contains the phrase \"not a color change\" and names the signal colors themes never override",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-color-themes.ac3",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md names resolveTerminalBackground() and the /api/color-themes routes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "contracts-color-theme",
+        "to": "theme-store",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-color-theme",
+        "to": "vscode-json-mapper",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-color-theme",
+        "to": "frontend-color-theme-store",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-color-theme",
+        "to": "selection-resolve",
+        "type": "blocks"
+      },
+      {
+        "from": "theme-store",
+        "to": "selection-resolve",
+        "type": "blocks"
+      },
+      {
+        "from": "config-color-theme",
+        "to": "selection-resolve",
+        "type": "blocks"
+      },
+      {
+        "from": "selection-resolve",
+        "to": "terminal-background",
+        "type": "blocks"
+      },
+      {
+        "from": "selection-resolve",
+        "to": "color-theme-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "theme-store",
+        "to": "color-theme-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "vscode-json-mapper",
+        "to": "color-theme-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-color-theme-store",
+        "to": "xterm-palette",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-color-theme-store",
+        "to": "chat-syntax-theme",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-color-theme-store",
+        "to": "appearance-pickers",
+        "type": "blocks"
+      },
+      {
+        "from": "appearance-pickers",
+        "to": "import-preview-ui",
+        "type": "blocks"
+      },
+      {
+        "from": "chat-syntax-theme",
+        "to": "import-preview-ui",
+        "type": "blocks"
+      },
+      {
+        "from": "vscode-json-mapper",
+        "to": "import-preview-ui",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

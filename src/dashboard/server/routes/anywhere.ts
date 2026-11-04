@@ -13,8 +13,9 @@
  * - `GET /api/anywhere/status` returns the Anywhere status card's data
  *   (`lib/remote-access/anywhere-status.ts`): machine identity, trusted
  *   addresses, the active paired-device count, the vault state, the
- *   problems with their fix actions, and the caller's credential kind
- *   (PAN-4455 D-3). Any dashboard credential may read it.
+ *   problems with their fix actions, a Tailscale summary (PAN-1254 FR-9), and
+ *   the caller's credential kind (PAN-4455 D-3). Any dashboard credential may
+ *   read it.
  *
  * No response is cacheable.
  */
@@ -26,19 +27,23 @@ import { emitActivityEntry } from '../../../lib/activity-logger.js';
 import { ensureEnvironmentIdentity } from '../../../lib/environment-identity.js';
 import {
   computeAnywhereProblems,
+  readDirectoryStatus,
+  readRelayStatus,
   readAnywhereVaultState,
   type AnywhereStatus,
   type AnywhereViewerKind,
 } from '../../../lib/remote-access/anywhere-status.js';
 import { isLoopbackOrigin } from '../../../lib/remote-access/loopback.js';
+import { invalidateRemoteAccessConfig, readRemoteAccessConfig } from '../../../lib/remote-access/config.js';
 import { addSavedTrustedOrigin } from '../../../lib/remote-access/trusted-origins.js';
+import { readTailscaleState } from '../../../lib/tailscale/state.js';
 import { jsonResponse } from '../http-helpers.js';
 import {
   rejectUnauthorizedDashboardRequest,
   rejectUnsafeDashboardMutationRequest,
-  resolveDashboardCredential,
+  resolveRequestCredential,
 } from './dashboard-auth.js';
-import { getTrustedOrigins, invalidateTrustedOriginsCache, type HeaderMap } from './origin-validation.js';
+import { getTrustedOrigins, invalidateTrustedOriginsCache } from './origin-validation.js';
 
 function noStore(response: HttpServerResponse.HttpServerResponse): HttpServerResponse.HttpServerResponse {
   return HttpServerResponse.setHeader(response, 'Cache-Control', 'no-store');
@@ -61,7 +66,7 @@ const addTrustedOriginRoute = HttpRouter.add(
     const authError = rejectUnsafeDashboardMutationRequest(request);
     if (authError) return noStore(authError);
     // PAN-4445 D-5: only the operator's browser on this machine widens origin trust.
-    if (resolveDashboardCredential(request.headers as HeaderMap)?.kind !== 'root-session') {
+    if (resolveRequestCredential(request)?.kind !== 'root-session') {
       return noStore(jsonResponse({ error: 'Only a browser session on this machine can add a trusted address.' }, { status: 403 }));
     }
 
@@ -89,6 +94,7 @@ const addTrustedOriginRoute = HttpRouter.add(
     }
     if (added.added) {
       invalidateTrustedOriginsCache();
+      invalidateRemoteAccessConfig(); // PAN-4645 D-4645-12: a remote address turns require_token_mint on.
       emitActivityEntry({ source: 'dashboard', level: 'info', message: `Added trusted address ${added.origin}`, details: '{}' });
     }
     return noStore(jsonResponse({ origin: added.origin, added: added.added }));
@@ -108,14 +114,31 @@ async function buildAnywhereStatus(viewerKind: AnywhereViewerKind | null): Promi
   const records = await listAccessTokens();
   // A record with no kind is a device (PAN-2351 FR-10).
   const active = records.filter((record) => (record.kind ?? 'device') === 'device' && !record.revokedAt).length;
-  const vault = await readAnywhereVaultState();
+  const [vault, tailscale] = await Promise.all([readAnywhereVaultState(), readTailscaleState()]);
+  // Read fresh: the Tailscale state is memoized and may predate a settings save.
+  const mint = readRemoteAccessConfig();
+  const requireTokenMint = mint.requireTokenMint;
   return {
     machine,
     addresses,
     devices: { active },
     vault,
-    problems: computeAnywhereProblems({ identityError, addresses, vault }),
+    tokenMint: { effective: mint.requireTokenMint, configured: mint.configured, autoReasons: [...mint.autoReasons] },
+    problems: computeAnywhereProblems({
+      identityError,
+      addresses,
+      vault,
+      tailscaleServeOn: tailscale.serve.proxiesDashboard,
+      requireTokenMint,
+    }),
+    tailscale: {
+      nextStep: tailscale.installed ? tailscale.nextStep : 'not-installed',
+      serveUrl: tailscale.serveUrl,
+      magicDnsName: tailscale.magicDnsName,
+    },
     viewer: { kind: viewerKind },
+    directory: readDirectoryStatus(),
+    relay: readRelayStatus(),
   };
 }
 
@@ -126,7 +149,7 @@ const anywhereStatusRoute = HttpRouter.add(
     const request = yield* HttpServerRequest.HttpServerRequest;
     const authError = rejectUnauthorizedDashboardRequest(request);
     if (authError) return noStore(authError);
-    const viewerKind = resolveDashboardCredential(request.headers as HeaderMap)?.kind ?? null;
+    const viewerKind = resolveRequestCredential(request)?.kind ?? null;
     return noStore(jsonResponse(yield* Effect.promise(() => buildAnywhereStatus(viewerKind))));
   }),
 );

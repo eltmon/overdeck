@@ -11,6 +11,7 @@
  * no flywheel run and no review-status record at all. Assemblies run minutes;
  * the reconciler is single-flight per project, so ticks never pile up.
  */
+import { existsSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { Effect } from 'effect';
@@ -37,9 +38,11 @@ import {
 } from '../../../lib/cloister/uat-polyrepo-engine.js';
 import { buildConflictAgentHook } from '../../../lib/cloister/uat-conflict-agent.js';
 import { reconcileUatGenerations, type ReconcileResult } from '../../../lib/cloister/uat-reconciler.js';
+import { mergePathOwner } from './merge-path-owner.js';
 import { ensureUatStack, probeUatStack, teardownUatStack } from '../../../lib/cloister/uat-stack.js';
 import {
   promoteUatGeneration,
+  promoteStatusRefusal,
   buildPolyrepoUatPromoteGitDeps,
   buildUatPromoteGitDeps,
   type PromoteResult,
@@ -57,7 +60,7 @@ import {
 import { getDerivedIssueState, listReadyIssuesForProject } from './derived-issue-state.js';
 import { evaluateIssueMergeGate } from '../../../lib/cloister/merge-gate.js';
 import { extractACFromDocument } from '../../../lib/xbrief/acceptance-criteria.js';
-import { findXBriefByIssue, readXBriefDocument } from '../../../lib/xbrief/xbrief-index.js';
+import { findXBriefByIssue, invalidateXBriefIndex, readXBriefDocument } from '../../../lib/xbrief/xbrief-index.js';
 import { findProjectByPath, listProjectsSync, resolveProjectFromIssueSync } from '../../../lib/projects.js';
 import {
   resolveConfiguredRepos,
@@ -67,6 +70,8 @@ import {
 import { getDashboardIdentity } from '../identity.js';
 import { issueHoldsForUat } from '../../../lib/cloister/auto-merge-eligibility.js';
 import { isFlywheelRequireUatBeforeMerge } from '../../../lib/overdeck/control-settings.js';
+import { memberSpecRoots } from './uat-member-spec-roots.js';
+import { getWorkspaceInfoForIssue } from '../routes/workspaces.js';
 
 const RECONCILE_INTERVAL_MS = 60_000;
 const CHAIN_PAYLOAD_LIMIT = 10;
@@ -89,6 +94,7 @@ interface AcceptanceCriteriaCacheEntry {
   path: string;
   mtimeMs: number;
   criteria: AcceptanceCriteriaSummary;
+  rootsKey: string;
 }
 
 const acceptanceCriteriaByIssue = new Map<string, AcceptanceCriteriaCacheEntry>();
@@ -216,6 +222,7 @@ async function runUatTrainReconcileForProject(
       teardownStack: (gen) => teardownUatStack(gen),
       cleanup: makeCleanupForProject(projectPath),
       holdsForUat: (feature) => issueHoldsForUat(feature.issueId, projectConfig, isFlywheelRequireUatBeforeMerge()),
+      mergesPerPr: async (feature) => (await mergePathOwner(feature.issueId, projectPath, projectConfig)) === 'per-pr',
       log: (msg) => console.log(msg),
     }, options);
   }
@@ -233,6 +240,7 @@ async function runUatTrainReconcileForProject(
     teardownStack: (gen) => teardownUatStack(gen),
     cleanup: makeCleanupForProject(projectPath),
     holdsForUat: (feature) => issueHoldsForUat(feature.issueId, projectConfig, isFlywheelRequireUatBeforeMerge()),
+    mergesPerPr: async (feature) => (await mergePathOwner(feature.issueId, projectPath, projectConfig)) === 'per-pr',
     log: (msg) => console.log(msg),
   }, options);
 }
@@ -607,24 +615,58 @@ async function mapBounded<T>(items: readonly T[], concurrency: number, worker: (
 }
 
 /**
- * PAN-1696: `root` is the project the issues belong to, NOT the dashboard's own
- * repo. Once the generations payload started serving every tracked project, a
- * dashboard-rooted xBRIEF lookup silently returned no acceptance criteria for
- * every non-PAN generation, so those batches showed an empty "What to UAT" list.
- * Issue ids are prefix-distinct across projects, so the module-level mtime cache
- * stays safe to key by issue id alone.
+ * Resolves one candidate root to a stat'd spec path, recovering once from a
+ * stale index entry (D7): a path the index remembers can be deleted without
+ * the 5s TTL noticing, so an ENOENT on `stat` invalidates that root's index
+ * and retries once before giving up on it.
+ */
+async function resolveInRoot(root: string, issueId: string): Promise<{ path: string; mtimeMs: number } | null> {
+  const found = await Effect.runPromise(findXBriefByIssue(root, issueId));
+  if (!found) return null;
+  try {
+    const { mtimeMs } = await stat(found.path);
+    return { path: found.path, mtimeMs };
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException)?.code !== 'ENOENT') throw err;
+  }
+  invalidateXBriefIndex(root);
+  const retried = await Effect.runPromise(findXBriefByIssue(root, issueId));
+  if (!retried) return null;
+  try {
+    const { mtimeMs } = await stat(retried.path);
+    return { path: retried.path, mtimeMs };
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException)?.code === 'ENOENT') return null;
+    throw err;
+  }
+}
+
+/**
+ * PAN-4799: a batch member's xBRIEF spec is committed on its feature branch
+ * and reaches main only when its PR merges, so a batch's own worktree (every
+ * member merged in) and each member's feature workspace both hold specs the
+ * project root never will. `rootsByIssue` carries each issue's ordered
+ * candidate roots (`memberSpecRoots`: batch worktree, then feature workspace,
+ * then project root) and the first root with a resolvable spec wins.
+ * Issue ids are prefix-distinct across projects, so the module-level mtime
+ * cache stays safe to key by issue id alone.
+ *
+ * D4: only a hit from `roots[0]` is cached. A hit from a later root is a
+ * fallback for this poll only — caching it would keep masking a spec that
+ * later appears in a higher-priority root (e.g. the batch worktree), so every
+ * later poll re-searches the full root list until roots[0] resolves.
  */
 async function loadAcceptanceCriteriaCache(
-  issueIds: ReadonlySet<string>,
-  root: string,
+  rootsByIssue: ReadonlyMap<string, readonly string[]>,
 ): Promise<Map<string, AcceptanceCriteriaLookup>> {
   const cache = new Map<string, AcceptanceCriteriaLookup>();
-  if (issueIds.size === 0) return cache;
+  if (rootsByIssue.size === 0) return cache;
 
-  await mapBounded([...issueIds], ACCEPTANCE_CRITERIA_READ_CONCURRENCY, async (issueId) => {
+  await mapBounded([...rootsByIssue.entries()], ACCEPTANCE_CRITERIA_READ_CONCURRENCY, async ([issueId, roots]) => {
     const upperIssueId = issueId.toUpperCase();
+    const rootsKey = roots.join('\0');
     const existing = acceptanceCriteriaByIssue.get(upperIssueId);
-    if (existing) {
+    if (existing && existing.rootsKey === rootsKey) {
       try {
         const { mtimeMs } = await stat(existing.path);
         if (existing.mtimeMs === mtimeMs) {
@@ -637,18 +679,22 @@ async function loadAcceptanceCriteriaCache(
     }
 
     try {
-      const found = await Effect.runPromise(findXBriefByIssue(root, upperIssueId));
-      if (!found) {
-        acceptanceCriteriaByIssue.delete(upperIssueId);
-        console.warn(`[uat-train] no xBRIEF spec resolved for ${upperIssueId} under ${root} — UAT checklist unavailable`);
-        cache.set(upperIssueId, { planResolved: false, criteria: [] });
+      for (const root of roots) {
+        const resolved = await resolveInRoot(root, upperIssueId);
+        if (!resolved) continue;
+        const document = await Effect.runPromise(readXBriefDocument(resolved.path));
+        const criteria = extractACFromDocument(document).map((ac) => ({ title: ac.title, status: ac.status }));
+        if (root === roots[0]) {
+          acceptanceCriteriaByIssue.set(upperIssueId, { path: resolved.path, mtimeMs: resolved.mtimeMs, criteria, rootsKey });
+        } else {
+          acceptanceCriteriaByIssue.delete(upperIssueId);
+        }
+        cache.set(upperIssueId, { planResolved: true, criteria });
         return;
       }
-      const { mtimeMs } = await stat(found.path);
-      const document = await Effect.runPromise(readXBriefDocument(found.path));
-      const criteria = extractACFromDocument(document).map((ac) => ({ title: ac.title, status: ac.status }));
-      acceptanceCriteriaByIssue.set(upperIssueId, { path: found.path, mtimeMs, criteria });
-      cache.set(upperIssueId, { planResolved: true, criteria });
+      acceptanceCriteriaByIssue.delete(upperIssueId);
+      console.warn(`[uat-train] no xBRIEF spec resolved for ${upperIssueId} under ${roots.join(', ')} — UAT checklist unavailable`);
+      cache.set(upperIssueId, { planResolved: false, criteria: [] });
     } catch (err) {
       console.warn(
         `[uat-train] failed to read xBRIEF spec for ${upperIssueId}:`,
@@ -671,8 +717,17 @@ export async function getUatGenerationsPayload(projectRootOverride?: string): Pr
   const chain = listUatGenerations({ projectRoot: root, limit: CHAIN_PAYLOAD_LIMIT });
   if (chain.length === 0) return [];
   const memberIssueIds = new Set(chain.flatMap((gen) => gen.members.map((member) => member.issueId.toUpperCase())));
-  // Resolve each member's xBRIEF in ITS OWN project, not the dashboard's repo.
-  const acCache = await loadAcceptanceCriteriaCache(memberIssueIds, root);
+  // Resolve each member's xBRIEF in ITS OWN project, not the dashboard's repo,
+  // and in the batch worktree / feature workspace before the project root —
+  // PAN-4799: an unmerged member's spec is never on the project root.
+  const featureWorkspacePath = (issueId: string): string | null => {
+    const info = getWorkspaceInfoForIssue(issueId);
+    return info.exists && !info.isRemote && info.localPath ? info.localPath : null;
+  };
+  const rootsByIssue = new Map([...memberIssueIds].map((id) => [
+    id, memberSpecRoots(id, chain, root, { exists: existsSync, featureWorkspacePath }),
+  ]));
+  const acCache = await loadAcceptanceCriteriaCache(rootsByIssue);
   const payload: UatGenerationPayload[] = [];
   for (const gen of chain) {
     const probe = await probeUatStack(gen);
@@ -764,10 +819,20 @@ export async function postUatGenerationPromotePayload(
   firePostMerge: UatPromoteDeps['firePostMerge'],
   shipVersion?: string,
 ): Promise<PromoteResult> {
+  // PAN-4970: a stale/invalidated card's Merge batch click used to pay for a
+  // round of per-member forge reads (the memberStates loop below) before
+  // reporting the same 409 postUatGenerationPromotePayload already knew it
+  // would return. Read the generation once and refuse before any of that.
+  const stored = getUatGeneration(name);
+  const refusal = promoteStatusRefusal(name, stored);
+  if (refusal) return refusal;
+  // promoteStatusRefusal returning null guarantees stored exists and is promotable.
+  const current = stored as UatGeneration;
+
   // PAN-1696: promote into the generation's OWN project repo. Generation rows carry
   // project_root, so a MIN generation must not be merged against the Overdeck repo.
   // For a generation belonging to this repo this resolves to the same path as before.
-  const root = resolve(getUatGeneration(name)?.projectRoot ?? projectRoot());
+  const root = resolve(current.projectRoot ?? projectRoot());
   // PAN-3917: promotion used to stamp a verification verdict onto every
   // member's record. The merge itself is the evidence — the generation's own
   // rows carry the merge sha, and readiness is re-derived from each PR.
@@ -776,7 +841,7 @@ export async function postUatGenerationPromotePayload(
   // approved, green, mergeable. `uat-promote`'s gate is synchronous, so the
   // states are derived up front and the closure reads the loaded answers.
   const memberStates = new Map<string, { eligible: boolean; reason?: string }>();
-  await Promise.all((getUatGeneration(name)?.members ?? []).map(async (member) => {
+  await Promise.all(current.members.map(async (member) => {
     const issueId = member.issueId.toUpperCase();
     try {
       // #4066 review: derived `ready` applies the merge gate's approval answer
@@ -800,7 +865,7 @@ export async function postUatGenerationPromotePayload(
   // (trial-merge everything, then publish) path.
   const projectConfig = findProjectByPath(root);
   const polyrepo = projectConfig?.workspace?.type === 'polyrepo';
-  const storedRepos = polyrepo ? (getUatGeneration(name)?.repos ?? []) : [];
+  const storedRepos = polyrepo ? (current.repos ?? []) : [];
 
   // Re-check writability against CURRENT config, not the config that was live
   // at assembly: a repo can be flipped to readonly between assembly and merge,

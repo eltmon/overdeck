@@ -1,0 +1,334 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-02T06:40:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4739: Fly machine: conversation-lifecycle marks a live conversation ended on every tick",
+    "updated": "2026-11-02T06:13:54.208Z"
+  },
+  "plan": {
+    "id": "pan-4739",
+    "title": "Fly machine: conversation-lifecycle marks a live conversation ended on every tick",
+    "status": "running",
+    "uid": "f9912eac-9377-4f45-b963-1f7279b857d2",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-02T06:40:00.000Z",
+    "updated": "2026-11-02T06:13:54.208Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4739",
+        "label": "PAN-4739",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4652",
+        "label": "PAN-4652",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "fly",
+      "conversation-lifecycle",
+      "liveness",
+      "tmux",
+      "anywhere"
+    ],
+    "narratives": {
+      "Problem": "On a Fly machine the lifecycle patrol ends a live conversation every tick. The patrol reads the runtime census (tmux list-panes -a), which omitted the session; home's GET /api/machines/conversations sync runs the conversation-list repair, which reads list-sessions plus conversationHarnessAlive and resurrects the row. The row flaps active/ended, and home's idle sweep can destroy a working machine when it reads ended.",
+      "Proposal": "Before ending a row, the patrol asks conversationHarnessAlive, the same door the list repair uses; if it reports the harness alive the row stays active and one WARNING (PAN-4739) line with the census health is logged per episode. A test pins the list repair to the same door. A time-boxed local Docker reproduction under Fly serve conditions looks for why list-panes -a missed the session and records the outcome. Docs describe the confirmation and the warning.",
+      "NonGoals": "- No change to sweepFlyMachines or any home-side Fly loop\n- No change to the runtime census or src/lib/tmux.ts except a repro-checkpoint fix that meets its <=30-line decision rule\n- No change to the conversation-list repair's production code\n- No paid Fly machine provisioning unless the operator asks\n- No change to the 10 s poll interval or the spawn grace periods\n- No extra subprocess calls on a tick where no row is about to be ended"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Fix the flap by confirming through conversationHarnessAlive at mark time instead of replacing the census",
+        "rationale": "The census is the cheap per-tick sweep (PAN-3921 FR-8); the root cause of its miss is unknown from code. Making the final end verdict come from the same door the list repair uses removes the flap whichever oracle is wrong, and costs subprocesses only for rows about to be ended."
+      },
+      {
+        "summary": "Warn once per disagreement episode, not every tick",
+        "rationale": "A 10 s patrol would otherwise flood fly-serve.log; once per episode keeps the evidence and re-warns on recurrence."
+      },
+      {
+        "summary": "Reproduce locally in Docker under Fly serve conditions, not on a paid Fly machine",
+        "rationale": "Auto mode has no operator approval for Fly spend; the Fly serve env and image base (ubuntu:24.04) can be mirrored locally."
+      },
+      {
+        "summary": "Leave the home-side idle sweep unchanged",
+        "rationale": "The issue says the sweep 'can' misread the VM; with the flap gone the shared row reports the true status, so the sweep's rule is correct as written."
+      }
+    ],
+    "items": [
+      {
+        "id": "patrol-door-confirm",
+        "title": "Lifecycle patrol confirms through conversationHarnessAlive before ending a conversation",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T06:40:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4739",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/conversation-lifecycle.ts",
+            "src/dashboard/server/services/__tests__/conversation-lifecycle.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/conversation-lifecycle.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "conversation-lifecycle.test.ts passes including the five PAN-4739 cases",
+            "typecheck completes without errors",
+            "file-size guard passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. In src/dashboard/server/services/conversation-lifecycle.ts add the module-level Set `censusDisagreementWarned` next to `notOrphanJsonlPaths`, and the helper `doorContradictsCensus(tmuxSession, sessionGone, census)` after `shouldResurrect`, exactly as in the PRD snippet: it awaits `conversationHarnessAlive(tmuxSession)` (already imported at line 44), returns false when the door says dead, and otherwise warns once per episode with the exact text `[conversation-lifecycle] WARNING (PAN-4739): the runtime census reports <session> <gone|without a harness process>, but conversation-liveness reports its harness alive; keeping the conversation active (census available=.. stale=.. error=.. panes=.. sessions=<up to 20 names or (none)>)` and returns true. In pollConversations: (a) first statement of the `if (!sessionGone && !harnessGone) {` branch deletes the session from the set; (b) turn the re-validation verdict check (`if (!sessionGone && !harnessGone) continue;` near line 334) into `{ censusDisagreementWarned.delete(conv.tmuxSession); continue; }`, and immediately after it, BEFORE the DEBUG log block and the corpse-diagnostics block, insert `if (await doorContradictsCensus(conv.tmuxSession, sessionGone, revalidationView.census)) continue;`; (c) after `markConversationEnded(conv.name);` delete the session from the set. Extend the module header with the PAN-4739 paragraph from the PRD. Tests in conversation-lifecycle.test.ts: record `lastCensusSessions` in buildRuntimeCensusMock and add `stale: false, error: null, panes: []` to its return; in beforeEach default `mockConversationHarnessAlive` to `lastCensusSessions.has(name) && await mockIsHarnessProcessAlive(name)` (no extra mockListSessionNames calls); add the five named PAN-4739 cases from the PRD, each with its own session name, spying console.warn."
+        },
+        "items": [
+          {
+            "id": "patrol-door-confirm.ac1",
+            "title": "Given the census omits session conv-flap-a and conversationHarnessAlive resolves true, when pollConversations() runs, then markConversationEnded and closeCompanionTerminalForOwner are not called and console.warn emits one line matching /WARNING \\(PAN-4739\\).*conv-flap-a.*gone.*harness alive/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "patrol-door-confirm.ac2",
+            "title": "Given the same disagreement, when pollConversations() runs twice, then console.warn emits exactly one PAN-4739 line across both ticks",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "patrol-door-confirm.ac3",
+            "title": "Given the census names the session but finds no harness process and the door resolves true, when pollConversations() runs, then the row is not ended and the warning text contains 'without a harness process'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "patrol-door-confirm.ac4",
+            "title": "Given the census omits the session and the door resolves false, when pollConversations() runs, then markConversationEnded is called with the row name and no PAN-4739 warning is emitted; every pre-existing case in conversation-lifecycle.test.ts reports 0 failed with its assertions unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "patrol-door-confirm.ac5",
+            "title": "Given a tick where no row is about to be ended, when pollConversations() runs, then conversationHarnessAlive is not called (no extra subprocess per tick)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "list-repair-door-test",
+        "title": "Pin the list-route repair to the conversation-liveness door",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T06:40:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4739",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/__tests__/conversation-list-repair-door.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-list-repair-door.test.ts",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "conversation-list-repair-door.test.ts passes with two cases",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Create src/lib/overdeck/__tests__/conversation-list-repair-door.test.ts by copying the vi.hoisted mock setup of src/lib/overdeck/__tests__/conversation-list-clear-chain.test.ts (listConversations, markConversationRunning, markConversationEnded, conversationHarnessAlive; listLiveConversationSessions resolving new Set(['conv-p'])). Add two cases against getEnrichedConversationList with an ended row (tmuxSession 'conv-p', no forkStatus, no clearedToConvId): door false -> markConversationRunning not called; door true -> markConversationRunning called with the row name. No production code change. Do not read source files as text (lint rejects source-grep tests)."
+        },
+        "items": [
+          {
+            "id": "list-repair-door-test.ac1",
+            "title": "Given an ended row whose session listLiveConversationSessions names and conversationHarnessAlive resolves false, when getEnrichedConversationList runs, then markConversationRunning is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "list-repair-door-test.ac2",
+            "title": "Given the same row and conversationHarnessAlive resolves true, when getEnrichedConversationList runs, then markConversationRunning is called with the row name",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "repro-checkpoint",
+        "title": "Time-boxed local reproduction of the census miss under Fly serve conditions",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T06:40:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "spike",
+          "issueLabel": "pan-4739",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/fly-provider.md",
+            "src/lib/runtime-census.ts",
+            "src/lib/tmux.ts",
+            "tests/unit/lib/runtime-census.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "grep -n 'Reproduction (PAN-4739)' docs/fly-provider.md",
+            "docker ps -a --filter name=pan4739-repro --format '{{.Names}}'"
+          ],
+          "expected_outputs": [
+            "docs/fly-provider.md has a 'Reproduction (PAN-4739)' paragraph",
+            "no pan4739-repro container remains"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ],
+          "acJustification": "Spike with a three-way decision rule; the ACs check the recorded outcome, the cleanup, and the conditional fix."
+        },
+        "narrative": {
+          "Action": "PRD WI-3, an implementation checkpoint time-boxed to 60 minutes. Build and pack the branch (npm run build && npm pack); run a local ubuntu:24.04 container with HOME=/ named pan4739-repro; install Node 22, tmux and the tarball; start pan serve exactly as src/lib/anywhere/fly/provision.ts line 286 does (OVERDECK_TERMINAL_BACKEND=tmux IS_SANDBOX=1 OVERDECK_PUBLIC_LINK_ONLY=1, setsid nohup, log to /.overdeck/fly-serve.log); install @anthropic-ai/claude-code and create the conversation through POST /api/conversations with harness claude-code (no credentials: Claude Code sits at its login prompt as a live non-shell process launched through launchAgentPane); fallback if the route refuses: a hand-made tmux -L overdeck session running node -e 'setInterval(()=>{},1e9)' (not sleep) plus a matching row, recorded as the fallback; after the spawn grace capture list-sessions, list-panes -a with the tab format piped through od -c, ps -eo pid=,ppid=,comm=, and the conversation-lifecycle log lines. Decision rule: cause found and fix <= 30 lines in src/lib/runtime-census.ts or src/lib/tmux.ts -> fix it here with a regression case in tests/unit/lib/runtime-census.test.ts; cause found but larger -> gh issue create with the captured output; not reproduced in 60 minutes -> stop. In every branch add a 'Reproduction (PAN-4739)' paragraph to docs/fly-provider.md right after the 'Recorded, not fixed here' list of 'Live verification (PAN-4652)' naming the branch taken and the evidence or the conditions tried. Always docker rm -f pan4739-repro at the end. Do not provision a paid Fly machine."
+        },
+        "items": [
+          {
+            "id": "repro-checkpoint.ac1",
+            "title": "docs/fly-provider.md contains a 'Reproduction (PAN-4739)' paragraph that names which decision-rule branch applied (fixed, filed as an issue with its link, or not reproduced) and lists the conditions tried",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "repro-checkpoint.ac2",
+            "title": "When the cause is fixed here, tests/unit/lib/runtime-census.test.ts contains a case that feeds the captured failing input and npx vitest run tests/unit/lib/runtime-census.test.ts exits 0; otherwise src/lib/runtime-census.ts and src/lib/tmux.ts are unchanged in this item's commit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "repro-checkpoint.ac3",
+            "title": "After the item, docker ps -a --filter name=pan4739-repro returns no container",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-liveness-confirm",
+        "title": "Document the patrol's mark-time door confirmation and the PAN-4739 warning",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T06:40:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4739",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/fly-provider.md",
+            "docs/TERMINAL-BACKENDS.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'PAN-4739' docs/TERMINAL-BACKENDS.md docs/fly-provider.md",
+            "grep -c 'marks the live conversation ended on every tick' docs/fly-provider.md || true"
+          ],
+          "expected_outputs": [
+            "PAN-4739 lines in both docs",
+            "the old 'marks the live conversation ended on every tick' phrase count is 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. docs/fly-provider.md: in 'Live verification (PAN-4652)' > 'Recorded, not fixed here', rewrite the #4739 bullet to say the patrol now confirms through conversationHarnessAlive before ending a conversation, so the list route and the patrol no longer flap the row, and a contradicted census verdict logs one 'WARNING (PAN-4739)' line in fly-serve.log. docs/TERMINAL-BACKENDS.md: in '### Conversation liveness (PAN-3921)', after the paragraph starting 'The lifecycle poller (`pollConversations`) reads `listHerdrAgents` once per tick', add a paragraph: the census verdict is a candidate; before ending a row the poller asks conversationHarnessAlive, the door the conversation list's repair uses, and keeps the row active, logging one WARNING (PAN-4739) line per episode with the census health, when the door reports the harness alive."
+        },
+        "items": [
+          {
+            "id": "docs-liveness-confirm.ac1",
+            "title": "grep -n 'PAN-4739' docs/TERMINAL-BACKENDS.md returns a line in the 'Conversation liveness (PAN-3921)' section that names conversationHarnessAlive and the WARNING (PAN-4739) line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-liveness-confirm.ac2",
+            "title": "docs/fly-provider.md no longer contains the phrase 'marks the live conversation ended on every tick', and its #4739 bullet states the patrol confirms through conversationHarnessAlive before ending a conversation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "patrol-door-confirm",
+        "to": "repro-checkpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "patrol-door-confirm",
+        "to": "docs-liveness-confirm",
+        "type": "blocks"
+      },
+      {
+        "from": "repro-checkpoint",
+        "to": "docs-liveness-confirm",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-02-PAN-4739-fly-machine-conversation-lifecycle-marks-a-live-conversation-ended-on-every-tick.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}

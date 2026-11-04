@@ -5,9 +5,11 @@ import { networkInterfaces, type NetworkInterfaceInfo } from 'node:os';
 import { Option } from 'effect';
 import { HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 
-import { scopeSatisfies, verifyAccessToken, type AccessTokenScope } from '../../../lib/access-tokens.js';
+import { CONNECTOR_SCOPE_CHOICES, scopeSatisfies, verifyAccessToken, type AccessTokenScope, type MachineAccess } from '../../../lib/access-tokens.js';
+import { effectiveScopes, LINK_ACTOR_HEADER, LINK_CEILING_HEADER, type LinkActor, parseLinkActor } from '../../../lib/anywhere/link-actor.js';
 import { getInternalToken, INTERNAL_TOKEN_HEADER } from '../../../lib/internal-token.js';
 import { readRemoteAccessConfig } from '../../../lib/remote-access/config.js';
+import { type ChannelMarker, channelOfRequest } from '../channel-peer.js';
 import { jsonResponse } from '../http-helpers.js';
 import { gatePathname, requiredScopeFor } from '../route-scopes.js';
 import { getHeaderFromMap, getTrustedOrigins, normalizeOrigin, type HeaderMap } from './origin-validation.js';
@@ -140,14 +142,25 @@ export function hasDashboardInternalToken(request: HttpServerRequest.HttpServerR
 
 /**
  * Who a request authenticates as. `internal-token` and `root-session` are root
- * credentials and imply `admin`. `device` and `token` are registry credentials:
- * they carry their record's scopes and are revocable.
+ * credentials and imply `admin`. `device`, `token`, `machine` and `phone` are
+ * registry credentials: they carry their record's scopes and are revocable. A
+ * `machine` credential (PAN-4645) exists only inside a link-mode secure
+ * channel bound to its key; `scopes` are already narrowed by the actor
+ * stamp's ceiling. A `phone` credential (PAN-4835) likewise exists only
+ * inside a link-mode channel bound to its `phoneKey`, carries its record's
+ * scopes unnarrowed (a phone sends no actor stamp or ceiling header), and
+ * never carries `admin` or `forward`. A `connector` credential (PAN-4927 D-17)
+ * exists only inside a link-mode channel bound to its `connectorKey` and carries
+ * only the record's scopes that are in `CONNECTOR_SCOPE_CHOICES`.
  */
 export type DashboardCredential =
   | { kind: 'internal-token' }
   | { kind: 'root-session' }
   | { kind: 'device'; deviceId: string; scopes: AccessTokenScope[] }
-  | { kind: 'token'; tokenId: string; scopes: AccessTokenScope[] };
+  | { kind: 'token'; tokenId: string; scopes: AccessTokenScope[]; agentId?: string; agentKind?: 'agent' | 'conversation'; role?: string; oauthClientId?: string }
+  | { kind: 'machine'; tokenId: string; environmentId: string; scopes: AccessTokenScope[]; actor: LinkActor; access: MachineAccess }
+  | { kind: 'phone'; tokenId: string; clientId: string; phoneKey: string; scopes: AccessTokenScope[] }
+  | { kind: 'connector'; tokenId: string; clientId: string; connectorKey: string; scopes: AccessTokenScope[] };
 
 /** The scopes a credential grants: `['admin']` for root credentials, else the record's scopes. */
 export function credentialScopes(credential: DashboardCredential): readonly string[] {
@@ -159,7 +172,49 @@ export function dashboardDeviceTokenFromHeaders(headers: HeaderMap): string | un
   return cookieValue(getHeaderFromMap(headers, 'cookie'), DASHBOARD_DEVICE_COOKIE) ?? bearerToken(headers);
 }
 
-export function resolveDashboardCredential(headers: HeaderMap): DashboardCredential | null {
+/**
+ * Resolve the credential a request presents. `channel` is the secure-channel
+ * marker of the request's socket (D-4645-9): inside a channel only a `machine`
+ * record bound to the channel's remote key, or a `phone` record bound to its
+ * `phoneKey` (PAN-4835 FR-3), resolves, from the Bearer header; the internal
+ * token, the root session, device cookies and `token` bearers all resolve to
+ * `null` there (NFR-2). On a plain socket a `machine` or `phone` record never
+ * resolves. (`verifyAccessToken` stamps `lastUsedAt` before this check, so a
+ * refused machine or phone presentation still updates the timestamp; harmless.)
+ * A `connector` record resolves the same way as a phone, bound to its
+ * `connectorKey`, and never on a plain socket (PAN-4927 D-17).
+ */
+export function resolveDashboardCredential(headers: HeaderMap, channel: ChannelMarker | null = null): DashboardCredential | null {
+  if (channel !== null) {
+    if (channel.mode !== 'link') return null;
+    const verified = verifyAccessToken(bearerToken(headers));
+    if (!verified.ok) return null;
+    const { record } = verified;
+    if (record.kind === 'phone') {
+      if (record.phoneKey !== channel.remoteKeyHex || !record.clientId) return null;
+      return { kind: 'phone', tokenId: record.id, clientId: record.clientId, phoneKey: record.phoneKey, scopes: record.scopes };
+    }
+    if (record.kind === 'connector') {
+      if (record.connectorKey !== channel.remoteKeyHex || !record.clientId) return null;
+      // PAN-4927 D-5: only the connector choices count, even on a hand-edited record.
+      const scopes = record.scopes.filter((scope) => CONNECTOR_SCOPE_CHOICES.includes(scope));
+      return { kind: 'connector', tokenId: record.id, clientId: record.clientId, connectorKey: record.connectorKey, scopes };
+    }
+    if (record.kind !== 'machine' || record.machineKey !== channel.remoteKeyHex || !record.environmentId || !record.access) return null;
+    const { actor, ceiling } = parseLinkActor(
+      getHeaderFromMap(headers, LINK_ACTOR_HEADER),
+      getHeaderFromMap(headers, LINK_CEILING_HEADER),
+      record.access,
+    );
+    return {
+      kind: 'machine',
+      tokenId: record.id,
+      environmentId: record.environmentId,
+      scopes: effectiveScopes(record.scopes, ceiling),
+      actor,
+      access: record.access,
+    };
+  }
   if (hasDashboardInternalTokenHeaders(headers)) return { kind: 'internal-token' };
   const cookie = getHeaderFromMap(headers, 'cookie');
   if (constantTimeTokenEqual(cookieValue(cookie, DASHBOARD_SESSION_COOKIE), getDashboardSessionToken())) {
@@ -169,12 +224,28 @@ export function resolveDashboardCredential(headers: HeaderMap): DashboardCredent
   const verified = verifyAccessToken(cookieToken ?? bearerToken(headers));
   if (!verified.ok) return null;
   const { record } = verified;
+  // PAN-4645 D-4645-9: a machine token authenticates only inside its channel.
+  if (record.kind === 'machine') return null;
+  // PAN-4835 FR-3: a phone token authenticates only inside its link channel.
+  if (record.kind === 'phone') return null;
+  // PAN-4927 D-17: a connector token authenticates only inside its link channel.
+  if (record.kind === 'connector') return null;
   if (record.kind === 'token') {
     // PAN-2351 D-9: a token authenticates only from the Bearer header.
-    return cookieToken === undefined ? { kind: 'token', tokenId: record.id, scopes: record.scopes } : null;
+    // PAN-4927 D-6: an agent token also names its agent; a plain token keeps the three keys.
+    // PAN-4945: an OAuth token also names its client.
+    return cookieToken === undefined
+      ? { kind: 'token', tokenId: record.id, scopes: record.scopes, ...(record.agentId ? { agentId: record.agentId, agentKind: record.agentKind, role: record.role } : {}),
+          ...(record.oauthClientId ? { oauthClientId: record.oauthClientId } : {}) }
+      : null;
   }
   // A record with no kind is a device (PAN-2351 FR-10).
   return { kind: 'device', deviceId: record.id, scopes: record.scopes };
+}
+
+/** `resolveDashboardCredential` for a request, reading the channel marker from its socket. */
+export function resolveRequestCredential(request: HttpServerRequest.HttpServerRequest): DashboardCredential | null {
+  return resolveDashboardCredential(request.headers as HeaderMap, channelOfRequest(request));
 }
 
 export function hasDashboardAuthHeaders(headers: HeaderMap): boolean {
@@ -182,7 +253,7 @@ export function hasDashboardAuthHeaders(headers: HeaderMap): boolean {
 }
 
 export function hasDashboardAuth(request: HttpServerRequest.HttpServerRequest): boolean {
-  return hasDashboardAuthHeaders(request.headers as HeaderMap);
+  return resolveRequestCredential(request) !== null;
 }
 
 function isJsonContentType(headers: HeaderMap): boolean {
@@ -216,8 +287,10 @@ export function rejectUnsafeDashboardMutationRequest(
 
   // Header-borne credentials cannot be sent by a cross-site form, so they skip
   // the Origin and CSRF checks (PAN-2351 FR-9). A token never arrives by cookie.
-  const credentialKind = resolveDashboardCredential(headers)?.kind;
-  if (credentialKind === 'internal-token' || credentialKind === 'token') return null;
+  // A phone's bearer rides a Noise-authenticated channel (PAN-4823 D-4), so it skips them too.
+  // A connector's bearer rides a Noise-authenticated channel too (PAN-4927 D-17).
+  const credentialKind = resolveRequestCredential(request)?.kind;
+  if (credentialKind === 'internal-token' || credentialKind === 'token' || credentialKind === 'phone' || credentialKind === 'connector') return null;
 
   const origin = getHeaderFromMap(headers, 'origin');
   if (origin && !hasTrustedExactOrigin(headers)) {
@@ -381,16 +454,27 @@ export function hasProxyForwardingHeader(headers: HeaderMap): boolean {
   return ['x-forwarded-for', 'x-forwarded-host', 'forwarded'].some((name) => getHeaderFromMap(headers, name) !== undefined);
 }
 
+/** True for a request Tailscale Funnel proxied from the public internet. tailscaled deletes any client-sent copy and sets `?1` (ipn/ipnlocal/serve.go). */
+export function isTailscaleFunnelRequest(headers: HeaderMap): boolean {
+  return getHeaderFromMap(headers, 'tailscale-funnel-request') !== undefined;
+}
+
 export function rejectUnauthorizedDashboardSessionMintRequest(
   request: HttpServerRequest.HttpServerRequest,
+  channel: ChannelMarker | null = channelOfRequest(request),
 ): HttpServerResponse.HttpServerResponse | null {
   const expected = getInternalToken();
   if (!expected) {
     return jsonResponse({ error: 'dashboard session token not configured' }, { status: 503 });
   }
+  // PAN-4645 NFR-2: no root credential is minted or honoured over a machine
+  // channel, whatever headers it carries (H3).
+  if (channel !== null) return jsonResponse({ error: 'unauthorized' }, { status: 401 });
   // With dashboard.require_token_mint, a loopback peer is not enough: a local
   // reverse proxy makes every remote visitor look like one (PAN-3762 D-3762-9).
-  const peerTrusted = !readRemoteAccessConfig().requireTokenMint && isLoopbackPeer(request);
+  // A Tailscale Funnel request is a public visitor, never a trusted peer (PAN-4648).
+  const peerTrusted =
+    !readRemoteAccessConfig().requireTokenMint && isLoopbackPeer(request) && !isTailscaleFunnelRequest(request.headers as HeaderMap);
   if (!hasDashboardInternalToken(request) && !peerTrusted) {
     return jsonResponse({ error: 'unauthorized' }, { status: 401 });
   }
@@ -399,12 +483,13 @@ export function rejectUnauthorizedDashboardSessionMintRequest(
 
 export function rejectUnauthorizedDashboardRequest(
   request: HttpServerRequest.HttpServerRequest,
+  channel: ChannelMarker | null = channelOfRequest(request),
 ): HttpServerResponse.HttpServerResponse | null {
   const expected = getInternalToken();
   if (!expected) {
     return jsonResponse({ error: 'dashboard session token not configured' }, { status: 503 });
   }
-  const credential = resolveDashboardCredential(request.headers as HeaderMap);
+  const credential = resolveDashboardCredential(request.headers as HeaderMap, channel);
   if (!credential) {
     return jsonResponse({ error: 'unauthorized' }, { status: 401 });
   }

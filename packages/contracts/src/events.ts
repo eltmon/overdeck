@@ -319,6 +319,7 @@ export const AgentEnrichmentChangedEvent = Schema.Struct({
       askedAt: Schema.String,
       questions: Schema.Array(Schema.Struct({
         question: Schema.String,
+        context: Schema.optional(Schema.String),
         header: Schema.optional(Schema.String),
         multiSelect: Schema.optional(Schema.Boolean),
         options: Schema.Array(Schema.Struct({
@@ -336,6 +337,8 @@ export const AgentEnrichmentChangedEvent = Schema.Struct({
     resolution: Schema.optional(AgentResolution),
     resolutionCount: Schema.optional(Schema.Number),
     turnEndAssessment: Schema.optional(TurnEndAssessment),
+    // PAN-4849 — open Deft `external` escalations: a quiet indicator, not pending input.
+    deftExternalEscalations: Schema.optional(Schema.Number),
   }),
 })
 export type AgentEnrichmentChangedEvent = typeof AgentEnrichmentChangedEvent.Type
@@ -1383,6 +1386,18 @@ export const ConversationPullRequestsChangedEvent = Schema.Struct({
 })
 export type ConversationPullRequestsChangedEvent = typeof ConversationPullRequestsChangedEvent.Type
 
+/** Emitted (in-memory only) when a conversation's schedules change (PAN-4657), so the
+ * list and the schedule dialog refresh the next-run badge. */
+export const ConversationSchedulesChangedEvent = Schema.Struct({
+  type: Schema.Literal("conversation.schedules_changed"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    conversationName: Schema.String,
+  }),
+})
+export type ConversationSchedulesChangedEvent = typeof ConversationSchedulesChangedEvent.Type
+
 /** Emitted (in-memory only) when a PermissionRequest hook fires or resolves for a conversation. */
 export const ConversationPermissionChangedEvent = Schema.Struct({
   type: Schema.Literal("conversation.permission_changed"),
@@ -1633,6 +1648,7 @@ export const DomainEvent = Schema.Union([
   ConversationMovedEvent,
   ConversationTitleChangedEvent,
   ConversationPullRequestsChangedEvent,
+  ConversationSchedulesChangedEvent,
   ConversationPermissionChangedEvent,
   ScanStartedEvent,
   ScanProgressEvent,

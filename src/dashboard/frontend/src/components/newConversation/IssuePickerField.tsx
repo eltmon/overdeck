@@ -5,7 +5,7 @@
  * The chosen identifier becomes the create request's `issueId`.
  */
 import { useMemo, useState, type KeyboardEvent } from 'react';
-import { X } from 'lucide-react';
+import { Search, X } from 'lucide-react';
 import { selectIssues, useDashboardStore } from '../../lib/store';
 import { cn } from '../../lib/utils';
 import type { Issue } from '../../types';
@@ -16,9 +16,11 @@ const MAX_MATCHES = 20;
 export interface IssuePickerFieldProps {
   value: string | null;
   onChange: (id: string | null) => void;
+  /** When set, ties the combobox's accessible name to an external label via aria-labelledby. */
+  labelId?: string;
 }
 
-export function IssuePickerField({ value, onChange }: IssuePickerFieldProps) {
+export function IssuePickerField({ value, onChange, labelId }: IssuePickerFieldProps) {
   const issues = useDashboardStore(selectIssues) as Issue[];
   const [text, setText] = useState('');
   const [open, setOpen] = useState(false);
@@ -70,10 +72,12 @@ export function IssuePickerField({ value, onChange }: IssuePickerFieldProps) {
   const listId = 'issue-picker-listbox';
   return (
     <div className={styles.picker}>
+      <span className={styles.lead} aria-hidden="true"><Search size={14} /></span>
       <input
         type="text"
         role="combobox"
         aria-label="Link to an issue"
+        aria-labelledby={labelId}
         aria-expanded={open}
         aria-controls={listId}
         aria-autocomplete="list"

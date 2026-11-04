@@ -2,7 +2,7 @@ import { createContext, useContext, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { GitPullRequest, Unlink } from 'lucide-react';
-import { parsePullRequestRef, type PullRequestLink } from '@overdeck/contracts';
+import { parsePullRequestRef, parseTrackerIssueUrl, type PullRequestLink } from '@overdeck/contracts';
 import {
   ContextMenuContent,
   ContextMenuItem,
@@ -10,13 +10,16 @@ import {
   ContextMenuRoot,
   ContextMenuTrigger,
 } from '../shared/ContextMenu';
+import { TranscriptIssueLink } from './TranscriptIssueLink';
+import { isNativeShell } from '../../lib/nativeShell';
 
 /**
- * PAN-3822 WI-7: right-click a pull request URL in a conversation transcript
- * to link it to (or unlink it from) that conversation. ConversationPanel
- * provides the open conversation; ChatMarkdown renders every link through
- * `TranscriptLink`, which adds the menu only for PR/MR URLs inside a
- * conversation. Everywhere else it is a plain link.
+ * PAN-3822 WI-7 / PAN-4714: inside a conversation transcript, PR/MR URLs get a
+ * right-click link/unlink menu and tracker issue URLs of registered projects
+ * open that issue's drawer on a plain click. ConversationPanel provides the
+ * open conversation; ChatMarkdown renders every link through `TranscriptLink`,
+ * which adds this behaviour only inside a conversation. Everywhere else a link
+ * is a plain new-tab link.
  */
 
 interface ConversationPullRequestContextValue {
@@ -40,12 +43,17 @@ export function ConversationPullRequestProvider({ conversation, children }: {
 export function TranscriptLink({ href, className, children }: { href: string | undefined; className?: string; children: ReactNode }) {
   const context = useContext(ConversationPullRequestContext);
   const ref = context && href ? parsePullRequestRef(href) : null;
+  const issueRef = context && href && !ref ? parseTrackerIssueUrl(href) : null;
+  if (href && issueRef) {
+    return <TranscriptIssueLink href={href} issueRef={issueRef} className={className}>{children}</TranscriptIssueLink>;
+  }
   const anchor = (
     <a href={href} target="_blank" rel="noopener noreferrer" className={className}>
       {children}
     </a>
   );
-  if (!context || !ref) return anchor;
+  // The phone app (PAN-4837) cannot link or unlink: the link only opens.
+  if (!context || !ref || isNativeShell()) return anchor;
   return <PullRequestLinkMenu context={context} prRef={ref} anchor={anchor} />;
 }
 

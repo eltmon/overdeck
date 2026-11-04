@@ -1,0 +1,557 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-03T14:17:36Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4843: Phone app: native push provider that seals notifications to each phone",
+    "updated": "2026-11-03T14:22:26.423Z"
+  },
+  "plan": {
+    "id": "pan-4843",
+    "title": "Phone app: native push provider that seals notifications to each phone",
+    "status": "running",
+    "uid": "5b140274-bc47-4a23-a414-447a3e6fd557",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-03T14:17:36Z",
+    "updated": "2026-11-03T14:22:26.423Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4843",
+        "label": "PAN-4843",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4823",
+        "label": "PAN-4823 (epic, W-MAC3, AC-9)",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4843.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "push",
+      "anywhere",
+      "phone-app",
+      "crypto"
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-03-PAN-4843-phone-app-native-push-provider-that-seals-notifications-to-each-phone.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "The phone app (epic PAN-4823) needs needs-you notifications while it is closed. Native push must go through Apple and Google, and the machine must not hold APNs or FCM credentials, so the machine has to hand each notification to the overdeck.ai directory. The directory must never see the content. Today needs-you push has only the Web Push and ntfy providers.",
+      "Proposal": "Add a third PushProvider, 'native', in src/lib/push/native-provider.ts. For each active phone access-token record with a push key, it builds the PhonePushPayload JSON (new contracts type), trims it to PUSH_PLAINTEXT_MAX_BYTES (2,256), seals it with crypto_box_seal (new sealTo in sealed-box.ts) to that phone's push key, and sends a push frame through the directory client, waiting up to 10 s for push-result. The provider reaches the directory through a lazy port (currentDirectoryClient) because the push service starts before the directory client exists. GET /api/push/status gains native { phones, directoryOnline } and Settings shows 'Overdeck app: N phones'. Docs gain additive sentences.",
+      "NonGoals": "- The directory side: decoding push, APNs/FCM delivery, directory rate limiting (PAN-4830, W-CON3)\n- The phone side: NSE / FirebaseMessagingService decryption and the tests/fixtures/phone-push fixture generator (W-IOS1, W-AND1), Live Activity push-activity frames (W-IOS2)\n- Changing dispatcher stats, the 6-per-minute limit, dedup, or how Web Push and ntfy send\n- Correlating directory error frames to push requests\n- Any change to anywhere-boot.ts or directory-client.ts\n- New HTTP routes, new config keys, or a per-phone notification list in Settings\n- The full phone-app documentation (configuration/phone-app.mdx, CONNECT-SERVICE and ANYWHERE-ARCHITECTURE sections), owned by PAN-4842 (W-DOC)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Trim the plaintext to PUSH_PLAINTEXT_MAX_BYTES (2,256), not the epic's 2,900",
+        "rationale": "2,900 bytes seal to 3,932 base64 characters, which the PUSH_SEALED_MAX_CHARS (3,072) contract cap refuses; the 2026-11-03 issue comment and PAN-4828 D-3 direct this issue to the exported constant."
+      },
+      {
+        "summary": "Pass a lazy currentDirectoryClient getter from needs-you-push-service.ts instead of injecting a port in anywhere-boot.ts",
+        "rationale": "main.ts:224 voids startAnywhere and main.ts:277 starts the push service synchronously, so the directory client can be null when defaultProviders() runs; a getter resolved per call is required and the existing seam already provides it."
+      },
+      {
+        "summary": "Map no_registration and unknown_client to the existing 'skipped' reason and make the Send test toast ignore skipped outcomes; leave dispatcher stats unchanged",
+        "rationale": "The epic says these are not operator errors; 'skipped' is the existing not-attempted reason, and changing dispatcher accounting would alter Web Push behaviour outside this issue while PushPanel does not display stats."
+      },
+      {
+        "summary": "Seal notification.title (the full Web Push title), not publicTitle",
+        "rationale": "The payload is end-to-end encrypted to the phone, the same trust level as Web Push, which already sends title."
+      },
+      {
+        "summary": "Export PhonePushPayload from packages/contracts/src/connect.ts",
+        "rationale": "It is the wire format W-APP1, W-IOS1 and W-AND1 decode; connect.ts already holds the push frame and stays type-only; the plan stays at 6 subsystems."
+      },
+      {
+        "summary": "Directory missing or offline yields a per-phone transient 'directory-offline' outcome instead of an empty list",
+        "rationale": "A paired phone that cannot be reached is a real delivery failure the operator should see on Send test, unlike ntfy's unconfigured state."
+      },
+      {
+        "summary": "Docs change only sentences that would become false plus one provider section/paragraph",
+        "rationale": "PAN-4842 (W-DOC) owns the full phone-app docs; PAN-4828 D-8 set the same pattern to avoid conflicting edits."
+      }
+    ],
+    "items": [
+      {
+        "id": "seal-helper",
+        "title": "Add sealTo (crypto_box_seal) to src/lib/anywhere/sealed-box.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:17:36Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4843",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "src/lib/anywhere/sealed-box.ts",
+            "src/lib/anywhere/__tests__/sealed-box.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/lib/anywhere/__tests__/sealed-box.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "sealed-box.test.ts passes (3 cases)",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-1 / D-9. Extend the SodiumSeal interface in src/lib/anywhere/sealed-box.ts with crypto_box_PUBLICKEYBYTES and crypto_box_seal, then export sealTo(recipientPublicKey: Uint8Array, message: Uint8Array): Buffer exactly as the PRD snippet shows (throws 'sealTo needs a 32-byte public key' when the key is not 32 bytes; output is message length + crypto_box_SEALBYTES). Update the file header to say it seals phone pushes as well as opening inbox events. New test file src/lib/anywhere/__tests__/sealed-box.test.ts builds key pairs with sodium-native crypto_box_seed_keypair (pattern: tests/unit/services/connect/seal-interop.test.ts)."
+        },
+        "items": [
+          {
+            "id": "seal-helper.ac1",
+            "title": "Given a key pair from crypto_box_seed_keypair, when sealTo(publicKey, message) runs, then openSealed returns the original message and the box length equals message length + 48",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "seal-helper.ac2",
+            "title": "When openSealed is called on a sealTo box with a different key pair, it returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "seal-helper.ac3",
+            "title": "When sealTo is called with a 31-byte public key, it throws 'sealTo needs a 32-byte public key'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "payload-contract",
+        "title": "Export the PhonePushPayload type from packages/contracts/src/connect.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:17:36Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "api",
+          "issueLabel": "pan-4843",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "foundationFor": [
+            "payload-builder",
+            "provider-send"
+          ],
+          "files_scope": [
+            "packages/contracts/src/connect.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run typecheck:connect"
+          ],
+          "expected_outputs": [
+            "both typecheck commands complete without errors"
+          ],
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-2 / D-3. Add the PhonePushPayload interface (fields v: 1, machine, kind, title, body, url, tag, issueId, ts, with the doc comments from D-3) to packages/contracts/src/connect.ts directly after the PushResultError type. Type only: connect.ts must stay runtime-import-free because services/connect imports it by relative path. Add one sentence to the header comment: 'PhonePushPayload is the plaintext a machine seals into push (PAN-4843).' No index.ts change: index.ts:42 already re-exports ./connect."
+        },
+        "items": [
+          {
+            "id": "payload-contract.ac1",
+            "title": "When code imports PhonePushPayload from @overdeck/contracts, the type resolves with exactly the fields v, machine, kind, title, body, url, tag, issueId, ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "payload-contract.ac2",
+            "title": "When npm run typecheck and npm run typecheck:connect run, both exit 0 and connect.ts contains no runtime import",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "payload-builder",
+        "title": "Build and trim the phone push payload in src/lib/push/native-provider.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:17:36Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4843",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "src/lib/push/native-provider.ts",
+            "tests/unit/lib/push/native-provider.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/push/native-provider.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "native-provider.test.ts 'phone push payload (PAN-4843)' block passes",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-3 / D-3 / D-4. Create src/lib/push/native-provider.ts with pure exports: buildPhonePushPayload(n, machine) (title = n.title, never publicTitle), fitPhonePushPayload(p) implementing the D-4 rule exactly (size = Buffer.byteLength(JSON.stringify(p),'utf8'); cut by code points via Array.from; binary search largest k with body = prefix + '…'; then title with body ''; else return null; url/tag/machine/kind/issueId/ts never altered; cap imported as PUSH_PLAINTEXT_MAX_BYTES from @overdeck/contracts, never hard-coded 2256 or 2900), and pushCollapseId(tag) = sha256 hex first 32 chars. File header per PRD. Tests in tests/unit/lib/push/native-provider.test.ts, describe 'phone push payload (PAN-4843)', covering every W-3 test bullet."
+        },
+        "items": [
+          {
+            "id": "payload-builder.ac1",
+            "title": "Given a 5,000-byte ASCII body, fitPhonePushPayload returns a payload of at most 2,256 UTF-8 JSON bytes whose body ends with '…' and whose url, tag and machine are unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "payload-builder.ac2",
+            "title": "Given a body of 3,000 '😀' characters or 2,000 '\"' characters, the trimmed payload stays at most 2,256 bytes and contains no lone surrogate",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "payload-builder.ac3",
+            "title": "Given a 3,000-character title, fitPhonePushPayload returns body '' and a title ending with '…'; given a 3,000-character url it returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "payload-builder.ac4",
+            "title": "pushCollapseId('auq:toolu_01') returns the first 32 lowercase hex characters of the sha256 hex digest",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "provider-send",
+        "title": "Send sealed push frames per phone with createNativePushProvider",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:17:36Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4843",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "foundationFor": [
+            "service-wiring"
+          ],
+          "files_scope": [
+            "src/lib/push/native-provider.ts",
+            "tests/unit/lib/push/native-provider.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/push/native-provider.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "native-provider.test.ts 'native push provider (PAN-4843)' block passes",
+            "typecheck and lint complete without errors"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-4 / D-2 / D-5 / D-8. In src/lib/push/native-provider.ts export NATIVE_PUSH_RESULT_TIMEOUT_MS = 10_000, the PushDirectoryPort interface (isOnline, send(MachineToDirectoryFrame): boolean, on('push-result', handler) => off), nativePushPhones() (active phone records from listActiveRecordsOfKind('phone') that have clientId and pushKey), and createNativePushProvider({ directory, listPhones?, environmentId?, randomRequestId? }). The directory getter is resolved on every hasTargets()/send() call (never captured). name 'native'; hasTargets = phones > 0 && port online. send(): [] when no phones; fit payload once; per phone in Promise.allSettled: directory-offline check, sealTo(pushKey) base64 (seal-failed on throw), subscribe push-result filtered by requestId BEFORE port.send, 10 s setTimeout, map every outcome per the D-5 table with target 'native:<clientId>', always clear timer and unsubscribe. Urgency via webPushUrgency from ./webpush-provider.js. Import nothing from src/dashboard/server. Logs carry only the first 8 chars of clientId and the detail; skip logging 'skipped'. Tests per W-4 using a fake port and vi.useFakeTimers/advanceTimersByTimeAsync."
+        },
+        "items": [
+          {
+            "id": "provider-send.ac1",
+            "title": "Given two phones, when send(question) runs, the port receives one push frame per clientId whose sealed field opens with openSealed only under that phone's key pair to buildPhonePushPayload(n, 'env-1')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "provider-send.ac2",
+            "title": "Each push frame carries urgency 'high' for question and 'normal' for finished, collapseId equal to pushCollapseId(tag), a 32-hex requestId, and sealed.length at most PUSH_SEALED_MAX_CHARS (a 2,256-byte plaintext produces exactly 3,072 characters)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "provider-send.ac3",
+            "title": "push-result errors no_registration and unknown_client return reason 'skipped', rate_limited and delivery_failed return 'transient' with the error as detail, and ok:true returns ok",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "provider-send.ac4",
+            "title": "When no push-result arrives, after advanceTimersByTimeAsync(10_000) the outcome is transient/timeout and the port holds no push-result handler",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "provider-send.ac5",
+            "title": "When the directory getter returns null, isOnline is false, or send returns false, the outcome is transient/directory-offline without waiting, and hasTargets returns false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "service-wiring",
+        "title": "Register the native provider in needs-you-push-service and report native status",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:17:36Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4843",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "src/dashboard/server/services/needs-you-push-service.ts",
+            "src/dashboard/server/services/__tests__/needs-you-push-service.test.ts",
+            "src/dashboard/server/services/__tests__/needs-you-push-status.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/needs-you-push-service.test.ts src/dashboard/server/services/__tests__/needs-you-push-status.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "both service test files pass, including the AC-9 two-phone case",
+            "typecheck and lint (incl. lint:circular) complete without errors"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-8",
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-5. In needs-you-push-service.ts export defaultProviders() (it is module-private today; the status test asserts its provider names) and make it return [createWebPushProvider(), createNtfyProvider(), createNativePushProvider({ directory: currentDirectoryClient })] (import currentDirectoryClient from ./directory-client.js; do NOT edit anywhere-boot.ts). Add native: { phones: number; directoryOnline: boolean } to PushStatus after ntfy and fill it in getNeedsYouPushStatus from nativePushPhones().length and currentDirectoryClient()?.isOnline() ?? false. Update the header comment per W-5 step 4. Tests: the AC-9 case in the existing needs-you-push-service.test.ts injects providers: [createNativePushProvider({ directory: () => fakePort, listPhones, environmentId: async () => 'env-1' })] with a fake port that answers push-result ok synchronously; the status cases go in the NEW file needs-you-push-status.test.ts with module mocks exactly as the PRD lists."
+        },
+        "items": [
+          {
+            "id": "service-wiring.ac1",
+            "title": "Given the service started with a native provider over a fake online port and two phones, when an agent.enrichment_changed event carries a pending AskUserQuestion, the port receives exactly two push frames and each sealed field opens with its phone's key to a payload with kind 'question'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "service-wiring.ac2",
+            "title": "getNeedsYouPushStatus returns native { phones: 2, directoryOnline: true } when two phones have push keys and the directory client is online, and directoryOnline false when currentDirectoryClient returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "service-wiring.ac3",
+            "title": "When needs-you-push-status.test.ts calls the exported defaultProviders(), it returns three providers whose names are webpush, ntfy and native",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-line",
+        "title": "Show the Overdeck app phone count in the Phone notifications panel",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:17:36Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4843",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/push/pushApi.ts",
+            "src/dashboard/frontend/src/components/Settings/anywhere/PushPanel.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/PushPanel.test.tsx",
+            "src/dashboard/frontend/src/components/push/__tests__/TurnOnNotificationsButton.test.tsx"
+          ],
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/Settings/anywhere/__tests__/PushPanel.test.tsx src/dashboard/frontend/src/components/push/__tests__/TurnOnNotificationsButton.test.tsx"
+          ],
+          "expected_outputs": [
+            "PushPanel.test.tsx and TurnOnNotificationsButton.test.tsx pass"
+          ],
+          "traces": [
+            "FR-9",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-6 / D-6 / D-7. Add native: { phones: number; directoryOnline: boolean } to PushStatus in pushApi.ts (required field). In PushPanel.tsx add nativeLine(native) with the exact D-7 strings and render <p data-testid=\"push-native-line\"> after the ntfy line inside the status branch. Change handleTest's failure pick to outcomes.find((o) => !o.ok && o.reason !== 'skipped'). Add native: { phones: 0, directoryOnline: false } to the PushStatus literals in PushPanel.test.tsx and TurnOnNotificationsButton.test.tsx. Browser UAT, if run, uses an isolated Playwright browser profile: Settings -> Anywhere -> Phone notifications on a dashboard with no phones shows 'Overdeck app: no phones paired.'"
+        },
+        "items": [
+          {
+            "id": "settings-line.ac1",
+            "title": "When native.phones is 0, the panel renders 'Overdeck app: no phones paired.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-line.ac2",
+            "title": "When native is { phones: 1, directoryOnline: true } the line renders exactly 'Overdeck app: 1 phone'; when { phones: 3, directoryOnline: false } it renders 'Overdeck app: 3 phones · not connected to overdeck.ai, so no notifications reach them'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-line.ac3",
+            "title": "When Send test returns one ok outcome and one skipped outcome, the panel calls toast.success('Test sent to 1 target(s)') and never toast.error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document the native provider in push-notifications.mdx and DASHBOARD-ARCHITECTURE.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:17:36Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4843",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "configuration/push-notifications.mdx",
+            "docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "verify_commands": [
+            "npm run lint",
+            "grep -n \"connect.overdeck.ai as ciphertext\" configuration/push-notifications.mdx",
+            "grep -n \"native-provider.ts\" docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "lint completes without errors",
+            "both greps print a matching line"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-7 / D-10. Additive sentences only; PAN-4842 owns the full phone-app docs. configuration/push-notifications.mdx: replace the 'No relay and no overdeck.ai service is involved.' sentence with the PRD's 'after' text, and add a '## The Overdeck app' section before '## Optional: ntfy' with the facts listed in W-7 step 2 (sealed per phone push key, ciphertext through connect.overdeck.ai, 2,256-byte cap with '…', machine must be signed in and connected, the 'Overdeck app: N phones' line, removal stops notifications within 5 s, link to /configuration/phone). docs/DASHBOARD-ARCHITECTURE.md 'Needs-you push (PAN-2354)': widen the source-2 target list and add a '**Native provider (PAN-4843).**' paragraph per W-7 step 3."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "configuration/push-notifications.mdx contains the sentence stating that Overdeck app notifications pass through connect.overdeck.ai as ciphertext that only the phone can open, and a '## The Overdeck app' section that shows the 'Overdeck app: N phones' status line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md contains a 'Native provider (PAN-4843)' paragraph that names src/lib/push/native-provider.ts, the lazy currentDirectoryClient port, the 2,256-byte trim and the 10 s push-result wait",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "payload-contract",
+        "to": "payload-builder",
+        "type": "blocks"
+      },
+      {
+        "from": "seal-helper",
+        "to": "provider-send",
+        "type": "blocks"
+      },
+      {
+        "from": "payload-builder",
+        "to": "provider-send",
+        "type": "blocks"
+      },
+      {
+        "from": "provider-send",
+        "to": "service-wiring",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

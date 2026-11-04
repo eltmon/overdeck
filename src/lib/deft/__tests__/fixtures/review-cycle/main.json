@@ -1,0 +1,103 @@
+{
+  "issueId": "PAN-1",
+  "prNumber": 12,
+  "headSha": "abc12340123456789abcdef0123456789abcdef0",
+  "discussions": [
+    {
+      "source": "github-pr-review-comment",
+      "author": "greptile-apps[bot]",
+      "createdAt": "2026-11-02T13:00:00Z",
+      "body": "<img alt=\"P0\" src=\"https://greptile.com/badge-p0.svg\"/> Null dereference when the list is empty."
+    },
+    {
+      "source": "github-pr-review-comment",
+      "author": "greptile-apps[bot]",
+      "createdAt": "2026-11-02T13:05:00Z",
+      "body": "<img alt=\"P2\" src=\"https://greptile.com/badge-p2.svg\"/> Prefer a const here."
+    },
+    {
+      "source": "github-pr-conversation",
+      "author": "eltmon",
+      "createdAt": "2026-11-02T14:00:00Z",
+      "body": "<!-- deft:review-owner\nkind: review-owner\nowner: agent:impl-1\nmonitor_agent_id: pr-watch-12-4242\nhead_sha: abc1234\nstarted_at: 2026-11-02T17:45:00Z\nexpires_at: 2026-11-02T18:15:00Z\nplatform_primitive: monitor\nended_at:\n-->\nDeft review cycle owner: agent:impl-1"
+    },
+    {
+      "source": "github-pr-conversation",
+      "author": "greptile-apps[bot]",
+      "createdAt": "2026-11-02T15:00:00Z",
+      "body": "<h3>Greptile Summary</h3>\n\nThis PR adds the Deft panel.\n\n<img alt=\"P1\" src=\"https://greptile.com/badge-p1.svg\"/> Missing null check in `src/a.ts`.\n\n```md\n**P0** example finding inside a code block\n```\n\nConfidence Score: 4/5\n\n<sub>Last reviewed commit: [fix: address Greptile review findings (batch)](https://github.com/o/r/commit/abc1234)</sub>"
+    },
+    {
+      "source": "github-pr-review-comment",
+      "author": "greptile-apps[bot]",
+      "createdAt": "2026-11-02T15:01:00Z",
+      "body": "<img alt=\"P1\" src=\"https://greptile.com/badge-p1.svg\"/> Missing null check."
+    },
+    {
+      "source": "github-pr-conversation",
+      "author": "eltmon",
+      "createdAt": "2026-11-02T15:30:00Z",
+      "body": "Thanks, looking now."
+    }
+  ],
+  "checkRuns": [
+    {
+      "name": "Greptile Review",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "CI / test",
+      "status": "completed",
+      "conclusion": "success"
+    }
+  ],
+  "fixCommits": [
+    {
+      "sha": "1111111111111111111111111111111111111111",
+      "subject": "fix: address Greptile review findings (batch)",
+      "committedAt": "2026-11-02T14:30:00Z"
+    }
+  ],
+  "state": {
+    "policy": {
+      "raw": {
+        "requireHumanMerge": true
+      },
+      "requireHumanMerge": true,
+      "reviewers": null,
+      "minGreptileConfidence": 4
+    },
+    "reviewerConfigPresent": true,
+    "heartbeats": [
+      {
+        "agentId": "impl-1",
+        "parentId": "deft-root",
+        "lastHeartbeatAt": "2026-11-02T17:55:00Z",
+        "lastMessage": "Implementing the UI scope",
+        "phase": "implementing"
+      },
+      {
+        "agentId": "pr-watch-12-4242",
+        "parentId": "impl-1",
+        "lastHeartbeatAt": "2026-11-02T17:58:00Z",
+        "lastMessage": "Waiting for Greptile",
+        "phase": "polling",
+        "prNumber": 12,
+        "waitKind": "review"
+      }
+    ],
+    "cleanRecords": [
+      {
+        "prNumber": 12,
+        "headSha": "0123456789abcdef0123456789abcdef01234567",
+        "cleanedAt": "2026-11-02T17:00:00Z"
+      },
+      {
+        "prNumber": 9,
+        "headSha": "fedcba9876543210fedcba9876543210fedcba98",
+        "cleanedAt": "2026-10-30T10:00:00Z"
+      }
+    ]
+  }
+}

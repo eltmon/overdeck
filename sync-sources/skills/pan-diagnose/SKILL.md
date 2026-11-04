@@ -20,6 +20,31 @@ allowed-tools:
 
 This skill helps diagnose and fix common issues with Overdeck installation, configuration, and operation.
 
+## Run it
+
+`pan diagnose` (PAN-4643) collects a redacted diagnostic bundle (config, logs,
+`pan doctor --json`, environment and service reachability) and, with your
+consent, starts Claude Code or Codex in that bundle's directory with this
+skill as a copy named `TROUBLESHOOTING.md`. It works even when the dashboard,
+the supervisor, or Herdr is down — that is when you need it most.
+
+```bash
+pan diagnose                                              # pick a harness interactively, then launch it
+pan diagnose --bundle-only                                # just collect and print the bundle path
+pan diagnose --harness codex --describe "dashboard will not start"
+pan diagnose --no-issue                                   # never draft or create an upstream issue
+```
+
+Flags: `--harness <claude-code|codex>`, `--describe <text>`, `--bundle-only`, `--no-issue`, `--yes` (skip the launch confirmation). See `pan diagnose --help` for the authoritative list.
+
+## When `pan diagnose` started this session
+
+- Read `MANIFEST.md` in the bundle directory first — it lists every file, what was redacted, and what collection failed.
+- Open `doctor.json` and check `checks` entries with `status: "error"` before `"warn"`.
+- If `services.json` reports `dashboard.reachable: false` or `supervisor.reachable: false`, treat the dashboard as down: see the Dashboard Issues section below, or suggest `pan up` / `pan restart`.
+- Confirm with the operator before editing any config file in the bundle's `config/` directory.
+- Never paste an unredacted secret into an issue or a message — the bundle is already redacted; quote from it, don't re-fetch the original file.
+
 ## Issue Categories
 
 1. [Installation Issues](#installation-issues)

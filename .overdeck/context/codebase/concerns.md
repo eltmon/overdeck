@@ -1,6 +1,6 @@
 # Concerns / hazards
 
-Live landmines a change in this repo can step on. Verified 2026-09-26.
+Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, linked-machine pooling and feature-branch-push bullets 2026-11-01/02).
 
 - **ToS policy gate** — `canUseHarness()` (`src/lib/harness-policy.ts`) blocks
   ohmypi/prime-agent + Anthropic + subscription auth (plus the model/harness pairing
@@ -32,6 +32,12 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
 - **`postMergeLifecycle` idempotency** — guarded by
   `src/lib/cloister/in-flight-guard.ts` + its test. Weakening it reopens the
   PAN-328 infinite-loop (24k tracker calls). Keep the test green.
+- **Polyrepo workspace roots have no `package.json`** (PAN-4929) — `createWorkspace`
+  (`src/lib/workspace-manager/create.ts`) must never run a package manager in a directory
+  without `package.json`: npm walks up to the nearest ancestor with `node_modules`, fails there,
+  and writes a stray `package-lock.json` into that ancestor. Polyrepo per-repo deps belong to
+  the repo's container or gates (`verification-runner.ts` skips polyrepo installs too); a
+  host install in a repo is opt-in through `repos[].package_manager`.
 - **Polyrepo UAT: never gate on `repos.length`** (PAN-3093) — every generation
   reads back with at least one `repos` entry because monorepo rows synthesize
   one, and a polyrepo project with a single contributing repo still needs the
@@ -121,12 +127,75 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   (PAN-4429) can be 1.5–7.5GB each. Overdeck no longer creates or deletes them
   (they may be the user's own); `.gitignore` keeps them untracked. Don't copy or
   back up old workspaces blindly.
+- **`remote.enabled` lives only in config.toml** — `loadConfig()` reads `[remote] enabled`
+  from `~/.overdeck/config.toml` and overlays only `resiliency_tier` / `max_concurrent_agents`
+  from config.yaml's `remote:` section; an `enabled` key in config.yaml is ignored. Any
+  "remote is off" message must name config.toml and the line `enabled = true` under `[remote]`
+  (PAN-4905). The live setup verb is `pan admin remote setup`, not `pan remote setup`.
 - **Fly Machine rootfs resets on every start** — the rootfs is rebuilt from the
   image on stop/start and on `restart.on-failure`. The ephemeral tier mitigates this
   with a VM-side continuous commit+push heartbeat daemon plus per-bead push
   instructions; the durable tier mitigates it by mounting a persistent Fly volume at
   `/workspace`. Never run durable work without verifying the volume mount
-  (PAN-1845).
+  (PAN-1845). The three host loops for Fly agents (PAN-4295): the heartbeat and
+  credential refresh run in `hygiene-scheduler.ts` (not behind the deacon freeze,
+  or every ephemeral watchdog would stop its machine); the reap runs in
+  `deacon-lite.ts` via `remote-reap-routine.ts` (behind the freeze). The reap acts
+  only on positive evidence: a failed exec is `indeterminate`, never a crash.
+  The deacon child inherits the dashboard's stdout, so its `[deacon-lite]` and
+  `[hygiene-scheduler]` lines land in `~/.overdeck/logs/dashboard.log`, not
+  `deacon.log`. Verified live on the deployed build by PAN-4696 (2026-11-02):
+  the reap and heartbeat loops both fired automatically with no operator
+  command (FR-1, FR-3 passed); PAN-4696's deployed-build check found
+  [#4847](https://github.com/eltmon/overdeck/issues/4847) (automatic reap
+  skips the review request when an unrelated process leaves a tracked
+  workspace file dirty at hand-off).
+- **Remote tmux helpers resolve their target from remote-state** — `getRemoteAgentOutput`,
+  `sendToRemoteAgent(Keyed)`, `killRemoteAgent`, `isRemoteAgentRunning` and the reap's
+  `probeRemoteSession` address `remoteTmuxTarget(agentId)`: a linked work agent's
+  `conv-<name>` on the VM's `overdeck` socket (PAN-4734), else the legacy `agent-<issue>` on
+  home's `getManagedTmuxSocketName()` (`overdeck-<hash>` on a non-default `OVERDECK_HOME`).
+  New code that runs commands in an agent's VM session must use the target, never the agent
+  id. Linked remote-state is also skipped by the spend cap's agent count, the remote heartbeat
+  and the credential refresh (its Fly machine record covers the VM), and the Fly idle sweep
+  never removes a machine hosting a `starting`/`running` linked agent. The legacy VM still
+  disagrees with its prompt about the continue file: `createRemoteWorkspace` writes
+  `/workspace/.pan/continue.json` but the REMOTE prompt names
+  `<workspace>/.overdeck/continue.json`.
+- **Fresh Claude Code state shows startup dialogs that eat the first message** — every
+  Fly VM starts with an empty `~/.claude.json` (exec shell `HOME=/`). Each dialog
+  Claude Code can show at launch must be pre-answered in
+  `FlyProvider.configureClaudeCode` (onboarding, `/workspace` trust,
+  `bypassPermissionsModeAccepted`, and since PAN-4738 `hasSeenAutoDefaultNudge`).
+  Verify a key in the image's `claude.exe` (`grep -a`), never in a host config. A
+  dialog's select cursor is the same `❯` the composer shows, and unnumbered selects
+  escape `paneHasBlockingChoiceMenu`, so `waitForClaudeReady` matches known
+  dialog titles instead.
+  With no `FLY_API_TOKEN` (or `remote.fly.api_token_env` variable), `createFlyApiClient()`
+  sends flyctl's stored `~/.fly/config.yml` token through a `FlyTokenSource`
+  (`src/lib/remote/fly-token.ts`, PAN-4748): `FlyApiClient.request()` re-reads the token
+  per call and, on a 401/403, runs `flyctl auth token` once (process-wide single-flight,
+  60s cooldown on failure) and retries. `pollUntil` rethrows a rejection that survives
+  the retry as `FlyMachineError('fly-token-rejected')` instead of counting it as "not
+  finished"; the heartbeat/sweep/Codex-sync loop lines, `pan machines unlink`/rollback,
+  and `pan doctor`'s `Fly token` row all report it as `Fly token rejected`.
+- **A pooled channel agent must set `timeout`, or Node ignores the peer's keep-alive hint** —
+  `http.Agent.keepSocketAlive` applies `Keep-Alive: timeout=N` only when it is below a nonzero
+  agent `timeout`; with none, a free socket never expires. The other dashboard's stock HTTP
+  server closes idle channels after 5 s, and behind the Fly WebSocket proxy home may not see
+  that close, so `LinkAgent` (`src/lib/anywhere/link-client.ts`) reused a dead channel and the
+  first `linkFetch` after idle failed with `socket hang up` (PAN-4740). `ChannelSocket`'s idle
+  timer was one-shot, unlike `net.Socket`, which also defeats pool expiry after one mid-request
+  timeout. Any new pooled agent over channels needs both an explicit `timeout` and re-arming
+  socket timeouts.
+- **A workspace's `feature/<id>` branch tracks `origin/main`** (`branch.<b>.merge =
+  refs/heads/main`), so a bare `git push` from a workspace fails ("upstream branch
+  does not match") and `pushPlanArtifacts` (`overdeck/plan-artifact-commit.ts`)
+  would push to `main`. Push a feature branch with an explicit refspec
+  (`git push origin HEAD:refs/heads/feature/<id>`) and never `-u`: `@{u}` readers
+  (`workspaces/git-state.ts`, `xbrief/continue-state.ts`, `lanes/*`) assume it.
+  A planned issue's spec lives on that branch, not on the primary checkout, so
+  "is it planned?" must check the workspace or the branch ref (PAN-4683).
 - **Close-out ceremony lives in `lifecycle/workflows.ts closeOut()`** — `pan close` and
   `POST /api/issues/:id/close-out` both call it. `src/lib/close-out.ts` now holds only
   merge detection (`isBranchMerged`, squash-aware via the merged PR). `closeOut()` reads
@@ -204,6 +273,13 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   raw prompt or even 3-5 expanded terms return ~0 FTS hits; prompt-time injection
   must search in OR mode. Expansion calls share `recordHealth` with extraction, so
   `extractions_attempted` also counts expansion calls.
+- **`pan memory` reads and writes different fact stores from a workspace** (found
+  planning PAN-4940) — `add`/`edit`/`retire` write the cwd checkout, but `show`,
+  `list` and the facts `search` prints read the primary checkout unless `--here`
+  (`resolveFactTarget`, `src/cli/commands/memory-facts.ts`). Plain `search` omits
+  facts from `--json` and searches observations of project `overdeck`
+  (`DEFAULT_PROJECT_ID`, `src/lib/memory/cli.ts`) whatever the cwd; PAN-4940 adds
+  `--facts` for a cwd-scoped `{ facts, observations }` envelope.
 
 - **Hygiene-scheduler module state lives in the deacon child, not the dashboard**
   — `startHygieneScheduler()` runs from `cloister/service.ts`, which only
@@ -381,11 +457,6 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   Background work from a route uses `void work().catch((err) => console.error(...))`
   (`routes/hooks.ts`, `routes/resources/snapshot.ts`); use `Effect.forkDetach` only
   where the work must stay inside the Effect runtime.
-- PR sync auto-archive liveness is tmux-only: `listLiveConversationSessions` in
-  `services/pull-request-sync-service.ts` runs `tmux list-sessions`, but
-  conversations launch through the terminal-backend door (Herdr default,
-  PAN-3921). With `conversations.auto_archive_on_merge` on under Herdr, every
-  conversation reads as not live. Use `getBackendPanes()` + `paneAgentKey`.
 - TanStack `rowVirtualizer.measure()` (virtual-core 3.17.11) clears cached sizes
   but re-reads no element; a row whose height did not change gets no
   ResizeObserver callback, and `resizeItem` caches only a changed size. So in
@@ -401,6 +472,11 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   (`costs/reconciler.ts`, `costs/sync-wal.ts`). `cavemanVariant` was lost this
   way. A new `cost_events` column also needs the init SQL plus a
   `runSchemaTopUp` ALTER in `ensureRuntimeIndexesSync` (PAN-4259).
+  `cost_events` inserts and updates are rolled up into `cost_issue_rollup` by
+  the `cost_issue_rollup_*_v1` triggers (`overdeck/cost-issue-rollup.ts`,
+  PAN-4724), so a new writer needs nothing there. A new *aggregated* column, a
+  changed grain, or any code that DELETEs `cost_events` rows needs a `_v2`
+  install: there is no delete trigger.
 - Reasoning effort resolves only through `resolveEffort` (`src/lib/agents/resolve-effort.ts`),
   which also clamps to model∩harness levels; `npm run lint:effort` ratchets new
   `?? 'high'` fallbacks and level-list copies. Clamping runs before Kimi K3
@@ -465,6 +541,14 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   pairs from/import with a quoted word (PAN-4508's `from "custom"`) blocks every
   deploy. Even after the lexer fix, the first reload of a change runs the
   *installed* CLI, so never write that syntax in source comments.
+- **`pan reload` holds the restart lock through its unbounded approval wait** (PAN-4888) —
+  `src/cli/commands/reload.ts` takes `~/.overdeck/restart.lock` (`caller: 'pan reload'`),
+  builds `origin/main`, activates the build (active-bundle record + primary `dist/` swap), then
+  waits on the restart gate with no timeout. `pan restart` waits on the gate *before* taking the
+  lock, so a waiting reload is the only lock holder that can sit for hours. A newer `pan reload`
+  replaces a waiting one through per-newcomer markers (`src/lib/deploy/reload-supersede.ts`); the
+  holder steps aside only after `POST /api/restart-gate/withdraw` succeeds. Holders written by an
+  older CLI lack `supersedable: true` and still refuse newcomers with exit 2.
 - **Most `main` commits are bookkeeping** (PAN-4618) — ~95% of commits on
   `main` are `chore(workspace)` commits touching only `.pan/**` or
   `.overdeck/memory/**`. Once PAN-4618 lands they run no `CI` workflow (only
@@ -475,6 +559,13 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   decisive test run, DoD row 6 skips candidates missing a required check, and the
   Command Deck chip uses `resolveCiHead` (`ci/project-ci-github.ts`, newest push
   run of `ci.yml`).
+- **`fetch-depth: 0` in CI fetches every branch, including `overdeck-state`** (PAN-4917) —
+  `actions/checkout` with `fetch-depth: 0` pulls all ~716 heads and ~588 tags. The archived
+  `overdeck-state` branch alone holds ~195k commits and ~391k trees not on `main` (main has
+  ~20k commits), so a full checkout can take over 5 minutes, and `filter: blob:none` does not
+  remove that cost. A job that needs history should fetch only the refs it reads. A job killed
+  by its own `timeout-minutes` reports conclusion `CANCELLED`, the same as a superseded run.
+  `lint-group (core)` still uses `fetch-depth: 0` (PAN-2227).
 - **The transcript heartbeat exists only where `runtimes/index.ts` loaded** —
   `liveness.ts` cannot import the registry (cycle), so `registerLivenessHeartbeatLookup`
   runs as a side effect of `src/lib/runtimes/index.ts`. A process that never loads it
@@ -490,4 +581,161 @@ Live landmines a change in this repo can step on. Verified 2026-09-26.
   `sizing attach refused` at launch. Streams now spawn with
   `herdrSearchDirs()` (exported from `select.ts`) as `PATH`. Any new `herdr`
   spawn must do the same or use the probe's resolved absolute path.
-<!-- last-verified: 2026-11-01 -->
+- **The internal token file wins over `OVERDECK_INTERNAL_TOKEN`** (PAN-4628) —
+  Herdr and tmux servers are long-lived and every pane inherits their env, so
+  an env token can be stale. Readers must read `<OVERDECK_HOME>/internal-token`
+  first and use env only when no file exists; `ensureInternalToken()` seeds a
+  missing file from env. PAN-4628 converts the seven readers
+  (`src/lib/internal-token.ts`, `routes/agents/shared.ts`, the caveman hook
+  script, four shell hooks). Never inject the token into a
+  pane's env, and never add a reader that checks env first.
+  Test consequence (PAN-4881): every test file in a Vitest pool slot shares
+  `OVERDECK_HOME=<run root>/worker-<VITEST_POOL_ID>`, and mocking the
+  `paths.js` `OVERDECK_HOME` constant does not move the token file
+  (`getOverdeckHome()` reads env). A test that authenticates with an env token
+  must `rmSync(join(getOverdeckHome(), 'internal-token'), { force: true })`
+  before resetting the token cache, or a sibling file's token 401s it.
+- **Docker's bridge pool caps live workspace stacks** (PAN-4663) — the host fits
+  ~31 bridge networks (`DEFAULT_DOCKER_BRIDGE_POOL_LIMIT`, `docker-bridge-pool.ts`);
+  past that, every stack create/rebuild fails "all predefined address pools have been
+  fully subnetted". A compose service with neither `networks:` nor `network_mode:`
+  makes Compose add an extra `<project>_default` network, so `init-perms` in
+  `infra/.devcontainer-template/` sets `network_mode: none`. The renderer reads the
+  template from the primary checkout (`devcontainer-renderer.ts`), so a branch's
+  template edit reaches workspace stacks only after merge.
+- **The dashboard snapshot is the `current` cycle, not every issue** (PAN-4717) —
+  the read model feeds `issuesRaw` from `IssueDataService.getIssues()` with
+  default options, and `computeIssues` drops canonical `backlog` and `canceled`
+  rows (Linear Backlog/Triage/Canceled, GitHub `backlog`/`icebox`/`canceled`
+  labels). Closed issues older than `issues.closedWindowDays` are also absent.
+  Opening the drawer fires `backfillIssue` (PAN-3659) through
+  `subscribeIssueEvents`, which hydrates aged-out closed issues via `issues.delta`
+  on the global stream, but it is a no-op for rows the poll holds and the cycle
+  filter drops, and `resolveMissingIssue` memoizes failures for the process
+  lifetime. A drawer for such an issue shows `Issue details` with no title.
+  Never widen the snapshot to fix one view: about 14 frontend views read `issuesRaw`.
+- **`npx mint broken-links` is red on `main`** (PAN-4779) — two MDX parse errors
+  (a bare `<machine>` in `configuration/linked-machines.mdx`, a bare `<label>` in
+  `cli/agent-commands.mdx`) and 15 links in `vision.mdx` to repo files that
+  `.mintignore` excludes. `npm run lint:docs` catches `$` in prose and `<` before a
+  digit, not `<word>` in prose. Until PAN-4779 lands, scope a docs change's link check
+  to its own pages and compare the rest against this baseline.
+- **Merge-train AC lookup roots** (PAN-1696, PAN-3165, PAN-4799) — batch members
+  are unmerged, so their specs are never on `main`; `memberSpecRoots`
+  (`services/uat-member-spec-roots.ts`) orders batch worktree → feature
+  workspace → project root. Do not collapse it back to one root.
+- **Two tmux oracles answer conversation liveness.** The lifecycle patrol reads the
+  runtime census (`list-panes -a`, `src/lib/runtime-census.ts`); the conversation
+  list's repair reads `list-sessions` + `conversationHarnessAlive`
+  (`src/lib/overdeck/conversation-liveness.ts`), and home's
+  `GET /api/machines/conversations` sync runs that repair on a linked machine. When
+  they disagree a row flaps active/ended every tick (PAN-4739, Fly VM). Any new
+  writer of conversation status must decide through the conversation-liveness door;
+  the patrol now confirms through it before ending a row. On the Fly VM the census
+  disagreed because tmux without a UTF-8 locale prints `-F` tabs as `_`: any new
+  multi-field `-F` reader must pass `-u` (see `listAllPaneRecords` in `src/lib/tmux.ts`).
+- **DoD gate: a failed forge read is not absence** (PAN-4821) — `fetchIssuePullRequest` returns
+  `{ pr: null }` for "no PR" and `{ pr: null, error }` for a failed read. The DoD verdict rows must keep
+  them apart: absence may be waived (strike path, tracker-closed settlement), a failed read may not.
+  Never cache an `error` response in the PR-tab cache, and never collapse a read error to `null`.
+- **The supervisor restarts any dashboard it watches** (PAN-4861) — `dist/supervisor/server.js`
+  (port `dashboardApiPort + 1`) runs `pan restart --dashboard` after 3 failed `/api/health` polls
+  and has no "stopped on purpose" state. Anything that stops a dashboard and wants it to stay
+  stopped must stop the supervisor first, as `pan down` does (`stopSupervisorUnitIfActive()`,
+  else `stopSupervisorProcess()`). The SSH helper's managed stop (`src/lib/anywhere/ssh/helper.ts`)
+  follows this rule after PAN-4861.
+- **One-host two-dashboard tests: pull adopts into the owner's checkout** (PAN-4774) — `resolveTarget`
+  (`src/dashboard/server/services/vault-continue.ts`) prefers the record's saved `cwd` when it exists,
+  and on one host the owner's checkout exists for the puller too, so a WIP bundle is never applied
+  (`isWipPresent` is true). A test proving "pulled with uncommitted changes" must adopt elsewhere.
+  Also keep test `OVERDECK_HOME`s short: `${OVERDECK_HOME}/sockets/pty-conv-<name>.sock` over ~107
+  bytes makes the PTY supervisor exit and kills the harness.
+- **werift reads one TURN URL** (PAN-4862) — werift 0.25.1 `parseIceServers` keeps only the first
+  `turn:`/`turns:` URL, and a blocked UDP allocation falls back to TCP only after ~6.35 s, while
+  `setLocalDescription` waits for gathering. Passing Cloudflare's list as-is (UDP first) makes the relay
+  route miss its 10 s budget on UDP-blocked networks. The relay route's list goes through
+  `relayIceServers` (`src/lib/anywhere/channel/relay-ice-servers.ts`: TLS 443 first, no STUN) on both ends.
+  The Shared Sessions host hub (`src/dashboard/server/sharing/peer-hub.ts`) does not reorder: it passes the
+  share Worker's TURN list to werift as-is, so its relay path has the same UDP-blocked exposure.
+- **Fly VMs and SSH hosts must run home's exact `pan` version from npm** (PAN-4882) —
+  `provisionFlyMachine` (`src/lib/anywhere/fly/provision.ts`) runs `npm install -g @overdeck/core@<home
+  version>` and throws `version-mismatch` when that fails; the SSH-machine add answers 409
+  `version-mismatch`. Both pin to home's version, not npm `latest`, so a newer `latest` is harmless (PAN-4882
+  ran on home 0.73.0 with `latest` 0.73.1). Only a deployed version not yet on npm breaks both until it is
+  published; live checks then need a branch image built from the deployed commit.
+- **`npx @overdeck/core <verb>` depends on bin aliasing** (PAN-4480) — npm's
+  `get-bin-from-manifest.js` runs a multi-bin package only when every `bin` value is the same file
+  (or one bin is named `core`). `package.json` maps `overdeck` and `pan` to `./dist/cli/index.js`, so
+  the zero-install `npx @overdeck/core join <CODE>` on the share invite page works. A bin with a
+  different target breaks it with "could not determine executable to run".
+- **Fixture PIDs reach the real `process.kill`** (PAN-4925) — code such as `src/lib/smee.ts`
+  `stopSmeeProcess()` probes and signals the PID it reads from a pidfile. A test that mocks
+  `node:fs` to return a fixture PID (`'12345'`) but does not spy `process.kill` sends a real
+  SIGTERM to whatever holds that PID on the host. On CI the vitest fork running the test held it,
+  so the worker killed itself: "Worker exited unexpectedly", every test green, and the file
+  missing from the `✓ root <file>` list. Spy `process.kill` in any test whose code under test
+  signals a fixture PID. 39 test files carry literal PIDs without a `process.kill` spy; most only
+  use the PID as data, but none were audited.
+- **The access-token snapshot is per process** (PAN-4930 planning) — `verifyAccessToken` and
+  `listActiveRecordsOfKind` (`src/lib/access-tokens.ts`) read an in-memory snapshot that only the dashboard
+  fills (`startAccessTokenRefresh`, every 5 s). A CLI process (`pan kill`, `pan start`) sees zero records
+  unless it calls `refreshAccessTokens()` first (as `pan mcp serve` does) or reads the file with
+  `listAccessTokens()`. `verifyAccessToken` also writes `lastUsedAt`, and `mutate` serializes writes only
+  within one process, so a CLI write and a dashboard `lastUsedAt` write can lose each other.
+- **Self jobs see only the identity env they are given** (PAN-4937 planning) — a self route's `pan` job
+  (`src/dashboard/server/services/self-jobs.ts` `selfJobEnv`) has no `$TMUX` and drops every inherited
+  identity variable. `pan handoff self` finds its source through `OVERDECK_AGENT_ID` (`src/lib/conversations/current.ts`)
+  and `pan task claim` records `OVERDECK_CLAIM_ID || OVERDECK_AGENT_ID || cli-<pid>` (`src/lib/xbrief/claim-check.ts`),
+  so a job for a conversation needs `OVERDECK_AGENT_ID=<tmuxSession>` like the conversation's own launcher, or
+  handoff fails and the claim is a `cli-<pid>` that `probeHolder` treats as dead. Work agents have no conversation
+  row (only `*-review` role runs do), so `pan handoff self` refuses them.
+<!-- last-verified: 2026-11-04 (PAN-4905, PAN-4917, PAN-4925, PAN-4929, PAN-4930, PAN-4931, PAN-4482, PAN-4937) -->
+<!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4930) -->
+<!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4925, PAN-4929, PAN-4482) -->
+- **MCP SDK clients require the advertised `resource` to share the origin they called** (PAN-4945
+  planning) — `@modelcontextprotocol/sdk` 1.30.1 `selectResourceURL` (`client/auth.js:344-357`) throws
+  unless `checkResourceAllowed` finds the protected-resource metadata's `resource` on the same origin as
+  the `/mcp` URL the client used. Any OAuth issuer for `/mcp` must be derived from the request's host
+  (checked against `getTrustedOrigins()`), never a fixed `127.0.0.1`. A stock SDK client also requests
+  every `scopes_supported` value at once (`auth.js:229`) and may send no `state` (`auth.js:732`).
+<!-- last-verified: 2026-11-04 (PAN-4905, PAN-4917, PAN-4925, PAN-4929, PAN-4930, PAN-4931, PAN-4482, PAN-4945) -->
+- **One merge path per feature (PAN-4970)** — the UAT reconciler drops features
+  `mergePathOwner` (`src/dashboard/server/services/merge-path-owner.ts`) assigns to the
+  per-PR train from its ready set before it ever assembles a batch; any new merge path
+  must ask the same function, or batches churn (30 generations invalidated in a day was
+  the original symptom, caused by the per-PR scheduler and the batch reconciler both
+  claiming the same unheld, gate-approved PR).
+- **Claude Code variadic flags swallow a positional prompt** (PAN-4932 planning, Claude Code 2.1.293) —
+  `--allowedTools <x> "prompt"` reads the prompt as another tool name (`claude -p` then fails with
+  "Input must be provided"); `--mcp-config <configs...>` is declared variadic the same way in `claude --help`. Launchers that end with `"$prompt"` must
+  emit the equals form (`--allowedTools=mcp__overdeck`, `--mcp-config=<path>`) or put another flag
+  between. Two equals-form `--mcp-config=` flags both load.
+- **Worker waits restart their startup grace on every call** (PAN-4938 planning) — `waitForWorkerReport`
+  (`src/lib/agents/worker/wait.ts`) takes `startedAt = now()` per call and counts a death or idleness only
+  after `startupGraceMs` (default 60 s) has passed in that call, unless it saw the worker alive. A caller
+  that waits in chunks shorter than 60 s (the 50 s MCP wait chunks) never sees a dead worker die: every
+  chunk answers `timeout`. Chunked callers pass `startupGraceMs` from the worker's launch time
+  (`worker.json` `startedAt`, or a stand-in's `createdAt`). PAN-4938 moves the stand-in wait helpers from
+  `src/cli/commands/worker-remote.ts` to `src/lib/agents/worker/wait-any.ts`, because server code never imports `src/cli/`.
+<!-- last-verified: 2026-11-04 (PAN-4905, PAN-4917, PAN-4925, PAN-4929, PAN-4930, PAN-4931, PAN-4932, PAN-4938, PAN-4944, PAN-4970, PAN-4482) -->
+- **Codex blocks un-annotated MCP tools** (PAN-4933 planning, Codex CLI 0.159.0) — an MCP tool without a
+  `readOnlyHint` annotation needs approval: under `approval_policy = "never"` the call fails with "MCP tool call
+  requires approval, but approval policy is never" (observed through `codex exec`), and under `on-request` the TUI
+  would prompt (inferred; `codex exec` forces `never`), which wedges an unattended agent. Overdeck's tools carry no annotations, so a server Overdeck provisions into a Codex
+  `config.toml` must set `default_tools_approval_mode = "approve"` in its `[mcp_servers.<name>]` table. Codex
+  refuses the whole config (the agent never starts) if that key holds anything but `auto`, `prompt`, `writes` or
+  `approve`; unknown keys in the table are ignored.
+<!-- last-verified: 2026-11-04 (PAN-4482, PAN-4905, PAN-4917, PAN-4925, PAN-4929, PAN-4930, PAN-4931, PAN-4932, PAN-4933) -->
+- **ACP agents spawn stdio MCP servers from `session/new` and `session/load`** (PAN-4934 planning probe) —
+  opencode 1.18.31 and kimi 2.0.2 both start a stdio `mcpServers` entry, pass its `env` array, keep the
+  inherited `PATH`/`HOME`, and call `initialize` then `tools/list`, on a new session and on a load. Both
+  advertise `mcpCapabilities: { http, sse }` too. The ACP host's `mcpServers` field
+  (`src/lib/acp/session-runtime.ts`) carries the `overdeck` server read from the host's `--mcp-config`
+  (PAN-4934); before that it was always `[]`.
+- **Work agents have no `conversations` row** (PAN-4943 planning) — `spawnRun` registers one only for
+  specialist roles or `registerConversation: true` (`src/lib/agents/spawn.ts:259`); a work agent
+  (`agent-pan-<n>`) has none, and `agent-pan-<n>-review` appears only once review starts. Anything keyed
+  on "the agent's own conversation" (PR links, the PR sync sweep, `getConversationByName(agentId)`) finds
+  nothing for a work agent; PR watches therefore carry their own key and baseline.
+<!-- last-verified: 2026-11-04 (PAN-4905, PAN-4917, PAN-4925, PAN-4929, PAN-4930, PAN-4931, PAN-4932, PAN-4934, PAN-4943, PAN-4944, PAN-4970, PAN-4482) -->
+<!-- last-verified: 2026-11-04 (PAN-4905, PAN-4917, PAN-4925, PAN-4929, PAN-4930, PAN-4931, PAN-4932, PAN-4934, PAN-4944, PAN-4482, PAN-4970, PAN-4940) -->

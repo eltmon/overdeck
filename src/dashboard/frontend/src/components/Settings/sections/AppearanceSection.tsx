@@ -1,6 +1,7 @@
 import { toast } from 'sonner';
 import { type UIPreferences } from '../../../hooks/useUIPreferences';
 import { useDesignLanguage, type DesignLanguage } from '../../../hooks/useDesignLanguage';
+import { ColorThemeSection } from './ColorThemeSection';
 
 interface AppearanceSectionProps {
   uiPrefs: UIPreferences;
@@ -69,6 +70,8 @@ export function AppearanceSection({ uiPrefs, updateUIPrefs }: AppearanceSectionP
           })}
         </div>
       </div>
+
+      <ColorThemeSection />
 
       <div className="space-y-1">
         <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">

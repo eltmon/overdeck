@@ -1,0 +1,324 @@
+{
+  "version": "1",
+  "issueId": "PAN-4882",
+  "created": "2026-11-03T06:27:51.535Z",
+  "updated": "2026-11-03T08:07:43.804Z",
+  "gitState": {},
+  "decisions": [
+    {
+      "id": "D-test-waived",
+      "summary": "Test gate waived: Evidence-only live UAT issue: no source code changed (diff is .pan/uat evidence, docs/ANYWHERE-RELEASE-CHECKLIST.md, .pan/uat/pan-4862/live-relay.md, concerns.md, spec lifecycle fields). The gate matched 'test' in 'test identities'. The fixes under test carry their own unit tests: 6ca4ae19e6e (remote-worker-follower.test.ts), af764fb9907 (PAN-4861), 054aea3e486 (PAN-4859), 04f8bccc9df (PAN-4862).",
+      "recordedAt": "2026-11-03T08:07:43.804Z"
+    }
+  ],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "preflight": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4882",
+      "claimedAt": "2026-11-03T06:27:51.535Z",
+      "doneAt": "2026-11-03T06:31:19.891Z"
+    },
+    "relay-vm-signin": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4882",
+      "claimedAt": "2026-11-03T06:31:29.520Z",
+      "doneAt": "2026-11-03T07:35:02.138Z"
+    },
+    "ssh-vm-setup": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4882",
+      "claimedAt": "2026-11-03T06:32:46.264Z",
+      "doneAt": "2026-11-03T06:37:56.515Z"
+    },
+    "ac04-fly-setup": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4882",
+      "claimedAt": "2026-11-03T06:34:07.297Z",
+      "doneAt": "2026-11-03T06:50:47.772Z"
+    },
+    "ac06-add-managed": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4882",
+      "claimedAt": "2026-11-03T06:38:03.358Z",
+      "doneAt": "2026-11-03T06:43:00.470Z"
+    },
+    "ac15-open-in-editor": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4882",
+      "claimedAt": "2026-11-03T06:43:09.762Z",
+      "doneAt": "2026-11-03T06:47:35.847Z"
+    },
+    "ac06-remove-managed": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4882",
+      "claimedAt": "2026-11-03T06:47:55.458Z",
+      "doneAt": "2026-11-03T06:53:24.476Z"
+    },
+    "ac04-remote-worker": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4882",
+      "claimedAt": "2026-11-03T06:50:59.184Z",
+      "doneAt": "2026-11-03T06:54:34.425Z"
+    },
+    "ac04-gauntlet": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4882",
+      "claimedAt": "2026-11-03T06:55:32.435Z",
+      "doneAt": "2026-11-03T06:58:26.027Z"
+    },
+    "relay-udp-blocked": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4882",
+      "claimedAt": "2026-11-03T07:35:10.924Z",
+      "doneAt": "2026-11-03T07:35:32.505Z"
+    },
+    "relay-encryption-capture": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4882",
+      "claimedAt": "2026-11-03T07:35:41.894Z",
+      "doneAt": "2026-11-03T07:36:03.809Z"
+    },
+    "relay-tcp443-variant": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4882",
+      "claimedAt": "2026-11-03T07:36:05.883Z",
+      "doneAt": "2026-11-03T07:36:56.157Z"
+    },
+    "file-failure-issues": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4882",
+      "claimedAt": "2026-11-03T07:37:17.522Z",
+      "doneAt": "2026-11-03T07:38:20.804Z"
+    },
+    "cleanup-audit": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4882",
+      "claimedAt": "2026-11-03T07:38:34.577Z",
+      "doneAt": "2026-11-03T07:39:31.780Z"
+    },
+    "checklist-doc": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4882",
+      "claimedAt": "2026-11-03T07:39:37.898Z",
+      "doneAt": "2026-11-03T07:40:53.929Z"
+    },
+    "closing-comment": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4882",
+      "claimedAt": "2026-11-03T07:41:10.419Z",
+      "doneAt": "2026-11-03T07:41:44.685Z"
+    },
+    "preflight.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:45:19.228Z"
+    },
+    "preflight.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:45:38.426Z"
+    },
+    "preflight.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:45:58.165Z"
+    },
+    "relay-vm-signin.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:46:18.536Z"
+    },
+    "relay-udp-blocked.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:46:38.167Z"
+    },
+    "relay-udp-blocked.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:46:55.798Z"
+    },
+    "relay-encryption-capture.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:47:15.107Z"
+    },
+    "relay-encryption-capture.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:47:33.560Z"
+    },
+    "relay-tcp443-variant.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:47:52.291Z"
+    },
+    "relay-tcp443-variant.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:48:12.409Z"
+    },
+    "relay-tcp443-variant.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:48:33.770Z"
+    },
+    "ac04-fly-setup.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:48:54.331Z"
+    },
+    "ac04-fly-setup.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:49:15.565Z"
+    },
+    "ac04-fly-setup.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:49:35.960Z"
+    },
+    "ac04-remote-worker.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:49:59.288Z"
+    },
+    "ac04-remote-worker.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:50:33.715Z"
+    },
+    "ac04-remote-worker.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:51:02.798Z"
+    },
+    "ac04-gauntlet.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:51:30.789Z"
+    },
+    "ac04-gauntlet.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:51:59.293Z"
+    },
+    "ac04-gauntlet.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:52:20.565Z"
+    },
+    "ssh-vm-setup.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:52:38.876Z"
+    },
+    "ssh-vm-setup.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:52:57.786Z"
+    },
+    "ac06-add-managed.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:53:18.327Z"
+    },
+    "ac06-add-managed.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:53:37.898Z"
+    },
+    "ac15-open-in-editor.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:54:00.338Z"
+    },
+    "ac15-open-in-editor.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:54:26.478Z"
+    },
+    "ac15-open-in-editor.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:54:45.167Z"
+    },
+    "ac15-open-in-editor.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:55:05.228Z"
+    },
+    "ac06-remove-managed.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:55:29.670Z"
+    },
+    "ac06-remove-managed.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:55:50.657Z"
+    },
+    "ac06-remove-managed.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:56:12.355Z"
+    },
+    "file-failure-issues.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:56:33.245Z"
+    },
+    "file-failure-issues.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:56:52.836Z"
+    },
+    "cleanup-audit.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:57:13.081Z"
+    },
+    "cleanup-audit.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:57:36.775Z"
+    },
+    "cleanup-audit.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:57:55.459Z"
+    },
+    "checklist-doc.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:58:16.472Z"
+    },
+    "checklist-doc.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:58:38.345Z"
+    },
+    "checklist-doc.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:59:01.058Z"
+    },
+    "checklist-doc.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:59:24.073Z"
+    },
+    "checklist-doc.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T07:59:47.338Z"
+    },
+    "closing-comment.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T08:00:09.935Z"
+    },
+    "closing-comment.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T08:00:47.808Z"
+    },
+    "closing-comment.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T08:01:13.991Z"
+    },
+    "relay-vm-signin.ac1": {
+      "status": "cancelled"
+    },
+    "relay-vm-signin.ac2": {
+      "status": "cancelled"
+    },
+    "relay-vm-signin.ac3": {
+      "status": "cancelled"
+    },
+    "relay-udp-blocked.ac1": {
+      "status": "cancelled"
+    },
+    "relay-udp-blocked.ac2": {
+      "status": "cancelled"
+    },
+    "relay-udp-blocked.ac3": {
+      "status": "cancelled"
+    },
+    "relay-encryption-capture.ac1": {
+      "status": "cancelled"
+    },
+    "relay-encryption-capture.ac2": {
+      "status": "cancelled"
+    },
+    "relay-encryption-capture.ac3": {
+      "status": "cancelled"
+    },
+    "relay-tcp443-variant.ac1": {
+      "status": "cancelled"
+    },
+    "ac06-add-managed.ac2": {
+      "status": "cancelled"
+    }
+  }
+}

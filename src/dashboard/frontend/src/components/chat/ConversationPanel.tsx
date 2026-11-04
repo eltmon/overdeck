@@ -32,12 +32,15 @@ import type { ReviewerRoundMetadata } from '@overdeck/contracts';
 import { DiffPanel } from '../DiffPanel';
 import { DiffWorkerPoolProvider } from '../DiffWorkerPoolProvider';
 import { PanOpenInPicker } from '../PanOpenInPicker';
+import { acceptsInput, ConversationMachineBanner, ConversationMachineChip, conversationHeaderStatus, conversationMachineState, isLiveMachineState, PullHereButton, RemoteHeaderActions, runsHere } from './ConversationMachineBanner';
 import { ConversationBranchMeta } from './ConversationBranchMeta';
+import { ShareConversationMenuItem } from './sharing/ShareDialog';
 import { ConversationPullRequestProvider } from './TranscriptPullRequestLink';
 import { ConversationBookmarksProvider } from './bookmarks/ConversationBookmarks';
 import { BookmarksToggle, BookmarksDrawer } from './bookmarks/BookmarksDrawer';
 import { PullRequestMenuItems } from '../CommandDeck/PullRequestMenuItems';
 import { parseDiffRouteSearch } from '../../lib/diffRouteSearch';
+import { isNativeShell } from '../../lib/nativeShell';
 import { useConfirm } from '../DialogProvider';
 import { useConversationMutations } from '../CommandDeck/useConversationMutations';
 import { ForkModal } from '../CommandDeck/ForkModal';
@@ -51,6 +54,7 @@ import { SubagentTranscript } from './SubagentTranscript';
 import { ForkProgressView } from './ForkProgressView';
 import { HeldHandoffView, HeldKickoffLookupFailedView } from './HeldHandoffView';
 import { useHeldKickoff } from './heldKickoff';
+import { scheduledToChatMessages, useScheduledMessages } from './scheduledMessages';
 import { TranscriptLoadingSkeleton } from './TranscriptLoadingSkeleton';
 import { useComposerDeliveryState } from './useComposerDeliveryState';
 import { ViewToggle } from '../shared/ViewToggle';
@@ -569,6 +573,7 @@ export function ConversationPanel({
   }, [resumeMutation]);
 
   const archivePending = convMutations.isArchivePending(conversation.name);
+  const native = isNativeShell(); // The phone app (PAN-4837): hide what its phone token cannot do.
   const handleArchive = useCallback(() => {
     convMutations.archive(conversation.name, { onSuccess: onArchived });
   }, [convMutations, conversation.name, onArchived]);
@@ -673,16 +678,8 @@ export function ConversationPanel({
   const isForkFailedHeader = conversation.forkStatus === 'failed';
   const isSpawnFailed = !!conversation.spawnError;
   const isSpawningHeader = !conversation.sessionAlive && !conversation.endedAt && !isSpawnFailed && isWithinSpawnWindow(conversation.createdAt);
-  // v1.2 signal law: blue = machine activity (forking/starting/alive),
-  // red = failed, neutral = ended. Amber is reserved for human-action states.
-  const statusColor = isForkingHeader || isSpawningHeader
-    ? 'var(--info)'
-    : isForkFailedHeader || isSpawnFailed
-    ? 'var(--destructive)'
-    : conversation.sessionAlive
-    ? 'var(--info)'
-    : 'var(--muted-foreground)';
-  const statusLabel = isForkingHeader ? 'forking' : isSpawningHeader ? 'starting' : isForkFailedHeader || isSpawnFailed ? 'failed' : conversation.sessionAlive ? 'active' : 'ended';
+  const { color: statusColor, label: statusLabel, hollow: statusHollow } = conversationHeaderStatus(conversation, { forking: isForkingHeader, spawning: isSpawningHeader, failed: isForkFailedHeader || isSpawnFailed });
+  const machineState = conversationMachineState(conversation); // PAN-4650: which machine runs it (D-6 title bar states)
   const showPiAbort = isWorking && (conversation.harness === 'ohmypi' || conversation.harness === 'pi');
   return (
     <ConversationPullRequestProvider conversation={conversation}><ConversationBookmarksProvider conversationName={conversation.name}><div className={styles.conversationTerminal}>
@@ -691,7 +688,7 @@ export function ConversationPanel({
           metadata, long-tail/config/destructive actions live in the ⋮ menu. */}
       {!embedded && (
         <div
-          className={`${styles.conversationHeaderShell} ${styles.conversationHeaderContainer}`}
+          className={`${styles.conversationHeaderShell} ${styles.conversationHeaderContainer}`} data-machine-state={machineState}
           onContextMenu={(e) => {
             // Right-click the header → open the ⋮ menu. Skip while renaming so
             // the native copy/paste menu still works in the title input.
@@ -740,7 +737,7 @@ export function ConversationPanel({
                     </span>
                   )}
                   <button
-                    className={styles.conversationTitleEditBtn}
+                    className={styles.conversationTitleEditBtn} hidden={native || !isLiveMachineState(machineState)}
                     onClick={startEditingTitle}
                     title="Rename conversation"
                     aria-label={`Rename ${conversation.name}`}
@@ -753,7 +750,7 @@ export function ConversationPanel({
 
             <div className={styles.conversationHeaderActions}>
               {/* View toggle — only when session is live */}
-              {showTerminal && (
+              {showTerminal && isLiveMachineState(machineState) && (
                 <ViewToggle
                   ariaLabel="Conversation view"
                   value={effectiveViewMode}
@@ -765,6 +762,7 @@ export function ConversationPanel({
                 />
               )}
 
+              <RemoteHeaderActions conversation={conversation} />
               <button
                 className={`${styles.conversationAboutToggle} ${aboutOpen ? styles.conversationAboutToggleActive : ''}`}
                 onClick={() => setAboutOpen(v => !v)}
@@ -802,9 +800,9 @@ export function ConversationPanel({
                 </button>
               )}
 
-              {archivePending && (
-                <span className={styles.conversationAboutToggle} role="status" aria-live="polite">
-                  <Loader2 size={14} className={styles.spinnerIcon} /><span>Archiving…</span>
+              {(archivePending || convMutations.isStopPending(conversation.name)) && (
+                <span className={styles.conversationAboutToggle} role="status" aria-live="polite" aria-label={archivePending ? 'Archiving conversation' : 'Stopping conversation'}>
+                  <Loader2 size={14} className={styles.spinnerIcon} /><span>{archivePending ? 'Archiving…' : 'Stopping…'}</span>
                 </span>
               )}
               {/* Copy link */}
@@ -851,6 +849,7 @@ export function ConversationPanel({
                       returnFocusRef={menuTriggerRef}
                       className="absolute right-0 top-full z-[1000] mt-1 min-w-[220px]"
                     >
+                      {!native && (<>
                       <MenuItemButton
                         active={conversation.isFavorited}
                         onClick={() => { convMutations.toggleFavorite({ name: conversation.name, favorited: !!conversation.isFavorited }); setMenuOpen(false); }}
@@ -911,12 +910,14 @@ export function ConversationPanel({
                         <Download size={14} />
                         Export transcript
                       </MenuItemButton>
-                      {conversation.origin !== 'vault' && (
+                      <PullHereButton conversation={conversation} menu onDone={() => setMenuOpen(false)} />
+                      {runsHere(conversation) && (
                         <MenuItemButton onClick={() => { openContinueOnDevice(continueTargetOf(conversation, viewMode === 'terminal' ? 'terminal' : 'conversation')); setMenuOpen(false); }}>
                           <MonitorSmartphone size={14} />
                           Continue on another device
                         </MenuItemButton>
                       )}
+                      <ShareConversationMenuItem conversation={conversation} onDone={() => setMenuOpen(false)} />
 
                       {(conversation.handoffDocPath || conversation.handoffTargetConvId) && (
                         <MenuSeparator />
@@ -937,6 +938,7 @@ export function ConversationPanel({
                           Open handoff target
                         </MenuItemButton>
                       )}
+                      </>)}
 
                       {(conversation.sessionAlive || onArchived) && (
                         <MenuSeparator />
@@ -949,7 +951,7 @@ export function ConversationPanel({
                           Stop agent
                         </MenuItemButton>
                       )}
-                      {onArchived && (
+                      {onArchived && !native && (
                         <MenuItemButton
                           destructive
                           disabled={archivePending}
@@ -981,12 +983,12 @@ export function ConversationPanel({
           {/* Row 2 — read-only metadata */}
           <div className={styles.conversationMetaRow}>
             <span className={styles.conversationTerminalStatus}>
-              <Circle size={7} style={{ fill: statusColor, color: statusColor }} />
+              <Circle size={7} style={{ fill: statusHollow ? 'transparent' : statusColor, color: statusColor }} />
               {statusLabel}
             </span>
             <ConversationBranchMeta conversation={conversation} />
-            <span className={styles.conversationMetaSep} aria-hidden>·</span>
-            <PanOpenInPicker openInCwd={conversation.cwd} />
+            <ConversationMachineChip conversation={conversation} />
+            {!native && <><span className={styles.conversationMetaSep} aria-hidden>·</span><PanOpenInPicker openInCwd={conversation.cwd} remote={conversation.origin === 'linked' ? { conversation: conversation.name } : undefined} /></>}
             {conversation.totalCost !== undefined && conversation.totalCost > 0 && (
               <>
                 <span className={styles.conversationMetaSep} aria-hidden>·</span>
@@ -1002,6 +1004,7 @@ export function ConversationPanel({
           </div>
         </div>
       )}
+      {!embedded && <ConversationMachineBanner conversation={conversation} />}
 
       {/* "About this conversation" drawer — collapsible summary beneath the header */}
       {!embedded && aboutOpen && (
@@ -1036,8 +1039,8 @@ export function ConversationPanel({
           ) : (
             <ConversationView
               conversation={conversation}
-              onResume={conversation.origin === 'vault' ? undefined : onEmbeddedResume ?? (!embedded && !showTerminal && !isSpawningHeader ? handleResume : undefined)}
-              onArchive={!embedded ? handleArchive : undefined}
+              onResume={!acceptsInput(conversation) ? undefined : onEmbeddedResume ?? (!embedded && !showTerminal && !isSpawningHeader ? handleResume : undefined)}
+              onArchive={!embedded && !native ? handleArchive : undefined}
               archivePending={archivePending}
               resumePending={resumeMutation.isPending}
               resumeLabel={embeddedResumeLabel}
@@ -1064,7 +1067,7 @@ export function ConversationPanel({
               targetMessageIndex={mainTarget ? targetMessageIndex : undefined}
               targetMessageNonce={mainTarget ? targetMessageNonce : undefined}
               onTargetMessageHandled={mainTarget ? onTargetMessageHandled : undefined}
-              modelPicker={!embedded ? (
+              modelPicker={!embedded && !native ? (
                 <ModelPicker
                   value={selectedModel}
                   harness={selectedHarness}
@@ -1231,7 +1234,8 @@ function ConversationView({ conversation, onResume, onArchive, archivePending = 
   const { onSend: handleMessageSent, contextWindowUsage } = useStableComposerProps({ conversation, data, serverMessages, addOptimistic });
 
   const visibleOptimistic = useComposerEchoes(conversation.name, serverMessages, data?.subagents ?? [], data?.streaming ?? false);
-  const messages = [...serverMessages, ...visibleOptimistic, ...commandResults];
+  const scheduled = useScheduledMessages(conversation.name, !agentId);
+  const messages = [...serverMessages, ...visibleOptimistic, ...scheduledToChatMessages(scheduled.messages), ...commandResults];
 
   // PAN-4268: only Claude Code's agent selector says where typed input goes.
   // Agent-backed panels carry no inputTarget; their sends still switch.
@@ -1366,7 +1370,7 @@ function ConversationView({ conversation, onResume, onArchive, archivePending = 
           <p className={styles.conversationEmptyStateTitle}>Failed to start</p>
           <p className={styles.conversationEmptyStateSubtitle}>{conversation.spawnError}</p>
           <div style={{ display: 'flex', gap: 8, marginTop: 12, alignItems: 'center' }}>
-            <button className={styles.conversationArchiveBtnLarge} onClick={() => onArchive?.()} disabled={archivePending}>
+            <button className={styles.conversationArchiveBtnLarge} hidden={isNativeShell()} onClick={() => onArchive?.()} disabled={archivePending}>
               {archivePending ? 'Archiving…' : 'Archive'}
             </button>
           </div>
@@ -1423,7 +1427,7 @@ function ConversationView({ conversation, onResume, onArchive, archivePending = 
                 className={styles.conversationResumeControls}
               />
             )}
-            <button className={styles.conversationArchiveBtnLarge} onClick={() => onArchive?.()} disabled={archivePending}>
+            <button className={styles.conversationArchiveBtnLarge} hidden={isNativeShell()} onClick={() => onArchive?.()} disabled={archivePending}>
               {archivePending ? 'Archiving…' : 'Archive'}
             </button>
           </div>
@@ -1468,6 +1472,7 @@ function ConversationView({ conversation, onResume, onArchive, archivePending = 
           targetMessageNonce={targetMessageNonce}
           onTargetMessageHandled={onTargetMessageHandled}
           bookmarksEnabled
+          citationsEnabled={!hideComposer && !onResume && !isForking && !conversation.clearedToConvId && acceptsInput(conversation)}
           history={olderHistory}
           onLoadOlder={olderHistory.loadOlder}
           onLoadOlderUntil={olderHistory.loadOlderUntil}

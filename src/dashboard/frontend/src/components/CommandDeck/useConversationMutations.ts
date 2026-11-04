@@ -7,6 +7,8 @@ import { closeConversationPanes } from '../../lib/panesStore';
 
 // Shared across hook instances so every view sees a pending archive (PAN-4584).
 const ARCHIVE_MUTATION_KEY = ['conversation-archive'] as const;
+// Shared across hook instances so every view sees a pending stop (PAN-4626).
+const STOP_MUTATION_KEY = ['conversation-stop'] as const;
 
 async function archiveConversation(name: string): Promise<void> {
   const res = await fetch(`/api/conversations/${encodeURIComponent(name)}/archive`, { method: 'POST' });
@@ -16,7 +18,8 @@ async function archiveConversation(name: string): Promise<void> {
 
 async function stopConversation(name: string): Promise<void> {
   const res = await fetch(`/api/conversations/${encodeURIComponent(name)}/stop`, { method: 'POST' });
-  if (!res.ok) throw new Error('Failed to stop conversation');
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(data?.error || 'Failed to stop conversation');
 }
 
 async function retitleConversation(name: string): Promise<{ title: string }> {
@@ -67,6 +70,90 @@ async function unlinkConversationPullRequest(name: string, ref: string): Promise
   if (!res.ok) throw new Error(data?.error || 'Failed to unlink pull request');
 }
 
+// ─── Triage (PAN-4639 WI-6) ─────────────────────────────────────────────────
+
+export interface TriageUpdateInput {
+  name: string;
+  settled?: boolean;
+  settleReason?: 'manual' | 'merge' | 'idle';
+  snoozedUntil?: string | null;
+  autoSettleOverride?: 'on' | 'off' | 'inherit';
+}
+
+interface TriageState {
+  settledAt: string | null;
+  settleReason: 'manual' | 'merge' | 'idle' | null;
+  snoozedUntil: string | null;
+}
+
+interface TriageUndoEntry {
+  label: string;
+  priors: Array<{ name: string; prior: TriageState }>;
+}
+
+interface TriageMutationVars {
+  updates: TriageUpdateInput[];
+  label: string;
+  isUndo?: boolean;
+}
+
+// D11: one history shared by every useConversationMutations instance, so Undo
+// and Cmd/Ctrl+Z see the same stack regardless of which view triggered a change.
+const TRIAGE_UNDO_STACK_MAX = 20;
+let triageUndoStack: TriageUndoEntry[] = [];
+
+export function __resetTriageUndoStackForTests(): void {
+  triageUndoStack = [];
+}
+
+function removeTriageUndoEntry(entry: TriageUndoEntry): void {
+  const index = triageUndoStack.indexOf(entry);
+  if (index !== -1) triageUndoStack.splice(index, 1);
+}
+
+function triageStateOf(conv: Conversation | undefined): TriageState {
+  return {
+    settledAt: conv?.settledAt ?? null,
+    settleReason: conv?.settleReason ?? null,
+    snoozedUntil: conv?.snoozedUntil ?? null,
+  };
+}
+
+/** D3 mutual exclusion, mirroring conversation-triage-store.applyTriageUpdate server-side. */
+function applyTriageOptimistic(prior: TriageState, update: TriageUpdateInput, nowIso: string): TriageState {
+  let next = prior;
+  if (update.snoozedUntil !== undefined) {
+    next = update.snoozedUntil === null
+      ? { ...next, snoozedUntil: null }
+      : { settledAt: null, settleReason: null, snoozedUntil: update.snoozedUntil };
+  }
+  if (update.settled !== undefined) {
+    next = update.settled
+      ? {
+          settledAt: next.settledAt ?? nowIso,
+          settleReason: next.settledAt ? next.settleReason : (update.settleReason ?? 'manual'),
+          snoozedUntil: null,
+        }
+      : { settledAt: null, settleReason: null, snoozedUntil: next.snoozedUntil };
+  }
+  return next;
+}
+
+/** The API contract's undo replay: restore exactly the prior triage triple. */
+function triagePriorToUpdate(name: string, prior: TriageState): TriageUpdateInput {
+  return { name, settled: prior.settledAt !== null, settleReason: prior.settleReason ?? undefined, snoozedUntil: prior.snoozedUntil };
+}
+
+async function postTriageUpdates(updates: TriageUpdateInput[]): Promise<void> {
+  const res = await fetch('/api/conversations/triage', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ updates }),
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(data?.error || 'Failed to update conversation triage');
+}
+
 type ApiForkMode = 'summary' | 'plain' | 'handoff';
 type ForkModeOption = ApiForkMode | 'fast-summary';
 type HandoffAuthor = 'source' | 'external';
@@ -106,6 +193,7 @@ export interface ConversationMutations {
   archive: (name: string, options?: { onSuccess?: () => void }) => void;
   isArchivePending: (name: string) => boolean;
   stop: (name: string) => void;
+  isStopPending: (name: string) => boolean;
   rename: (opts: { name: string; title: string }) => void;
   retitle: (name: string) => void;
   isRetitlePending: (name: string) => boolean;
@@ -113,6 +201,12 @@ export interface ConversationMutations {
   move: (opts: { name: string; projectKey: string; projectName: string }) => void;
   linkPullRequest: (opts: { name: string; ref: string }) => void;
   unlinkPullRequest: (opts: { name: string; ref: string }) => void;
+  /** PAN-4639: apply triage updates (one request), push an undo entry, toast with Undo. */
+  triage: (opts: { updates: TriageUpdateInput[]; label: string }) => void;
+  /** Pops the newest undo entry and replays its priors. Returns false when the stack is empty. */
+  undoLastTriage: () => boolean;
+  /** PAN-4653: set one conversation's auto-settle-on-merge override (no undo entry). */
+  setAutoSettleOverride: (opts: { name: string; override: 'on' | 'off' | 'inherit' }) => void;
   openForkModal: (conv: Conversation, options?: { mode?: ForkModeOption; focus?: string }) => void;
   submitFork: (conv: Conversation, launchModel: string, summaryModel: string, forkMode: ApiForkMode, localSummaryOnly: boolean, includeThinkingInSummary: boolean, title?: string, launchHarness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent', summaryHarness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent', focus?: string, handoffAuthor?: HandoffAuthor, handoffAuthorModel?: string, handoffAuthorHarness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent', projectKey?: string, handoffExtras?: { skills?: string[]; packs?: string[]; hold?: boolean; fresh?: boolean }) => void;
   forkTarget: Conversation | null;
@@ -140,8 +234,10 @@ export function useConversationMutations(
         ?.find((c) => c.name === name)?.title ?? name;
       return { title };
     },
-    onSuccess: (_data, name, ctx) => {
-      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    onSuccess: async (_data, name, ctx) => {
+      // Awaited so the mutation stays pending (row dimmed) until the
+      // refetched list drops the row (PAN-4626).
+      await queryClient.invalidateQueries({ queryKey: ['conversations'] });
       // An archived conversation leaves the list — close its deck tab(s) too.
       closeConversationPanes(name);
       if (selectedConversation === name) {
@@ -160,13 +256,24 @@ export function useConversationMutations(
   });
 
   const stopMutation = useMutation({
+    mutationKey: STOP_MUTATION_KEY,
     mutationFn: stopConversation,
-    onSuccess: (_data, name) => {
-      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    onSuccess: async (_data, name) => {
+      // Awaited so the mutation stays pending (row dimmed) until the
+      // refetched list reflects the stopped session (PAN-4626).
+      await queryClient.invalidateQueries({ queryKey: ['conversations'] });
       if (selectedConversation === name) {
         onSelectConversation(null);
       }
     },
+    onError: (err: Error) => {
+      toast.error(err.message, { duration: 6000 });
+    },
+  });
+
+  const pendingStopNames = useMutationState({
+    filters: { mutationKey: STOP_MUTATION_KEY, status: 'pending' },
+    select: (m) => m.state.variables as string,
   });
 
   const renameMutation = useMutation({
@@ -275,6 +382,61 @@ export function useConversationMutations(
     onError: (err: Error) => { toast.error(err.message, { duration: 6000 }); },
   });
 
+  const triageMutation = useMutation({
+    mutationFn: (vars: TriageMutationVars) => postTriageUpdates(vars.updates),
+    onMutate: async (vars) => {
+      await queryClient.cancelQueries({ queryKey: ['conversations'] });
+      const nowIso = new Date().toISOString();
+      const current = queryClient.getQueryData<Conversation[]>(['conversations']) ?? [];
+      const byName = new Map(current.map((c) => [c.name, c]));
+      const priors = vars.updates.map((update) => ({ name: update.name, prior: triageStateOf(byName.get(update.name)) }));
+      queryClient.setQueryData<Conversation[]>(['conversations'], (old) =>
+        old?.map((c) => {
+          const update = vars.updates.find((u) => u.name === c.name);
+          return update ? { ...c, ...applyTriageOptimistic(triageStateOf(c), update, nowIso) } : c;
+        }) ?? [],
+      );
+      return { priors };
+    },
+    onError: (err: Error, _vars, ctx) => {
+      if (ctx?.priors) {
+        queryClient.setQueryData<Conversation[]>(['conversations'], (old) =>
+          old?.map((c) => {
+            const found = ctx.priors.find((p) => p.name === c.name);
+            return found ? { ...c, ...found.prior } : c;
+          }) ?? [],
+        );
+      }
+      toast.error(err.message, { duration: 6000 });
+    },
+    onSuccess: (_data, vars, ctx) => {
+      if (vars.isUndo || !ctx?.priors || ctx.priors.length === 0) {
+        if (!vars.isUndo) toast(vars.label, { duration: 6000 });
+        return;
+      }
+      const entry: TriageUndoEntry = { label: vars.label, priors: ctx.priors };
+      triageUndoStack.push(entry);
+      if (triageUndoStack.length > TRIAGE_UNDO_STACK_MAX) triageUndoStack.shift();
+      toast(vars.label, {
+        duration: 6000,
+        action: {
+          label: 'Undo',
+          onClick: () => {
+            removeTriageUndoEntry(entry);
+            triageMutation.mutate({
+              updates: entry.priors.map(({ name, prior }) => triagePriorToUpdate(name, prior)),
+              label: entry.label,
+              isUndo: true,
+            });
+          },
+        },
+      });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    },
+  });
+
   const summaryForkMutation = useMutation({
     mutationFn: summaryForkConversation,
     onSuccess: (_data, variables) => {
@@ -331,17 +493,43 @@ export function useConversationMutations(
   // PAN-4560: one object per meaningful change, so the memoized conversation
   // list items do not all re-render on every list render. TanStack keeps each
   // `.mutate` stable; retitleVersion is a dependency so isRetitlePending
-  // re-evaluates after pending changes, and pendingArchiveNames is a
-  // dependency so isArchivePending does too.
+  // re-evaluates after pending changes, and pendingArchiveNames /
+  // pendingStopNames are dependencies so isArchivePending / isStopPending do too.
+  // PAN-4653 D10: the override is a preference, not a triage move — no undo entry, no success toast.
+  const autoSettleOverrideMutation = useMutation({
+    mutationFn: ({ name, override }: { name: string; override: 'on' | 'off' | 'inherit' }) =>
+      postTriageUpdates([{ name, autoSettleOverride: override }]),
+    onMutate: async ({ name, override }) => {
+      await queryClient.cancelQueries({ queryKey: ['conversations'] });
+      const current = queryClient.getQueryData<Conversation[]>(['conversations']) ?? [];
+      const prior = current.find((c) => c.name === name)?.autoSettleOverride ?? 'inherit';
+      queryClient.setQueryData<Conversation[]>(['conversations'], (old) =>
+        old?.map((c) => (c.name === name ? { ...c, autoSettleOverride: override } : c)) ?? [],
+      );
+      return { name, prior };
+    },
+    onError: (err: Error, _vars, ctx) => {
+      if (ctx) {
+        queryClient.setQueryData<Conversation[]>(['conversations'], (old) =>
+          old?.map((c) => (c.name === ctx.name ? { ...c, autoSettleOverride: ctx.prior } : c)) ?? [],
+        );
+      }
+      toast.error(err.message, { duration: 6000 });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    },
+  });
   const archiveMutate = archiveMutation.mutate;
   const stopMutate = stopMutation.mutate;
-  const stopIsPending = stopMutation.isPending;
   const renameMutate = renameMutation.mutate;
   const retitleMutate = retitleMutation.mutate;
   const favoriteMutate = favoriteMutation.mutate;
   const moveMutate = moveMutation.mutate;
   const linkPullRequestMutate = linkPullRequestMutation.mutate;
   const unlinkPullRequestMutate = unlinkPullRequestMutation.mutate;
+  const triageMutate = triageMutation.mutate;
+  const autoSettleOverrideMutate = autoSettleOverrideMutation.mutate;
   const isForkPending = summaryForkMutation.isPending;
   return useMemo<ConversationMutations>(() => ({
     archive: (name, options) => {
@@ -349,7 +537,11 @@ export function useConversationMutations(
       archiveMutate(name, options?.onSuccess ? { onSuccess: () => options.onSuccess?.() } : undefined);
     },
     isArchivePending: (name) => pendingArchiveNames.includes(name),
-    stop: (name) => { if (!stopIsPending) stopMutate(name); },
+    stop: (name) => {
+      if (queryClient.isMutating({ mutationKey: STOP_MUTATION_KEY, predicate: (m) => m.state.variables === name }) > 0) return;
+      stopMutate(name);
+    },
+    isStopPending: (name) => pendingStopNames.includes(name),
     rename: (opts) => renameMutate(opts),
     retitle: (name) => {
       if (pendingRetitleNamesRef.current.has(name)) return;
@@ -363,6 +555,18 @@ export function useConversationMutations(
     move: (opts) => moveMutate(opts),
     linkPullRequest: (opts) => linkPullRequestMutate(opts),
     unlinkPullRequest: (opts) => unlinkPullRequestMutate(opts),
+    triage: (opts) => triageMutate({ updates: opts.updates, label: opts.label }),
+    undoLastTriage: () => {
+      const entry = triageUndoStack.pop();
+      if (!entry) return false;
+      triageMutate({
+        updates: entry.priors.map(({ name, prior }) => triagePriorToUpdate(name, prior)),
+        label: entry.label,
+        isUndo: true,
+      });
+      return true;
+    },
+    setAutoSettleOverride: (opts) => autoSettleOverrideMutate(opts),
     openForkModal,
     submitFork,
     forkTarget,
@@ -370,5 +574,5 @@ export function useConversationMutations(
     forkTargetFocus,
     closeForkModal: () => { setForkTarget(null); setForkTargetMode(undefined); setForkTargetFocus(undefined); },
     isForkPending,
-  }), [archiveMutate, pendingArchiveNames, queryClient, stopMutate, stopIsPending, renameMutate, retitleMutate, favoriteMutate, moveMutate, linkPullRequestMutate, unlinkPullRequestMutate, openForkModal, submitFork, forkTarget, forkTargetMode, forkTargetFocus, isForkPending, retitleVersion]);
+  }), [archiveMutate, pendingArchiveNames, queryClient, stopMutate, pendingStopNames, renameMutate, retitleMutate, favoriteMutate, moveMutate, linkPullRequestMutate, unlinkPullRequestMutate, triageMutate, autoSettleOverrideMutate, openForkModal, submitFork, forkTarget, forkTargetMode, forkTargetFocus, isForkPending, retitleVersion]);
 }

@@ -1,0 +1,403 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-01T13:58:23Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4717: Conversation issue links: handle issues the dashboard snapshot does not hold (CodeRabbit finding on merged #4716)",
+    "updated": "2026-11-01T14:06:55.891Z"
+  },
+  "plan": {
+    "id": "pan-4717",
+    "title": "Conversation issue links: handle issues the dashboard snapshot does not hold (CodeRabbit finding on merged #4716)",
+    "status": "running",
+    "uid": "c149455a-d11c-4b41-ba0f-2e68245274d4",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-01T13:58:23Z",
+    "updated": "2026-11-01T14:06:55.891Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4717",
+        "label": "PAN-4717",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/pull/4716",
+        "label": "PR #4716 (PAN-4714)",
+        "type": "pull_request"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4717.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "conversations",
+      "issue-drawer",
+      "coderabbit-followup"
+    ],
+    "metadata": {
+      "sizeJustification": "Five small frontend items; no server change.",
+      "canonicalFilename": "2026-11-01-PAN-4717-conversation-issue-links-handle-issues-the-dashboard-snapshot-does-not-hold-coderabbit-finding-on-merged-4716.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "TranscriptIssueLink (PAN-4714) intercepts plain clicks on resolvable issue links in conversations and opens the issue drawer without checking the dashboard snapshot. CodeRabbit flagged that an issue absent from the snapshot opens a drawer titled 'Issue details' with no record, and that the drawer's tracker-button fallback only covers the hardcoded PAN/KRUX prefixes. Planning verified live: an aged-out closed issue (PAN-3659) hydrates through the existing PAN-3659 backfill (title and tracker button appear), but a cycle-filtered issue (MIN-658, Linear Backlog) never hydrates and its drawer has no title and no tracker button, a dead end.",
+      "Proposal": "Follow the issue's rule: the drawer already has an on-demand issue-fetch path (subscribeIssueEvents -> backfillIssue -> issues.delta), so keep intercepting. Close the dead end for issues that path cannot load: openIssue gains an optional third argument trackerUrl stored on the drawer slice (not in the URL, preserved across tab switches, cleared on close/URL sync), TranscriptIssueLink passes its href, and the drawer header's tracker button falls back to drawer.trackerUrl when the issue row is absent. Add component tests for the absent-issue click, the tracker fallback, and client-side hydration via issues.delta; document the behaviour; attach a closed-issue-link screenshot to the PR; reply to the CodeRabbit thread on #4716.",
+      "NonGoals": "- No change to the server snapshot, the current-cycle filter, IssueDataService.backfillIssue, or resolveMissingIssue (including its failure memo).\n- No new HTTP route, RPC method, or contract type.\n- No gating of the click on snapshot presence (CodeRabbit's literal suggestion is not adopted; see autoDecisions).\n- No change to what the drawer body shows for done or backfilled issues (Plan (Auto) controls, queued review specialists, Start work on a closed issue).\n- No change to the 'Issue details' placeholder text.\n- No change to PR links, links outside a conversation, modified/middle clicks, or hosts where IssueDrawerAvailableContext is false.\n- No change to trackerIssueUrl's hardcoded prefix table in lib/issueLinks.ts.\n- trackerUrl is never written to the page URL."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Chose on-demand load (keep intercepting) over falling through to the tracker for issues absent from the snapshot.",
+        "rationale": "The issue says to pick on-demand load if the drawer already has an issue-fetch path. It does: the PAN-3659 backfill fired by subscribeIssueEvents. A live Playwright probe showed it loads PAN-3659 (aged-out closed, the common absent case) with title and tracker button within seconds. Falling through would regress PAN-4714 for that common case."
+      },
+      {
+        "summary": "Covered the residual class (cycle-filtered and unresolvable issues) with a tracker-URL fallback carried from the clicked link, not by widening the snapshot.",
+        "rationale": "The probe showed MIN-658 (Linear Backlog) never hydrates and its drawer has no tracker button. About 14 frontend views read issuesRaw, so pushing backlog/canceled rows into the shared snapshot would change the kanban, Command Deck, God View and others. The click decision must stay synchronous (a deferred window.open is popup-blocked), so a server probe before deciding is not viable. Passing the link's href gives every such drawer a working exit for every registered repository, which also answers CodeRabbit's second point."
+      },
+      {
+        "summary": "Repro IDs: PAN-3659 for aged-out closed, MIN-658 for cycle-filtered; PAN-4299 (the issue's example) is in the snapshot and is not a repro.",
+        "rationale": "GET /api/issues on 2026-11-01 listed PAN-4299 but not PAN-3659 or MIN-658; MIN-658 appears only with ?cycle=all."
+      },
+      {
+        "summary": "Screenshots are committed under docs/screenshots/pan-4717/ and embedded in the PR via a blob ?raw=true URL.",
+        "rationale": "Repo precedent (docs/screenshots/pan-4626/, docs/screenshots/pan-4523/); gh cannot upload images to a PR body."
+      }
+    ],
+    "items": [
+      {
+        "id": "drawer-tracker-url-fallback",
+        "title": "Drawer slice carries trackerUrl; header tracker button falls back to it",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T13:58:23Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4717",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/store.ts",
+            "src/dashboard/frontend/src/components/drawer/IssueDrawer.tsx",
+            "src/dashboard/frontend/src/components/drawer/IssueDrawer.tracker-fallback.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/drawer/IssueDrawer.tracker-fallback.test.tsx",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/drawer/IssueDrawer.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "IssueDrawer.tracker-fallback.test.tsx: all tests pass",
+            "IssueDrawer.test.tsx: all tests pass (unchanged)",
+            "typecheck:frontend exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. In src/dashboard/frontend/src/lib/store.ts: add optional `trackerUrl?: string` to `DrawerState` (line 38) with a PAN-4717 comment; change the interface to `openIssue(issueId: string, tab?: string, trackerUrl?: string): void` (line 67); in the `openIssue` implementation (line 213) build `trackerUrl ? { issueId, tab, trackerUrl } : { issueId, tab }` (only add the key when present so the 22 existing `toEqual({ issueId, tab })` assertions keep passing); in `setDrawerTab` (line 249) carry `state.drawer.trackerUrl` into the new drawer when present. Leave closeIssue, openIssueFromRoute, syncDrawerFromUrl and replaceDrawerUrl unchanged (trackerUrl never enters the URL). In src/dashboard/frontend/src/components/drawer/IssueDrawer.tsx line 110 change to `trackerIssueUrl(drawer.issueId ?? '', issue?.url ?? drawer.trackerUrl)`. Create IssueDrawer.tracker-fallback.test.tsx by copying the harness from IssueDrawer.test.tsx (hoisted wsTransportMock, vi.mock of ../../lib/wsTransport, mockFetch, beforeEach store reset, resetDrawerIssueSubscriptionForTest, renderDrawer) and add the five cases listed in the PRD. ORDER MATTERS: IssueDrawer calls syncDrawerFromUrl() on mount, which rebuilds the drawer from the URL and drops trackerUrl, so every case calls renderDrawer() FIRST and then act(() => openIssue(..., trackerUrl)); add a separate case asserting syncDrawerFromUrl() clears trackerUrl. Add `src/components/drawer/IssueDrawer.tracker-fallback.test.tsx` to scripts/frontend-test-subset.txt in sorted position."
+        },
+        "items": [
+          {
+            "id": "drawer-tracker-url-fallback.ac1",
+            "title": "Given issuesRaw holds only PAN-1 and IssueDrawer is already mounted, when act(() => openIssue('MIN-658', 'overview', 'https://linear.app/mindyournow/issue/MIN-658/x')) runs, then the header renders 'Issue details' and a link named 'Issue' whose href is that Linear URL",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drawer-tracker-url-fallback.ac2",
+            "title": "Given that drawer, when setDrawerTab('activity') runs, then useDashboardStore.getState().drawer.trackerUrl still equals the Linear URL and the 'Issue' link keeps that href; and when closeIssue() then openIssue('MIN-658', 'overview') with no third argument run, drawer.trackerUrl is undefined and no 'Issue' link renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drawer-tracker-url-fallback.ac3",
+            "title": "Given issuesRaw holds PAN-1 with url 'https://example.com/PAN-1', when openIssue('PAN-1', 'overview', 'https://github.com/eltmon/overdeck/issues/1') runs, then the 'Issue' link href is 'https://example.com/PAN-1' (the issue row wins over trackerUrl)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drawer-tracker-url-fallback.ac4",
+            "title": "Given a drawer opened with a trackerUrl, window.location.search contains issue= and tab= but no trackerUrl parameter, and when syncDrawerFromUrl() runs, then drawer.trackerUrl becomes undefined",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "drawer-absent-issue-hydration-test",
+        "title": "Test: useIssueData hydrates an issue that was absent when the drawer opened",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T13:58:23Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4717",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/drawer/useDrawerData.absent-issue.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/drawer/useDrawerData.absent-issue.test.tsx"
+          ],
+          "expected_outputs": [
+            "useDrawerData.absent-issue.test.tsx: all tests pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Test only, no source change. Create src/dashboard/frontend/src/components/drawer/useDrawerData.absent-issue.test.tsx: renderHook(() => useIssueData('PAN-3659')) inside a QueryClientProvider (retry off); vi.mock '../../lib/wsTransport' with getTransport returning { subscribe: vi.fn(() => vi.fn()), request: vi.fn() } (hoisted, like IssueDrawer.test.tsx); stub fetch to return Response.json({ tasks: [] }) for URLs containing '/tasks' and Response.json({}) otherwise; call resetDrawerIssueSubscriptionForTest() in beforeEach; seed issuesRaw with one unrelated row (PAN-1). Apply the backfill row with useDashboardStore.getState().applyEvent({ type: 'issues.delta', sequence: 2, timestamp: '2026-11-01T00:00:00.000Z', payload: { length: 2, changes: [{ index: 1, issue: <PAN-3659 row with identifier, id, title 'Backfilled title', url 'https://github.com/eltmon/overdeck/issues/3659', status 'Done', labels []> }] } } as DomainEvent) inside act(). applyEvent takes a single DomainEvent (store.ts line 56). This mirrors what the server emits after backfillIssue (issues.delta arrives on the global stream; ws-rpc.ts filters it out of issue-scoped streams). Add the file to scripts/frontend-test-subset.txt in sorted position."
+        },
+        "items": [
+          {
+            "id": "drawer-absent-issue-hydration-test.ac1",
+            "title": "Given issuesRaw lacks PAN-3659, when useIssueData('PAN-3659') renders, then result.current.issue is null and the captured subscribe connect calls subscribeIssueEvents with { issueId: 'PAN-3659' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drawer-absent-issue-hydration-test.ac2",
+            "title": "When an issues.delta event adding the PAN-3659 row is applied to the store, then result.current.issue.title returns 'Backfilled title'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drawer-absent-issue-hydration-test.ac3",
+            "title": "scripts/frontend-test-subset.txt lists src/components/drawer/useDrawerData.absent-issue.test.tsx and running that file with npm --prefix ./src/dashboard/frontend run test exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "transcript-link-passes-href",
+        "title": "TranscriptIssueLink passes its href to openIssue; absent-issue click test",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T13:58:23Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4717",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/TranscriptIssueLink.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ChatMarkdown.issue-links.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/chat/__tests__/ChatMarkdown.issue-links.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "ChatMarkdown.issue-links.test.tsx: all tests pass, including 'opens the drawer for an issue absent from the store snapshot (PAN-4717)'",
+            "typecheck:frontend exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. In src/dashboard/frontend/src/components/chat/TranscriptIssueLink.tsx line 47 change `openIssue(issueId, 'overview')` to `openIssue(issueId, 'overview', href)`; extend the header comment (lines 7-15) with the PAN-4717 sentence from the PRD (absent issues still open the drawer, the server backfills them via PAN-3659, and the tracker button falls back to this link's href). Do NOT add a snapshot-presence gate. In ChatMarkdown.issue-links.test.tsx update the assertions at lines 72 and 84 to the three-argument call with the link hrefs; add test 'opens the drawer for an issue absent from the store snapshot (PAN-4717)': save and restore the original issuesRaw (like openIssue), seed issuesRaw with a PAN-4645 row only, render a transcript with [PAN-3659](https://github.com/eltmon/overdeck/issues/3659) and [PAN-4645](https://github.com/eltmon/overdeck/issues/4645), wait for both data-issue-id attributes, click both, assert fireEvent.click returned false for both, openIssueMock was called with ('PAN-3659', 'overview', 'https://github.com/eltmon/overdeck/issues/3659') and ('PAN-4645', 'overview', 'https://github.com/eltmon/overdeck/issues/4645'), and window.open was not called."
+        },
+        "items": [
+          {
+            "id": "transcript-link-passes-href.ac1",
+            "title": "Given issuesRaw holds PAN-4645 but not PAN-3659, when the PAN-3659 transcript link is plain-clicked, then fireEvent.click returns false and openIssue is called with ('PAN-3659', 'overview', 'https://github.com/eltmon/overdeck/issues/3659')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "transcript-link-passes-href.ac2",
+            "title": "Given the same store, when the PAN-4645 link is plain-clicked, then openIssue is called with ('PAN-4645', 'overview', 'https://github.com/eltmon/overdeck/issues/4645') and window.open is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "transcript-link-passes-href.ac3",
+            "title": "Given a modified click, an unregistered repo, a PR link, a link outside a conversation, or a host with no drawer, when clicked, then fireEvent.click returns true and openIssue is not called (existing tests pass unchanged); and the two existing plain-click tests assert openIssue receives the link href as its third argument",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-absent-issue-links",
+        "title": "Document absent-issue drawer behaviour for conversation issue links",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T13:58:23Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4717",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "features/conversations.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'PAN-4717' docs/DASHBOARD-ARCHITECTURE.md",
+            "grep -n 'drawer.trackerUrl' docs/DASHBOARD-ARCHITECTURE.md",
+            "grep -n 'old closed issues' features/conversations.mdx"
+          ],
+          "expected_outputs": [
+            "each grep prints at least one matching line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. Append the PAN-4717 paragraph from the PRD to the 'Issue links in conversations (PAN-4714)' bullet in docs/DASHBOARD-ARCHITECTURE.md (lines 440-457): absent issues still open the drawer; useIssueData subscribes subscribeIssueEvents, backfillIssue (PAN-3659) loads aged-out closed issues and the row arrives as issues.delta on the global stream; backfill cannot load current-cycle-filtered (backlog, canceled) or unresolvable issues, so the link passes its href as openIssue(id, 'overview', href), stored as drawer.trackerUrl (not in the URL), and the header tracker button falls back to it. In features/conversations.mdx under '### Issue links' (line 657) insert, after the sentence ending 'instead of leaving the page.', the user-facing sentences from the PRD: old closed issues the dashboard no longer lists still open in the drawer, which loads them; if the dashboard cannot load an issue, the drawer still shows the Issue button that opens the link's tracker page. Do not edit .overdeck/context/codebase/concerns.md; the planner already updated it."
+        },
+        "items": [
+          {
+            "id": "docs-absent-issue-links.ac1",
+            "title": "grep -n 'drawer.trackerUrl' docs/DASHBOARD-ARCHITECTURE.md returns a line inside the issue-links bullet that also names PAN-4717, backfillIssue and issues.delta, and states that trackerUrl is not written to the URL",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-absent-issue-links.ac2",
+            "title": "features/conversations.mdx's Issue links section states that old closed issues the dashboard no longer lists still open in the drawer, and that the drawer's Issue button opens the link's tracker page when the dashboard cannot load the issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "evidence-screenshot-and-coderabbit-reply",
+        "title": "PR screenshot of a closed-issue link click; reply to the CodeRabbit thread on #4716",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T13:58:23Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4717",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/screenshots/pan-4717/closed-issue-link-drawer.png"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "test -s docs/screenshots/pan-4717/closed-issue-link-drawer.png",
+            "gh api repos/eltmon/overdeck/pulls/4716/comments --jq '.[] | select(.in_reply_to_id==4435754182) | .html_url'"
+          ],
+          "expected_outputs": [
+            "the screenshot file exists and is non-empty",
+            "the gh query prints at least one reply URL"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. Implementation checkpoint. (1) cd packages/contracts && npm run build; start the workspace frontend in the background: cd src/dashboard/frontend && npx vite --port 3417 --strictPort (proxies /api and /ws to the live dashboard at 127.0.0.1:3011; choose another free port if taken). (2) Pick a CLOSED overdeck issue absent from `curl -s http://localhost:3011/api/issues` (confirm closed with gh issue view <n> --repo eltmon/overdeck --json state) and find a conversation transcript linking it with `grep -l 'github.com/eltmon/overdeck/issues/<n>' ~/.claude/projects/*/*.jsonl` (read-only; never modify JSONL); map the session to /conv/<id> via pan conversations list/show. If none links an absent closed issue, use a conversation linking any closed issue (e.g. PAN-4299) and say which case was shown. (3) In an isolated Playwright browser (chromium.launch() + newContext(); never a shared profile or another agent's session) open http://localhost:3417/conv/<id>, click a[data-issue-id=\"<ID>\"], wait for [data-testid=issue-drawer], wait up to 10 s for the header h2 to stop reading 'Issue details', screenshot. (4) Save to docs/screenshots/pan-4717/closed-issue-link-drawer.png, commit, embed in the PR description with a https://github.com/eltmon/overdeck/blob/feature/pan-4717/docs/screenshots/pan-4717/closed-issue-link-drawer.png?raw=true image link plus the commands used; stop Vite. The screenshot is MANDATORY: this item is not complete until the PNG is committed and embedded in the PR description. If Vite or Playwright cannot run, try another free port and VITE_PROXY_TARGET=http://127.0.0.1:3011; if it still fails, leave this item pending (do not mark it done), record the exact error in the PR description, and run pan tell flywheel-orchestrator \"work PAN-4717: screenshot capture blocked - <error>\". (5) Reply in the existing thread: gh api repos/eltmon/overdeck/pulls/4716/comments/4435754182/replies -f body=\"Addressed in PAN-4717 (https://github.com/eltmon/overdeck/issues/4717). ...\" with one paragraph explaining: the drawer's on-demand path (PAN-3659 backfill) loads aged-out closed issues so the link keeps intercepting; for issues it cannot load (cycle-filtered backlog/canceled, unresolvable) the link passes its href and the drawer's tracker button falls back to it, covering every registered repository; name the three test files and the fix commit SHA. Confirm with the gh --jq query in verify_commands and add the reply URL to the PR description. Post nothing else externally."
+        },
+        "items": [
+          {
+            "id": "evidence-screenshot-and-coderabbit-reply.ac1",
+            "title": "docs/screenshots/pan-4717/closed-issue-link-drawer.png exists on the branch and renders an open issue drawer whose header shows a closed issue's ID and title, and the PR description embeds it with the commands used; no error note substitutes for the committed screenshot",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "evidence-screenshot-and-coderabbit-reply.ac2",
+            "title": "gh api repos/eltmon/overdeck/pulls/4716/comments --jq '.[] | select(.in_reply_to_id==4435754182) | .html_url' returns a reply URL whose body links https://github.com/eltmon/overdeck/issues/4717",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "evidence-screenshot-and-coderabbit-reply.ac3",
+            "title": "Browser UAT (test role): Given a conversation containing a link to a closed overdeck issue, when the link is plain-clicked in the main dashboard, then the issue drawer opens and its header shows the issue title within 10 s, and the header renders an 'Issue' button that links to the issue's tracker page (the MIN-658 tracker fallback is proven by the drawer-tracker-url-fallback component test, not UAT)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "drawer-tracker-url-fallback",
+        "to": "transcript-link-passes-href",
+        "type": "blocks"
+      },
+      {
+        "from": "drawer-tracker-url-fallback",
+        "to": "drawer-absent-issue-hydration-test",
+        "type": "blocks"
+      },
+      {
+        "from": "drawer-tracker-url-fallback",
+        "to": "evidence-screenshot-and-coderabbit-reply",
+        "type": "blocks"
+      },
+      {
+        "from": "transcript-link-passes-href",
+        "to": "evidence-screenshot-and-coderabbit-reply",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

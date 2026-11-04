@@ -31,3 +31,23 @@ describe('runMergeTrainReconcile (PAN-1691 flag gating)', () => {
     ]);
   });
 });
+
+describe('runMergeTrainReconcile log line (PAN-4801)', () => {
+  it('logs every enabled run, including one with no siblings', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    await runMergeTrainReconcile('PAN-1', { enabled: () => true, deps: mockDeps([]) });
+    await runMergeTrainReconcile('PAN-1', { enabled: () => true, deps: mockDeps(['PAN-2']) });
+    expect(log.mock.calls.map(([line]) => line)).toEqual([
+      '[merge-train] reconciled 0 sibling(s) after PAN-1',
+      '[merge-train] reconciled 1 sibling(s) after PAN-1: PAN-2=unaffected',
+    ]);
+    log.mockRestore();
+  });
+
+  it('logs nothing when the merge-train flag is off', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    await runMergeTrainReconcile('PAN-1', { enabled: () => false, deps: mockDeps(['PAN-2']) });
+    expect(log).not.toHaveBeenCalled();
+    log.mockRestore();
+  });
+});

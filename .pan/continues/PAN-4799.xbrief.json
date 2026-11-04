@@ -1,0 +1,93 @@
+{
+  "version": "1",
+  "issueId": "PAN-4799",
+  "created": "2026-11-02T05:59:19.070Z",
+  "updated": "2026-11-02T06:25:18.384Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "member-spec-roots": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4799",
+      "claimedAt": "2026-11-02T05:59:19.070Z",
+      "doneAt": "2026-11-02T06:03:24.426Z"
+    },
+    "wire-ac-cache": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4799",
+      "claimedAt": "2026-11-02T06:03:35.498Z",
+      "doneAt": "2026-11-02T06:12:37.354Z"
+    },
+    "ac-cache-recovery": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4799",
+      "claimedAt": "2026-11-02T06:12:46.237Z",
+      "doneAt": "2026-11-02T06:18:04.770Z"
+    },
+    "docs-uat-lookup": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4799",
+      "claimedAt": "2026-11-02T06:18:12.914Z",
+      "doneAt": "2026-11-02T06:19:39.925Z"
+    },
+    "member-spec-roots.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T06:21:28.796Z"
+    },
+    "member-spec-roots.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T06:21:48.305Z"
+    },
+    "member-spec-roots.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T06:22:07.631Z"
+    },
+    "member-spec-roots.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T06:22:24.474Z"
+    },
+    "wire-ac-cache.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T06:22:44.960Z"
+    },
+    "wire-ac-cache.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T06:23:02.204Z"
+    },
+    "wire-ac-cache.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T06:23:17.312Z"
+    },
+    "wire-ac-cache.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T06:23:32.777Z"
+    },
+    "ac-cache-recovery.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T06:23:51.338Z"
+    },
+    "ac-cache-recovery.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T06:24:09.313Z"
+    },
+    "ac-cache-recovery.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T06:24:26.395Z"
+    },
+    "ac-cache-recovery.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T06:24:43.034Z"
+    },
+    "docs-uat-lookup.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T06:25:01.969Z"
+    },
+    "docs-uat-lookup.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T06:25:18.384Z"
+    }
+  }
+}

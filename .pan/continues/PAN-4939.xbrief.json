@@ -1,0 +1,169 @@
+{
+  "version": "1",
+  "issueId": "PAN-4939",
+  "created": "2026-11-04T00:21:28.043Z",
+  "updated": "2026-11-04T01:17:06.824Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "schedule-route-scopes": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4939",
+      "claimedAt": "2026-11-04T00:29:18.568Z",
+      "doneAt": "2026-11-04T00:41:55.905Z"
+    },
+    "schedule-message-tool": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4939",
+      "claimedAt": "2026-11-04T00:42:25.946Z",
+      "doneAt": "2026-11-04T00:44:19.150Z"
+    },
+    "schedule-recurring-tool": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4939",
+      "claimedAt": "2026-11-04T00:44:23.792Z",
+      "doneAt": "2026-11-04T00:45:51.972Z"
+    },
+    "list-scheduled-tool": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4939",
+      "claimedAt": "2026-11-04T00:45:56.835Z",
+      "doneAt": "2026-11-04T00:47:17.277Z"
+    },
+    "update-scheduled-tool": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4939",
+      "claimedAt": "2026-11-04T00:47:21.960Z",
+      "doneAt": "2026-11-04T00:48:56.421Z"
+    },
+    "delete-scheduled-tool": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4939",
+      "claimedAt": "2026-11-04T00:49:01.201Z",
+      "doneAt": "2026-11-04T00:50:18.205Z"
+    },
+    "register-schedule-tools": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4939",
+      "claimedAt": "2026-11-04T00:51:04.127Z",
+      "doneAt": "2026-11-04T00:54:06.273Z"
+    },
+    "schedule-tools-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4939",
+      "claimedAt": "2026-11-04T00:54:11.276Z",
+      "doneAt": "2026-11-04T00:55:35.620Z"
+    },
+    "schedule-route-scopes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:09:30.907Z"
+    },
+    "schedule-route-scopes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:09:49.345Z"
+    },
+    "schedule-route-scopes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:10:08.918Z"
+    },
+    "schedule-message-tool.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:10:29.981Z"
+    },
+    "schedule-message-tool.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:10:48.890Z"
+    },
+    "schedule-message-tool.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:11:07.845Z"
+    },
+    "schedule-message-tool.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:11:28.401Z"
+    },
+    "schedule-recurring-tool.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:11:46.786Z"
+    },
+    "schedule-recurring-tool.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:12:04.021Z"
+    },
+    "schedule-recurring-tool.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:12:21.028Z"
+    },
+    "list-scheduled-tool.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:12:39.105Z"
+    },
+    "list-scheduled-tool.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:12:57.319Z"
+    },
+    "list-scheduled-tool.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:13:15.429Z"
+    },
+    "update-scheduled-tool.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:13:34.521Z"
+    },
+    "update-scheduled-tool.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:13:51.628Z"
+    },
+    "update-scheduled-tool.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:14:08.471Z"
+    },
+    "update-scheduled-tool.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:14:24.398Z"
+    },
+    "delete-scheduled-tool.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:14:41.325Z"
+    },
+    "delete-scheduled-tool.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:14:58.520Z"
+    },
+    "delete-scheduled-tool.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:15:16.164Z"
+    },
+    "register-schedule-tools.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:15:33.338Z"
+    },
+    "register-schedule-tools.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:15:49.934Z"
+    },
+    "register-schedule-tools.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:16:06.218Z"
+    },
+    "register-schedule-tools.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:16:22.017Z"
+    },
+    "schedule-tools-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:16:37.234Z"
+    },
+    "schedule-tools-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:16:51.900Z"
+    },
+    "schedule-tools-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:17:06.824Z"
+    }
+  }
+}

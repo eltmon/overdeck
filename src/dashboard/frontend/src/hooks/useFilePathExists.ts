@@ -15,6 +15,7 @@
 import { useEffect, useState } from 'react';
 import { WS_METHODS } from '@overdeck/contracts';
 import { getTransport, type PanRpcProtocolClient } from '../lib/wsTransport';
+import { isNativeShell } from '../lib/nativeShell';
 import {
   getCachedExists,
   setCachedExists,
@@ -40,7 +41,7 @@ function canResolve(cwd: string | undefined, path: string | undefined): path is 
 }
 
 function readCacheState(cwd: string | undefined, path: string | undefined): FilePathExistsState {
-  if (!canResolve(cwd, path)) return { state: 'missing' };
+  if (isNativeShell() || !canResolve(cwd, path)) return { state: 'missing' };
   const cached = getCachedExists(cwd, path);
   if (!cached) return { state: 'loading' };
   return cached.exists
@@ -55,7 +56,8 @@ export function useFilePathExists(
   const [state, setState] = useState<FilePathExistsState>(() => readCacheState(cwd, path));
 
   useEffect(() => {
-    if (!canResolve(cwd, path)) {
+    // The phone app (PAN-4837) cannot call resolveFilePathExists: file links render as text.
+    if (isNativeShell() || !canResolve(cwd, path)) {
       setState({ state: 'missing' });
       return;
     }

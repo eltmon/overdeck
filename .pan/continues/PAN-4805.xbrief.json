@@ -1,0 +1,107 @@
+{
+  "version": "1",
+  "issueId": "PAN-4805",
+  "created": "2026-11-02T06:47:26.972Z",
+  "updated": "2026-11-02T07:07:11.085Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "pickport-os-assigned": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4805",
+      "claimedAt": "2026-11-02T06:47:26.972Z",
+      "doneAt": "2026-11-02T06:49:08.408Z"
+    },
+    "health-pid-match": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4805",
+      "claimedAt": "2026-11-02T06:49:17.057Z",
+      "doneAt": "2026-11-02T06:50:34.477Z"
+    },
+    "boot-retry-eaddrinuse": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4805",
+      "claimedAt": "2026-11-02T06:50:41.636Z",
+      "doneAt": "2026-11-02T06:56:38.616Z"
+    },
+    "pickport-unit-test": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4805",
+      "claimedAt": "2026-11-02T06:56:45.039Z",
+      "doneAt": "2026-11-02T06:58:46.259Z"
+    },
+    "docs-testing-fixture-port": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4805",
+      "claimedAt": "2026-11-02T06:58:56.887Z",
+      "doneAt": "2026-11-02T06:59:43.512Z"
+    },
+    "pickport-os-assigned.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T07:01:23.580Z"
+    },
+    "pickport-os-assigned.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T07:01:47.539Z"
+    },
+    "pickport-os-assigned.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T07:02:09.291Z"
+    },
+    "health-pid-match.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T07:02:31.532Z"
+    },
+    "health-pid-match.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T07:02:53.557Z"
+    },
+    "health-pid-match.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T07:03:14.503Z"
+    },
+    "boot-retry-eaddrinuse.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T07:03:36.131Z"
+    },
+    "boot-retry-eaddrinuse.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T07:03:56.408Z"
+    },
+    "boot-retry-eaddrinuse.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T07:04:16.830Z"
+    },
+    "boot-retry-eaddrinuse.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T07:04:37.031Z"
+    },
+    "pickport-unit-test.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T07:04:58.504Z"
+    },
+    "pickport-unit-test.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T07:05:24.615Z"
+    },
+    "pickport-unit-test.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T07:05:53.439Z"
+    },
+    "pickport-unit-test.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T07:06:22.659Z"
+    },
+    "docs-testing-fixture-port.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T07:06:49.880Z"
+    },
+    "docs-testing-fixture-port.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T07:07:11.085Z"
+    }
+  }
+}

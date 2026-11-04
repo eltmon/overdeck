@@ -1,0 +1,783 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-04T05:19:45Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4942: Agent MCP and bots (W-LINK1): link_machine: ask the operator to link a machine",
+    "updated": "2026-11-04T05:29:21.938Z"
+  },
+  "plan": {
+    "id": "pan-4942",
+    "title": "Agent MCP and bots (W-LINK1): link_machine: ask the operator to link a machine",
+    "status": "running",
+    "uid": "4e03f36f-7b40-4540-a727-04f469f0b071",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-04T05:19:45Z",
+    "updated": "2026-11-04T05:29:21.938Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4942",
+        "label": "PAN-4942",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4927",
+        "label": "PAN-4927 (epic)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "mcp",
+      "agent-requests",
+      "anywhere",
+      "dashboard",
+      "frontend",
+      "security"
+    ],
+    "narratives": {
+      "Problem": "An agent told to work on a machine that is not linked has no safe way to get it linked. Asking in chat would put a pairing link (with its one-time odp_ code) into the agent's transcript. W-SEC1 (PAN-4941) built an in-memory agent request store, operator routes and a Decisions card for secrets only; the store already names a machine-link kind, but no route creates one, the list route drops the hint, the decline route refuses non-secret requests, and the frontend drops every non-secret row.",
+      "Proposal": "Add the machine-link kind end to end, lowered in .pan/drafts/PAN-4942.md: (1) a createMachineLink store creator with a 24-hour expiry, same-hint dedupe and a result that can carry { environmentId, label }; (2) agent self routes POST /api/self/machine-link-requests (tell) and GET /api/self/machine-link-requests/:id/wait (read:state), each wait answering only its own kind; (3) a root-only POST /api/agent-requests/:id/linked that finds the active link by environment id in the link store and settles the request linked with the stored label, plus a decline route that takes either kind and a list row that carries the hint; (4) agent-only MCP tools link_machine and link_machine_wait; (5) the Anywhere dialog store carries an agentRequestId; (6) a 'Machine link requested' blocking card whose Link a machine… button opens the existing dialog with the request id and whose Dismiss declines; (7) LinkMachineDialog posts the resolve after a successful link; (8) docs in configuration/mcp.mdx, docs/DASHBOARD-AUTH.md, configuration/linked-machines.mdx and the codebase map.",
+      "NonGoals": "- Resolving a pending request from a link made outside the card's dialog (pan machines link, the Machines panel, the SSH or Fly dialogs, the command palette).\n- Picking an already-linked machine from the card.\n- Answering a machine-link request from a phone, a linked machine's browser, a bot or any registry token.\n- Adding delegate_task or changing the W-INJ4 instruction block text.\n- Persisting agent requests across a dashboard restart.\n- Any agent-visible field that carries the pairing link, the odp_ code or a body-supplied label.\n- A new /dismiss route (Dismiss uses the existing decline route)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Add createMachineLink next to createSecret; both use one private insert helper.",
+        "rationale": "Keeps expiry, ids and waiters in one place; the epic gave no creator and the shipped store has only createSecret."
+      },
+      {
+        "summary": "Dedupe a machine-link ask on the same owner and the same trimmed, case-insensitive hint; a different hint makes a new request; both kinds share the 20-request limit.",
+        "rationale": "Mirrors W-SEC1's same-name rule; an agent can need two machines."
+      },
+      {
+        "summary": "Fixed 24-hour expiry, no timeoutMs input.",
+        "rationale": "The epic fixes 24 h, and linking needs the operator at the other machine."
+      },
+      {
+        "summary": "Widen AgentRequestView.result and settle's result to { file?, machine?: { environmentId, label } }.",
+        "rationale": "One result shape for both kinds; the wait route reads it."
+      },
+      {
+        "summary": "Each wait route answers 404 unknown-request at once for a request of the other kind, including the secret wait.",
+        "rationale": "The shared store now holds two kinds; a wrong-kind wait must not block 50 s and answer a foreign status."
+      },
+      {
+        "summary": "The /linked body is read for environmentId only; the label comes from the active link record found with listLinks() by environmentId and revokedAt === null.",
+        "rationale": "getLink also matches ids and labels and returns revoked links; the client must not choose the label the agent sees."
+      },
+      {
+        "summary": "/linked settles expired and answers 409 agent-stopped when the agent holds no active agent token.",
+        "rationale": "Parity with the secret route; the machine stays linked."
+      },
+      {
+        "summary": "Dismiss uses the existing /decline route, widened to both kinds with a kind-aware activity message.",
+        "rationale": "No new route surface; declined is already a status the wait answers."
+      },
+      {
+        "summary": "AgentRequestCard branches on kind with a MachineLinkRequestBody function in the same file; Decision.agentRequest becomes a discriminated union.",
+        "rationale": "DecisionsPanel already renders AgentRequestCard for any agentRequest decision; one card file stays small."
+      },
+      {
+        "summary": "machineLink is a blocking kind.",
+        "rationale": "The agent is parked in link_machine_wait."
+      },
+      {
+        "summary": "The Anywhere dialog store holds agentRequestId; openDialog sets it from opts and close clears it.",
+        "rationale": "A later palette open must never resolve an old request."
+      },
+      {
+        "summary": "LinkMachineDialog resolves after a successful link, shows an info toast on agent-stopped and an error toast on other failures, invalidates ['agent-requests'] and always closes.",
+        "rationale": "A resolve failure must never undo or hide a successful link."
+      },
+      {
+        "summary": "Only the card's dialog resolves a request; other link paths leave it pending until Dismiss or 24 h.",
+        "rationale": "Auto-matching links to requests is out of scope; the tool description tells the agent the operator must use the card."
+      },
+      {
+        "summary": "link_machine_wait tells the agent to pass the label as machine to start_worker or start_conversation, not delegate_task.",
+        "rationale": "delegate_task is W-DEL1 (PAN-4938), still open."
+      },
+      {
+        "summary": "Hints are trimmed, 1 to 200 characters, with no control characters, else 400 bad-hint.",
+        "rationale": "The epic fixes 1..200; control characters have no place in a card line."
+      },
+      {
+        "summary": "Add AgentRequestCard.test.tsx and the new LinkMachineDialog.test.tsx to scripts/frontend-test-subset.txt.",
+        "rationale": "CI runs only listed frontend tests; W-SEC1 shipped the card test without a row."
+      }
+    ],
+    "items": [
+      {
+        "id": "store-machine-link",
+        "title": "Store: machine-link creator, 24-hour expiry and a result that carries the linked machine",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T05:19:45Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4942",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "self-machine-link-routes",
+            "operator-linked-route"
+          ],
+          "files_scope": [
+            "src/dashboard/server/services/agent-requests.ts",
+            "src/dashboard/server/__tests__/agent-requests.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run src/dashboard/server/__tests__/agent-requests.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors",
+            "agent-requests.test.ts passes, including the new createMachineLink cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-3",
+            "NFR-4",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. In src/dashboard/server/services/agent-requests.ts: add MACHINE_LINK_REQUEST_TIMEOUT_MS = 24 * 60 * 60_000 and MACHINE_LINK_HINT_MAX_LENGTH = 200; add AgentRequestResult { file?: string; machine?: { environmentId: string; label: string } } and use it for AgentRequestView.result, settle's result (interface and implementation) and settleHeld; make copyView copy result.machine; extract createSecret's insertion into a private insert(caller, fields, timeoutMs, label) helper; add createMachineLink(caller, { hint, label }) that dedupes a pending machine-link request of the same owner whose hint matches after trim + toLowerCase (created: false), counts every other pending request of the owner against AGENT_REQUEST_PENDING_LIMIT (20), and inserts { kind: 'machine-link', hint: hint.trim() } with the 24-hour expiry. Update the module header. Extend agent-requests.test.ts with fake timers."
+        },
+        "items": [
+          {
+            "id": "store-machine-link.ac1",
+            "title": "Given an agent caller, when createMachineLink is called with hint '  my desk Mac ', then it returns created: true and a pending view with kind 'machine-link', hint 'my desk Mac' and expiresAt exactly 24 h after createdAt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "store-machine-link.ac2",
+            "title": "Given a pending machine-link request, when the same owner calls createMachineLink with 'MY DESK MAC', then it returns created: false with the same id; a different hint returns a new id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "store-machine-link.ac3",
+            "title": "Given an owner with 19 pending secret requests and 1 pending machine-link request, when it calls createMachineLink with a new hint, then it returns { ok: false, code: 'too-many-requests' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "store-machine-link.ac4",
+            "title": "Given a running wait, when settle(id, 'linked', { machine: { environmentId: 'env-1', label: 'desk' } }) runs, then the wait resolves with status 'linked' and result.machine, and mutating that returned machine does not change the next getForCaller view",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "store-machine-link.ac5",
+            "title": "Given a pending machine-link request, when fake time advances past 24 h, then getForCaller returns status 'expired'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "self-machine-link-routes",
+        "title": "Agent routes: POST /api/self/machine-link-requests and its kind-checked wait",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T05:19:45Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4942",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/self-requests.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/__tests__/agent-requests-routes.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run src/dashboard/server/__tests__/agent-requests-routes.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts src/dashboard/server/__tests__/route-scopes.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "agent-requests-routes.test.ts, no-loss-matrix.test.ts and route-scopes.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-6",
+            "NFR-1",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. In src/dashboard/server/routes/self-requests.ts: extract requestLabel(caller); add handleMachineLinkRequestCreate (POST /api/self/machine-link-requests, body { hint }: trimmed 1..200 chars, no /[\\u0000-\\u001f\\u007f]/, else 400 bad-hint; 429 too-many-requests; 201 new / 200 existing with { requestId, status: 'pending', expiresAt, next: { tool: 'link_machine_wait', arguments: { requestId } } }); add handleMachineLinkRequestWait (GET /api/self/machine-link-requests/:id/wait, parseWaitTimeoutMs, getForCaller first: null or kind !== 'machine-link' answers 404 unknown-request at once with text 'call link_machine again'; then wait; answers pending+next, linked+machine, or the bare status). In handleSecretRequestWait answer 404 at once when getForCaller is null or its kind is not 'secret'. Register both routes in makeSelfRequestsRouteLayer. Add route-scope rows (ask: tell, wait: read:state) after the W-SEC1 rows and two no-loss rows after line 532."
+        },
+        "items": [
+          {
+            "id": "self-machine-link-routes.ac1",
+            "title": "Given an agent token with tell, when it POSTs { hint: 'my desk Mac' } twice through the gate, then the first answer is 201 and the second 200 with the same requestId, both with next.tool 'link_machine_wait'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "self-machine-link-routes.ac2",
+            "title": "Given an agent token, when the hint is empty, 201 characters, or contains a newline, then the route returns 400 with code 'bad-hint'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "self-machine-link-routes.ac3",
+            "title": "Given a plain (non-agent) token, when it calls either machine-link route, then it returns 403 not-an-agent-token; an agent token with only read:state is rejected on the ask with 403 insufficient_scope; requiredScopeFor maps the ask to tell and the wait to read:state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "self-machine-link-routes.ac4",
+            "title": "Given a secret request id on the machine-link wait, or a machine-link id on the secret wait, when the wait is called, then it returns 404 unknown-request without advancing any timer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "self-machine-link-routes.ac5",
+            "title": "Given a pending machine-link request, when the owner waits, then on fake timers it returns pending with next after 50 s, and returns { status: 'linked', machine } at once after the store settles it linked",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "operator-linked-route",
+        "title": "Operator routes: root-only POST /api/agent-requests/:id/linked, decline for either kind, hint in the list",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T05:19:45Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "api",
+          "issueLabel": "pan-4942",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "dialog-resolves-request"
+          ],
+          "files_scope": [
+            "src/dashboard/server/routes/agent-requests.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/__tests__/agent-requests-routes.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run src/dashboard/server/__tests__/agent-requests-routes.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts src/dashboard/server/__tests__/route-scopes.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "agent-requests-routes.test.ts passes including the end-to-end no-pairing-code test; no-loss-matrix.test.ts and route-scopes.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "NFR-1",
+            "NFR-2",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. In src/dashboard/server/routes/agent-requests.ts: AgentRequestRow gains hint and handleAgentRequestList copies it; replace pendingSecret with pendingRequest(requests, id, kind?) (secret route passes 'secret', decline passes none); decline writes a kind-aware activity message ('Machine link declined for <label>'); add deps.findActiveLink defaulting to listLinks().find(environmentId match && revokedAt === null) → { environmentId, label }; add handleAgentRequestLinked: root credential else 403 root-only; environmentId string 1..200 else 400 bad-environment-id; pendingRequest(..., 'machine-link'); no active link → 400 unknown-machine (request stays pending); no active agent token → settle expired + 409 agent-stopped; settle('linked', { machine }) with the link store's label; activity 'Machine <label> linked for <request label>'; answer 200 { requestId, status: 'linked', machine }. Every other body field is ignored and never stored, echoed or logged. Register POST /api/agent-requests/:id/linked with rejectUnsafeDashboardMutationRequest and noStore. Update the route-scopes.ts comment (no row: root only) and add the no-loss row; change the decline row's door to 'either kind'."
+        },
+        "items": [
+          {
+            "id": "operator-linked-route.ac1",
+            "title": "Given an agent token holding approve, when it POSTs /api/agent-requests/:id/linked through the gate, then it is rejected with 403 insufficient_scope; a device credential calling the handler gets 403 root-only",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "operator-linked-route.ac2",
+            "title": "Given a pending machine-link request, when the root session posts an environmentId with no active link (unknown or revoked), then the route returns 400 unknown-machine and the request stays pending; a secret request id returns 409 wrong-kind",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "operator-linked-route.ac3",
+            "title": "Given one real store, when an agent asks, the list returns the hint, and the root session posts { environmentId: 'env-1', label: 'spoofed', pairingUrl: 'https://desk/#pair=odp_secret' } for a link labelled 'desk', then the agent's wait returns { status: 'linked', machine: { environmentId: 'env-1', label: 'desk' } } and no agent-side answer contains 'odp_', 'pair=' or 'spoofed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "operator-linked-route.ac4",
+            "title": "Given the requesting agent holds no active agent token, when the root session posts /linked, then the route returns 409 agent-stopped and the agent's wait returns 'expired'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "operator-linked-route.ac5",
+            "title": "Given a pending machine-link request, when the root session POSTs /decline, then the route returns 200 and the agent's wait returns 'declined'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "link-machine-tools",
+        "title": "MCP tools link_machine and link_machine_wait (agent-only)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T05:19:45Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4942",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/mcp/tools-self.ts",
+            "tests/unit/lib/mcp/tools-self.test.ts",
+            "tests/unit/lib/mcp/tool-annotations.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run tests/unit/lib/mcp/tools-self.test.ts tests/unit/lib/mcp/tool-annotations.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "tools-self.test.ts and tool-annotations.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. In src/lib/mcp/tools-self.ts add linkMachine (name 'link_machine', scope 'tell', audience 'agent', input { hint } maxLength 200, POST /api/self/machine-link-requests with exactly { hint }) and linkMachineWait (name 'link_machine_wait', scope 'read:state', audience 'agent', input { requestId }, GET /api/self/machine-link-requests/<encodeURIComponent(id)>/wait?timeoutMs=${WAIT_CHUNK_MS}) with the descriptions in the PRD (never ask for a pairing code; the operator must use the card's Link a machine… button; on linked pass the label as machine to start_worker or start_conversation; 404 means call link_machine again). Append both to SELF_TOOLS and update the module header. Add both to SINGLE_ROUTE_PATHS in tool-annotations.test.ts and a describe block in tools-self.test.ts. The tool names must be exactly link_machine and link_machine_wait (W-INJ4, PAN-4935, names them)."
+        },
+        "items": [
+          {
+            "id": "link-machine-tools.ac1",
+            "title": "Given a non-agent token with tell, when tools/list runs, then neither link_machine nor link_machine_wait is listed; an agent token with tell and read:state lists both",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "link-machine-tools.ac2",
+            "title": "Given an agent context, when link_machine is called with { hint: 'desk' }, then it POSTs exactly { hint: 'desk' } to /api/self/machine-link-requests; a call without hint returns a tool error and sends no request",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "link-machine-tools.ac3",
+            "title": "Given an agent context, when link_machine_wait is called with requestId 'a/b', then it GETs /api/self/machine-link-requests/a%2Fb/wait?timeoutMs=50000 and passes a linked answer through; a route 404 returns a tool error starting 'HTTP 404'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "link-machine-tools.ac4",
+            "title": "Given tool-annotations.test.ts with the two new SINGLE_ROUTE_PATHS rows, when it runs, then both tools report audience 'agent' and a scope equal to requiredScopeFor of their route",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dialog-store-request-id",
+        "title": "Anywhere dialog store carries an optional agentRequestId",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T05:19:45Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4942",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/anywhere/anywhereDialogStore.ts",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/AnywhereDialogHost.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "cd src/dashboard/frontend && npx vitest run src/components/Settings/anywhere/__tests__/AnywhereDialogHost.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck (including typecheck:frontend) completes without errors",
+            "AnywhereDialogHost.test.tsx passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. In anywhereDialogStore.ts export AnywhereDialogOptions { agentRequestId?: string }; add agentRequestId: string | null to the state (initial null); openDialog(dialog, opts?) sets { dialog, agentRequestId: opts?.agentRequestId ?? null }; close sets { dialog: null, agentRequestId: null }; openAnywhereDialog(dialog, opts?) forwards opts. Existing one-argument callers (command palette) keep compiling. Extend AnywhereDialogHost.test.tsx with store assertions and reset the store in beforeEach."
+        },
+        "items": [
+          {
+            "id": "dialog-store-request-id.ac1",
+            "title": "Given an empty store, when openAnywhereDialog('link-machine', { agentRequestId: 'r1' }) runs, then useAnywhereDialogStore.getState() returns dialog 'link-machine' and agentRequestId 'r1'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-store-request-id.ac2",
+            "title": "Given a store holding agentRequestId 'r1', when close() runs and then openAnywhereDialog('link-machine') runs, then agentRequestId is null after each call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "machine-link-card",
+        "title": "Decisions panel: blocking 'Machine link requested' card with Link a machine… and Dismiss",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T05:19:45Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4942",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/pendingInput.ts",
+            "src/dashboard/frontend/src/lib/useDecisions.ts",
+            "src/dashboard/frontend/src/components/AgentRequestCard.tsx",
+            "src/dashboard/frontend/src/components/__tests__/AgentRequestCard.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "cd src/dashboard/frontend && npx vitest run src/components/__tests__/AgentRequestCard.test.tsx src/components/__tests__/DecisionsPanel.test.tsx src/lib/__tests__/useDecisions.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck (including typecheck:frontend) completes without errors",
+            "AgentRequestCard.test.tsx, DecisionsPanel.test.tsx and useDecisions.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. pendingInput.ts: add 'machineLink' with label 'Machine link requested'. useDecisions.ts: Decision.agentRequest becomes a union on kind ('secret' with name/prompt, 'machine-link' with hint); AgentRequestRow.kind is 'secret' | 'machine-link' with optional name, prompt, hint; agentRequestDecisions maps machine-link rows to kinds ['machineLink'], blocking true; add 'machineLink' to BLOCKING_KINDS. AgentRequestCard.tsx: keep the secret branch; add MachineLinkRequestBody in the same file rendering '<label> asks you to link a machine: <hint>', and for a root-session viewer the buttons 'Link a machine…' (openAnywhereDialog('link-machine', { agentRequestId: request.id })) and 'Dismiss' (POST {} to /api/agent-requests/<id>/decline); other viewers read 'Answer this on <machine>'s own dashboard'. Add src/components/__tests__/AgentRequestCard.test.tsx to scripts/frontend-test-subset.txt on the line before AskUserQuestionDialog.test.tsx."
+        },
+        "items": [
+          {
+            "id": "machine-link-card.ac1",
+            "title": "Given a root-session viewer and a machine-link decision with hint 'my desk Mac', when AgentRequestCard renders, then it shows 'Machine link requested', 'asks you to link a machine: my desk Mac', a 'Link a machine…' button and a 'Dismiss' button, and no password input",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "machine-link-card.ac2",
+            "title": "Given that card, when the operator clicks 'Link a machine…', then useAnywhereDialogStore.getState() returns dialog 'link-machine' and the request's id as agentRequestId; when they click 'Dismiss', then fetch receives POST /api/agent-requests/<id>/decline with body {}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "machine-link-card.ac3",
+            "title": "Given a device viewer, when the machine-link card renders, then it shows 'Answer this on' text and no buttons",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "machine-link-card.ac4",
+            "title": "Given one secret row and one machine-link row, when agentRequestDecisions runs, then it returns two blocking decisions, the machine-link one with kinds ['machineLink'] and agentRequest.hint set",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "machine-link-card.ac5",
+            "title": "Given scripts/frontend-test-subset.txt, when grep -n 'AgentRequestCard.test.tsx' runs on it, then it prints exactly one line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dialog-resolves-request",
+        "title": "LinkMachineDialog resolves the agent request after a successful link",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T05:19:45Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4942",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/anywhere/LinkMachineDialog.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/AnywhereDialogHost.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/machinesApi.ts",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/LinkMachineDialog.test.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/AnywhereDialogHost.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "cd src/dashboard/frontend && npx vitest run src/components/Settings/anywhere/__tests__/LinkMachineDialog.test.tsx src/components/Settings/anywhere/__tests__/AnywhereDialogHost.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck (including typecheck:frontend) completes without errors",
+            "LinkMachineDialog.test.tsx and AnywhereDialogHost.test.tsx pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. machinesApi.ts: add markAgentRequestLinked(requestId, environmentId) posting { environmentId } (and nothing else) to /api/agent-requests/<encoded id>/linked with dashboardMutationJsonHeaders. LinkMachineDialog: optional prop agentRequestId?: string | null; after a successful linkMachine and toast.success, when agentRequestId is set, call markAgentRequestLinked(agentRequestId, result.body.environmentId) in its own try/catch; 409 with code 'agent-stopped' → toast.info('Linked <label>, but the agent that asked has stopped.'); other failure or throw → toast.error('Linked <label>, but could not tell the agent: <error>'); add ['agent-requests'] to the invalidations; always close. AnywhereDialogHost passes agentRequestId from the store to LinkMachineDialog. MachinesPanel keeps rendering the dialog without the prop. New LinkMachineDialog.test.tsx (mocked linkMachine, markAgentRequestLinked and sonner); extend AnywhereDialogHost.test.tsx so the stub records its agentRequestId prop. Add the new test to scripts/frontend-test-subset.txt after the DirectoryPanel.test.tsx line."
+        },
+        "items": [
+          {
+            "id": "dialog-resolves-request.ac1",
+            "title": "Given agentRequestId 'r1' and a linkMachine answer { environmentId: 'env-1', label: 'desk' }, when the operator submits a pairing link, then markAgentRequestLinked is called once with ('r1', 'env-1') and onClose is called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-resolves-request.ac2",
+            "title": "Given no agentRequestId, when a link succeeds, then markAgentRequestLinked is never called; given a failed link, then neither markAgentRequestLinked nor onClose is called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-resolves-request.ac3",
+            "title": "Given markAgentRequestLinked answers 409 { code: 'agent-stopped' }, when a link succeeds, then toast.info shows 'has stopped' text and the dialog still closes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-resolves-request.ac4",
+            "title": "Given openAnywhereDialog('link-machine', { agentRequestId: 'r1' }), when AnywhereDialogHost renders, then the LinkMachineDialog stub receives agentRequestId 'r1'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-resolves-request.ac5",
+            "title": "Given scripts/frontend-test-subset.txt, when grep -n 'LinkMachineDialog.test.tsx' runs on it, then it prints exactly one line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-link-machine",
+        "title": "Docs: link_machine tools, machine-link routes and the agent path into Link a machine",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T05:19:45Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4942",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/mcp.mdx",
+            "docs/DASHBOARD-AUTH.md",
+            "configuration/linked-machines.mdx",
+            ".overdeck/context/codebase/architecture.md",
+            ".pan/drafts/pan-4927.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint",
+            "grep -n 'link_machine_wait' configuration/mcp.mdx docs/DASHBOARD-AUTH.md",
+            "grep -n 'link_machine' configuration/linked-machines.mdx",
+            "grep -n '/api/agent-requests/:id/linked' docs/DASHBOARD-AUTH.md"
+          ],
+          "expected_outputs": [
+            "lint (including lint:docs) completes without errors",
+            "each grep prints at least one line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. configuration/mcp.mdx: two rows (link_machine, link_machine_wait) in the Agent-only tools table after secret_wait, and a '### Machine links' section after '### Secrets' (card in the Decisions panel, root-session browser only, Link a machine… opens the usual dialog, the wait answers the new machine's label, Dismiss declines, the agent never sees the pairing link, other link paths do not answer the request, 24-hour expiry, restart forgets it). docs/DASHBOARD-AUTH.md: a paragraph for the two machine-link self routes after the secret self-route paragraph; in 'Agent requests' the list answers hint, /decline takes either kind, and the root-only POST /api/agent-requests/:id/linked with its errors and the label taken from the link store. configuration/linked-machines.mdx '## Link a machine': one paragraph on agents asking with link_machine. .overdeck/context/codebase/architecture.md line 342: name createMachineLink, the routes, the tools, the machineLink kind and the dialog store's agentRequestId; keep one last-verified line at the end and add PAN-4942. Commit the 'Revision 2 (PAN-4942 planning)' block the planner added under '### W-LINK1' in .pan/drafts/pan-4927.md with this item (it is already written in the workspace; do not change it unless an implementation decision changed)."
+        },
+        "items": [
+          {
+            "id": "docs-link-machine.ac1",
+            "title": "Given configuration/mcp.mdx, when a reader opens the Agent-only tools table, then it lists link_machine (scope tell) and link_machine_wait (scope read:state), and a 'Machine links' section states that the agent never sees the pairing link and that only the card's Link a machine… button answers the request",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-link-machine.ac2",
+            "title": "Given docs/DASHBOARD-AUTH.md, when a reader looks up agent requests, then it documents POST /api/self/machine-link-requests, GET /api/self/machine-link-requests/:id/wait and the root-only POST /api/agent-requests/:id/linked with its 400 unknown-machine and 409 agent-stopped answers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-link-machine.ac3",
+            "title": "Given configuration/linked-machines.mdx, when a reader opens 'Link a machine', then it states an agent can ask for a link with link_machine and learns only the new machine's label",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "store-machine-link",
+        "to": "self-machine-link-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "store-machine-link",
+        "to": "operator-linked-route",
+        "type": "blocks"
+      },
+      {
+        "from": "self-machine-link-routes",
+        "to": "operator-linked-route",
+        "type": "blocks"
+      },
+      {
+        "from": "self-machine-link-routes",
+        "to": "link-machine-tools",
+        "type": "blocks"
+      },
+      {
+        "from": "dialog-store-request-id",
+        "to": "machine-link-card",
+        "type": "blocks"
+      },
+      {
+        "from": "dialog-store-request-id",
+        "to": "dialog-resolves-request",
+        "type": "blocks"
+      },
+      {
+        "from": "machine-link-card",
+        "to": "dialog-resolves-request",
+        "type": "blocks"
+      },
+      {
+        "from": "operator-linked-route",
+        "to": "docs-link-machine",
+        "type": "blocks"
+      },
+      {
+        "from": "link-machine-tools",
+        "to": "docs-link-machine",
+        "type": "blocks"
+      },
+      {
+        "from": "dialog-resolves-request",
+        "to": "docs-link-machine",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "This issue is already one decomposed child (W-LINK1) of epic PAN-4927 and one vertical feature: an agent asks, the operator links through the existing dialog, the agent learns the label. The projected-surface count reaches 8 'subsystems' and 26 files only because each root-level doc file (configuration/mcp.mdx, configuration/linked-machines.mdx, docs/DASHBOARD-AUTH.md, the epic PRD, the codebase map, scripts/frontend-test-subset.txt) counts as its own subsystem; the code itself spans src/dashboard, src/lib and tests/unit. Splitting the server half from the card and dialog would ship a tool no operator can answer, or a card for requests no agent can make.",
+      "canonicalFilename": "2026-11-04-PAN-4942-agent-mcp-and-bots-w-link1-link-machine-ask-the-operator-to-link-a-machine.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { ChevronDown, ChevronRight, ClipboardList, GitBranchPlus } from 'lucide-react';
 import type { ChatMessage, TurnDiffSummary } from '../chat-types';
 import { ChatMarkdown } from '../ChatMarkdown';
@@ -8,9 +8,44 @@ import { summarizeTurnDiffStats } from '../../../lib/turnDiffTree';
 import styles from '../../CommandDeck/styles/command-deck.module.css';
 import { useComposerStore } from '../../../lib/composerStore';
 import { openImageLightbox } from '../ImageLightbox';
-import { extractAttachmentImageRefs, formatElapsed, formatTimestamp } from './helpers';
+import { type AttachmentImageRef, extractAttachmentImageRefs, formatElapsed, formatTimestamp } from './helpers';
 import { SlashCommandDivider } from './dividers';
 import { MessageRoleIcon } from '../bookmarks/MessageRoleIcon';
+import { ScheduledMessageRow } from './ScheduledMessageRow';
+import { useCitationHighlight } from '../citations/citationHighlight';
+import { useChannelMediaSrc } from '../../../lib/useChannelMediaSrc';
+
+/** PAN-4642 WI-8: wraps a citable row body, painting pending-citation highlights.
+ *  A separate component (not a conditional hook call) keeps the hook unconditional. */
+function CitableText({
+  conversationName,
+  messageId,
+  text,
+  role,
+  className,
+  children,
+}: {
+  conversationName: string;
+  messageId: string;
+  text: string;
+  role: 'assistant' | 'user';
+  className?: string;
+  children: ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const cited = useCitationHighlight(ref, conversationName, messageId, text);
+  return (
+    <div
+      ref={ref}
+      className={className}
+      data-cite-message-id={messageId}
+      data-cite-role={role}
+      data-cited={cited ? 'true' : undefined}
+    >
+      {children}
+    </div>
+  );
+}
 
 /** PAN-4493: clickable thumbnails for the image attachments a sent message references. */
 function AttachmentThumbnails({ text }: { text: string }) {
@@ -21,23 +56,34 @@ function AttachmentThumbnails({ text }: { text: string }) {
   return (
     <div className="mt-1.5 flex flex-wrap gap-1.5" data-testid="user-message-attachments">
       {visible.map((ref) => (
-        <button
+        <AttachmentThumbnail
           key={ref.url}
-          type="button"
-          className="cursor-zoom-in border-0 bg-transparent p-0"
-          title={`View ${ref.file}`}
-          onClick={() => openImageLightbox(ref.url, ref.file)}
-        >
-          <img
-            src={ref.url}
-            alt={ref.file}
-            loading="lazy"
-            className="h-24 w-24 rounded border border-border object-cover"
-            onError={() => setFailed((prev) => new Set(prev).add(ref.url))}
-          />
-        </button>
+          attachment={ref}
+          onFailed={() => setFailed((prev) => new Set(prev).add(ref.url))}
+        />
       ))}
     </div>
+  );
+}
+
+/** PAN-4834 CP-2: in the phone app the image loads through the channel; the lightbox gets the `/api/…` URL. */
+function AttachmentThumbnail({ attachment, onFailed }: { attachment: AttachmentImageRef; onFailed: () => void }) {
+  const src = useChannelMediaSrc(attachment.url);
+  return (
+    <button
+      type="button"
+      className="cursor-zoom-in border-0 bg-transparent p-0"
+      title={`View ${attachment.file}`}
+      onClick={() => openImageLightbox(attachment.url, attachment.file)}
+    >
+      <img
+        src={src}
+        alt={attachment.file}
+        loading="lazy"
+        className="h-24 w-24 rounded border border-border object-cover"
+        onError={onFailed}
+      />
+    </button>
   );
 }
 
@@ -58,7 +104,7 @@ function parseSlashCommandMessage(text: string): { command: string } | null {
   return match ? { command: match[1] } : null;
 }
 
-export function UserMessageRow({ message, cwd, issueId, bookmarkable }: { message: ChatMessage; cwd?: string; issueId?: string | null; bookmarkable?: boolean }) {
+export function UserMessageRow({ message, cwd, issueId, bookmarkable, citeConversationName }: { message: ChatMessage; cwd?: string; issueId?: string | null; bookmarkable?: boolean; citeConversationName?: string }) {
   const slashCommand = parseSlashCommandMessage(message.text);
   if (slashCommand) {
     return <SlashCommandDivider command={slashCommand.command} createdAt={message.createdAt} />;
@@ -85,6 +131,10 @@ export function UserMessageRow({ message, cwd, issueId, bookmarkable }: { messag
         <MessageRoleIcon message={message} role="user" bookmarkable={false} className="ml-2 mt-3 shrink-0 text-muted-foreground opacity-70" />
       </div>
     );
+  }
+
+  if (message.deliveryState === 'scheduled' && message.scheduled) {
+    return <ScheduledMessageRow message={message} scheduled={message.scheduled} cwd={cwd} issueId={issueId} />;
   }
 
   if (message.deliveryState === 'held') {
@@ -114,6 +164,9 @@ export function UserMessageRow({ message, cwd, issueId, bookmarkable }: { messag
   }
 
   const isPending = message.id.startsWith('optimistic-') && !message.acknowledged;
+  const isOptimistic = message.id.startsWith('optimistic-');
+  const isCitable = !!citeConversationName && !isPending && !isOptimistic;
+  const userMessageText = <ChatMarkdown text={message.text} cwd={cwd} issueId={issueId} />;
   return (
     <div className={styles.userMessageRow}>
       <div
@@ -121,9 +174,21 @@ export function UserMessageRow({ message, cwd, issueId, bookmarkable }: { messag
         style={isPending ? { opacity: 0.6 } : undefined}
         title={isPending ? 'Pending — waiting for agent to process' : undefined}
       >
-        <div className={styles.userMessageText}><ChatMarkdown text={message.text} cwd={cwd} issueId={issueId} /></div>
+        {isCitable ? (
+          <CitableText conversationName={citeConversationName!} messageId={message.id} text={message.text} role="user" className={styles.userMessageText}>
+            {userMessageText}
+          </CitableText>
+        ) : (
+          <div className={styles.userMessageText}>{userMessageText}</div>
+        )}
         <AttachmentThumbnails text={message.text} />
         <span className={styles.messageTimestamp}>
+          {message.author && (
+            <span data-testid="user-message-author" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginRight: '6px' }}>
+              <img src={message.author.avatarUrl} alt="" width={16} height={16} style={{ width: '16px', height: '16px', borderRadius: '2px' }} />
+              <span className="font-mono">@{message.author.login}</span>
+            </span>
+          )}
           {isPending ? (
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
               <svg style={{ width: '10px', height: '10px', animation: 'spin 1s linear infinite', color: 'var(--primary)' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -209,6 +274,7 @@ export function AssistantMessageRow({
   cwd,
   issueId,
   bookmarkable,
+  citeConversationName,
 }: {
   message: ChatMessage;
   durationStart: string;
@@ -219,23 +285,30 @@ export function AssistantMessageRow({
   onOpenTurnDiff?: (turnId: string, filePath?: string) => void;
   resolvedTheme?: 'light' | 'dark';
   bookmarkable?: boolean;
+  citeConversationName?: string;
 }) {
   const duration = message.completedAt
     ? formatElapsed(durationStart, message.completedAt)
     : null;
 
   const [allExpanded, setAllExpanded] = useState(false);
+  const stillStreaming = isStreaming && !message.completedAt;
+  const turnBody = <TurnBody text={message.text} streaming={stillStreaming} cwd={cwd} issueId={issueId} />;
 
   return (
     <div className={styles.assistantMessageRow}>
       <MessageRoleIcon
         message={message}
         role="assistant"
-        bookmarkable={!!bookmarkable && !(isStreaming && !message.completedAt)}
+        bookmarkable={!!bookmarkable && !stillStreaming}
         className={styles.assistantMessageAvatar}
       />
       <div className={styles.assistantMessageContent}>
-        <TurnBody text={message.text} streaming={isStreaming && !message.completedAt} cwd={cwd} issueId={issueId} />
+        {citeConversationName && !stillStreaming ? (
+          <CitableText conversationName={citeConversationName} messageId={message.id} text={message.text} role="assistant">
+            {turnBody}
+          </CitableText>
+        ) : turnBody}
         {turnDiffSummary && turnDiffSummary.files.length > 0 && (
           <div className="mt-2 rounded-md border border-border/50 bg-muted/30 p-2">
             <div className="flex items-center justify-between mb-1.5">

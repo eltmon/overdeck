@@ -71,6 +71,10 @@ const KNOWN_CALL_SITES = new Set([
   'lib/cloister/review-verdict-feedback.ts|deliveryOutcome = await messageAgent(target.agentId, message, \'internal\', {',
   'lib/cloister/conflict-repair.ts|return await messageAgent(agentId, prompt, SOURCE, { owesRework: true, feedbackRedelivery: true, dedupKey });',
   'lib/cloister/conflict-repair.ts|return messageAgent(agentId, prompt, SOURCE, { owesRework: true, feedbackRedelivery: true });',
+  // PAN-4773: CodeRabbit findings are keyed per review, with conflict repair's unkeyed fallback;
+  // an unaccepted or failed delivery raises Needs-you with the feedback file and records nothing.
+  'lib/cloister/coderabbit-feedback.ts|return await messageAgent(agentId, message, SOURCE, { owesRework: true, feedbackRedelivery: true, dedupKey });',
+  'lib/cloister/coderabbit-feedback.ts|return messageAgent(agentId, message, SOURCE, { owesRework: true, feedbackRedelivery: true });',
   // PAN-4451: blocker wake is keyed per declaration, with conflict repair's unkeyed fallback;
   // an unaccepted delivery raises Needs-you and journals blocked.woken 'unreachable'.
   'lib/cloister/blocker-wake.ts|return await messageAgent(agentId, prompt, SOURCE, { owesRework: true, feedbackRedelivery: true, dedupKey });',
@@ -85,6 +89,8 @@ const KNOWN_CALL_SITES = new Set([
   'lib/cloister/verification-escalation.ts|outcome = await messageAgent(target.agentId, message, \'internal\', { owesRework: true, feedbackRedelivery: true });',
   // PAN-3705 follow-up: verification PASS is told to the work agent (no rework owed, no needs-you).
   'lib/cloister/verification-runner.ts|const outcome = await messageAgent(target.agentId, message, \'internal\');',
+  // PAN-4943: PR watch notifications, agentKind 'agent' (D-7). A failed delivery is logged, not retried.
+  'dashboard/server/services/pull-request-watch-notifier.ts|const outcome = await messageAgent(agentId, text, \'pr-watch\', { dedupKey });',
 ]);
 
 function* walkTs(dir: string): Generator<string> {

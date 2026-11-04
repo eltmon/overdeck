@@ -1,4 +1,4 @@
-import { exec, spawn } from 'node:child_process';
+import { exec } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { access, readdir, readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
@@ -12,11 +12,10 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import type { IssueDataService } from '../../services/issue-data-service.js';
 import { extractPrefix } from '../../../../lib/issue-id.js';
 import { getIssuePrefix, listProjectsSync } from '../../../../lib/projects.js';
-import { panCliInvocation } from '../../../../lib/pan-cli-invocation.js';
+import { tryResolveProjectTrackerType } from '../../../../lib/project-tracker-type.js';
 import { sendKeys } from '../../../../lib/tmux.js';
-import { getRestartGate } from '../../services/restart-gate.js';
+import { restartDashboardDetached } from '../../services/dashboard-restart.js';
 import { getSyncStatus, runSyncNow } from '../../services/sync-auto-service.js';
-import { RESTART_GATE_CLAIMED_ENV } from '../../../../lib/restart-gate-client.js';
 import { jsonResponse } from '../../http-helpers.js';
 import {
   getOverdeckVersion,
@@ -136,6 +135,7 @@ const getRegisteredProjectsRoute = HttpRouter.add(
           linearTeam: getIssuePrefix(p.config) || null,
           membershipQueryable: Boolean(getIssuePrefix(p.config)),
           githubRepo: p.config.github_repo || null,
+          tracker: tryResolveProjectTrackerType(p.config),
           linearProject: (p.config as { linear_project?: string }).linear_project || null,
         })),
       );
@@ -410,46 +410,15 @@ const postDevRebuildRoute = HttpRouter.add(
 );
 
 // POST /api/system/restart-dashboard — fire-and-forget restart of the dashboard
-// server. Spawns a detached `pan restart --dashboard` so the new process
-// outlives the SIGTERM that kills this server. Used by the browser fallback
-// path in App.tsx when window.overdeckBridge is not available.
-//
-// PAN-3729: pressing the dashboard's own restart button IS operator approval.
-// Two things follow from that:
-//   1. Every request waiting in the restart gate is folded into an epoch this
-//      restart claims, so the next boot marks them satisfied and the blocked
-//      requesters exit instead of waiting for an approval that already happened.
-//   2. The spawned CLI carries OVERDECK_RESTART_GATE_CLAIMED=1: it performs the
-//      restart as the claimant of the epoch created in (1) instead of
-//      re-negotiating the gate (which would register a request the new server
-//      has to expire). Same pattern as the deploy script's `pan restart` child.
+// server; see restartDashboardDetached (services/dashboard-restart.ts).
 const postRestartDashboardRoute = HttpRouter.add(
   'POST',
   '/api/system/restart-dashboard',
   Effect.promise(async () => {
-    try {
-      await getRestartGate().satisfyForDirectRestart(`dashboard-ui:${process.pid}`);
-    } catch (error: unknown) {
-      // The gate is runtime-plane convenience state — never let it block the
-      // restart the operator explicitly asked for.
-      console.error('[restart-dashboard] restart-gate implicit approval failed:', error);
-    }
-    try {
-      const invocation = panCliInvocation(['restart', '--dashboard']);
-      const child = spawn(invocation.command, invocation.args, {
-        detached: true,
-        stdio: 'ignore',
-        env: { ...process.env, [RESTART_GATE_CLAIMED_ENV]: '1' },
-      });
-      child.on('error', (err) => {
-        console.error('[restart-dashboard] pan restart spawn failed:', err);
-      });
-      child.unref();
-      return jsonResponse({ ok: true, pid: child.pid ?? null }, { status: 202 });
-    } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : String(error);
-      return jsonResponse({ error: 'Restart failed: ' + msg }, { status: 500 });
-    }
+    const result = await restartDashboardDetached(`dashboard-ui:${process.pid}`);
+    return result.ok
+      ? jsonResponse(result, { status: 202 })
+      : jsonResponse({ error: 'Restart failed: ' + result.error }, { status: 500 });
   }),
 );
 

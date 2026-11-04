@@ -1,9 +1,12 @@
 /** PAN-4307 WI-6: the six /api/vault/* routes map onto vault-service, no route touches evict.ts directly. */
+import { rmSync } from 'node:fs';
+import { join } from 'node:path';
 import { Effect } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { _resetInternalTokenCacheForTests } from '../../../../../src/lib/internal-token.js';
+import { getOverdeckHome } from '../../../../../src/lib/paths.js';
 import {
   DASHBOARD_CSRF_HEADER,
   DASHBOARD_SESSION_COOKIE,
@@ -62,6 +65,7 @@ beforeEach(() => {
   process.env.OVERDECK_INTERNAL_TOKEN = 'test-internal-token';
   process.env.OVERDECK_DASHBOARD_SESSION_TOKEN = SESSION;
   process.env.OVERDECK_DASHBOARD_CSRF_TOKEN = CSRF;
+  rmSync(join(getOverdeckHome(), 'internal-token'), { force: true });
   _resetInternalTokenCacheForTests();
   _resetDashboardSessionTokenForTests();
   for (const mock of Object.values(mocks)) mock.mockReset();

@@ -1,0 +1,1369 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-01T16:40:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4727: gstack as a skill pack: full runtime from the eltmon/gstack fork, toggle at global/project/issue level, clean removal",
+    "updated": "2026-11-01T17:45:41.680Z"
+  },
+  "plan": {
+    "id": "pan-4727",
+    "title": "gstack as a skill pack: full runtime from the eltmon/gstack fork, toggle at global/project/issue level, clean removal",
+    "status": "running",
+    "uid": "b43077ee-781a-4f21-be5c-947ef4959f9f",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 4,
+    "created": "2026-11-01T16:40:00Z",
+    "updated": "2026-11-01T17:45:41.680Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4727",
+        "label": "PAN-4727",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/feature/pan-4727/.pan/drafts/PAN-4727.md",
+        "label": "PRD",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4730",
+        "label": "PAN-4730 follow-up (browser runtime)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/gstack",
+        "label": "eltmon/gstack fork",
+        "type": "repo"
+      }
+    ],
+    "tags": [
+      "skill-packs",
+      "gstack",
+      "fork",
+      "cli"
+    ],
+    "metadata": {
+      "sizeJustification": "29 files_scope entries, 10 of them in a different repository (the eltmon/gstack fork, prefixed gstack-fork/). The Overdeck surface is 19 files in src/lib/skill-packs, src/lib/skill-overrides, src/cli and docs. The fork's pack-mode contract and the Overdeck adapter must ship together for the acceptance run, and a sibling issue in this tracker could not carry a PR for another repo.",
+      "canonicalFilename": "2026-11-01-PAN-4727-gstack-as-a-skill-pack-full-runtime-from-the-eltmon-gstack-fork-toggle-at-global-project-issue-level-clean-removal.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "gstack's skills call ~/.claude/skills/gstack/bin/* by absolute path and its ./setup writes ~/.claude settings hooks, harness skill dirs and ~/.gstack. Overdeck's pack mount copies only skill directories, so gstack skills cannot run as a pack, and installing gstack normally cannot be turned off per project or removed cleanly.",
+      "Proposal": "Add a network-free pack mode to the eltmon/gstack fork (setup --pack-root R --pack-state-root S) that renders every skill and its bash/bun runtime into R, keeps state in S via a marker file, and writes nothing else. Add a gstack-runtime adapter in Overdeck: a reviewed skill map with default/opt-in/excluded/needs-binary classes, a consent preview that lists the render command and every executable, a render after consent in add/update/sync, mounts built from the render root for Claude Code and Codex, and remove/gc that delete the render, the state, mounts and Codex caches. The existing global/project/issue/conversation resolver is unchanged.",
+      "NonGoals": "- Building browse/design/make-pdf, bun install, Playwright, or mounting the 21 needs-binary skills (PAN-4730)\n- Installing any of gstack setup's settings hooks (plan-tune, timeline Stop, SessionStart auto-update, verify-gate) or MCP servers\n- A Codex-specific gstack render\n- Setting GSTACK_SESSION_KIND or any gstack env var in Overdeck launches\n- Deleting project-local .gstack/ or .gstack-worktrees/ directories\n- Merging or tagging the fork PR, or any issue, PR, comment or push to garrytan/*\n- Dashboard UI changes\n- Renaming or retiring bundled Overdeck skills that share a name with gstack skills\n- Auto-updating gstack (gstack-upgrade stays excluded)\n- Touching src/lib/launcher-generator.ts"
+    },
+    "autoDecisions": [
+      {
+        "summary": "A1: Pack mode never runs bun install, bun run build or Playwright, so the 21 skills that call the compiled $B/$D/$P binaries (qa, browse, ship, design-* …) are classified needs-binary and not mounted; follow-up PAN-4730 adds an opt-in browser runtime.",
+        "rationale": "The issue's scope requires no network calls at setup and names --no-browser; the acceptance names only test-audit and deslop-shared-libs. The operator's 'qa should work' note conflicts with no-network setup, so the network-free core ships now and the browser runtime gets its own consented step and issue."
+      },
+      {
+        "summary": "A2: State root comes from a marker file in the render (R/.gstack-pack-state-root) read by the fork's resolver, not from launch env vars.",
+        "rationale": "Works for Claude Code, Codex and hand-run scripts with zero launcher changes; Codex has no general per-pack env path today (only Deft's two-line allowlist)."
+      },
+      {
+        "summary": "A3: Render root ~/.overdeck/packs/gstack/render/<commit>/ and state root ~/.overdeck/packs/gstack/state/, both inside the pack cache dir.",
+        "rationale": "removePack already rm -rf's packs/<id>/, so removal covers both with no new path logic; the issue's example path was illustrative."
+      },
+      {
+        "summary": "A4: Skill classes per PRD §6: 22 default, 14 opt-in (push/deploy, paid or cloud APIs, Codex upload, blocking hooks), 6 excluded (gstack-upgrade, setup-gbrain, sync-gbrain, plan-tune, setup-deploy, connect-chrome), 21 needs-binary; unknown names excluded as unreviewed.",
+        "rationale": "Follows the issue's candidate list and the Deft unreviewed-by-default pattern; investigate stays default because its hooks allow by default and the operator named it."
+      },
+      {
+        "summary": "A5: Codex mounts the same Claude-host render; no Codex-specific render.",
+        "rationale": "Rendered paths are absolute and work from the Codex plugin cache copy; one mount serves both harnesses as today."
+      },
+      {
+        "summary": "A6: The work agent pushes branch overdeck/pack-mode to eltmon/gstack and opens a PR inside the fork; it never merges, tags, or contacts garrytan/*. KNOWN_PACKS carries no pinned commit; docs use --ref main.",
+        "rationale": "Fork-first policy (PAN-4424); the trusted commit is the operator's consent at add time; gh push permission on eltmon/gstack was verified during planning."
+      },
+      {
+        "summary": "A7: Live acceptance runs with the workspace build in an isolated OVERDECK_HOME with a scratch project and claude -p --plugin-dir probes, not managed launches.",
+        "rationale": "The deployed pan lacks the new adapter until merge, and an isolated home keeps the operator's real config, toggles and projects untouched."
+      },
+      {
+        "summary": "A8: remove lists, but does not delete, project-local .gstack/ and .gstack-worktrees/ dirs that invoked skills wrote.",
+        "rationale": "The issue allows project-local writes by skills the operator invokes; they can hold the operator's reports and .gstack-worktrees are git worktrees, so deleting them silently is destructive."
+      },
+      {
+        "summary": "A9: The changelog entry goes in CHANGELOG.md '## Unreleased', not changelog.mdx.",
+        "rationale": "changelog.mdx is written by the release step (docs/RELEASING.md; PAN-4424 WI-3 precedent)."
+      }
+    ],
+    "items": [
+      {
+        "id": "fork-pack-render",
+        "title": "Fork: add `setup --pack-root/--pack-state-root` pack-mode renderer",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T16:40:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "infra",
+          "issueLabel": "pan-4727",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "gstack-fork/setup*",
+            "gstack-fork/scripts/pack-render.sh",
+            "gstack-fork/scripts/gen-skill-docs.ts",
+            "gstack-fork/pack-mode.json",
+            ".pan/drafts/PAN-4727-live-checkpoint.md"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "cd $HOME/Projects/gstack && bash setup --help | grep -c pack-root",
+            "cd $HOME/Projects/gstack && cat pack-mode.json"
+          ],
+          "expected_outputs": [
+            "help output lists --pack-root and --pack-state-root",
+            "pack-mode.json prints {\"packMode\": 1}"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4",
+            "FR-5",
+            "NFR-1"
+          ],
+          "foundationFor": [
+            "fork-pack-mode-test",
+            "fork-publish",
+            "gstack-live-acceptance"
+          ]
+        },
+        "narrative": {
+          "Action": "Work in the fork clone $HOME/Projects/gstack on branch overdeck/pack-mode (create per PRD §7 preamble: clone https://github.com/eltmon/gstack if absent, `git switch -c overdeck/pack-mode origin/main`; if the clone exists dirty or with another origin, stop and pan tell flywheel-orchestrator). files_scope paths prefixed gstack-fork/ are relative to that clone (setup* = only the setup script, bin/gstack-paths* = only bin/gstack-paths; globs only because the lint needs a filename-like segment; never edit setup.ps1). Never touch garrytan/*. Implement PRD WI-F1 exactly: parse --pack-root/--pack-state-root in setup's parser (lines 213-239) and exec scripts/pack-render.sh right after the parser loop, before any other setup step; pack-render.sh validates both paths against ^/[A-Za-z0-9_.@+/-]*$ (exit 2 otherwise), copies the source tree into R without .git/, test/, node_modules/, .github/ and deletes every symlink under R, runs `bun run R/scripts/gen-skill-docs.ts --host claude --out-dir R --install-root R --link-root R` with cwd R, checks R/test-audit/SKILL.md names R/bin/gstack-skill-start, writes R/.gstack-pack-state-root (absolute S), seeds S/config.yaml (telemetry: off, update_check: false, auto_upgrade: false) only when absent, and writes R/.gstack-pack.json {packMode:1,stateRoot,version} last. Add '${HOME}/.claude/skills/gstack' to rewriteInstallRoot's Claude defaults. Add pack-mode.json = {\"packMode\": 1}. Follow the WI-F1 implementation checkpoint for sections. Never run bun install, bun run build, Playwright, or write outside R and S. Commit in the fork, then record the fork SHA in .pan/drafts/PAN-4727-live-checkpoint.md and commit that here with the Item trailer."
+        },
+        "items": [
+          {
+            "id": "fork-pack-render.ac1",
+            "title": "Given the fork clone on overdeck/pack-mode, when `bash setup --help` runs, then its output lists --pack-root and --pack-state-root",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-pack-render.ac2",
+            "title": "Given a relative --pack-root, when setup runs in pack mode, then it exits 2 and writes no files",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-pack-render.ac3",
+            "title": "Given valid R and S, when setup runs in pack mode, then R/.gstack-pack.json contains packMode 1 and R/test-audit/SKILL.md contains R/bin/gstack-skill-start",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-pack-render.ac4",
+            "title": "Given an existing S/config.yaml, when pack mode runs again into a fresh R, then the existing config.yaml is preserved byte for byte",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-pack-render.ac5",
+            "title": "Given the checkpoint doc, when the item lands, then it contains a '## Fork: pack render' section with the fork commit SHA",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fork-state-root-marker",
+        "title": "Fork: state-root resolver and plan dir read the pack marker",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T16:40:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-4727",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "gstack-fork/bin/gstack-state-root.sh",
+            "gstack-fork/lib/state-root.ts",
+            "gstack-fork/bin/gstack-paths*",
+            "gstack-fork/test/state-root-parity.test.ts",
+            ".pan/drafts/PAN-4727-live-checkpoint.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd $HOME/Projects/gstack && bun test test/state-root-parity.test.ts test/state-root-ratchet.test.ts"
+          ],
+          "expected_outputs": [
+            "bun test reports 0 fail for both files"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Work in the fork clone $HOME/Projects/gstack on branch overdeck/pack-mode (create per PRD §7 preamble: clone https://github.com/eltmon/gstack if absent, `git switch -c overdeck/pack-mode origin/main`; if the clone exists dirty or with another origin, stop and pan tell flywheel-orchestrator). files_scope paths prefixed gstack-fork/ are relative to that clone (setup* = only the setup script, bin/gstack-paths* = only bin/gstack-paths; globs only because the lint needs a filename-like segment; never edit setup.ps1). Never touch garrytan/*. Implement PRD WI-F2: in bin/gstack-state-root.sh (25-48) and lib/state-root.ts (22-29) add a branch after GSTACK_STATE_DIR and before the CLAUDE_PLUGIN_DATA rule that reads <dir of the resolver>/../.gstack-pack-state-root (first line, absolute path only). In bin/gstack-paths (107-115) default the plan dir to <state root>/plans when the pack marker resolved the root and GSTACK_PLAN_DIR is unset. Extend test/state-root-parity.test.ts with the marker case and the GSTACK_HOME-wins case. Commit in the fork; record SHA and the bun test summary in .pan/drafts/PAN-4727-live-checkpoint.md; commit here with the Item trailer."
+        },
+        "items": [
+          {
+            "id": "fork-state-root-marker.ac1",
+            "title": "Given a pack root holding .gstack-pack-state-root and no GSTACK_* env, when bin/gstack-state-root.sh and lib/state-root.ts resolve, then both return the marker's path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-state-root-marker.ac2",
+            "title": "Given the same pack root with GSTACK_HOME set, when either resolver runs, then GSTACK_HOME wins",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-state-root-marker.ac3",
+            "title": "Given the pack marker resolved the state root and GSTACK_PLAN_DIR unset, when bin/gstack-paths runs, then the plan dir is <state root>/plans, not ~/.claude/plans",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-state-root-marker.ac4",
+            "title": "Given the fork clone, when `bun test test/state-root-parity.test.ts test/state-root-ratchet.test.ts` runs, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fork-pack-mode-test",
+        "title": "Fork: test proving pack mode writes only its two roots, plus docs/pack-mode.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T16:40:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4727",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "gstack-fork/test/pack-mode.test.ts",
+            "gstack-fork/docs/pack-mode.md",
+            ".pan/drafts/PAN-4727-live-checkpoint.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd $HOME/Projects/gstack && bun test test/pack-mode.test.ts"
+          ],
+          "expected_outputs": [
+            "bun test reports 0 fail for test/pack-mode.test.ts"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Work in the fork clone $HOME/Projects/gstack on branch overdeck/pack-mode (create per PRD §7 preamble: clone https://github.com/eltmon/gstack if absent, `git switch -c overdeck/pack-mode origin/main`; if the clone exists dirty or with another origin, stop and pan tell flywheel-orchestrator). files_scope paths prefixed gstack-fork/ are relative to that clone (setup* = only the setup script, bin/gstack-paths* = only bin/gstack-paths; globs only because the lint needs a filename-like segment; never edit setup.ps1). Never touch garrytan/*. Implement PRD WI-F3: test/pack-mode.test.ts with a temp HOME (do not use makeFixture, it seeds ~/.gstack), stub curl/wget on PATH that log to <tmp>/net.log, a git stub that logs and fails only network subcommands (fetch, pull, clone, ls-remote, push, remote) and execs the real git otherwise, real bun with BUN_INSTALL and XDG_CACHE_HOME under <tmp>/bun outside HOME, and tree() snapshots from test/helpers/install-fixture.ts. Cover every bullet in WI-F3 step 1. Write docs/pack-mode.md (invocation, the §5 write list, what pack mode never does). Commit in the fork; record SHA and the bun test summary line in .pan/drafts/PAN-4727-live-checkpoint.md; commit here with the Item trailer."
+        },
+        "items": [
+          {
+            "id": "fork-pack-mode-test.ac1",
+            "title": "Given a temp HOME snapshot, when setup runs in pack mode, then tree(HOME) equals the snapshot and HOME/.gstack and HOME/.claude do not exist",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-pack-mode-test.ac2",
+            "title": "Given stub curl/wget and a git stub that logs only network subcommands, when pack mode runs, then the log file does not exist",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-pack-mode-test.ac3",
+            "title": "Given the render, when its SKILL.md and sections files are scanned, then none contains ~/.claude/skills/gstack, $HOME/.claude/skills/gstack or ${HOME}/.claude/skills/gstack, and find R -type l prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-pack-mode-test.ac4",
+            "title": "Given the render and no GSTACK_* env, when R/bin/gstack-skill-start --skill test-audit runs, then it prints SKILL_START_PROTO: 1 and STATE_ROOT: <S> and tree(HOME) is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-pack-mode-test.ac5",
+            "title": "Given the fork clone, when `bun test test/pack-mode.test.ts` runs, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fork-publish",
+        "title": "Fork: push overdeck/pack-mode and open the PR inside eltmon/gstack",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T16:40:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-4727",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/drafts/PAN-4727-live-checkpoint.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "gh pr view --repo eltmon/gstack overdeck/pack-mode --json baseRefName,headRefName,state,isCrossRepository"
+          ],
+          "expected_outputs": [
+            "JSON shows baseRefName main, headRefName overdeck/pack-mode, state OPEN, isCrossRepository false"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Work in the fork clone $HOME/Projects/gstack on branch overdeck/pack-mode (create per PRD §7 preamble: clone https://github.com/eltmon/gstack if absent, `git switch -c overdeck/pack-mode origin/main`; if the clone exists dirty or with another origin, stop and pan tell flywheel-orchestrator). files_scope paths prefixed gstack-fork/ are relative to that clone (setup* = only the setup script, bin/gstack-paths* = only bin/gstack-paths; globs only because the lint needs a filename-like segment; never edit setup.ps1). Never touch garrytan/*. Implement PRD WI-F4 (needs the Bash sandbox disabled for network): push the branch to origin (eltmon/gstack); run `gh pr create --repo eltmon/gstack --base main --head overdeck/pack-mode` with the body from WI-F4; confirm the command carries --repo eltmon/gstack before running it, because gh defaults a fork PR's base to garrytan/gstack. Never query garrytan/*, even read-only. Do not merge. Record the PR URL and the pack-mode SHA (`git -C $HOME/Projects/gstack rev-parse HEAD`) in .pan/drafts/PAN-4727-live-checkpoint.md and commit here with the Item trailer."
+        },
+        "items": [
+          {
+            "id": "fork-publish.ac1",
+            "title": "Given the pushed branch, when `gh pr view --repo eltmon/gstack overdeck/pack-mode --json baseRefName,headRefName,state` runs, then it returns base main, head overdeck/pack-mode, state OPEN",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-publish.ac2",
+            "title": "Given the open PR, when `gh pr view --repo eltmon/gstack overdeck/pack-mode --json isCrossRepository` runs, then it returns false, showing base and head are both eltmon/gstack",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-publish.ac3",
+            "title": "Given the checkpoint doc, when the item lands, then it records the PR URL and the 40-hex pack-mode SHA",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gstack-skill-map",
+        "title": "Add src/lib/skill-packs/gstack.ts: skill map, classes and pack-mode constants",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T16:40:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4727",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/skill-packs/gstack.ts",
+            "src/lib/skill-packs/__tests__/gstack.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/skill-packs/__tests__/gstack.test.ts"
+          ],
+          "expected_outputs": [
+            "gstack.test.ts passes with 0 failures"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "NFR-3"
+          ],
+          "foundationFor": [
+            "gstack-adapter-manifest",
+            "gstack-mount-transform",
+            "gstack-render-runner"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-O1: a leaf module (imports nothing from src/lib) exporting GstackSkillClass, GSTACK_SKILL_MAP with all 63 names from PRD §6 and their per-entry reasons, GSTACK_SKILL_MAP_VERIFIED_AT (eltmon/gstack @ 1cac25cb8eb1b394136e98ab76ecd2b8fcec458e, 1.92.33.0), GSTACK_MOUNTED_SKILLS (default + opt-in, sorted), GSTACK_OPT_IN_SKILLS, classifyGstackSkill (unknown → excluded 'unreviewed'), GSTACK_PACK_MODE_FILE='pack-mode.json', GSTACK_RENDER_MARKER='.gstack-pack.json', GSTACK_PACK_MODE_VERSION=1, GSTACK_RENDER_VERSION=1, GSTACK_DISCLOSURE (PRD text). §6 table rows are authoritative."
+        },
+        "items": [
+          {
+            "id": "gstack-skill-map.ac1",
+            "title": "Given GSTACK_SKILL_MAP, when the test counts classes, then default=22, opt-in=14, excluded=6, needs-binary=21",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-skill-map.ac2",
+            "title": "Given GSTACK_MOUNTED_SKILLS, when compared with the map, then it contains test-audit, deslop-shared-libs, review and codex and contains no qa, ship, gstack-upgrade or connect-chrome",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-skill-map.ac3",
+            "title": "Given an unknown name, when classifyGstackSkill('new-thing') runs, then it returns class excluded with reason unreviewed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-skill-map.ac4",
+            "title": "Given GSTACK_OPT_IN_SKILLS, when read, then it includes codex, careful, freeze, guard, autoplan and document-generate",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gstack-adapter-manifest",
+        "title": "Add the gstack-runtime adapter, KNOWN_PACKS.gstack and its manifest",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T16:40:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4727",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/skill-packs/adapters.ts",
+            "src/lib/skill-packs/sources.ts",
+            "src/cli/commands/skills.ts",
+            "src/lib/skill-packs/__tests__/adapters.test.ts",
+            "src/cli/commands/__tests__/skills.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/skill-packs/__tests__/adapters.test.ts src/cli/commands/__tests__/skills.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-O2: add 'gstack-runtime' to PackAdapterId (adapters.ts:16), ADAPTERS (sources.ts:31) and the CLI --adapter check (skills.ts:285-291, message 'plain, claude-plugin, deft-readonly, or gstack-runtime'; update skills.test.ts:507). Add optional PackCapabilities.runtime and PackManifest.excluded. Add KNOWN_PACKS.gstack (url https://github.com/eltmon/gstack, adapter gstack-runtime, optIn GSTACK_OPT_IN_SKILLS, disclosure GSTACK_DISCLOSURE). readPackManifest for gstack-runtime: mounted skills from GSTACK_MOUNTED_SKILLS where <root>/<name>/SKILL.md is a regular file; excluded list with reasons for every other top-level SKILL.md dir (incl. symlinks and unknown names); executables from a walk of the whole root skipping .git, test, node_modules; hooks true, runtime true, requiresCli ['bun']. notAppliedLabels omits the executables label when runtime is true. Tests per WI-O2 step 7."
+        },
+        "items": [
+          {
+            "id": "gstack-adapter-manifest.ac1",
+            "title": "Given a fixture tree with review, codex, qa, newskill and a connect-chrome symlink, when readPackManifest(root,'gstack-runtime') runs, then skills are review (optIn false) and codex (optIn true) and excluded lists qa, newskill (unreviewed) and connect-chrome",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-adapter-manifest.ac2",
+            "title": "Given the fixture's bin/gstack-x (0755) and test/t.sh, when the manifest is read, then executables contains bin/gstack-x and not test/t.sh",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-adapter-manifest.ac3",
+            "title": "Given capabilities.runtime true, when notAppliedLabels runs, then no label starts with 'executables'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-adapter-manifest.ac4",
+            "title": "Given KNOWN_PACKS, when read, then gstack has url https://github.com/eltmon/gstack and adapter gstack-runtime",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-adapter-manifest.ac5",
+            "title": "Given `pan skills pack add x u --adapter bogus`, when it runs, then it prints '--adapter must be plain, claude-plugin, deft-readonly, or gstack-runtime' and exits 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gstack-render-runner",
+        "title": "Add src/lib/skill-packs/render.ts (render runner, readiness check) and the render/state path helpers",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T16:40:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4727",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/skill-packs/render.ts",
+            "src/lib/skill-packs/sources.ts",
+            "src/lib/skill-packs/__tests__/render.test.ts",
+            "src/lib/skill-packs/__tests__/sources.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/skill-packs/__tests__/render.test.ts src/lib/skill-packs/__tests__/sources.test.ts",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "both test files pass with 0 failures",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "FR-10",
+            "NFR-2",
+            "NFR-3",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-O3 exactly. Import rule: render.ts imports only node:* and ./gstack.js, never sources.ts (madge counts dynamic imports too). Add packRenderDir(id, commit) = <packCacheDir(id)>/render/<commit> and packStateDir(id) = <packCacheDir(id)>/state to sources.ts next to packExtractDir. render.ts exports RenderError, isRenderReady(renderDir), assertRenderable(extractDir, commit) (D12 message, then D13 bun check), renderCommand(renderDir, stateDir), renderRuntimePack({extractDir, commit, renderDir, stateDir}) (rm renderDir, mkdir stateDir, async execFile bash setup --pack-root --pack-state-root with cwd extractDir and a 10 min timeout; on failure or missing marker rm renderDir and throw RenderError with the stderr tail). Tests use mkdtempSync fixtures with a fake setup script; no timers."
+        },
+        "items": [
+          {
+            "id": "gstack-render-runner.ac1",
+            "title": "Given a fixture extraction with pack-mode.json and a fake setup that writes the marker, when renderRuntimePack runs, then isRenderReady(renderDir) is true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-render-runner.ac2",
+            "title": "Given a fake setup that exits 3, when renderRuntimePack runs, then it rejects with RenderError and renderDir does not exist",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-render-runner.ac3",
+            "title": "Given an extraction without pack-mode.json, when renderRuntimePack runs, then it rejects with 'has no pack mode (pack-mode.json)' and the fake setup's sentinel file does not exist",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-render-runner.ac4",
+            "title": "Given a PATH without bun, when assertRenderable runs, then it rejects with 'pack gstack needs bun on PATH'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-render-runner.ac5",
+            "title": "Given packRenderDir('gstack', <40-hex>) and packStateDir('gstack'), when called, then they return <OVERDECK_HOME>/packs/gstack/render/<sha> and <OVERDECK_HOME>/packs/gstack/state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gstack-add-update-sync",
+        "title": "Render gstack in pack add, update and sync, after consent and before the registry write",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T16:40:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4727",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/skill-packs/sources.ts",
+            "src/lib/skill-packs/__tests__/sources.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/skill-packs/__tests__/sources.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "sources.test.ts passes with 0 failures",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-9",
+            "FR-10",
+            "FR-11",
+            "NFR-2"
+          ],
+          "foundationFor": [
+            "gstack-cli-preview",
+            "gstack-live-acceptance"
+          ],
+          "parallelSafeReason": "Touches only sources.ts and sources.test.ts; every other item editing those files is ordered by blocks edges (render-runner before, remove-sweep after)."
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-O4: add 'render' to PackSourceErrorCode and runtime?: {command} to PackPreview. In addPack and updatePack, for adapter gstack-runtime call assertRenderable(dir, commit) and set preview.runtime = {command: renderCommand(packRenderDir(id, commit), packStateDir(id))} before confirm; wrap every RenderError as PackSourceError('render', message); after confirm and before writePackEntry call renderRuntimePack (skip when the commit's render is already ready). In syncPack render when the trusted commit's render is not ready. A render failure leaves no registry entry. Tests extend the local bare repo fixture with pack-mode.json, review/SKILL.md and a fake setup."
+        },
+        "items": [
+          {
+            "id": "gstack-add-update-sync.ac1",
+            "title": "Given confirm resolves false, when addPack runs for gstack, then no registry entry and no render dir exist",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-add-update-sync.ac2",
+            "title": "Given confirm resolves true, when addPack runs, then the render is ready and the registry entry is written",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-add-update-sync.ac3",
+            "title": "Given a fake setup that exits 1, when addPack runs with consent, then it rejects with code render and no registry entry exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-add-update-sync.ac4",
+            "title": "Given a tree without pack-mode.json, when addPack runs, then it rejects with the D12 message and confirm is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-add-update-sync.ac5",
+            "title": "Given a registered gstack whose render dir was deleted, when syncPack runs, then the render is ready again",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gstack-mount-transform",
+        "title": "Mount accepts the gstack-runtime transform with a render-version hash term",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T16:40:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4727",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/skill-packs/mount.ts",
+            "src/lib/skill-packs/__tests__/mount.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/skill-packs/__tests__/mount.test.ts"
+          ],
+          "expected_outputs": [
+            "mount.test.ts passes with 0 failures"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-O5: MountTransform = 'deft-readonly' | 'gstack-runtime' (mount.ts:35); a transformTag helper in mountHash (line 65) giving deft-readonly.<DEFT_HOST_NOTICE_VERSION> or gstack-runtime.<GSTACK_RENDER_VERSION>; assertMountPack (line 75) accepts both; populateMount copies gstack-runtime skill dirs verbatim."
+        },
+        "items": [
+          {
+            "id": "gstack-mount-transform.ac1",
+            "title": "Given a gstack-runtime MountPack, when buildMount runs, then plugins/gstack/skills/<name>/SKILL.md is byte-identical to the source",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-mount-transform.ac2",
+            "title": "Given the same selection with and without the gstack-runtime transform, when mountHash runs, then the two hashes differ",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-mount-transform.ac3",
+            "title": "Given a different GSTACK_RENDER_VERSION, when mountHash runs, then the hash changes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-mount-transform.ac4",
+            "title": "Given transform 'bogus', when buildMount runs, then it throws invalid pack transform",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gstack-launch-root",
+        "title": "Catalog and launch mount gstack from the render root and skip unrendered commits",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T16:40:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4727",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/skill-overrides/catalog.ts",
+            "src/lib/skill-overrides/launch.ts",
+            "src/lib/skill-overrides/__tests__/launch.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/skill-overrides/__tests__/launch.test.ts src/lib/skill-overrides/__tests__/store.test.ts"
+          ],
+          "expected_outputs": [
+            "both test files pass with 0 failures"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12",
+            "FR-13",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-O6: in listPackCatalog (catalog.ts:104-121) compute the adapter first, then for gstack-runtime set cached = extraction exists AND isRenderReady, manifest null when not cached. In resolveLaunchPackSelection (launch.ts:115-121) use packRenderDir and transform 'gstack-runtime' for that adapter; Deft and others unchanged. No git, bun or render on this path."
+        },
+        "items": [
+          {
+            "id": "gstack-launch-root.ac1",
+            "title": "Given gstack registered with extraction and ready render and the pack on at project level, when applyClaudePacks runs, then the mount's plugins/gstack/skills/review/SKILL.md carries the render fixture's marker string",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-launch-root.ac2",
+            "title": "Given gstack registered with no render, when applyClaudePacks runs with the pack on, then the warnings include 'skill pack gstack not cached; run pan skills pack sync gstack' and the mount has no gstack plugin",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-launch-root.ac3",
+            "title": "Given the pack on, when applyCodexPacks runs, then config.toml contains [plugins.\"gstack@overdeck-packs\"]",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gstack-remove-sweep",
+        "title": "pan skills pack remove also deletes mounts, links and Codex caches holding the pack",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T16:40:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4727",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/skill-packs/mount.ts",
+            "src/lib/skill-packs/sources.ts",
+            "src/cli/commands/skills.ts",
+            "src/lib/skill-packs/__tests__/mount.test.ts",
+            "src/lib/skill-packs/__tests__/sources.test.ts",
+            "src/cli/commands/__tests__/skills.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/lib/skill-packs/__tests__/mount.test.ts src/lib/skill-packs/__tests__/sources.test.ts src/cli/commands/__tests__/skills.test.ts"
+          ],
+          "expected_outputs": [
+            "all three test files pass with 0 failures"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-14",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-O7: removePackFromMounts(id) in mount.ts (delete mounts containing plugins/<id>, then dangling launch links via a helper shared with gcMounts, then <agents>/*/codex-home*/plugins/cache/overdeck-packs/<id>); removePack calls it before deleting packCacheDir and returns the lists. For id gstack, list (never delete) .gstack and .gstack-worktrees under registered project roots — compute in the CLI if sources.ts cannot import the projects loader without a cycle. CLI prints the counts and one line per project dir with its rm -rf command."
+        },
+        "items": [
+          {
+            "id": "gstack-remove-sweep.ac1",
+            "title": "Given mounts with and without plugins/gstack, when removePack('gstack') runs, then only mounts containing plugins/gstack are deleted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-remove-sweep.ac2",
+            "title": "Given agents/x/codex-home-v2/plugins/cache/overdeck-packs/gstack and …/mattpocock, when removePack('gstack') runs, then the gstack cache is deleted and the mattpocock cache survives",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-remove-sweep.ac3",
+            "title": "Given a registered project with a .gstack dir, when `pan skills pack remove gstack` runs, then the output names that dir with its rm -rf command and the dir still exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-remove-sweep.ac4",
+            "title": "Given a launch link pointing at a deleted mount, when removePack runs, then the link is removed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gstack-gc-renders",
+        "title": "pan skills pack gc removes stale renders and orphaned pack state",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T16:40:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4727",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/skill-packs/render.ts",
+            "src/cli/commands/skills.ts",
+            "src/lib/skill-packs/__tests__/render.test.ts",
+            "src/cli/commands/__tests__/skills.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/skill-packs/__tests__/render.test.ts src/cli/commands/__tests__/skills.test.ts"
+          ],
+          "expected_outputs": [
+            "both test files pass with 0 failures"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-15"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-O8: gcPackRenders({packsHome, registered, maxAgeMs, now}) in render.ts (the CLI passes packsHome()) (unregistered id → remove <id>/render and <id>/state; registered → remove non-trusted <id>/render/<name> older than maxAgeMs; never the trusted render or a registered pack's state); skillsPackGcCommand calls it with the same age and prints 'Removed N mount(s), N dangling launch link(s), N stale render(s) and N orphaned pack state dir(s).' Tests pass an explicit now; no timers."
+        },
+        "items": [
+          {
+            "id": "gstack-gc-renders.ac1",
+            "title": "Given a trusted render older than the limit, when gcPackRenders runs, then the trusted render survives",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-gc-renders.ac2",
+            "title": "Given an old non-trusted render and a young one, when gcPackRenders runs, then only the old one is removed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-gc-renders.ac3",
+            "title": "Given an unregistered id with render/, state/ and another file, when gcPackRenders runs, then render/ and state/ are removed and the other file survives",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-gc-renders.ac4",
+            "title": "Given `pan skills pack gc`, when it runs, then its output line names the four counts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gstack-cli-preview",
+        "title": "Consent preview lists the render command, every executable and the unmounted skills",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T16:40:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4727",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/skills.ts",
+            "src/cli/commands/__tests__/skills.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/skills.test.ts"
+          ],
+          "expected_outputs": [
+            "skills.test.ts passes with 0 failures"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-O9: printPackPreview adds 'Not mounted' when manifest.excluded is non-empty; for capabilities.runtime adds 'Runs' (preview.runtime.command joined), 'Requires' (requiresCli), and prints every executable on its own indented line instead of truncating. skillsPackAddCommand appends the runtime trust note for gstack-runtime packs. Non-runtime packs keep the 3-item truncation."
+        },
+        "items": [
+          {
+            "id": "gstack-cli-preview.ac1",
+            "title": "Given a runtime preview with 5 executables, when printPackPreview runs, then all 5 paths print and no '…' appears",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-cli-preview.ac2",
+            "title": "Given a runtime preview, when printed, then lines start with 'Runs         bash setup --pack-root', 'Requires     bun' and 'Not mounted'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-cli-preview.ac3",
+            "title": "Given a non-runtime preview with 5 executables, when printed, then the Executables row shows 3 paths followed by '…'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-cli-preview.ac4",
+            "title": "Given no TTY and no --yes, when `pan skills pack add gstack …` runs, then it prints 'Not written:' and the render function is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gstack-docs",
+        "title": "Document the gstack pack in features/skills.mdx, CHANGELOG.md and docs/USAGE.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T16:40:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4727",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/skills.mdx",
+            "CHANGELOG.md",
+            "docs/USAGE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c '### gstack' features/skills.mdx",
+            "grep -c 'PAN-4730' features/skills.mdx",
+            "grep -n 'gstack' CHANGELOG.md docs/USAGE.md"
+          ],
+          "expected_outputs": [
+            "### gstack count is 1",
+            "PAN-4730 count is at least 1",
+            "CHANGELOG.md and docs/USAGE.md each show a gstack line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-16"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-O10: a '### gstack' section in features/skills.mdx after the SageOx subsections and before '### Deft' with subsections Adding gstack, Which skills mount, Where gstack keeps state, Removing gstack, Limits (content per WI-O10); amend '### What is not applied' and '### Where pack state is stored'; add '### Added: gstack skill pack' under CHANGELOG.md '## Unreleased'; add the add-command example to docs/USAGE.md's pack list. Do not edit changelog.mdx."
+        },
+        "items": [
+          {
+            "id": "gstack-docs.ac1",
+            "title": "Given features/skills.mdx, when read, then a single '### gstack' section shows `pan skills pack add gstack https://github.com/eltmon/gstack --ref main`, the four skill classes with their names, and the render and state paths",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-docs.ac2",
+            "title": "Given features/skills.mdx, when read, then '### What is not applied' states that runtime packs (gstack) run their scripts after the add-time trust",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-docs.ac3",
+            "title": "Given the Limits subsection, when read, then it names PAN-4730 for browser/design/PDF skills and states that setup's settings hooks are not installed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-docs.ac4",
+            "title": "Given CHANGELOG.md, when read, then '## Unreleased' contains '### Added: gstack skill pack' referencing PAN-4727",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gstack-live-acceptance",
+        "title": "Live acceptance: gstack on for one project runs test-audit and deslop-shared-libs, off and remove leave nothing",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T16:40:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "test",
+          "issueLabel": "pan-4727",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/drafts/PAN-4727-live-checkpoint.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'SKILL_START_PROTO: 1' .pan/drafts/PAN-4727-live-checkpoint.md",
+            "grep -n '## Live acceptance' .pan/drafts/PAN-4727-live-checkpoint.md"
+          ],
+          "expected_outputs": [
+            "checkpoint doc records SKILL_START_PROTO: 1 from the live run",
+            "checkpoint doc has the Live acceptance section with steps 4-9"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-17"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-O11 exactly, with the workspace build (node dist/cli/index.js), OVERDECK_HOME=/tmp/pan-4727-live/overdeck-home, a scratch project clone at /tmp/pan-4727-live/project registered as project 'live', the pack added at the pack-mode SHA from fork-publish, and `GSTACK_SESSION_KIND=spawned claude -p --plugin-dir /tmp/pan-4727-live/link --output-format stream-json --verbose` probes for /gstack:test-audit and /gstack:deslop-shared-libs. Never run pan up/start with the isolated home. Record every command and output verbatim. If blocked (no SHA, no auth), record it and pan tell flywheel-orchestrator."
+        },
+        "items": [
+          {
+            "id": "gstack-live-acceptance.ac1",
+            "title": "Given the pack on for project live, when launch-settings builds the plugin link, then <link>/gstack/skills lists test-audit and deslop-shared-libs and not qa or codex",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-live-acceptance.ac2",
+            "title": "Given the two claude -p probes, when they finish, then each stream ends with a result event with is_error false and test-audit's stream contains SKILL_START_PROTO: 1 and STATE_ROOT under the isolated packs/gstack/state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-live-acceptance.ac3",
+            "title": "Given before/after snapshots, when diffed, then ~/.claude/settings.json and the ~/.claude/skills listing are unchanged, ~/.gstack does not exist, and the scoped find under ~/.claude (excluding plugins/ and projects/) prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-live-acceptance.ac4",
+            "title": "Given the pack set to inherit for project live, when launch-settings runs again, then the plugin link does not exist",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gstack-live-acceptance.ac5",
+            "title": "Given `pan skills pack remove gstack`, when it finishes, then find on the isolated OVERDECK_HOME for *gstack* prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "fork-pack-render",
+        "to": "fork-state-root-marker",
+        "type": "blocks"
+      },
+      {
+        "from": "fork-state-root-marker",
+        "to": "fork-pack-mode-test",
+        "type": "blocks"
+      },
+      {
+        "from": "fork-pack-render",
+        "to": "fork-pack-mode-test",
+        "type": "blocks"
+      },
+      {
+        "from": "fork-pack-mode-test",
+        "to": "fork-publish",
+        "type": "blocks"
+      },
+      {
+        "from": "fork-publish",
+        "to": "gstack-live-acceptance",
+        "type": "blocks"
+      },
+      {
+        "from": "gstack-skill-map",
+        "to": "gstack-adapter-manifest",
+        "type": "blocks"
+      },
+      {
+        "from": "gstack-skill-map",
+        "to": "gstack-render-runner",
+        "type": "blocks"
+      },
+      {
+        "from": "gstack-adapter-manifest",
+        "to": "gstack-render-runner",
+        "type": "blocks"
+      },
+      {
+        "from": "gstack-skill-map",
+        "to": "gstack-mount-transform",
+        "type": "blocks"
+      },
+      {
+        "from": "gstack-adapter-manifest",
+        "to": "gstack-add-update-sync",
+        "type": "blocks"
+      },
+      {
+        "from": "gstack-render-runner",
+        "to": "gstack-add-update-sync",
+        "type": "blocks"
+      },
+      {
+        "from": "gstack-render-runner",
+        "to": "gstack-launch-root",
+        "type": "blocks"
+      },
+      {
+        "from": "gstack-mount-transform",
+        "to": "gstack-launch-root",
+        "type": "blocks"
+      },
+      {
+        "from": "gstack-adapter-manifest",
+        "to": "gstack-launch-root",
+        "type": "blocks"
+      },
+      {
+        "from": "gstack-add-update-sync",
+        "to": "gstack-cli-preview",
+        "type": "blocks"
+      },
+      {
+        "from": "gstack-adapter-manifest",
+        "to": "gstack-cli-preview",
+        "type": "blocks"
+      },
+      {
+        "from": "gstack-cli-preview",
+        "to": "gstack-remove-sweep",
+        "type": "blocks"
+      },
+      {
+        "from": "gstack-mount-transform",
+        "to": "gstack-remove-sweep",
+        "type": "blocks"
+      },
+      {
+        "from": "gstack-add-update-sync",
+        "to": "gstack-remove-sweep",
+        "type": "blocks"
+      },
+      {
+        "from": "gstack-remove-sweep",
+        "to": "gstack-gc-renders",
+        "type": "blocks"
+      },
+      {
+        "from": "gstack-render-runner",
+        "to": "gstack-gc-renders",
+        "type": "blocks"
+      },
+      {
+        "from": "gstack-gc-renders",
+        "to": "gstack-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "gstack-launch-root",
+        "to": "gstack-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "gstack-docs",
+        "to": "gstack-live-acceptance",
+        "type": "blocks"
+      },
+      {
+        "from": "gstack-launch-root",
+        "to": "gstack-live-acceptance",
+        "type": "blocks"
+      },
+      {
+        "from": "gstack-gc-renders",
+        "to": "gstack-live-acceptance",
+        "type": "blocks"
+      },
+      {
+        "from": "fork-pack-render",
+        "to": "fork-publish",
+        "type": "blocks"
+      },
+      {
+        "from": "fork-pack-render",
+        "to": "gstack-live-acceptance",
+        "type": "blocks"
+      },
+      {
+        "from": "fork-state-root-marker",
+        "to": "fork-publish",
+        "type": "blocks"
+      },
+      {
+        "from": "fork-state-root-marker",
+        "to": "gstack-live-acceptance",
+        "type": "blocks"
+      },
+      {
+        "from": "fork-pack-mode-test",
+        "to": "gstack-live-acceptance",
+        "type": "blocks"
+      },
+      {
+        "from": "gstack-adapter-manifest",
+        "to": "gstack-remove-sweep",
+        "type": "blocks"
+      },
+      {
+        "from": "gstack-adapter-manifest",
+        "to": "gstack-gc-renders",
+        "type": "blocks"
+      },
+      {
+        "from": "gstack-render-runner",
+        "to": "gstack-remove-sweep",
+        "type": "blocks"
+      },
+      {
+        "from": "gstack-cli-preview",
+        "to": "gstack-gc-renders",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

@@ -4,9 +4,10 @@
  * Turn numbers count only prompts a person typed. Harnesses also write
  * user-role lines that no human typed: Claude Code's `<task-notification>`,
  * slash-command echoes, tool results and compaction summaries; Codex's
- * `<environment_context>` and friends. Those are matched by their exact known
- * prefixes, never by "starts with `<`", so a typed prompt that begins with
- * `<div>` still counts.
+ * `<environment_context>`, `<recommended_plugins>`, AGENTS.md instructions,
+ * `<turn_aborted>`, `<subagent_notification>` and friends. Those are matched
+ * by their exact known prefixes, never by "starts with `<`", so a typed
+ * prompt that begins with `<div>` still counts.
  *
  * Codex writes a typed prompt both as a model-facing `response_item` message
  * (role `user`) and as an `event_msg` echo. Only the `response_item` form is
@@ -32,6 +33,10 @@ export const CODEX_INJECTED_PREFIXES: readonly string[] = [
   '<environment_context>',
   '<codex_internal_context>',
   '# Files mentioned by the user:',
+  '<recommended_plugins>',
+  '# AGENTS.md instructions',
+  '<turn_aborted>',
+  '<subagent_notification>',
 ];
 
 function parse(line: string | unknown): unknown {

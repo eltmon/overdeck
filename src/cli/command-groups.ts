@@ -36,6 +36,11 @@ export const COMMAND_GROUPS = {
     load: () => import('./commands/close.js'),
     register: (mod, program) => mod.registerCloseCommand(program),
   }),
+  start: group({
+    names: ['start'],
+    load: () => import('./commands/start-register.js'),
+    register: (mod, program) => mod.registerStartCommand(program),
+  }),
   knowledge: group({
     names: ['knowledge'],
     load: () => import('./commands/knowledge.js'),
@@ -60,6 +65,16 @@ export const COMMAND_GROUPS = {
     names: ['vault'],
     load: () => import('./commands/vault/index.js'),
     register: (mod, program) => mod.registerVaultCommands(program),
+  }),
+  account: group({
+    names: ['account'],
+    load: () => import('./commands/account/index.js'),
+    register: (mod, program) => mod.registerAccountCommands(program),
+  }),
+  sharing: group({
+    names: ['share', 'join'],
+    load: () => import('./commands/sharing/index.js'),
+    register: (mod, program) => mod.registerSharingCommands(program),
   }),
   test: group({
     names: ['test'],

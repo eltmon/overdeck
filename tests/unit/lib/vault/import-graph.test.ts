@@ -4,13 +4,17 @@
  * vault CLI verbs and library, following relative imports recursively, and
  * fails when any module resolves into the dashboard, the terminal backends,
  * the Overdeck orchestration layer, Effect, or a node-pty package.
+ *
+ * `pan account` (PAN-4330) follows the same standalone rule (NFR-2), so its
+ * CLI verbs and library are walked here too.
  */
 import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 
 const REPO_ROOT = resolve(__dirname, '..', '..', '..', '..');
-const ENTRY_DIRS = ['src/cli/commands/vault', 'src/lib/vault'];
+// PAN-4330: `pan account` follows the same standalone rule (NFR-2).
+const ENTRY_DIRS = ['src/cli/commands/vault', 'src/lib/vault', 'src/cli/commands/account', 'src/lib/account'];
 const BANNED_PATH_PREFIXES = ['src/dashboard/', 'src/lib/terminal-backends/', 'src/lib/overdeck/'];
 const BANNED_PACKAGES = [/^effect(\/|$)/, /^@effect\//, /node-pty/];
 

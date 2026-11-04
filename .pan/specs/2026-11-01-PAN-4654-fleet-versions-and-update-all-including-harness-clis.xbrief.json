@@ -1,0 +1,991 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-01T13:20:51Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4654: Fleet versions and Update all, including harness CLIs",
+    "updated": "2026-11-01T13:26:49.800Z"
+  },
+  "plan": {
+    "id": "pan-4654",
+    "title": "Fleet versions and Update all, including harness CLIs",
+    "status": "running",
+    "uid": "769df306-873f-47cc-8648-4c4617e30a11",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-01T13:20:51Z",
+    "updated": "2026-11-01T13:26:49.800Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4654",
+        "label": "PAN-4654",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2350",
+        "label": "PAN-2350 (epic)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4645",
+        "label": "PAN-4645 (foundation)",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4654.md",
+        "label": "PRD",
+        "type": "document"
+      }
+    ],
+    "tags": [
+      "anywhere",
+      "machine-links",
+      "fleet",
+      "updates",
+      "harness-cli"
+    ],
+    "narratives": {
+      "Problem": "Linked machines (PAN-4645) show state and Overdeck version per link, but nothing shows the harness CLI versions across machines, the unsupported state's refusal path names the wrong version to install when the peer is older, and there is no way to update Overdeck and the harness CLIs on every machine at once without interrupting running turns.",
+      "Proposal": "Each machine serves a version report (GET /api/versions/self: Overdeck version, install mode, link protocol, each installed harness CLI with version and update plan from new HarnessCapabilities fields) and runs its own persisted update job (when-idle waits for zero working turns machine-wide, harness CLIs first via npm or their own update verb, Overdeck last via UpdateManager plus a gate-claiming restart, before/after recorded). The viewing machine aggregates a fleet table (GET /api/machines/versions) and fans Update all out over links (POST /api/machines/update), fenced to operator-level links with an operator actor. Unsupported links name the exact version and npm command. Surfaces: pan machines versions|update, a Fleet versions panel in Settings → Anywhere, docs, and a two-machine smoke run with fake CLIs.",
+      "NonGoals": "- Updating machines that are offline, connecting, unsupported or revoked (they are listed and skipped)\n- Choosing a target version for Overdeck or any harness CLI; the request body carries only mode\n- Updating OhMyPi (omp), Muse or Prime Agent, or installing a missing harness CLI\n- Updating Overdeck on development or desktop installs, or running pan reload from the job\n- Restarting or resuming running agents or conversations after a harness update\n- Changing ENVIRONMENT_PROTOCOL_VERSION, LINK_PROTOCOL_VERSION, the descriptor, the heartbeat or MachineLinkView\n- Per-harness turn waiting, scheduled or automatic fleet updates\n- Running any real harness or Overdeck update on the operator's machine during implementation or tests\n- Fleet usage (FR-31), settings comparison (FR-32) and every other PAN-2350 work item"
+    },
+    "metadata": {
+      "sizeJustification": "W-LINK7 is a single work item the PAN-2350 epic assigned to this issue; its done-when (unsupported shows the exact version; Update all on two machines changes claude and codex on both and waits for turns) needs the per-machine report, the update job, the fenced routes, the fleet aggregation, CLI, panel and docs together. The surface spans contracts, lib, server, CLI, frontend, scripts and docs because it is one vertical feature; each item is still small and independently reviewable.",
+      "canonicalFilename": "2026-11-01-PAN-4654-fleet-versions-and-update-all-including-harness-clis.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Protocol gating keeps the PAN-4645 link-protocol gate; fix the refusal-path version bug and append the exact npm install command; never bump ENVIRONMENT_PROTOCOL_VERSION.",
+        "rationale": "The done-when asks for the exact version to install; the refusal path names the older peer's own version today, and bumping the environment protocol breaks desktop clients (D-4645-11)."
+      },
+      {
+        "summary": "Turn wait is machine-wide: zero 'working' entries in the live agent directory, re-checked every 5 s, never auto-proceeding; Update now and Cancel are the exits.",
+        "rationale": "FR-29 says 'a machine with a turn in progress'; the Overdeck npm install replaces files running agents' pan calls read, so a per-harness wait would not protect it."
+      },
+      {
+        "summary": "Updated harness CLIs: claude, codex, kimi (kimi-code/acp), opencode. muse (no update verb), prime-agent (pinned 0.8) and ohmypi (support being removed) are listed but not updated.",
+        "rationale": "Probed --help on this machine; the three excluded ones either lack an update command, would break a pinned compat range, or are being removed."
+      },
+      {
+        "summary": "Update target is always latest on the machine's own channel; the request body carries only mode.",
+        "rationale": "Update all means update; letting a remote caller choose versions or commands would allow downgrades and arbitrary exec."
+      },
+      {
+        "summary": "Development and desktop installs skip the Overdeck component with a reason and still update harness CLIs.",
+        "rationale": "UpdateManager already refuses development builds (this machine reports installMode development); the desktop app has its own updater."
+      },
+      {
+        "summary": "Each machine runs and persists its own job in ${OVERDECK_HOME}/fleet-update.json; the viewing machine stores no fleet state and reads jobs from each machine's report.",
+        "rationale": "Store no status you can derive; the persisted job is needed only to carry before/after across the Overdeck restart."
+      },
+      {
+        "summary": "Update and cancel are allowed through a link only for an operator-level link with an operator actor stamp; machine tokens keep their scopes (operate row plus a handler check), no new scope.",
+        "rationale": "Mirrors the FR-4 fence; a new scope would not reach already-issued machine tokens."
+      },
+      {
+        "summary": "Older peers without the feature are detected by a 404 from GET /api/versions/self rather than a new descriptor capability flag.",
+        "rationale": "Equivalent signal with no protocol or descriptor change (NFR-5)."
+      },
+      {
+        "summary": "No sibling split; one issue with plan.metadata.sizeJustification.",
+        "rationale": "The epic scoped W-LINK7 to this issue and its done-when needs the report, job and table together."
+      }
+    ],
+    "items": [
+      {
+        "id": "unsupported-install-detail",
+        "title": "Name the exact Overdeck version and install command for unsupported links",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T13:20:51Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4654",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/link-supervisor.ts",
+            "src/dashboard/server/services/machine-link-service.ts",
+            "src/dashboard/server/services/__tests__/link-supervisor.test.ts",
+            "packages/contracts/src/machines.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/link-supervisor.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "link-supervisor.test.ts passes including the new refusal-02 older/newer responder tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1 (.pan/drafts/PAN-4654.md). Add overdeckInstallCommand(version) to packages/contracts/src/machines.ts. In link-supervisor.ts add exported pure unsupportedInstall(peerLinkProtocol, peerVersion, localVersion) and unsupportedDetail(install, peerLabel); Entry gains unsupported: UnsupportedInstall|null; markUnsupported takes the structured value; fix the refusal path at :423-426 (it names the older responder's own version) and route the descriptor path at :503-508 through the same helper; status() returns unsupported; extend LinkStatusSource['status'] in machine-link-service.ts. MachineLinkView and GET /api/machines do not change. Never touch ENVIRONMENT_PROTOCOL_VERSION or LINK_PROTOCOL_VERSION."
+        },
+        "items": [
+          {
+            "id": "unsupported-install-detail.ac1",
+            "title": "Given a link whose responder refuses with code 02 reporting linkProtocol 0 and serverVersion 0.71.0, when the supervisor probes, then status('link-1').stateDetail equals 'Install Overdeck 0.73.0 on peer: npm install -g @overdeck/core@0.73.0' and status().unsupported returns { version: '0.73.0', on: 'peer' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "unsupported-install-detail.ac2",
+            "title": "Given a responder refusing with linkProtocol 2 and serverVersion 0.80.0, when probed, then stateDetail equals 'Install Overdeck 0.80.0 on this machine: npm install -g @overdeck/core@0.80.0'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "unsupported-install-detail.ac3",
+            "title": "Given an unsupported link, when fake timers advance 10 minutes, then no new channel open is attempted, and after reconnect('link-1') status().unsupported returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "unsupported-install-detail.ac4",
+            "title": "The existing ac4 descriptor-mismatch test still passes and its stateDetail ends with the npm install command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "harness-update-capabilities",
+        "title": "Declare each harness CLI's update argv and npm package in HarnessCapabilities",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T13:20:51Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4654",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/harness-capabilities.ts",
+            "tests/unit/lib/harness-capability-contract.test.ts",
+            "packages/contracts/src/harness-behavior.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/harness-capability-contract.test.ts packages/contracts/src/harness-behavior.test.ts",
+            "npm run lint:harness-branches",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both capability test files pass",
+            "lint:harness-branches exits 0",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2 and D-6. Add readonly updateArgs: readonly string[] | null and readonly npmPackage: string | null to HarnessCapabilities after installHint; add both keys to HARNESS_CAPABILITY_KEYS; set exact values: claude-code ['update'] / '@anthropic-ai/claude-code'; codex ['update'] / '@openai/codex'; kimi-code and acp ['upgrade','--yes'] / null; opencode ['upgrade'] / 'opencode-ai'; muse, prime-agent, ohmypi null / null. Touch harness-behavior.test.ts only if it enumerates capability keys."
+        },
+        "items": [
+          {
+            "id": "harness-update-capabilities.ac1",
+            "title": "Given CLAUDE_CODE_CAPABILITIES, when read, then updateArgs equals ['update'] and npmPackage equals '@anthropic-ai/claude-code'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "harness-update-capabilities.ac2",
+            "title": "Given the kimi-code and acp capabilities, when read, then both declare updateArgs ['upgrade','--yes'] and npmPackage null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "harness-update-capabilities.ac3",
+            "title": "Given the muse, prime-agent and ohmypi capabilities, when read, then updateArgs and npmPackage are both null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "harness-update-capabilities.ac4",
+            "title": "HARNESS_CAPABILITY_KEYS includes 'updateArgs' and 'npmPackage' and npm run lint:harness-branches exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "versions-self-report",
+        "title": "Serve this machine's Overdeck and harness CLI versions at GET /api/versions/self",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T13:20:51Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "api",
+          "issueLabel": "pan-4654",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/fleet-versions.ts",
+            "packages/contracts/src/index.ts",
+            "src/lib/fleet/harness-versions.ts",
+            "tests/unit/lib/fleet/harness-versions.test.ts",
+            "src/dashboard/server/routes/versions-self.ts",
+            "src/dashboard/server/routes/__tests__/versions-self.test.ts",
+            "src/dashboard/server/routes/misc/updates.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "src/dashboard/server/server.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/fleet/harness-versions.test.ts src/dashboard/server/routes/__tests__/versions-self.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the three test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-6",
+            "NFR-1",
+            "NFR-2",
+            "NFR-5"
+          ],
+          "foundationFor": [
+            "update-job-service",
+            "update-routes-fenced",
+            "fleet-routes",
+            "cli-versions-update",
+            "fleet-versions-panel"
+          ],
+          "parallelSafeReason": "Parallel-safe once harness-update-capabilities lands: its new files (fleet-versions.ts, src/lib/fleet/harness-versions.ts, routes/versions-self.ts) are touched by no ready sibling; shared files with later items are ordered by blocks edges."
+        },
+        "narrative": {
+          "Action": "PRD WI-3, wire shapes section, D-7, D-15, D-16. Create packages/contracts/src/fleet-versions.ts with every type in 'Wire shapes' and export it from index.ts. Create src/lib/fleet/harness-versions.ts (no dashboard imports, injectable deps): parseCliVersion, readCliVersion (execFile --version, 8 s timeout, 60 s cache by realpath+mtime, refresh bypass), harnessUpdatePlan (win32 -> not runnable; npm prefix match -> npm argv with <prefix>/bin/npm, sudo display when not writable; Caskroom/Cellar -> brew display; updateArgs -> [binaryPath, ...updateArgs]; else not runnable), listInstalledHarnessClis (iterate KNOWN_HARNESSES, harnessBinaryName, resolveHarnessBinary, group by binary, D-16 order). Export currentInstallMode() from misc/updates.ts (desktop if OVERDECK_MODE=desktop, development if overdeckDevMode, else npm-global). Create routes/versions-self.ts with buildVersionsReport and GET /api/versions/self (job null until update-job-service lands); register in server.ts beside machinesRouteLayer; route-scopes row read:state; no-loss row READ. All exec via promisified execFile, never execSync."
+        },
+        "items": [
+          {
+            "id": "versions-self-report.ac1",
+            "title": "Given the banners '2.1.293 (Claude Code)', 'codex-cli 0.159.0', 'Muse Code 1.4.7 (1.4.7-R6101.1)' and 'omp/17.4.1', when parseCliVersion runs, then it returns '2.1.293', '0.159.0', '1.4.7' and '17.4.1', and returns null for 'nothing'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "versions-self-report.ac2",
+            "title": "Given a codex binary whose real path is /p/lib/node_modules/@openai/codex/bin/codex.js and a writable prefix, when harnessUpdatePlan runs, then argv equals ['/p/bin/npm','install','-g','--prefix','/p','@openai/codex@latest']; with an unwritable prefix argv is null and display starts with 'sudo npm install -g --prefix /p'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "versions-self-report.ac3",
+            "title": "Given kimi resolved for both acp and kimi-code, when listInstalledHarnessClis runs, then it returns one kimi entry whose harnesses lists both and whose plan argv ends with ['upgrade','--yes']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "versions-self-report.ac4",
+            "title": "Given a second read within 60 s, when readCliVersion runs, then it serves the cached version without exec, and with refresh: true it execs again",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "versions-self-report.ac5",
+            "title": "Given a request to GET /api/versions/self, when it is served, then it returns 200 with overdeck.linkProtocol 1, and route-scopes routes that path to read:state so a machine credential with read:state is accepted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "extract-dashboard-restart",
+        "title": "Move the dashboard self-restart into restartDashboardDetached()",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T13:20:51Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-4654",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/dashboard-restart.ts",
+            "src/dashboard/server/routes/misc/meta.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4 and D-9. Move the satisfyForDirectRestart call and the detached spawn of `pan restart --dashboard` with OVERDECK_RESTART_GATE_CLAIMED=1 out of postRestartDashboardRoute (meta.ts:412-452) into export async function restartDashboardDetached(requester: string) in src/dashboard/server/services/dashboard-restart.ts, moving the PAN-3729 comment block with it. The route calls it with `dashboard-ui:${process.pid}` and keeps byte-identical responses (202 { ok: true, pid } / 500 { error: 'Restart failed: ...' })."
+        },
+        "items": [
+          {
+            "id": "extract-dashboard-restart.ac1",
+            "title": "Given POST /api/system/restart-dashboard, when the spawn succeeds, then it still responds 202 with { ok: true, pid }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-dashboard-restart.ac2",
+            "title": "meta.ts no longer contains the restart spawn call; it calls restartDashboardDetached from services/dashboard-restart.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-dashboard-restart.ac3",
+            "title": "restartDashboardDetached(requester) passes the requester string to satisfyForDirectRestart and spawns the child with OVERDECK_RESTART_GATE_CLAIMED set to '1'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "update-job-service",
+        "title": "Run a per-machine update job that waits for turns and records before/after versions",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T13:20:51Z",
+        "metadata": {
+          "difficulty": "expert",
+          "kind": "backend",
+          "issueLabel": "pan-4654",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/fleet-update-service.ts",
+            "src/dashboard/server/services/__tests__/fleet-update-service.test.ts",
+            "src/dashboard/server/routes/misc/updates.ts",
+            "src/dashboard/server/main.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/fleet-update-service.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "fleet-update-service.test.ts passes, all timer tests on vi fake timers",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "FR-9",
+            "NFR-1",
+            "NFR-3",
+            "NFR-4",
+            "NFR-6"
+          ],
+          "foundationFor": [
+            "update-routes-fenced",
+            "fleet-routes"
+          ],
+          "parallelSafeReason": "Parallel-safe after its blockers: fleet-update-service.ts and its test are new and owned only here; updates.ts and main.ts are ordered after versions-self-report by edges."
+        },
+        "narrative": {
+          "Action": "PRD WI-5 and D-3, D-4, D-5, D-8, D-13. Export getUpdateManager from misc/updates.ts (rename of private getManager). Create FleetUpdateService with the injectable FleetUpdateDeps of the PRD and a module singleton fleetUpdateService(): current(), start(mode, requestedBy), escalate(), cancel(), run(), boot(). Job persisted atomically (temp + rename) at ${OVERDECK_HOME}/fleet-update.json on every phase change. when-idle waits for zero working entries from getLiveAgentDirectory() re-checking every 5 s and never proceeds on its own; harness CLIs first (one failure never stops the next), Overdeck last via UpdateManager check/install with a 1 s snapshot poll (10 min cap); restart via restartDashboardDetached('fleet-update:<id>') only when Overdeck installed; development/desktop -> Overdeck skipped with the PRD reason. boot() finishes a 'restarting' job (after = running version) and fails an interrupted waiting/updating job. Commands run with stdin ignored, 10-minute timeout, output tail 2,000 chars. main.ts calls boot() beside startAnywhere when hostsMachineLinks() (src/lib/boot-gates.ts) is true. Tests use vi.useFakeTimers and an in-memory file map; never real exec."
+        },
+        "items": [
+          {
+            "id": "update-job-service.ac1",
+            "title": "Given countWorkingTurns returning 2, 2, then 0, when the when-idle job runs under fake timers, then no update command runs before the count reaches 0 and the job reaches phase updating within one 5 s tick after it does",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "update-job-service.ac2",
+            "title": "Given one working turn forever, when fake timers advance 2 hours, then runCommand was never called and the job stays waiting with waitingTurns 1; after escalate() the claude and codex commands run",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "update-job-service.ac3",
+            "title": "Given fake claude 2.1.0 -> 2.1.5 and codex 0.150.0 -> 0.159.0, when the job finishes, then both components are status updated with those before and after values, and a failing claude command still lets codex run and ends the job failed with claude's output tail in detail",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "update-job-service.ac4",
+            "title": "Given an npm-global install with an available release, when the install reaches ready, then restart is called once with 'fleet-update:<id>', the job file holds phase restarting, and a fresh service's boot() with the new version persists phase done with overdeck status updated",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "update-job-service.ac5",
+            "title": "Given a development install, when the job runs, then the overdeck component is skipped with a reason naming the repository and the harness components still update",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "update-routes-fenced",
+        "title": "Expose start, escalate and cancel of the update job, fenced to operator-level links",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T13:20:51Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "api",
+          "issueLabel": "pan-4654",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/dashboard/server/routes/versions-self.ts",
+            "src/dashboard/server/routes/__tests__/versions-self.test.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/versions-self.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-10",
+            "NFR-3"
+          ],
+          "foundationFor": [
+            "fleet-routes"
+          ],
+          "parallelSafeReason": "Runs after update-job-service and versions-self-report by edges; it is the only item editing versions-self.ts at that point."
+        },
+        "narrative": {
+          "Action": "PRD WI-6 and D-10, D-13, D-14. Add POST /api/versions/self/update (body { mode?: 'when-idle'|'now' }, nothing else is read) and DELETE /api/versions/self/update to routes/versions-self.ts. authorizeFleetUpdate: through a channel require credential.kind 'machine' with actor === 'operator' and access === 'operator', else 403 { error: 'fleet-update-forbidden' }; outside a channel run rejectUnsafeDashboardMutationRequest, then refuse device/token credentials lacking admin (scopeSatisfies(credentialScopes(c), 'admin')). Peer dashboard -> 409 not-primary, decided with hostsMachineLinks() imported from src/lib/boot-gates.ts (never import from main.ts). New job 202, escalation 200, in progress 409 update-in-progress, cancel of a non-waiting job 409 not-waiting. GET /api/versions/self now fills job from fleetUpdateService().current(). route-scopes rows: POST and DELETE /api/versions/self/update -> operate. Two WRITE no-loss rows."
+        },
+        "items": [
+          {
+            "id": "update-routes-fenced.ac1",
+            "title": "Given a machine credential whose actor is { agentId: 'a1' }, when it POSTs /api/versions/self/update, then the route responds 403 fleet-update-forbidden and no job is created",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "update-routes-fenced.ac2",
+            "title": "Given a machine credential on an agent-fenced link (actor operator-fenced), when it POSTs, then the route responds 403 and no job is created",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "update-routes-fenced.ac3",
+            "title": "Given an operator actor on an operator-level link, when it POSTs { mode: 'when-idle' }, then the route responds 202 with a waiting job; a second POST responds 409 update-in-progress and POST { mode: 'now' } responds 200 with mode now",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "update-routes-fenced.ac4",
+            "title": "Given a token credential without admin outside a channel, when it POSTs, then the route responds 403; DELETE on a waiting job responds 200 with phase cancelled and on an updating job responds 409 not-waiting",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fleet-routes",
+        "title": "Build the fleet versions table and Update all fan-out on this machine",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T13:20:51Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "api",
+          "issueLabel": "pan-4654",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/machines-fleet.ts",
+            "src/dashboard/server/routes/__tests__/machines-fleet.test.ts",
+            "src/dashboard/server/server.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/machines-fleet.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "FR-10",
+            "NFR-2"
+          ],
+          "parallelSafeReason": "Runs after update-routes-fenced, versions-self-report and unsupported-install-detail by edges; machines-fleet.ts and its test are new and owned only here."
+        },
+        "narrative": {
+          "Action": "PRD WI-7 and D-3, D-11, D-12. Create routes/machines-fleet.ts with injectable buildFleetVersions (self row first, then one row per link from listLinks; online -> linkFetch GET /api/versions/self with actor operator, 404 -> updateSupported false with the D-11 text and install command; unsupported -> install from supervisor status().unsupported plus overdeckInstallCommand; other states -> report null; every row copies stateDetail and peerVersion). GET /api/machines/versions and POST /api/machines/update ({ mode?, environmentIds?, cancel? }) both refuse channel requests (403) and keep the default admin scope. Update all: peers in parallel first (skip non-online with '<label> is <state>', 404 -> 'predates fleet updates', 409 -> peer error code, 403 -> '<label>: this link is agent-fenced; Update all needs an operator-level link'), then this machine via fleetUpdateService() last; respond FleetUpdateResponse. Register the layer in server.ts; add AGGREGATE and WRITE no-loss rows."
+        },
+        "items": [
+          {
+            "id": "fleet-routes.ac1",
+            "title": "Given this machine and two links, when GET /api/machines/versions runs, then rows return self first followed by one row per link in link-store order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fleet-routes.ac2",
+            "title": "Given an unsupported link whose supervisor status carries { version: '0.73.0', on: 'peer' }, when the table builds, then that row's install equals { version: '0.73.0', on: 'peer', command: 'npm install -g @overdeck/core@0.73.0' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fleet-routes.ac3",
+            "title": "Given one online, one offline and one agent-fenced link whose peer answers 403, when POST /api/machines/update runs, then the offline machine is skipped with '<label> is offline' and not called, the 403 peer is skipped with a reason naming 'agent-fenced', and the online peer is called with an operator actor before this machine's job starts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fleet-routes.ac4",
+            "title": "Given a request that arrives through a secure channel, when it calls either fleet route, then the route responds 403",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fleet-routes.ac5",
+            "title": "Given an online peer that answers 404, when the table builds, then its row has updateSupported false and an error naming 'predates fleet updates'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-versions-update",
+        "title": "Add pan machines versions and pan machines update",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T13:20:51Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4654",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/machines.ts",
+            "tests/unit/cli/machines.test.ts",
+            "cli/machines.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/machines.test.ts",
+            "npm run lint:skills",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "machines.test.ts passes",
+            "lint:skills exits 0",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. Add runMachinesVersions({ json }) (table MACHINE STATE OVERDECK <binary columns in D-16 order> UPDATE; changed components print 'before → after'; install rows print '<label>: install Overdeck <v> on <where>: <command>') and runMachinesUpdate({ now, machine[], cancel, json }) (labels resolved via GET /api/machines/versions, unknown label exits 1 naming `pan machines versions`; prints Started/Skipped lines; exit 0 with skips). Register `versions` and `update` (--now, --machine <label> repeatable, --cancel, --json) in registerMachinesCommands with the PRD help strings; update the module header. Export pure formatter formatFleetUpdateCell and test it. Document both verbs in cli/machines.mdx. Checkpoint: if npm run lint:skills demands a skill for pan machines, add sync-sources/skills/pan-machines/SKILL.md covering all five verbs."
+        },
+        "items": [
+          {
+            "id": "cli-versions-update.ac1",
+            "title": "Given a job phase waiting with 2 turns, when formatFleetUpdateCell runs, then it returns 'waiting (2 turns)', and once waitingSince is 31 minutes old it returns 'waiting (2 turns, 31 min: use --now)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-versions-update.ac2",
+            "title": "Given a finished job with claude 2.1.0 -> 2.1.5, when the versions table renders, then the CLAUDE cell shows '2.1.0 → 2.1.5'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-versions-update.ac3",
+            "title": "Given pan machines update --help, when it runs, then it prints --now, --machine <label>, --cancel and --json; pan machines versions --help prints --json",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-versions-update.ac4",
+            "title": "cli/machines.mdx contains a section for pan machines versions and one for pan machines update, each naming every flag of that verb",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fleet-versions-panel",
+        "title": "Show the Fleet versions panel with Update all, Update now and Cancel",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T13:20:51Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4654",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/anywhere/FleetVersionsPanel.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/FleetVersionsPanel.test.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/machinesApi.ts",
+            "src/dashboard/frontend/src/components/Settings/sections/AnywhereSection.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash -c 'cd src/dashboard/frontend && npx vitest run src/components/Settings/anywhere/__tests__/FleetVersionsPanel.test.tsx'",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "FleetVersionsPanel.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. Add FLEET_VERSIONS_QUERY_KEY, loadFleetVersions and updateFleet to machinesApi.ts. Build FleetVersionsPanel (data-testid fleet-versions-panel): refetch 5 s while any job is waiting/updating/restarting else 30 s; columns Machine, State (reuse LinkStateBadge), Overdeck, one per binary in D-16 order, Update; 'before → after' cells; Update all (data-testid fleet-update-all) behind useConfirm then a sonner toast of skipped machines; per waiting row Update now (data-testid fleet-update-now) and Cancel; install rows show the command in font-mono with a copy button. Follow pan-style-guide: no pills, never green, unsupported amber. Mount directly after MachinesPanel in AnywhereSection. Add the test path to scripts/frontend-test-subset.txt before the MachinesPanel line."
+        },
+        "items": [
+          {
+            "id": "fleet-versions-panel.ac1",
+            "title": "Given a fleet response with two machines, when the panel renders, then it shows two rows with Claude Code and Codex columns and an updated cell reading '2.1.0 → 2.1.5'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fleet-versions-panel.ac2",
+            "title": "Given the operator clicks Update all and confirms, when the request is sent, then it POSTs /api/machines/update with { mode: 'when-idle' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fleet-versions-panel.ac3",
+            "title": "Given a row whose job is waiting on 2 turns, when it renders, then it shows 'Waiting for 2 turns' and Update now POSTs { mode: 'now', environmentIds: [<that id>] }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fleet-versions-panel.ac4",
+            "title": "Given an unsupported row, when it renders, then it shows 'npm install -g @overdeck/core@0.73.0' in a monospace span",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "smoke-update-all",
+        "title": "Extend the two-machine smoke with fake CLIs and an Update all run",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T13:20:51Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4654",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/anywhere/two-machine-smoke.mjs"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run build",
+            "node scripts/anywhere/two-machine-smoke.mjs"
+          ],
+          "expected_outputs": [
+            "the smoke prints steps fake-clis, versions and update-all and exits 0"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10, including its 'Safety first' paragraph. resolveHarnessBinary falls back to ~/.local/bin, ~/.kimi-code/bin, ~/.opencode/bin, npm prefix -g and $SHELL -lc, so smoke servers must run with HOME=<home>/fakehome, PATH=<home>/npm/bin:/usr/local/bin:/usr/bin:/bin and SHELL removed, or Update all would update the operator's real kimi/opencode. In two-machine-smoke.mjs create under each .tmp/anywhere-a|b home a fake npm prefix (lib/node_modules/@anthropic-ai/claude-code/bin/claude and @openai/codex/bin/codex.js printing versions from a version file; bin/claude and bin/codex symlinks; bin/npm that answers `prefix -g` with the fake prefix and rewrites the version file to 2.1.5 / 0.159.0 on `install -g --prefix <p> <pkg>@latest`). After step online add: versions (both rows report claude 2.1.0 and codex 0.150.0; GUARD: fail and exit 1 without updating unless each row lists exactly claude and codex and both command strings contain .tmp/anywhere-) and update-all (`pan machines update --json` on A; within 60 s both rows done with claude 2.1.0 → 2.1.5 and codex 0.150.0 → 0.159.0). Update the header step list. Not in CI."
+        },
+        "items": [
+          {
+            "id": "smoke-update-all.ac1",
+            "title": "Given both smoke servers online, when step versions runs, then pan machines versions --json on A returns two rows each reporting claude 2.1.0 and codex 0.150.0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "smoke-update-all.ac2",
+            "title": "Given step update-all, when pan machines update --json runs on A, then within 60 s both rows show phase done with claude 2.1.0 → 2.1.5 and codex 0.150.0 → 0.159.0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "smoke-update-all.ac3",
+            "title": "Given a versions report listing any binary other than claude and codex, or a command outside .tmp/anywhere-, when step versions runs, then the script exits 1 before update-all and never calls pan machines update",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "smoke-update-all.ac4",
+            "title": "Both smoke servers start with HOME under .tmp/anywhere-a|b/fakehome, PATH beginning with the fake npm bin and no SHELL variable, and the script exits 0 after update-all",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-fleet-versions",
+        "title": "Document fleet versions, Update all and the update routes",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T13:20:51Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4654",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/linked-machines.mdx",
+            "docs/ANYWHERE-ARCHITECTURE.md",
+            "docs/DASHBOARD-AUTH.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-11. configuration/linked-machines.mdx: new '## Fleet versions and Update all' section after '## States' (table, what Update all updates and in which order, the D-6 per-harness command table, the running-turn rule with Update now and Cancel, the 30-minute message, development/desktop skipping, offline/unsupported skipping); the Unsupported row names the exact version and the npm install command; two Troubleshooting entries. docs/ANYWHERE-ARCHITECTURE.md: 'Fleet versions and updates (PAN-4654)' section with the five routes and scopes, fleet-update.json phases, the machine-wide turn wait, restartDashboardDetached and the 404 rule. docs/DASHBOARD-AUTH.md: the three /api/versions/self* route-scope rows and the operator-actor rule."
+        },
+        "items": [
+          {
+            "id": "docs-fleet-versions.ac1",
+            "title": "configuration/linked-machines.mdx contains a '## Fleet versions and Update all' section naming `pan machines update --now`, the update command for each harness CLI, and that offline and unsupported machines are skipped",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-fleet-versions.ac2",
+            "title": "docs/ANYWHERE-ARCHITECTURE.md contains a 'Fleet versions and updates (PAN-4654)' section naming /api/versions/self/update, /api/machines/update and fleet-update.json with its phases",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-fleet-versions.ac3",
+            "title": "docs/DASHBOARD-AUTH.md contains GET /api/versions/self as read:state and POST/DELETE /api/versions/self/update as operate, with the rule that a linked machine must carry an operator actor on an operator-level link",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-fleet-versions.ac4",
+            "title": "npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "harness-update-capabilities",
+        "to": "versions-self-report",
+        "type": "blocks"
+      },
+      {
+        "from": "versions-self-report",
+        "to": "update-job-service",
+        "type": "blocks"
+      },
+      {
+        "from": "extract-dashboard-restart",
+        "to": "update-job-service",
+        "type": "blocks"
+      },
+      {
+        "from": "update-job-service",
+        "to": "update-routes-fenced",
+        "type": "blocks"
+      },
+      {
+        "from": "update-routes-fenced",
+        "to": "fleet-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "unsupported-install-detail",
+        "to": "fleet-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "fleet-routes",
+        "to": "cli-versions-update",
+        "type": "blocks"
+      },
+      {
+        "from": "fleet-routes",
+        "to": "fleet-versions-panel",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-versions-update",
+        "to": "smoke-update-all",
+        "type": "blocks"
+      },
+      {
+        "from": "fleet-routes",
+        "to": "docs-fleet-versions",
+        "type": "informs"
+      },
+      {
+        "from": "versions-self-report",
+        "to": "update-routes-fenced",
+        "type": "blocks"
+      },
+      {
+        "from": "versions-self-report",
+        "to": "fleet-routes",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

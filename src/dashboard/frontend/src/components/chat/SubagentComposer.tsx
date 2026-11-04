@@ -5,6 +5,7 @@ import { SendHorizontal } from 'lucide-react';
 import { ComposerPromptEditor, loadDraft } from './ComposerPromptEditor';
 import type { Conversation } from '../CommandDeck/ConversationList';
 import type { SubagentSummary } from './chat-types';
+import { isNativeShell } from '../../lib/nativeShell';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 
 /** Mount with a child-specific key: sends and drafts must never cross recipients. */
@@ -18,9 +19,12 @@ export function SubagentComposer({ conversation, subagent }: { conversation: Con
   const [sending, setSending] = useState(false);
   const [feedback, setFeedback] = useState('');
   const [failed, setFailed] = useState(false);
+  // The phone app (PAN-4837) cannot call the subagent input route, so it neither polls nor sends.
+  const native = isNativeShell();
+  const direct = conversation.harness === 'codex' && conversation.sessionAlive && !conversation.endedAt;
   const capability = useQuery({
     queryKey: ['subagent-input', conversation.name, subagent.agentId],
-    enabled: conversation.harness === 'codex' && conversation.sessionAlive && !conversation.endedAt,
+    enabled: direct && !native,
     queryFn: async () => {
       const response = await fetch(endpoint);
       if (!response.ok) return false;
@@ -59,6 +63,13 @@ export function SubagentComposer({ conversation, subagent }: { conversation: Con
     }
   }
 
+  if (native) {
+    return direct ? (
+      <div className={styles.composerFooter}>
+        <div className="px-3 py-2 text-xs text-muted-foreground">Sending to a subagent needs the dashboard on a computer.</div>
+      </div>
+    ) : null;
+  }
   // No placeholder composer for unsupported harnesses, old hosts, or unloaded children.
   if (!conversation.sessionAlive || conversation.endedAt || conversation.harness !== 'codex' || capability.isError || capability.data !== true) return null;
   return (

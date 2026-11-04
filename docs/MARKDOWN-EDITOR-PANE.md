@@ -124,19 +124,69 @@ grants no caller anything it didn't already have:
 ## StageDeckContext — how a chip reaches its deck
 
 `src/dashboard/frontend/src/components/Stage/StageDeckContext.tsx` is a
-plain React context (`{ deckKey, openOrFocusEditorPane }` or `null`),
-provided by `Stage` around everything it renders. It exists because the
-Stage's own `StageApi`/`StageContext` are handed to pane wrappers as props,
-not via context — a `MarkdownFileLink` chip can be nested arbitrarily deep
-inside a pane's content (`AgentPane` → `ConversationPanel` → `ChatMarkdown`
-→ `MarkdownFileLink`), too deep to prop-thread cleanly.
-`useStageDeck()` returns `null` outside a `Stage` (popout conversation
-windows, `ConversationDock`, issue-drawer transcripts) — those surfaces have
-nowhere to open an internal tab and fall back to the external flow.
-`openOrFocusEditorPane(filePath, label)` mirrors the existing
-`openIssue`/`openOrFocusAgentPane` find-or-focus dedupe pattern: a second
-call with the same `filePath` focuses the existing tab instead of opening a
-duplicate.
+plain React context (`{ deckKey, openOrFocusEditorPane, openOrFocusAgentPane }`
+or `null`), provided by `Stage` around everything it renders. It exists
+because the Stage's own `StageApi`/`StageContext` are handed to pane
+wrappers as props, not via context — a `MarkdownFileLink` chip can be
+nested arbitrarily deep inside a pane's content (`AgentPane` →
+`ConversationPanel` → `ChatMarkdown` → `MarkdownFileLink`), too deep to
+prop-thread cleanly. `useStageDeck()` returns `null` outside a `Stage`
+(popout conversation windows, `ConversationDock`, issue-drawer transcripts)
+— those surfaces have nowhere to open an internal tab and fall back to the
+external flow.
+`openOrFocusEditorPane(filePath, label, citeConversationName)` mirrors the
+existing `openIssue`/`openOrFocusAgentPane` find-or-focus dedupe pattern: a
+second call with the same `filePath` focuses the existing tab instead of
+opening a duplicate. The third argument is PAN-4658's cite target — D4: a
+non-null `citeConversationName` becomes (or replaces) the found-or-created
+pane's target; `null` never clears an existing one. `openOrFocusAgentPane`
+(D10) opens or focuses the agent tab for a conversation id — used by the
+Preview citation toast's "Open conversation" action below.
+
+## Citing from the Preview (PAN-4658)
+
+`WorkspacePane.citeConversationName?: string` (`panesStore.ts`) records which
+conversation's composer an editor pane's Preview cites into — the
+conversation whose file chip opened the file. A markdown chip reads its
+origin via `useCitationTarget()` and passes it as `openOrFocusEditorPane`'s
+third argument (see above); `MessagesTimeline` provides it through
+`CitationTargetContext` (`lib/composerCitations.ts`), gated on
+`citationsEnabled`, so a chip rendered outside a live composer carries no
+target. `closeConversationPanes` clears `citeConversationName` from any
+editor pane targeting an archived conversation (D13) — the pane itself
+stays open.
+
+`EditorPane` wraps its Preview's `MarkdownTab` in a second
+`CitationTargetContext.Provider` keyed on `pane.citeConversationName`, so a
+chip rendered *inside* the Preview (a file linking another file) resolves
+its own origin, not the editor pane's. The pane also mounts a local
+`EditorPreviewCite` component — rendering `CiteSelectionLayer` (`chat/citations/CiteSelectionToolbar.tsx`)
+over the Preview's root — only when `activeTab === 'preview' &&
+pane.citeConversationName && !dirty` (D3: no target, no Cite; D8: hidden
+while the draft has unsaved changes, since the agent reads the file from
+disk).
+
+`CiteSelectionLayer` takes an optional `resolve: SelectionCitationResolver`
+(`resolveSelectionCitation.ts`); the Preview passes
+`fileSelectionResolver(path)`, which accepts any non-collapsed selection
+whose both ends land inside the layer's root and returns
+`{ source: { kind: 'file', path }, quotedText }` — unlike the default
+`resolveMessageSelection`, it needs no `[data-cite-message-id]` wrapper,
+since a whole Preview is one citable surface. Saving calls the layer's
+`onSaved(citation)` callback, which shows a `toast.success('Citation
+added', …)` with an **Open conversation** action wired to
+`deck?.openOrFocusAgentPane(conversationName, 'Agent')`.
+
+A pending file citation highlights in the Preview via
+`useFileCitationHighlight(ref, conversationName, path, text)`
+(`chat/citations/citationHighlight.ts`), the file-citation twin of
+`useCitationHighlight`: it registers under the CSS Custom Highlight API key
+`${conversationName}:file:${path}` instead of a per-message key.
+
+On send, a file citation serializes into its own block, one per path, after
+any reply-notes block (`lib/citationFormat.ts`'s `fileCitationHeader` and
+`formatCitationBlock`) — see `features/conversations.mdx`'s "Citing a
+markdown file" for the exact block shape.
 
 ## The open-target preference and the fallback matrix
 
@@ -168,12 +218,14 @@ chips always call the original `handleOpen()`. The fallback matrix:
 Right-click on a markdown chip lists **Open in internal editor**, one
 **Open in `<EDITORS label>`** entry per editor the server reports available
 (`pan.getAvailableEditors`, fetched once and cached module-wide, same
-pattern as the chip's Quickview syntax-highlighter cache), then the
-**Open containing folder**, then the existing **Copy relative path** /
-**Copy full path** items. Choosing any editor open action calls
-`setMarkdownOpenTarget` before opening, so the choice survives a reload.
-Right-click on a non-markdown chip lists **Open in editor** / **Open
-containing folder** / **Copy relative path** / **Copy full path**.
+pattern as the chip's Quickview syntax-highlighter cache), then one
+**Open in browser** / **Open in `<Browser>`** entry per browser the server
+detected (PAN-4762, see below), then the **Open containing folder**, then
+the existing **Copy relative path** / **Copy full path** items. Choosing
+any editor open action calls `setMarkdownOpenTarget` before opening, so the
+choice survives a reload. Right-click on a non-markdown chip lists **Open
+in editor**, the same browser items, **Open containing folder**, **Copy
+relative path** and **Copy full path**.
 
 **Open containing folder** sends `shellOpenInEditor` with
 `editor: 'file-manager'` and `reveal: true` for `filePath` (never
@@ -183,3 +235,16 @@ parent folder with the file selected: `open -R` on macOS,
 `org.freedesktop.FileManager1.ShowItems` D-Bus call on Linux, which falls
 back to `xdg-open` on the parent folder when no file manager implements it.
 It does not change the persisted markdown open target.
+
+Browser items (PAN-4762) appear only for `html`, `htm`, `xhtml`, `svg`,
+`pdf`, `png`, `jpg`, `jpeg`, `gif`, `webp`, `avif`, `md` and `txt` chips;
+`.mdx`/`.markdown` chips get none. **Open in browser** sends
+`pan.shellOpenInBrowser` with `browser: 'default-browser'`, which hands the
+`file://` URL to `xdg-open` / `open` / `explorer`; for non-HTML types the OS
+may pick a non-browser app for that type. One **Open in `<Browser>`** item
+appears for each browser the server detected at startup (Google Chrome,
+Chromium, Firefox, Brave, Microsoft Edge, Vivaldi): on Linux by command on
+`PATH`, on macOS by `/Applications/<App>.app`; Windows offers only **Open
+in browser**. The request uses `filePath`, never `targetPath`, and the
+browser opens on the machine that runs the dashboard server. Browser items
+do not change the persisted markdown open target.

@@ -263,6 +263,73 @@ describe('fetchIssuePullRequest — GET /api/issues/:id/pr', () => {
     expect(result.error).toContain('gh pr view failed');
     expect(result.error).toContain('not authenticated');
   });
+
+  it('does not cache a failed gh pr view, so the next read asks the forge again (PAN-4821)', async () => {
+    mockResolveGitHubIssue.mockReturnValue({
+      isGitHub: true,
+      owner: 'eltmon',
+      repo: 'overdeck',
+      number: 830,
+    });
+    mockExec
+      .mockResolvedValueOnce({ stdout: JSON.stringify([{ number: 642, state: 'OPEN', mergedAt: null }]), stderr: '' })
+      .mockResolvedValueOnce({ stdout: '[]', stderr: '' })
+      .mockRejectedValueOnce(new Error('gh: secondary rate limit'));
+
+    const first = await fetchIssuePullRequest('PAN-830');
+    expect(first.error).toContain('secondary rate limit');
+
+    mockExec
+      .mockResolvedValueOnce({ stdout: JSON.stringify([{ number: 642, state: 'OPEN', mergedAt: null }]), stderr: '' })
+      .mockResolvedValueOnce({ stdout: '[]', stderr: '' })
+      .mockResolvedValueOnce({ stdout: JSON.stringify({ number: 642, state: 'OPEN' }), stderr: '' });
+
+    const second = await fetchIssuePullRequest('PAN-830');
+    expect(second.pr?.number).toBe(642);
+    expect(second.error).toBeUndefined();
+    expect(mockExec).toHaveBeenCalledTimes(6);
+  });
+
+  it('does not cache a failed branch lookup (PAN-4821)', async () => {
+    mockResolveGitHubIssue.mockReturnValue({
+      isGitHub: true,
+      owner: 'eltmon',
+      repo: 'overdeck',
+      number: 830,
+    });
+    mockExec.mockRejectedValueOnce(new Error('connect ETIMEDOUT'));
+
+    const first = await fetchIssuePullRequest('PAN-830');
+    expect(first.error).toContain('gh pr list failed');
+    expect(first.error).toContain('ETIMEDOUT');
+
+    mockExec
+      .mockResolvedValueOnce({ stdout: JSON.stringify([{ number: 642, state: 'OPEN', mergedAt: null }]), stderr: '' })
+      .mockResolvedValueOnce({ stdout: '[]', stderr: '' })
+      .mockResolvedValueOnce({ stdout: JSON.stringify({ number: 642, state: 'OPEN' }), stderr: '' });
+
+    const second = await fetchIssuePullRequest('PAN-830');
+    expect(second.pr?.number).toBe(642);
+  });
+
+  it('still caches an absent answer (PAN-4821)', async () => {
+    mockResolveGitHubIssue.mockReturnValue({
+      isGitHub: true,
+      owner: 'eltmon',
+      repo: 'overdeck',
+      number: 830,
+    });
+    mockExec.mockResolvedValueOnce({ stdout: '', stderr: '' }).mockResolvedValueOnce({ stdout: '', stderr: '' });
+
+    const first = await fetchIssuePullRequest('PAN-830');
+    const second = await fetchIssuePullRequest('PAN-830');
+
+    expect(first.pr).toBeNull();
+    expect(first.error).toBeUndefined();
+    expect(second.pr).toBeNull();
+    expect(second.error).toBeUndefined();
+    expect(mockExec).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe('fetchIssuePullRequestDiff — GET /api/issues/:id/pr/diff', () => {

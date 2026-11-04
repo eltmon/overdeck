@@ -9,6 +9,8 @@ import {
   getTodayCost,
   getTodayCostSummary,
   getCostsByIssue,
+  getCostsByIssueFullScan,
+  COST_ISSUE_ROLLUP_READ_SQL,
   getCostForIssueAggregate,
   getAgentCostStats,
   getEffortRollup,
@@ -16,6 +18,7 @@ import {
 import { buildAgentStatsSnapshot } from '../../../src/dashboard/server/routes/resources/agents-stats.js';
 import { closeOverdeckDatabase, getOverdeckDatabase } from '../../../src/lib/overdeck/infra.js';
 import type { CostEvent } from '../../../src/lib/costs/events.js';
+import type { IssueAggregate } from '../../../src/lib/overdeck/cost-sync.js';
 
 let originalOverdeckHome: string | undefined;
 let testHome: string;
@@ -204,6 +207,81 @@ describe('getCostsByIssue', () => {
     });
     expect(Object.values(result!.providers).reduce((sum, cost) => sum + cost, 0)).toBeCloseTo(result!.totalCost, 8);
     expect(Object.values(result!.models).reduce((sum, model) => sum + model.cost, 0)).toBeCloseTo(result!.totalCost, 8);
+  });
+});
+
+const ROLLUP_ISSUES = [null, 'pan-1', 'PAN-1', 'PAN-2', 'pan-3', 'UNKNOWN'] as const;
+const ROLLUP_STAGES = ['work', 'review', 'planning'] as const;
+const ROLLUP_MODELS = ['model-a', 'model-b', 'unknown'] as const;
+
+function seedRollupRows(count: number, offset: number, issues: ReadonlyArray<string | null> = ROLLUP_ISSUES): void {
+  const insert = getOverdeckDatabase().prepare(
+    `INSERT INTO cost_events (
+      ts, issue_id, session_type, provider, model, input, output, cache_read, cache_write, cost, request_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  );
+  for (let i = offset; i < offset + count; i += 1) {
+    insert.run(
+      1_700_000_000_000 + i * 1000,
+      issues[i % issues.length],
+      ROLLUP_STAGES[i % ROLLUP_STAGES.length],
+      i % 5 === 0 ? null : 'anthropic',
+      ROLLUP_MODELS[i % ROLLUP_MODELS.length],
+      i * 3, i * 2, i, i % 7,
+      0.1 * i,
+      `rollup-${i}`,
+    );
+  }
+}
+
+function expectAggregateEqual(actual: Record<string, IssueAggregate>, expected: Record<string, IssueAggregate>): void {
+  expect(Object.keys(actual).sort()).toEqual(Object.keys(expected).sort());
+  for (const [key, want] of Object.entries(expected)) {
+    const got = actual[key]!;
+    const { totalCost, models, stages, providers, ...rest } = got;
+    const { totalCost: wantTotal, models: wantModels, stages: wantStages, providers: wantProviders, ...wantRest } = want;
+    expect(rest).toEqual(wantRest);
+    expect(totalCost).toBeCloseTo(wantTotal, 6);
+    for (const [breakdown, wantBreakdown] of [[models, wantModels], [stages, wantStages]] as const) {
+      expect(Object.keys(breakdown).sort()).toEqual(Object.keys(wantBreakdown).sort());
+      for (const [name, { cost, ...counts }] of Object.entries(wantBreakdown)) {
+        expect({ calls: breakdown[name]!.calls, tokens: breakdown[name]!.tokens }).toEqual(counts);
+        expect(breakdown[name]!.cost).toBeCloseTo(cost, 6);
+      }
+    }
+    expect(Object.keys(providers).sort()).toEqual(Object.keys(wantProviders).sort());
+    for (const [name, cost] of Object.entries(wantProviders)) expect(providers[name]).toBeCloseTo(cost, 6);
+  }
+}
+
+describe('getCostsByIssue rollup (PAN-4724)', () => {
+  it('equals the full-scan aggregate', () => {
+    seedRollupRows(200, 1);
+
+    const rollup = getCostsByIssue();
+    expectAggregateEqual(rollup, getCostsByIssueFullScan());
+    expect(Object.keys(rollup)).toContain('null');
+    expect(Object.keys(rollup)).toContain('PAN-1');
+  });
+
+  it('stays equal after further inserts', () => {
+    seedRollupRows(200, 1);
+    expectAggregateEqual(getCostsByIssue(), getCostsByIssueFullScan());
+
+    seedRollupRows(50, 201, ['PAN-NEW', null, 'pan-2', 'PAN-1']);
+
+    const rollup = getCostsByIssue();
+    expect(Object.keys(rollup)).toContain('PAN-NEW');
+    expectAggregateEqual(rollup, getCostsByIssueFullScan());
+  });
+
+  it('never reads cost_events', () => {
+    const db = getOverdeckDatabase();
+    for (const sql of Object.values(COST_ISSUE_ROLLUP_READ_SQL)) {
+      const plan = db.prepare(`EXPLAIN QUERY PLAN ${sql}`).all<{ detail: string }>().map((row) => row.detail).join('\n');
+      expect(plan).toContain('cost_issue_rollup');
+      expect(plan).not.toContain('cost_events');
+    }
   });
 });
 

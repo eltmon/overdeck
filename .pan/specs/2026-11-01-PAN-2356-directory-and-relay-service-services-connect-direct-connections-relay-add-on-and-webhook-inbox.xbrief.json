@@ -1,0 +1,2001 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-01T13:33:03Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2356: Directory and relay service: services/connect, direct connections, relay add-on and webhook inbox",
+    "updated": "2026-11-01T13:33:59.716Z"
+  },
+  "plan": {
+    "id": "pan-2356",
+    "title": "Directory and relay service: services/connect, direct connections, relay add-on and webhook inbox",
+    "status": "running",
+    "uid": "27233510-1346-4ff6-bc30-045c591402b8",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-01T13:33:03Z",
+    "updated": "2026-11-01T13:33:59.716Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2356",
+        "label": "PAN-2356",
+        "type": "issue"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2356/.pan/drafts/pan-2356.md",
+        "label": "PRD draft (.pan/drafts/pan-2356.md)",
+        "type": "prd"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2356/.pan/drafts/pan-2350.md",
+        "label": "Epic PRD (.pan/drafts/pan-2350.md, revision 5)",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "anywhere",
+      "directory",
+      "relay",
+      "webrtc",
+      "cloudflare-worker",
+      "durable-objects",
+      "webhook-inbox",
+      "security"
+    ],
+    "metadata": {
+      "sizeJustification": "The operator's epic (pan-2350.md, Issue disposition) assigns W-LINK5, W-LINK8 and the directory inbox of W-INT1 to this one issue. All three are served by one Cloudflare Worker (services/connect), one Durable Object class, one wire protocol (packages/contracts/src/connect.ts) and one machine-side directory client, so sibling issues would serialize on the same files and could not be verified separately: the Done-when checks need the Worker and the client together (D-2356-20). The plan is decomposed into 24 independently reviewable items instead.",
+      "canonicalFilename": "2026-11-01-PAN-2356-directory-and-relay-service-services-connect-direct-connections-relay-add-on-and-webhook-inbox.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Two Overdeck machines on different networks without Tailscale cannot reach each other, and a webhook trigger loses every event sent while its machine is offline. PAN-4645 built the secure channel and the link supervisor; nothing provides the overdeck.ai directory, peer-to-peer routes, a relay fallback or an inbox (verified on main 1c20fe2c38b).",
+      "Proposal": "Build services/connect, a Cloudflare Worker with one AccountDirectory Durable Object per account: presence and a per-plan machine limit (3 on the free plan), signalling for WebRTC, TURN credentials with monthly metering and a 50 GB cap for relay-plan accounts, and a webhook inbox that seals each event to the machine key and keeps only sealed bytes for at most 24 hours. On the machine, add a directory client, a werift WebRTC transport carrying the existing Noise secure channel as rtc:// (direct) and rtc+turn:// (relay) dynamic routes probed after LAN/Tailscale routes, a two-screen approval flow that links account machines without a pairing code, the relay status on the Anywhere card, and inbox delivery into the PAN-4648 trigger core.",
+      "NonGoals": "- Billing, Creem products or a working Add 50 GB purchase (PAN-4294); the button only links to https://overdeck.ai/anywhere\n- Opening overdeck.ai sign-up to non-allowlisted GitHub users\n- Deploying services/connect or services/account to Cloudflare, or running the live cross-network checks (operator checkpoint, D-2356-21)\n- Persisting rtc:// or rtc+turn:// routes in machine-links.json\n- Any change to services/share or Shared Sessions\n- pan connect / npx @overdeck/core connect (PAN-4656)\n- Webhook trigger features beyond the inbox flag: Funnel delivery, signature checks and pan triggers management stay as PAN-4648 built them\n- A Settings UI field for anywhere.directory_url\n- Per-gigabyte billing, relay for free accounts, or multi-region relay selection\n- Directory machines in the conversation sidebar or fleet views (PAN-4650)\n- Any edit to src/cli/index.ts, src/lib/settings-api.ts or src/dashboard/server/main.ts"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Free plan comes from the existing grants.entitlement column: 'free' maps to { plan: 'free', maxDevices: 3 }; everything else stays 'tester' (D-2356-3).",
+        "rationale": "The account service is invite-only and has only plan 'tester'; this makes the 3-machine limit testable without opening public sign-up, and OD-3 says paid tiers stay allowlist-only until billing."
+      },
+      {
+        "summary": "Approval needs confirmation on both machines with a six-digit code from the Noise XX handshake hash (D-2356-9/10), tightening FR-20's one-sided approval.",
+        "rationale": "D-18 forbids a compromised directory making any machine trust an impostor; a one-sided approval leaves the new machine trusting whoever approves it. Numeric comparison closes that gap at the cost of one extra click."
+      },
+      {
+        "summary": "direct and relay routes are dynamic, provided by the directory client and never written to machine-links.json (D-2356-7).",
+        "rationale": "link-store isRoute rejects unknown schemes and a rejected file empties every link, so persisting rtc:// would drop all links on a downgrade."
+      },
+      {
+        "summary": "Probing runs in three phases: LAN/tailnet/public at 2.5 s, then direct at 10 s, then relay at 10 s (D-2356-8).",
+        "rationale": "WebRTC setup across NAT cannot finish in 2.5 s, and FR-21 requires the relay only when every other route failed; phasing also avoids WebRTC negotiation while LAN works."
+      },
+      {
+        "summary": "The relay channel initiator reports ciphertext bytes every 60 s and on close; the cap stops new TURN credentials (600 s TTL) and broadcasts stopped (D-2356-12). Add 50 GB links to https://overdeck.ai/anywhere.",
+        "rationale": "One reporter per channel avoids double counting; the account's own machines are already trusted with its data; billing is out of scope."
+      },
+      {
+        "summary": "Inbox URL is /h/<doId>.<secret> with a 256 KiB body cap, 200 pending events per inbox and 64 MiB per account (D-2356-13/14).",
+        "rationale": "Encoding the Durable Object id routes without a global index; each sealed event must fit one WebSocket message after base64."
+      },
+      {
+        "summary": "Sealed box: Worker seals with pinned @noble 2.4.0 libraries, machine opens with sodium-native 5.2.0 crypto_box_seal_open, proven by a fixed-vector interop test (D-2356-16).",
+        "rationale": "D-20 names an X25519 sealed box; libsodium is the reference implementation and sodium-native is already in the lockfile via the Noise stack."
+      },
+      {
+        "summary": "werift pinned at 0.25.1 and bundled; one peer connection per (peer, kind) with a data channel per secure-channel connection (D-2356-11).",
+        "rationale": "The epic chose werift; 0.25.1 is the newest release older than two weeks; LinkAgent pools up to four channels per machine."
+      },
+      {
+        "summary": "Inbox delivery skips only the URL-secret step of the trigger core and measures the Stripe 300 s tolerance against the sealed receivedAt (D-2356-17).",
+        "rationale": "The inbox secret already authorised the sender, and a 24-hour hold would otherwise fail every Stripe signature."
+      },
+      {
+        "summary": "Keep all three work items in one plan with plan.metadata.sizeJustification (D-2356-20).",
+        "rationale": "The operator's epic assigns them to this issue and they share one Worker, Durable Object, protocol and client."
+      },
+      {
+        "summary": "anywhere.directory_url is read straight from config.yaml with no Settings UI field (D-2356-19).",
+        "rationale": "settings-api.ts is over the file-size ceiling; Settings saves preserve unknown YAML blocks (setBlockMergePreserving)."
+      }
+    ],
+    "items": [
+      {
+        "id": "wi1-contracts",
+        "title": "Connect wire protocol contracts in packages/contracts/src/connect.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T13:33:03Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-2356",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/connect.ts",
+            "packages/contracts/src/index.ts",
+            "packages/contracts/src/__tests__/connect.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run packages/contracts/src/__tests__/connect.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "connect.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-20",
+            "FR-21",
+            "FR-26i",
+            "NFR-2356-1"
+          ],
+          "foundationFor": [
+            "wi5-do-presence",
+            "wi6-do-signaling",
+            "wi7-do-relay",
+            "wi8-do-inbox",
+            "wi9-directory-client"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Define the directory wire protocol exactly as the PRD \"Wire protocol\" section lists it: type-only discriminated unions MachineToDirectoryFrame and DirectoryToMachineFrame (the Worker imports them by relative path, like services/share imports packages/contracts/src/sharing.ts), SignalData imported from sharing.ts, the error codes, the close codes 4001/4003/4009/4010/4011/4012, CONNECT_PROTOCOL_VERSION = 1, RELAY_MONTHLY_CAP_BYTES = 50_000_000_000, INBOX_BODY_MAX_BYTES = 262_144, INBOX_HOLD_MS = 86_400_000, APPROVAL_TTL_MS = 600_000, and the three exact strings FREE_MACHINE_LIMIT_MESSAGE, NO_DIRECT_PATH_MESSAGE, RELAY_CAP_MESSAGE. Add Effect Schema structs DirectoryMachineView, DirectoryApprovalView, DirectoryJoinView, RelayStatusView and DirectoryResponse following packages/contracts/src/machines.ts. Export from index.ts."
+        },
+        "items": [
+          {
+            "id": "wi1-contracts.ac1",
+            "title": "Given the contracts package, when connect.test.ts imports FREE_MACHINE_LIMIT_MESSAGE, NO_DIRECT_PATH_MESSAGE and RELAY_CAP_MESSAGE, then they equal exactly \"The free account includes 3 machines\", \"No direct path; install Tailscale or use the relay plan\" and \"Relay allowance used; install Tailscale or add 50 GB\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-contracts.ac2",
+            "title": "Given a sample DirectoryResponse object, when Schema.decodeUnknownSync(DirectoryResponse) runs, then it accepts the sample and rejects the same object with state \"paused\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-contracts.ac3",
+            "title": "Given the constants, when the test reads RELAY_MONTHLY_CAP_BYTES and INBOX_BODY_MAX_BYTES, then it returns 50_000_000_000 and 262_144",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi2-account-free-plan",
+        "title": "Free plan entitlement in services/account (plan free with maxDevices 3)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T13:33:03Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2356",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "services/account/src/entitlement.ts",
+            "services/account/src/devices.ts",
+            "tests/unit/services/account/entitlement.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/services/account/",
+            "npm run typecheck:account"
+          ],
+          "expected_outputs": [
+            "all account unit tests pass",
+            "typecheck:account completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-20a"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2 and D-2356-3. Widen Entitlement.plan to \"free\" | \"tester\", export FREE_PLAN_MAX_MACHINES = 3, and make entitlementFor(grant) read the grant row's existing entitlement column: \"free\" gives { plan: \"free\", maxDevices: 3 }, anything else and the owner give { plan: \"tester\", maxDevices: null } (use the before/after snippet in the PRD). Update the call at services/account/src/devices.ts:152 to pass entitlement: row.entitlement, adding g.entitlement to the lookup query select if missing. Do not change who may sign in."
+        },
+        "items": [
+          {
+            "id": "wi2-account-free-plan.ac1",
+            "title": "Given a grant row with entitlement \"free\", when verifyDevice runs for that account's device, then it returns entitlement { plan: \"free\", maxDevices: 3 }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-account-free-plan.ac2",
+            "title": "Given a grant row with entitlement \"tester\" or the owner account, when verifyDevice runs, then it returns { plan: \"tester\", maxDevices: null }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-account-free-plan.ac3",
+            "title": "Given the existing account unit tests, when npx vitest run tests/unit/services/account/ runs, then every test passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi3-connect-scaffold",
+        "title": "Scaffold services/connect Worker with account check, healthz and typecheck lane",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T13:33:03Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-2356",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "services/connect/package.json",
+            "services/connect/tsconfig.json",
+            "services/connect/wrangler.jsonc",
+            "services/connect/.gitignore",
+            "services/connect/.dev.vars.example",
+            "services/connect/src/index.ts",
+            "services/connect/src/env.ts",
+            "services/connect/src/routes.ts",
+            "services/connect/src/account.ts",
+            "services/connect/src/http.ts",
+            "package.json",
+            "bun.lock",
+            "README.md",
+            "tests/unit/services/connect/routes.test.ts",
+            "tests/integration/services/connect/miniflare.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/services/connect/routes.test.ts tests/integration/services/connect/miniflare.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both connect test files pass",
+            "typecheck completes without errors including typecheck:connect"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3 and D-2356-1/2. Create services/connect as a Bun workspace copying services/share: same devDependency pins, tsconfig, compatibility_date, only src/index.ts imports cloudflare:workers. wrangler.jsonc exactly as the PRD lists (name overdeck-connect, custom domain connect.overdeck.ai, DO binding DIRECTORY class AccountDirectory with migration v1 new_sqlite_classes, ACCOUNT service binding to overdeck-account entrypoint AccountRpc, ratelimits INBOX_LIMIT 1101 and CONNECT_LIMIT 1102, vars PUBLIC_BASE_URL and STUN_URLS, secrets comment TURN_KEY_ID and TURN_KEY_API_TOKEN). account.ts copies services/share/src/account.ts. GET /healthz returns { ok: true, turn: boolean }. AccountDirectory is an empty Durable Object class for now. Root package.json: add the workspace, typecheck:connect, chain it into typecheck after typecheck:share. README.md:264 names the connect service in the FSL licensing line. Tests follow the share recipe (unit with fake ACCOUNT; Miniflare with wrangler deploy --dry-run bundle and inline AccountRpc stub)."
+        },
+        "items": [
+          {
+            "id": "wi3-connect-scaffold.ac1",
+            "title": "Given the root package.json, when npm run typecheck runs, then it runs typecheck:connect and completes without errors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-connect-scaffold.ac2",
+            "title": "Given no Authorization header, when the unit test calls GET /v1/directory, then the Worker answers 401; given a token the fake ACCOUNT reports grant_expired, then it answers 403",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-connect-scaffold.ac3",
+            "title": "Given the Miniflare-hosted bundle, when the integration test requests GET /healthz, then it returns 200 with ok true and turn false when TURN secrets are unset",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi4-sealed-box",
+        "title": "Sealed box: seal in the Worker with noble, open on the machine with sodium-native",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T13:33:03Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2356",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "services/connect/src/seal.ts",
+            "services/connect/package.json",
+            "src/lib/anywhere/sealed-box.ts",
+            "package.json",
+            "bun.lock",
+            "tests/unit/services/connect/seal-interop.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/services/connect/seal-interop.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "seal-interop.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-26i",
+            "NFR-2356-1"
+          ],
+          "foundationFor": [
+            "wi8-do-inbox",
+            "wi19-inbox-delivery"
+          ],
+          "parallelSafeReason": "Runs in its own slot once its DAG predecessors land; every file it shares with another item is ordered by a blocks edge, so no unordered item mutates its files_scope."
+        },
+        "narrative": {
+          "Action": "PRD WI-4 and D-2356-16. services/connect/src/seal.ts exports sealTo(recipientPublicKey, message) producing libsodium crypto_box_seal format (epk || XSalsa20-Poly1305 ciphertext, nonce = BLAKE2b-192(epk || rpk), key = HSalsa20 of the X25519 shared secret) using @noble/curves@2.4.0, @noble/ciphers@2.4.0 and @noble/hashes@2.4.0 pinned exactly in services/connect/package.json. src/lib/anywhere/sealed-box.ts exports openSealed(sealed, keyPair) calling sodium-native crypto_box_seal_open (loaded with createRequire like src/lib/anywhere/channel/noise.ts:47), returning null on any failure. Add \"sodium-native\": \"5.2.0\" as a direct root dependency (already external in both tsdown configs; confirm it stays listed). No Worker code may import node: modules."
+        },
+        "items": [
+          {
+            "id": "wi4-sealed-box.ac1",
+            "title": "Given a fixed 32-byte X25519 key pair and a fixed message, when sealTo seals it and openSealed opens it, then the opened bytes equal the message and the sealed length equals message length plus 48",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-sealed-box.ac2",
+            "title": "Given a sealed message with one byte flipped, when openSealed runs, then it returns null and does not throw",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-sealed-box.ac3",
+            "title": "Given a message sealed by sodium-native crypto_box_seal, when openSealed opens it, then it returns the message, proving the Worker and the machine use the same libsodium format",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi5-do-presence",
+        "title": "AccountDirectory Durable Object: presence registry and the free 3-machine limit",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T13:33:03Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2356",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "services/connect/src/directory.ts",
+            "services/connect/src/directory-state.ts",
+            "services/connect/src/protocol.ts",
+            "services/connect/src/log.ts",
+            "services/connect/src/index.ts",
+            "services/connect/src/routes.ts",
+            "tests/unit/services/connect/directory-state.test.ts",
+            "tests/integration/services/connect/miniflare.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/services/connect/directory-state.test.ts tests/integration/services/connect/miniflare.test.ts",
+            "npm run typecheck:connect"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck:connect completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-20",
+            "FR-20a",
+            "NFR-2356-1",
+            "NFR-2356-2"
+          ],
+          "parallelSafeReason": "Runs in its own slot once its DAG predecessors land; every file it shares with another item is ordered by a blocks edge, so no unordered item mutates its files_scope."
+        },
+        "narrative": {
+          "Action": "PRD WI-5, D-2356-2/4/5, NFR-2356-1/2. GET /v1/directory verifies the device and forwards the upgrade to DIRECTORY.idFromName(userId) with X-Connect-Identity. The DO stores machines(environment_id PK, label, public_key_hex, fingerprint, endpoints_json, server_version, device_id, registered_at, last_seen_at) and meta(key, value) in ctx.storage.sql. hello registers or updates; a new environment id when rows >= maxDevices gets error machine_limit with FREE_MACHINE_LIMIT_MESSAGE and close 4009; a second socket for the same id closes the first with 4011; forget deletes a row and closes that socket with 4012; any change broadcasts directory; hello answers welcome. Fingerprint = first 10 bytes of SHA-256 of the key as five groups of four hex, via WebCrypto. Pure reducer in directory-state.ts (share room-state pattern), decoder in protocol.ts (known keys only, 64 KiB, label <= 64 chars, <= 16 endpoints), and log.ts is the only logging function and writes only frame type, environment id and outcome. ping/pong via setWebSocketAutoResponse."
+        },
+        "items": [
+          {
+            "id": "wi5-do-presence.ac1",
+            "title": "Given a free account with 3 registered machines, when a fourth environment id sends hello, then the socket receives error machine_limit with message \"The free account includes 3 machines\" and closes with code 4009",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-do-presence.ac2",
+            "title": "Given a registered machine, when forget names it, then the directory frame sent to the other sockets no longer lists it and a new fourth machine can register",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-do-presence.ac3",
+            "title": "Given a second socket for the same environment id, when it sends hello, then the first socket closes with code 4011",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-do-presence.ac4",
+            "title": "Given hello carrying a label with a unique marker string, when the Miniflare test captures console output, then the captured logs contain no marker text, only frame types and environment ids",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi6-do-signaling",
+        "title": "Durable Object signalling relay, STUN servers and pending approvals",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T13:33:03Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2356",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "services/connect/src/directory.ts",
+            "services/connect/src/directory-state.ts",
+            "services/connect/src/protocol.ts",
+            "services/connect/src/approvals.ts",
+            "tests/unit/services/connect/approvals.test.ts",
+            "tests/integration/services/connect/miniflare.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/services/connect/approvals.test.ts tests/integration/services/connect/miniflare.test.ts",
+            "npm run typecheck:connect"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck:connect completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-20",
+            "NFR-2356-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6, D-2356-6, D-2356-9 limits. signal frames are forwarded to the target socket with from stamped from the sender socket attachment (never from the frame); an offline target answers error peer_offline with the session. Frame caps: 64 KiB frame, 32 KiB SDP, 2 KiB candidate. purpose approval signals pass only between the requester of a live approval and its target (or any other account machine when to is null), else error approval_unknown. ice-servers relay false answers STUN_URLS split on commas. approval-request stores approvals(request_id PK, from_env, to_env, created_at, expires_at) and forwards to the target or every other online machine; limits 1 pending per requester, 5 per account (error approval_limit), 10-minute expiry checked on read; welcome also delivers live approvals targeting that socket; approval-cancel deletes and forwards."
+        },
+        "items": [
+          {
+            "id": "wi6-do-signaling.ac1",
+            "title": "Given machines A and B online, when A sends a signal to B with a forged from field, then B receives the signal with from equal to A's environment id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-do-signaling.ac2",
+            "title": "Given B offline, when A signals B, then A receives error peer_offline carrying the same session id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-do-signaling.ac3",
+            "title": "Given an account with 5 pending approvals, when a sixth approval-request arrives, then the sender receives error approval_limit; and given 10 minutes of fake clock, then the expired approvals are gone",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-do-signaling.ac4",
+            "title": "Given no pending approval between A and B, when A sends a purpose approval signal to B, then A receives error approval_unknown and B receives nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi7-do-relay",
+        "title": "Durable Object TURN credentials and monthly relay metering with the 50 GB cap",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T13:33:03Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2356",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "services/connect/src/turn.ts",
+            "services/connect/src/relay-meter.ts",
+            "services/connect/src/directory.ts",
+            "services/connect/src/directory-state.ts",
+            "services/connect/src/protocol.ts",
+            "tests/unit/services/connect/relay-meter.test.ts",
+            "tests/integration/services/connect/miniflare.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/services/connect/relay-meter.test.ts tests/integration/services/connect/miniflare.test.ts",
+            "npm run typecheck:connect"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck:connect completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-21",
+            "NFR-2356-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7, D-2356-12. turn.ts copies services/share/src/turn.ts with TURN_TTL_SECONDS = 600. relay_usage(month PK, bytes) keyed by UTC YYYY-MM. ice-servers relay true refuses in order: relay_not_allowed (plan free), relay_cap_reached (month total >= cap), turn_unavailable (secrets unset); otherwise returns TURN iceServers. relay-usage adds bytes (integer 0..1e9, else bad_frame); when the total first reaches the cap, broadcast relay-status stopped true. A new month starts a fresh row. welcome includes the current RelayStatus. Optional Worker var RELAY_CAP_BYTES (positive integer) overrides RELAY_MONTHLY_CAP_BYTES; unset or invalid uses the constant."
+        },
+        "items": [
+          {
+            "id": "wi7-do-relay.ac1",
+            "title": "Given a free plan socket, when it sends ice-servers relay true, then it receives error relay_not_allowed and no TURN fetch is made",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7-do-relay.ac2",
+            "title": "Given a tester account under the cap, when it sends ice-servers relay true, then it receives the stubbed TURN iceServers and the stubbed Cloudflare request body carries ttl 600",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7-do-relay.ac3",
+            "title": "Given usage that crosses 50_000_000_000 bytes, when the relay-usage frame is applied, then every socket receives relay-status with stopped true and the next ice-servers relay true gets relay_cap_reached",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7-do-relay.ac4",
+            "title": "Given the cap was reached in November, when the fake clock moves to 1 December UTC, then the same account receives TURN credentials again",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi8-do-inbox",
+        "title": "Durable Object webhook inbox: sealed intake at /h/<id>, delivery, ack and 24-hour expiry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T13:33:03Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2356",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "services/connect/src/inbox.ts",
+            "services/connect/src/inbox-intake.ts",
+            "services/connect/src/directory.ts",
+            "services/connect/src/directory-state.ts",
+            "services/connect/src/protocol.ts",
+            "services/connect/src/routes.ts",
+            "services/connect/src/index.ts",
+            "tests/unit/services/connect/inbox.test.ts",
+            "tests/integration/services/connect/miniflare.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/services/connect/inbox.test.ts tests/integration/services/connect/miniflare.test.ts",
+            "npm run typecheck:connect"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck:connect completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-26i",
+            "NFR-2356-1",
+            "NFR-2356-4"
+          ],
+          "parallelSafeReason": "Runs in its own slot once its DAG predecessors land; every file it shares with another item is ordered by a blocks edge, so no unordered item mutates its files_scope."
+        },
+        "narrative": {
+          "Action": "PRD WI-8, D-2356-13/14/15/18, D-20. Tables inboxes(inbox_id PK, secret_hash UNIQUE, environment_id, created_at) and inbox_events(event_id PK, inbox_id, environment_id, received_at, size, next_attempt_at, sealed BLOB). inbox-create (refused plan_required on free) returns inbox-created with url PUBLIC_BASE_URL/h/<doId>.<secret> (doId = 64-hex DO id, secret 32 hex) and stores only SHA-256(secret). POST /h/:id: split on the dot, idFromString(doId) (invalid -> 404 not found), constant-time hash compare (wrong -> identical 404), read at most 262_144 bytes while streaming (413), per-inbox 200 pending and per-account 64 MiB caps (429 Retry-After 3600), INBOX_LIMIT 120/min, plan free -> 403; seal the D-2356-15 JSON with sealTo to the owner machine key, insert, answer 202 { queued: true }, push inbox-event if the machine is online. inbox-ack deletes; inbox-nack sets next_attempt_at = now + max(retryAfter, 60 s) and arms the alarm; welcome sends all pending in received_at order; alarm deletes rows older than 24 h and re-sends due rows. inbox-delete only by the owning machine. forget of a machine (WI-5) also deletes that machine's inboxes and their pending events."
+        },
+        "items": [
+          {
+            "id": "wi8-do-inbox.ac1",
+            "title": "Given the machine offline, when a POST carrying the marker PLAINTEXT-MARKER-2356 reaches its inbox URL, then the response is 202 and a dump of every Durable Object table row, BLOBs decoded as text, contains no marker",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8-do-inbox.ac2",
+            "title": "Given that held event, when the machine reconnects, then it receives inbox-event and openSealed with the machine key returns the original body bytes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8-do-inbox.ac3",
+            "title": "Given an unacknowledged event, when the fake clock advances 24 hours and 1 ms and the alarm runs, then the event row is deleted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8-do-inbox.ac4",
+            "title": "Given a body of 262_145 bytes, when it is posted, then the inbox answers 413; and given a wrong secret or a malformed doId, then both answer the identical 404 body",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi9-directory-client",
+        "title": "Machine directory client service, anywhere.directory_url reader and GET /api/directory",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T13:33:03Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2356",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/anywhere/directory-config.ts",
+            "src/lib/anywhere/__tests__/directory-config.test.ts",
+            "src/dashboard/server/services/directory-client.ts",
+            "src/dashboard/server/services/__tests__/directory-client.test.ts",
+            "src/dashboard/server/routes/directory.ts",
+            "src/dashboard/server/services/anywhere-boot.ts",
+            "src/dashboard/server/server.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/anywhere/__tests__/directory-config.test.ts src/dashboard/server/services/__tests__/directory-client.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "all three test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-20",
+            "FR-2356-1",
+            "FR-2356-2",
+            "NFR-8",
+            "NFR-2356-2",
+            "NFR-2356-3",
+            "NFR-2356-4"
+          ],
+          "parallelSafeReason": "Runs in its own slot once its DAG predecessors land; every file it shares with another item is ordered by a blocks edge, so no unordered item mutates its files_scope."
+        },
+        "narrative": {
+          "Action": "PRD WI-9, FR-2356-1/2, D-2356-19. directory-config.ts reads anywhere.directory_url from ${OVERDECK_HOME}/config.yaml with js-yaml (pattern of src/lib/remote-access/config.ts), default https://connect.overdeck.ai, https only except http to a loopback host. DirectoryClient: idle when readAccount() is null; else ws to <url>/v1/directory with Authorization Bearer accessToken, hello from ensureMachineKey/ensureEnvironmentIdentity/advertiser endpoints; back-off 1 s doubling to 300 s +/-20% reset on welcome; closes 4001/4003/4009/4010 set state refused with the message and stop retrying until account.json changes (checked every 60 s); ping every 30 s, 75 s without pong reconnects; send endpoints when the advertiser hash changes; status(), on(type, handler), send(frame), machine(envId); module source setDirectoryClient/currentDirectoryClient. Start it in anywhere-boot.ts after the advertiser on the primary dashboard and stop it in stopAnywhere. GET /api/directory (admin scope by default) returns DirectoryResponse; register directoryRouteLayer in server.ts next to machinesRouteLayer; declare the route as HttpRouter.add('GET', '/api/directory', ...) so tests/unit/lib/overdeck/no-loss-matrix.test.ts enumerates it, and add the no-loss-matrix row. All timer tests use fake timers."
+        },
+        "items": [
+          {
+            "id": "wi9-directory-client.ac1",
+            "title": "Given no account.json, when the client starts, then it opens no WebSocket and GET /api/directory returns signedIn false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi9-directory-client.ac2",
+            "title": "Given a loopback ws server that closes with 4009 and reason text, when the client connects, then status().state is refused with refusal \"The free account includes 3 machines\" and no reconnect happens within 10 minutes of fake clock",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi9-directory-client.ac3",
+            "title": "Given a server that drops the socket, when fake time advances, then the client reconnects after about 1 s and then about 2 s (within the 20% jitter)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi9-directory-client.ac4",
+            "title": "Given anywhere.directory_url http://example.com, when readDirectoryUrl runs, then it returns an error; given http://127.0.0.1:8787, then it returns that URL",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi10-rtc-transport",
+        "title": "WebRTC transport on werift: data channel Duplex with chunking and backpressure",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T13:33:03Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2356",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/anywhere/channel/rtc-duplex.ts",
+            "src/lib/anywhere/channel/rtc-transport.ts",
+            "src/lib/anywhere/channel/__tests__/rtc-transport.test.ts",
+            "package.json",
+            "bun.lock"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/lib/anywhere/channel/__tests__/rtc-transport.test.ts",
+            "npm run typecheck",
+            "npm run build"
+          ],
+          "expected_outputs": [
+            "rtc-transport.test.ts passes",
+            "typecheck completes without errors",
+            "build completes and dist/dashboard/server.js exists"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-20",
+            "FR-21",
+            "NFR-2356-5"
+          ],
+          "parallelSafeReason": "Runs in its own slot once its DAG predecessors land; every file it shares with another item is ordered by a blocks edge, so no unordered item mutates its files_scope."
+        },
+        "narrative": {
+          "Action": "PRD WI-10, D-2356-11, NFR-2356-5. Add \"werift\": \"0.25.1\" exactly. RtcTransport(port: RtcSignalingPort, onIncoming) with dial(peerEnvironmentId, { relay, purpose, signal }) -> Promise<Duplex> and close(peer?). One RTCPeerConnection per (peer, relay) reused; each dial opens a new ordered reliable data channel labelled ovdl; offer/answer/ICE through port.send/onSignal; iceServers from port.iceServers(relay); relay uses iceTransportPolicy relay on the initiator only; abort rejects. rtc-duplex.ts wraps a data channel as a Duplex: writes split into <= 16 KiB chunks, pause while bufferedAmount > 1 MiB and resume on bufferedamountlow (threshold 256 KiB), destroy closes the channel, close/end emitted on channel close, remoteAddress rtc:<first 16 hex>. Implementation checkpoint: after npm run build confirm dist/dashboard/server.js loads werift; fallback is neverBundle werift in both tsdown configs plus the desktop server-resources lists (PRD WI-10)."
+        },
+        "items": [
+          {
+            "id": "wi10-rtc-transport.ac1",
+            "title": "Given two in-process RtcTransport instances joined by an in-memory signalling port, when A dials B, then the returned Duplex round-trips 10 bytes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi10-rtc-transport.ac2",
+            "title": "Given that connection, when A writes 1 MiB in one write, then B receives identical bytes in under 5 s",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi10-rtc-transport.ac3",
+            "title": "Given two dials from A to B, when both resolve, then exactly one RTCPeerConnection exists for B and two data channels are open",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi10-rtc-transport.ac4",
+            "title": "Given a dial whose AbortSignal aborts before connection, when the abort fires, then dial rejects",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi11-rtc-routes",
+        "title": "direct and relay route kinds: rtc:// URLs dialed through the secure channel and accepted by the listener",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T13:33:03Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2356",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/anywhere/routes.ts",
+            "src/lib/anywhere/__tests__/routes.test.ts",
+            "src/lib/anywhere/channel/open.ts",
+            "src/dashboard/server/channel-listener.ts",
+            "src/dashboard/server/services/directory-rtc.ts",
+            "src/dashboard/server/services/anywhere-boot.ts",
+            "src/dashboard/server/__tests__/channel-rtc.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/anywhere/__tests__/routes.test.ts src/dashboard/server/__tests__/channel-rtc.test.ts src/dashboard/server/__tests__/channel-listener.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "all three test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-20",
+            "FR-21"
+          ],
+          "parallelSafeReason": "Runs in its own slot once its DAG predecessors land; every file it shares with another item is ordered by a blocks edge, so no unordered item mutates its files_scope."
+        },
+        "narrative": {
+          "Action": "PRD WI-11. routes.ts: TransportKind gains rtc; parseRouteUrl accepts rtc://<uuid> as kind direct and rtc+turn://<uuid> as kind relay, rejects non-uuid. open.ts: TransportUrl gains both forms (before/after in the PRD); connectTransport dispatches them to a dialer registered with setRtcDialer(dialer | null); with none registered it throws ChannelOpenError(\"unreachable\", \"Direct connections need an overdeck.ai sign-in\"). channel-listener.ts exports acceptRawChannel(raw) that runs the existing accept closure (destroys raw when the listener is not installed). New directory-rtc.ts builds RtcTransport with a signalling port over the directory client (signal frames and ice-servers requests), registers the dialer, and hands incoming purpose link data channels to acceptRawChannel; start/stop from anywhere-boot.ts."
+        },
+        "items": [
+          {
+            "id": "wi11-rtc-routes.ac1",
+            "title": "Given two in-process dashboards wired through an in-memory directory port, when A calls openChannel(\"rtc://<B>\") in link mode, then GET /api/environment through that channel returns B's environment id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi11-rtc-routes.ac2",
+            "title": "Given the same channel, when A sends a request with a 1 MiB body, then B's HTTP server receives all bytes and responds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi11-rtc-routes.ac3",
+            "title": "Given no registered dialer, when openChannel(\"rtc://<uuid>\") runs, then it rejects with ChannelOpenError code unreachable",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi11-rtc-routes.ac4",
+            "title": "Given parseRouteUrl, when it receives rtc+turn://<uuid> and rtc://not-a-uuid, then it returns kind relay for the first and throws for the second",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi12-supervisor-phases",
+        "title": "Link supervisor: dynamic directory routes and phased probing with the No direct path detail",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T13:33:03Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2356",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/link-supervisor.ts",
+            "src/lib/anywhere/routes.ts",
+            "packages/contracts/src/machines.ts",
+            "src/dashboard/server/services/machine-link-service.ts",
+            "src/dashboard/server/services/directory-routes.ts",
+            "src/dashboard/server/services/anywhere-boot.ts",
+            "src/dashboard/server/services/__tests__/link-supervisor-phases.test.ts",
+            "src/dashboard/server/services/__tests__/directory-routes.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/link-supervisor-phases.test.ts src/dashboard/server/services/__tests__/directory-routes.test.ts src/dashboard/server/services/__tests__/link-supervisor.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "all three test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-20",
+            "FR-21",
+            "NFR-2356-4"
+          ],
+          "parallelSafeReason": "Runs in its own slot once its DAG predecessors land; every file it shares with another item is ordered by a blocks edge, so no unordered item mutates its files_scope."
+        },
+        "narrative": {
+          "Action": "PRD WI-12, D-2356-7/8. LinkSupervisorDeps gains dynamicRoutes?(link) and relayEntitled?(). The probe merges link.routes with dynamicRoutes(link) deduped by URL and runs phase 1 (non direct/relay kinds, 2.5 s), phase 2 (direct, DIRECT_PROBE_TIMEOUT_MS = 10_000) only when phase 1 gave no channel and no unknown-peer refusal, phase 3 (relay, RELAY_PROBE_TIMEOUT_MS = 10_000) only when phase 2 failed and a relay route exists; when phases 1 and 2 fail and relayEntitled() is false, stateDetail = NO_DIRECT_PATH_MESSAGE. RouteSource gains \"directory\" in packages/contracts/src/machines.ts and SOURCE_RANK gains directory: 3; link-store ROUTE_SOURCES is NOT changed and dynamic routes are never persisted. machineLinkView appends dynamic routes with status. directory-routes.ts provides dynamicRoutes: only when the directory lists the link environment id with the same publicKeyHex the link pinned; returns rtc://<id> (direct), rtc+turn://<id> (relay, only when relay entitled) and the peer's directory endpoints, source directory. Wire both deps in anywhere-boot.ts. Fake timers in all tests."
+        },
+        "items": [
+          {
+            "id": "wi12-supervisor-phases.ac1",
+            "title": "Given a link with a reachable tcp route plus dynamic direct and relay routes, when the supervisor probes, then the stub openChannel records only the tcp URL",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi12-supervisor-phases.ac2",
+            "title": "Given the tcp route unreachable, when phase 1 fails, then the direct route is dialed and becomes currentRoute; and given direct also unreachable with relay entitled, then the relay route is dialed last",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi12-supervisor-phases.ac3",
+            "title": "Given phases 1 and 2 failing and relayEntitled false, when probing finishes, then the link stateDetail equals \"No direct path; install Tailscale or use the relay plan\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi12-supervisor-phases.ac4",
+            "title": "Given a directory machine whose publicKeyHex differs from the pinned key, when dynamicRoutes runs, then it returns no routes; and machine-links.json written after a probe contains no rtc URL",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi13-approval-channel",
+        "title": "Approval channel mode (Noise XX, mode byte 0x03), SAS derivation and gate allowlist",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T13:33:03Z",
+        "metadata": {
+          "difficulty": "expert",
+          "kind": "backend",
+          "issueLabel": "pan-2356",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/lib/anywhere/channel/wire.ts",
+            "src/lib/anywhere/channel/noise.ts",
+            "src/lib/anywhere/channel/open.ts",
+            "src/lib/anywhere/channel/accept.ts",
+            "src/lib/anywhere/channel/channel-socket.ts",
+            "src/lib/anywhere/channel/__tests__/channel.test.ts",
+            "src/dashboard/server/remote-request-gate.ts",
+            "src/dashboard/server/__tests__/remote-request-gate.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/anywhere/channel/__tests__/channel.test.ts src/dashboard/server/__tests__/remote-request-gate.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-20",
+            "NFR-2356-1"
+          ],
+          "foundationFor": [
+            "wi14-approval-service",
+            "wi15-approval-ui",
+            "wi16-approval-cli"
+          ],
+          "parallelSafeReason": "Runs in its own slot once its DAG predecessors land; every file it shares with another item is ordered by a blocks edge, so no unordered item mutates its files_scope."
+        },
+        "narrative": {
+          "Action": "PRD WI-13, D-2356-9/10, D-18. wire.ts: ChannelMode gains approval, MODE_BYTES.approval = 0x03, the preamble appends the 16-byte request id for approval mode as for pairing. noise.ts: pattern union gains XX; xxInitiator/xxResponder; prologueFor(\"approval\", requestId); approvalSas(handshakeHash) = (uint32BE(SHA-256(\"overdeck-approve-sas/1\" || 0x00 || hash)[0..4]) mod 1_000_000) zero-padded to 6 digits and formatted \"123 456\". open.ts: OpenChannelOptions gains { mode: \"approval\", localKey, requestId }. accept.ts: AcceptChannelOptions.takeApproval?(requestId) -> boolean, refusal 03 when false, single use. channel-socket.ts: marker carries approvalSas. remote-request-gate.ts: APPROVAL_CHANNEL_ALLOWLIST = GET /api/environment and POST /api/machines/approval-exchange; an approval channel reaches only those (401 otherwise); POST /api/machines/approval-exchange from any non-approval socket answers 401 (before/after in the PRD). Implementation checkpoint: noise-handshake@4.2.0 accepts XX; fallback XXpsk0 with psk = SHA-256(\"overdeck-approve-psk/1\" || 0x00 || requestId); record which shipped in docs/ANYWHERE-ARCHITECTURE.md."
+        },
+        "items": [
+          {
+            "id": "wi13-approval-channel.ac1",
+            "title": "Given two endpoints over loopback TCP, when they complete an approval handshake with the same request id, then both channel markers carry the same 6-digit SAS",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi13-approval-channel.ac2",
+            "title": "Given a proxy that terminates the handshake with its own key and re-originates it, when both sides finish, then the two SAS values differ",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi13-approval-channel.ac3",
+            "title": "Given takeApproval returning false, when an approval preamble arrives, then the responder sends refusal 03 and no channel is produced",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi13-approval-channel.ac4",
+            "title": "Given an approval channel, when it requests GET /api/machines, then the gate answers 401; and given a plain socket, when it posts /api/machines/approval-exchange, then the gate answers 401",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi14-approval-service",
+        "title": "Approval service, /api/directory approval routes and the approval exchange",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T13:33:03Z",
+        "metadata": {
+          "difficulty": "expert",
+          "kind": "backend",
+          "issueLabel": "pan-2356",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/machine-link-grant.ts",
+            "src/dashboard/server/routes/machines-peer.ts",
+            "src/dashboard/server/services/directory-approval.ts",
+            "src/dashboard/server/routes/directory-approval.ts",
+            "src/dashboard/server/server.ts",
+            "src/dashboard/server/channel-listener.ts",
+            "src/dashboard/server/services/anywhere-boot.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/services/__tests__/directory-approval.test.ts",
+            "src/dashboard/server/__tests__/machines-exchange.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/directory-approval.test.ts src/dashboard/server/__tests__/machines-exchange.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "all three test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-20",
+            "NFR-2356-3",
+            "NFR-2356-4"
+          ],
+          "parallelSafeReason": "Runs in its own slot once its DAG predecessors land; every file it shares with another item is ordered by a blocks edge, so no unordered item mutates its files_scope."
+        },
+        "narrative": {
+          "Action": "PRD WI-14 and D-2356-9. Extract machines-peer.ts:84-122 into machine-link-grant.ts grantMachineLink({ environmentId, label, peerKeyHex, access, reverseToken? }) and call it from handleMachinesExchange. Add POST /api/machines/approval-exchange (403 unless channel.mode === \"approval\"). directory-approval.ts: requester side (join creates a 16-byte hex requestId, sends approval-request, keeps it 10 minutes, accepts one approval channel for it via takeApproval wired in server.ts:156-166, shows SAS and approver fingerprint from the handshake in joins[], holds the exchange until accept or reject or expiry, on accept mints its token with grantMachineLink and answers { token, label, environmentId }, else 403 approval-refused) and approver side (approvals[] from frames; open dials rtc://<R> purpose approval and fails fingerprint-mismatch when the handshake key differs from the request publicKeyHex, returns { sas, fingerprint }; approve mints its token, posts the exchange, stores link A to R with routes from R's descriptor via mergeAdvertised, revokes its token on failure; reject closes and sends approval-cancel). Links are operator access both ways. Routes from the PRD table, each declared as HttpRouter.add('METHOD', '/path', ...) so the no-loss matrix test enumerates them, with one no-loss-matrix row each (join, joins accept, joins reject, approvals open, approvals approve, approvals reject, forget, approval-exchange). If the Effect server or http.Agent times out the held approval-exchange response, return 202 { pending: true } and have the approver re-post every 10 s on the same channel until accept, reject or expiry. Fake timers for expiry."
+        },
+        "items": [
+          {
+            "id": "wi14-approval-service.ac1",
+            "title": "Given two in-process dashboards, when the approver approves and the requester accepts, then each side holds exactly one link to the other and one machine token for the other",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi14-approval-service.ac2",
+            "title": "Given approve without accept, when 10 minutes of fake clock pass, then neither side has a link and the approver's minted token is revoked",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi14-approval-service.ac3",
+            "title": "Given an approval channel whose handshake key differs from the request publicKeyHex, when open runs, then it fails with fingerprint-mismatch and no token is minted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi14-approval-service.ac4",
+            "title": "Given the extraction, when machines-exchange.test.ts runs, then it passes unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi15-approval-ui",
+        "title": "Settings Directory panel and approval dialog with the two-screen code",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T13:33:03Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2356",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/anywhere/DirectoryPanel.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/ApprovalDialog.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/directoryApi.ts",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/DirectoryPanel.test.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/AnywhereSection.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --config src/dashboard/frontend/vitest.config.ts src/dashboard/frontend/src/components/Settings/anywhere/__tests__/DirectoryPanel.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "DirectoryPanel.test.tsx passes",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-20",
+            "FR-20a",
+            "FR-2356-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-15. DirectoryPanel rendered after MachinesPanel in AnywhereSection. Signed out: \"Sign in with `pan account login` to find your machines through overdeck.ai.\" Refused: the refusal message. Rows: label, fingerprint, online or \"last seen <relative>\", Linked or Link, Remove from directory (not on this machine). Incoming approvals: Review opens ApprovalDialog showing the code, the other fingerprint, \"Approve only if the other machine shows the same code\", Approve/Reject. Outgoing joins: Waiting for approval, then the dialog with Accept/Reject. Poll every 5 s like MachinesPanel. Follow pan-style-guide (no green for online, no pill badges). Add the test file to scripts/frontend-test-subset.txt."
+        },
+        "items": [
+          {
+            "id": "wi15-approval-ui.ac1",
+            "title": "Given GET /api/directory returns signedIn false, when the panel renders, then it shows the pan account login sign-in sentence",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi15-approval-ui.ac2",
+            "title": "Given state refused with \"The free account includes 3 machines\", when the panel renders, then that text is shown",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi15-approval-ui.ac3",
+            "title": "Given an approval with sas \"123 456\", when Review is clicked, then the dialog shows \"123 456\" and clicking Approve calls the approve endpoint for that request id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi16-approval-cli",
+        "title": "pan machines directory, join, accept, reject, approve and forget verbs",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T13:33:03Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2356",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/machines.ts",
+            "tests/unit/cli/machines.test.ts",
+            "packages/contracts/src/composer-commands.generated.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/machines.test.ts",
+            "npm run typecheck",
+            "npm run build:cli && npm run lint:slash-commands"
+          ],
+          "expected_outputs": [
+            "machines.test.ts passes",
+            "typecheck completes without errors",
+            "lint:slash-commands prints that the manifest matches the CLI registry"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-20",
+            "FR-20a"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-16. Add the six verbs to registerMachinesCommands in src/cli/commands/machines.ts (never src/cli/index.ts), all via callDashboard: directory [--json]; join [--to] [--json] prints \"Requested approval (request <id>). This machine's fingerprint: <fp>\", waits up to 10 minutes, prints \"Code: 123 456 · approver <label> <fingerprint>\", asks \"Accept? [y/N]\" on a TTY, otherwise prints \"Confirm with: pan machines accept <requestId>\" and exits 0; accept <requestId>; reject <requestId>; approve <requestId> [--yes] opens, prints code and fingerprint, asks \"Approve? [y/N]\" unless --yes; forget <label|environmentId>. join waits by polling GET /api/directory every 2 s until its joins[] entry carries a sas (or the 10-minute expiry passes), then prompts. Dashboard errors exit 1 with the error text. Update the file header comment listing verbs. Run npm run build:cli then npm run generate:slash-commands and commit the regenerated packages/contracts/src/composer-commands.generated.ts, or lint:slash-commands fails."
+        },
+        "items": [
+          {
+            "id": "wi16-approval-cli.ac1",
+            "title": "Given stdout is not a TTY, when pan machines join gets an opened approval, then it prints \"Confirm with: pan machines accept <requestId>\" and exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi16-approval-cli.ac2",
+            "title": "Given pan machines approve <id> --yes, when it runs, then it calls the open endpoint then the approve endpoint in that order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi16-approval-cli.ac3",
+            "title": "Given pan machines forget with a label the directory does not list, when it runs, then it exits 1 with the dashboard error text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi17-relay-client",
+        "title": "Relay client: TURN credentials on demand, usage reports every 60 s, stop at the cap",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T13:33:03Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2356",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/relay-client.ts",
+            "src/dashboard/server/services/directory-rtc.ts",
+            "src/dashboard/server/services/anywhere-boot.ts",
+            "src/dashboard/server/services/__tests__/relay-client.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/relay-client.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "relay-client.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-21",
+            "NFR-2356-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-17 and D-2356-12. relayEntitled() = welcome.relayAllowed && !relay.stopped, wired into WI-12 deps. Relay dials in directory-rtc.ts request ice-servers relay true; relay_cap_reached or relay_not_allowed fails the dial with ChannelOpenError unreachable and the message. Track every relay ChannelSocket this machine opened; every 60 s and on close send relay-usage with the delta of sent plus received ciphertext bytes; the responder never reports. On relay-status stopped true destroy every tracked relay channel. relayStatus() returns the last RelayStatus and whether a relay channel is current. Fake timers."
+        },
+        "items": [
+          {
+            "id": "wi17-relay-client.ac1",
+            "title": "Given a tracked relay channel that moved 1000 then 500 more bytes, when 60 s and then 120 s of fake clock pass, then relay-usage frames carry 1000 and 500, and closing the channel sends the remaining delta",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi17-relay-client.ac2",
+            "title": "Given relay-status stopped true, when it arrives, then every tracked relay channel is destroyed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi17-relay-client.ac3",
+            "title": "Given a welcome with relayAllowed false, when relayEntitled is read, then it returns false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi18-status-card",
+        "title": "Anywhere status card shows Using relay, bytes used and Add 50 GB; Machines panel shows route kind",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T13:33:03Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2356",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/remote-access/anywhere-status.ts",
+            "src/lib/remote-access/__tests__/anywhere-status.test.ts",
+            "src/dashboard/server/services/anywhere-boot.ts",
+            "src/dashboard/frontend/src/components/Settings/anywhere/AnywhereStatusCard.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/MachinesPanel.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/AnywhereStatusCard.test.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/MachinesPanel.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run --config src/dashboard/frontend/vitest.config.ts src/dashboard/frontend/src/components/Settings/anywhere/__tests__/AnywhereStatusCard.test.tsx src/dashboard/frontend/src/components/Settings/anywhere/__tests__/MachinesPanel.test.tsx",
+            "npx vitest run src/lib/remote-access/__tests__/anywhere-status.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both frontend test files pass",
+            "anywhere-status.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-21"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-18. anywhere-status.ts gains directory { state, plan, url, refusal } | null and relay { using, bytesUsed, capBytes, stopped } | null from registered sources setDirectoryStatusSource/setRelayStatusSource (no import of the dashboard server from src/lib); register them in anywhere-boot.ts. AnywhereStatusCard: when relay.using show \"Using relay\" and \"<GB one decimal> of 50 GB relay traffic this month\"; when relay.stopped show RELAY_CAP_MESSAGE and an Add 50 GB button opening https://overdeck.ai/anywhere in a new tab; directory refused shows the refusal as a problem line; nothing relay-related when relay is null. MachinesPanel line 147 shows \"via <kind> · <url>\" from the current route kind. Add any new frontend test file to scripts/frontend-test-subset.txt."
+        },
+        "items": [
+          {
+            "id": "wi18-status-card.ac1",
+            "title": "Given relay { using: true, bytesUsed: 12_345_000_000 }, when the card renders, then it shows \"Using relay\" and \"12.3 of 50 GB relay traffic this month\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi18-status-card.ac2",
+            "title": "Given relay { stopped: true }, when the card renders, then it shows \"Relay allowance used; install Tailscale or add 50 GB\" and an Add 50 GB link to https://overdeck.ai/anywhere",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi18-status-card.ac3",
+            "title": "Given relay null, when the card renders, then no relay text appears",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi18-status-card.ac4",
+            "title": "Given a link whose current route is rtc+turn://<id>, when MachinesPanel renders, then the row reads \"via relay\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi19-inbox-delivery",
+        "title": "Inbox delivery on the machine: open sealed events and run them through the trigger core",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T13:33:03Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2356",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/triggers/inbox.ts",
+            "src/lib/triggers/deliver.ts",
+            "src/dashboard/server/services/inbox-client.ts",
+            "src/dashboard/server/services/anywhere-boot.ts",
+            "tests/unit/lib/triggers/inbox.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/triggers/inbox.test.ts tests/unit/lib/triggers/",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "inbox.test.ts and the existing trigger tests pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-26i",
+            "NFR-2356-3"
+          ],
+          "parallelSafeReason": "Runs in its own slot once its DAG predecessors land; every file it shares with another item is ordered by a blocks edge, so no unordered item mutates its files_scope."
+        },
+        "narrative": {
+          "Action": "PRD WI-19, D-2356-17. deliver.ts: refactor runDelivery so steps 2-6 (signature, rate limit, CPU hold, envelope, delivery door) are one function shared by deliverTriggerEvent and new deliverInboxEvent(record, event, deps); the inbox path passes Math.floor(receivedAt / 1000) as nowSeconds to verifyStripeSignature. inbox.ts: openInboxEvent (openSealed with the machine key, parse v1 JSON, headers subset, base64 body), freshness (reject receivedAt older than 24 h 5 min or more than 5 min ahead), dedupe file ${OVERDECK_HOME}/inbox-delivered.json (0600, last 1000 ids, 48 h). inbox-client.ts subscribes to inbox-event, processes serially in receivedAt order, maps inboxId to the trigger with inbox.id, calls deliverInboxEvent with triggerDeliveryDependencies (src/dashboard/server/routes/trigger-hooks.ts:68-86), sends inbox-ack for 2xx and 401/404/410/413 and duplicates and unreadable or unknown-inbox events, inbox-nack with retryAfterSeconds for 503/429. Logs never contain the body."
+        },
+        "items": [
+          {
+            "id": "wi19-inbox-delivery.ac1",
+            "title": "Given a GitHub-signed event sealed with sealTo for a conversation trigger, when the inbox client handles it, then the stub sendMessage receives the enveloped event and inbox-ack is sent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi19-inbox-delivery.ac2",
+            "title": "Given the same event id delivered twice, when both are handled, then sendMessage runs once and inbox-ack is sent twice",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi19-inbox-delivery.ac3",
+            "title": "Given a Stripe event whose signature timestamp is 3 hours before now but within 300 s of receivedAt, when delivered, then the signature verifies",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi19-inbox-delivery.ac4",
+            "title": "Given the delivery door answers 503, when the event is handled, then inbox-nack is sent with retryAfterSeconds 300; and given receivedAt 25 hours ago, then the event is refused and acknowledged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi20-inbox-create",
+        "title": "Create triggers with a directory inbox: store field, API, pan triggers add --inbox and dialog checkbox",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T13:33:03Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2356",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/triggers/store.ts",
+            "src/dashboard/server/routes/triggers.ts",
+            "src/cli/commands/triggers.ts",
+            "src/dashboard/frontend/src/components/Settings/anywhere/AddTriggerDialog.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/TriggersPanel.tsx",
+            "tests/unit/lib/triggers/store.test.ts",
+            "src/dashboard/server/routes/__tests__/triggers-inbox.test.ts",
+            "tests/unit/cli/triggers.test.ts",
+            "packages/contracts/src/composer-commands.generated.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/triggers/store.test.ts src/dashboard/server/routes/__tests__/triggers-inbox.test.ts tests/unit/cli/triggers.test.ts",
+            "npm run typecheck",
+            "npm run build:cli && npm run lint:slash-commands"
+          ],
+          "expected_outputs": [
+            "all three test files pass",
+            "typecheck completes without errors",
+            "lint:slash-commands prints that the manifest matches the CLI registry"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-26i"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-20. store.ts: TriggerRecord.inbox?: { id, createdAt } | null; isRecord accepts it; setTriggerInbox(id, inbox). routes/triggers.ts: POST /api/triggers with inbox true creates the trigger, sends inbox-create through currentDirectoryClient(), awaits inbox-created up to 10 s, stores inbox and returns inboxUrl once; plan_required, signed out or timeout remove the new trigger and answer 409 with the reason; DELETE sends inbox-delete when the trigger has an inbox. CLI pan triggers add --inbox prints the inbox URL instead of the Funnel lines. AddTriggerDialog: checkbox \"Hold events while this machine is offline (overdeck.ai inbox, Anywhere plan)\" shown only when GET /api/directory reports inboxAllowed; TriggersPanel labels inbox triggers \"inbox\". Run npm run build:cli then npm run generate:slash-commands and commit the regenerated packages/contracts/src/composer-commands.generated.ts (the --inbox flag changes it), or lint:slash-commands fails."
+        },
+        "items": [
+          {
+            "id": "wi20-inbox-create.ac1",
+            "title": "Given a triggers.json written before this change (no inbox field), when readTriggers runs, then every trigger parses",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi20-inbox-create.ac2",
+            "title": "Given a stub directory client that answers inbox-created, when POST /api/triggers { inbox: true } runs, then the stored trigger has inbox.id and the response includes inboxUrl starting https://connect.overdeck.ai/h/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi20-inbox-create.ac3",
+            "title": "Given the client answers plan_required, when POST /api/triggers { inbox: true } runs, then the response is 409 and no trigger remains in triggers.json",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi20-inbox-create.ac4",
+            "title": "Given pan triggers add --inbox, when the API returns inboxUrl, then the CLI prints that URL and no tailscale funnel command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi21-directory-smoke",
+        "title": "Loopback directory smoke script: register, approve, direct route, machine limit and inbox",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T13:33:03Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "test",
+          "issueLabel": "pan-2356",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/anywhere/directory-smoke.mjs",
+            "docs/ANYWHERE-ARCHITECTURE.md",
+            "src/lib/anywhere/endpoints.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run build",
+            "node scripts/anywhere/directory-smoke.mjs"
+          ],
+          "expected_outputs": [
+            "build completes",
+            "smoke exits 0 with all steps passing"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-20",
+            "FR-20a",
+            "FR-26i",
+            "NFR-2356-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-21. Write scripts/anywhere/directory-smoke.mjs modelled on scripts/anywhere/two-machine-smoke.mjs (.tmp homes only, peer-mode dashboards with OVERDECK_DISABLE_DEACON=1 and OVERDECK_ANYWHERE_SUPERVISOR=1). Steps connect, start, register, approve, limit, inbox, logs, stop exactly as the PRD lists, with Miniflare hosting the connect bundle and an inline AccountRpc stub (two tester tokens, three free tokens) and a TURN stub answering 503. Implementation checkpoint: if a peer dashboard cannot disable LAN advertising, add OVERDECK_ANYWHERE_NO_ADVERTISE=1 read by EndpointAdvertiser in src/lib/anywhere/endpoints.ts; fallback asserts the rtc:// route is listed reachable while LAN is current. Exit 0 or 1 with \"FAILED at step <name>: <why>\". Add a \"Running the directory smoke\" table to docs/ANYWHERE-ARCHITECTURE.md. Run it after npm run build and paste the output into the PR description."
+        },
+        "items": [
+          {
+            "id": "wi21-directory-smoke.ac1",
+            "title": "Given a built tree, when node scripts/anywhere/directory-smoke.mjs runs, then it exits 0 and prints every step name passing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi21-directory-smoke.ac2",
+            "title": "Given the approve step, when both dashboards list each other, then each current route starts with rtc:// and both SAS values printed are equal",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi21-directory-smoke.ac3",
+            "title": "Given the inbox step, when the Durable Object storage dump is taken while B is offline, then it contains no body marker, and after B restarts the trigger fires within 60 s",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi22-docs-user",
+        "title": "User docs: directory, direct routes, relay plan and the webhook inbox",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T13:33:03Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-2356",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/remote-access.mdx",
+            "configuration/triggers.mdx",
+            "configuration/linked-machines.mdx",
+            "cli/machines.mdx",
+            "cli/triggers.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -q \"What the inbox can see\" configuration/triggers.mdx",
+            "grep -q \"anywhere.directory_url\" configuration/remote-access.mdx",
+            "grep -q \"pan machines approve\" cli/machines.mdx"
+          ],
+          "expected_outputs": [
+            "each grep exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-20",
+            "FR-21",
+            "FR-26i",
+            "NFR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-22. remote-access.mdx gains a \"Find your machines through overdeck.ai\" section (sign in, what the directory stores, two-screen approval code, direct routes, free 3-machine limit, the relay plan with the 50 GB monthly allowance, Using relay, Add 50 GB, anywhere.directory_url for self-hosters). triggers.mdx replaces the \"planned separately (PAN-2356)\" bullet with \"Hold events with the directory inbox\" (--inbox, URL form, 256 KiB cap, 24-hour hold, in-order delivery, the Stripe receivedAt rule) and a \"What the inbox can see\" paragraph stating D-20. cli/machines.mdx documents directory, join, accept, reject, approve, forget with sample output. cli/triggers.mdx documents --inbox. linked-machines.mdx adds one paragraph on direct and relay routes and approval."
+        },
+        "items": [
+          {
+            "id": "wi22-docs-user.ac1",
+            "title": "Given configuration/triggers.mdx, when grep searches it, then it contains the heading \"What the inbox can see\" and no longer contains \"planned separately\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi22-docs-user.ac2",
+            "title": "Given configuration/remote-access.mdx, when grep searches it, then it contains \"The free account includes 3 machines\", \"anywhere.directory_url\" and \"Add 50 GB\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi22-docs-user.ac3",
+            "title": "Given cli/machines.mdx, when grep searches it, then it contains \"pan machines join\", \"pan machines approve\" and \"pan machines forget\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi23-docs-dev",
+        "title": "Developer docs: ANYWHERE-ARCHITECTURE D-3/D-20 sections, CONNECT-SERVICE runbook, free entitlement, topic index",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T13:33:03Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-2356",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/ANYWHERE-ARCHITECTURE.md",
+            "docs/CONNECT-SERVICE.md",
+            "docs/ACCOUNT-SERVICE.md",
+            "CLAUDE.md",
+            ".overdeck/context/codebase/architecture.md",
+            ".overdeck/context/codebase/stack.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -q \"Webhook inbox (D-20)\" docs/ANYWHERE-ARCHITECTURE.md",
+            "grep -q \"wrangler rollback\" docs/CONNECT-SERVICE.md",
+            "grep -q \"docs/CONNECT-SERVICE.md\" CLAUDE.md"
+          ],
+          "expected_outputs": [
+            "each grep exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-20",
+            "FR-21",
+            "FR-26i",
+            "NFR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-23. In docs/ANYWHERE-ARCHITECTURE.md replace the \"#2356: D-3, D-20.\" placeholder with sections \"Directory and direct connections (D-3)\", \"Approval (D-2356-9/10)\" (including which Noise pattern shipped per the WI-13 checkpoint and wire mode 03), \"Relay and metering (D-2356-12)\" and \"Webhook inbox (D-20)\". New docs/CONNECT-SERVICE.md: what the Worker does, bindings, secrets, limits, wrangler dev --local, and the eight-step operator-only deploy runbook from the PRD including the two live checks and RELAY_CAP_BYTES for staging. docs/ACCOUNT-SERVICE.md: the free entitlement and the wrangler d1 execute command that sets it. CLAUDE.md Topic Index row pointing to docs/CONNECT-SERVICE.md. One line each for services/connect in .overdeck/context/codebase/architecture.md and stack.md, updating their last-verified dates."
+        },
+        "items": [
+          {
+            "id": "wi23-docs-dev.ac1",
+            "title": "Given docs/ANYWHERE-ARCHITECTURE.md, when grep searches it, then it contains \"Webhook inbox (D-20)\" and \"Directory and direct connections (D-3)\" and no longer contains \"#2356: D-3, D-20.\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi23-docs-dev.ac2",
+            "title": "Given docs/CONNECT-SERVICE.md, when grep searches it, then it contains \"wrangler rollback\", \"TURN_KEY_ID\" and \"RELAY_CAP_BYTES\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi23-docs-dev.ac3",
+            "title": "Given CLAUDE.md, when grep searches the Topic Index, then a row links docs/CONNECT-SERVICE.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi24-anywhere-page",
+        "title": "anywhere.mdx: fix the shipped table and apply the OD-3 tiers",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T13:33:03Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2356",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "anywhere.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "! grep -q \"v0.65.0\" anywhere.mdx",
+            "grep -q \"up to 3 machines\" anywhere.mdx"
+          ],
+          "expected_outputs": [
+            "each command exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-21",
+            "NFR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-24. In \"What has shipped\" (anywhere.mdx lines 110-122) remove the stale \"next release (v0.65.0)\" rows and the \"planned: PAN-4446\" sentence, listing those features as shipped with their release, and add rows for the directory, direct connections, the relay add-on and the inbox as in the next release. Replace \"The relay and hosted push notifications as they ship\" with the OD-3 tiers (free without account; free account with directory and direct connections for up to 3 machines; Anywhere with unlimited machines, the inbox and the hosted vault; relay add-on +$3/mo or +$30/yr with 50 GB a month and a one-time $3 extra 50 GB). Replace \"until the relay ships\" in the founding-price lines with \"the first 500 subscribers or 90 days after the Anywhere release\"."
+        },
+        "items": [
+          {
+            "id": "wi24-anywhere-page.ac1",
+            "title": "Given anywhere.mdx, when grep searches it, then it contains no \"v0.65.0\" and no \"PAN-4446\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi24-anywhere-page.ac2",
+            "title": "Given anywhere.mdx, when grep searches it, then it contains \"up to 3 machines\" and \"50 GB\" and no longer contains \"until the relay ships\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "wi1-contracts",
+        "to": "wi5-do-presence",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-contracts",
+        "to": "wi9-directory-client",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-contracts",
+        "to": "wi12-supervisor-phases",
+        "type": "blocks"
+      },
+      {
+        "from": "wi2-account-free-plan",
+        "to": "wi5-do-presence",
+        "type": "blocks"
+      },
+      {
+        "from": "wi3-connect-scaffold",
+        "to": "wi4-sealed-box",
+        "type": "blocks"
+      },
+      {
+        "from": "wi3-connect-scaffold",
+        "to": "wi5-do-presence",
+        "type": "blocks"
+      },
+      {
+        "from": "wi5-do-presence",
+        "to": "wi6-do-signaling",
+        "type": "blocks"
+      },
+      {
+        "from": "wi6-do-signaling",
+        "to": "wi7-do-relay",
+        "type": "blocks"
+      },
+      {
+        "from": "wi7-do-relay",
+        "to": "wi8-do-inbox",
+        "type": "blocks"
+      },
+      {
+        "from": "wi4-sealed-box",
+        "to": "wi8-do-inbox",
+        "type": "blocks"
+      },
+      {
+        "from": "wi4-sealed-box",
+        "to": "wi10-rtc-transport",
+        "type": "blocks"
+      },
+      {
+        "from": "wi4-sealed-box",
+        "to": "wi19-inbox-delivery",
+        "type": "blocks"
+      },
+      {
+        "from": "wi9-directory-client",
+        "to": "wi11-rtc-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "wi13-approval-channel",
+        "to": "wi11-rtc-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "wi10-rtc-transport",
+        "to": "wi11-rtc-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "wi11-rtc-routes",
+        "to": "wi12-supervisor-phases",
+        "type": "blocks"
+      },
+      {
+        "from": "wi12-supervisor-phases",
+        "to": "wi14-approval-service",
+        "type": "blocks"
+      },
+      {
+        "from": "wi13-approval-channel",
+        "to": "wi14-approval-service",
+        "type": "blocks"
+      },
+      {
+        "from": "wi14-approval-service",
+        "to": "wi15-approval-ui",
+        "type": "blocks"
+      },
+      {
+        "from": "wi14-approval-service",
+        "to": "wi16-approval-cli",
+        "type": "blocks"
+      },
+      {
+        "from": "wi14-approval-service",
+        "to": "wi17-relay-client",
+        "type": "blocks"
+      },
+      {
+        "from": "wi17-relay-client",
+        "to": "wi18-status-card",
+        "type": "blocks"
+      },
+      {
+        "from": "wi9-directory-client",
+        "to": "wi20-inbox-create",
+        "type": "blocks"
+      },
+      {
+        "from": "wi16-approval-cli",
+        "to": "wi20-inbox-create",
+        "type": "blocks"
+      },
+      {
+        "from": "wi20-inbox-create",
+        "to": "wi19-inbox-delivery",
+        "type": "blocks"
+      },
+      {
+        "from": "wi18-status-card",
+        "to": "wi19-inbox-delivery",
+        "type": "blocks"
+      },
+      {
+        "from": "wi15-approval-ui",
+        "to": "wi18-status-card",
+        "type": "blocks"
+      },
+      {
+        "from": "wi8-do-inbox",
+        "to": "wi21-directory-smoke",
+        "type": "blocks"
+      },
+      {
+        "from": "wi19-inbox-delivery",
+        "to": "wi21-directory-smoke",
+        "type": "blocks"
+      },
+      {
+        "from": "wi16-approval-cli",
+        "to": "wi21-directory-smoke",
+        "type": "blocks"
+      },
+      {
+        "from": "wi16-approval-cli",
+        "to": "wi22-docs-user",
+        "type": "blocks"
+      },
+      {
+        "from": "wi20-inbox-create",
+        "to": "wi22-docs-user",
+        "type": "blocks"
+      },
+      {
+        "from": "wi18-status-card",
+        "to": "wi22-docs-user",
+        "type": "blocks"
+      },
+      {
+        "from": "wi21-directory-smoke",
+        "to": "wi23-docs-dev",
+        "type": "blocks"
+      },
+      {
+        "from": "wi13-approval-channel",
+        "to": "wi23-docs-dev",
+        "type": "blocks"
+      },
+      {
+        "from": "wi2-account-free-plan",
+        "to": "wi23-docs-dev",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

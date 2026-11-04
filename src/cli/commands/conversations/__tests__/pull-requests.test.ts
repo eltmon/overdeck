@@ -192,31 +192,77 @@ describe('prsAction', () => {
   });
 });
 
-describe('autoArchiveOnMergeAction', () => {
-  it('shows off by default, sets on and off, and rejects anything else', async () => {
-    const { autoArchiveOnMergeAction } = await import('../pull-requests.js');
-    const { isConversationsAutoArchiveOnMerge } = await import('../../../../lib/overdeck/control-settings.js');
+describe('autoSettleOnMergeAction', () => {
+  it('shows on by default, sets off and on, and rejects anything else', async () => {
+    const { autoSettleOnMergeAction } = await import('../pull-requests.js');
+    const { isConversationsAutoSettleOnMerge } = await import('../../../../lib/overdeck/control-settings.js');
     const { logs } = captureConsole();
     const exitSpy = mockExit();
 
-    await autoArchiveOnMergeAction();
-    expect(logs.at(-1)).toBe('off');
-
-    await autoArchiveOnMergeAction('on');
-    expect(isConversationsAutoArchiveOnMerge()).toBe(true);
-    await autoArchiveOnMergeAction();
+    await autoSettleOnMergeAction();
     expect(logs.at(-1)).toBe('on');
 
-    await autoArchiveOnMergeAction('off');
-    expect(isConversationsAutoArchiveOnMerge()).toBe(false);
+    await autoSettleOnMergeAction('off');
+    expect(isConversationsAutoSettleOnMerge()).toBe(false);
+    await autoSettleOnMergeAction();
+    expect(logs.at(-1)).toBe('off');
 
-    await expect(autoArchiveOnMergeAction('yes')).rejects.toThrow('exit 1');
+    await autoSettleOnMergeAction('on');
+    expect(isConversationsAutoSettleOnMerge()).toBe(true);
+
+    await expect(autoSettleOnMergeAction('yes')).rejects.toThrow('exit 1');
     expect(exitSpy).toHaveBeenCalledWith(1);
   });
 });
 
+describe('autoSettleOverrideAction', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(connRefused()));
+  });
+
+  it('shows inherit with the global value for a fresh conversation', async () => {
+    const { autoSettleOverrideAction } = await import('../pull-requests.js');
+    const { logs } = captureConsole();
+
+    await autoSettleOverrideAction('pr-conv');
+
+    expect(logs.at(-1)).toBe('inherit (global: on)');
+  });
+
+  it('stores the override through the triage store when the dashboard is down', async () => {
+    const { autoSettleOverrideAction } = await import('../pull-requests.js');
+    const { getConversationTriage } = await import('../../../../lib/overdeck/conversation-triage-store.js');
+    const { logs } = captureConsole();
+
+    await autoSettleOverrideAction('pr-conv', 'off');
+
+    expect(getConversationTriage('pr-conv')?.autoSettleOverride).toBe('off');
+    expect(logs.at(-1)).toBe('✓ Auto-settle on merge for pr-conv: off');
+    await autoSettleOverrideAction('pr-conv');
+    expect(logs.at(-1)).toBe('off');
+  });
+
+  it('rejects an invalid value with exit 1', async () => {
+    const { autoSettleOverrideAction } = await import('../pull-requests.js');
+    captureConsole();
+    const exitSpy = mockExit();
+
+    await expect(autoSettleOverrideAction('pr-conv', 'sometimes')).rejects.toThrow('exit 1');
+    expect(exitSpy).toHaveBeenCalledWith(1);
+  });
+
+  it('exits 2 for an unknown conversation', async () => {
+    const { autoSettleOverrideAction } = await import('../pull-requests.js');
+    captureConsole();
+    const exitSpy = mockExit();
+
+    await expect(autoSettleOverrideAction('no-such-conversation-anywhere', 'on')).rejects.toThrow('exit 2');
+    expect(exitSpy).toHaveBeenCalledWith(2);
+  });
+});
+
 describe('registerConversationsCommands', () => {
-  it('registers link-pr, unlink-pr, and prs', async () => {
+  it('registers link-pr, unlink-pr, prs, auto-settle-on-merge, and auto-settle', async () => {
     const { registerConversationsCommands } = await import('../index.js');
     const program = new Command();
     registerConversationsCommands(program);
@@ -227,6 +273,10 @@ describe('registerConversationsCommands', () => {
     expect(args('link-pr')).toEqual(['query', 'ref']);
     expect(args('unlink-pr')).toEqual(['query', 'ref']);
     expect(args('prs')).toEqual(['query']);
-    expect(args('auto-archive-on-merge')).toEqual(['value']);
+    expect(args('auto-settle-on-merge')).toEqual(['value']);
+    expect(args('auto-settle')).toEqual(['query', 'value']);
+    // The PAN-3822 auto-archive verb is gone; only the auto-settle verbs remain (PAN-4653, PAN-4655).
+    expect(conversations?.commands.map((command) => command.name()).filter((name) => name.startsWith('auto-')))
+      .toEqual(['auto-settle-on-merge', 'auto-settle', 'auto-settle-idle-days']);
   });
 });

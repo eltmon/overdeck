@@ -158,3 +158,20 @@ describe('every registered runtime declares its capabilities (PAN-4562 AC1)', ()
     }
   });
 });
+
+describe('harness update data (PAN-4654 D-6)', () => {
+  it('update data: claude, codex, kimi and opencode declare an update argv; muse, prime-agent and ohmypi declare none', () => {
+    const update = (harness: string) => {
+      const { updateArgs, npmPackage } = contracts.getRuntimeBehavior(harness as never).capabilities;
+      return { updateArgs, npmPackage };
+    };
+    expect(update('claude-code')).toEqual({ updateArgs: ['update'], npmPackage: '@anthropic-ai/claude-code' });
+    expect(update('codex')).toEqual({ updateArgs: ['update'], npmPackage: '@openai/codex' });
+    expect(update('kimi-code')).toEqual({ updateArgs: ['upgrade', '--yes'], npmPackage: null });
+    expect(update('acp')).toEqual({ updateArgs: ['upgrade', '--yes'], npmPackage: null });
+    expect(update('opencode')).toEqual({ updateArgs: ['upgrade'], npmPackage: 'opencode-ai' });
+    expect(update('muse')).toEqual({ updateArgs: null, npmPackage: null });
+    expect(update('prime-agent')).toEqual({ updateArgs: null, npmPackage: null });
+    expect(update('ohmypi')).toEqual({ updateArgs: null, npmPackage: null });
+  });
+});

@@ -1,0 +1,130 @@
+---
+title: Use Overdeck on your phone
+description: Install one machine's dashboard on a phone over Tailscale and answer agent questions in three taps
+---
+
+# Use Overdeck on your phone
+
+The phone app is a small version of the dashboard at `/m`. It shows what needs
+you, your conversations and the pipeline, and it answers agent questions. You install it
+from the browser to the home screen. It connects to one machine through that
+machine's Tailscale address and signs in with its own pairing, never with the
+machine's root token.
+
+## Before you start
+
+- **Tailscale Serve with HTTPS on the machine.** A phone app needs an
+  `https://` address. Publish the dashboard port with `tailscale serve`, so the
+  machine is reachable at an address such as `https://desk.tailnet.ts.net`.
+  See [Remote access](/configuration/remote-access) for trusted addresses and
+  pairing.
+- **Require a token to sign in.** Turn on Settings → Access Tokens → Require a
+  token to sign in (`dashboard.require_token_mint: true` in
+  `~/.overdeck/config.yaml`). Tailscale Serve forwards phone traffic from the
+  machine itself. With the setting off, the dashboard treats the phone as a
+  browser on the machine and gives it full access without pairing.
+
+## Set up a phone
+
+On the machine, open Settings → Anywhere → **Set up a phone**. The dialog has
+two tabs: **Overdeck app** (first) and **Browser on the phone**.
+
+### Overdeck app
+
+This machine must be signed in to overdeck.ai first (`pan account login`);
+otherwise the tab says so and shows no code.
+
+Install Overdeck from Google Play or the App Store, select
+**Create pairing code**, and scan the QR code with the app. The code works
+once and expires after 10 minutes; select **Create another code** for a new
+one. The tab lists the phones paired with this machine; **Remove** signs a
+phone out of this machine and closes its open connections. No Tailscale is
+needed for the app.
+
+### Browser on the phone
+
+The dialog has four steps:
+
+1. **Install Tailscale.** Scan the QR code with the phone, install Tailscale,
+   and sign in with the same account as the machine.
+2. **Choose this machine's address.** The list offers only trusted `https://`
+   addresses that other devices can reach. To add one, type it and select
+   **Add**. An `http://` address is refused, because a phone app needs HTTPS.
+3. **Require a token to sign in.** The dialog checks the setting. While it is
+   off, step 4 stays hidden. Select **Open the setting**, turn it on, then
+   select **Check again**.
+4. **Scan the pairing code.** Choose **Android** or **iPhone**, then select
+   **Create pairing link**. The code works once and expires after 10 minutes.
+   Select **Create another code** for a new one.
+
+## Android
+
+Scan the pairing code with the camera. Chrome opens the phone app and pairs
+it. Then select **Install app** at the top of the screen to add it to the home
+screen.
+
+## iPhone
+
+The iPhone needs two scans, in this order:
+
+1. Scan the first QR code. It opens the app in Safari. Tap Share, then **Add
+   to Home Screen**.
+2. Open the app from the home screen. Tap **Scan pairing code** and scan the
+   second QR code. You can also paste the pairing link instead.
+
+The order matters. An app on the iPhone home screen keeps its own storage, so
+it cannot use a pairing made earlier in Safari. Pair inside the installed app.
+Notifications need iOS 16.4 or later.
+
+## Answer a question
+
+When an agent asks a question, it needs three taps:
+
+1. Open the app (or tap the notification).
+2. Tap an option.
+3. Tap **Send**.
+
+The first open question is already expanded. A notification link opens its own
+question. To give an answer that is not an option, tap **Type an answer**.
+
+## See the pipeline
+
+Tap **Pipeline** (or open `/m/pipeline`) to see the active issues grouped by
+phase: Ship, Review, Work, Plan and Ready. Each row shows the issue ID and
+title. **Needs you** marks an issue that waits for you. Tap a row to see the
+issue: its phase, state, pull request, agent, project, labels and a link to
+the tracker. The pipeline on the phone is read-only. To start, stop, merge or
+move an issue, use the desktop.
+
+## What the phone can and cannot do
+
+The phone answers questions from agents and conversations, including questions
+with more than one part and Codex approval menus. It uses the same delivery as
+the desktop dialog.
+
+Other kinds of waiting input are shown but not answered on the phone. These
+include permission prompts, plan approvals, choice menus, rate-limit menus,
+session resume, held handoffs and turns that ended. For a conversation, tap
+**Open** to read it. For an agent, answer it on the desktop.
+
+The phone lists conversations and opens one full screen. The list includes
+conversations owned by linked machines; opening one reads it from the machine
+that runs it, the same as the desktop, at `/m?conversation=@<environment-id>/<name>`.
+The phone does not show terminals. It shows the pipeline but does not change
+it: there are no issue actions, filters or drag and drop.
+
+## Notifications
+
+In the phone app, tap **Turn on notifications** at the top of the screen and
+allow notifications. A notification opens the question it is about, or the
+Needs-you list. See [Push notifications](/configuration/push-notifications) for
+what is sent and how it is encrypted.
+
+The phone app's service worker only shows notifications. It never stores
+pages, so the phone always shows the current state of the machine.
+
+## Remove a phone
+
+On the machine, open Settings → Anywhere → Paired devices and select
+**Revoke** next to the phone. The next time the phone app opens, it shows
+**Pair this phone** again.

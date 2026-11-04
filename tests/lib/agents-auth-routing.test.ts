@@ -197,8 +197,8 @@ describe('agents auth routing', () => {
   });
 
   it('launches Mimo models directly with Claude Code', async () => {
-    expect(await getAgentRuntimeBaseCommand('mimo-v2.5')).toBe(
-      "claude --permission-mode bypassPermissions --model 'mimo-v2.5'"
+    expect(await getAgentRuntimeBaseCommand('mimo-v2.6-flash')).toBe(
+      "claude --permission-mode bypassPermissions --model 'mimo-v2.6-flash'"
     );
   });
 

@@ -191,6 +191,17 @@ Flywheel's own picks — `pan spawn` is for the foreman dispatching item
 workers *within* an already-started issue, not for the Flywheel picking a
 new one.
 
+If `pan start` fails with "Disk low — new workspace starts are held", the
+disk cannot take another workspace setup. Launch nothing more this tick, put
+`needs-you=disk low (<free> GiB free)` in the tick marker (the free GiB is in
+the message), and do not retry that issue until a later tick. If the message
+instead says "the disk reservation ledger at <path> is unavailable", the disk
+is not the problem: put `needs-you=disk reservation ledger unavailable at
+<path>` in the marker, because every start is held until that directory is
+fixed. A planning handoff deferred for low disk retries on its own for 2 hours;
+after that it needs `pan start <id>`, which the loop runs on a later tick once
+starts succeed again.
+
 ## Phase 4 — Watch to landing
 
 Poll the issue's derived state, not a stored one:
@@ -221,6 +232,11 @@ Once a PR onto Overdeck's own `main` merges, apply the deploy rule, then run:
 ```bash
 pan reload
 ```
+
+`pan reload` exits 0 when a reload of the same or a newer commit is already waiting, and
+replaces a waiting reload of an older commit (PAN-4888), so the Flywheel never
+needs to wait for, or retry around, a held reload. Exit 2 still means a
+non-reload restart holds the lock.
 
 Only for an Overdeck merge — not for merges in other projects the loop is
 also driving. Other projects deploy their own way; do not `pan reload` on

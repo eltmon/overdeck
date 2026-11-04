@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "esc-20261102120200-cccccc",
+  "agentId": "impl-1",
+  "type": "external",
+  "title": "Waiting on the vendor API key",
+  "body": "The staging key expires Friday.",
+  "contextRefs": [],
+  "createdAt": "2026-11-02T12:02:00Z",
+  "slaHours": 72,
+  "status": "open",
+  "dangerous": false,
+  "resolution": null
+}

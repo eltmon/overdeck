@@ -1,0 +1,774 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-02T03:45:48Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4655: Auto-settle idle conversations after a configurable number of days",
+    "updated": "2026-11-02T03:52:30.540Z"
+  },
+  "plan": {
+    "id": "pan-4655",
+    "title": "Auto-settle idle conversations after a configurable number of days",
+    "status": "running",
+    "uid": "88b7d802-efcf-4917-9ff4-e10003d15bb7",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-02T03:45:48Z",
+    "updated": "2026-11-02T03:52:30.540Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4655",
+        "label": "PAN-4655",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4639",
+        "label": "PAN-4639 (settle/snooze storage, merged)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4653",
+        "label": "PAN-4653 (auto-settle on merge, sibling)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/1485",
+        "label": "#1485 (archive-after-idle, superseded in part)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "conversations",
+      "triage",
+      "dashboard-sweep",
+      "settings",
+      "cli"
+    ],
+    "metadata": {
+      "sizeJustification": "About 24 files. The subsystem count (first two path segments) is inflated by single files that every complete feature touches: the init migration (drizzle/overdeck), the skill text (sync-sources/skills), two docs pages, the frontend test subset list and the no-loss matrix (tests/unit). Splitting the Settings control or the CLI verb into a sibling issue would not lower that count, and the issue requires the setting surfaces together with the sweep. The core (column, sweep, patrol) cannot ship in parts.",
+      "canonicalFilename": "2026-11-02-PAN-4655-auto-settle-idle-conversations-after-a-configurable-number-of-days.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "PAN-4639 added Settle and Snooze to the conversation list, but every conversation stays in Inbox until the operator settles it by hand. Conversations nobody has touched for days pile up in Inbox. The issue asks the primary dashboard to settle an operator conversation automatically after a configurable number of idle days (default 3, 0 = off), without ever settling agent conversations, snoozed ones, or ones waiting on the operator, and without re-settling a conversation the operator just brought back.",
+      "Proposal": "Add an app_settings key conversations.auto_settle_idle_days (door in control-settings.ts, default 3) with a GET/PUT route, a Settings → Conversations number input and a pan conversations auto-settle-idle-days verb. Add a nullable idle_reset_at column that unsettle and unsnooze set to now, plus a guarded settleIdleConversation store write. A pure sweep (src/lib/overdeck/conversation-idle-settle.ts) groups operator conversations by the Command Deck display-parent rule, filters roots by cheap DB checks, skips the pass when liveness or the pending-input feed is unknown, reads last activity with one stat (and a transcript tail read only when the mtime is recent, because Claude touches live transcripts hourly), and settles idle roots with reason idle. A dashboard patrol runs it 2 minutes after boot and every 15 minutes, only on the primary dashboard and never while the Deacon is frozen. main.ts is at 997/1000 lines, so the existing conversation sweep starts move into services/conversation-sweeps.ts first and the patrol registers there. Docs in features/conversations.mdx, docs/DASHBOARD-ARCHITECTURE.md and the pan-conversations skill; a supersession comment on #1485.",
+      "NonGoals": "- No change to auto-archive on merge, conversations.auto_archive_on_merge, pan conv auto-archive-on-merge, or anything PAN-4653 owns.\n- No archiving, stopping, resuming or messaging of any conversation; idle-settle writes only settled_at, settle_reason and snoozed_until.\n- No warning stage before settling and no settle-reason label in the conversation list.\n- Favorited conversations are not exempt from idle-settle.\n- A message queued for a usage-limit reset (conversation_scheduled_messages) does not block idle-settle.\n- Linked conversations from other machines and vault browse copies are never touched.\n- Child rows of a group are never idle-settled, and new activity never unsettles a row (PAN-4639 D8).\n- No activity-feed entry or notification for idle-settles; a log line only.\n- #1485 is commented on, not closed."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Activity = max(createdAt, lastAttachedAt, transcript activity); viewing without resuming does not count.",
+        "rationale": "Operator messages are written to the transcript as user records; lastAttachedAt is written only by an operator resume/reattach (conversation-runtime.ts:1092), so counting it is the conservative reading of 'no operator message'."
+      },
+      {
+        "summary": "Transcript activity is the file mtime when it is older than the cutoff, else the last user/assistant record time from scanPendingInputs, else the mtime.",
+        "rationale": "A record cannot be newer than the file's mtime, so an old mtime proves idleness with one stat; a recent mtime may be Claude's hourly touch (PAN-4515), so only then is the 512 KB tail read."
+      },
+      {
+        "summary": "New nullable column idle_reset_at, set by unsettle and unsnooze; a snooze that ends by time uses the past snoozed_until value as its restart point.",
+        "rationale": "Unsettle clears settled_at and leaves no trace, so without a stored time the next sweep would re-settle the conversation the operator just brought back, which the issue forbids."
+      },
+      {
+        "summary": "Only group roots are idle-settled, and a group is idle only when every member is idle.",
+        "rationale": "PAN-4639 decides a group's section from its root (sectionOf); settling a root whose lane or successor is busy would hide active work in Settled."
+      },
+      {
+        "summary": "'Waiting on the operator' uses the pending-input feed (getConversationsPendingInputFeed), a superset of pendingInputCount.",
+        "rationale": "The feed also sees terminal permission prompts, pane choice menus and held kickoffs; broader is safer, and it is the server source of Needs-you."
+      },
+      {
+        "summary": "Unknown liveness or a failed pending-input feed skips the whole sweep; a failed setting read reads as 0 (off).",
+        "rationale": "Same rule as autoArchiveSettledConversations: never act on unknown state."
+      },
+      {
+        "summary": "Released conversations (released_to set) and rows with a fork in progress are skipped.",
+        "rationale": "A released row is read-only on this machine (conversation-release.ts); a pending fork is still being created."
+      },
+      {
+        "summary": "Patrol cadence: first sweep 2 minutes after boot, then every 15 minutes; skipped on peers, while the Deacon is frozen, with OVERDECK_DISABLE_IDLE_SETTLE=1, and while a sweep is in flight.",
+        "rationale": "Day-granular thresholds need no faster cadence; the skips mirror scheduled-message-patrol.ts, and the Deacon freeze is the operator's emergency stop for automation."
+      },
+      {
+        "summary": "Extract the PR-sync and schedule starts/stops from main.ts into services/conversation-sweeps.ts before registering the new patrol there.",
+        "rationale": "main.ts is 997 lines against the 1000-line file-size ceiling and is not allowlisted; agents may not raise allowlist rows."
+      },
+      {
+        "summary": "Route GET/PUT /api/conversations/triage/auto-settle with body { idleDays }.",
+        "rationale": "A two-segment path cannot be matched as a conversation id, it groups with the triage route, and the object leaves room for PAN-4653's onMerge field."
+      },
+      {
+        "summary": "CLI verb pan conversations auto-settle-idle-days [days] writes app_settings directly.",
+        "rationale": "Same shape and mechanism as auto-archive-on-merge; works with the dashboard down because the sweep reads the value each pass."
+      },
+      {
+        "summary": "Default 3 days is on after upgrade; the first sweep settles every conversation already idle that long.",
+        "rationale": "The issue sets the default; settling is display-only and undoable, so the issue drops #1485's warning stage."
+      },
+      {
+        "summary": "Comment on #1485 that its archive-after-idle part is superseded; do not close it.",
+        "rationale": "Archive at day 10 and clearing favorites are not delivered here; closing is the operator's call. The issue allows 'update or close'."
+      },
+      {
+        "summary": "Keep one xBRIEF with plan.metadata.sizeJustification instead of sibling issues.",
+        "rationale": "The subsystem count is driven by single docs/migration/list files that a split would not remove; the issue requires the setting surfaces with the sweep."
+      }
+    ],
+    "items": [
+      {
+        "id": "idle-clock-store",
+        "title": "Add the idle_reset_at column and the idle-settle store functions",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T03:45:48Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4655",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "idle-sweep-core",
+            "idle-settle-patrol"
+          ],
+          "files_scope": [
+            "drizzle/overdeck/0000_overdeck_init.sql",
+            "src/lib/overdeck/infra.ts",
+            "src/lib/overdeck/conversation-triage-store.ts",
+            "src/lib/overdeck/__tests__/conversation-triage-store.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-triage-store.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversation-triage-store.test.ts passes, including the new idle_reset_at and settleIdleConversation cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Add `idle_reset_at` integer to the conversations table in drizzle/overdeck/0000_overdeck_init.sql (after the `snoozed_until` line 177) and as a runSchemaTopUp ALTER after infra.ts:166 with a PAN-4655 comment. In conversation-triage-store.ts: unsettleConversation(name, nowMs = Date.now()) and unsnoozeConversation(name, nowMs = Date.now()) also SET idle_reset_at = nowMs; applyTriageUpdate passes its nowMs to both. Add `IdleClock` { settledAtMs, snoozedUntilMs, idleResetAtMs }, `listIdleClocks(): Map<string, IdleClock>` (one SELECT over unarchived rows), and `settleIdleConversation(name, cutoffMs, nowMs)` whose single UPDATE sets settled_at = nowMs, settle_reason = 'idle', snoozed_until = NULL WHERE name = ? AND archived_at IS NULL AND settled_at IS NULL AND (snoozed_until IS NULL OR snoozed_until <= cutoffMs) AND (idle_reset_at IS NULL OR idle_reset_at <= cutoffMs), returning changes > 0. Extend the existing temp-OVERDECK_HOME test file with the PRD WI-1 cases."
+        },
+        "items": [
+          {
+            "id": "idle-clock-store.ac1",
+            "title": "Given a fresh database, when PRAGMA table_info(conversations) runs, then it returns a column named idle_reset_at",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "idle-clock-store.ac2",
+            "title": "When unsettleConversation(name, 5000) or applyTriageUpdate({ name, snoozedUntil: null }, 7000) runs, then the row persists idle_reset_at = 5000 or 7000 respectively",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "idle-clock-store.ac3",
+            "title": "Given an unarchived, unsettled row with no snooze and no reset, when settleIdleConversation(name, cutoff, now) runs, then it returns true and getConversationTriage returns settleReason 'idle' and settledAt = now",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "idle-clock-store.ac4",
+            "title": "Given a row that is already settled, archived, has idle_reset_at > cutoff, or has snoozed_until > cutoff, when settleIdleConversation runs, then it returns false and preserves the row's triage state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "auto-settle-setting",
+        "title": "Add the conversations.auto_settle_idle_days setting door",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T03:45:48Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4655",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/control-settings.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors; getter/setter behavior is exercised by the cli-auto-settle-verb test file"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. In src/lib/overdeck/control-settings.ts after setConversationsAutoArchiveOnMerge (line ~213) add CONVERSATIONS_AUTO_SETTLE_IDLE_DAYS_KEY = 'conversations.auto_settle_idle_days', DEFAULT_AUTO_SETTLE_IDLE_DAYS = 3, MAX_AUTO_SETTLE_IDLE_DAYS = 365, parseAutoSettleIdleDays(value: unknown): number | null (accepts an integer number or a string of digits, 0..365), getConversationsAutoSettleIdleDays(): number (unset → 3; invalid stored value → 3 with one console.warn; getSetting throws → console.warn and 0), and setConversationsAutoSettleIdleDays(days: number): void (RangeError unless parseAutoSettleIdleDays accepts it; stores String(days) via setSetting)."
+        },
+        "items": [
+          {
+            "id": "auto-settle-setting.ac1",
+            "title": "Given the key is unset, when getConversationsAutoSettleIdleDays() runs, then it returns 3; given a stored 'garbage' value it returns 3",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-settle-setting.ac2",
+            "title": "parseAutoSettleIdleDays returns 0, 5 and 365 for 0, '5' and 365, and returns null for -1, 1.5, 'abc' and 366",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-settle-setting.ac3",
+            "title": "setConversationsAutoSettleIdleDays(1.5) rejects with a RangeError and persists nothing; setConversationsAutoSettleIdleDays(5) persists '5' under conversations.auto_settle_idle_days",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "idle-sweep-core",
+        "title": "Build the idle-settle sweep with injected clock and IO",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T03:45:48Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4655",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "idle-settle-patrol"
+          ],
+          "files_scope": [
+            "src/lib/overdeck/conversation-idle-settle.ts",
+            "src/lib/overdeck/__tests__/conversation-idle-settle.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-idle-settle.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "conversation-idle-settle.test.ts passes all PRD WI-3 cases",
+            "typecheck and lint (including lint:circular) complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "FR-9",
+            "FR-10",
+            "NFR-1",
+            "NFR-2"
+          ],
+          "parallelSafeReason": "Touches only two new files (conversation-idle-settle.ts and its test); no other item edits them, and its inputs from idle-clock-store and auto-settle-setting arrive through blocks edges."
+        },
+        "narrative": {
+          "Action": "PRD WI-3. New module src/lib/overdeck/conversation-idle-settle.ts exporting DAY_MS, displayParentIdOf, groupByDisplayRoot (D27 rule: criticOfConversationId if in the set, else parentConversationId if in the set; chains over 64 hops or cycles make the row its own root), readTranscriptLastActivityMs(path, cutoffMs) (fs/promises stat; mtime <= cutoff → mtime; else Date.parse(scanPendingInputs(path).lastRecordAt) when finite, else mtime; stat failure → null), the IdleSettleDeps interface and sweepIdleConversations(deps) following the PRD's 9-step order: idleDays <= 0 returns [] before any other dep; cheap root checks (agent name, releasedTo, settled, snooze, idle_reset_at, member createdAt/lastAttachedAt, fork in progress) before any IO; null liveness or null waiting set returns [] with one log line; per-member transcript reads under withConcurrencyLimit(8); a live member with no resolvable transcript or any member activity newer than the cutoff skips the group; settle(root.name, cutoffMs, nowMs) only for roots. Imports stay in src/lib (triage store, control-settings, conversations, agent-enrichment scanPendingInputs, concurrency); the dashboard wiring lives in idle-settle-patrol. Tests use an injected now and fake IO deps over a temp OVERDECK_HOME with real createConversation rows; no real waits."
+        },
+        "items": [
+          {
+            "id": "idle-sweep-core.ac1",
+            "title": "Given N=3 and now injected, when the sweep runs, then a root whose newest activity is 3 days old is returned and persisted with settleReason 'idle', and a root whose newest activity is 2 days old is not",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "idle-sweep-core.ac2",
+            "title": "Given N=0, when the sweep runs, then it returns [] and listLiveSessions, resolveTranscript and lastActivityMs are never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "idle-sweep-core.ac3",
+            "title": "Given a conversation unsettled at T with a 10-day-old transcript, when the sweep runs at T+2 days it is not settled, and when it runs at T+3 days it returns that conversation settled",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "idle-sweep-core.ac4",
+            "title": "Given otherwise idle roots, when one is snoozed into the future, one's snooze ended 1 day ago, one is named agent-pan-1, one has released_to set, one has a child named by listWaitingNames, and one has a child active 1 hour ago, then the sweep settles none of them and leaves the child's settledAt null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "idle-sweep-core.ac5",
+            "title": "Given listLiveSessions returns null or listWaitingNames returns null, when the sweep runs, then it returns [] and settle is never called; and readTranscriptLastActivityMs returns a 4-day-old assistant record time when the file's mtime is recent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "auto-settle-route",
+        "title": "Add GET and PUT /api/conversations/triage/auto-settle",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T03:45:48Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4655",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/conversation-triage.ts",
+            "src/dashboard/server/routes/__tests__/conversation-triage-route.test.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/conversation-triage-route.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts src/dashboard/server/__tests__/route-scopes.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversation-triage-route, no-loss-matrix and route-scopes tests pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. In src/dashboard/server/routes/conversation-triage.ts add two HttpRouter.add routes on '/api/conversations/triage/auto-settle' (method and path on the lines after `HttpRouter.add(` so the no-loss enumerator finds them): GET → origin check (403) → { idleDays: getConversationsAutoSettleIdleDays() }; PUT → origin check → readJsonBody → parseAutoSettleIdleDays(body.idleDays) → null ⇒ 400 { error: 'idleDays must be a whole number from 0 to 365' } → else setConversationsAutoSettleIdleDays(days) and return { idleDays: days }. Merge both into conversationTriageRouteLayer. Add the two no-loss-matrix rows after line 241 (READ / WRITE, doors control-settings.getConversationsAutoSettleIdleDays / setConversationsAutoSettleIdleDays (PAN-4655)). Extend the route test file with the PRD WI-4 cases."
+        },
+        "items": [
+          {
+            "id": "auto-settle-route.ac1",
+            "title": "Given a fresh database, GET /api/conversations/triage/auto-settle returns 200 with { idleDays: 3 }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-settle-route.ac2",
+            "title": "PUT with { idleDays: 5 } returns 200 { idleDays: 5 } and a following GET returns { idleDays: 5 }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-settle-route.ac3",
+            "title": "PUT with idleDays -1, 1.5, 'abc', 366 or missing returns 400 with the error text, and PUT with a foreign Origin returns 403",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-settle-route.ac4",
+            "title": "no-loss-matrix.test.ts passes with rows for 'GET /api/conversations/triage/auto-settle' and 'PUT /api/conversations/triage/auto-settle'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "extract-conversation-sweeps",
+        "title": "Move the PR-sync and schedule sweep starts out of main.ts into services/conversation-sweeps.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T03:45:48Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-4655",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/conversation-sweeps.ts",
+            "src/dashboard/server/main.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "wc -l src/dashboard/server/main.ts",
+            "grep -c 'startPullRequestSyncService\\|startConversationScheduleService' src/dashboard/server/main.ts"
+          ],
+          "expected_outputs": [
+            "typecheck and lint (including the file-size lint) complete without errors",
+            "main.ts line count is below 997",
+            "the grep prints 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. Create src/dashboard/server/services/conversation-sweeps.ts with startConversationSweeps() (startPullRequestSyncService(); console.log('[pr-sync] started (boot +30s, 60s sweep)'); startConversationScheduleService(); console.log('[schedules] started (boot +30s, 60s sweep)')) and stopConversationSweeps() (both stops). In main.ts replace the two imports at :77-78 with one import of the new module, replace both `if (!isPeerDashboard) { … }` blocks at :596-608 with a two-line comment plus `if (!isPeerDashboard) startConversationSweeps();`, and replace the two stop calls at :815-816 with `stopConversationSweeps();` in the same position. Log text and start/stop order stay identical. Do not touch scripts/file-size-allowlist.txt."
+        },
+        "items": [
+          {
+            "id": "extract-conversation-sweeps.ac1",
+            "title": "main.ts on the branch has fewer lines than on origin/main and contains startConversationSweeps and stopConversationSweeps",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-conversation-sweeps.ac2",
+            "title": "grep for startPullRequestSyncService and startConversationScheduleService in main.ts returns no matches, and conversation-sweeps.ts emits the unchanged '[pr-sync] started' and '[schedules] started' log lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-conversation-sweeps.ac3",
+            "title": "npm run lint exits 0 with the file-size lint passing and scripts/file-size-allowlist.txt unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "idle-settle-patrol",
+        "title": "Run the idle-settle sweep on a patrol timer in the primary dashboard",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T03:45:48Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4655",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/conversation-idle-settle-service.ts",
+            "src/dashboard/server/services/__tests__/conversation-idle-settle-service.test.ts",
+            "src/dashboard/server/services/conversation-sweeps.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/conversation-idle-settle-service.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "conversation-idle-settle-service.test.ts passes under fake timers",
+            "typecheck and lint (including lint:circular) complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. New src/dashboard/server/services/conversation-idle-settle-service.ts on the scheduled-message-patrol.ts pattern: IDLE_SETTLE_BOOT_DELAY_MS = 120_000, IDLE_SETTLE_INTERVAL_MS = 900_000, IdleSettlePatrolDeps { sweep?, isFrozen?, invalidate?, log? }, startConversationIdleSettleService(deps?) returning false for OVERDECK_DISABLE_IDLE_SETTLE=1, isPeerDashboardProcess(), or an existing start; otherwise a boot timeout then an interval, both unref'd. Each run: silent skip when isDeaconGloballyPaused(); skip with '[idle-settle] previous sweep still running, skipping' while one is in flight; non-empty result → invalidate() (default invalidateConversationListEnrichmentCache) and log '[idle-settle] settled N idle conversation(s): a, b'; throw → console.warn('[idle-settle] sweep failed:', error). The default sweep calls sweepIdleConversations with listLiveSessions = listLiveConversationSessions, listWaitingNames = getConversationsPendingInputFeed({ resolveSessionFile, listSessionNames: async () => [...live] }) mapped to a Set of row names (null when status is set or the body is not an array), resolveTranscript = resolveSessionFile. stopConversationIdleSettleService() clears both timers. In conversation-sweeps.ts, startConversationSweeps() also logs '[idle-settle] started (boot +2m, 15m sweep)' when the start returns true, and stopConversationSweeps() stops it. Tests use vi.useFakeTimers() and advanceTimersByTimeAsync with mocked boot-gates.js and control-settings.js."
+        },
+        "items": [
+          {
+            "id": "idle-settle-patrol.ac1",
+            "title": "Given fake timers, when the patrol starts, then the injected sweep is not called before 120 s, is called once at 120 s, and is called again at 120 s + 900 s",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "idle-settle-patrol.ac2",
+            "title": "With the Deacon frozen the sweep is never called; with isPeerDashboardProcess() true or OVERDECK_DISABLE_IDLE_SETTLE=1 start returns false; a second start returns false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "idle-settle-patrol.ac3",
+            "title": "When a sweep never resolves, the next interval skips the sweep and emits the 'previous sweep still running' log line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "idle-settle-patrol.ac4",
+            "title": "When the sweep returns ['conv-a'], invalidate is called once and the log line '[idle-settle] settled 1 idle conversation(s): conv-a' is emitted; when it returns [], invalidate is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-auto-settle-row",
+        "title": "Add the Auto-settle idle conversations control to Settings → Conversations",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T03:45:48Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4655",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/sections/AutoSettleIdleRow.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/__tests__/AutoSettleIdleRow.test.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/ConversationSettingsSection.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Settings/sections/__tests__/AutoSettleIdleRow.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "AutoSettleIdleRow.test.tsx passes",
+            "typecheck (including the frontend type ratchet) completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. New AutoSettleIdleRow.tsx: useQuery(['conversations-auto-settle']) over GET /api/conversations/triage/auto-settle; row markup copied from the existing rows in ConversationSettingsSection.tsx; label 'Auto-settle idle conversations'; description 'Settle a conversation after this many days with no activity. 0 turns it off.'; an <input type=\"number\" min=0 max=365 step=1 aria-label=\"Days before an idle conversation is settled\" data-testid=\"auto-settle-idle-days-input\"> plus a 'days' suffix. On blur or Enter, when the text changed: invalid (not /^\\d+$/ or > 365) → render <p role=\"alert\">Enter a whole number from 0 to 365</p> and send nothing; valid → useMutation PUT with ensureDashboardSession() and dashboardMutationJsonHeaders() from lib/wsTransport, credentials 'include', body { idleDays }; success → setQueryData; error → render the server's error string in the alert. Render <AutoSettleIdleRow /> in ConversationSettingsSection.tsx immediately before {children}. Add the test path to scripts/frontend-test-subset.txt in sorted position (before the AccessTokensSection test line). Tests follow CloseOutSection.test.tsx (QueryClientProvider with retry false, mocked wsTransport, stubbed fetch). Follow the pan-style-guide: no pill badges, no decorative color."
+        },
+        "items": [
+          {
+            "id": "settings-auto-settle-row.ac1",
+            "title": "Given GET returns { idleDays: 3 }, the row renders the label 'Auto-settle idle conversations' and the input shows 3",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-auto-settle-row.ac2",
+            "title": "When the operator types 5 and blurs the input, then exactly one PUT is sent to /api/conversations/triage/auto-settle with body {\"idleDays\":5}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-auto-settle-row.ac3",
+            "title": "When the operator types -1 or 400 and blurs, then an alert renders 'Enter a whole number from 0 to 365' and no PUT is sent; when the server answers 400, its error text renders in the alert",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-auto-settle-row.ac4",
+            "title": "scripts/frontend-test-subset.txt contains src/components/Settings/sections/__tests__/AutoSettleIdleRow.test.tsx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-auto-settle-verb",
+        "title": "Add pan conversations auto-settle-idle-days [days]",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T03:45:48Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4655",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/conversations/auto-settle.ts",
+            "src/cli/commands/conversations/index.ts",
+            "src/cli/commands/conversations/__tests__/auto-settle.test.ts",
+            "sync-sources/skills/pan-conversations/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/conversations/__tests__/auto-settle.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "auto-settle.test.ts passes",
+            "typecheck completes without errors and lint (including lint-skills.sh) exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-14",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. New src/cli/commands/conversations/auto-settle.ts exporting autoSettleIdleDaysAction(value?: string): no value → print the current days, or '0 (off)' for 0; a value → parseAutoSettleIdleDays; null → console.error(chalk.red(`Error: expected a whole number of days from 0 to 365, got \"${value}\"`)) and return exitCli(1) (import from '../../exit.js' as pull-requests.ts does); else setConversationsAutoSettleIdleDays and print '✓ Conversations idle for N day(s) are settled automatically' or '✓ Idle auto-settle is off'. Register `auto-settle-idle-days [days]` in index.ts right after auto-archive-on-merge (:155-158) with description 'Show or set how many days without activity before an operator conversation is settled (0 = off, default 3)'. In SKILL.md add the command line after line 38 and a Notes bullet stating default 3, 0 = off, what counts as activity, the never-settled cases, that unsettling restarts the clock, and that it works with the dashboard down. Tests on a temp OVERDECK_HOME follow __tests__/pull-requests.test.ts:195 and also cover the WI-2 getter/setter cases."
+        },
+        "items": [
+          {
+            "id": "cli-auto-settle-verb.ac1",
+            "title": "On a fresh database the verb with no argument prints 3; after '5' it prints 5; after '0' it prints '0 (off)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-auto-settle-verb.ac2",
+            "title": "When the argument is 'abc', '-1' or '366', then the verb exits 1, prints the error text, and preserves the stored value",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-auto-settle-verb.ac3",
+            "title": "pan conversations --help lists auto-settle-idle-days, SKILL.md contains 'pan conversations auto-settle-idle-days [days]', and npm run lint exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-idle-settle",
+        "title": "Document idle auto-settle and comment on #1485",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T03:45:48Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4655",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/conversations.mdx",
+            "docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'Settling idle conversations automatically\\|auto-settle-idle-days\\|PAN-4653' features/conversations.mdx",
+            "grep -c 'tracked separately' features/conversations.mdx",
+            "grep -n 'conversation-idle-settle-service.ts\\|idle_reset_at' docs/DASHBOARD-ARCHITECTURE.md",
+            "gh issue view 1485 --json state,comments --jq '.state, (.comments | last | .body)'"
+          ],
+          "expected_outputs": [
+            "the first grep prints the heading, the CLI verb and the PAN-4653 pointer",
+            "the second grep prints 0",
+            "the third grep prints both strings",
+            "#1485 state is OPEN and its last comment names PAN-4655"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-15"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. features/conversations.mdx: replace the 'Auto-settle — … tracked separately …' paragraph (lines 815-818) with a '### Settling idle conversations automatically' subsection whose content is listed in PRD WI-9 step 1 (default 3 days, what counts as activity, never-settled cases, group rule, clock restart on unsettle/unsnooze/snooze end, ~15-minute check paused by the Deacon freeze, first-sweep effect after upgrade, Settings → Conversations control and `pan conv auto-settle-idle-days`, 0 = off), keeping one sentence pointing to PAN-4653 for on-merge. docs/DASHBOARD-ARCHITECTURE.md: after line 490 ('deacon pause toggle does not apply.') add an 'Idle auto-settle (PAN-4655)' bullet naming conversation-idle-settle.ts, services/conversation-idle-settle-service.ts, services/conversation-sweeps.ts, idle_reset_at and settleIdleConversation, the setting key and its route, cadence and skip rules. Then `gh issue comment 1485` with the PRD WI-9 step 3 text; do not close #1485."
+        },
+        "items": [
+          {
+            "id": "docs-idle-settle.ac1",
+            "title": "features/conversations.mdx renders a '### Settling idle conversations automatically' heading containing 'auto-settle-idle-days', '3 days' and a PAN-4653 link, and no longer contains 'tracked separately'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-idle-settle.ac2",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md contains an 'Idle auto-settle (PAN-4655)' bullet naming conversation-idle-settle-service.ts, conversation-sweeps.ts and idle_reset_at",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-idle-settle.ac3",
+            "title": "gh issue view 1485 returns state OPEN with a comment stating its archive-after-idle part is superseded by PAN-4655",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "idle-clock-store",
+        "to": "idle-sweep-core",
+        "type": "blocks"
+      },
+      {
+        "from": "auto-settle-setting",
+        "to": "idle-sweep-core",
+        "type": "blocks"
+      },
+      {
+        "from": "auto-settle-setting",
+        "to": "auto-settle-route",
+        "type": "blocks"
+      },
+      {
+        "from": "auto-settle-setting",
+        "to": "cli-auto-settle-verb",
+        "type": "blocks"
+      },
+      {
+        "from": "idle-sweep-core",
+        "to": "idle-settle-patrol",
+        "type": "blocks"
+      },
+      {
+        "from": "extract-conversation-sweeps",
+        "to": "idle-settle-patrol",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

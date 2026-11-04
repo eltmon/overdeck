@@ -208,9 +208,43 @@ describe('cost module', () => {
       expect(terra61?.cacheReadPer1k).toBe(0.00005);
       expect(terra61?.outputPer1k).toBe(0.005);
       expect(terra56?.model).toBe('gpt-5.6-terra');
-      expect(terra56?.inputPer1k).toBe(0.0025);
-      expect(terra56?.cacheReadPer1k).toBe(0.00025);
-      expect(terra56?.outputPer1k).toBe(0.015);
+      expect(terra56?.inputPer1k).toBe(0.002);
+      expect(terra56?.cacheReadPer1k).toBe(0.0002);
+      expect(terra56?.outputPer1k).toBe(0.012);
+    });
+
+    it.each([
+      ['gpt-5.6-sol', 0.004, 0.0004, 0.020],
+      ['gpt-5.6-terra', 0.002, 0.0002, 0.012],
+      ['gpt-5.6-luna', 0.0002, 0.00002, 0.0012],
+      ['gpt-5.5', 0.005, 0.0005, 0.030],
+      ['gpt-5.4-mini', 0.00075, 0.000075, 0.0045],
+      ['gpt-5.2', 0.00175, 0.000175, 0.014],
+    ] as const)('prices %s at the 2026-11 official OpenAI rate', (model, input, cached, output) => {
+      const pricing = getPricing('openai', model);
+      expect(pricing?.model).toBe(model);
+      expect(pricing?.inputPer1k).toBe(input);
+      expect(pricing?.cacheReadPer1k).toBe(cached);
+      expect(pricing?.outputPer1k).toBe(output);
+    });
+
+    it('prices gpt-5.5-pro at $30/$180 with no cached rate', () => {
+      const pricing = getPricing('openai', 'gpt-5.5-pro');
+      expect(pricing?.model).toBe('gpt-5.5-pro');
+      expect(pricing?.inputPer1k).toBe(0.030);
+      expect(pricing?.outputPer1k).toBe(0.180);
+      expect(pricing?.cacheReadPer1k).toBeUndefined();
+    });
+
+    it.each([
+      ['gpt-6-rosalind', 0.015, 0.0015, 0.075],
+      ['gpt-6-astra-law', 0.010, 0.001, 0.050],
+    ] as const)('prices %s through its own exact row', (model, input, cached, output) => {
+      const pricing = getPricing('openai', model);
+      expect(pricing?.model).toBe(model);
+      expect(pricing?.inputPer1k).toBe(input);
+      expect(pricing?.cacheReadPer1k).toBe(cached);
+      expect(pricing?.outputPer1k).toBe(output);
     });
   });
 

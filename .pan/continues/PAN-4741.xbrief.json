@@ -1,0 +1,49 @@
+{
+  "version": "1",
+  "issueId": "PAN-4741",
+  "created": "2026-11-02T12:35:33.008Z",
+  "updated": "2026-11-02T12:49:33.861Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "public-link-only-no-advertise": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4741",
+      "claimedAt": "2026-11-02T12:35:33.008Z",
+      "doneAt": "2026-11-02T12:44:42.500Z"
+    },
+    "docs-public-link-only-advertising": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4741",
+      "claimedAt": "2026-11-02T12:44:51.985Z",
+      "doneAt": "2026-11-02T12:46:24.961Z"
+    },
+    "public-link-only-no-advertise.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T12:47:37.508Z"
+    },
+    "public-link-only-no-advertise.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T12:48:00.973Z"
+    },
+    "public-link-only-no-advertise.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T12:48:29.010Z"
+    },
+    "docs-public-link-only-advertising.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T12:48:52.221Z"
+    },
+    "docs-public-link-only-advertising.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T12:49:12.564Z"
+    },
+    "docs-public-link-only-advertising.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T12:49:33.861Z"
+    }
+  }
+}

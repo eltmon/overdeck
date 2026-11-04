@@ -198,6 +198,14 @@ services:
       - app-network
 ```
 
+In a stack that declares named networks (as every bundled template does with
+`app-network`), every service must list at least one named network or set
+`network_mode:` (use `network_mode: none` for a one-shot job such as a `chown`
+or a migration that needs no network). A service with neither, or with an
+empty `networks:`, puts Compose on an extra `<project>_default` network,
+which uses another bridge subnet. A stack that declares no networks at all and
+relies only on `_default` is fine; that network is its only one.
+
 ### Change Ports
 
 Edit `.env`:

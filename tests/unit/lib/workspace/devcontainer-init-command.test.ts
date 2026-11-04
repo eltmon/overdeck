@@ -3,19 +3,17 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parse as parseYaml } from 'yaml';
 
+interface DevcontainerService {
+  user?: string;
+  command?: string;
+  volumes?: string[];
+  depends_on?: Record<string, { condition?: string }>;
+  networks?: unknown;
+  network_mode?: string;
+}
+
 interface DevcontainerCompose {
-  services?: {
-    'init-perms'?: {
-      user?: string;
-      command?: string;
-      volumes?: string[];
-    };
-    init?: {
-      command?: string;
-      depends_on?: Record<string, { condition?: string }>;
-      volumes?: string[];
-    };
-  };
+  services?: Record<string, DevcontainerService | undefined>;
 }
 
 function readDevcontainerTemplate(): DevcontainerCompose {
@@ -31,6 +29,12 @@ function readDevcontainerTemplate(): DevcontainerCompose {
   return parseYaml(rendered) as DevcontainerCompose;
 }
 
+function declaredNetworkNames(networks: unknown): string[] {
+  if (Array.isArray(networks)) return networks.map(String);
+  if (networks && typeof networks === 'object') return Object.keys(networks);
+  return [];
+}
+
 describe('devcontainer init command', () => {
   it('repairs the node_modules volume ownership before installing dependencies', () => {
     const compose = readDevcontainerTemplate();
@@ -41,7 +45,9 @@ describe('devcontainer init command', () => {
       user: 'root',
       command: 'chown node:node /workspaces/overdeck/node_modules',
       volumes: ['container-node-modules:/workspaces/overdeck/node_modules'],
+      network_mode: 'none',
     });
+    expect(perms).not.toHaveProperty('networks');
     expect(init?.depends_on?.['init-perms']).toEqual({
       condition: 'service_completed_successfully',
     });
@@ -66,5 +72,21 @@ describe('devcontainer init command', () => {
     expect(command).toContain('npm rebuild better-sqlite3 2>&1 ||');
     expect(command).toContain('WARN: better-sqlite3 rebuild failed (dev-only transitive dep via evalite');
     expect(command).not.toContain('npm rebuild better-sqlite3 2>&1 &&');
+  });
+
+  it('attaches every service to a declared network so Compose creates no _default network', () => {
+    const services = readDevcontainerTemplate().services ?? {};
+
+    expect(Object.keys(services).length).toBeGreaterThan(0);
+    // An empty networks: [] / {} still lands the service on `default`, so it
+    // counts as undeclared (PAN-4663).
+    const undeclared = Object.entries(services)
+      .filter(([, service]) => {
+        if (typeof service?.network_mode === 'string' && service.network_mode.length > 0) return false;
+        const names = declaredNetworkNames(service?.networks);
+        return names.length === 0 || names.includes('default');
+      })
+      .map(([name]) => name);
+    expect(undeclared).toEqual([]);
   });
 });

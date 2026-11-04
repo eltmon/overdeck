@@ -103,6 +103,21 @@ describe('browse-row door (PAN-4436 WI-3)', () => {
     expect(vaultBrowseReadOnlyMessage(row!)).toBe(`Read-only copy from laptop. To continue it here, run: pan vault resume ${id}`);
   });
 
+  it('PAN-4645 WI-10 ac1/ac2: stores the owner environment id and fills a null one on the next upsert', () => {
+    const id = vaultId(21);
+    expect(upsertVaultBrowseRow(input(id, { ownerEnvironmentId: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee' }))).toBe('inserted');
+    expect(getConversationByName(`vault-${id}`)?.environmentId).toBe('aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee');
+    expect(upsertVaultBrowseRow(input(id, { ownerEnvironmentId: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee' }))).toBe('unchanged');
+
+    // A row written from a manifest that predates the column: null until the next refresh brings the id.
+    const legacy = vaultId(22);
+    expect(upsertVaultBrowseRow(input(legacy))).toBe('inserted');
+    expect(getConversationByName(`vault-${legacy}`)?.environmentId).toBeNull();
+    expect(upsertVaultBrowseRow(input(legacy))).toBe('unchanged');
+    expect(upsertVaultBrowseRow(input(legacy, { ownerEnvironmentId: 'ffffffff-0000-4000-8000-000000000001' }))).toBe('updated');
+    expect(getConversationByName(`vault-${legacy}`)?.environmentId).toBe('ffffffff-0000-4000-8000-000000000001');
+  });
+
   it('reports updated for a new title and unchanged for identical input', () => {
     const id = vaultId(2);
     upsertVaultBrowseRow(input(id));
@@ -283,11 +298,12 @@ describe('browse rows refuse resume (PAN-4436 WI-6)', () => {
     expect(getConversationByName(`vault-${id}`)).toMatchObject({ status: 'ended' });
   });
 
-  it('a message to a browse row is refused by the ended-row guard', async () => {
+  it('a message to a browse row is refused as a read-only copy (PAN-4650 D-4650-8)', async () => {
     const id = vaultId(13);
     upsertVaultBrowseRow(input(id));
-    const { status } = await readResponse(await handleConversationMessage(`vault-${id}`, { message: 'hi' }));
-    expect(status).toBe(422);
+    const { status, body } = await readResponse(await handleConversationMessage(`vault-${id}`, { message: 'hi' }));
+    expect(status).toBe(409);
+    expect(body).toMatchObject({ code: 'vault-browse-copy' });
   });
 });
 

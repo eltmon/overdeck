@@ -1,0 +1,688 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-01T22:30:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4653: Auto-settle a conversation when its linked PR merges (replaces auto-archive on merge)",
+    "updated": "2026-11-02T03:31:37.519Z"
+  },
+  "plan": {
+    "id": "pan-4653",
+    "title": "Auto-settle a conversation when its linked PR merges (replaces auto-archive on merge)",
+    "status": "running",
+    "uid": "8e6e4ea0-a50a-4c12-91a2-fb1f699f3141",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-01T22:30:00.000Z",
+    "updated": "2026-11-02T03:31:37.519Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4653",
+        "label": "PAN-4653",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4639",
+        "label": "PAN-4639",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "conversations",
+      "pr-sync",
+      "triage",
+      "settings",
+      "cli"
+    ],
+    "metadata": {
+      "sizeJustification": "28 files across server, frontend, CLI and docs, but every surface is required by the issue itself (sweep behavior, per-conversation override in the row menu and pan conv, a Settings toggle, a CLI verb, removal of the old key): this issue is already the PAN-4639 split product, the 8 items are small vertical slices, and splitting further would ship a setting with no way to change it or an override with no effect.",
+      "canonicalFilename": "2026-11-02-PAN-4653-auto-settle-a-conversation-when-its-linked-pr-merges-replaces-auto-archive-on-merge.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "The PR sync sweep archives an operator conversation when all its linked PRs merge or close (conversations.auto_archive_on_merge, default off, CLI-only). Archiving is destructive, it skips live sessions through a tmux-only liveness read that is wrong under Herdr, and PAN-4639 now offers a non-destructive Settled state that fits the 'this work is done' signal better.",
+      "Proposal": "On the same open → merged/closed transition, when every live link is merged or closed, settle the conversation (settled_at = now, settle_reason = 'merge') through the PAN-4639 triage store instead of archiving, with no liveness read. A new app_settings key conversations.auto_settle_on_merge (default on) is exposed in Settings → Conversations and as pan conv auto-settle-on-merge; a per-conversation override column auto_settle_override (on/off/inherit) is exposed in the row and tab menus and as pan conv auto-settle <query>. Agent conversations, already-settled conversations and conversations snoozed into the future are skipped. The old key and verb are removed.",
+      "NonGoals": "- Auto-settle when idle (PAN-4655)\n- Archiving, stopping, or reading terminal liveness from the PR sync sweep\n- Migrating or reading conversations.auto_archive_on_merge, deleting its stale app_settings row, or an auto-archive-on-merge alias\n- A new settle reason for closed-without-merge PRs (they use 'merge')\n- Showing the settle reason or an override badge in the conversation list\n- Hiding the override submenu for agent conversations in the tab menu\n- GitLab merge-request transitions\n- A new event type for list refresh\n- An undo entry or Undo toast for override changes"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Remove conversations.auto_archive_on_merge and pan conv auto-archive-on-merge outright; no alias, no migration of the old value.",
+        "rationale": "The behavior (archive → settle) and the default (off → on) both changed, so an alias or a fallback read would silently mean something different; the old key was opt-in and CLI-only."
+      },
+      {
+        "summary": "Keep the existing trigger and gate: only the open → merged/closed transition fires, and only when every live link is merged or closed.",
+        "rationale": "It is the drop-in reading of 'the same transition' in the issue, keeps the existing tests' semantics, and makes the settle fire once so an unsettle sticks."
+      },
+      {
+        "summary": "A PR closed without merging also settles the conversation, with settle_reason 'merge'.",
+        "rationale": "The issue names the open → merged/closed transition; the reason enum from PAN-4639 has no 'closed' value and adding one is out of scope."
+      },
+      {
+        "summary": "A conversation snoozed until a future time is not auto-settled and keeps its snooze.",
+        "rationale": "Settling clears snoozed_until (PAN-4639 D3) and would silently drop an explicit operator reminder; skipping costs only a manual settle after the wake."
+      },
+      {
+        "summary": "Store the override as a nullable column written through the existing POST /api/conversations/triage door (autoSettleOverride field), exposed as 'inherit' when NULL.",
+        "rationale": "Reuses the triage store, route and enrichment so the list gets the field with no extra query and no new per-conversation route."
+      },
+      {
+        "summary": "Global setting gets its own GET/POST /api/conversations/auto-settle-on-merge routes and a self-contained Settings row component.",
+        "rationale": "The issue rules out the YAML ConversationSettingsSection/settings-api.ts path and points at the app_settings toggle pattern."
+      },
+      {
+        "summary": "Two CLI verbs: auto-settle-on-merge [on|off] (global) and auto-settle <query> [on|off|inherit] (override).",
+        "rationale": "One optional positional cannot distinguish a conversation query from on/off."
+      }
+    ],
+    "items": [
+      {
+        "id": "override-store",
+        "title": "Add the auto_settle_override column and triage-store support",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T22:30:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4653",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "drizzle/overdeck/0000_overdeck_init.sql",
+            "src/lib/overdeck/infra.ts",
+            "src/lib/overdeck/conversation-triage-store.ts",
+            "src/lib/overdeck/__tests__/conversation-triage-store.test.ts",
+            "src/lib/overdeck/__tests__/conversation-list-costs.test.ts",
+            "src/dashboard/server/routes/__tests__/conversation-triage-route.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-triage-store.test.ts src/lib/overdeck/__tests__/conversation-list-costs.test.ts src/lib/overdeck/__tests__/conversation-list-triage.test.ts src/dashboard/server/routes/__tests__/conversation-triage-route.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "the four named test files pass",
+            "typecheck completes without errors",
+            "file-size guard reports no violations"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1"
+          ],
+          "foundationFor": [
+            "sweep-settles",
+            "cli-verbs",
+            "menu-override"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1 (.pan/drafts/PAN-4653.md). Add `auto_settle_override text` to the conversations table in drizzle/overdeck/0000_overdeck_init.sql (after `snoozed_until`, line 177) and a runSchemaTopUp line in src/lib/overdeck/infra.ts after line 166. In conversation-triage-store.ts add AUTO_SETTLE_OVERRIDES/AutoSettleOverride, the autoSettleOverride field on ConversationTriage (EMPTY = 'inherit'; stored NULL or any unknown value reads 'inherit'), read the column in both SELECTs (still one query per page), add setAutoSettleOverride(name, override) ('inherit' stores NULL) and the pure autoSettlesOnMerge(override, globalEnabled) = override==='inherit' ? globalEnabled : override==='on'. Extend TriageUpdate/parseTriageUpdates/applyTriageUpdate so an update may set only autoSettleOverride; invalid values return 'autoSettleOverride must be on, off, or inherit'; an entry with none of settled/snoozedUntil/autoSettleOverride returns 'each update requires settled, snoozedUntil, or autoSettleOverride'. Update the exact-shape tests at conversation-triage-store.test.ts:126 and :198 and conversation-list-costs.test.ts:43, and add the tests listed in WI-1 step 4 and step 6."
+        },
+        "items": [
+          {
+            "id": "override-store.ac1",
+            "title": "Given a fresh overdeck.db, PRAGMA table_info(conversations) returns a row for auto_settle_override, and infra.ts contains the runSchemaTopUp line that adds it to existing databases",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "override-store.ac2",
+            "title": "Given a new conversation row, getConversationTriage returns autoSettleOverride 'inherit'; after setAutoSettleOverride(name,'off') it returns 'off'; after 'inherit' the column is NULL",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "override-store.ac3",
+            "title": "parseTriageUpdates accepts { updates: [{ name, autoSettleOverride: 'on' }] } and rejects autoSettleOverride 'sometimes' with the message 'autoSettleOverride must be on, off, or inherit'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "override-store.ac4",
+            "title": "POST /api/conversations/triage with { updates: [{ name, autoSettleOverride: 'off' }] } returns 200 and persists 'off' while settledAt and snoozedUntil stay unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "override-store.ac5",
+            "title": "autoSettlesOnMerge returns true for (inherit,true) and (on,false) and false for (inherit,false) and (off,true)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "global-setting",
+        "title": "Add the conversations.auto_settle_on_merge key, default on",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T22:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4653",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/control-settings.ts",
+            "src/lib/overdeck/__tests__/control-settings-auto-settle.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/control-settings-auto-settle.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "control-settings-auto-settle.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. In src/lib/overdeck/control-settings.ts add CONVERSATIONS_AUTO_SETTLE_ON_MERGE_KEY = 'conversations.auto_settle_on_merge', isConversationsAutoSettleOnMerge() returning getSetting(key) !== 'false' (default on, the isFlywheelRequireUatBeforeMerge shape) and setConversationsAutoSettleOnMerge(enabled). Add it AFTER the auto-archive block (lines 200-213) and leave that block in place: cli-verbs deletes it once nothing imports it. New test file with a temp OVERDECK_HOME."
+        },
+        "items": [
+          {
+            "id": "global-setting.ac1",
+            "title": "Given no app_settings row for conversations.auto_settle_on_merge, isConversationsAutoSettleOnMerge() returns true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "global-setting.ac2",
+            "title": "After setConversationsAutoSettleOnMerge(false) the app_settings value is 'false' and isConversationsAutoSettleOnMerge() returns false; after setting true it returns true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sweep-settles",
+        "title": "Make the PR sync sweep settle merged conversations instead of archiving them",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T22:30:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4653",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/pull-request-sync-service.ts",
+            "src/dashboard/server/services/__tests__/pull-request-sync-service.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/pull-request-sync-service.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "pull-request-sync-service.test.ts passes including the 13 auto-settle tests",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. Replace autoArchiveSettledConversations with autoSettleMergedConversations(ctx) exactly as in the PRD snippet: filter isAgentConversationName, read the global key once, read triage for all candidates in one listConversationTriage call, skip already-settled rows, skip when autoSettlesOnMerge(override, global) is false, skip a snoozedUntil later than ctx.now, require at least one live link and every live link merged or closed, then settleConversation(name,'merge',ctx.now); call invalidateConversationListEnrichmentCache() when anything settled. Rename SweepContext.settled to prFinished. Delete listLiveConversationSessions, the listLiveSessions parameter (signature becomes (now, readPullRequest, listLivePanes)), and the archiveConversation/getConversationByName/tmuxExecAsync imports. Update the module header (new step 6) and the runPullRequestSyncOnce JSDoc. In the test file: fix the 4-arg calls at lines 185/194/212 to 3 args, drop the tmux mock if unused, replace the auto-archive describe (lines 446-563) with the 13 auto-settle tests listed in WI-3 step 5, resetting the app_settings row in afterEach."
+        },
+        "items": [
+          {
+            "id": "sweep-settles.ac1",
+            "title": "Given the global key unset, when a conversation's only PR goes open to merged across two sweeps (even with its pane reported live), then getConversationTriage shows settleReason 'merge' and settledAt equal to the second sweep's time, and archivedAt stays null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sweep-settles.ac2",
+            "title": "Given override 'off' with the global key on, the conversation is not settled; given override 'on' with the global key off, it is settled with reason 'merge'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sweep-settles.ac3",
+            "title": "Given a conversation named agent-pan-77 with override 'on', when its PR goes open to merged, then the sweep leaves settledAt null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sweep-settles.ac4",
+            "title": "The sweep preserves a manual settle (settleReason stays 'manual' with its original settledAt), preserves a future snooze (snoozedUntil unchanged, settledAt null), and leaves an operator-unsettled conversation unsettled on a later sweep",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sweep-settles.ac5",
+            "title": "git grep -n 'archiveConversation\\|tmuxExecAsync\\|listLiveSessions' src/dashboard/server/services/pull-request-sync-service.ts prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "setting-routes",
+        "title": "Add GET/POST /api/conversations/auto-settle-on-merge",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T22:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4653",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/conversation-triage.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/routes/__tests__/conversation-triage-route.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/conversation-triage-route.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts src/dashboard/server/__tests__/route-scopes.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the three named test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. In src/dashboard/server/routes/conversation-triage.ts add the GET and POST handlers from the PRD snippet (validateOrigin → 403; POST body enabled must be boolean → 400 'enabled must be a boolean'), add both to conversationTriageRouteLayer's Layer.mergeAll (no server.ts change), update the header comment, add two no-loss-matrix rows after line 241, and add the four route tests."
+        },
+        "items": [
+          {
+            "id": "setting-routes.ac1",
+            "title": "Given a fresh DB, GET /api/conversations/auto-settle-on-merge returns 200 { enabled: true }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "setting-routes.ac2",
+            "title": "POST { enabled: false } returns 200 { enabled: false } and a following GET returns { enabled: false }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "setting-routes.ac3",
+            "title": "POST { enabled: 'no' } returns 400 and a request failing validateOrigin returns 403",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "setting-routes.ac4",
+            "title": "tests/unit/lib/overdeck/no-loss-matrix.ts contains rows for GET and POST /api/conversations/auto-settle-on-merge and no-loss-matrix.test.ts exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-toggle",
+        "title": "Add the Auto-settle on merge switch to Settings → Conversations",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T22:30:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4653",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/sections/AutoSettleOnMergeRow.tsx",
+            "src/dashboard/frontend/src/components/Settings/SettingsPage.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/__tests__/AutoSettleOnMergeRow.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Settings/sections/__tests__/AutoSettleOnMergeRow.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "AutoSettleOnMergeRow.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. New self-contained component AutoSettleOnMergeRow (own useQuery/useMutation on /api/conversations/auto-settle-on-merge, query key ['conversation-auto-settle-on-merge'], optimistic update, restore + toast.error on failure), markup copied from the 'Rich summaries' switch row in ConversationSettingsSection.tsx, label 'Auto-settle on merge', aria-label 'Toggle auto-settle on merge'. Render it in SettingsPage.tsx as the first child of <ConversationSettingsSection> before <ConversationSearchSection>. Never use formData or settings-api.ts. Add the test file to scripts/frontend-test-subset.txt."
+        },
+        "items": [
+          {
+            "id": "settings-toggle.ac1",
+            "title": "Given GET returns { enabled: true }, the switch renders with aria-checked='true' under Settings → Conversations",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-toggle.ac2",
+            "title": "Clicking the switch sends POST with body {\"enabled\":false} and renders aria-checked='false' before the response resolves",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-toggle.ac3",
+            "title": "When the POST answers 500, the switch restores aria-checked='true' and toast.error is called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-toggle.ac4",
+            "title": "scripts/frontend-test-subset.txt contains src/components/Settings/sections/__tests__/AutoSettleOnMergeRow.test.tsx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-verbs",
+        "title": "Replace pan conv auto-archive-on-merge with auto-settle-on-merge and auto-settle",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T22:30:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4653",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/conversations/pull-requests.ts",
+            "src/cli/commands/conversations/index.ts",
+            "src/cli/commands/conversations/__tests__/pull-requests.test.ts",
+            "src/lib/overdeck/control-settings.ts",
+            "packages/contracts/src/composer-commands.generated.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/conversations/__tests__/pull-requests.test.ts",
+            "npm run typecheck",
+            "npm run build:cli && bash scripts/lint-slash-commands.sh"
+          ],
+          "expected_outputs": [
+            "pull-requests.test.ts passes",
+            "typecheck completes without errors",
+            "lint-slash-commands prints '✓ composer-command manifest matches the CLI registry'"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. In pull-requests.ts replace autoArchiveOnMergeAction with autoSettleOnMergeAction and add autoSettleOverrideAction (PRD snippet: prints override or 'inherit (global: on|off)'; validates on|off|inherit → exit 1; writes through viaDashboard POST /api/conversations/triage with an applyTriageUpdate offline fallback; unknown query exits 2 via resolveOrExit). Register 'auto-settle-on-merge [value]' and 'auto-settle <query> [value]' in index.ts in place of 'auto-archive-on-merge' (no alias). Delete the auto-archive block from control-settings.ts (lines 200-213). Update pull-requests.test.ts (lines 195-215 and 230). Run npm run build:cli && npm run generate:slash-commands and commit composer-commands.generated.ts."
+        },
+        "items": [
+          {
+            "id": "cli-verbs.ac1",
+            "title": "On a fresh DB `autoSettleOnMergeAction()` prints 'on'; after 'off' it prints 'off'; the value 'yes' exits 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-verbs.ac2",
+            "title": "With the dashboard refused, autoSettleOverrideAction('pr-conv') prints 'inherit (global: on)', autoSettleOverrideAction('pr-conv','off') persists autoSettleOverride 'off', 'sometimes' exits 1, and an unknown query exits 2",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-verbs.ac3",
+            "title": "registerConversationsCommands creates auto-settle-on-merge ['value'] and auto-settle ['query','value'] and returns no auto-archive-on-merge command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-verbs.ac4",
+            "title": "git grep -n 'AutoArchiveOnMerge\\|auto_archive_on_merge\\|auto-archive-on-merge' -- src packages prints nothing and bash scripts/lint-slash-commands.sh exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "menu-override",
+        "title": "Add the Auto-settle on merge submenu to the row and tab menus",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T22:30:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4653",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/TriageMenuItems.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/useConversationMutations.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationList.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/TriageMenuItems.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/useConversationMutations.triage.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/CommandDeck/__tests__/TriageMenuItems.test.tsx src/components/CommandDeck/__tests__/useConversationMutations.triage.test.tsx",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "both named frontend test files pass",
+            "typecheck completes without errors",
+            "file-size guard reports no violations"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. Add autoSettleOverride?: 'on'|'off'|'inherit' to the Conversation interface in ConversationList.tsx (after snoozedUntil). In useConversationMutations.ts add autoSettleOverride to TriageUpdateInput and a setAutoSettleOverride({name, override}) mutation posting { updates: [{ name, autoSettleOverride }] } through postTriageUpdates with optimistic cache update, restore + toast.error on failure, invalidate ['conversations'] on settle, and NO undo entry or success toast; add it to the returned object and useMemo deps. In TriageMenuItems.tsx extend the structural prop types and add the 'Auto-settle on merge' submenu (GitMerge icon, nested MenuSurface like Snooze, items Use global setting / Always / Never, current one shows Check + aria-current='true'). ConversationRow.tsx and ConversationActionMenu.tsx need no change."
+        },
+        "items": [
+          {
+            "id": "menu-override.ac1",
+            "title": "Given a conversation with no autoSettleOverride, opening the Auto-settle on merge submenu renders three items with 'Use global setting' marked aria-current='true'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "menu-override.ac2",
+            "title": "Clicking 'Never' calls mutations.setAutoSettleOverride with { name, override: 'off' } and calls onClose; a conversation with override 'on' marks 'Always'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "menu-override.ac3",
+            "title": "setAutoSettleOverride posts { updates: [{ name, autoSettleOverride: 'off' }] } to /api/conversations/triage, updates the cached row before the response, and undoLastTriage() still returns false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "menu-override.ac4",
+            "title": "A 500 response restores the cached row's prior autoSettleOverride",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document auto-settle on merge and drop the auto-archive docs",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T22:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4653",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/conversations.mdx",
+            "sync-sources/skills/pan-conversations/SKILL.md",
+            ".overdeck/context/codebase/concerns.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "git grep -n 'auto-archive-on-merge\\|auto_archive_on_merge' -- features sync-sources .overdeck/context",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "git grep prints nothing",
+            "lint:docs completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. Rewrite features/conversations.mdx lines 681-696 (the auto-archive paragraph and bash block) as the auto-settle-on-merge paragraph with both CLI verbs, the Settings switch, the menu override, default on, fires once, already-settled and snoozed behavior, agent exclusion. Replace lines 814-818 with a pointer to that paragraph while keeping the PAN-4655 idle link. Update sync-sources/skills/pan-conversations/SKILL.md lines 38 and 92-94. Delete the 'PR sync auto-archive liveness is tmux-only' bullet from .overdeck/context/codebase/concerns.md (lines 388-392), keeping one last-verified line at the end."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "features/conversations.mdx states that auto-settle on merge is on by default, names Settings → Conversations → Auto-settle on merge, shows `pan conv auto-settle-on-merge [on|off]` and `pan conv auto-settle <query> [on|off|inherit]`, and states that agent conversations are never auto-settled",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "sync-sources/skills/pan-conversations/SKILL.md lists both new verbs and contains no auto-archive-on-merge line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": ".overdeck/context/codebase/concerns.md no longer contains 'auto-archive liveness is tmux-only' and ends with exactly one last-verified line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "override-store",
+        "to": "sweep-settles",
+        "type": "blocks"
+      },
+      {
+        "from": "global-setting",
+        "to": "sweep-settles",
+        "type": "blocks"
+      },
+      {
+        "from": "override-store",
+        "to": "setting-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "global-setting",
+        "to": "setting-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "override-store",
+        "to": "cli-verbs",
+        "type": "blocks"
+      },
+      {
+        "from": "global-setting",
+        "to": "cli-verbs",
+        "type": "blocks"
+      },
+      {
+        "from": "sweep-settles",
+        "to": "cli-verbs",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

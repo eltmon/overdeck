@@ -339,6 +339,7 @@
   border: none;
   background: none;
   width: 100%;
+  min-width: 0;
   text-align: left;
   color: var(--foreground);
 }
@@ -2717,6 +2718,40 @@
   flex-shrink: 0;
   color: var(--success);
   animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* PAN-4626: a row being stopped or archived — dimmed, inert, labelled. */
+.conversationRowLeaving {
+  opacity: 0.45;
+  transition: opacity 150ms ease-out;
+  pointer-events: none;
+}
+
+/* The stop button is hover-only; pointer-events: none ends hover, so keep it shown. */
+.conversationRowLeaving .conversationStopBtn {
+  opacity: 1;
+}
+
+.conversationLeavingStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  font-size: 10px;
+  color: var(--muted-foreground);
+  white-space: nowrap;
+}
+
+.conversationLeavingSpinner {
+  flex-shrink: 0;
+  color: var(--muted-foreground);
+  animation: spin 1s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .conversationRowLeaving {
+    transition: none;
+  }
 }
 
 .conversationName {
@@ -6390,6 +6425,64 @@
   padding-left: 28px;
 }
 
+/* ─── Triage sections (PAN-4639) ─────────────────────────────────────────────
+   Needs you / Inbox / Snoozed / Settled headers, the per-row settle control
+   and snooze label, and the multi-select bulk bar. Muted captions, no pill
+   shapes, no decorative color — only the needs-you header uses the
+   needs-you state token. */
+
+.convSectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 4px 12px;
+  border: none;
+  background: none;
+  text-align: left;
+  font-size: 10px;
+  line-height: 1.4;
+  color: var(--muted-foreground);
+  cursor: pointer;
+}
+
+.convSectionHeader:hover {
+  color: var(--foreground);
+}
+
+.convSectionCount {
+  color: var(--muted-foreground);
+}
+
+.conversationSettleBox {
+  color: var(--muted-foreground);
+  cursor: pointer;
+}
+
+.conversationSettleBox:hover {
+  color: var(--foreground);
+}
+
+.conversationSnoozeLabel {
+  font-size: 10px;
+  line-height: 1.4;
+  color: var(--muted-foreground);
+}
+
+.convBulkBar {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: var(--muted);
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+
 .laneLabel {
   flex-shrink: 0;
   font-family: var(--font-mono-ui, var(--font-mono));
@@ -6434,4 +6527,197 @@
 
 .laneVerdictLink:hover {
   text-decoration: underline;
+}
+
+/* PAN-4650 WI-12 (D-6, D-4650-19): a conversation another machine owns, or a
+   released copy, sits on --surface-remote — a surface tone, never a status
+   color. The three non-live states also mute the title. */
+.conversationHeaderShell[data-machine-state]:not([data-machine-state="local"]) {
+  background: var(--surface-remote);
+}
+
+.conversationHeaderShell[data-machine-state="offline-saved"] .conversationTerminalTitleText,
+.conversationHeaderShell[data-machine-state="offline-none"] .conversationTerminalTitleText,
+.conversationHeaderShell[data-machine-state="released"] .conversationTerminalTitleText {
+  color: var(--muted-foreground);
+}
+
+.headerMachineChip {
+  font-family: var(--font-mono-ui);
+  font-size: 11px;
+  padding: 2px 8px;
+  font-weight: 400;
+  gap: 5px;
+  /* One line: long hostnames ellipsis inside the chip (full label in the tooltip). */
+  max-width: 280px;
+  white-space: nowrap;
+}
+
+.machineBanner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-remote);
+  font-size: 12px;
+  color: var(--body-foreground, var(--foreground));
+  flex-shrink: 0;
+}
+
+.machineBannerIcon,
+.machineBannerSub {
+  color: var(--muted-foreground);
+}
+
+.machineBannerLabel {
+  font-family: var(--font-mono-ui);
+  color: var(--foreground);
+}
+
+.machineBannerActions {
+  margin-left: auto;
+  display: flex;
+  gap: 6px;
+}
+
+.machineBannerPrimary {
+  color: var(--primary-ink, var(--primary));
+}
+
+.composerReadOnly {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--body-foreground, var(--foreground));
+}
+
+.composerReadOnly > svg {
+  color: var(--muted-foreground);
+  flex-shrink: 0;
+}
+
+/* PAN-4650: a copy that cannot run here cannot be renamed here. */
+.conversationTitleEditBtn[hidden] {
+  display: none;
+}
+
+/* PAN-4650 WI-13: linked conversation rows. The machine chip is tinted while
+   the machine is online and a hairline outline while it is offline; an
+   offline row's title is muted. Surface tones only, never status colors. */
+.linkedMachineChipOnline {
+  background: var(--surface-remote);
+}
+
+.linkedMachineChipOffline {
+  background: transparent;
+  border: 1px solid var(--border);
+}
+
+.linkedRowOffline .conversationName,
+.linkedRowOffline .projectConvLabel {
+  color: var(--muted-foreground);
+}
+
+.hiddenMachinesFooter {
+  padding: 8px 12px;
+  font-size: 11px;
+  color: var(--muted-foreground);
+  border-top: 1px solid var(--border);
+}
+
+.hiddenMachinesShow {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--primary-ink, var(--primary));
+  cursor: pointer;
+  font-size: inherit;
+}
+
+/* PAN-4650 WI-14: Pull here leaves the title bar for the ⋮ menu when the header is narrow. */
+@container (max-width: 520px) {
+  .conversationHeaderContainer .pullHereHeaderButton {
+    display: none;
+  }
+}
+
+/* PAN-4650 WI-19: Open preview popover (mockup flows f, g, h). */
+.previewAnchor {
+  position: relative;
+  display: inline-flex;
+}
+
+.previewPopover {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  margin-top: 6px;
+  z-index: 50;
+  width: 300px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--popover);
+  color: var(--popover-foreground);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-floating, 0 8px 24px rgb(0 0 0 / 0.18));
+  font-size: 12px;
+}
+
+.previewTitle {
+  font-weight: 500;
+  color: var(--foreground);
+}
+
+.previewText {
+  color: var(--muted-foreground);
+}
+
+.previewForwardLine {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono-ui);
+}
+
+.previewPortOption {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 4px);
+  background: transparent;
+  color: var(--foreground);
+  cursor: pointer;
+  text-align: left;
+}
+
+.previewPortOption:hover {
+  background: var(--accent);
+}
+
+.previewPortInput {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 8px;
+  border: 1px solid var(--input, var(--border));
+  border-radius: var(--radius-sm, 4px);
+  background: transparent;
+  color: var(--foreground);
+  font-family: var(--font-mono-ui);
+}
+
+.previewActions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.previewError {
+  color: var(--destructive);
 }

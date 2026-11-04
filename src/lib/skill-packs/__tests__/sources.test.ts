@@ -27,10 +27,14 @@ import {
   fetchPackSource,
   getPack,
   listPacks,
+  packBrowserDir,
   packCacheDir,
   packExtractDir,
+  packRenderDir,
   packRepoDir,
   packsHome,
+  packStateDir,
+  readPackRegistry,
   packUpdateAvailable,
   PackSourceError,
   removePack,
@@ -71,6 +75,19 @@ describe('pack registry', () => {
   it('stores adapter only when given', async () => {
     await writePackEntry({ id: 'p', url: 'u', ref: 'main', commit: COMMIT, adapter: 'plain' });
     expect(readConfig().skills?.packs?.['p']).toEqual({ url: 'u', ref: 'main', commit: COMMIT, adapter: 'plain' });
+  });
+
+  it('round-trips browser: true and stores it only when set (PAN-4730)', async () => {
+    await writePackEntry({ id: 'gstack', url: 'u', ref: 'main', commit: COMMIT, adapter: 'gstack-runtime', browser: true });
+    expect(readConfig().skills?.packs?.['gstack']).toEqual({ url: 'u', ref: 'main', commit: COMMIT, adapter: 'gstack-runtime', browser: true });
+    expect(await getPack('gstack')).toEqual({ id: 'gstack', url: 'u', ref: 'main', commit: COMMIT, adapter: 'gstack-runtime', browser: true });
+    await writePackEntry({ id: 'gstack', url: 'u', ref: 'main', commit: COMMIT, adapter: 'gstack-runtime' });
+    expect(readConfig().skills?.packs?.['gstack']).toEqual({ url: 'u', ref: 'main', commit: COMMIT, adapter: 'gstack-runtime' });
+  });
+
+  it('ignores a browser value other than true without skipping the entry', async () => {
+    writeFileSync(configPath(), `skills:\n  packs:\n    gstack: { url: u, ref: r, commit: ${COMMIT}, browser: 'yes' }\n`);
+    expect(await getPack('gstack')).toEqual({ id: 'gstack', url: 'u', ref: 'r', commit: COMMIT });
   });
 
   it('preserves comments and unrelated keys', async () => {
@@ -121,17 +138,46 @@ describe('pack registry', () => {
   });
 });
 
+describe('readPackRegistry (gc)', () => {
+  it('reads every pack key, with null for a malformed entry', async () => {
+    writeFileSync(configPath(), `skills:\n  packs:\n    gstack:\n      url: u\n      ref: main\n      commit: ${COMMIT}\n    broken:\n      url: u\n      ref: main\n      commit: not-a-sha\n`);
+    const registry = await readPackRegistry();
+    expect(registry.readable).toBe(true);
+    expect([...registry.packs.entries()]).toEqual([['gstack', COMMIT], ['broken', null]]);
+  });
+
+  it('is unreadable when the config does not parse', async () => {
+    writeFileSync(configPath(), `skills:\n  packs:\n    gstack:\n      url: u\n     ref: main\n`);
+    expect(await readPackRegistry()).toEqual({ readable: false, packs: new Map() });
+    expect(await listPacks()).toEqual([]);
+  });
+
+  it('is readable and empty without a config or packs', async () => {
+    expect(await readPackRegistry()).toEqual({ readable: true, packs: new Map() });
+    writeFileSync(configPath(), 'models:\n  default: sonnet\n');
+    expect(await readPackRegistry()).toEqual({ readable: true, packs: new Map() });
+  });
+});
+
 describe('pack cache paths', () => {
   it('lives under OVERDECK_HOME/packs', () => {
     expect(packsHome()).toBe(join(overdeckHome, 'packs'));
     expect(packRepoDir('mattpocock')).toBe(join(overdeckHome, 'packs', 'mattpocock', 'repo.git'));
     expect(packExtractDir('mattpocock', COMMIT)).toBe(join(overdeckHome, 'packs', 'mattpocock', COMMIT));
+    expect(packBrowserDir('gstack')).toBe(join(overdeckHome, 'packs', 'gstack', 'browser'));
   });
 
   it('throws on ids and commits that could escape the cache', () => {
     expect(() => packCacheDir('../x')).toThrow(/invalid pack id/);
     expect(() => packCacheDir('')).toThrow(/invalid pack id/);
     expect(() => packExtractDir('mattpocock', '../../etc')).toThrow(/invalid pack commit/);
+  });
+
+  it('puts a runtime pack render per commit and its state beside the extractions', () => {
+    expect(packRenderDir('gstack', COMMIT)).toBe(join(overdeckHome, 'packs', 'gstack', 'render', COMMIT));
+    expect(packStateDir('gstack')).toBe(join(overdeckHome, 'packs', 'gstack', 'state'));
+    expect(() => packRenderDir('gstack', '../../etc')).toThrow(/invalid pack commit/);
+    expect(() => packStateDir('../x')).toThrow(/invalid pack id/);
   });
 });
 
@@ -242,6 +288,63 @@ describe('pack git cache', () => {
   it('leaves no partial clone after a failed fetch', async () => {
     await expect(fetchPackSource('gone', join(scratch, 'missing.git'))).rejects.toThrow();
     expect(existsSync(packRepoDir('gone'))).toBe(false);
+  });
+});
+
+describe('plugin root packs', () => {
+  let up: Upstream;
+  let first = '';
+
+  beforeAll(() => {
+    up = createUpstream();
+    up.commitFile('harness/pstack/claude-code/.claude-plugin/plugin.json', JSON.stringify({ name: 'pstack' }), 'plugin');
+    up.commitFile('harness/pstack/claude-code/skills/alpha/SKILL.md', skillMd('alpha'), 'alpha');
+    up.commitFile('harness/pstack/claude-code/skills/setup-pstack/SKILL.md', skillMd('setup-pstack'), 'setup-pstack');
+    first = up.commitFile('other/skills/x/SKILL.md', skillMd('x'), 'other');
+    up.tag('v1', first);
+  });
+
+  afterAll(() => {
+    rmSync(up.scratch, { recursive: true, force: true });
+  });
+
+  beforeEach(() => {
+    rmSync(packsHome(), { recursive: true, force: true });
+  });
+
+  it('addPack previews the skills under the known plugin root', async () => {
+    writeFileSync(configPath(), '# keep me\n');
+    const result = await addPack({ id: 'pstack', url: up.url, ref: 'v1' }, vi.fn(async () => true));
+    expect(result.preview.manifest.skills.map((skill) => skill.name)).toEqual(['alpha', 'setup-pstack']);
+    expect(result.preview.manifest.skills.find((skill) => skill.name === 'setup-pstack')?.optIn).toBe(true);
+    expect(result.preview.pluginRoot).toBe('harness/pstack/claude-code');
+  });
+
+  it('extracts only the plugin root', async () => {
+    writeFileSync(configPath(), '# keep me\n');
+    const result = await addPack({ id: 'pstack', url: up.url, ref: 'v1' }, vi.fn(async () => true));
+    const dir = packExtractDir('pstack', result.preview.commit);
+    expect(existsSync(join(dir, 'other'))).toBe(false);
+    expect(existsSync(join(dir, 'harness', 'pstack', 'claude-code', 'skills', 'alpha', 'SKILL.md'))).toBe(true);
+  });
+
+  it('re-extracts a cached commit that lacks the plugin root', async () => {
+    const dir = packExtractDir('pstack', first);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'unrelated.txt'), 'stale\n');
+    await fetchPackSource('pstack', up.url);
+    const extracted = await extractCommit('pstack', first, 'harness/pstack/claude-code');
+    expect(existsSync(join(extracted, 'harness', 'pstack', 'claude-code', 'skills', 'alpha', 'SKILL.md'))).toBe(true);
+  });
+
+  it('updatePack reports a changed skill by its repo-relative tree hash', async () => {
+    writeFileSync(configPath(), '# keep me\n');
+    await addPack({ id: 'pstack', url: up.url, ref: 'v1' }, vi.fn(async () => true));
+    up.commitFile('harness/pstack/claude-code/skills/alpha/SKILL.md', `${skillMd('alpha')}\nChanged.\n`, 'change alpha');
+    const next = up.commitFile('harness/pstack/claude-code/skills/alpha/notes.md', 'notes\n', 'notes');
+    const result = await updatePack('pstack', { ref: 'main' }, vi.fn(async () => true));
+    expect(result.preview.commit).toBe(next);
+    expect(result.preview.diff).toEqual({ added: [], removed: [], changed: ['alpha'], newCapabilities: [] });
   });
 });
 
@@ -356,5 +459,102 @@ describe('pack lifecycle', () => {
     expect(readConfig().skills).toEqual({ overrides: { grilling: false } });
     expect(existsSync(packCacheDir('demo'))).toBe(false);
     expect(await removePack('demo')).toEqual({ removed: false });
+  });
+});
+
+describe('gstack runtime pack lifecycle', () => {
+  // A fake fork: pack-mode.json, one skill, and a `setup` that does what pack mode's contract says (or fails).
+  const GOOD_SETUP = [
+    '#!/usr/bin/env bash',
+    'set -e',
+    'mkdir -p "$2" "$4"',
+    'printf \'{"packMode":1,"stateRoot":"%s","version":"0.0.0"}\\n\' "$4" > "$2/.gstack-pack.json"',
+    'printf \'%s\\n\' "$4" > "$2/.gstack-pack-state-root"',
+  ].join('\n');
+  const FAILING_SETUP = '#!/usr/bin/env bash\necho "pack mode: boom" >&2\nexit 1\n';
+
+  let up: Upstream;
+  let good = '';
+  let failing = '';
+  let noPackMode = '';
+  const accept = vi.fn(async () => true);
+  const decline = vi.fn(async () => false);
+
+  beforeAll(() => {
+    up = createUpstream();
+    up.commitFile('pack-mode.json', '{"packMode": 1}\n', 'pack mode');
+    up.commitFile('review/SKILL.md', skillMd('review'), 'review');
+    good = up.commitFile('setup', GOOD_SETUP, 'good setup');
+    failing = up.commitFile('setup', FAILING_SETUP, 'failing setup');
+    up.commitFile('setup', GOOD_SETUP, 'good setup again');
+    noPackMode = up.commitFile('pack-mode.json', '{"packMode": 2}\n', 'other pack mode');
+  });
+
+  afterAll(() => {
+    rmSync(up.scratch, { recursive: true, force: true });
+  });
+
+  beforeEach(() => {
+    rmSync(packsHome(), { recursive: true, force: true });
+    accept.mockClear();
+    decline.mockClear();
+  });
+
+  it('previews the render command and writes and renders nothing when declined', async () => {
+    const result = await addPack({ id: 'gstack', url: up.url, ref: good }, decline);
+    expect(result.written).toBe(false);
+    expect(result.preview.adapter).toBe('gstack-runtime');
+    expect(result.preview.runtime).toEqual({
+      command: ['bash', 'setup', '--pack-root', packRenderDir('gstack', good), '--pack-state-root', packStateDir('gstack')],
+    });
+    expect(await getPack('gstack')).toBeNull();
+    expect(existsSync(packRenderDir('gstack', good))).toBe(false);
+  });
+
+  it('renders after consent, then registers the commit', async () => {
+    const result = await addPack({ id: 'gstack', url: up.url, ref: good }, accept);
+    expect(result.written).toBe(true);
+    expect(existsSync(join(packRenderDir('gstack', good), '.gstack-pack.json'))).toBe(true);
+    expect(existsSync(packStateDir('gstack'))).toBe(true);
+    expect(await getPack('gstack')).toEqual({ id: 'gstack', url: up.url, ref: good, commit: good });
+  });
+
+  it('writes no registry entry and no render when the render fails', async () => {
+    const error = await addPack({ id: 'gstack', url: up.url, ref: failing }, accept).catch((e: unknown) => e);
+    expect(error).toMatchObject({ code: 'render', message: 'pack gstack: render failed: pack mode: boom' });
+    expect(accept).toHaveBeenCalledOnce();
+    expect(await getPack('gstack')).toBeNull();
+    expect(existsSync(packRenderDir('gstack', failing))).toBe(false);
+  });
+
+  it('rejects a commit without pack mode before asking', async () => {
+    await expect(addPack({ id: 'gstack', url: up.url, ref: noPackMode }, accept)).rejects.toMatchObject({
+      code: 'render',
+      message: `pack gstack: ${noPackMode.slice(0, 7)} has no pack mode (pack-mode.json); use https://github.com/eltmon/gstack at a commit with pack mode`,
+    });
+    expect(accept).not.toHaveBeenCalled();
+    expect(await getPack('gstack')).toBeNull();
+  });
+
+  it('keeps the trusted commit when the new commit fails to render on update', async () => {
+    await writePackEntry({ id: 'gstack', url: up.url, ref: good, commit: good });
+    await expect(updatePack('gstack', { ref: failing }, accept)).rejects.toMatchObject({ code: 'render' });
+    expect((await getPack('gstack'))?.commit).toBe(good);
+    expect(existsSync(packRenderDir('gstack', failing))).toBe(false);
+  });
+
+  it('reports an unchanged pack without the pack-mode and bun checks', async () => {
+    await writePackEntry({ id: 'gstack', url: up.url, ref: good, commit: good });
+    const result = await updatePack('gstack', {}, accept);
+    expect(result.written).toBe(false);
+    expect(result.preview.runtime).toBeUndefined();
+    expect(accept).not.toHaveBeenCalled();
+  });
+
+  it('re-renders the trusted commit on sync when its render is missing', async () => {
+    await addPack({ id: 'gstack', url: up.url, ref: good }, accept);
+    rmSync(packRenderDir('gstack', good), { recursive: true, force: true });
+    await syncPack('gstack');
+    expect(existsSync(join(packRenderDir('gstack', good), '.gstack-pack.json'))).toBe(true);
   });
 });

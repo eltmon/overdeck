@@ -46,6 +46,7 @@ import { Effect } from 'effect';
 import { listSessionNames } from '../tmux.js';
 import { isAlive, isConfirmedDead, type LivenessVerdict } from '../agents/liveness.js';
 import { emitActivityEntry } from '../activity-logger.js';
+import { isDeftPipelineIssue } from '../deft/issue-pipeline.js';
 import { removeAgent } from '../agents/removal.js';
 import { listAgentIdsByPrefix } from '../overdeck/agents.js';
 import { loadConfigSync as loadYamlConfig, type ReviewMode } from '../config-yaml.js';
@@ -300,6 +301,12 @@ async function spawnReviewRoleForIssueBody(
   // caller reaches here — 'none' skips only the AI review, never the quality floor.
   // PAN-3917: nothing is stamped. Skipping the AI review leaves the PR
   // unreviewed, which is exactly what the forge then reports.
+  // PAN-4820 (AD-6): Deft runs its own review cycle for a Deft issue.
+  if (await isDeftPipelineIssue(opts.issueId)) {
+    const message = `Review not dispatched for ${opts.issueId}: it runs on Deft`;
+    emitActivityEntry({ source: 'review', level: 'info', message, issueId: opts.issueId });
+    return { success: true, message };
+  }
   if (reviewMode === 'none') {
     const message = opts.reviewMode === 'none'
       ? `Review skipped for ${opts.issueId} (mode=none) — AI review skipped for this run by request; the verification gate still applies`

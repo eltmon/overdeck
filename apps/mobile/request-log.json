@@ -1,0 +1,65 @@
+{
+  "http": [
+    {
+      "method": "GET",
+      "path": "/api/activity",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/fleet/needs-you",
+      "status": 403
+    },
+    {
+      "method": "GET",
+      "path": "/api/conversations/pending-input",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/health",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/conversations/20261103-3247/message",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/conversations/20261103-3247",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/conversations/20261103-3247/kickoff",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/conversations/20261103-3247/bookmarks",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/conversations/20261103-3247/scheduled-messages",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/conversations/20261103-3247/diffs",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/conversations",
+      "status": 200
+    }
+  ],
+  "rpc": [
+    "pan.subscribeDomainEvents",
+    "pan.getSnapshot",
+    "pan.replayEvents",
+    "pan.subscribeConversationMessages"
+  ]
+}

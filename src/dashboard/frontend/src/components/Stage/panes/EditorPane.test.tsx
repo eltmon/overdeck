@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { act, render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { PanRpcError, WS_METHODS } from '@overdeck/contracts'
 import { EditorPane } from './EditorPane'
+import { useStageDeck, type StageDeckContextValue } from '../StageDeckContext'
+import { getConversationCitations, resetCitationStore } from '../../../lib/composerCitations'
 import type { StageContext } from '../types'
 import type { WorkspacePane } from '../../../lib/panesStore'
 
@@ -44,6 +46,7 @@ const pane = (over: Partial<WorkspacePane> = {}): WorkspacePane => ({
 
 beforeEach(() => {
   localStorage.clear()
+  resetCitationStore()
   toastMock.error.mockReset()
   toastMock.success.mockReset()
   wsTransportMock.readFileAtPath.mockReset()
@@ -303,6 +306,79 @@ describe('EditorPane', () => {
   })
 })
 
+// PAN-4658 — Cite over the editor Preview.
+describe('EditorPane Preview cite', () => {
+  function selectTextIn(element: Element): void {
+    const range = document.createRange()
+    range.selectNodeContents(element)
+    const selection = window.getSelection()
+    selection?.removeAllRanges()
+    selection?.addRange(range)
+    document.dispatchEvent(new Event('selectionchange'))
+  }
+
+  it('selecting Preview text shows Cite; Save stores a file citation and shows a toast with an "Open conversation" action', async () => {
+    wsTransportMock.readFileAtPath.mockResolvedValue({ text: 'Step one\nStep two', lang: 'markdown', mtimeMs: 100, totalLines: 2, writable: true })
+
+    render(<EditorPane pane={pane({ citeConversationName: 'conv-a' })} ctx={ctx} />)
+    await waitFor(() => expect(screen.getByTestId('editor-pane-textarea')).toHaveValue('Step one\nStep two'))
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Preview' }))
+    const md = screen.getByTestId('md')
+
+    act(() => selectTextIn(md))
+    fireEvent.click(screen.getByRole('button', { name: 'Cite' }))
+    const commentBox = screen.getByLabelText('Citation comment')
+    fireEvent.change(commentBox, { target: { value: 'Wrong step' } })
+    const citeBox = commentBox.closest('div')!
+    fireEvent.click(within(citeBox).getByRole('button', { name: 'Save' }))
+
+    const citations = getConversationCitations('conv-a')
+    expect(citations).toHaveLength(1)
+    expect(citations[0]!.source).toEqual({ kind: 'file', path: '/repo/docs/flywheel-brief.md' })
+    expect(citations[0]!.comment).toBe('Wrong step')
+
+    expect(toastMock.success).toHaveBeenCalledWith(
+      'Citation added',
+      expect.objectContaining({ action: expect.objectContaining({ label: 'Open conversation' }) }),
+    )
+  })
+
+  it('renders no Cite button when the pane has no citeConversationName', async () => {
+    wsTransportMock.readFileAtPath.mockResolvedValue({ text: 'Step one', lang: 'markdown', mtimeMs: 100, totalLines: 1, writable: true })
+
+    render(<EditorPane pane={pane()} ctx={ctx} />)
+    await waitFor(() => expect(screen.getByTestId('editor-pane-textarea')).toHaveValue('Step one'))
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Preview' }))
+    act(() => selectTextIn(screen.getByTestId('md')))
+
+    expect(screen.queryByRole('button', { name: 'Cite' })).not.toBeInTheDocument()
+  })
+
+  it('renders no Cite button while the draft is dirty', async () => {
+    wsTransportMock.readFileAtPath.mockResolvedValue({ text: 'Step one', lang: 'markdown', mtimeMs: 100, totalLines: 1, writable: true })
+
+    render(<EditorPane pane={pane({ citeConversationName: 'conv-a' })} ctx={ctx} />)
+    await waitFor(() => expect(screen.getByTestId('editor-pane-textarea')).toHaveValue('Step one'))
+
+    fireEvent.change(screen.getByTestId('editor-pane-textarea'), { target: { value: 'edited' } })
+    fireEvent.click(screen.getByRole('tab', { name: 'Preview' }))
+    act(() => selectTextIn(screen.getByTestId('md')))
+
+    expect(screen.queryByRole('button', { name: 'Cite' })).not.toBeInTheDocument()
+  })
+
+  it('renders no Cite button on the Edit tab', async () => {
+    wsTransportMock.readFileAtPath.mockResolvedValue({ text: 'Step one', lang: 'markdown', mtimeMs: 100, totalLines: 1, writable: true })
+
+    render(<EditorPane pane={pane({ citeConversationName: 'conv-a' })} ctx={ctx} />)
+    await waitFor(() => expect(screen.getByTestId('editor-pane-textarea')).toHaveValue('Step one'))
+
+    expect(screen.queryByRole('button', { name: 'Cite' })).not.toBeInTheDocument()
+  })
+})
+
 // PAN-3260 editor-pane.ac5 — the Stage self-heal effect (index.tsx's
 // ISSUE_SCOPED set) must not drop 'editor' panes that carry no issueId, the
 // way it drops files/commits/plan/docs panes created without one. An editor
@@ -348,5 +424,111 @@ describe('editor pane survives the Stage self-heal effect', () => {
     // addPane makes the new pane active, so EditorPane mounted and started its
     // load already — wait for it to settle instead of leaving a dangling promise.
     await waitFor(() => expect(wsTransportMock.readFileAtPath).toHaveBeenCalledWith({ path: '/repo/docs/flywheel-brief.md' }))
+  })
+})
+
+// PAN-4658 pane-cite-target — StageDeckContextValue.openOrFocusEditorPane now
+// takes an optional citeConversationName, and the deck also exposes
+// openOrFocusAgentPane. DeckProbe captures useStageDeck() so tests can drive
+// the deck API directly; the HOME pane (and DeckProbe with it) unmounts as
+// soon as an editor or agent pane becomes active, so calls happen inside
+// act() against the previously-captured reference, not via rendered buttons.
+describe('StageDeckContext — citeConversationName and openOrFocusAgentPane', () => {
+  async function mountDeck(): Promise<{ captured: StageDeckContextValue }> {
+    wsTransportMock.readFileAtPath.mockResolvedValue({ text: 'body', lang: 'markdown', mtimeMs: 1, totalLines: 1, writable: true })
+
+    const [{ Stage }, { usePanesStore }, { useTerminalStateStore }, reactQuery] = await Promise.all([
+      import('../index'),
+      import('../../../lib/panesStore'),
+      import('../../terminal/terminalStateStore'),
+      import('@tanstack/react-query'),
+    ])
+
+    localStorage.clear()
+    usePanesStore.setState({ panesByWorkspace: {}, activePaneByWorkspace: {} })
+    useTerminalStateStore.setState({ terminalStateByThreadId: {} })
+
+    const DECK = 'overdeck'
+    const ref: { captured: StageDeckContextValue | null } = { captured: null }
+
+    function DeckProbe() {
+      ref.captured = useStageDeck()
+      return null
+    }
+
+    const qc = new reactQuery.QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <reactQuery.QueryClientProvider client={qc}>
+        <Stage
+          deckKey={DECK}
+          renderHome={() => <DeckProbe />}
+          renderIssue={(issueId: string) => <div data-testid="issue-overview">{issueId}</div>}
+        />
+      </reactQuery.QueryClientProvider>,
+    )
+
+    if (!ref.captured) throw new Error('DeckProbe did not capture useStageDeck()')
+    return { captured: ref.captured }
+  }
+
+  function panesOf(usePanesStore: typeof import('../../../lib/panesStore').usePanesStore, deck = 'overdeck') {
+    return usePanesStore.getState().panesByWorkspace[deck] ?? []
+  }
+
+  it('opening a new file with a cite target creates an editor pane with citeConversationName', async () => {
+    const { usePanesStore } = await import('../../../lib/panesStore')
+    const { captured } = await mountDeck()
+
+    act(() => captured.openOrFocusEditorPane('/repo/a.md', 'a.md', 'conv-a'))
+
+    const editors = panesOf(usePanesStore).filter((p) => p.paneType === 'editor')
+    expect(editors).toHaveLength(1)
+    expect(editors[0]!.citeConversationName).toBe('conv-a')
+  })
+
+  it('reopening the same file with a different target updates that one pane', async () => {
+    const { usePanesStore } = await import('../../../lib/panesStore')
+    const { captured } = await mountDeck()
+
+    act(() => captured.openOrFocusEditorPane('/repo/a.md', 'a.md', 'conv-a'))
+    act(() => captured.openOrFocusEditorPane('/repo/a.md', 'a.md', 'conv-b'))
+
+    const editors = panesOf(usePanesStore).filter((p) => p.paneType === 'editor')
+    expect(editors).toHaveLength(1)
+    expect(editors[0]!.citeConversationName).toBe('conv-b')
+  })
+
+  it('reopening with null keeps the existing target', async () => {
+    const { usePanesStore } = await import('../../../lib/panesStore')
+    const { captured } = await mountDeck()
+
+    act(() => captured.openOrFocusEditorPane('/repo/a.md', 'a.md', 'conv-b'))
+    act(() => captured.openOrFocusEditorPane('/repo/a.md', 'a.md', null))
+
+    const editors = panesOf(usePanesStore).filter((p) => p.paneType === 'editor')
+    expect(editors).toHaveLength(1)
+    expect(editors[0]!.citeConversationName).toBe('conv-b')
+  })
+
+  it('a first open with null creates a pane with no citeConversationName field', async () => {
+    const { usePanesStore } = await import('../../../lib/panesStore')
+    const { captured } = await mountDeck()
+
+    act(() => captured.openOrFocusEditorPane('/repo/a.md', 'a.md', null))
+
+    const editors = panesOf(usePanesStore).filter((p) => p.paneType === 'editor')
+    expect(editors).toHaveLength(1)
+    expect(editors[0]).not.toHaveProperty('citeConversationName')
+  })
+
+  it('openOrFocusAgentPane adds an agent pane for the conversation', async () => {
+    const { usePanesStore } = await import('../../../lib/panesStore')
+    const { captured } = await mountDeck()
+
+    act(() => captured.openOrFocusAgentPane('conv-a', 'Agent'))
+
+    const agents = panesOf(usePanesStore).filter((p) => p.paneType === 'agent')
+    expect(agents).toHaveLength(1)
+    expect(agents[0]!.conversationId).toBe('conv-a')
   })
 })

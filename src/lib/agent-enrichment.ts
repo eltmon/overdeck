@@ -12,6 +12,7 @@ import { promisify } from 'util'
 import { exec } from 'child_process'
 import { Effect } from 'effect'
 import { getAgentState } from './agents/agent-state.js'
+import { deftEscalationQuestions, deftMenuQuestion } from './deft/pending.js'
 import { getAgentRuntimeState } from './agents/runtime-state.js'
 import {
   detectAwaitingInputForAgent,
@@ -44,7 +45,7 @@ const execAsync = promisify(exec)
 export interface TurnEndAssessment { kind: string; confidence: number; needsAnswer: boolean; model: string }
 
 export interface QuestionOption { label: string; description: string }
-export interface Question { question: string; header: string; options: QuestionOption[]; multiSelect: boolean }
+export interface Question { question: string; context?: string; header: string; options: QuestionOption[]; multiSelect: boolean }
 export interface PendingQuestion { toolId: string; timestamp: string; questions: Question[] }
 
 /**
@@ -76,6 +77,7 @@ export interface PendingAskUserQuestionSnapshot {
   askedAt: string
   questions: Array<{
     question: string
+    context?: string
     header?: string
     multiSelect?: boolean
     options: Array<{ label: string; description?: string }>
@@ -110,6 +112,8 @@ export interface AgentEnrichment {
   jsonlScan?: PendingInputsScan
   /** PAN-4371 — advisory Jev reading of why a bare turn end happened. Only present alongside pendingInputKinds:['agentTurnEnded']. */
   turnEndAssessment?: TurnEndAssessment
+  /** PAN-4849 — open Deft escalations of type external: a quiet indicator, never pending input. */
+  deftExternalEscalations?: number
 }
 
 // PAN-1520 / PAN-1834 — promote pane-detected blocking surfaces into the
@@ -655,12 +659,15 @@ function openDecisionForAgent(agentId: string): OperatorDecision | null {
   return decision && decision.agentId === agentId ? decision : null
 }
 
+const NO_DEFT_QUESTIONS = { questions: [] as PendingQuestion[], externalCount: 0 }
+
 function toPendingAskUserQuestion(q: PendingQuestion): PendingAskUserQuestionSnapshot {
   return {
     toolUseId: q.toolId,
     askedAt: q.timestamp,
     questions: q.questions.map(question => ({
       question: question.question,
+      ...(question.context ? { context: question.context } : {}),
       header: question.header,
       multiSelect: question.multiSelect,
       options: question.options.map(o => ({ label: o.label, description: o.description })),
@@ -672,8 +679,11 @@ function toPendingAskUserQuestion(q: PendingQuestion): PendingAskUserQuestionSna
 export async function getAgentPendingQuestions(agentId: string): Promise<PendingQuestion[]> {
   const jsonlPath = await getAgentJsonlPath(agentId)
   const questions = jsonlPath ? [...(await getPendingQuestions(jsonlPath))] : []
+  const menu = questions.length === 0 ? await deftMenuQuestion(agentId, jsonlPath).catch(() => null) : null
+  if (menu) questions.push(menu)
   const decision = openDecisionForAgent(agentId)
   if (decision) questions.push(operatorDecisionAsPendingQuestion(decision))
+  questions.push(...(await deftEscalationQuestions(agentId).catch(() => NO_DEFT_QUESTIONS)).questions)
   return questions
 }
 
@@ -721,14 +731,20 @@ export async function computeAgentEnrichment(
   // so its mtime never moves again, and a fabricated "nothing is pending" would
   // latch permanently and strand the operator's dialog.
   let scan: PendingInputsScan = EMPTY_PENDING_INPUTS_SCAN
+  let jsonlPath: string | null | undefined
   if (cachedScan) {
     scan = cachedScan
   } else {
-    const jsonlPath = await getAgentJsonlPath(agentId)
+    jsonlPath = await getAgentJsonlPath(agentId)
     if (jsonlPath) scan = await scanPendingInputs(jsonlPath)
   }
 
   let pendingQuestions: PendingQuestion[] = [...scan.askUserQuestions]
+  // PAN-4849: a Deft menu in the last assistant message, re-read on every call (keyed on the last record).
+  if (pendingQuestions.length === 0) {
+    const menu = await deftMenuQuestion(agentId, jsonlPath ?? (() => getAgentJsonlPath(agentId))).catch(() => null)
+    if (menu) pendingQuestions.push(menu)
+  }
   const enterPlanModeOpen = scan.enterPlanModeOpen
   const exitPlanModePending = scan.exitPlanModePending
   if (pendingQuestions.length > 0 && startedAt) {
@@ -748,6 +764,12 @@ export async function computeAgentEnrichment(
     // while a specialist is active only the decision shows, never stale transcript questions.
     pendingQuestions = specialistActive ? [decisionQuestion] : [...pendingQuestions, decisionQuestion]
   }
+  // PAN-4849: open Deft escalations, read on every poll like the decision and exempt from suppression.
+  const deft = await deftEscalationQuestions(agentId).catch(() => NO_DEFT_QUESTIONS)
+  if (deft.questions.length > 0) {
+    pendingQuestions = [...(specialistActive && !operatorDecision ? [] : pendingQuestions), ...deft.questions]
+  }
+  const freshOperatorQuestion = operatorDecision !== null || deft.questions.length > 0
 
   const questionDetection: AwaitingInputDetection | null = pendingQuestions.length > 0
     ? {
@@ -817,7 +839,7 @@ export async function computeAgentEnrichment(
   // unrelated stale JSONL state (a pending ExitPlanMode, an old AskUserQuestion)
   // that happens to be sitting in the same scan.
   const hasBlockingPaneDetection = paneDetection !== null && BLOCKING_AWAITING_INPUT_REASONS.has(paneDetection.reason)
-  const shouldSuppressPendingInput = isSpecialistSuppressed && !hasBlockingPaneDetection && !operatorDecision
+  const shouldSuppressPendingInput = isSpecialistSuppressed && !hasBlockingPaneDetection && !freshOperatorQuestion
   const hasPendingQuestion = !shouldSuppressPendingInput && detection !== null
 
   // PAN-1520 — fold every blocking surface into a uniform set.
@@ -841,8 +863,8 @@ export async function computeAgentEnrichment(
     // prompt is idle too, and must read as the permission, not as a bare turn-end.
     if (turnEndedWaiting && pendingInputKinds.length === 0) pendingInputKinds.push('agentTurnEnded')
   }
-  // PAN-4383: under specialist suppression pendingQuestions holds only the decision.
-  if (isSpecialistSuppressed && operatorDecision && pendingQuestions.length > 0) {
+  // PAN-4383/PAN-4849: under specialist suppression pendingQuestions holds only the decision and Deft questions.
+  if (isSpecialistSuppressed && freshOperatorQuestion && pendingQuestions.length > 0) {
     pendingInputKinds.push('askUserQuestion')
     pendingAskUserQuestion = toPendingAskUserQuestion(pendingQuestions[0])
   }
@@ -887,5 +909,6 @@ export async function computeAgentEnrichment(
     resolutionCount: runtimeState?.resolutionCount || 0,
     jsonlScan: scan,
     ...(turnEndAssessment && pendingInputKinds.includes('agentTurnEnded') ? { turnEndAssessment } : {}),
+    ...(deft.externalCount > 0 ? { deftExternalEscalations: deft.externalCount } : {}),
   }
 }

@@ -74,6 +74,7 @@ projects:
           path: frontend           # Relative to project root
           branch_prefix: "feature/"
           # default_branch: main   # Can override workspace default per-repo
+          # package_manager: pnpm   # Optional: host-side install in this repo at workspace creation
         - name: api
           path: backend
           branch_prefix: "feature/"
@@ -128,6 +129,12 @@ projects:
           COMPOSE_PROJECT_NAME={{COMPOSE_PROJECT}}
           FRONTEND_URL=https://{{FEATURE_FOLDER}}.{{DOMAIN}}
 ```
+
+## Dependency installs in polyrepo workspaces
+
+A polyrepo workspace root is a plain container directory with no `package.json`, so Overdeck skips the root install there. Per-repo installs run only for repos that set `package_manager` (`bun`, `npm`, or `pnpm`) and have a `package.json` in their directory.
+
+Leave `package_manager` unset on a repo when a devcontainer installs that repo's dependencies (for example a pnpm init service) — a host install can conflict with the container's pnpm store. A failed per-repo install fails workspace creation; re-running the command resumes setup.
 
 ## Template Placeholders
 

@@ -170,6 +170,7 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
   const addPane = usePanesStore((s) => s.addPane)
   const closePane = usePanesStore((s) => s.closePane)
   const setActivePane = usePanesStore((s) => s.setActivePane)
+  const updatePane = usePanesStore((s) => s.updatePane)
   const panes = usePanesStore(selectPanesForWorkspace(deckKey))
   const activePaneId = usePanesStore(selectActivePaneId(deckKey))
   const activeId = activePaneId ?? ''
@@ -272,13 +273,24 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
   // chat content (AgentPane → ConversationPanel → ChatMarkdown → MarkdownFileLink)
   // can reach the deck without prop-threading StageApi/StageContext.
   const openOrFocusEditorPane = useCallback(
-    (filePath: string, label: string) => {
+    (filePath: string, label: string, citeConversationName?: string | null) => {
       const current = usePanesStore.getState().panesByWorkspace[deckKey] ?? []
       const existing = current.find((p) => p.paneType === 'editor' && p.editorFilePath === filePath)
-      if (existing) setActivePane(deckKey, existing.paneId)
-      else addPane(deckKey, { paneType: 'editor', label, editorFilePath: filePath })
+      if (existing) {
+        if (citeConversationName && existing.citeConversationName !== citeConversationName) {
+          updatePane(deckKey, existing.paneId, { citeConversationName })
+        }
+        setActivePane(deckKey, existing.paneId)
+      } else {
+        addPane(deckKey, {
+          paneType: 'editor',
+          label,
+          editorFilePath: filePath,
+          ...(citeConversationName ? { citeConversationName } : {}),
+        })
+      }
     },
-    [deckKey, setActivePane, addPane],
+    [deckKey, setActivePane, addPane, updatePane],
   )
 
   const api: StageApi = useMemo(
@@ -287,8 +299,8 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
   )
 
   const deckContextValue: StageDeckContextValue = useMemo(
-    () => ({ deckKey, openOrFocusEditorPane }),
-    [deckKey, openOrFocusEditorPane],
+    () => ({ deckKey, openOrFocusEditorPane, openOrFocusAgentPane }),
+    [deckKey, openOrFocusEditorPane, openOrFocusAgentPane],
   )
 
   const ctx: StageContext = useMemo(

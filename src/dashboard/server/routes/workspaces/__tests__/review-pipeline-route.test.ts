@@ -5,12 +5,15 @@
  * review-mode record write and the per-item tier escalation — is gone.
  */
 
+import { rmSync } from 'node:fs';
+import { join } from 'node:path';
 import { Effect } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DerivedIssueState } from '@overdeck/contracts';
 
 import { INTERNAL_TOKEN_HEADER, _resetInternalTokenCacheForTests } from '../../../../../lib/internal-token.js';
+import { getOverdeckHome } from '../../../../../lib/paths.js';
 
 const routeMocks = vi.hoisted(() => ({
   getProjectPath: vi.fn(),
@@ -30,7 +33,18 @@ const routeMocks = vi.hoisted(() => ({
   refreshIssuePullRequestStateNow: vi.fn(),
   resolveEffort: vi.fn(),
   answerMissingWorkspace: vi.fn(),
+  isDeftPipelineIssue: vi.fn(),
 }));
+
+vi.mock('../../../../../lib/deft/issue-pipeline.js', () => ({
+  isDeftPipelineIssue: routeMocks.isDeftPipelineIssue,
+}));
+
+// PAN-4820: a pass-through spy, so a test can prove nothing was journalled.
+vi.mock('../../../../../lib/cloister/pipeline-journal.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../../../lib/cloister/pipeline-journal.js')>();
+  return { ...actual, appendPipelineEntry: vi.fn(actual.appendPipelineEntry) };
+});
 
 vi.mock('../../workspaces.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../workspaces.js')>();
@@ -138,6 +152,7 @@ const trigger = (init: RequestInit = {}) => post('/api/review/PAN-3340/trigger',
 
 beforeEach(() => {
   process.env.OVERDECK_INTERNAL_TOKEN = 'test-internal-token';
+  rmSync(join(getOverdeckHome(), 'internal-token'), { force: true });
   _resetInternalTokenCacheForTests();
   _resetAutoRequeueCountsForTests();
   for (const mock of Object.values(routeMocks)) mock.mockReset();
@@ -154,6 +169,7 @@ beforeEach(() => {
   routeMocks.pushLocalReviewBranches.mockImplementation(() => new Promise<void>(() => {}));
   routeMocks.resolveEffort.mockReturnValue({ effort: 'high', source: 'default', requested: 'high', clamped: false });
   routeMocks.answerMissingWorkspace.mockResolvedValue(null);
+  routeMocks.isDeftPipelineIssue.mockResolvedValue(false);
 });
 
 afterEach(() => {
@@ -483,5 +499,26 @@ describe('POST /api/review/:issueId/request — PR state refresh (PAN-4457)', ()
     expect(routeMocks.refreshIssuePullRequestStateNow).not.toHaveBeenCalled();
 
     isInFlightSpy.mockRestore();
+  });
+});
+
+// PAN-4820 (AD-5): a Deft issue runs Deft's own review cycle, so the request
+// door refuses before it transitions the issue or journals anything; a
+// journalled `review.requested` would make the Deacon re-request every tick.
+describe('POST /api/review/:issueId/request — Deft issue (PAN-4820)', () => {
+  it('answers 409 and neither transitions the issue nor journals review.requested', async () => {
+    routeMocks.isDeftPipelineIssue.mockResolvedValue(true);
+    const { appendPipelineEntry } = await import('../../../../../lib/cloister/pipeline-journal.js');
+    vi.mocked(appendPipelineEntry).mockClear();
+
+    const result = await post('/api/review/PAN-3340/request', {
+      method: 'POST',
+      headers: authHeaders,
+      body: '{}',
+    });
+
+    expect(result).toEqual({ status: 409, body: { success: false, error: 'PAN-3340 runs on Deft; Overdeck review is off' } });
+    expect(routeMocks.transitionIssueToInReview).not.toHaveBeenCalled();
+    expect(vi.mocked(appendPipelineEntry).mock.calls.filter(([, entry]) => entry.type === 'review.requested')).toEqual([]);
   });
 });

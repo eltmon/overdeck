@@ -1,0 +1,203 @@
+{
+  "version": "1",
+  "issueId": "PAN-4658",
+  "created": "2026-11-02T04:25:38.183Z",
+  "updated": "2026-11-02T05:22:50.215Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "file-citation-type": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4658",
+      "claimedAt": "2026-11-02T04:25:38.183Z",
+      "doneAt": "2026-11-02T04:32:58.387Z"
+    },
+    "file-citation-format": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4658",
+      "claimedAt": "2026-11-02T04:33:10.758Z",
+      "doneAt": "2026-11-02T04:36:46.674Z"
+    },
+    "cite-layer-resolver": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4658",
+      "claimedAt": "2026-11-02T04:36:54.650Z",
+      "doneAt": "2026-11-02T04:42:24.445Z"
+    },
+    "pane-cite-target": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4658",
+      "claimedAt": "2026-11-02T04:42:35.413Z",
+      "doneAt": "2026-11-02T04:46:36.201Z"
+    },
+    "chip-passes-target": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4658",
+      "claimedAt": "2026-11-02T04:46:45.614Z",
+      "doneAt": "2026-11-02T04:51:13.676Z"
+    },
+    "archive-clears-target": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4658",
+      "claimedAt": "2026-11-02T04:51:20.520Z",
+      "doneAt": "2026-11-02T04:53:15.162Z"
+    },
+    "editor-preview-cite": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4658",
+      "claimedAt": "2026-11-02T04:53:20.752Z",
+      "doneAt": "2026-11-02T04:57:59.018Z"
+    },
+    "file-citation-highlight": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4658",
+      "claimedAt": "2026-11-02T04:58:05.450Z",
+      "doneAt": "2026-11-02T05:01:46.104Z"
+    },
+    "chips-file-label": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4658",
+      "claimedAt": "2026-11-02T05:01:53.581Z",
+      "doneAt": "2026-11-02T05:06:12.104Z"
+    },
+    "docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4658",
+      "claimedAt": "2026-11-02T05:06:18.645Z",
+      "doneAt": "2026-11-02T05:07:53.257Z"
+    },
+    "ci-subset": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4658",
+      "claimedAt": "2026-11-02T05:07:59.992Z",
+      "doneAt": "2026-11-02T05:08:54.177Z"
+    },
+    "file-citation-type.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:13:18.148Z"
+    },
+    "file-citation-type.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:13:35.396Z"
+    },
+    "file-citation-type.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:13:55.257Z"
+    },
+    "file-citation-format.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:14:31.808Z"
+    },
+    "file-citation-format.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:14:57.311Z"
+    },
+    "file-citation-format.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:15:18.097Z"
+    },
+    "cite-layer-resolver.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:15:38.251Z"
+    },
+    "cite-layer-resolver.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:15:55.399Z"
+    },
+    "cite-layer-resolver.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:16:12.834Z"
+    },
+    "pane-cite-target.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:16:40.561Z"
+    },
+    "pane-cite-target.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:16:57.840Z"
+    },
+    "pane-cite-target.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:17:14.463Z"
+    },
+    "pane-cite-target.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:17:31.443Z"
+    },
+    "chip-passes-target.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:17:48.731Z"
+    },
+    "chip-passes-target.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:18:05.439Z"
+    },
+    "chip-passes-target.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:18:22.217Z"
+    },
+    "archive-clears-target.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:18:37.615Z"
+    },
+    "archive-clears-target.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:18:54.228Z"
+    },
+    "archive-clears-target.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:19:11.593Z"
+    },
+    "editor-preview-cite.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:19:35.907Z"
+    },
+    "editor-preview-cite.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:19:51.965Z"
+    },
+    "editor-preview-cite.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:20:09.753Z"
+    },
+    "file-citation-highlight.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:20:28.036Z"
+    },
+    "file-citation-highlight.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:20:45.858Z"
+    },
+    "chips-file-label.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:21:04.516Z"
+    },
+    "chips-file-label.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:21:24.280Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:21:40.906Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:21:57.400Z"
+    },
+    "docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:22:14.291Z"
+    },
+    "ci-subset.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:22:32.780Z"
+    },
+    "ci-subset.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:22:50.215Z"
+    }
+  }
+}

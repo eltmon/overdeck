@@ -6,10 +6,12 @@
  *   pan skills set <skill> on|off|inherit [--project <key> | --issue <id>]
  *   pan skills set --pack <id> on|off|inherit [--project <key> | --issue <id>]   (PAN-4334; <skill> may be <pack>/<skill>)
  *   pan skills launch-settings --harness <h> --cwd <dir> [--issue <id>] [--conversation <tmuxSession>] [--codex-home <dir>] [--plugin-link <path>]   (hidden; launchers)
- *   pan skills pack add <id> <url> --ref <ref> [--adapter plain|claude-plugin|deft-readonly] [--yes]      (PAN-4334)
+ *   pan skills pack add <id> [url] [--ref <ref>] [--adapter plain|claude-plugin|deft-readonly|gstack-runtime] [--browser] [--yes]      (PAN-4334; known packs default url/ref, PAN-4728)
  *   pan skills pack update <id> [--ref <ref>] [--yes]
+ *   pan skills pack browser <id> [on|off] [--yes]   (PAN-4730; gstack's browser runtime, second consent; ./skills-pack-browser.ts)
  *   pan skills pack list [--json] [--offline] | remove <id> | sync [id] | gc [--max-age-days <n>]
  *   pan skills pack sageox status [--project <key>] [--json] | upload on|off --project <key>   (PAN-2444)
+ *   pan skills pack sageox link --project <key> [--team <team>] | commit --project <key>   (PAN-4852; ./skills-sageox.ts)
  *   pan skills deft status|enable|disable …   (PAN-3943; ./skills-deft.ts)
  *
  * `src/cli/index.ts` imports this module at startup to register the verbs, so
@@ -20,11 +22,13 @@ import chalk from 'chalk';
 import type { Command } from 'commander';
 import type { DeftLaunchResult } from '../../lib/skill-overrides/launch.js';
 import { registerSkillsDeftCommands } from './skills-deft.js';
+import { registerSkillsSageoxCommands } from './skills-sageox.js';
 
 interface ListOptions { project?: string; issue?: string; json?: boolean }
 interface SetOptions { project?: string; issue?: string; pack?: string }
 interface LaunchSettingsOptions { harness: string; cwd: string; issue?: string; conversation?: string; codexHome?: string; pluginLink?: string }
-interface PackAddOptions { ref: string; adapter?: string; yes?: boolean }
+interface PackAddOptions { ref?: string; adapter?: string; yes?: boolean; browser?: boolean }
+interface PackBrowserOptions { yes?: boolean }
 interface PackUpdateOptions { ref?: string; yes?: boolean }
 interface PackListOptions { json?: boolean; offline?: boolean }
 interface PackGcOptions { maxAgeDays?: string }
@@ -187,6 +191,14 @@ export async function skillsLaunchSettingsCommand(options: LaunchSettingsOptions
     const { writeCodexPackBlock } = await import('../../lib/skill-packs/mount.js');
     await writeCodexPackBlock(codexHome, null);
   });
+  // PAN-4852 AD-23/AD-24: pre-trusted SageOx hooks, written last so the trust block ends config.toml. Fail open.
+  try {
+    const hooks = await import('../../lib/sageox/codex-hooks.js');
+    if (sageox.active && sageox.settings && sageox.bin) await hooks.writeSageoxCodexHooks(codexHome, sageox.settings.env, sageox.bin);
+    else await hooks.removeSageoxCodexHooks(codexHome);
+  } catch (error) {
+    console.error(`[launcher] WARNING: SageOx hooks not applied: ${error instanceof Error ? error.message : String(error)}`);
+  }
 }
 
 function mergeSkillNames(disabled: readonly string[], hidden: readonly string[]): string[] {
@@ -238,14 +250,27 @@ function printPackPreview(preview: PackPreview, notAppliedLabels: NotAppliedLabe
   const { manifest } = preview;
   const optIn = manifest.skills.filter(skill => skill.optIn).map(skill => skill.name);
   const executables = manifest.capabilities.executables;
+  // A runtime pack (gstack) runs its scripts, so consent lists every one of them (PAN-4727 D5).
+  const runtime = manifest.capabilities.runtime === true;
   const rows: Array<[string, string]> = [
     ['Source', `${preview.url} @ ${preview.ref} (${short(preview.commit)})`],
+    ...(preview.pluginRoot ? ([['Root', preview.pluginRoot]] as Array<[string, string]>) : []),
     ['Adapter', preview.adapter],
     ['License', manifest.license ?? 'unknown'],
     ['Skills', `${manifest.skills.length}${optIn.length > 0 ? ` (${optIn.length} opt-in: ${optIn.join(', ')})` : ''}`],
-    ['Executables', executables.length > 3 ? `${executables.slice(0, 3).join(', ')}, …` : listOrNone(executables)],
-    ['Not applied', listOrNone(notAppliedLabels(manifest.capabilities))],
   ];
+  if (manifest.excluded?.length) {
+    rows.push(['Not mounted', `${manifest.excluded.length}: ${manifest.excluded.map(skill => `${skill.name} (${skill.reason})`).join('; ')}`]);
+  }
+  if (runtime) {
+    // The browser-runtime preview (PAN-4730) renders nothing, so it has no render command; its own Runs row follows.
+    if (preview.runtime) rows.push(['Runs', preview.runtime.command.join(' ')]);
+    rows.push(['Executables', `${executables.length} files the mounted skills can run:`]);
+  } else {
+    rows.push(['Executables', executables.length > 3 ? `${executables.slice(0, 3).join(', ')}, …` : listOrNone(executables)]);
+  }
+  rows.push(['Not applied', listOrNone(notAppliedLabels(manifest.capabilities))]);
+  if (runtime) rows.push(['Requires', listOrNone(manifest.capabilities.requiresCli)]);
   if (preview.diff && preview.previousCommit) {
     rows.push(
       ['Previous', short(preview.previousCommit)],
@@ -255,15 +280,30 @@ function printPackPreview(preview: PackPreview, notAppliedLabels: NotAppliedLabe
       ['New', listOrNone(preview.diff.newCapabilities)],
     );
   }
+  if (preview.oxBuild) {
+    // PAN-4852 AD-8: the sageox build's commands, the paths it writes and what it downloads, one per line.
+    const section = (label: string, lines: string[]): void =>
+      (lines.length > 0 ? lines : ['none']).forEach((line, i) => rows.push([i === 0 ? label : '', line]));
+    section('Builds', preview.oxBuild.commands.map(command => command.join(' ')));
+    section('Writes', preview.oxBuild.writes);
+    section('Downloads', preview.oxBuild.downloads);
+  }
   console.log(chalk.bold(`Pack ${preview.id}`));
   for (const [label, value] of rows) console.log(`  ${label.padEnd(12)} ${value}`);
+  if (runtime) for (const file of executables) console.log(`${' '.repeat(16)}${file}`);
 }
 
 /** PD-10: `--yes` trusts; a TTY asks; anything else writes nothing. */
-async function packConfirm(yes: boolean | undefined, note?: string): Promise<(preview: PackPreview) => Promise<boolean>> {
+async function packConfirm(
+  yes: boolean | undefined,
+  note?: string,
+  question = 'Trust this commit? [y/N] ',
+): Promise<(preview: PackPreview) => Promise<boolean>> {
   const { notAppliedLabels } = await import('../../lib/skill-packs/adapters.js');
   return async preview => {
     printPackPreview(preview, notAppliedLabels);
+    // PAN-4730 D13: the browser runtime's command, downloads and writes join the preview (add --browser, browser on, update).
+    if (preview.browser) (await import('./skills-pack-browser.js')).printBrowserPreview(preview.browser);
     if (note) console.log(note);
     if (yes) return true;
     if (!process.stdin.isTTY) {
@@ -273,33 +313,50 @@ async function packConfirm(yes: boolean | undefined, note?: string): Promise<(pr
     const { createInterface } = await import('node:readline/promises');
     const rl = createInterface({ input: process.stdin, output: process.stderr });
     try {
-      return /^y(es)?$/i.test((await rl.question('Trust this commit? [y/N] ')).trim());
+      return /^y(es)?$/i.test((await rl.question(question)).trim());
     } finally {
       rl.close();
     }
   };
 }
 
-export async function skillsPackAddCommand(id: string, url: string, options: PackAddOptions): Promise<void> {
+export async function skillsPackAddCommand(id: string, url: string | undefined, options: PackAddOptions): Promise<void> {
   if (
     options.adapter !== undefined &&
     options.adapter !== 'plain' &&
     options.adapter !== 'claude-plugin' &&
-    options.adapter !== 'deft-readonly'
+    options.adapter !== 'deft-readonly' &&
+    options.adapter !== 'gstack-runtime'
   ) {
-    console.error(chalk.red('--adapter must be plain, claude-plugin, or deft-readonly'));
+    console.error(chalk.red('--adapter must be plain, claude-plugin, deft-readonly, or gstack-runtime'));
     process.exit(1);
   }
-  const [{ addPack }, { CORE_SKILLS }] = await Promise.all([
+  const [{ addPack }, { CORE_SKILLS }, { KNOWN_PACKS }] = await Promise.all([
     import('../../lib/skill-packs/sources.js'),
     import('../../lib/skill-overrides/resolve.js'),
+    import('../../lib/skill-packs/adapters.js'),
   ]);
-  const note = `Adding a pack trusts this commit and enables nothing. Turn it on with: pan skills set --pack ${id} on`;
+  const known = KNOWN_PACKS[id];
+  const resolvedUrl = url ?? known?.url;
+  const ref = options.ref ?? known?.ref;
+  if (!resolvedUrl) {
+    console.error(chalk.red(`pack ${id} has no default url; pass one: pan skills pack add ${id} <url> --ref <ref>`));
+    process.exit(1);
+  }
+  if (!ref) {
+    console.error(chalk.red(`pack ${id} has no default ref; pass --ref <tag-or-branch>`));
+    process.exit(1);
+  }
+  const runtimeNote =
+    (options.adapter ?? known?.adapter) === 'gstack-runtime'
+      ? '\nTrusting runs the command above once now; skills run the listed scripts when you invoke them.'
+      : '';
+  const note = `Adding a pack trusts this commit and enables nothing. Turn it on with: pan skills set --pack ${id} on${runtimeNote}`;
   const confirm = await packConfirm(options.yes, note);
   let result;
   try {
     result = await addPack(
-      { id, url, ref: options.ref, ...(options.adapter ? { adapter: options.adapter } : {}), reservedIds: CORE_SKILLS },
+      { id, url: resolvedUrl, ref, ...(options.adapter ? { adapter: options.adapter } : {}), reservedIds: CORE_SKILLS },
       confirm,
     );
   } catch (error) {
@@ -307,6 +364,44 @@ export async function skillsPackAddCommand(id: string, url: string, options: Pac
   }
   if (!result.written) process.exit(1);
   console.log(`Trusted ${id} @ ${short(result.preview.commit)}.`);
+  // PAN-4730 D10: the browser runtime is a second, separate consent with its own preview.
+  if (options.browser) await skillsPackBrowserCommand(id, 'on', { yes: options.yes });
+}
+
+const BROWSER_NOTE = 'Trusting runs the command above once now and downloads the listed packages and Chromium.';
+
+/** `pan skills pack browser <id> [on|off]` (PAN-4730): build or remove a runtime pack's browser runtime. */
+export async function skillsPackBrowserCommand(id: string, state: string | undefined, options: PackBrowserOptions): Promise<void> {
+  const value = state ?? 'on';
+  if (value !== 'on' && value !== 'off') {
+    console.error(chalk.red('state must be on or off'));
+    process.exit(1);
+  }
+  const { enablePackBrowser, disablePackBrowser } = await import('../../lib/skill-packs/sources.js');
+  if (value === 'off') {
+    let off;
+    try {
+      off = await disablePackBrowser(id);
+    } catch (error) {
+      return failOnPackError(error);
+    }
+    console.log(`Browser runtime for ${id} is off; ${off.renderDir} was rendered again without it and ${off.cacheDir} was removed.`);
+    for (const line of await (await import('./skills-pack-browser.js')).daemonLines()) console.log(line);
+    return;
+  }
+  const confirm = await packConfirm(options.yes, BROWSER_NOTE, 'Trust this browser runtime? [y/N] ');
+  let result;
+  try {
+    result = await enablePackBrowser(id, confirm);
+  } catch (error) {
+    return failOnPackError(error);
+  }
+  if (result.alreadyOn) {
+    console.log(`Browser runtime for ${id} is already on.`);
+    return;
+  }
+  if (!result.written) process.exit(1);
+  console.log(`Browser runtime for ${id} is on. Browser skills mount at the next launch.`);
 }
 
 export async function skillsPackUpdateCommand(id: string, options: PackUpdateOptions): Promise<void> {
@@ -347,7 +442,9 @@ export async function skillsPackListCommand(options: PackListOptions): Promise<v
     license: pack.manifest?.license ?? null,
     skills: pack.manifest?.skills.length ?? 0,
     notApplied: pack.manifest ? notAppliedLabels(pack.manifest.capabilities) : [],
-    ...(options.offline ? {} : { updateAvailable: await packUpdateAvailable(pack) }),
+    ...(options.offline
+      ? {}
+      : { updateAvailable: await packUpdateAvailable({ id: pack.id, url: pack.url, ref: pack.ref, commit: pack.commit }) }),
   })));
   if (options.json) {
     console.log(JSON.stringify(rows, null, 2));
@@ -368,26 +465,70 @@ export async function skillsPackListCommand(options: PackListOptions): Promise<v
   }
 }
 
-export async function skillsPackRemoveCommand(id: string): Promise<void> {
-  const [{ removePack }, { listLowerLevelPackOverrides }] = await Promise.all([
-    import('../../lib/skill-packs/sources.js'),
-    import('../../lib/skill-overrides/store.js'),
+/** gstack skills write `.gstack/` and `.gstack-worktrees/` in the projects they run in (PAN-4727 D9); remove never deletes them. */
+async function projectGstackDirs(): Promise<string[]> {
+  const [{ listProjectsAsync }, { lstat }, { join }] = await Promise.all([
+    import('../../lib/projects.js'),
+    import('node:fs/promises'),
+    import('node:path'),
   ]);
+  const dirs: string[] = [];
+  for (const { config } of await listProjectsAsync()) {
+    if (!config.path) continue;
+    for (const name of ['.gstack', '.gstack-worktrees']) {
+      const dir = join(config.path, name);
+      if (await lstat(dir).then(() => true, () => false)) dirs.push(dir);
+    }
+  }
+  return dirs;
+}
+
+export async function skillsPackRemoveCommand(id: string): Promise<void> {
+  const [{ removePack, getPack }, { removePackFromMounts }, { listLowerLevelPackOverrides }, { KNOWN_PACKS }] =
+    await Promise.all([
+      import('../../lib/skill-packs/sources.js'),
+      import('../../lib/skill-packs/mount.js'),
+      import('../../lib/skill-overrides/store.js'),
+      import('../../lib/skill-packs/adapters.js'),
+    ]);
   let result;
+  let runtimePack = false;
   try {
+    // Read before removal: a gstack fork registered under another id still writes project .gstack dirs.
+    runtimePack = ((await getPack(id))?.adapter ?? KNOWN_PACKS[id]?.adapter) === 'gstack-runtime';
     result = await removePack(id);
   } catch (error) {
     return failOnPackError(error);
   }
+  // Mounts, dangling launch links and Codex caches hold copies of the pack outside its cache (PAN-4727 D8).
+  // The sweep lives here because mount.ts imports sources.ts.
+  const swept = await removePackFromMounts(id);
   if (!result.removed) {
     console.error(chalk.red(`pack ${id} is not registered`));
     process.exit(1);
   }
-  console.log(`Removed pack ${id} and its cache.`);
+  console.log(
+    `Removed pack ${id}, its cache, ${swept.removedMounts.length} mount(s) and ${swept.removedCodexCaches.length} Codex cache(s).`,
+  );
+  if (result.keptBindings) {
+    console.log(`kept SageOx link files in ${result.keptBindings}/ (delete them by hand to forget every project's SageOx link)`);
+  }
+  if (runtimePack) {
+    for (const dir of await projectGstackDirs()) {
+      console.log(`Project files gstack skills wrote (not removed): ${dir}  — remove with: rm -rf ${dir}`);
+    }
+    // PAN-4730 D14: live browse daemons are reported, never killed.
+    for (const line of await (await import('./skills-pack-browser.js')).daemonLines()) console.log(line);
+  }
   const below = (await listLowerLevelPackOverrides())[id];
   const remaining = below ? below.projects.length + below.issues.length : 0;
   if (remaining > 0) {
     console.log(`${remaining} project or issue toggle(s) for ${id} remain; they do nothing unless ${id} is added again.`);
+  }
+  if (swept.failures.length > 0) {
+    for (const failure of swept.failures) console.error(chalk.red(`Not removed: ${failure}`));
+    console.error(chalk.red(`Run pan skills pack remove ${id} again to retry.`));
+    process.exit(1);
   }
 }
 
@@ -414,16 +555,42 @@ export async function skillsPackGcCommand(options: PackGcOptions): Promise<void>
     console.error(chalk.red('--max-age-days must be a number of days, 0 or more'));
     process.exit(1);
   }
-  const { gcMounts } = await import('../../lib/skill-packs/mount.js');
-  const { removedMounts, removedLinks } = await gcMounts({ maxAgeMs: days * 24 * 60 * 60 * 1000 });
-  console.log(`Removed ${removedMounts.length} mount(s) and ${removedLinks.length} dangling launch link(s).`);
+  const [{ gcMounts, renderRootsUsedBy }, { gcPackRenders }, { readPackRegistry, packsHome }] = await Promise.all([
+    import('../../lib/skill-packs/mount.js'),
+    import('../../lib/skill-packs/render.js'),
+    import('../../lib/skill-packs/sources.js'),
+  ]);
+  // Strict read first: a config that cannot be read or parsed must never make a registered pack look
+  // orphaned, so gc stops before it removes anything.
+  const registry = await readPackRegistry();
+  if (!registry.readable) {
+    console.error(chalk.red('Nothing removed: the global config.yaml could not be read or parsed, so registered packs are unknown.'));
+    console.error(chalk.red('Fix config.yaml, then run pan skills pack gc again.'));
+    process.exit(1);
+  }
+  const maxAgeMs = days * 24 * 60 * 60 * 1000;
+  const { removedMounts, removedLinks, referencedMounts } = await gcMounts({ maxAgeMs });
+  // A render that a linked mount's skills call into stays, whatever its age.
+  const keep = await renderRootsUsedBy(referencedMounts);
+  const { removedRenders, removedStates } = await gcPackRenders({
+    packsHome: packsHome(),
+    registered: registry.packs,
+    registryReadable: registry.readable,
+    maxAgeMs,
+    keep,
+  });
+  console.log(
+    `Removed ${removedMounts.length} mount(s), ${removedLinks.length} dangling launch link(s), ` +
+      `${removedRenders.length} stale render(s) and ${removedStates.length} orphaned pack state dir(s).`,
+  );
 }
 
 // ── pan skills pack sageox (PAN-2444) ───────────────────────────────────
 
 export async function skillsPackSageoxStatusCommand(options: SageoxStatusOptions): Promise<void> {
-  const [{ listSageoxUploads }, { loadSkillOverrideLayers }, { resolvePackToggle }, { getPack }] = await Promise.all([
+  const [{ listSageoxUploads }, { readSageoxLinkState }, { loadSkillOverrideLayers }, { resolvePackToggle }, { getPack }] = await Promise.all([
     import('../../lib/sageox/config.js'),
+    import('../../lib/sageox/binding.js'),
     import('../../lib/skill-overrides/store.js'),
     import('../../lib/skill-overrides/resolve.js'),
     import('../../lib/skill-packs/sources.js'),
@@ -437,17 +604,18 @@ export async function skillsPackSageoxStatusCommand(options: SageoxStatusOptions
   const registered = (await getPack('sageox')) !== null;
   const projects = await Promise.all(selected.map(async ({ projectKey, upload }) => {
     const pack = resolvePackToggle('sageox', await loadSkillOverrideLayers({ projectKey }));
-    return { project: projectKey, pack: pack.enabled ? 'on' : 'off', packSource: pack.source, upload };
+    const link = await readSageoxLinkState(projectKey);
+    return { project: projectKey, pack: pack.enabled ? 'on' : 'off', packSource: pack.source, upload, link };
   }));
   if (options.json) {
     console.log(JSON.stringify({ registered, projects }, null, 2));
     return;
   }
-  if (!registered) console.log(chalk.yellow('The sageox pack is not registered. Add it with: pan skills pack add sageox https://github.com/eltmon/ox --ref <ref>'));
+  if (!registered) console.log(chalk.yellow('The sageox pack is not registered. Add it with: pan skills pack add sageox'));
   const width = Math.max(7, ...projects.map(row => row.project.length));
-  console.log(chalk.dim(`${'PROJECT'.padEnd(width)}  PACK  ${'SOURCE'.padEnd(7)}  UPLOAD`));
+  console.log(chalk.dim(`${'PROJECT'.padEnd(width)}  PACK  ${'SOURCE'.padEnd(7)}  ${'UPLOAD'.padEnd(8)}  LINK`));
   for (const row of projects) {
-    console.log(`${row.project.padEnd(width)}  ${row.pack.padEnd(4)}  ${row.packSource.padEnd(7)}  ${row.upload ? 'enabled' : 'disabled'}`);
+    console.log(`${row.project.padEnd(width)}  ${row.pack.padEnd(4)}  ${row.packSource.padEnd(7)}  ${(row.upload ? 'enabled' : 'disabled').padEnd(8)}  ${row.link}`);
   }
 }
 
@@ -492,12 +660,17 @@ export function registerSkillsCommands(program: Command): void {
     .action(skillsLaunchSettingsCommand);
 
   const pack = skills.command('pack').description('Register, update, and cache external skill packs pinned to a commit');
-  pack.command('add <id> <url>').description('Register a git skill pack at the commit a ref resolves to (enables nothing)')
-    .requiredOption('--ref <ref>', 'Tag or branch to pin').option('--adapter <adapter>', 'plain, claude-plugin, or deft-readonly')
+  pack.command('add <id> [url]')
+    .description('Register a git skill pack at the commit a ref resolves to (enables nothing); known packs default the url and ref')
+    .option('--ref <ref>', 'Tag, branch or commit to pin (default: the known pack ref)')
+    .option('--adapter <adapter>', 'plain, claude-plugin, deft-readonly, or gstack-runtime')
+    .option('--browser', 'Also build the browser runtime (gstack; asks separately)')
     .option('--yes', 'Trust the resolved commit without asking').action(skillsPackAddCommand);
   pack.command('update <id>').description('Move a pack to the commit its ref (or --ref) now resolves to')
     .option('--ref <ref>', 'Switch to a different tag or branch').option('--yes', 'Trust the new commit without asking')
     .action(skillsPackUpdateCommand);
+  pack.command('browser <id> [state]').description("Turn a runtime pack's browser runtime on or off (gstack)")
+    .option('--yes', 'Trust without asking').action(skillsPackBrowserCommand);
   pack.command('list').description('List registered skill packs')
     .option('--json', 'Output as JSON').option('--offline', 'Skip the update check (no network)')
     .action(skillsPackListCommand);
@@ -505,15 +678,16 @@ export function registerSkillsCommands(program: Command): void {
     .action(skillsPackRemoveCommand);
   pack.command('sync [id]').description('Re-fetch packs and extract their trusted commits (all packs when omitted)')
     .action(skillsPackSyncCommand);
-  pack.command('gc').description('Remove unused skill pack mounts and dangling launch links')
+  pack.command('gc').description('Remove unused skill pack mounts, dangling launch links, stale renders and orphaned pack state')
     .option('--max-age-days <n>', 'Keep unused mounts younger than this', '7').action(skillsPackGcCommand);
 
   const sageox = pack.command('sageox').description('SageOx pack state and per-project upload opt-in (PAN-2444)');
-  sageox.command('status').description('Show, per project, the sageox pack state and the upload state')
+  sageox.command('status').description('Show, per project, the sageox pack state, the upload state and the link state')
     .option('--project <key>', 'Only this project').option('--json', 'Output as JSON')
     .action(skillsPackSageoxStatusCommand);
   sageox.command('upload <state>').description('Turn SageOx uploads on or off for a project (off by default)')
     .requiredOption('--project <key>', 'Project key').action(skillsPackSageoxUploadCommand);
+  registerSkillsSageoxCommands(sageox);
 
   registerSkillsDeftCommands(skills);
 }

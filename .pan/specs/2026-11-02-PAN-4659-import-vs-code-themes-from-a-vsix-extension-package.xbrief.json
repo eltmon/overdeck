@@ -1,0 +1,549 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-02T05:40:28Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4659: Import VS Code themes from a .vsix extension package",
+    "updated": "2026-11-02T05:46:47.178Z"
+  },
+  "plan": {
+    "id": "pan-4659",
+    "title": "Import VS Code themes from a .vsix extension package",
+    "status": "running",
+    "uid": "30eefe63-7c64-437a-82f9-3dacb409ff30",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-02T05:40:28Z",
+    "updated": "2026-11-02T05:46:47.178Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4659",
+        "label": "PAN-4659",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4644",
+        "label": "PAN-4644 (parent, merged)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "color-themes",
+      "settings",
+      "import",
+      "zip",
+      "dashboard-server"
+    ],
+    "narratives": {
+      "Problem": "Settings > Appearance > Import VS Code theme accepts only a single .json file; the preview route rejects .vsix with a 400 pointing at #4659 (src/dashboard/server/routes/color-themes.ts lines 81-86). Most VS Code themes ship as .vsix packages holding several themes that share a base file through include.",
+      "Proposal": "Add a hand-rolled, read-only ZIP reader on node:zlib (src/lib/color-themes/zip-reader.ts: stored + deflated entries, strict refusals for ZIP64, encryption, unsafe paths, duplicates; async inflateRaw with maxOutputLength; CRC-32 check). Split vscode-import.ts's mapper into parseVsCodeThemeText + mapVsCodeThemeObject. Add vsix-import.ts, which reads extension/package.json, enforces the 10 MiB / 2 MiB / 20-theme caps, resolves include chains (depth 5, cycles refused, paths kept under extension/), maps uiTheme to light/dark, skips .tmTheme token colors with a warning, and returns all themes for the existing multi-theme preview. The preview route branches on .vsix; the file input accepts .vsix; the base64 encoder becomes chunked; appearance.mdx and DASHBOARD-ARCHITECTURE.md document it. Full detail, exact APIs and before/after snippets are in .pan/drafts/PAN-4659.md.",
+      "NonGoals": "- Per-theme selection in the import preview (the package imports as a whole)\n- Parsing .tmTheme (XML plist) files, for tokenColors or for a contributed theme path\n- Icon themes (contributes.iconThemes) and product icon themes\n- semanticTokenColors / semanticHighlighting\n- Downloading a .vsix from the Marketplace or Open VSX by name or URL\n- Changing the single-file .json import's 2 MB limit, 413 status, or its include/tokenColors warnings (the BOM strip is the only .json change)\n- A general request body cap for the dashboard server\n- Supporting ZIP64, multi-disk, encrypted, or non-deflate compressed archives\n- Writing any archive content to disk during preview\n- Adding a new npm dependency"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Hand-rolled ZIP reader on node:zlib, no dependency",
+        "rationale": "The issue lists it first, PAN-4644 kept dependencies minimal, and a new root dependency must clear lint:dist-externals. The reader needs only the central directory, two methods and strict refusals. fflate is the named fallback if review objects."
+      },
+      {
+        "summary": "FR-3 refusals (ZIP64, encrypted, unsafe path, duplicate) are checked across the whole central directory, rejecting the package with 400",
+        "rationale": "Matches the issue's 'reject' wording and gives one mechanically testable rule regardless of which entries the import would read."
+      },
+      {
+        "summary": "More than 20 contributed themes rejects the package with 400 instead of importing the first 20",
+        "rationale": "Truncation would silently import an arbitrary subset; the other caps reject, so this one does too."
+      },
+      {
+        "summary": ".vsix over 10 MiB returns 400; the .json path keeps its 413 for over 2 MB",
+        "rationale": "The issue AC says 400 for the archive; the .json path's existing behavior is out of scope."
+      },
+      {
+        "summary": "Problems inside one theme's file chain drop only that theme with a prefixed warning; manifest and archive problems reject the package",
+        "rationale": "One broken theme in a multi-theme pack should not block the others; nothing is written in either case."
+      },
+      {
+        "summary": "Theme name = resolved contributes label (NLS from package.nls.json), else file name field, else file base name; source.fileName = '<vsix>:<path under extension/>'",
+        "rationale": "The label is what VS Code shows in its own picker; the source string identifies both package and file without a contracts change."
+      },
+      {
+        "summary": "include and contributed paths resolve with path.posix against the including file's directory and must stay under extension/ and end in .json/.jsonc",
+        "rationale": "Pins one rule so '../base.json' from themes/ is allowed while escaping the extension folder is refused."
+      },
+      {
+        "summary": "Missing or unknown uiTheme falls back to the existing type/luminance resolution with a warning",
+        "rationale": "Reuses PAN-4644 behavior instead of guessing."
+      },
+      {
+        "summary": "Test fixtures are built at test time by a test-only ZIP writer instead of committed .vsix binaries",
+        "rationale": "Only a writer can produce the ZIP64, encrypted and '..' cases; deflate, data-descriptor and archive-comment modes guard against reader/writer sharing a mistake."
+      },
+      {
+        "summary": "fileToBase64 becomes chunked (32 KiB String.fromCharCode spreads)",
+        "rationale": "This issue raises the upload size fivefold; the per-byte concatenation is slow at 10 MB."
+      },
+      {
+        "summary": "Strip a leading UTF-8 BOM in parseVsCodeThemeText for both .json and .vsix paths",
+        "rationale": "Verified jsonc-parser reports a BOM as a parse error at offset 0; Windows-authored theme files often carry one, and fixing it at the shared parser is one line."
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-02-PAN-4659-import-vs-code-themes-from-a-vsix-extension-package.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "zip-reader",
+        "title": "Add a read-only ZIP reader with strict refusals for .vsix import",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T05:40:28Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4659",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "vsix-import",
+            "route-vsix"
+          ],
+          "files_scope": [
+            "src/lib/color-themes/zip-reader.ts",
+            "src/lib/color-themes/__tests__/zip-fixture.ts",
+            "src/lib/color-themes/__tests__/zip-reader.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/color-themes/__tests__/zip-reader.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "zip-reader.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "NFR-1",
+            "NFR-2"
+          ],
+          "parallelSafeReason": "New files only (zip-reader.ts and its test helper/test); no other item touches them, so it can run in its own slot alongside mapper-split and docs."
+        },
+        "narrative": {
+          "Action": "Implement PRD work item W1 exactly: new src/lib/color-themes/zip-reader.ts exporting ZipFormatError, ZipEntry, readZipDirectory(archive) and async readZipEntry(archive, entry, maxBytes). EOCD backward scan; refuse ZIP64 (EOCD 0xffff/0xffffffff fields, locator 0x07064b50 at eocd-20, CD 0xffffffff fields, extra id 0x0001), multi-disk, out-of-bounds CD, encrypted entries (flag bit 0 or method 99), unsafe names (leading '/', drive letter, backslash, NUL, '..' segment), duplicates. Sizes come from the CD; deflate via promisify(zlib.inflateRaw) with maxOutputLength; verify length and zlib.crc32. Never use inflateRawSync in this file. Add the test-only writer src/lib/color-themes/__tests__/zip-fixture.ts (buildZip with method/encrypted/dataDescriptor/declaredUncompressedSize options and zip64/comment opts; buildVsix adding [Content_Types].xml and extension.vsixmanifest) and zip-reader.test.ts covering every case listed in W1."
+        },
+        "items": [
+          {
+            "id": "zip-reader.ac1",
+            "title": "Given buildZip archives with a stored, a deflated and a data-descriptor entry, readZipEntry returns each entry's bytes identical to the input",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "zip-reader.ac2",
+            "title": "readZipDirectory rejects with ZipFormatError messages containing 'ZIP64' for a zip64 fixture, 'encrypted' for a flag-bit-0 entry, and 'unsafe entry path' for each of '../evil.json', 'extension/../../evil.json', '/abs.json', 'C:/x.json' and 'extension\\\\x.json'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "zip-reader.ac3",
+            "title": "Given a deflated 3 MiB entry whose central directory claims 100 bytes, readZipEntry with maxBytes 2 MiB rejects with ZipFormatError and never returns a buffer longer than 2 MiB",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "zip-reader.ac4",
+            "title": "readZipEntry rejects an entry with compression method 12 ('unsupported compression method') and an entry with one flipped data byte ('corrupt'); readZipDirectory rejects a non-ZIP buffer ('end of central directory') and duplicate names ('duplicate entry')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mapper-split",
+        "title": "Split mapVsCodeTheme into parseVsCodeThemeText and mapVsCodeThemeObject",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T05:40:28Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-4659",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/color-themes/vscode-import.ts",
+            "src/lib/color-themes/__tests__/vscode-import.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/color-themes/__tests__/vscode-import.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vscode-import.test.ts passes with all pre-existing tests unmodified",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD work item W2: in src/lib/color-themes/vscode-import.ts extract parseVsCodeThemeText(text) (today's JSONC parse + object check, same ColorThemeImportError messages) and mapVsCodeThemeObject(parsed, fileName) (today's lines 72-143 unchanged); keep mapVsCodeTheme(text, fileName) as their composition; export isPlainObject. Do not change any existing test. Add one test calling mapVsCodeThemeObject directly. Strip a leading U+FEFF in parseVsCodeThemeText before calling jsonc-parser's parse (jsonc-parser reports a BOM as error code 1 at offset 0)."
+        },
+        "items": [
+          {
+            "id": "mapper-split.ac1",
+            "title": "vscode-import.ts exports parseVsCodeThemeText, mapVsCodeThemeObject, mapVsCodeTheme and isPlainObject, and mapVsCodeTheme returns the same result as mapVsCodeThemeObject(parseVsCodeThemeText(text), fileName)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mapper-split.ac2",
+            "title": "Every pre-existing test in vscode-import.test.ts passes without edits (git diff shows only added lines in that file)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mapper-split.ac3",
+            "title": "mapVsCodeThemeObject({ name: 'X', type: 'light', colors: { 'editor.background': '#ffffff' }, tokenColors: [] }, 'x.json') returns type 'light' and emits no warning containing 'include' or 'tokenColors'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mapper-split.ac4",
+            "title": "mapVsCodeTheme('\\uFEFF{\"name\":\"B\",\"type\":\"dark\"}', 'b.json') returns a theme named 'B' instead of throwing 'invalid JSON at offset 0'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "vsix-import",
+        "title": "Map every contributed theme in a .vsix with caps, uiTheme and include resolution",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T05:40:28Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4659",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/color-themes/vsix-import.ts",
+            "src/lib/color-themes/__tests__/vsix-import.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/color-themes/__tests__/vsix-import.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vsix-import.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "NFR-1",
+            "NFR-3"
+          ],
+          "parallelSafeReason": "New files only (vsix-import.ts and its test); it runs after its two blockers and no concurrently ready item edits these files."
+        },
+        "narrative": {
+          "Action": "Implement PRD work item W3 exactly: new src/lib/color-themes/vsix-import.ts exporting MAX_VSIX_BYTES (10 MiB), MAX_VSIX_FILE_BYTES (2 MiB), MAX_VSIX_THEMES (20), MAX_INCLUDE_DEPTH (5) and async importVsixThemes(archive, vsixFileName). Package-level failures throw ColorThemeImportError with the PRD's messages; theme-level failures become warnings prefixed '\"<label or path>\": ' and the theme is skipped. uiTheme vs/hc-light -> light, vs-dark/hc-black -> dark. include resolves with path.posix against the including file's directory, must stay under extension/, ends .json/.jsonc; colors merge base-underneath, tokenColors base-first; depth 6 refused; cycles refused with the chain in the message. String tokenColors -> warning mentioning .tmTheme, theme still imports. Names: label (NLS-resolved) -> file name -> base name. source fileName '<vsix>:<path under extension/>'. Use buildVsix from __tests__/zip-fixture.ts for every test listed in W3."
+        },
+        "items": [
+          {
+            "id": "vsix-import.ac1",
+            "title": "Given a .vsix contributing a uiTheme 'vs' theme and a uiTheme 'vs-dark' theme, importVsixThemes returns two themes with types 'light' and 'dark', names from their labels, and source.fileName 'two.vsix:themes/light.json' for the first; hc-light maps to light and hc-black to dark",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vsix-import.ac2",
+            "title": "Given dark.json that includes ./base.json and overrides only editor.background, the imported theme has ui.background from dark.json, terminal.red from base.json, and syntax.tokenColors with base.json's rules before dark.json's",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vsix-import.ac3",
+            "title": "Given a 5-include chain, importVsixThemes returns that theme; given a 6-include chain, an a.json<->b.json cycle, or an include of '../../outside.json', it drops only that theme and returns a warning containing 'include depth exceeds 5', 'include cycle', or 'outside' respectively while the package's other theme still imports",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vsix-import.ac4",
+            "title": "importVsixThemes rejects with ColorThemeImportError for a 10 MiB + 1 byte buffer ('10 MB'), a zip64 fixture ('ZIP64'), an 'extension/../evil.json' entry ('unsafe entry path'), a missing extension/package.json, empty contributes.themes, 21 themes ('at most 20'), and a package whose every theme fails ('no importable themes')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vsix-import.ac5",
+            "title": "A theme with tokenColors './x.tmTheme' imports with a warning containing '.tmTheme'; a contributed path ending '.tmTheme' and a theme file inflating past 2 MiB are each dropped with a warning while the other theme imports; a '%dark.label%' label resolves from package.nls.json in both string and { message } forms",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "route-vsix",
+        "title": "Accept .vsix in POST /api/color-themes/import/preview",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T05:40:28Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4659",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/color-themes.ts",
+            "src/dashboard/server/__tests__/color-themes-routes.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/color-themes-routes.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "color-themes-routes.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD work item W4: in routes/color-themes.ts accept a fileName ending .vsix (case-insensitive) alongside .json; for .vsix call importVsixThemes(decoded, fileName) and return { themes: themes.map(t => ({ ...t, id: slugifyThemeId(t.name) })), warnings }; map ColorThemeImportError to 400 { error }. Other extensions get 400 'Only VS Code theme .json files and .vsix extension packages are supported'. Leave the .json branch's 2 MB 413 and mapping unchanged and keep rejectUnsafeDashboardMutationRequest first. Update the header comment. In color-themes-routes.test.ts replace the 'rejects a .vsix file name with 400 naming #4659' test with the W4 cases, using buildVsix from ../../../lib/color-themes/__tests__/zip-fixture.js."
+        },
+        "items": [
+          {
+            "id": "route-vsix.ac1",
+            "title": "Given a two-theme .vsix (one vs, one vs-dark), POST /api/color-themes/import/preview returns 200 with two themes carrying proposed ids and leaves <OVERDECK_HOME>/themes empty; after POSTing each theme to /api/color-themes, GET /api/color-themes lists one with type 'light' and one with type 'dark'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "route-vsix.ac2",
+            "title": "Given a 10 MiB + 1 byte 'big.vsix', a ZIP64 .vsix, or a .vsix holding 'extension/../evil.json', the route returns 400 with an error containing '10 MB', 'ZIP64', or '..' respectively, and <OVERDECK_HOME>/themes stays empty after each",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "route-vsix.ac3",
+            "title": "A 'theme.txt' upload returns 400 with an error containing '.vsix', and the existing over-2 MB .json request still returns 413",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ui-accept-vsix",
+        "title": "Let the Import VS Code theme picker choose .vsix files",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T05:40:28Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4659",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/sections/ColorThemeSection.tsx",
+            "src/dashboard/frontend/src/hooks/useColorTheme.ts",
+            "src/dashboard/frontend/src/components/Settings/__tests__/ColorThemeImportPreview.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/Settings/__tests__/ColorThemeImportPreview.test.tsx src/components/Settings/__tests__/ColorThemeSection.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ColorThemeImportPreview.test.tsx and ColorThemeSection.test.tsx pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD work item W5: ColorThemeSection.tsx input accept becomes '.json,.vsix' and the helper text names both formats (button label unchanged); useColorTheme.ts fileToBase64 encodes in 32 KiB String.fromCharCode chunks. Add the W5 tests to ColorThemeImportPreview.test.tsx (already in scripts/frontend-test-subset.txt). The browser UAT criterion needs the server route from route-vsix, which is why this item follows it."
+        },
+        "items": [
+          {
+            "id": "ui-accept-vsix.ac1",
+            "title": "The import file input renders accept='.json,.vsix', and user.upload of a 'pack.vsix' File sends POST /api/color-themes/import/preview with fileName 'pack.vsix'; the two mocked themes (one light, one dark) render as two preview cards with both names",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ui-accept-vsix.ac2",
+            "title": "Given a 100 KiB file of bytes 0..255 repeating, previewImport sends a contentBase64 equal to the expected base64 of those bytes, proving the chunked encoder crosses chunk boundaries correctly",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ui-accept-vsix.ac3",
+            "title": "Clicking Save on the two-theme preview sends two POST /api/color-themes requests, one per theme",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ui-accept-vsix.ac4",
+            "title": "Browser UAT in an isolated Playwright profile: choosing uat-pack.vsix (built with the PRD's UAT fixture recipe) in Settings > Appearance renders a preview listing 'UAT Light' and 'UAT Dark'; after Save, 'UAT Light' appears in the Light mode picker and 'UAT Dark' in the Dark mode picker",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document .vsix theme import in appearance.mdx and DASHBOARD-ARCHITECTURE.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T05:40:28Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4659",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/appearance.mdx",
+            "docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'Importing a .vsix package' configuration/appearance.mdx",
+            "grep -c 'tracked separately (#4659)' configuration/appearance.mdx || true",
+            "grep -n 'vsix-import.ts' docs/DASHBOARD-ARCHITECTURE.md",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "appearance.mdx has the 'Importing a .vsix package' heading",
+            "the 'tracked separately (#4659)' count is 0",
+            "DASHBOARD-ARCHITECTURE.md names vsix-import.ts",
+            "lint:docs completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD work item W6: in configuration/appearance.mdx, line 79 mentions .vsix as an accepted file, line 97 drops the '.vsix ... tracked separately (#4659)' clause (keep the #4660 sentence), and a new '#### Importing a .vsix package' subsection states: all contributed themes preview and save together; uiTheme vs/hc-light -> light, vs-dark/hc-black -> dark; include followed with base colors underneath, up to 5 levels, cycles refused; .tmTheme token colors or themes skipped with a warning; limits 10 MB archive, 2 MB per theme file, 20 themes; ZIP64, encrypted and path-traversal archives refused with a message and nothing saved. In docs/DASHBOARD-ARCHITECTURE.md's color-themes bullet (lines 69-79) add the sentence naming zip-reader.ts and vsix-import.ts."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "configuration/appearance.mdx renders a '#### Importing a .vsix package' subsection that states the 10 MB archive, 2 MB per-file and 20-theme limits and the vs/hc-light -> light, vs-dark/hc-black -> dark mapping",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "configuration/appearance.mdx no longer contains 'tracked separately (#4659)' and still contains the #4660 editor sentence",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md's color-themes bullet names src/lib/color-themes/zip-reader.ts and vsix-import.ts as the .vsix path, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "zip-reader",
+        "to": "vsix-import",
+        "type": "blocks"
+      },
+      {
+        "from": "mapper-split",
+        "to": "vsix-import",
+        "type": "blocks"
+      },
+      {
+        "from": "vsix-import",
+        "to": "route-vsix",
+        "type": "blocks"
+      },
+      {
+        "from": "route-vsix",
+        "to": "ui-accept-vsix",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

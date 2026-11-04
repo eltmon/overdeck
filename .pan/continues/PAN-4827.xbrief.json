@@ -1,0 +1,274 @@
+{
+  "version": "1",
+  "issueId": "PAN-4827",
+  "created": "2026-11-02T16:36:08.290Z",
+  "updated": "2026-11-02T19:25:05.186Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-02T19:25Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-02T19:25:05.186Z"
+    }
+  ],
+  "items": {
+    "google-flash-lite-ga": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4827",
+      "claimedAt": "2026-11-02T16:36:08.290Z",
+      "doneAt": "2026-11-02T16:53:06.580Z"
+    },
+    "google-add-3-6-flash": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4827",
+      "claimedAt": "2026-11-02T16:53:31.622Z",
+      "doneAt": "2026-11-02T17:08:44.037Z"
+    },
+    "google-reprice-flash": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4827",
+      "claimedAt": "2026-11-02T17:08:52.361Z",
+      "doneAt": "2026-11-02T17:22:42.676Z"
+    },
+    "dashscope-retire-tier-ids": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4827",
+      "claimedAt": "2026-11-02T17:22:48.991Z",
+      "doneAt": "2026-11-02T17:37:26.336Z"
+    },
+    "dashscope-real-prices": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4827",
+      "claimedAt": "2026-11-02T17:37:35.030Z",
+      "doneAt": "2026-11-02T17:50:24.962Z"
+    },
+    "zai-add-glm-5-3-flash": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4827",
+      "claimedAt": "2026-11-02T17:50:33.510Z",
+      "doneAt": "2026-11-02T18:01:35.217Z"
+    },
+    "zai-tiers": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4827",
+      "claimedAt": "2026-11-02T18:01:39.145Z",
+      "doneAt": "2026-11-02T18:11:47.413Z"
+    },
+    "zai-reprice": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4827",
+      "claimedAt": "2026-11-02T18:11:52.141Z",
+      "doneAt": "2026-11-02T18:21:42.211Z"
+    },
+    "settings-route-dead-ids": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4827",
+      "claimedAt": "2026-11-02T18:21:47.663Z",
+      "doneAt": "2026-11-02T18:31:47.485Z"
+    },
+    "tier-invariant-test": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4827",
+      "claimedAt": "2026-11-02T18:31:54.889Z",
+      "doneAt": "2026-11-02T18:40:54.854Z"
+    },
+    "docs-catalog-refresh": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4827",
+      "claimedAt": "2026-11-02T18:41:03.339Z",
+      "doneAt": "2026-11-02T18:50:45.472Z"
+    },
+    "google-flash-lite-ga.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T18:54:39.426Z"
+    },
+    "google-flash-lite-ga.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T18:54:54.477Z"
+    },
+    "google-flash-lite-ga.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T18:55:09.133Z"
+    },
+    "google-flash-lite-ga.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T18:55:24.832Z"
+    },
+    "google-flash-lite-ga.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-02T18:55:41.368Z"
+    },
+    "google-add-3-6-flash.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T18:55:57.950Z"
+    },
+    "google-add-3-6-flash.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T18:56:15.946Z"
+    },
+    "google-add-3-6-flash.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T18:56:33.976Z"
+    },
+    "google-add-3-6-flash.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T18:56:50.292Z"
+    },
+    "google-add-3-6-flash.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-02T18:57:05.830Z"
+    },
+    "google-reprice-flash.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T18:57:22.668Z"
+    },
+    "google-reprice-flash.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T18:57:37.914Z"
+    },
+    "google-reprice-flash.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T18:57:52.182Z"
+    },
+    "google-reprice-flash.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T18:58:07.839Z"
+    },
+    "dashscope-retire-tier-ids.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T18:58:32.652Z"
+    },
+    "dashscope-retire-tier-ids.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T18:58:47.646Z"
+    },
+    "dashscope-retire-tier-ids.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T18:59:02.230Z"
+    },
+    "dashscope-retire-tier-ids.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T18:59:19.063Z"
+    },
+    "dashscope-retire-tier-ids.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-02T18:59:34.471Z"
+    },
+    "dashscope-real-prices.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T18:59:50.458Z"
+    },
+    "dashscope-real-prices.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T19:00:06.484Z"
+    },
+    "dashscope-real-prices.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T19:00:23.055Z"
+    },
+    "dashscope-real-prices.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T19:00:40.684Z"
+    },
+    "dashscope-real-prices.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-02T19:00:56.790Z"
+    },
+    "zai-add-glm-5-3-flash.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T19:01:12.181Z"
+    },
+    "zai-add-glm-5-3-flash.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T19:01:28.489Z"
+    },
+    "zai-add-glm-5-3-flash.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T19:01:44.660Z"
+    },
+    "zai-add-glm-5-3-flash.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T19:02:01.215Z"
+    },
+    "zai-tiers.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T19:02:26.462Z"
+    },
+    "zai-tiers.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T19:02:41.949Z"
+    },
+    "zai-tiers.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T19:02:58.264Z"
+    },
+    "zai-reprice.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T19:03:17.500Z"
+    },
+    "zai-reprice.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T19:03:37.383Z"
+    },
+    "zai-reprice.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T19:03:56.013Z"
+    },
+    "zai-reprice.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T19:04:13.783Z"
+    },
+    "settings-route-dead-ids.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T19:04:28.847Z"
+    },
+    "settings-route-dead-ids.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T19:04:46.446Z"
+    },
+    "settings-route-dead-ids.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T19:05:02.205Z"
+    },
+    "settings-route-dead-ids.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T19:05:19.436Z"
+    },
+    "tier-invariant-test.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T19:05:36.493Z"
+    },
+    "tier-invariant-test.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T19:05:53.467Z"
+    },
+    "docs-catalog-refresh.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T19:06:09.687Z"
+    },
+    "docs-catalog-refresh.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T19:06:25.489Z"
+    },
+    "docs-catalog-refresh.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T19:06:41.686Z"
+    },
+    "docs-catalog-refresh.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T19:06:57.072Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-02T19:25:05Z",
+      "markdownBody": "# CI Failure Feedback for PAN-4827\n\nPull request: https://github.com/eltmon/overdeck/pull/4858 (head `35e1f04b`)\n\nSource: check_run:test-shard (2/4)\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\n## Failing checks (1)\n\n### test-shard (2/4)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/125495245204/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/41508890122/job/125495245204  \n```\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/__tests__/settings-model-catalog.test.ts\u001b[2m > \u001b[22mmodel catalog no-loss audit\u001b[2m > \u001b[22mpreserves every previous provider, ordered model, display name, price and effort field\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/__tests__/settings-model-catalog.test.ts\u001b[2m > \u001b[22mmodel catalog no-loss audit\u001b[2m > \u001b[22mpreserves every previous provider, ordered model, display name, price and effort field\n\u001b[31m\u001b[1mAssertionError\u001b[22m: expected { Object (anthropic, openai, ...) } to deeply equal { Object (anthropic, openai, ...) }\u001b[39m\n\n\u001b[32m- Expected\u001b[39m\n\u001b[31m+ Received\u001b[39m\n\n\u001b[33m@@ -103,89 +103,88 @@\u001b[39m\n\u001b[2m        \"name\": \"Claude Sonnet 4.6 (200K context)\",\u001b[22m\n\u001b[2m      },\u001b[22m\n\u001b[2m      {\u001b[22m\n\u001b[2m        \"contextWindow\": 200000,\u001b[22m\n\u001b[2m        \"costPer1MTokens\": 3,\u001b[22m\n\u001b[31m+       \"effortLevels\": undefined,\u001b[39m\n\u001b[2m        \"id\": \"claude-haiku-4-5\",\u001b[22m\n\u001b[2m        \"name\": \"Claude Haiku 4.5 (200K context)\",\u001b[22m\n\u001b[2m      },\u001b[22m\n\u001b[2m    ],\u001b[22m\n\u001b[2m    \"dashscope\": [\u001b[22m\n\u001b[2m      {\u001b[22m\n\u001b[2m        \"contextWindow\": 1000000,\u001b[22m\n\u001b[2m        \"costPer1MTokens\": 1,\u001b[22m\n\u001b[31m+       \"effortLevels\": undefined,\u001b[39m\n\u001b[2m        \"id\": \"qwen3.7-plus\",\u001b[22m\n\u001b[2m        \"name\": \"Qwen3.7 Plus (1M context)\",\u001b[22m\n\u001b[2m      },\u001b[22m\n\u001b[2m      {\u001b[22m\n\u001b[2m        \"contextWindow\": 1000000,\u001b[22m\n\u001b[32m-       \"costPer1MTokens\": 0,\u001b[39m\n\u001b[31m+       \"costPer1MTokens\": 0.31,\u001b[39m\n\u001b[31m+       \"effortLevels\": undefined,\u001b[39m\n\u001b[2m        \"id\": \"qwen3.8-flash\",\u001b[22m\n\u001b[2m        \"name\": \"Qwen3.8 Flash (1M context)\",\u001b[22m\n\u001b[2m      },\u001b[22m\n\u001b[2m      {\u001b[22m\n\u001b[2m        \"contextWindow\": 262144,\u001b[22m\n\u001b[32m-       \"costPer1MTokens\": 0,\u001b[39m\n\u001b[32m-       \"id\": \"qwen3-max\",\u001b[39m\n\u001b[32m-       \"name\": \"Qwen3 Max (DashScope) (256K context)\",\u001b[39m\n\u001b[32m-     },\u001b[39m\n\u001b[32m-\n…\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m1 failed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[1m\u001b[32m554 passed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[33m1 skipped\u001b[39m\u001b[90m (556)\u001b[39m\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    }
+  ]
+}

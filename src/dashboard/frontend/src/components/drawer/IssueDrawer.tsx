@@ -107,7 +107,7 @@ export function IssueDrawer() {
           </div>
           {(() => {
             // PAN-1610: one-click jump to the full issue on its tracker.
-            const href = trackerIssueUrl(drawer.issueId ?? '', issue?.url);
+            const href = trackerIssueUrl(drawer.issueId ?? '', issue?.url ?? drawer.trackerUrl);
             return href ? (
               <a
                 href={href}

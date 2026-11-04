@@ -1,0 +1,614 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-02T03:20:15Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4748: Fly API calls use flyctl's stored token, which goes stale until flyctl runs: loops, clone poll and rollback destroy get 403",
+    "updated": "2026-11-02T03:23:22.693Z"
+  },
+  "plan": {
+    "id": "pan-4748",
+    "title": "Fly API calls use flyctl's stored token, which goes stale until flyctl runs: loops, clone poll and rollback destroy get 403",
+    "status": "running",
+    "uid": "22bde1cc-9a8d-404f-b7c7-2faf507d7591",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-02T03:20:15Z",
+    "updated": "2026-11-02T03:23:22.693Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4748",
+        "label": "PAN-4748",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4748.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "fly",
+      "remote",
+      "auth",
+      "deacon",
+      "doctor"
+    ],
+    "metadata": {
+      "sizeJustification": "Seven vertical items across src/lib/remote, src/lib/anywhere/fly, one dashboard service, one doctor check and two doc pages; all hang off one token-source change in fly-api.ts and ship together as one bug fix.",
+      "canonicalFilename": "2026-11-02-PAN-4748-fly-api-calls-use-flyctl-s-stored-token-which-goes-stale-until-flyctl-runs-loops-clone-poll-and-rollback-destroy-get-403.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "createFlyApiClient() (src/lib/remote/fly-api.ts) falls back to the access_token in ~/.fly/config.yml when no FLY_API_TOKEN / remote.fly.api_token_env token is set. That token's discharge tokens expire within minutes and flyctl refreshes them only when flyctl runs, and the client holds the token string for its whole life. When it expires every Machines API call answers 403: the clone poll (pollUntil swallows probe errors) waits the full 20 min, the add-fly rollback cannot destroy the VM (it keeps billing), and the deacon Fly loops stop heartbeating (the watchdog stops the VM after 300 s), stop sweeping and stop the Codex sign-in sync, with loop lines that do not name the cause.",
+      "Proposal": "Introduce a token source (new src/lib/remote/fly-token.ts): explicit tokens are static; flyctl's stored login is re-read per request and, after a 401/403, refreshed once by running `flyctl auth token --quiet --json` (verified in flyctl v0.4.115 source to refresh and persist via RequireSession -> MonitorTokens before printing), single-flight per process with a 60 s cooldown after a failed refresh. FlyApiClient.request() retries the request once with the refreshed token. pollUntil rethrows a surviving 401/403 as FlyMachineError('fly-token-rejected', 424). The heartbeat, sweep and Codex-sync loop lines, unlink and rollback name 'Fly token rejected (<status>)' with one fix text. pan doctor gains a 'Fly token' row. docs/fly-provider.md and configuration/linked-machines.mdx document the refresh and recommend a long-lived `fly tokens create deploy` token for unattended hosts.",
+      "NonGoals": "- Overdeck must not create, store or rotate a long-lived Fly token, and must not write ~/.fly/config.yml.\n- No proactive or periodic token refresh; refresh runs only after a 401/403.\n- No retry for any status other than 401/403, and never more than one retry per request.\n- No refresh or retry for explicit tokens (remote.fly.api_token_env, FLY_API_TOKEN, createFlyApiClient(token)).\n- No change to FlyProvider.isAuthenticated(), isRemoteAvailable(), pan remote setup, the Fly VM watchdog, or the loops' 60 s schedule.\n- No synchronous child process (execSync/spawnSync) anywhere in the change.\n- No new Effect wrapper around the new Promise functions.\n- No token value in any log line, error message, activity entry, loop line or test fixture that looks like a real secret."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Refresh flyctl's stored token by running `flyctl auth token --quiet --json` after a 401/403 and retry the request once (issue direction 1).",
+        "rationale": "flyctl v0.4.115 source shows `auth token` uses RequireSession, which synchronously refreshes discharge tokens and persists them before printing; measured 0.57 s on the planning host and its token matched the file's. It fixes the root cause for every caller in one place."
+      },
+      {
+        "summary": "Do not mint or store a long-lived deploy token at setup (issue direction 2); document and recommend it in docs and the pan doctor fix text instead.",
+        "rationale": "Writing a secret to disk and choosing its scope and expiry is the operator's decision; the flyctl refresh already covers hosts where flyctl is logged in."
+      },
+      {
+        "summary": "Also treat a 401/403 that survives the refresh as a hard failure in pollUntil and name 'Fly token rejected' in loop lines, unlink, rollback and pan doctor (issue direction 3).",
+        "rationale": "The refresh can still fail (flyctl missing, login older than flyctl's 30-day TokenTimeout); the operator then needs a fast, named failure instead of a 20-minute timeout or a misleading 'did not answer'."
+      },
+      {
+        "summary": "Take the refreshed token from flyctl's JSON stdout, not from a re-read of ~/.fly/config.yml; re-read the file only when the flyctl run fails.",
+        "rationale": "The JSON is exactly what flyctl would send; the file re-read covers the case where another flyctl run refreshed it."
+      },
+      {
+        "summary": "Put the token source in a new module src/lib/remote/fly-token.ts that does not import fly-api.ts; keep isFlyAuthError and flyTokenRejectedMessage in fly-api.ts.",
+        "rationale": "fly-api.ts imports the source, so the reverse import would fail lint:circular; keeping the public client shape unchanged means fly-provider.ts, provision.ts and fly-machine-service.ts construct clients without edits."
+      },
+      {
+        "summary": "Resolve flyctl from PATH first, then ~/.fly/bin/flyctl on ENOENT; strip FLY_API_TOKEN and FLY_ACCESS_TOKEN from the child env.",
+        "rationale": "The dashboard/deacon PATH may lack ~/.fly/bin; flyctl prints an env token instead of its stored login when either variable is set."
+      }
+    ],
+    "items": [
+      {
+        "id": "fly-token-source",
+        "title": "Add the Fly token source module with a single-flight flyctl refresh",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T03:20:15Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4748",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "fly-api-retry"
+          ],
+          "files_scope": [
+            "src/lib/remote/fly-token.ts",
+            "tests/lib/remote/fly-token.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/remote/fly-token.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tests/lib/remote/fly-token.test.ts passes with 0 failures",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4",
+            "NFR-1",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-1 exactly: create src/lib/remote/fly-token.ts exporting FlyTokenSource { origin: 'explicit'|'flyctl'; current(): Promise<string>; refresh?(rejected): Promise<string|null> }, staticFlyTokenSource(token), flyctlTokenSource(initial, deps?: Partial<{readStoredToken, runFlyctl, now}>), readStoredFlyTokenSync() (the existing readFlyctlConfigToken body moved from fly-api.ts) and _resetFlyTokenStateForTests(). Module-level state refreshedToken / inflight / failedAt, REFRESH_COOLDOWN_MS = 60_000, FLYCTL_TIMEOUT_MS = 30_000. refresh(rejected): return refreshedToken if it differs from rejected; return null inside the cooldown; join an in-flight refresh; else run `flyctl auth token --quiet --json` via promisified execFile (timeout 30 s, env without FLY_API_TOKEN and FLY_ACCESS_TOKEN; on ENOENT retry with ~/.fly/bin/flyctl), parse the last stdout line starting with '{' for `token`; on failure re-read ~/.fly/config.yml; a token different from rejected is cached and returned, anything else sets failedAt and returns null. Error messages never include stdout. Must not import ./fly-api.js. Write the seven tests the PRD lists in tests/lib/remote/fly-token.test.ts with injected deps and an injected now (no real flyctl, no real timers)."
+        },
+        "items": [
+          {
+            "id": "fly-token-source.ac1",
+            "title": "Given a flyctl source whose runFlyctl resolves '{\"token\":\"fm2_new\"}', when refresh('fm2_old') runs, then it returns 'fm2_new' and a later current() returns 'fm2_new'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fly-token-source.ac2",
+            "title": "Given two refresh('fm2_old') calls started before runFlyctl resolves, when both settle, then runFlyctl was called exactly once and both return the same token",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fly-token-source.ac3",
+            "title": "Given runFlyctl rejects at now=0, when refresh runs again at now=59_999 it returns null without calling runFlyctl, and at now=60_000 it calls runFlyctl again",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fly-token-source.ac4",
+            "title": "The default runFlyctl passes an env option that contains neither FLY_API_TOKEN nor FLY_ACCESS_TOKEN and uses execFile, not execSync (asserted through a vi.mock of node:child_process)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fly-token-source.ac5",
+            "title": "staticFlyTokenSource('t') reports origin 'explicit', has no refresh method, and current() resolves 't'; src/lib/remote/fly-token.ts contains no import of ./fly-api.js",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fly-api-retry",
+        "title": "Retry a Machines API request once with a refreshed token after 401/403",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T03:20:15Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4748",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "poll-token-hard-fail",
+            "loop-lines-token-rejected",
+            "unlink-rollback-token-rejected",
+            "doctor-fly-token"
+          ],
+          "files_scope": [
+            "src/lib/remote/fly-api.ts",
+            "tests/lib/remote/fly-api.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/remote/fly-api.test.ts tests/lib/remote/fly-provider.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "fly-api.test.ts and fly-provider.test.ts pass with 0 failures",
+            "typecheck completes without errors",
+            "lint:circular reports no cycles"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-2: FlyApiClient's constructor accepts string | FlyTokenSource (a string becomes staticFlyTokenSource) and exposes a tokenOrigin getter. request() takes the token from tokens.current() per request; on a 401 or 403, when the source has refresh, it calls refresh(token) and, if that returns a different non-null token, sends the same request once more with it (no sleep). The thrown FlyApiError carries the final response's status and body. createFlyApiClient(token?) keeps its signature and its exact 'Fly API token not found…' error: explicit token or FLY_API_TOKEN => static source; else readStoredFlyTokenSync() => flyctlTokenSource; else throw. Remove the moved readFlyctlConfigToken and now-unused imports. Add exported isFlyAuthError(error), FLY_TOKEN_FIX and flyTokenRejectedMessage(error) with the PRD D-10 text. Rewrite the file header's auth line. Add no new Effect wrapper. Add the seven tests the PRD lists to tests/lib/remote/fly-api.test.ts."
+        },
+        "items": [
+          {
+            "id": "fly-api-retry.ac1",
+            "title": "Given a client built with a fake flyctl source (current 'old', refresh 'new') and fetch answering 403 then 200 [], when listMachines runs, then it resolves [] and the second fetch carries 'Authorization: Bearer new'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fly-api-retry.ac2",
+            "title": "Given new FlyApiClient('test-token') and fetch answering 403, when listMachines runs, then fetch was called exactly once and the call rejects with a FlyApiError whose statusCode is 403",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fly-api-retry.ac3",
+            "title": "Given a flyctl source whose refresh returns null, when a call gets 401, then it rejects with statusCode 401 after one fetch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fly-api-retry.ac4",
+            "title": "With FLY_API_TOKEN unset and HOME pointing at a temp dir whose .fly/config.yml holds 'access_token: fm2_test', createFlyApiClient() returns a client whose tokenOrigin is 'flyctl'; with no token anywhere it still throws 'Fly API token not found'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fly-api-retry.ac5",
+            "title": "isFlyAuthError returns true for FlyApiError 401 and 403 and false for 404 and a plain Error; flyTokenRejectedMessage(403 error) starts with 'Fly token rejected (403): run `fly auth login`'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "poll-token-hard-fail",
+        "title": "Make pollUntil fail fast with fly-token-rejected on a 401/403 probe",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T03:20:15Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4748",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/anywhere/fly/provision-shared.ts",
+            "src/lib/anywhere/fly/__tests__/project.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/anywhere/fly/__tests__/project.test.ts src/lib/anywhere/fly/__tests__/provision.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "project.test.ts and provision.test.ts pass with 0 failures",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-3: add 'fly-token-rejected' to FlyMachineErrorCode and 'fly-token-rejected': 424 to FLY_MACHINE_ERROR_STATUS in src/lib/anywhere/fly/provision-shared.ts. In pollUntil, replace `probe().catch(() => false)` with a catch that throws new FlyMachineError('fly-token-rejected', flyTokenRejectedMessage(error), { status: error.statusCode }) when isFlyAuthError(error), and returns false for every other error. Update pollUntil's doc comment. Add the two tests from the PRD to src/lib/anywhere/fly/__tests__/project.test.ts (the file already uses vi.useFakeTimers)."
+        },
+        "items": [
+          {
+            "id": "poll-token-hard-fail.ac1",
+            "title": "Given execCommand throws FlyApiError 403 for `cat /tmp/pan-project.exit`, when ensureFlyProject runs, then it rejects with a FlyMachineError whose code is 'fly-token-rejected' after exactly one poll exec, without advancing fake timers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "poll-token-hard-fail.ac2",
+            "title": "Given the first poll exec throws FlyApiError 500 and the next returns '0', when ensureFlyProject runs with timers advanced 5 s, then the clone completes without error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "poll-token-hard-fail.ac3",
+            "title": "Given the 'fly-token-rejected' code, FLY_MACHINE_ERROR_STATUS returns 424 for it, so the add-fly route answers HTTP 424",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "loop-lines-token-rejected",
+        "title": "Name a rejected Fly token in the heartbeat, sweep and Codex-sync loop lines",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T03:20:15Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4748",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/remote/fly-machine-loops.ts",
+            "src/lib/anywhere/fly/codex-auth.ts",
+            "tests/unit/lib/remote/fly-machine-loops.test.ts",
+            "src/lib/anywhere/fly/__tests__/codex-auth.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/remote/fly-machine-loops.test.ts src/lib/anywhere/fly/__tests__/codex-auth.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "fly-machine-loops.test.ts and codex-auth.test.ts pass with 0 failures",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-4: in src/lib/remote/fly-machine-loops.ts, the heartbeat catch prints `failed to refresh host heartbeat on <label>: <flyTokenRejectedMessage>` for an auth error; reasonToRemove rethrows an auth error (still returns null for other errors); sweepFlyMachines catches that rethrow, prints `could not check <label>: <flyTokenRejectedMessage>` and continues without destroying or removing the record; the sweep's destroy catch uses flyTokenRejectedMessage for an auth error. In src/lib/anywhere/fly/codex-auth.ts the indeterminate VmCodexAuthRead member gains optional tokenRejected: FlyApiError, set by readVmCodexAuth when the exec throws an auth error; syncFlyCodexAuth prints `Codex sign-in sync skipped on <label>: <flyTokenRejectedMessage>` when it is set and keeps `the Fly machine did not answer` otherwise. Update the fly-machine-loops.ts header. Add the four tests the PRD lists."
+        },
+        "items": [
+          {
+            "id": "loop-lines-token-rejected.ac1",
+            "title": "Given a record whose heartbeat exec throws FlyApiError 403, heartbeatFlyMachines returns a line containing 'Fly token rejected (403)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "loop-lines-token-rejected.ac2",
+            "title": "Given a linked record whose getMachine throws FlyApiError 403, sweepFlyMachines returns a line starting 'could not check' that contains 'Fly token rejected (403)' and calls neither destroyMachine nor removeRecord",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "loop-lines-token-rejected.ac3",
+            "title": "Given a Codex-ready record whose exec throws FlyApiError 403, syncFlyCodexAuth returns a line containing 'Fly token rejected (403)' and no line containing 'did not answer'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "loop-lines-token-rejected.ac4",
+            "title": "readVmCodexAuth returns { state: 'indeterminate', tokenRejected } for an exec that throws FlyApiError 403 and { state: 'indeterminate' } without tokenRejected for an exec that throws a plain Error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "unlink-rollback-token-rejected",
+        "title": "Report fly-token-rejected from Fly machine unlink and the add-fly rollback",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T03:20:15Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4748",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/fly-machine-service.ts",
+            "src/dashboard/server/services/__tests__/fly-machine-service.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/fly-machine-service.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "fly-machine-service.test.ts passes with 0 failures",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-5 in src/dashboard/server/services/fly-machine-service.ts: in removeFlyMachineForLink's destroy catch, throw new FlyMachineError('fly-token-rejected', `Could not destroy Fly machine <id>: <flyTokenRejectedMessage>`, { machineId }) when isFlyAuthError(error), else keep the existing 'unreachable' error; the record stays in both cases. In rollback's attempt helper, log flyTokenRejectedMessage(error) instead of the raw message when isFlyAuthError(error). Add the two tests the PRD lists to the existing service test file."
+        },
+        "items": [
+          {
+            "id": "unlink-rollback-token-rejected.ac1",
+            "title": "Given a Fly record and a destroy dep that throws FlyApiError 403, removeFlyMachineForLink(link, { keepServer: false }) rejects with a FlyMachineError whose code is 'fly-token-rejected' and removeRecord is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "unlink-rollback-token-rejected.ac2",
+            "title": "Given a destroy dep that throws a plain Error, removeFlyMachineForLink still rejects with code 'unreachable'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "unlink-rollback-token-rejected.ac3",
+            "title": "Given addFlyMachine fails after the machine exists and the rollback destroy throws FlyApiError 403, the log dep receives a line containing 'Rollback could not destroy' and 'Fly token rejected (403)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "doctor-fly-token",
+        "title": "Add a pan doctor 'Fly token' row that probes the Machines API read-only",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T03:20:15Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4748",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/doctor-fly.ts",
+            "src/cli/commands/doctor.ts",
+            "src/cli/commands/__tests__/doctor-fly.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/doctor-fly.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "doctor-fly.test.ts passes with 0 failures",
+            "typecheck completes without errors",
+            "lint-file-size passes with doctor.ts at or under 1042 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-6: new src/cli/commands/doctor-fly.ts exporting checkFlyToken(options?: { loadRemote, hasRecords, loadApi }) that returns CheckResult rows named 'Fly token' (CheckResult re-declared locally like doctor-ollama.ts). Silent ([]) unless remote.enabled is true or fly-machines.json has a record. No token => error 'No Fly API token' with FLY_TOKEN_FIX. listMachines(remote.fly.app ?? 'pan-workspaces') resolves => ok 'Accepted (<origin>)' where origin is the api_token_env name (default FLY_API_TOKEN) for 'explicit' and '~/.fly/config.yml via flyctl' for 'flyctl'; 404 => ok 'Accepted (<origin>); app <app> does not exist yet'; isFlyAuthError => error 'Rejected (<status>, <origin>)' with fix FLY_TOKEN_FIX; other errors => warn 'Could not check: <message>'. Never call ensureApp. Wire it into collectDoctorChecks in src/cli/commands/doctor.ts right after the checkSemgrep line with one import line (net +2 lines). Add the five tests the PRD lists."
+        },
+        "items": [
+          {
+            "id": "doctor-fly-token.ac1",
+            "title": "Given remote.enabled false and no Fly machine records, checkFlyToken returns an empty array and never calls loadApi",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-fly-token.ac2",
+            "title": "Given an explicit-origin api whose listMachines resolves and api_token_env 'MY_FLY', checkFlyToken returns one row { name: 'Fly token', status: 'ok' } whose message contains 'MY_FLY'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-fly-token.ac3",
+            "title": "Given a flyctl-origin api whose listMachines throws FlyApiError 403, checkFlyToken returns status 'error', a message containing 'Rejected (403' and a fix containing 'fly auth login'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-fly-token.ac4",
+            "title": "Given listMachines throws FlyApiError 404, checkFlyToken returns status 'ok' with a message containing 'does not exist yet'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-fly-token.ac5",
+            "title": "collectDoctorChecks in src/cli/commands/doctor.ts calls checkFlyToken, and bash scripts/lint-file-size.sh exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-fly-token",
+        "title": "Document the flyctl token refresh, 'Fly token rejected' and the long-lived token recommendation",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T03:20:15Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4748",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/fly-provider.md",
+            "configuration/linked-machines.mdx",
+            ".overdeck/context/codebase/concerns.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'Fly token rejected' docs/fly-provider.md configuration/linked-machines.mdx",
+            "grep -n 'fly tokens create deploy' docs/fly-provider.md configuration/linked-machines.mdx",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "grep prints at least one matching line in each of the two files",
+            "lint:docs completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-7. docs/fly-provider.md: under Troubleshooting > Authentication failure add a 'Fly token rejected (403)' paragraph (stored flyctl login expires quickly and is refreshed only when flyctl runs; Overdeck runs `flyctl auth token` once after a 401/403 and retries; if that fails — flyctl missing, or a login older than 30 days — loop lines, add-fly/unlink errors and the pan doctor 'Fly token' row say 'Fly token rejected'; fix with `fly auth login` or a long-lived `fly tokens create deploy -a <app> --expiry <duration>` token exported as FLY_API_TOKEN, e.g. in ~/.overdeck.env), and correct the step-3 'falls back to the CLI session' sentence; under Automatic loops add one sentence that a rejected token shows as 'Fly token rejected (<status>)' and the sweep keeps the record. configuration/linked-machines.mdx: extend the Setup token bullet with the refresh behaviour and the deploy-token recommendation, and add a Troubleshooting entry for 'Fly token rejected (403)' pointing to the pan doctor 'Fly token' row. .overdeck/context/codebase/concerns.md: replace the planner's PAN-4748 sentence in the Fly bullet with the shipped behaviour and update the last-verified date."
+        },
+        "items": [
+          {
+            "id": "docs-fly-token.ac1",
+            "title": "docs/fly-provider.md Troubleshooting contains a 'Fly token rejected' paragraph that names `flyctl auth token`, `fly auth login` and `fly tokens create deploy`, and no longer says the provider simply falls back to the CLI session",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-fly-token.ac2",
+            "title": "configuration/linked-machines.mdx Setup contains the `fly tokens create deploy -a <app>` recommendation for FLY_API_TOKEN on hosts where nobody runs fly, and its Troubleshooting section contains an entry that names the pan doctor 'Fly token' row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-fly-token.ac3",
+            "title": ".overdeck/context/codebase/concerns.md's Fly bullet contains the per-request token read, the single flyctl refresh after 401/403 and pollUntil's fly-token-rejected failure, and the file contains exactly one last-verified line, at the end",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "fly-token-source",
+        "to": "fly-api-retry",
+        "type": "blocks"
+      },
+      {
+        "from": "fly-api-retry",
+        "to": "poll-token-hard-fail",
+        "type": "blocks"
+      },
+      {
+        "from": "fly-api-retry",
+        "to": "loop-lines-token-rejected",
+        "type": "blocks"
+      },
+      {
+        "from": "fly-api-retry",
+        "to": "unlink-rollback-token-rejected",
+        "type": "blocks"
+      },
+      {
+        "from": "poll-token-hard-fail",
+        "to": "unlink-rollback-token-rejected",
+        "type": "blocks"
+      },
+      {
+        "from": "fly-api-retry",
+        "to": "doctor-fly-token",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

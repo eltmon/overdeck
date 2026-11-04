@@ -1,0 +1,115 @@
+{
+  "version": "1",
+  "issueId": "PAN-4775",
+  "created": "2026-11-02T03:25:35.744Z",
+  "updated": "2026-11-02T03:38:51.035Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "w1-note-and-plans": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4775",
+      "claimedAt": "2026-11-02T03:25:35.744Z",
+      "doneAt": "2026-11-02T03:27:03.467Z"
+    },
+    "w2-shipped-table": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4775",
+      "claimedAt": "2026-11-02T03:27:36.753Z",
+      "doneAt": "2026-11-02T03:28:37.730Z"
+    },
+    "w3-roadmap-steps": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4775",
+      "claimedAt": "2026-11-02T03:28:42.500Z",
+      "doneAt": "2026-11-02T03:29:45.723Z"
+    },
+    "w4-pricing-reasoning": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4775",
+      "claimedAt": "2026-11-02T03:29:50.568Z",
+      "doneAt": "2026-11-02T03:31:14.124Z"
+    },
+    "w5-supersede-header": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4775",
+      "claimedAt": "2026-11-02T03:31:22.778Z",
+      "doneAt": "2026-11-02T03:31:58.692Z"
+    },
+    "w1-note-and-plans.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T03:33:53.576Z"
+    },
+    "w1-note-and-plans.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T03:34:11.637Z"
+    },
+    "w1-note-and-plans.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T03:34:28.863Z"
+    },
+    "w1-note-and-plans.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T03:34:45.279Z"
+    },
+    "w1-note-and-plans.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-02T03:35:01.306Z"
+    },
+    "w2-shipped-table.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T03:35:19.250Z"
+    },
+    "w2-shipped-table.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T03:35:38.870Z"
+    },
+    "w2-shipped-table.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T03:35:57.470Z"
+    },
+    "w3-roadmap-steps.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T03:36:16.216Z"
+    },
+    "w3-roadmap-steps.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T03:36:34.911Z"
+    },
+    "w3-roadmap-steps.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T03:36:50.882Z"
+    },
+    "w3-roadmap-steps.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T03:37:08.426Z"
+    },
+    "w4-pricing-reasoning.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T03:37:25.078Z"
+    },
+    "w4-pricing-reasoning.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T03:37:41.950Z"
+    },
+    "w4-pricing-reasoning.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T03:37:58.886Z"
+    },
+    "w4-pricing-reasoning.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T03:38:17.438Z"
+    },
+    "w5-supersede-header.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T03:38:35.043Z"
+    },
+    "w5-supersede-header.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T03:38:51.035Z"
+    }
+  }
+}

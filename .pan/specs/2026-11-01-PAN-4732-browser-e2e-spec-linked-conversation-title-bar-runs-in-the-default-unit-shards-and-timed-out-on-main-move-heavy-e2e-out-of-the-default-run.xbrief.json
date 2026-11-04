@@ -1,0 +1,203 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-01T18:26:53Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4732: Browser e2e spec (linked-conversation-title-bar) runs in the default unit shards and timed out on main; move heavy e2e out of the default run",
+    "updated": "2026-11-01T18:35:20.130Z"
+  },
+  "plan": {
+    "id": "pan-4732",
+    "title": "Browser e2e spec (linked-conversation-title-bar) runs in the default unit shards and timed out on main; move heavy e2e out of the default run",
+    "status": "running",
+    "uid": "b9d28670-fdc5-42d7-9ae0-ca133d5b1464",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-01T18:26:53Z",
+    "updated": "2026-11-01T18:35:20.130Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4732",
+        "label": "PAN-4732",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4733",
+        "label": "PAN-4733 (follow-up: gating browser lane, other specs, un-quarantine)",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4732.md",
+        "label": "PRD draft (.pan/drafts/PAN-4732.md)",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "ci",
+      "tests",
+      "flaky",
+      "quarantine",
+      "main-red"
+    ],
+    "narratives": {
+      "Problem": "main CI is red since the PAN-4650 merge (run 41335061342, commit 8d26b6fb84f): tests/e2e/linked-conversation-title-bar.spec.ts starts a Vite dev server and Chromium inside the CI unit shards (vitest.config.ts includes tests/**/*.spec.ts) and its warm-up page.goto times out at 180 s. A CI re-run failed identically, so the failure is deterministic and every PR that merges main inherits it.",
+      "Proposal": "Minimal fix requested by the operator. (1) Add the spec to scripts/flaky-quarantine.txt with a PAN-4733 reference: vitest.config.ts (readQuarantineList) then excludes it from the CI shards and the verification gate, and the non-blocking flake-lane job, which installs Chromium, keeps running it in CI. (2) Add a five-state case to ConversationMachineBanner.test.tsx, already in the CI frontend subset, asserting chip, banner, buttons and read-only notice for local, remote, offline-saved, offline-none and released. The gating browser lane, the audit of the other tests/e2e specs, the root cause and the un-quarantine are follow-up PAN-4733.",
+      "NonGoals": "- No change to vitest.config.ts, .github/workflows/ci.yml or scripts/run-flake-lane.sh\n- No change to the browser spec tests/e2e/linked-conversation-title-bar.spec.ts or its fixture tests/e2e/fixtures/linked-conversations.ts\n- No move, rename or quarantine of tests/e2e/issue-tree.spec.ts, merge-train.spec.ts or styleguide-conformance.spec.ts (PAN-4733)\n- No root-cause fix for the warm-up timeout and no un-quarantine (PAN-4733)\n- No ten-consecutive-CI-runs proof (PAN-4733)\n- No colour or screenshot assertions in the component test\n- No edit to scripts/frontend-test-subset.txt\n- No .skip, .only or skipIf added to any test\n- No docs edit\n- No test of ComposerFooter's read-only switch (the component test checks MachineReadOnlyNotice as the browser fixture renders it)"
+    },
+    "metadata": {
+      "docsJustification": "The change adds one entry to scripts/flaky-quarantine.txt (whose header documents the quarantine and flake lane) and one test case; no documented behaviour, command or configuration changes. Documentation for the browser lane is part of follow-up PAN-4733.",
+      "canonicalFilename": "2026-11-01-PAN-4732-browser-e2e-spec-linked-conversation-title-bar-runs-in-the-default-unit-shards-and-timed-out-on-main-move-heavy-e2e-out-of-the-default-run.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Use the CI quarantine list, not the slow-test convention, to take the spec out of the shards.",
+        "rationale": "The operator offered both. The spec fails deterministically on main, so a gating slow-test lane in test-e2e would keep the required test check red; the quarantine keeps it running in the existing non-blocking flake lane, which installs Chromium."
+      },
+      {
+        "summary": "Reference follow-up PAN-4733 in the quarantine entry.",
+        "rationale": "lint-quarantine-audit.sh requires an issue reference, and PAN-4732 closes when this lands; PAN-4733 owns the root cause and the un-quarantine."
+      },
+      {
+        "summary": "Define the five component-test rows inline instead of sharing a module with the browser fixture.",
+        "rationale": "Sharing would edit the quarantined spec and fixture, growing the fast fix; a frontend test cannot import the tests/e2e fixture without a second copy of React."
+      },
+      {
+        "summary": "Move the issue's 10-consecutive-CI-runs criterion and the audit of the other tests/e2e specs to PAN-4733.",
+        "rationale": "Operator direction: keep this plan minimal. Ten green runs only mean something in the gating lane PAN-4733 builds."
+      }
+    ],
+    "items": [
+      {
+        "id": "quarantine-title-bar-spec",
+        "title": "Quarantine tests/e2e/linked-conversation-title-bar.spec.ts under PAN-4733",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T18:26:53Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "test",
+          "issueLabel": "pan-4732",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/flaky-quarantine.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash scripts/lint-quarantine-audit.sh",
+            "CI=true npx vitest list --configLoader runner --filesOnly tests/e2e",
+            "OVERDECK_FLAKE_LANE=1 CI=true npx vitest list --configLoader runner --filesOnly tests/e2e/linked-conversation-title-bar.spec.ts",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "✓ quarantine audit passed",
+            "the CI=true list omits tests/e2e/linked-conversation-title-bar.spec.ts and still lists the other tests/e2e files",
+            "the flake-lane list prints [root] tests/e2e/linked-conversation-title-bar.spec.ts",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Insert exactly this line as the FIRST entry of scripts/flaky-quarantine.txt, directly after the header comment block and before `tests/playwright/conversation-supervisor-uat.test.ts  # PAN-2371` (run-flake-lane.sh runs entries serially under the flake-lane job's 30-minute cap, so it must not wait behind the others), leaving the header comment untouched: `tests/e2e/linked-conversation-title-bar.spec.ts  # PAN-4733`. Do not edit vitest.config.ts, .github/workflows/ci.yml, scripts/run-flake-lane.sh or the spec. vitest.config.ts already excludes quarantined paths when CI=true or OVERDECK_VERIFICATION=1 (unless OVERDECK_FLAKE_LANE=1), and the flake-lane CI job installs Chromium and runs each quarantined file non-blocking."
+        },
+        "items": [
+          {
+            "id": "quarantine-title-bar-spec.ac1",
+            "title": "The first non-comment line of scripts/flaky-quarantine.txt is `tests/e2e/linked-conversation-title-bar.spec.ts  # PAN-4733`, and `bash scripts/lint-quarantine-audit.sh` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "quarantine-title-bar-spec.ac2",
+            "title": "Given CI=true, when `npx vitest list --configLoader runner --filesOnly tests/e2e` runs, then it omits tests/e2e/linked-conversation-title-bar.spec.ts and still lists issue-tree, merge-train and styleguide-conformance",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "quarantine-title-bar-spec.ac3",
+            "title": "Given OVERDECK_FLAKE_LANE=1 and CI=true, when vitest lists tests/e2e/linked-conversation-title-bar.spec.ts, then it is collected, so the flake-lane job still runs it in CI",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "title-bar-component-test",
+        "title": "Add a five-state title-bar case to ConversationMachineBanner.test.tsx",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T18:26:53Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4732",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/__tests__/ConversationMachineBanner.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/chat/__tests__/ConversationMachineBanner.test.tsx",
+            "npm run test:frontend-subset -- --dry-run",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "ConversationMachineBanner.test.tsx passes, including five cases named local, remote, offline-saved, offline-none and released",
+            "the dry-run args list includes src/components/chat/__tests__/ConversationMachineBanner.test.tsx",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2 (the PRD has the full code block). In src/dashboard/frontend/src/components/chat/__tests__/ConversationMachineBanner.test.tsx add RemoteHeaderActions to the '../ConversationMachineBanner' import; keep the existing vi.mock lines, helpers and tests. At the end of the file add, with a comment naming both sources: STATES = ['local','remote','offline-saved','offline-none','released']; BASE, LINKED, a rowFor(state) switch and CONTINUATION copied verbatim from tests/e2e/fixtures/linked-conversations.ts (lines 27-55, conversationFor and CONTINUATION); and the EXPECTED table copied verbatim from tests/e2e/linked-conversation-title-bar.spec.ts (lines 43-50). Add describe('the five title-bar states (PAN-4732)') with it.each(STATES)('%s') that renders through the file's wrap() helper with rows [conversation, CONTINUATION]: <RemoteHeaderActions/>, <ConversationMachineChip/>, <ConversationMachineBanner/>, and <div>composer</div> for local/remote or <MachineReadOnlyNotice/> otherwise. Assert against EXPECTED[state]: machine-chip texts equal [chip] or []; first machine-banner text contains banner, or no banner when null; trimmed non-empty button texts equal buttons; machine-read-only-notice count equals readOnly ? 1 : 0. No fetch stub is needed (OpenPreviewPopover queries only when open); if happy-dom reports an unexpected request, stub globalThis.fetch inside the describe and restore it in afterEach. Do not assert colours. If a case fails for anything other than a whitespace artefact, stop and report it instead of changing the expected values. Do not edit scripts/frontend-test-subset.txt; the file is already listed. Scope note (critique): the read-only assertion checks the MachineReadOnlyNotice text in the fixture's composition; it does not test ComposerFooter's read-only switch."
+        },
+        "items": [
+          {
+            "id": "title-bar-component-test.ac1",
+            "title": "Given each of the five states, when the title-bar composition renders in happy-dom, then the chip, banner, buttons and read-only notice match the EXPECTED table copied from the browser spec",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "title-bar-component-test.ac2",
+            "title": "Given the remote state, when it renders, then the test asserts it renders exactly the buttons ['Preview', 'Pull here'] and the chip 'on desk'; given the local state, then it asserts no chip, banner, button or read-only notice renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "title-bar-component-test.ac3",
+            "title": "`npm run test:frontend-subset -- --dry-run` prints an args list containing src/components/chat/__tests__/ConversationMachineBanner.test.tsx, so the five cases run on every PR in CI's test-e2e job",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": []
+  },
+  "status": "active"
+}

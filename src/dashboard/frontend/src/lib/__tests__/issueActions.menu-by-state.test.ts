@@ -64,12 +64,12 @@ const cases: ReadonlyArray<readonly [string, IssueActionState, readonly IssueAct
   [
     'backlog: plan it, queue it, or drop it',
     baseState({ derived: { issueId: 'PAN-1', state: 'backlog' } }),
-    ['plan', 'addToOrderBook', 'cancel'],
+    ['plan', 'addToOrderBook', 'cancel', 'runOnDeft'],
   ],
   [
     'parked: same three as backlog',
     baseState({ derived: { issueId: 'PAN-1', state: 'parked' } }),
-    ['plan', 'addToOrderBook', 'cancel'],
+    ['plan', 'addToOrderBook', 'cancel', 'runOnDeft'],
   ],
   [
     'planning: watch it or talk to it, never queue it',
@@ -80,7 +80,7 @@ const cases: ReadonlyArray<readonly [string, IssueActionState, readonly IssueAct
       workspace,
       issueCanonicalState: 'in_progress',
     }),
-    ['watchPlanning', 'tell', 'stopAgent', 'resetIssue', 'cancel', 'open'],
+    ['watchPlanning', 'tell', 'stopAgent', 'resetIssue', 'cancel', 'open', 'runOnDeft'],
   ],
   [
     'planned: accept the plan and start work',
@@ -93,7 +93,7 @@ const cases: ReadonlyArray<readonly [string, IssueActionState, readonly IssueAct
       workspace,
       issueCanonicalState: 'in_progress',
     }),
-    ['donePlanning', 'startAgent', 'syncMain', 'resetIssue', 'cancel', 'open', 'addToOrderBook', 'tasks'],
+    ['donePlanning', 'startAgent', 'syncMain', 'resetIssue', 'cancel', 'open', 'addToOrderBook', 'tasks', 'runOnDeft'],
   ],
   [
     'working: steer the agent, no start and no sync',
@@ -106,22 +106,22 @@ const cases: ReadonlyArray<readonly [string, IssueActionState, readonly IssueAct
       workspace,
       issueCanonicalState: 'in_progress',
     }),
-    ['tell', 'doneWork', 'stopAgent', 'restartAgent', 'resetIssue', 'cancel', 'open', 'tasks'],
+    ['tell', 'doneWork', 'stopAgent', 'restartAgent', 'resetIssue', 'cancel', 'open', 'tasks', 'runOnDeft'],
   ],
   [
     'in-review: review again, never resume or restart the author',
     baseState({ ...stoppedWork, derived: { issueId: 'PAN-1', state: 'in-review', pr: pr('review-requested', 'pending', true) } }),
-    ['restartReview', 'syncMain', 'resetIssue', 'cancel', 'open', 'viewPr', 'tasks'],
+    ['restartReview', 'syncMain', 'resetIssue', 'cancel', 'open', 'viewPr', 'tasks', 'runOnDeft'],
   ],
   [
     'changes-requested: the one state that offers Resume and Restart',
     baseState({ ...stoppedWork, derived: { issueId: 'PAN-1', state: 'changes-requested', pr: pr('changes-requested', 'pending', true) } }),
-    ['restartReview', 'resumeSession', 'restartAgent', 'syncMain', 'resetIssue', 'cancel', 'open', 'viewPr', 'tasks'],
+    ['restartReview', 'resumeSession', 'restartAgent', 'syncMain', 'resetIssue', 'cancel', 'open', 'viewPr', 'tasks', 'runOnDeft'],
   ],
   [
     'ready: merge is the next step',
     baseState({ ...stoppedWork, derived: { issueId: 'PAN-1', state: 'ready', pr: pr('approved', 'green', true) } }),
-    ['merge', 'syncMain', 'resetIssue', 'cancel', 'open', 'viewPr', 'tasks'],
+    ['merge', 'syncMain', 'resetIssue', 'cancel', 'open', 'viewPr', 'tasks', 'runOnDeft'],
   ],
   [
     'merged: close out, and nothing that would undo the merge',
@@ -142,6 +142,20 @@ const cases: ReadonlyArray<readonly [string, IssueActionState, readonly IssueAct
       issueCanonicalState: 'done',
     }),
     ['reopen', 'destroyWorkspace', 'open', 'viewPr', 'tasks'],
+  ],
+  [
+    'working on Deft: Back to Overdeck replaces Run on Deft (PAN-4849)',
+    baseState({
+      derived: { issueId: 'PAN-1', state: 'working' },
+      panes: WORK_PANE,
+      agent: { status: 'running', role: 'work' },
+      hasPlan: true,
+      hasTasks: true,
+      workspace,
+      issueCanonicalState: 'in_progress',
+      isDeftPipeline: true,
+    }),
+    ['tell', 'doneWork', 'stopAgent', 'restartAgent', 'resetIssue', 'cancel', 'open', 'tasks', 'backToOverdeck'],
   ],
 ];
 
