@@ -22,13 +22,14 @@ public class OverdeckMessagingService extends FirebaseMessagingService {
                 message.getData().get("s"),
                 message.getOriginalPriority() == RemoteMessage.PRIORITY_HIGH,
                 () -> {
-                    String pk = store.get(OverdeckKeysPlugin.PUSH_PUBLIC_KEY);
-                    String sk = store.get(OverdeckKeysPlugin.PUSH_SECRET_KEY);
-                    if (pk == null || sk == null) return null;
+                    // Corrupted storage (bad Base64 or hex) reads as unreadable keys: the placeholder posts.
                     try {
+                        String pk = store.get(OverdeckKeysPlugin.PUSH_PUBLIC_KEY);
+                        String sk = store.get(OverdeckKeysPlugin.PUSH_SECRET_KEY);
+                        if (pk == null || sk == null) return null;
                         return new PushHandler.PushKeys(Hex.decode(pk), Hex.decode(sk));
-                    } catch (IllegalArgumentException e) {
-                        throw new GeneralSecurityException("stored push key is not hex", e);
+                    } catch (RuntimeException e) {
+                        throw new GeneralSecurityException("stored push key is unreadable", e);
                     }
                 },
                 new LazySodiumAndroid(new SodiumAndroid()));

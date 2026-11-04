@@ -71,6 +71,13 @@ public class SealedBoxTest {
     }
 
     @Test
+    public void returnsNullForAKeyOfTheWrongLength() {
+        byte[] sealed = Base64.getDecoder().decode(field("sealedBase64"));
+        assertNull(SealedBox.open(SODIUM, sealed, new byte[31], hex(field("secretKeyHex"))));
+        assertNull(SealedBox.open(SODIUM, sealed, hex(field("publicKeyHex")), new byte[33]));
+    }
+
+    @Test
     public void returnsNullForAnInputShorterThanTheSealOverhead() {
         assertNull(SealedBox.open(SODIUM, new byte[10], hex(field("publicKeyHex")), hex(field("secretKeyHex"))));
     }
