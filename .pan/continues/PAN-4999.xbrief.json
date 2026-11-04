@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4999",
   "created": "2026-11-04T10:07:26.830Z",
-  "updated": "2026-11-04T10:24:05.440Z",
+  "updated": "2026-11-04T10:24:37.520Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -40,6 +40,10 @@
     "resolve-name-shaped.ac2": {
       "status": "completed",
       "doneAt": "2026-11-04T10:24:05.440Z"
+    },
+    "resolve-name-shaped.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:24:37.519Z"
     }
   }
 }
