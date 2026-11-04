@@ -1,12 +1,13 @@
 /**
  * PAN-4927 W-BOT1 (PAN-4951): client for the Bots panel and the "Connect a bot" dialog —
- * connectors, pairing, and the public MCP route (W-FUN1, not yet landed; a 404 reads as off).
+ * connectors and pairing. The public MCP route (W-FUN1, PAN-4947) has one client,
+ * `loadPublicMcp` + `ANYWHERE_PUBLIC_MCP_QUERY_KEY` in `anywhereApi.ts`, shared with the
+ * Public MCP panel: React Query keys data by query key, so one key must have one shape.
  */
 import { dashboardMutationJsonHeaders } from '../../../lib/wsTransport';
 import { apiError, type ApiResult, isOk } from './anywhereApi';
 
 export const BOTS_CONNECTORS_QUERY_KEY = ['anywhere-connectors'] as const;
-export const PUBLIC_MCP_QUERY_KEY = ['anywhere-public-mcp'] as const;
 
 /** Mirrors CONNECTOR_SCOPE_CHOICES and BOT_DEFAULT_SCOPES in src/lib/access-tokens.ts (PAN-4927 D-4). */
 export const BOT_SCOPE_CHOICES = ['read:state', 'read:conversations', 'tell', 'operate', 'approve'] as const;
@@ -60,19 +61,4 @@ export async function createConnectorPairing(
     headers: await dashboardMutationJsonHeaders(),
     body: JSON.stringify({ name, scopes }),
   }));
-}
-
-export interface PublicMcpState {
-  available: boolean;
-  enabled: boolean;
-  url: string | null;
-}
-
-/** D-6: a 404 (W-FUN1 not landed) reads the same as "off". */
-export async function loadPublicMcp(): Promise<PublicMcpState> {
-  const response = await fetch('/api/mcp/public');
-  if (response.status === 404) return { available: false, enabled: false, url: null };
-  const result = await readResult<{ enabled: boolean; baseUrl: string | null }>(response);
-  if (!isOk(result)) throw new Error(apiError(result));
-  return { available: true, enabled: result.body.enabled, url: result.body.baseUrl ?? null };
 }

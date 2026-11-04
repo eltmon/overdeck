@@ -9,11 +9,13 @@ import { X } from 'lucide-react';
 
 import {
   ANYWHERE_ACCESS_TOKENS_QUERY_KEY,
+  ANYWHERE_PUBLIC_MCP_QUERY_KEY,
   ANYWHERE_STATUS_QUERY_KEY,
   apiError,
   createAccessToken,
   isOk,
   loadAnywhereStatus,
+  loadPublicMcp,
 } from './anywhereApi';
 import {
   BOT_PLATFORMS,
@@ -28,11 +30,9 @@ import {
   BOTS_CONNECTORS_QUERY_KEY,
   BOT_DEFAULT_SCOPES,
   BOT_SCOPE_CHOICES,
-  PUBLIC_MCP_QUERY_KEY,
   type BotScope,
   botScopes,
   createConnectorPairing,
-  loadPublicMcp,
 } from './botsApi';
 import { ConnectBotOutput, type ConnectBotResult } from './ConnectBotOutput';
 import { requestSettingsSection } from '../../../lib/settingsSection';
@@ -74,7 +74,9 @@ function ConnectBotDialogBody({ onClose }: { onClose: () => void }) {
   const [forbidden, setForbidden] = useState(false);
   const [output, setOutput] = useState<ConnectBotResult | null>(null);
 
-  const { data: publicMcp } = useQuery({ queryKey: PUBLIC_MCP_QUERY_KEY, queryFn: loadPublicMcp, enabled: reach === 'public' });
+  // PAN-4947: the same key and loader as the Public MCP panel. A failed load (an older server
+  // answers 404) leaves `publicMcp` undefined, which reads as off (D-6).
+  const { data: publicMcp } = useQuery({ queryKey: ANYWHERE_PUBLIC_MCP_QUERY_KEY, queryFn: loadPublicMcp, enabled: reach === 'public' });
 
   const platformEntry = BOT_PLATFORMS.find((entry) => entry.id === platform) ?? BOT_PLATFORMS[0]!;
   // D-10: Tailscale Serve's URL, or the placeholder plus a "not set up" note.
@@ -142,7 +144,7 @@ function ConnectBotDialogBody({ onClose }: { onClose: () => void }) {
   const canSubmit = (reach === 'connector' || reach === 'tailscale' || reach === 'this-computer')
     && name.trim().length > 0 && !creating;
 
-  // D-7: hand off to the Public MCP panel; W-FUN1 must give it data-component="public-mcp-panel".
+  // D-7: hand off to the Public MCP panel (PublicMcpPanel, data-component="public-mcp-panel").
   const showPublicMcpSettings = () => {
     requestSettingsSection('anywhere');
     onClose();
@@ -153,8 +155,8 @@ function ConnectBotDialogBody({ onClose }: { onClose: () => void }) {
     if (!publicMcp) return;
     setOutput({
       kind: 'public',
-      url: publicMcp.url ?? PUBLIC_MCP_PLACEHOLDER_URL,
-      urlUnknown: publicMcp.enabled && publicMcp.url === null, // D-6
+      url: publicMcp.mcpUrl ?? PUBLIC_MCP_PLACEHOLDER_URL,
+      urlUnknown: publicMcp.enabled && publicMcp.mcpUrl === null, // D-6
       name: name.trim(),
       scopes: botScopes(ticked),
     });

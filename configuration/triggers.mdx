@@ -94,7 +94,9 @@ No route or command shows a signing secret after you set it. To change one, set 
 ## Publish with Tailscale Funnel
 
 Tailscale Funnel publishes one local address on the public internet through Tailscale's
-relays. Overdeck publishes only the `/hooks` path, on port 8443.
+relays. Overdeck publishes the `/hooks` path on port 8443. If you turn on Public MCP (see
+MCP server → Public MCP for hosted bots), it adds `/mcp`, `/.well-known` and `/oauth` on
+the same port.
 
 **Prerequisites:**
 

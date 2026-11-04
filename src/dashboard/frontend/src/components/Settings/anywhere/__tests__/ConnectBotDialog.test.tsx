@@ -4,8 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { buildConnectorPairLink, parseConnectorPairLink } from '@overdeck/contracts';
 
-import { ANYWHERE_STATUS_QUERY_KEY } from '../anywhereApi';
-import { PUBLIC_MCP_QUERY_KEY, type PublicMcpState } from '../botsApi';
+import { ANYWHERE_PUBLIC_MCP_QUERY_KEY, ANYWHERE_STATUS_QUERY_KEY, type PublicMcpStatus } from '../anywhereApi';
 import { ConnectBotDialog } from '../ConnectBotDialog';
 
 vi.mock('../../../../lib/wsTransport', () => ({
@@ -33,6 +32,11 @@ const PAIRING_STRING = buildConnectorPairLink({
 });
 
 const TOKEN = 'odk_0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcd';
+
+/** The `GET /api/mcp/public` body (PAN-4947). */
+function publicMcpBody(enabled: boolean, mcpUrl: string | null): PublicMcpStatus {
+  return { enabled, funnelCommands: [], funnelOffCommands: [], mcpUrl };
+}
 
 function statusBody(serveUrl: string | null) {
   return {
@@ -79,7 +83,7 @@ function postedTo(path: string): boolean {
   return fetchMock.mock.calls.some(([input, init]) => input.toString() === path && (init as RequestInit | undefined)?.method === 'POST');
 }
 
-async function renderDialog(opts: { serveUrl?: string | null; publicMcp?: PublicMcpState } = {}) {
+async function renderDialog(opts: { serveUrl?: string | null; publicMcp?: PublicMcpStatus } = {}) {
   const user = userEvent.setup();
   const writeText = vi.fn(async () => undefined);
   Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
@@ -90,8 +94,8 @@ async function renderDialog(opts: { serveUrl?: string | null; publicMcp?: Public
     queryClient.setQueryData(ANYWHERE_STATUS_QUERY_KEY, statusBody(opts.serveUrl ?? null));
   }
   if (opts.publicMcp) {
-    queryClient.setQueryDefaults(PUBLIC_MCP_QUERY_KEY, { staleTime: Infinity });
-    queryClient.setQueryData(PUBLIC_MCP_QUERY_KEY, opts.publicMcp);
+    queryClient.setQueryDefaults(ANYWHERE_PUBLIC_MCP_QUERY_KEY, { staleTime: Infinity });
+    queryClient.setQueryData(ANYWHERE_PUBLIC_MCP_QUERY_KEY, opts.publicMcp);
   }
   render(
     <QueryClientProvider client={queryClient}>
@@ -221,7 +225,7 @@ describe('ConnectBotDialog (PAN-4951 WI-3, WI-4)', () => {
 
   it('renders only the Public MCP reach for Grok Bot', async () => {
     mockServer();
-    const { user } = await renderDialog({ publicMcp: { available: false, enabled: false, url: null } });
+    const { user } = await renderDialog({ publicMcp: publicMcpBody(false, null) });
 
     await user.click(screen.getByLabelText('Grok Bot'));
 
@@ -229,9 +233,9 @@ describe('ConnectBotDialog (PAN-4951 WI-3, WI-4)', () => {
     expect(screen.queryByLabelText('Overdeck connector')).not.toBeInTheDocument();
   });
 
-  it('renders "Public MCP is off" and sends no POST when the route is off (404)', async () => {
+  it('renders "Public MCP is off" and sends no POST when the switch is off', async () => {
     mockServer();
-    const { user } = await renderDialog({ publicMcp: { available: false, enabled: false, url: null } });
+    const { user } = await renderDialog({ publicMcp: publicMcpBody(false, null) });
 
     await user.click(screen.getByLabelText('Grok Bot'));
 
@@ -241,10 +245,23 @@ describe('ConnectBotDialog (PAN-4951 WI-3, WI-4)', () => {
     expect(postedTo('/api/connectors/pairing')).toBe(false);
   });
 
+  it('reads a 404 from /api/mcp/public (an older server) as off (D-6)', async () => {
+    mockServer();
+    const { user } = await renderDialog();
+
+    await user.click(screen.getByLabelText('Grok Bot'));
+
+    expect(await screen.findByText(/Public MCP is off/)).toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([input]) => input.toString() === '/api/mcp/public')).toBe(true);
+    expect(screen.getByRole('button', { name: 'Show Public MCP settings' })).toBeInTheDocument();
+    expect(postedTo('/api/access-tokens')).toBe(false);
+    expect(postedTo('/api/connectors/pairing')).toBe(false);
+  });
+
   it("puts the public URL in Grok Bot's mcp.json", async () => {
     mockServer();
     const { user } = await renderDialog({
-      publicMcp: { available: true, enabled: true, url: 'https://box.tail1.ts.net:8443/mcp' },
+      publicMcp: publicMcpBody(true, 'https://box.tail1.ts.net:8443/mcp'),
     });
 
     await user.click(screen.getByLabelText('Grok Bot'));
@@ -259,7 +276,7 @@ describe('ConnectBotDialog (PAN-4951 WI-3, WI-4)', () => {
   it('renders --level operate for the xAI API when operate is ticked', async () => {
     mockServer();
     const { user } = await renderDialog({
-      publicMcp: { available: true, enabled: true, url: 'https://box.tail1.ts.net:8443/mcp' },
+      publicMcp: publicMcpBody(true, 'https://box.tail1.ts.net:8443/mcp'),
     });
 
     await user.click(screen.getByLabelText('xAI API'));

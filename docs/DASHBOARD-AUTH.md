@@ -175,8 +175,8 @@ S256, dynamic client registration, public clients only). User guide:
   `/.well-known/oauth-authorization-server` and `/oauth/mcp/*` (register,
   authorize, authorize/status, token, revoke) are outside the gate's `/api/`
   and `/events/` prefixes and check their own input
-  (`src/dashboard/server/routes/mcp-oauth.ts`). The gate's Funnel rule still
-  answers them 404. The authorize page escapes every value and sends a nonce
+  (`src/dashboard/server/routes/mcp-oauth.ts`). The gate's Funnel rule answers
+  them 404 unless Public MCP is on (see "Public MCP (PAN-4947)"). The authorize page escapes every value and sends a nonce
   CSP with `connect-src 'self'`, `frame-ancestors 'none'` and `form-action 'none'`.
 - **Operator routes.** `GET /api/mcp-oauth/approvals`,
   `POST /api/mcp-oauth/approvals/:id`, `GET /api/mcp-oauth/sign-ins`,
@@ -871,8 +871,10 @@ The server binds `0.0.0.0`, and many routes check only `Origin`.
 middleware, merged into `makeRoutesLayer`, that decides whether a request may
 reach any route at all:
 
-0. A Tailscale Funnel request may reach only `POST /hooks/*`; anything else is
-   **404** (see "Webhook triggers and Tailscale Funnel").
+0. A Tailscale Funnel request may reach only `POST /hooks/*` and, while
+   `mcp.public.enabled` is on, the nine public MCP surfaces in
+   `PUBLIC_MCP_SURFACES`; anything else is **404** (see "Webhook triggers and
+   Tailscale Funnel").
 1. The path is not under `/api/` or `/events/` (the static SPA): pass.
 2. `METHOD path` is on `REMOTE_GATE_ALLOWLIST`: pass. The list is
    `GET /api/health`, `GET /api/environment`, `OPTIONS` and
@@ -913,7 +915,9 @@ unknown id and a wrong secret get the same `404`. The management routes
 (`/api/triggers`, `routes/triggers.ts`) stay behind the gate at the default
 `admin` scope.
 
-**A Funnel request reaches only `POST /hooks/*`.** Tailscale Funnel proxies
+**A Funnel request reaches only `POST /hooks/*`** (plus the nine public MCP
+surfaces while `mcp.public.enabled` is on; see "Public MCP (PAN-4947)" below).
+Tailscale Funnel proxies
 public traffic to `127.0.0.1`, so with the default `require_token_mint: false` a
 funneled request would look like the local operator. Every funneled request
 carries `Tailscale-Funnel-Request: ?1`: tailscaled deletes any client-sent copy
@@ -922,7 +926,8 @@ header cannot be forged through Funnel. `isTailscaleFunnelRequest` in
 `routes/dashboard-auth.ts` detects it, and:
 
 - the remote request gate answers **404** `{ "error": "not found" }` to a Funnel
-  request for any method or (normalized) path other than `POST /hooks/*`, before
+  request for any method or (normalized) path other than `POST /hooks/*` and,
+  while Public MCP is on, the nine public MCP surfaces (exact raw path), before
   any credential check, and `isTrustedLocalRequest` is never true for one;
 - the session mint (`rejectUnauthorizedDashboardSessionMintRequest`) never
   treats a Funnel request as a trusted peer;
@@ -931,6 +936,31 @@ header cannot be forged through Funnel. `isTailscaleFunnelRequest` in
 
 The gate keys on the Funnel marker, never on `X-Forwarded-*`, because Traefik
 and Tailscale Serve add those for legitimate local and tailnet visitors too.
+
+**Public MCP (PAN-4947).** With `mcp.public.enabled` on, rule 0 also admits the
+nine `METHOD path` pairs in `PUBLIC_MCP_SURFACES` (`src/lib/mcp/public-mcp.ts`):
+`POST /mcp`, the three `/.well-known` OAuth documents and the five
+`/oauth/mcp/*` endpoints. The match is on the raw path before `?` or `#`, with
+no decoding or normalization, so `/mcp/`, `//mcp`, `/api/../mcp` and `/%6Dcp`
+stay 404. The switch is read from the operator's global `config.yaml` only
+(`isPublicMcpEnabled()`, cached, fails closed); `stripProjectSecurity` drops
+`mcp.public` from the project layer, and `savePublicMcpEnabled`
+(`public-mcp-write.ts`) writes the one node and clears the cache. Then:
+
+- `routes/mcp.ts` answers **403** `public MCP accepts only OAuth sign-ins` to a
+  Funnel `POST /mcp` whose token has no `oauthClientId`;
+- `public-mcp-funnel.ts`, a second global middleware, rate-limits each admitted
+  request (60 per minute per OAuth token on `/mcp`, 60 per minute per
+  `x-forwarded-for` address for the authorize status poll, 20 per minute per
+  address otherwise; **429** with `Retry-After`) and writes one best-effort
+  activity entry per request (`emitActivityEntry` drops a failed write) with the
+  OAuth client id and never a token; an authorize `client_id` that is not
+  `odc_` plus 32 hex characters is logged as null. It re-checks the
+  gate's admit condition itself, so the order of the two middlewares does not
+  matter;
+- `GET`/`PUT /api/mcp/public` (`routes/mcp-public.ts`, internal token or root
+  session only) report and set the switch, with the Funnel commands and the
+  public `/mcp` URL.
 
 ## Threat model
 

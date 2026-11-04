@@ -68,6 +68,8 @@ src/components/Settings/anywhere/__tests__/McpSignInsList.test.tsx
 src/components/Settings/anywhere/__tests__/McpUrlDialog.test.tsx
 src/components/Settings/anywhere/__tests__/PairDeviceDialog.test.tsx
 src/components/Settings/anywhere/__tests__/PairedPhonesList.test.tsx
+src/components/Settings/anywhere/__tests__/PublicMcpPanel.test.tsx
+src/components/Settings/anywhere/__tests__/PublicMcpSharedCache.test.tsx
 src/components/Settings/anywhere/__tests__/PushPanel.test.tsx
 src/components/Settings/anywhere/__tests__/SetUpPhoneAppPanel.test.tsx
 src/components/Settings/anywhere/__tests__/SetUpPhoneDialog.test.tsx

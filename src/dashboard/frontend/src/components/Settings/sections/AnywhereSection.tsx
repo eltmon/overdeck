@@ -15,6 +15,7 @@ import { McpUrlDialog } from '../anywhere/McpUrlDialog';
 import { PairDeviceDialog } from '../anywhere/PairDeviceDialog';
 import { TriggersPanel } from '../anywhere/TriggersPanel';
 import { SetUpPhoneDialog } from '../anywhere/SetUpPhoneDialog';
+import { PublicMcpPanel } from '../anywhere/PublicMcpPanel';
 import { PushPanel } from '../anywhere/PushPanel';
 import { TailscalePeersPanel } from '../anywhere/TailscalePeersPanel';
 import { TailscaleSetupDialog } from '../anywhere/TailscaleSetupDialog';
@@ -95,6 +96,7 @@ export function AnywhereSection({ pairDialogOpen, onPairDialogChange }: Anywhere
         <TriggersPanel />
         <AccessTokensPanel />
         <BotsPanel />
+        <PublicMcpPanel />
         <PushPanel />
       </div>
       <PairDeviceDialog open={open} onClose={() => setOpen(false)} />
