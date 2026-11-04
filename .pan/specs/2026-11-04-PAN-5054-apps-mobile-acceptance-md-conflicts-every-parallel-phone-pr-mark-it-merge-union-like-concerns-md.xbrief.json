@@ -1,0 +1,411 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-04T19:47:50Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5054: apps/mobile/ACCEPTANCE.md conflicts every parallel phone PR: mark it merge=union like concerns.md",
+    "updated": "2026-11-04T19:56:42.008Z"
+  },
+  "plan": {
+    "id": "pan-5054",
+    "title": "apps/mobile/ACCEPTANCE.md conflicts every parallel phone PR: mark it merge=union like concerns.md",
+    "status": "running",
+    "uid": "0329abff-b1e5-4d0c-9eef-4b5b8740b111",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-04T19:47:50Z",
+    "updated": "2026-11-04T19:56:42.008Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5054",
+        "label": "PAN-5054",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5054.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "mobile",
+      "git",
+      "merge",
+      "docs"
+    ],
+    "narratives": {
+      "Problem": "Every phone-app PR appends its acceptance evidence as a new section at the end of apps/mobile/ACCEPTANCE.md, so any two phone PRs in flight conflict at the end of the file and each pays a conflict-repair round, a re-verify and a re-review. The issue proposed merge=union, but a planning probe showed git's union merge silently interleaves two realistic evidence sections (shared blank lines, `| --- |` table rows and `**Result: PASS.**` lines are emitted once and the rest is split around them) with no conflict markers.",
+      "Proposal": "Do not mark ACCEPTANCE.md union. Each new phone issue writes its evidence in its own file, apps/mobile/acceptance/PAN-<n>.md, with screenshots beside it as pan-<n>-<step>.png; two PRs that add different files never conflict. ACCEPTANCE.md keeps its existing sections byte-identical and gets a note at the top pointing new evidence at the per-issue files. .gitattributes gets a comment explaining why the file is deliberately not union. A Vitest test guards that the evidence files carry no merge driver and shows two branches adding per-issue files merge cleanly. docs/MERGE-WORKFLOW.md, apps/mobile/README.md and the codebase-map conventions.md state the convention.",
+      "NonGoals": "- Marking apps/mobile/ACCEPTANCE.md or any markdown file merge=union\n- Adding any new merge= attribute line to .gitattributes\n- Moving, rewriting or reformatting the existing sections of apps/mobile/ACCEPTANCE.md (line 7 onward stays byte-identical)\n- An index file listing the per-issue evidence files\n- A lint or test that refuses new sections in apps/mobile/ACCEPTANCE.md\n- Changing the open PRs #5051 (PAN-4840) and #5049 (PAN-5046) or the PRDs/specs of other phone issues\n- A test that asserts git's union interleaving behavior\n- PAN-4616 (whether GitHub's mergeable honors merge=union)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Rejected the issue's proposed merge=union for apps/mobile/ACCEPTANCE.md; switched to one evidence file per issue (apps/mobile/acceptance/PAN-<n>.md).",
+        "rationale": "Probe in a temp repo seeded with the real file's last 20 lines: two branches each appended a realistic evidence section; with `A.md merge=union`, both `git merge-tree --write-tree` and `git merge` exited 0 but produced `## PAN-111 ...` directly followed by `## PAN-222 ...`, PAN-111 table rows running into PAN-222 bullets, and a final table mixing both issues' rows. Silent interleaving is worse than a visible conflict. Separate files remove the conflict entirely and avoid the PAN-4616 GitHub question. The issue body is a proposed fix, not a contradictory authoritative requirement, so this is a defensible default rather than a halt."
+      },
+      {
+        "summary": "Existing ACCEPTANCE.md sections stay in place; only a top note is added.",
+        "rationale": "Rewriting the file would conflict with the two open PRs (#5051, #5049) that append to it, and later PRDs cite its sections by heading."
+      },
+      {
+        "summary": "No shared index of per-issue evidence files and no enforcement lint.",
+        "rationale": "A shared index recreates the append hot spot; a lint would turn the two open PRs' CI red after this lands. The note plus docs steer new plans; a miss costs one conflict repair, as today."
+      },
+      {
+        "summary": "Per-issue file naming: apps/mobile/acceptance/PAN-<n>.md with screenshots pan-<n>-<step>.png in the same folder.",
+        "rationale": "Matches the .pan/drafts/PAN-<n>.md naming, keeps relative screenshot links short, and nothing in code or CI globs apps/mobile/acceptance/ (git grep found only a comment)."
+      },
+      {
+        "summary": "The test lives in a new tests/unit/mobile/acceptance-evidence-merge.test.ts instead of extending the PAN-4614 merge-door test.",
+        "rationale": "The PAN-4614 test exercises a union-marked file through the merge door; with no union attribute there is nothing for the door to resolve, so the check-attr + merge-tree pattern of tests/unit/scripts/frontend-test-subset-merge.test.ts is the right template."
+      }
+    ],
+    "metadata": {
+      "docsJustification": "Documentation items: acceptance-note (apps/mobile/ACCEPTANCE.md), merge-workflow-doc (docs/MERGE-WORKFLOW.md), mobile-readme-note (apps/mobile/README.md), conventions-map-note (.overdeck/context/codebase/conventions.md). No Mintlify page documents phone evidence or merge attributes.",
+      "canonicalFilename": "2026-11-04-PAN-5054-apps-mobile-acceptance-md-conflicts-every-parallel-phone-pr-mark-it-merge-union-like-concerns-md.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "acceptance-note",
+        "title": "Add the per-issue evidence note at the top of apps/mobile/ACCEPTANCE.md",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T19:47:50Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5054",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/ACCEPTANCE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'acceptance/PAN-<n>.md' apps/mobile/ACCEPTANCE.md",
+            "git diff origin/main -- apps/mobile/ACCEPTANCE.md | awk '/^--- / { next } /^-/ { removed++ } END { print removed+0; exit(removed>0) }'"
+          ],
+          "expected_outputs": [
+            "grep prints one line numbered below 15",
+            "the awk check prints 0 and exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In apps/mobile/ACCEPTANCE.md insert, between the intro paragraph that ends at line 5 with \"[`request-log.json`](request-log.json).\" and the heading `## AC-10 on the Android emulator` (line 7), the blockquote note given verbatim in PRD WI-1 (.pan/drafts/PAN-5054.md): new evidence goes in `acceptance/PAN-<n>.md` with screenshots `acceptance/pan-<n>-<step>.png`; do not append a section to this file; never edit another issue's section; merge=union is not a fix because it interleaves sections with no conflict markers. Keep one blank line before and after the blockquote. Change no other line of the file."
+        },
+        "items": [
+          {
+            "id": "acceptance-note.ac1",
+            "title": "Given the edited file, when grepping for `acceptance/PAN-<n>.md`, then it prints a match located before the `## AC-10 on the Android emulator` heading",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acceptance-note.ac2",
+            "title": "`git diff origin/main -- apps/mobile/ACCEPTANCE.md` contains only added lines and no removed lines, so every existing section is preserved byte-identical",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acceptance-note.ac3",
+            "title": "The note contains the sentence telling readers never to edit another issue's section and names merge=union as unsafe because it interleaves sections",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gitattributes-no-union-comment",
+        "title": "Add a .gitattributes comment saying ACCEPTANCE.md is deliberately not merge=union",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T19:47:50Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "infra",
+          "issueLabel": "pan-5054",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".gitattributes"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "git check-attr merge -- apps/mobile/ACCEPTANCE.md",
+            "grep -v '^#' .gitattributes | grep -c 'merge='"
+          ],
+          "expected_outputs": [
+            "prints `apps/mobile/ACCEPTANCE.md: merge: unspecified`",
+            "prints 3 (no new attribute line)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In .gitattributes insert the five-line comment block given verbatim in PRD WI-2 (starting `# apps/mobile/ACCEPTANCE.md is deliberately NOT merge=union (PAN-5054).`) plus one blank line, between the `scripts/frontend-test-subset.txt merge=union` line and the `# WARNING: The single-JSON state files` block. Every inserted line starts with `#`; add no attribute line."
+        },
+        "items": [
+          {
+            "id": "gitattributes-no-union-comment.ac1",
+            "title": "`git check-attr merge -- apps/mobile/ACCEPTANCE.md` prints `merge: unspecified` after the change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gitattributes-no-union-comment.ac2",
+            "title": "`.gitattributes` contains the PAN-5054 comment block located after the frontend-test-subset rule and before the `# WARNING` block",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gitattributes-no-union-comment.ac3",
+            "title": "`grep -v '^#' .gitattributes | grep -c 'merge='` prints 3, so no new merge attribute line exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "evidence-merge-test",
+        "title": "Test that phone evidence files carry no merge driver and per-issue files merge cleanly",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T19:47:50Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-5054",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/mobile/acceptance-evidence-merge.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/mobile/acceptance-evidence-merge.test.ts",
+            "bash scripts/lint-source-introspection.sh"
+          ],
+          "expected_outputs": [
+            "vitest reports 1 file and 2 tests passed",
+            "lint-source-introspection exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create tests/unit/mobile/acceptance-evidence-merge.test.ts modeled on tests/unit/scripts/frontend-test-subset-merge.test.ts (execFileSync git, mkdtempSync temp repos, git merge-tree --write-tree, git cat-file -p <tree>:<path>; rmSync temp dirs in afterEach). Test 1 runs `git check-attr merge -- apps/mobile/ACCEPTANCE.md apps/mobile/acceptance/PAN-1.md` at the repo root and expects both lines to end in `merge: unspecified`. Test 2 builds a temp repo whose base commit has the real repo's .gitattributes (readFileSync) and a small apps/mobile/ACCEPTANCE.md; branch x adds apps/mobile/acceptance/PAN-111.md and branch y adds apps/mobile/acceptance/PAN-222.md, each body containing a `| --- | --- | --- | --- |` row and `**Result: PASS.**`; it expects merge-tree to exit 0 and each file at the merged tree to equal what its branch wrote. No skipIf, no .only, no reading of .ts source text, no timers."
+        },
+        "items": [
+          {
+            "id": "evidence-merge-test.ac1",
+            "title": "Given this repo, when the test runs `git check-attr merge` on ACCEPTANCE.md and acceptance/PAN-1.md, then it asserts both report `merge: unspecified` and passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "evidence-merge-test.ac2",
+            "title": "Given two branches that each add a different apps/mobile/acceptance/PAN-<n>.md, when merged with `git merge-tree --write-tree`, then the test asserts exit 0 and that the merged tree contains both files byte-identical",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "evidence-merge-test.ac3",
+            "title": "`npx vitest run tests/unit/mobile/acceptance-evidence-merge.test.ts` passes 2 tests and `bash scripts/lint-source-introspection.sh` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "merge-workflow-doc",
+        "title": "Document union's limit and the per-issue phone evidence files in docs/MERGE-WORKFLOW.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T19:47:50Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5054",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/MERGE-WORKFLOW.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'apps/mobile/acceptance/PAN-<n>.md' docs/MERGE-WORKFLOW.md",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "grep prints one line just after the union paragraph",
+            "lint-docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In docs/MERGE-WORKFLOW.md add the paragraph given verbatim in PRD WI-4 directly after the existing paragraph that starts \"Three files are union-merged in `.gitattributes`:\" and ends \"JSON state files under `.pan/` never get union.\" It says union is safe only for one-entry-per-line files, that sectioned markdown interleaves silently (PAN-5054), that apps/mobile/ACCEPTANCE.md is therefore not union, and that each phone issue writes evidence in its own apps/mobile/acceptance/PAN-<n>.md. Leave the existing paragraph unchanged."
+        },
+        "items": [
+          {
+            "id": "merge-workflow-doc.ac1",
+            "title": "docs/MERGE-WORKFLOW.md contains a paragraph after the union paragraph that names `apps/mobile/acceptance/PAN-<n>.md`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-workflow-doc.ac2",
+            "title": "The new paragraph contains the statement that union interleaves sectioned markdown with no conflict markers and that ACCEPTANCE.md is therefore not union",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-workflow-doc.ac3",
+            "title": "`npm run lint:docs` exits 0 and the existing \"Three files are union-merged\" paragraph is preserved unchanged in the diff",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mobile-readme-note",
+        "title": "Tell apps/mobile/README.md readers where acceptance evidence goes",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-11-04T19:47:50Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5054",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/README.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'acceptance/PAN-<n>.md' apps/mobile/README.md"
+          ],
+          "expected_outputs": [
+            "grep prints one line between the `## Tests` and `## Release` headings"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "In apps/mobile/README.md, inside `## Tests`, after the paragraph ending \"The `test` check requires it.\", add the three-line paragraph given verbatim in PRD WI-5: evidence goes in one file per issue, acceptance/PAN-<n>.md, with screenshots acceptance/pan-<n>-<step>.png; ACCEPTANCE.md holds evidence written before PAN-5054; do not add sections to it."
+        },
+        "items": [
+          {
+            "id": "mobile-readme-note.ac1",
+            "title": "apps/mobile/README.md contains `acceptance/PAN-<n>.md` between the `## Tests` and `## Release` headings",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mobile-readme-note.ac2",
+            "title": "The added paragraph contains the instruction not to add sections to ACCEPTANCE.md and names the `pan-<n>-<step>.png` screenshot pattern",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conventions-map-note",
+        "title": "State the per-issue phone evidence convention in the codebase-map conventions.md",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-11-04T19:47:50Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5054",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".overdeck/context/codebase/conventions.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'apps/mobile/acceptance/PAN-<n>.md' .overdeck/context/codebase/conventions.md",
+            "npm run lint:last-verified"
+          ],
+          "expected_outputs": [
+            "grep prints one line inside the `## Testing` section",
+            "lint:last-verified exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "In .overdeck/context/codebase/conventions.md add the bullet given verbatim in PRD WI-6 as the last bullet of the `## Testing` section: phone-app acceptance evidence goes in apps/mobile/acceptance/PAN-<n>.md, never a new section in apps/mobile/ACCEPTANCE.md, because union cannot merge sectioned markdown safely (PAN-5054). Do not change the `<!-- last-verified: ... -->` footer line."
+        },
+        "items": [
+          {
+            "id": "conventions-map-note.ac1",
+            "title": "conventions.md contains a `## Testing` bullet naming `apps/mobile/acceptance/PAN-<n>.md`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conventions-map-note.ac2",
+            "title": "The `<!-- last-verified: ... -->` footer line is preserved identical to origin/main and `npm run lint:last-verified` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": []
+  },
+  "status": "active"
+}

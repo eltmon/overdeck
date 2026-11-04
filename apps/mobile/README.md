@@ -111,7 +111,11 @@ address comes from DHCP). The rig needs no bun or Node.
    --stdout=$HOME/app-stdout.log $U ai.overdeck.app`, then `grep '\[overdeck\]' ~/app-stdout.log`.
    Capacitor prints the WebView's `console` lines (`⚡️  [warn] - [overdeck] link …`) to stdout, not to
    the unified log, so `log show` does not have them. Without `NSUnbufferedIO` the file stays empty
-   until the buffer fills. Each launch truncates the file.
+   until the buffer fills. Each launch truncates the file. The dialer's own lines (PAN-5046) carry
+   the machine id and session cut to 8 characters: `rtc <id> disconnected; ice restart in 2000 ms`,
+   `rtc <id> ice restart sent`, `rtc <id> ice restart recovered`,
+   `rtc <id> ice restart timed out; closing`, and `rtc <id> closing session <session>: <reason>` for
+   every peer connection it closes.
 7. When you are done, run `xcrun simctl delete $U`.
 
 `ios/scripts/add-widgets-target.rb` needs the `xcodeproj` gem 1.28 or later
@@ -237,6 +241,10 @@ cd apps/mobile/android && ./gradlew testDebugUnitTest assembleDebug
 The root `npm test` does not run these tests. The CI job `mobile-android` runs the app tests, the
 web build, the Capacitor sync, `testDebugUnitTest` and `assembleDebug`, and uploads the `app-debug` APK. The `test`
 check requires it.
+
+Device and emulator acceptance evidence goes in one file per issue, `acceptance/PAN-<n>.md`, with
+its screenshots beside it as `acceptance/pan-<n>-<step>.png`. `ACCEPTANCE.md` holds the evidence
+written before PAN-5054; do not add sections to it.
 
 ## Release
 

@@ -6,6 +6,7 @@ import { randomBytes } from 'node:crypto';
 import type { Duplex } from 'node:stream';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { SignalData } from '@overdeck/contracts';
+import { RTCPeerConnection } from 'werift';
 
 import { RtcDialAbortedError, type RtcPurpose, type RtcSignalingPort, RtcTransport } from '../rtc-transport.js';
 
@@ -247,4 +248,105 @@ describe('RtcTransport diagnostics (PAN-5018 FR-6)', () => {
       expect(line).not.toContain('candidate:');
     }
   }, 20_000);
+});
+
+describe('RtcTransport ICE restart (PAN-5046 FR-6)', () => {
+  /**
+   * A werift peer connection that plays the phone dialer through the hub: one session, candidates held
+   * until the offer is out and until the answer is applied, and `restart()` for a same-session ICE restart.
+   */
+  function phone(h: ReturnType<typeof hub>) {
+    const port = h.port(A);
+    const session = randomBytes(16).toString('hex');
+    const pc = new RTCPeerConnection({ iceServers: [] });
+    const channel = pc.createDataChannel('ovdl', { ordered: true });
+    let localSent = false;
+    let remoteSet = false;
+    const pendingLocal: NonNullable<SignalData['candidate']>[] = [];
+    const pendingRemote: NonNullable<SignalData['candidate']>[] = [];
+    const send = (data: SignalData) => port.send(B, session, 'link', false, data);
+    const addRemote = async (candidate: NonNullable<SignalData['candidate']>) => {
+      if (!remoteSet) pendingRemote.push(candidate);
+      else await pc.addIceCandidate({ candidate: candidate.candidate, sdpMid: candidate.sdpMid ?? undefined, sdpMLineIndex: candidate.sdpMLineIndex ?? undefined }).catch(() => {});
+    };
+    let answers = 0;
+    port.onSignal((_from, s, _purpose, _relay, data) => {
+      if (s !== session) return;
+      void (async () => {
+        if (data.sdp?.type === 'answer' && pc.signalingState === 'have-local-offer') {
+          await pc.setRemoteDescription({ type: 'answer', sdp: data.sdp.sdp });
+          remoteSet = true;
+          answers += 1;
+          // werift as the offerer resets its ICE agent on an ICE restart but skips the new checks while DTLS is
+          // still connected; a browser does not. Start them here so this werift stand-in behaves like the phone.
+          if (answers > 1) for (const transport of pc.iceTransports) void transport.start().catch(() => {});
+          for (const candidate of pendingRemote.splice(0)) await addRemote(candidate);
+        }
+        if (data.candidate) await addRemote(data.candidate);
+      })();
+    });
+    pc.onIceCandidate.subscribe((candidate) => {
+      if (!candidate) return;
+      const json = candidate.toJSON();
+      const out = { candidate: json.candidate, sdpMid: json.sdpMid ?? null, sdpMLineIndex: json.sdpMLineIndex ?? null };
+      if (localSent) send({ candidate: out });
+      else pendingLocal.push(out);
+    });
+    const offer = async (iceRestart: boolean) => {
+      localSent = false;
+      remoteSet = false;
+      const description = await pc.createOffer({ iceRestart });
+      await pc.setLocalDescription(description);
+      send({ sdp: { type: 'offer', sdp: pc.localDescription!.sdp } });
+      localSent = true;
+      for (const candidate of pendingLocal.splice(0)) send({ candidate });
+    };
+    return { pc, channel, session, offer, answers: () => answers };
+  }
+
+  it('answers an ice-restart offer on the same session and keeps the data channel open', async () => {
+    const h = hub();
+    const bLogs = { log: vi.fn(), debug: vi.fn() };
+    const incoming: Duplex[] = [];
+    const b = new RtcTransport(h.port(B), (raw) => incoming.push(raw), bLogs);
+    transports.push(b);
+    const p = phone(h);
+    const opened = new Promise<void>((resolve) => p.channel.stateChanged.subscribe((state) => state === 'open' && resolve()));
+    await p.offer(false);
+    await opened;
+    await vi.waitFor(() => expect(incoming).toHaveLength(1));
+    const accepted = incoming[0]!;
+    const toPhone = (bytes: Buffer) =>
+      new Promise<Buffer>((resolve) => {
+        const { unSubscribe } = p.channel.onMessage.subscribe((data) => {
+          unSubscribe();
+          resolve(Buffer.from(data as Buffer));
+        });
+        accepted.write(bytes);
+      });
+    expect((await toPhone(Buffer.from('0123456789'))).toString()).toBe('0123456789');
+
+    const before = h.sent.length;
+    await p.offer(true);
+    await vi.waitFor(() => expect(p.answers()).toBe(2), { timeout: 10_000 });
+    await vi.waitFor(() => expect(p.pc.connectionState).toBe('connected'), { timeout: 10_000 });
+
+    const lines = bLogs.log.mock.calls.map(([line]) => line as string);
+    const s8 = p.session.slice(0, 8);
+    expect(lines).toContain(`rtc session ${s8} ice restart from 00000000`);
+    expect(lines.filter((line) => line === `rtc session ${s8} answered`)).toHaveLength(2);
+    expect(lines.some((line) => line.includes('a new offer replaced it'))).toBe(false);
+    expect([...lines, ...bLogs.debug.mock.calls.map(([line]) => line as string)].some((line) => line.includes('v=0'))).toBe(false);
+    expect(b.peerConnectionCount()).toBe(1);
+    // The machine sends no candidate of the new generation before its answer.
+    const fromMachine = h.sent.slice(before).filter((frame) => frame.from === B && frame.session === p.session);
+    expect(fromMachine[0]?.data.sdp?.type).toBe('answer');
+    expect(fromMachine.filter((frame) => frame.data.sdp?.type === 'answer')).toHaveLength(1);
+
+    expect((await toPhone(Buffer.from('9876543210'))).toString()).toBe('9876543210');
+    const back = readBytes(accepted, 10);
+    p.channel.send(Buffer.from('abcdefghij'));
+    expect((await back).toString()).toBe('abcdefghij');
+    await p.pc.close();
+  }, 15_000);
 });

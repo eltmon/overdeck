@@ -3,9 +3,10 @@
  *
  * On every dashboard: make sure the machine key exists and keep the link-store
  * snapshot fresh (a peer dashboard sharing this home then computes the same
- * `require_token_mint` as the primary). On the primary only: start the link
- * supervisor and wire it into the routes (status, reconnect, unlink
- * notification) and into the link client, then the SSH forward supervisor
+ * `require_token_mint` as the primary). On the primary only: wire the link
+ * supervisor into the routes (status, presence) and into the link client before
+ * it starts, so a link that comes online during boot finds them (PAN-5046
+ * FR-9), then the unlink notification, then the SSH forward supervisor
  * (PAN-4404), which keeps one port forward per SSH machine. `main.ts` calls
  * `startAnywhere` once after the dashboard listens; `stopAnywhere` closes every
  * channel and forward.
@@ -34,6 +35,7 @@ import { RelayClient, setRelayClient } from './relay-client.js';
 import { setHeartbeatConversationsHashSource, setHeartbeatEndpointsHashSource, setHeartbeatMachineFactsSource } from './link-heartbeat.js';
 import { startTransferSweep } from './conversation-release-service.js';
 import { defaultLinkSupervisorDeps, LinkSupervisor } from './link-supervisor.js';
+import { startLinkSupervisorWired } from './link-supervisor-wiring.js';
 import { setLinkPresenceSource } from './conversation-list-merged.js';
 import { createLinkedConversationsSync, setLinkedConversationsSync } from './linked-conversations-sync.js';
 import { createLinkedProjectsSync, setLinkedProjectsSync } from './linked-projects-sync.js';
@@ -164,7 +166,7 @@ export async function startAnywhere(options: { primary: boolean }): Promise<void
     onDescriptor: (link) => Promise.all([linkedConversations, linkedProjects, linkedNeedsYou].map((sync) => sync.onConnect(link))).then(() => undefined),
     onHeartbeat: (link, payload) => Promise.all([linkedConversations, linkedProjects, linkedNeedsYou].map((sync) => sync.onHeartbeat(link, payload))).then(() => undefined),
   });
-  supervisor.start();
+  startLinkSupervisorWired(supervisor, [setLinkStatusSource, setLinkPresenceSource, setLinkRouteSource]);
   // PAN-4651 WI-12: follow workers delegated to linked machines; resumes running stand-ins from disk.
   const linkSupervisor = supervisor;
   const linkOnline = (environmentId: string): boolean => linkSupervisor.routeFor(environmentId)?.state === 'online';
@@ -175,9 +177,6 @@ export async function startAnywhere(options: { primary: boolean }): Promise<void
   laneFollower = new RemoteLaneFollower(defaultRemoteLaneFollowerDeps(linkOnline));
   setRemoteLaneFollower(laneFollower);
   await laneFollower.start().catch((error: Error) => console.warn(`[anywhere] could not resume remote lanes: ${error.message}`));
-  setLinkStatusSource(supervisor);
-  setLinkPresenceSource(supervisor);
-  setLinkRouteSource(supervisor);
   setPeerUnlinkNotifier(async (link) => {
     try {
       const response = await linkFetch(link.environmentId, '/api/machines/self', { method: 'DELETE', actor: 'operator' });

@@ -21,7 +21,7 @@ vi.mock('../../native/keys', async () => {
 vi.mock('../directory', () => ({
   createDirectory: () => ({
     client: { state: 'online', machines: [], refusal: null, onStateChange: () => () => undefined, start: vi.fn(async () => undefined), stop: vi.fn(), send: vi.fn(() => true) },
-    dialer: { close: vi.fn() },
+    dialer: { close: vi.fn(), onRecovered: () => () => {} },
     relayStopped: () => false,
   }),
   useDirectoryState: (client: { state: string }) => client.state,

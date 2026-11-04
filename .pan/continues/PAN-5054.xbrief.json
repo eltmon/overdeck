@@ -1,0 +1,113 @@
+{
+  "version": "1",
+  "issueId": "PAN-5054",
+  "created": "2026-11-04T19:57:03.624Z",
+  "updated": "2026-11-04T20:19:38.199Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "acceptance-note": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5054",
+      "claimedAt": "2026-11-04T19:57:03.624Z",
+      "doneAt": "2026-11-04T19:57:44.476Z"
+    },
+    "gitattributes-no-union-comment": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5054",
+      "claimedAt": "2026-11-04T19:57:58.068Z",
+      "doneAt": "2026-11-04T19:58:27.824Z"
+    },
+    "evidence-merge-test": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5054",
+      "claimedAt": "2026-11-04T19:58:32.115Z",
+      "doneAt": "2026-11-04T19:59:40.155Z"
+    },
+    "merge-workflow-doc": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5054",
+      "claimedAt": "2026-11-04T19:59:43.840Z",
+      "doneAt": "2026-11-04T20:00:15.052Z"
+    },
+    "mobile-readme-note": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5054",
+      "claimedAt": "2026-11-04T20:00:18.932Z",
+      "doneAt": "2026-11-04T20:00:50.075Z"
+    },
+    "conventions-map-note": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5054",
+      "claimedAt": "2026-11-04T20:00:53.717Z",
+      "doneAt": "2026-11-04T20:01:32.457Z"
+    },
+    "acceptance-note.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T20:16:28.790Z"
+    },
+    "acceptance-note.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T20:16:41.462Z"
+    },
+    "acceptance-note.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T20:16:53.947Z"
+    },
+    "gitattributes-no-union-comment.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T20:17:06.221Z"
+    },
+    "gitattributes-no-union-comment.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T20:17:18.305Z"
+    },
+    "gitattributes-no-union-comment.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T20:17:31.011Z"
+    },
+    "evidence-merge-test.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T20:17:44.270Z"
+    },
+    "evidence-merge-test.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T20:17:56.811Z"
+    },
+    "evidence-merge-test.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T20:18:09.154Z"
+    },
+    "merge-workflow-doc.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T20:18:21.843Z"
+    },
+    "merge-workflow-doc.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T20:18:34.246Z"
+    },
+    "merge-workflow-doc.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T20:18:47.577Z"
+    },
+    "mobile-readme-note.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T20:19:00.322Z"
+    },
+    "mobile-readme-note.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T20:19:13.209Z"
+    },
+    "conventions-map-note.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T20:19:25.744Z"
+    },
+    "conventions-map-note.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T20:19:38.198Z"
+    }
+  }
+}

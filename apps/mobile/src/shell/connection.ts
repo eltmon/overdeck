@@ -11,7 +11,9 @@
  * Failures become a {@link ConnectionError} whose message is the exact text the shell shows. Each
  * failed dial and secure open is also logged with its code and route (PAN-5018 FR-1). A handshake
  * that times out or breaks protocol on an open raw channel means the peer connection under it is
- * suspect, so the phone closes its connections to that machine and forgets the route (FR-3, D-5).
+ * suspect, so the phone closes that one peer connection, if it is still the current one for the
+ * machine, and forgets the route (PAN-5018 FR-3, D-5; PAN-5046 FR-3). Other connections to the
+ * machine stay open.
  */
 import { ChannelOpenError, type MachineDialer, openSecureChannel, type RtcDuplexWeb, type SecureChannel, type StaticKeyPair } from '@overdeck/anywhere-channel/web';
 import type { DirectoryWebClient } from '@overdeck/anywhere-channel/web';
@@ -212,7 +214,7 @@ export function createConnection({
       log(`link ${label}: secure open failed over ${route} (${errorCode(error)}): ${errorMessage(error)}`);
       if (suspectsPeerConnection(error)) {
         routes.delete(environmentId);
-        directory.dialer.close(environmentId);
+        directory.dialer.evict(raw, `secure open ${errorCode(error)}`);
       }
       throw channelError(error, label, showErrorCodes);
     }

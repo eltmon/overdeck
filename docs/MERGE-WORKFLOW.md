@@ -344,6 +344,13 @@ PAN-4616. For the frontend test list this residual case needs two PRs that
 add tests sorting into the same gap; inserts into different gaps merge
 cleanly even without union. JSON state files under `.pan/` never get union.
 
+Union is safe only for files with one independent entry per line. It is not safe for markdown
+with sections: git emits lines that both sides added (blank lines, `| --- |` table rows, repeated
+boilerplate) once and splits the rest around them, so two appended sections come out interleaved,
+with no conflict markers (PAN-5054). That is why `apps/mobile/ACCEPTANCE.md` is not union. Each
+phone-app issue writes its acceptance evidence in its own `apps/mobile/acceptance/PAN-<n>.md`, so
+parallel phone PRs add different files and do not conflict.
+
 Each codebase-map file ends with one `<!-- last-verified: YYYY-MM-DD -->`
 footer that holds only the date (PAN-5020). Agents correct statements
 without touching it; only a full `/pan-map` refresh changes the date, so
