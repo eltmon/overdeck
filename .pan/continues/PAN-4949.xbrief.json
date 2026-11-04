@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4949",
   "created": "2026-11-04T01:31:58.132Z",
-  "updated": "2026-11-04T03:08:03.840Z",
+  "updated": "2026-11-04T03:08:22.399Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -77,6 +77,10 @@
     "connector-record.ac4": {
       "status": "completed",
       "doneAt": "2026-11-04T03:08:03.840Z"
+    },
+    "connector-credential.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:08:22.399Z"
     }
   }
 }
