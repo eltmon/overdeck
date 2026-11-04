@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5020",
   "created": "2026-11-04T12:51:44.824Z",
-  "updated": "2026-11-04T13:11:35.513Z",
+  "updated": "2026-11-04T13:12:09.393Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -104,6 +104,10 @@
     "w5-lint.ac4": {
       "status": "completed",
       "doneAt": "2026-11-04T13:11:35.513Z"
+    },
+    "w6-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:12:09.393Z"
     }
   }
 }
