@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4953",
+  "created": "2026-11-04T13:46:40.439Z",
+  "updated": "2026-11-04T13:46:40.440Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "hermes-skeleton": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4953",
+      "claimedAt": "2026-11-04T13:46:40.439Z"
+    }
+  }
+}
