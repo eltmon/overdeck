@@ -1,0 +1,247 @@
+---
+title: pan mcp
+description: Serve Overdeck's MCP tools over stdio, manage OAuth sign-ins, and run the Overdeck connector for a bot
+---
+
+# `pan mcp`
+
+Serve Overdeck's MCP tools to a client over stdio, manage the OAuth sign-ins that reach
+`/mcp`, and run the Overdeck connector next to a self-hosted bot. This page lists the
+commands; [MCP server](/configuration/mcp) explains the tools and scopes, and
+[Connect a bot](/configuration/bots) walks through setting up a bot.
+
+## serve
+
+```bash
+pan mcp serve
+```
+
+Serves Overdeck as an MCP server over stdio. It takes no flags. The token comes from the
+environment:
+
+| Variable | Effect |
+| --- | --- |
+| `OVERDECK_MCP_TOKEN` | The access token. When it is set, it wins. |
+| `OVERDECK_MCP_TOKEN_FILE` | Used only when `OVERDECK_MCP_TOKEN` is unset: the path of a file that holds the token. The file must be mode 0600. |
+
+Before it serves, the command checks the token against this machine's token registry. Each
+tool then calls the dashboard with that token, so the token's scopes decide what every call
+may do. stdout carries JSON-RPC only; every diagnostic goes to stderr. The command exits 0
+when stdin closes.
+
+It exits 1 and prints one of these lines when it refuses to start:
+
+| Cause | Message |
+| --- | --- |
+| Neither variable is set | `OVERDECK_MCP_TOKEN or OVERDECK_MCP_TOKEN_FILE is not set. Create a token with: pan token create mcp --scopes read:state,read:conversations,operate` |
+| The file is readable by group or other users | `OVERDECK_MCP_TOKEN_FILE must be mode 0600 (it is 0644). Fix it with: chmod 600 <path>` |
+| The file is empty | `OVERDECK_MCP_TOKEN_FILE is empty: <path>` |
+| The file cannot be opened | `OVERDECK_MCP_TOKEN_FILE could not be read: <error>` |
+| The token is unknown or revoked | `OVERDECK_MCP_TOKEN is refused: the token is unknown or revoked. Create a token with: pan token create mcp --scopes read:state,read:conversations,operate` |
+| The token is a paired device credential | `OVERDECK_MCP_TOKEN is refused: a paired device credential cannot drive MCP.` |
+| The token carries `admin` | `OVERDECK_MCP_TOKEN is refused: MCP tokens cannot carry admin. Create a token with: pan token create mcp --scopes read:state,read:conversations,operate` |
+
+Create the token with [`pan token create`](/cli/token#create). A client configured in the
+Claude Desktop style points at a token file, so the token never appears in the config:
+
+```json
+{
+  "mcpServers": {
+    "overdeck": {
+      "command": "pan",
+      "args": ["mcp", "serve"],
+      "env": { "OVERDECK_MCP_TOKEN_FILE": "/home/you/.overdeck/mcp-token" }
+    }
+  }
+}
+```
+
+## oauth
+
+Manage OAuth sign-ins to `/mcp`. Every subcommand calls the dashboard on this machine, so the
+dashboard must be running. When it is not, the command prints
+`The dashboard is not running. Start it with pan up.` and exits 1. See
+[Sign in with OAuth](/configuration/mcp#sign-in-with-oauth) for the browser flow.
+
+A sign-in has one of four access levels:
+
+| Level | Label | Scopes |
+| --- | --- | --- |
+| `read` | Read only | `read:state`, `read:conversations` |
+| `message` | Can message | `read:state`, `read:conversations`, `tell` |
+| `operate` | Can operate | `read:state`, `read:conversations`, `tell`, `operate` |
+| `approve` | Can approve | `read:state`, `read:conversations`, `tell`, `operate`, `approve` |
+
+Any other `--level` value prints `The level must be one of read, message, operate, approve.`
+and exits 1.
+
+### issue
+
+```bash
+pan mcp oauth issue --name <name> --level <level>
+```
+
+Create a sign-in for a client that cannot open a browser; prints its tokens once.
+
+| Flag | Effect |
+| --- | --- |
+| `--name <name>` | Required. Name shown in the sign-in list. |
+| `--level <level>` | Required. Access level: read, message, operate or approve. |
+
+It prints the client id, the sign-in id, the level, the access token and the refresh token
+(`odr_…`), followed by:
+
+```
+These tokens are shown once. Store them in your client now.
+```
+
+### list
+
+```bash
+pan mcp oauth list
+```
+
+List active OAuth sign-ins. Each line shows the sign-in id, the level, the client name, when
+it was last used (or `never`) and the date its refresh token expires:
+
+```
+<sign-in id>  <level>  <client name>  last used <time>  refresh expires <date>
+```
+
+With no sign-ins it prints `No MCP sign-ins.`
+
+### revoke
+
+```bash
+pan mcp oauth revoke <familyId>
+```
+
+End one OAuth sign-in. `<familyId>` is the sign-in id from `list`. It prints
+`Revoked sign-in <familyId>.`; an unknown id prints `No active sign-in <familyId>.` and exits 1.
+
+### pending
+
+```bash
+pan mcp oauth pending
+```
+
+List sign-ins waiting for your approval. Each line shows the approval code, the client name,
+the host it redirects to, the level it asked for and when the request expires:
+
+```
+<approval code>  <client name>  → <redirect host>  wants <level>  expires <time>
+```
+
+With nothing waiting it prints `No sign-ins are waiting.`
+
+### approve
+
+```bash
+pan mcp oauth approve <code> --level <level>
+```
+
+Approve the waiting sign-in that shows this approval code.
+
+| Flag | Effect |
+| --- | --- |
+| `--level <level>` | Required. Access level: read, message, operate or approve. |
+
+The code ignores case and the dash: `KQZT-MWRB`, `kqztmwrb` and `kqzt-mwrb` name the same
+approval. It prints `Approved sign-in <code> for <client name> at level <level>.` A code that
+matches no waiting sign-in prints `No waiting sign-in has code <CODE>.` and exits 1.
+
+### deny
+
+```bash
+pan mcp oauth deny <code>
+```
+
+Deny the waiting sign-in that shows this approval code. It matches the code the same way as
+`approve` and prints `Denied sign-in <code> for <client name>.`
+
+## connector
+
+Run an Overdeck connector for a self-hosted bot. The connector runs on the computer where the
+bot runs, pairs with one Overdeck machine, and serves that machine's MCP tools on
+`http://127.0.0.1:7466/mcp` (or stdio). See
+[Run the Overdeck connector](/configuration/bots#run-the-overdeck-connector) for the whole
+setup.
+
+It needs Node 22.16 or later. On a computer without Overdeck, run each command as
+`npx -y @overdeck/core@<version> mcp connector <command>`; the Connect a bot dialog shows the
+exact version.
+
+| Variable | Effect |
+| --- | --- |
+| `OVERDECK_CONNECTOR_HOME` | The connector home. Default `~/.overdeck-connector`. |
+| `OVERDECK_CONNECTOR_DIRECTORY_URL` | The overdeck.ai directory URL when `login` has no `--directory-url`. Default `https://connect.overdeck.ai`. |
+| `OVERDECK_ACCOUNT_URL` | The overdeck.ai account service URL when `login` has no `--account-url`. Default `https://account.overdeck.ai`. |
+
+The connector home is mode 0700 and holds four files, each mode 0600: `account.json`,
+`identity.json`, `pairing.json` and `local-token`. The connector never reads or writes
+`~/.overdeck`.
+
+### login
+
+```bash
+pan mcp connector login [--account-url <url>] [--directory-url <url>]
+```
+
+Sign this connector in to overdeck.ai with the device flow: open the URL it prints and enter
+the code.
+
+| Flag | Effect |
+| --- | --- |
+| `--account-url <url>` | overdeck.ai account service URL. |
+| `--directory-url <url>` | overdeck.ai directory URL. |
+
+### pair
+
+```bash
+pan mcp connector pair <pairingString> [--label <name>]
+```
+
+Pair with one Overdeck machine using the string from Connect a bot.
+
+| Flag | Effect |
+| --- | --- |
+| `--label <name>` | Name this connector shows on the machine. Default: the host name. |
+
+### serve
+
+```bash
+pan mcp connector serve [--port <port>] [--stdio] [--label <name>]
+```
+
+Serve the Overdeck MCP tools on 127.0.0.1 (or stdio) for the paired machine. It runs until
+stopped.
+
+| Flag | Effect |
+| --- | --- |
+| `--port <port>` | Loopback port for `http://127.0.0.1:<port>/mcp`. Default `7466`. |
+| `--stdio` | Serve one MCP session on stdin and stdout instead. All diagnostics then go to stderr. |
+| `--label <name>` | Name this connector shows in the overdeck.ai directory. Default: the host name. |
+
+A `--port` that is not an integer from 1 to 65535 prints
+`--port must be an integer from 1 to 65535` and exits 1.
+
+### status
+
+```bash
+pan mcp connector status [--port <port>]
+```
+
+Show the signed-in account, the paired machine, its scopes and the live route. It never
+prints a token.
+
+| Flag | Effect |
+| --- | --- |
+| `--port <port>` | Port of the running `serve`. Default `7466`. |
+
+### logout
+
+```bash
+pan mcp connector logout
+```
+
+Remove this connector from its machine and overdeck.ai, then delete its files.

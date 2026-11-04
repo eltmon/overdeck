@@ -64,6 +64,7 @@
               "configuration/triggers",
               "configuration/tailscale",
               "configuration/mcp",
+              "configuration/bots",
               "configuration/phone",
               "configuration/push-notifications",
               "cli/vault",
@@ -74,6 +75,7 @@
               "cli/devices",
               "cli/machines",
               "cli/token",
+              "cli/mcp",
               "cli/triggers"
             ]
           }
