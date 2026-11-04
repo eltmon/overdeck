@@ -8,7 +8,7 @@ description: Drive this machine's Overdeck from another tool over the Model Cont
 Overdeck serves a Model Context Protocol (MCP) server, so another tool (Claude
 Desktop, another agent harness, a chat bot) can list conversations, read one,
 send a message, start a conversation or a worker, and answer prompts that wait
-on you. It reaches this machine's Overdeck only.
+on you. It reaches this machine and the machines it is linked to (see Fleet reach).
 
 This is separate from the Channels bridge (`overdeck-bridge`), which delivers
 messages into one running agent. The MCP server is a control surface for
@@ -34,9 +34,15 @@ There is no second path to any operation.
 | `list_scheduled` | Lists a conversation's pending one-shot messages (`once`) and its schedules (`recurring`). | `read:conversations` |
 | `update_scheduled` | `kind: once` replaces a pending message's text; `kind: recurring` changes `prompt`, `cron`, `timeZone` or `enabled` (pause or resume). | `tell` |
 | `delete_scheduled` | `kind: once` cancels an unsent message; `kind: recurring` deletes a schedule. | `tell` |
-| `list_pending_input` | Lists conversations waiting on input: questions, permission prompts, plan approvals and menus. | `read:conversations` |
-| `answer_question` | Answers a Claude Code conversation's pending question. | `tell` and `approve` |
+| `list_pending_input` | Lists what waits on input on this machine and every online linked machine, conversations and agents, grouped by machine. | `read:conversations` |
+| `answer_question` | Answers a pending question of a Claude Code conversation (`conversation`) or of an agent on this machine (`agentId`, optional `toolUseId`). | `tell` and `approve` |
 | `answer_permission` | Answers a Claude Code permission prompt with `allow-once`, `allow-always` or `deny`. | `approve` |
+| `answer_pane_choice` | Chooses an option (`selectedIndex` 0-8) in a numbered menu shown in a Claude Code conversation, with its `signature`. | `approve` |
+| `answer_codex_approval` | Answers a Codex conversation's approval prompt with the 1-based `optionNumber`, and `toolUseId` when the app-server transport needs it. | `approve` |
+| `answer_pi_ask` | Answers a Pi conversation's ask prompt: `toolUseId` and exactly one `answers` entry. | `approve` |
+| `answer_plan` | Approves or rejects a conversation's proposed plan: `action` (`approve-auto`, `approve-manual`, `reject-ultraplan`, `reject-feedback`) and optional `feedback`. | `approve` |
+| `answer_agent_plan` | Approves or rejects a plan an agent on this machine is waiting on: `agentId`, `action`, optional `feedback`. | `approve` |
+| `answer_agent_permission` | Allows or denies a tool-permission request from an agent on this machine: `agentId`, `requestId`, `behavior` (`allow`/`deny`). | `approve` |
 
 No tool pairs devices, creates or revokes tokens, reads or writes settings, or
 touches the session vault.
@@ -258,9 +264,10 @@ two start tools.
 
 The box **Allow answering questions and approving permissions** adds
 `approve`. It is off by default, and only `approve` or `admin` satisfies it.
-`approve` lets the token answer blocking prompts: the `answer_question` and
-`answer_permission` tools, and the dashboard routes for pane-choice menus, pi
-asks, Codex approvals and plan approvals. See [Remote access](/configuration/remote-access)
+`approve` lets the token answer blocking prompts with any of the eight answer
+tools: `answer_question`, `answer_permission`, `answer_pane_choice`,
+`answer_codex_approval`, `answer_pi_ask`, `answer_plan`, `answer_agent_plan`
+and `answer_agent_permission`. See [Remote access](/configuration/remote-access)
 for the full scope table.
 
 <Warning>
@@ -307,5 +314,10 @@ conversation's permission prompt, and one without `tell` cannot message it. Sett
 never reachable: `PUT /api/settings` answers 403 because an MCP token never carries `admin`,
 and linked machines never forward it. A linked machine cannot use this one to reach a third
 machine (no chained hops), so the URL reaches only the machines linked to this dashboard.
+
+Agent answers (`answer_agent_plan`, `answer_agent_permission`, `answer_question` with
+`agentId`) reach agents on this machine only; `list_pending_input` marks a linked machine's
+agents `remote: true`.
+
 The linked machine must run a version with the schedule scopes (PAN-4939); an older one
 answers `403 insufficient_scope` for recurring schedules.

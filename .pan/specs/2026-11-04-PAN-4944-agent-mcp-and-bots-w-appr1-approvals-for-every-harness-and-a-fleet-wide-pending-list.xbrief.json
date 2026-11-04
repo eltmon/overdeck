@@ -1,0 +1,582 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-04T00:20:04Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4944: Agent MCP and bots (W-APPR1): Approvals for every harness and a fleet-wide pending list",
+    "updated": "2026-11-04T00:24:41.120Z"
+  },
+  "plan": {
+    "id": "pan-4944",
+    "title": "Agent MCP and bots (W-APPR1): Approvals for every harness and a fleet-wide pending list",
+    "status": "running",
+    "uid": "925714d8-c75e-4529-a0e6-6391545bf62e",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-04T00:20:04Z",
+    "updated": "2026-11-04T00:24:41.120Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4944",
+        "label": "PAN-4944",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4927",
+        "label": "PAN-4927 (epic)",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4944.md",
+        "label": "PRD",
+        "type": "prd"
+      },
+      {
+        "uri": ".pan/drafts/pan-4927.md",
+        "label": "Epic PRD (W-APPR1)",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "mcp",
+      "approvals",
+      "needs-you",
+      "fleet",
+      "pan-4927"
+    ],
+    "metadata": {
+      "sizeJustification": "One subsystem (src/lib/mcp approval tools) plus one read route; 11 files total.",
+      "canonicalFilename": "2026-11-04-PAN-4944-agent-mcp-and-bots-w-appr1-approvals-for-every-harness-and-a-fleet-wide-pending-list.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "The dashboard has eight approval routes with approve rows, but the MCP server exposes only answer_question (Claude Code conversations) and answer_permission. MCP clients cannot answer pane menus, Pi asks, Codex approvals, plan approvals or any work agent's prompt, and list_pending_input shows only this machine's conversations: no agents, no linked machines, and no agent permission request ids.",
+      "Proposal": "Add GET /api/needs-you (read:conversations): this machine's Needs-You feed with agent rows enriched from the read model (pendingAskUserQuestion, redacted channel permissionRequests), without touching buildNeedsYou(). Rewrite list_pending_input to merge it with GET /api/fleet/needs-you into { machines: [...] } with linked rows renamed @<env>/<name> and linked agents marked remote: true. Add six thin approve-scoped proxy tools in src/lib/mcp/tools-approve.ts (answer_pane_choice, answer_codex_approval, answer_pi_ask, answer_plan, answer_agent_plan, answer_agent_permission) and give answer_question an agentId branch plus Pi/Codex redirect errors. Prove AC-15 with the real-gate mcp-acceptance test and document the tools in configuration/mcp.mdx.",
+      "NonGoals": "- Changing buildNeedsYou(), services/needs-you-feed.ts, the link heartbeat hash, or GET /api/machines/needs-you.\n- An MCP tool for agent pane menus; POST /api/agents/:id/pane-choice keeps no route-scope row (admin only).\n- Answering agents on linked machines; tools taking agentId refuse ids starting with @.\n- Any route-scope row other than GET /api/needs-you, and any change to an approval route handler.\n- The epic W-DOC revision note in .pan/drafts/pan-4649.md.\n- Frontend changes.\n- A separate tools-approve-agent.ts module."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Enrich agent rows in the new GET /api/needs-you route, not in buildNeedsYou().",
+        "rationale": "buildNeedsYou's hash rides in the link heartbeat and every peer caches its shape; changing it would churn every linked machine's cache for no benefit."
+      },
+      {
+        "summary": "Agent rows gain pendingAskUserQuestion and permissionRequests (beyond the epic PRD's step 1).",
+        "rationale": "Without a requestId, answer_agent_permission is unusable from MCP, and answer_question(agentId) has no question text; the read model already holds both."
+      },
+      {
+        "summary": "Agents that have a channel permission request but empty pendingInputKinds are added to the feed with permissionRequest.",
+        "rationale": "The read model keeps channel requests apart from agent kinds (the frontend checks both), so the feed would otherwise hide answerable prompts."
+      },
+      {
+        "summary": "Redact inputPreview with redactPermissionInputPreview in the route.",
+        "rationale": "Stored previews are raw and MCP output lands in bot and agent transcripts."
+      },
+      {
+        "summary": "Agent-targeted tools reach this machine only and refuse @-prefixed agent ids; linked agents are listed with remote: true.",
+        "rationale": "The linked proxy forwards /api/conversations/@... only; there is no /api/agents/@... path."
+      },
+      {
+        "summary": "Agent pane menus (sessionResume, rateLimit on work agents) stay out of scope.",
+        "rationale": "Their route has no route-scope row and needs admin; widening approve is a separate decision the epic PRD did not make."
+      },
+      {
+        "summary": "Keep every approval tool in src/lib/mcp/tools-approve.ts (about 380 lines).",
+        "rationale": "The epic PRD splits only if needed; the file stays well under the 600-line module rule."
+      },
+      {
+        "summary": "AC-15 is proven by mcp-acceptance.test.ts through the real gate and route-scope table with stub answer routes; live prompt resolution is the test role's UAT.",
+        "rationale": "The route handlers are unchanged and already used by the dashboard; the new code is only the proxy and scope wiring, which the acceptance test exercises end to end."
+      },
+      {
+        "summary": "list_pending_input changes shape from an array to { machines, fleetError? }.",
+        "rationale": "The epic PRD specifies this shape; MCP tools are pre-1.0."
+      },
+      {
+        "summary": "Group the six thin proxy tools into two xBRIEF items (conversation tools, agent tools) instead of one item per tool.",
+        "rationale": "They are mechanically identical edits to one file and its exact-list test, so per-tool items would serialize anyway and only add merge churn; each grouped item keeps five checkable ACs."
+      }
+    ],
+    "items": [
+      {
+        "id": "needs-you-route",
+        "title": "Add GET /api/needs-you with agent question and permission-request ids",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T00:20:04Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4944",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "list-pending-fleet",
+            "agent-answer-tools",
+            "acceptance-ac15"
+          ],
+          "files_scope": [
+            "src/dashboard/server/routes/needs-you.ts",
+            "src/dashboard/server/server.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/__tests__/needs-you-route.test.ts",
+            "docs/DASHBOARD-AUTH.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run src/dashboard/server/__tests__/needs-you-route.test.ts src/dashboard/server/__tests__/route-scopes.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors (including lint:circular and lint:file-size)",
+            "needs-you-route.test.ts, route-scopes.test.ts and no-loss-matrix.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1",
+            "NFR-4",
+            "NFR-5",
+            "NFR-6",
+            "NFR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-4944.md work item W1 exactly. Create src/dashboard/server/routes/needs-you.ts exporting localNeedsYou(deps), handleLocalNeedsYou(deps) and needsYouRouteLayer (GET /api/needs-you). localNeedsYou awaits deps.build() (buildNeedsYou) and deps.snapshot() (ReadModelService.getSnapshot) in parallel, returns { conversations, agents } without hash; each agent row gains pendingAskUserQuestion from the snapshot agent and permissionRequests [{ requestId, toolName, description, inputPreview: redactPermissionInputPreview(...), createdAt }] from snapshot.channelPermissionRequests grouped by agentId; append 'permissionRequest' to pendingInputKinds when absent; add agents that appear only in channel requests; sort by id. On throw: console.error and 500 { error: 'the Needs-You feed could not be built' }. Register the layer in server.ts next to fleetAwarenessRouteLayer; add the route-scope row (read:conversations) and the no-loss-matrix row from the PRD; append GET /api/needs-you to the read:conversations row in docs/DASHBOARD-AUTH.md line 103. Do not edit services/needs-you-feed.ts."
+        },
+        "items": [
+          {
+            "id": "needs-you-route.ac1",
+            "title": "Given a feed with one conversation and one agent, when localNeedsYou runs, then it returns { conversations, agents } and the result has no hash key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "needs-you-route.ac2",
+            "title": "Given a channel permission request for agent-pan-1 whose inputPreview contains ghp_abc123, when localNeedsYou runs, then agent-pan-1's row returns permissionRequests with requestId and an inputPreview containing [REDACTED], and pendingInputKinds contains 'permissionRequest' exactly once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "needs-you-route.ac3",
+            "title": "Given an agent present only in channelPermissionRequests, when localNeedsYou runs, then the agents list includes it with pendingInputKinds ['permissionRequest']; and a snapshot agent's pendingAskUserQuestion is copied onto its row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "needs-you-route.ac4",
+            "title": "requiredScopeFor('GET', '/api/needs-you') returns 'read:conversations', the no-loss-matrix and route-scopes tests pass, and a throwing build makes handleLocalNeedsYou answer status 500 with error 'the Needs-You feed could not be built'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "needs-you-route.ac5",
+            "title": "git diff shows no change to src/dashboard/server/services/needs-you-feed.ts, and docs/DASHBOARD-AUTH.md's read:conversations row names GET /api/needs-you",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conv-answer-tools",
+        "title": "Add the four conversation answer tools (pane choice, Codex approval, Pi ask, plan)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T00:20:04Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4944",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/mcp/tools-approve.ts",
+            "tests/unit/lib/mcp/tools-approve.test.ts",
+            "tests/unit/lib/mcp/tool-annotations.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/mcp/tools-approve.test.ts tests/unit/lib/mcp/tool-annotations.test.ts tests/unit/lib/mcp/visibility.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the three MCP test files pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-10",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4944.md work items W3, W4, W5 and W6 (four mechanically identical thin proxies in one file). In src/lib/mcp/tools-approve.ts add the helpers requiredInteger, conversationPath and CONVERSATION_PROPERTY exactly as in the PRD's 'Shared helpers' block, export PLAN_ACTIONS (copied four values, comment naming conversation-delivery.ts:58-62 and 87; no server import), then add answerPaneChoice (conversation, selectedIndex 0-8, signature -> POST .../pane-choice { selectedIndex, signature }), answerCodexApproval (conversation, optionNumber 1-9, optional toolUseId -> POST .../codex-approval { optionNumber, toolUseId? }), answerPiAsk (conversation, toolUseId, answers of exactly one non-empty string -> POST .../pi-ask-answer { toolUseId, answers }) and answerPlan (conversation, action in PLAN_ACTIONS, optional feedback -> POST .../plan-action { action, feedback? }). All scope approve, audience any, with the PRD's descriptions and error texts. Append them to APPROVE_TOOLS after answerPermission in that order. Update the exact-list test in tools-approve.test.ts and add one SINGLE_ROUTE_PATHS row per tool in tool-annotations.test.ts."
+        },
+        "items": [
+          {
+            "id": "conv-answer-tools.ac1",
+            "title": "Given an approve token, each of the four tools sends exactly one POST to /api/conversations/conv-a/<pane-choice|codex-approval|pi-ask-answer|plan-action> with exactly the PRD body, and answer_codex_approval called without toolUseId sends { optionNumber } with no toolUseId key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conv-answer-tools.ac2",
+            "title": "When conversation is @desk/conv-a, each tool sends its POST to /api/conversations/%40desk%2Fconv-a/<suffix>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conv-answer-tools.ac3",
+            "title": "When arguments are invalid (selectedIndex 9, missing signature, optionNumber 0, answers ['a','b'] or ['  '], action 'approve'), the tool returns isError true and the fake API records zero calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conv-answer-tools.ac4",
+            "title": "tools-approve.test.ts passes with APPROVE_TOOLS names list_pending_input, answer_question, answer_permission, answer_pane_choice, answer_codex_approval, answer_pi_ask, answer_plan, and each new SINGLE_ROUTE_PATHS row passes the scope-equals-route-row check (approve)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conv-answer-tools.ac5",
+            "title": "PLAN_ACTIONS returns exactly approve-auto, approve-manual, reject-ultraplan, reject-feedback, and grep of src/lib/mcp/tools-approve.ts shows no import from src/dashboard or src/lib/overdeck",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "agent-answer-tools",
+        "title": "Add agent answer tools and the answer_question agentId branch",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T00:20:04Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4944",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/mcp/tools-approve.ts",
+            "tests/unit/lib/mcp/tools-approve.test.ts",
+            "tests/unit/lib/mcp/tool-annotations.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/mcp/tools-approve.test.ts tests/unit/lib/mcp/tool-annotations.test.ts tests/unit/lib/mcp/visibility.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the three MCP test files pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-8",
+            "FR-9",
+            "FR-10",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work items W7, W8 and W9. Export AGENT_ON_LINKED_MACHINE_TEXT and add the agentIdArg helper exactly as in the PRD (refuses agentId starting with @ before any request). Add answerAgentPlan (agentId, action in PLAN_ACTIONS, optional feedback -> POST /api/agents/<id>/plan-action) and answerAgentPermission (agentId, requestId, behavior allow|deny -> POST /api/agents/<id>/permissions/<encoded requestId>/respond { behavior }), appended after answerPlan. In answerQuestion: add agentId and toolUseId properties, required ['answers'], keep the MISSING_APPROVE_TEXT check first, require exactly one of conversation/agentId ('pass exactly one of conversation or agentId'); the agent branch sends { answers, toolUseId? } to POST /api/agents/<id>/answer-question; the conversation branch refuses Pi harnesses (capabilities.askAnswerDelivery === 'pi-ask-modal') with NOT_CLAUDE_CODE_PI_TEXT, Codex (transcriptKind === 'codex-rollout-jsonl') with NOT_CLAUDE_CODE_CODEX_TEXT, else NOT_CLAUDE_CODE_TEXT; export both new constants with the PRD texts. Update the codex test at tools-approve.test.ts lines 63-70, the exact-list test, and add SINGLE_ROUTE_PATHS rows for the two agent tools."
+        },
+        "items": [
+          {
+            "id": "agent-answer-tools.ac1",
+            "title": "answer_agent_plan sends { action: 'approve-manual' } to /api/agents/agent-pan-1/plan-action, and answer_agent_permission sends { behavior: 'deny' } to /api/agents/agent-pan-1/permissions/req-1/respond",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-answer-tools.ac2",
+            "title": "When agentId is '@desk/agent-pan-1' for any of the three agent-capable tools, the tool returns AGENT_ON_LINKED_MACHINE_TEXT and the fake API records zero calls; behavior 'maybe' also records zero calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-answer-tools.ac3",
+            "title": "answer_question with agentId agent-pan-1, answers ['Yes'] and toolUseId t1 sends { answers: ['Yes'], toolUseId: 't1' } to /api/agents/agent-pan-1/answer-question; passing both or neither of conversation and agentId returns 'pass exactly one of conversation or agentId' with zero calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-answer-tools.ac4",
+            "title": "A codex conversation returns NOT_CLAUDE_CODE_CODEX_TEXT, an ohmypi conversation returns NOT_CLAUDE_CODE_PI_TEXT, a 'mystery' harness still returns NOT_CLAUDE_CODE_TEXT, and a Claude Code conversation still receives the composed message (existing test passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-answer-tools.ac5",
+            "title": "tools-approve.test.ts passes with the full D-6 order ending answer_agent_plan, answer_agent_permission, and both agent SINGLE_ROUTE_PATHS rows pass the scope check (approve)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "list-pending-fleet",
+        "title": "Make list_pending_input merge this machine with every linked machine",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T00:20:04Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4944",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/mcp/tools-approve.ts",
+            "tests/unit/lib/mcp/tools-approve.test.ts",
+            "tests/unit/lib/mcp/tool-annotations.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/mcp/ tests/unit/cli/mcp.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "every test under tests/unit/lib/mcp/ and tests/unit/cli/mcp.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W2 (runs after agent-answer-tools because both edit tools-approve.ts and its exact-list test). Rewrite listPendingInput (tools-approve.ts line 44): new description from the PRD; run GET /api/needs-you and GET /api/fleet/needs-you in parallel (catch the fleet request's throw into an Error). Local non-2xx returns routeErrorResult. Answer jsonResult({ machines: [{ environmentId: null, label: 'this machine', conversations, agents }, ...linked], fleetError? }) where linked conversations get name '@<environmentId>/<name>' and linked agents get id '@<environmentId>/<id>' and remote: true; non-array fields become []. A fleet Error sets fleetError to its message; a fleet non-2xx sets fleetError to 'HTTP <status>: <error>'. Replace the pass-through test at tools-approve.test.ts lines 23-27. In tool-annotations.test.ts remove list_pending_input from SINGLE_ROUTE_PATHS and add a test that its scope equals requiredScopeFor for both GET /api/needs-you and GET /api/fleet/needs-you."
+        },
+        "items": [
+          {
+            "id": "list-pending-fleet.ac1",
+            "title": "Given /api/needs-you with conv-a and /api/fleet/needs-you with machine env-lap-2 holding conv-z and agent agent-9, list_pending_input returns machines[0] { environmentId: null, label: 'this machine' } and machines[1] with conversation name '@env-lap-2/conv-z' and agent id '@env-lap-2/agent-9' with remote: true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "list-pending-fleet.ac2",
+            "title": "When /api/fleet/needs-you answers 503 { error: 'down' }, the tool returns the local machine entry and fleetError 'HTTP 503: down' with isError not set",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "list-pending-fleet.ac3",
+            "title": "When the fleet request throws, fleetError holds the thrown message; when /api/needs-you answers 500, the tool returns isError true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "list-pending-fleet.ac4",
+            "title": "tool-annotations.test.ts passes with a test asserting list_pending_input's scope equals requiredScopeFor('GET', '/api/needs-you') and requiredScopeFor('GET', '/api/fleet/needs-you'), both read:conversations",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "acceptance-ac15",
+        "title": "Prove every answer tool and the fleet pending list through the real gate (AC-15)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T00:20:04Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4944",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/server/__tests__/mcp-acceptance.test.ts",
+            "tests/unit/lib/mcp/visibility.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/mcp-acceptance.test.ts tests/unit/lib/mcp/",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "mcp-acceptance.test.ts and every tests/unit/lib/mcp test pass",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "FR-9",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W10. In mcp-acceptance.test.ts add the stub routes listed in the PRD (GET /api/needs-you, GET /api/fleet/needs-you with one linked machine env-lap-2 holding conv-z, and the seven answer routes answering { ok: true }). Add one table-driven test over answer_pane_choice, answer_codex_approval, answer_pi_ask, answer_plan, answer_agent_plan, answer_agent_permission and answer_question with agentId: a token minted with [...MCP_DEFAULT_SCOPES] gets 'Unknown tool <name>' and stubCalls stays []; a token with [...MCP_DEFAULT_SCOPES, 'approve'] succeeds and stubCalls equals exactly one entry for the documented route pattern and body. Add a test that list_pending_input with MCP_DEFAULT_SCOPES returns two machines and the conversation '@env-lap-2/conv-z'. In visibility.test.ts retitle 'two approve tools' to 'the approve tools' and 'all ten tools' to 'every tool' (assertions unchanged)."
+        },
+        "items": [
+          {
+            "id": "acceptance-ac15.ac1",
+            "title": "Given a token without approve, each of the seven answer calls returns 'Unknown tool <name>' and the stub routes record zero calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acceptance-ac15.ac2",
+            "title": "Given a token with approve, each of the seven answer calls passes the real remote request gate and the stub records exactly one call to its documented route with its documented body",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acceptance-ac15.ac3",
+            "title": "Given MCP_DEFAULT_SCOPES, list_pending_input returns two machines through the real gate and includes the linked conversation '@env-lap-2/conv-z'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-mcp",
+        "title": "Document the approval tools and GET /api/needs-you",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T00:20:04Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4944",
+          "requiresInspection": false,
+          "files_scope": [
+            "configuration/mcp.mdx",
+            "docs/ANYWHERE-ARCHITECTURE.md",
+            ".overdeck/context/codebase/architecture.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint",
+            "grep -c 'answer_agent_permission' configuration/mcp.mdx",
+            "grep -c '/api/needs-you' docs/ANYWHERE-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "lint (including lint:docs) completes without errors",
+            "the mcp.mdx count is 2 or more",
+            "the ANYWHERE-ARCHITECTURE.md count is 1 or more"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W11, exact text there. configuration/mcp.mdx: fix line 11 ('It reaches this machine and the machines it is linked to (see Fleet reach).'), rewrite the list_pending_input and answer_question rows, add six tool rows after answer_permission with their arguments and scope approve, name all eight answer tools in the approve section, and add the agent-answers-reach-this-machine-only sentence to Fleet reach. docs/ANYWHERE-ARCHITECTURE.md (section near line 1100): add the sentence distinguishing GET /api/needs-you from GET /api/machines/needs-you. .overdeck/context/codebase/architecture.md line 330: add routes/needs-you.ts and change tools-{read,write} to tools-{read,write,approve}."
+        },
+        "items": [
+          {
+            "id": "docs-mcp.ac1",
+            "title": "configuration/mcp.mdx's Tools table renders sixteen tool rows, the six new answer tools each show scope approve, and line 11 no longer says 'this machine's Overdeck only'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-mcp.ac2",
+            "title": "configuration/mcp.mdx's Fleet reach section contains the statement that answer_agent_plan, answer_agent_permission and answer_question with agentId reach agents on this machine only and that linked agents carry remote: true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-mcp.ac3",
+            "title": "docs/ANYWHERE-ARCHITECTURE.md states that GET /api/needs-you serves this machine's feed to any read:conversations token while GET /api/machines/needs-you stays machine-credential only, and npm run lint passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "conv-answer-tools",
+        "to": "agent-answer-tools",
+        "type": "blocks"
+      },
+      {
+        "from": "agent-answer-tools",
+        "to": "list-pending-fleet",
+        "type": "blocks"
+      },
+      {
+        "from": "conv-answer-tools",
+        "to": "list-pending-fleet",
+        "type": "blocks"
+      },
+      {
+        "from": "needs-you-route",
+        "to": "list-pending-fleet",
+        "type": "blocks"
+      },
+      {
+        "from": "list-pending-fleet",
+        "to": "acceptance-ac15",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

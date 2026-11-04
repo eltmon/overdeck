@@ -18,8 +18,13 @@ const SINGLE_ROUTE_PATHS: Record<string, { method: string; path: string }> = {
   start_worker: { method: 'POST', path: '/api/fleet/workers' },
   schedule_message: { method: 'POST', path: '/api/conversations/conv-a/scheduled-messages' },
   schedule_recurring: { method: 'POST', path: '/api/conversations/conv-a/schedules' },
-  list_pending_input: { method: 'GET', path: '/api/conversations/pending-input' },
   answer_permission: { method: 'POST', path: '/api/conversations/conv-a/permission' },
+  answer_pane_choice: { method: 'POST', path: '/api/conversations/conv-a/pane-choice' },
+  answer_codex_approval: { method: 'POST', path: '/api/conversations/conv-a/codex-approval' },
+  answer_pi_ask: { method: 'POST', path: '/api/conversations/conv-a/pi-ask-answer' },
+  answer_plan: { method: 'POST', path: '/api/conversations/conv-a/plan-action' },
+  answer_agent_plan: { method: 'POST', path: '/api/agents/agent-pan-1/plan-action' },
+  answer_agent_permission: { method: 'POST', path: '/api/agents/agent-pan-1/permissions/req-1/respond' },
   wait_job: { method: 'GET', path: '/api/self/jobs/abc/wait' },
 };
 
@@ -57,6 +62,14 @@ describe('MCP tool annotations (PAN-4927 W-MCP1)', () => {
     const deleteScheduled = ALL_TOOLS.find((t) => t.name === 'delete_scheduled');
     expect(deleteScheduled!.scope).toBe(requiredScopeFor('DELETE', '/api/conversations/conv-a/scheduled-messages/1'));
     expect(deleteScheduled!.scope).toBe(requiredScopeFor('DELETE', '/api/conversations/conv-a/schedules/1'));
+  });
+
+  it('list_pending_input needs read:conversations, matching both GET /api/needs-you and GET /api/fleet/needs-you', () => {
+    const tool = ALL_TOOLS.find((t) => t.name === 'list_pending_input');
+    expect(tool).toBeDefined();
+    expect(tool!.scope).toBe('read:conversations');
+    expect(requiredScopeFor('GET', '/api/needs-you')).toBe(tool!.scope);
+    expect(requiredScopeFor('GET', '/api/fleet/needs-you')).toBe(tool!.scope);
   });
 
   it('hasAgentId is true only for a non-empty string agentId', () => {

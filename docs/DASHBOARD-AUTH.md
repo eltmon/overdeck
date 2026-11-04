@@ -206,7 +206,7 @@ does not list needs `admin` (D-6):
 | --- | --- |
 | `read:events` | `GET /events/stream`, `GET /events/version`, RPC `pan.replayEvents` (PAN-4835) |
 | `read:state` | `GET /api/issues`, `GET /api/agents`, `GET /api/agent-directory`, `GET /api/flywheel/status`, `GET /api/pipeline/membership`, `GET /api/versions/self`, `GET /api/activity` (PAN-4835), RPC `pan.getSnapshot` (PAN-4835) |
-| `read:conversations` | `GET /api/conversations`, `GET /api/conversations/:id`, `GET /api/conversations/:name/messages`, `GET /api/conversations/:name/about`, `GET /api/palette/search`, `GET /api/conversations/pending-input` (explicit row, PAN-4835) |
+| `read:conversations` | `GET /api/conversations`, `GET /api/conversations/:id`, `GET /api/conversations/:name/messages`, `GET /api/conversations/:name/about`, `GET /api/palette/search`, `GET /api/conversations/pending-input` (explicit row, PAN-4835), `GET /api/needs-you` (PAN-4944) |
 | `tell` | `POST /api/agents/:id/message`, `POST /api/agents/:id/tell`, `POST /api/conversations/:name/message`, `POST /api/conversations/:name/delete-image` (the undo of `upload-image`, PAN-4835), `PUT /api/phones/self/push-key`, `DELETE /api/phones/self` (PAN-4835) |
 | `operate` | WebSocket `/ws/terminal` (`WS_TERMINAL_SCOPE`), `POST /api/conversations`, `POST /api/workers`, `POST /api/versions/self/update`, `DELETE /api/versions/self/update` |
 | `approve` | `POST /api/conversations/:id/permission`, `POST /api/conversations/:id/pane-choice`, `POST /api/conversations/:id/pi-ask-answer`, `POST /api/conversations/:id/codex-approval`, `POST /api/conversations/:name/plan-action`, `POST /api/agents/:id/answer-question`, `POST /api/agents/:id/plan-action`, `POST /api/agents/:id/permissions/:requestId/respond` |

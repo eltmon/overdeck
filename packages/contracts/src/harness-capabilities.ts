@@ -13,8 +13,8 @@ export type HarnessContextChannel =
 export type HarnessAttachmentDelivery = "native" | "inline-paths"
 export type HarnessBinaryConfigKey = "acp.kimi.binaryPath" | "kimiCode.binaryPath"
 export type HarnessLaunchPreflight = "claude-code-model-minimum"
-/** message = an AskUserQuestion answer is sent as a conversation message; pi-ask-modal = keystrokes drive the open ask modal (a queued message would be swallowed). */
-export type HarnessAskAnswerDelivery = "message" | "pi-ask-modal"
+/** message = an AskUserQuestion answer is sent as a conversation message; pi-ask-modal = keystrokes drive the open ask modal (a queued message would be swallowed); codex-approval = answered as a numbered approval prompt (PAN-4944), not a question. */
+export type HarnessAskAnswerDelivery = "message" | "pi-ask-modal" | "codex-approval"
 /** claude-project-hash = resolve via HashResolver; agent-dir = first-message cwd, else the agent dir; first-message-only = first-message cwd, else null. */
 export type HarnessWorkspaceResolution = "claude-project-hash" | "agent-dir" | "first-message-only"
 
@@ -165,7 +165,7 @@ export const CODEX_CAPABILITIES: HarnessCapabilities = {
   workspaceResolution: "agent-dir",
   correlatesBySessionId: true,
   answersQuestionByMessage: false,
-  askAnswerDelivery: "message",
+  askAnswerDelivery: "codex-approval",
   runsOnFlyMachine: true,
   overdeckMcp: false,
 }

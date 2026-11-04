@@ -1,12 +1,11 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-04T03:02:40.508080Z · model: claude-opus-5-5 · open: 883_
+_Last sequenced: 2026-11-04T03:26:21.786895Z · model: claude-opus-5-5 · open: 881_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-4702 | S | critical | ok |  |  | Merge gate orders reviews by skewed submitted_at, so a stale ancestor approval hides head approval; blocks 3 approved PRs. |
-| 3 | PAN-4970 | M | high | ok |  |  | Per-PR auto-merge and UAT batch reconciler race on same PRs: 30 generations invalidated in a day; Merge batch button silently 409s. |
 | 4 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 5 | PAN-4553 | S | critical | ok |  |  | Duplicate of PAN-4929, now in review as PR #4963; close PAN-4553 when that PR merges. |
 | 6 | PAN-4733 | M | high | ok |  |  | Follow-up to closed PAN-4732: root-cause the title-bar spec, move 4 browser specs to a gating test-e2e lane, un-quarantine it. |
@@ -871,7 +870,6 @@ _Last sequenced: 2026-11-04T03:02:40.508080Z · model: claude-opus-5-5 · open: 
 | 881 | PAN-4851 | S | low | needs-refinement |  |  | Open question: opt-in Overdeck reviewer for Deft-pipeline issues; operator says low priority, do not plan or start without them |
 | 882 | PAN-4887 | M | medium | ok |  |  | Phone app: let phone credentials reach linked machines (fleet Needs-you, linked-conv proxy, /ws/linked); PAN-4835 merged. |
 | 885 | PAN-4958 | S | low | ok |  |  | Docs for agent MCP and bot plugins; no hard deps but best written once Part A and B surfaces have landed. |
-| 889 | PAN-4944 | M | medium | ok |  |  | Approvals for every harness plus a fleet-wide pending list exposed as tools; needs only W-MCP1. |
 | 890 | PAN-4945 | L | medium | ok |  |  | OAuth 2.1 server for /mcp with access levels and expiry; gates dashboard OAuth UI, Funnel and Grok bot. |
 | 892 | PAN-4937 | M | medium | ok |  |  | Checklist, done, handoff and worker-report as MCP tools so agents stop shelling to pan over Bash. |
 | 895 | PAN-4941 | M | medium | ok |  |  | request_secret tool: agent asks operator for a secret without it entering the transcript; unblocks link_machine. |
@@ -886,7 +884,7 @@ _Last sequenced: 2026-11-04T03:02:40.508080Z · model: claude-opus-5-5 · open: 
 | 905 | PAN-4954 | M | medium | ok |  | PAN-4950 | integrations/openclaw/: OpenClaw plugin with its own revocable scoped token. |
 | 906 | PAN-4955 | S | medium | ok |  | PAN-4950 | integrations/grok-build/: Grok Build plugin with its own revocable scoped token. |
 | 907 | PAN-4956 | S | low | ok |  | PAN-4946, PAN-4947 | integrations/grok-bot/ and xAI API example; needs OAuth UI and public Funnel /mcp, not the connector. |
-| 908 | PAN-4935 | M | medium | ok |  | PAN-4937, PAN-4938, PAN-4940, PAN-4941, PAN-4942, PAN-4943, PAN-4944 | Instruction blocks and no-MCP fallback; lands last in Part A since it documents every tool to agents. |
+| 908 | PAN-4935 | M | medium | ok |  | PAN-4937, PAN-4938, PAN-4940, PAN-4941, PAN-4942, PAN-4943 | Instruction blocks and no-MCP fallback; lands last in Part A since it documents every tool to agents. |
 | 909 | PAN-4957 | S | low | ok |  | PAN-4953, PAN-4954, PAN-4955, PAN-4956 | CI for the four integration packages; lands after all integrations exist. |
 
 ## Rationale detail
@@ -894,10 +892,6 @@ _Last sequenced: 2026-11-04T03:02:40.508080Z · model: claude-opus-5-5 · open: 
 ### PAN-4702 (rank 1)
 
 New substrate bug in the merge door: on 2026-11-01 it refused three approved, green PRs (#4699, #4692, #4686) because latestTrustedVerdicts in pr-facts.ts ranks a reviewer's verdicts by submitted_at, and GitHub returned future-skewed timestamps for stale approvals on ancestor commits. It blocks merging for in-pipeline PAN-4649, PAN-4681 and PAN-4641, so it takes the free rank 1 with no other node moving. It carries needs-handoff (TENET-10), so it runs as a supervised strike, never an autonomous Flywheel pickup.
-
-### PAN-4970 (rank 3)
-
-New in-pipeline substrate-improvement bug filed 2026-11-03: the per-PR auto-merge train and the UAT batch reconciler both act on the same ready Overdeck PRs, so every per-PR merge invalidates the current batch and the Merge train page offers a promote action that returns 409 without telling the operator. PRs still land through the per-PR path, so this is high rather than critical, but it makes merge ownership and deploy units unclear. It takes the free rank 3 because in-pipeline work is pinned at the top, and no other node moves. The fix direction and acceptance tests are concrete, so condition is ok.
 
 ### PAN-4636 (rank 4)
 
@@ -1211,6 +1205,10 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
 
 New this pass. The test role evaluates the workspace working tree rather than the reviewed commit, so a live work agent's in-progress uncommitted edits are counted against the issue — the gate's own artifact diagnosed it exactly, failing on a file the reviewed commit never touched. Combined with PAN-3104, which replays the stale artifact, it becomes a durable trap.
 
+### PAN-4213 (rank 82)
+
+Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066 merged, so these seven follow-ups now harden code that is on main. Items 2 and 5 are real merge-path correctness hazards: a success status can sit on a head that never landed, and git reset --keep can move an agent commit off its branch. Each item names its file, so the work is well defined and is now startable.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1218,10 +1216,10 @@ New this pass. The test role evaluates the workspace working tree rather than th
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-04T03:02:40.508080Z",
+  "generatedAt": "2026-11-04T03:26:21.786895Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 883,
+  "openCount": 881,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -11910,19 +11908,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "planning": "auto"
     },
     {
-      "issue": "PAN-4944",
-      "rank": 889,
-      "size": "M",
-      "importance": "medium",
-      "score": 48,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Approvals for every harness plus a fleet-wide pending list exposed as tools; needs only W-MCP1.",
-      "rationale": "New child W-APPR1 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4945",
       "rank": 890,
       "size": "L",
@@ -12188,8 +12173,7 @@ New this pass. The test role evaluates the workspace working tree rather than th
         "PAN-4940",
         "PAN-4941",
         "PAN-4942",
-        "PAN-4943",
-        "PAN-4944"
+        "PAN-4943"
       ],
       "why": "Instruction blocks and no-MCP fallback; lands last in Part A since it documents every tool to agents.",
       "rationale": "New child W-INJ4 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic. Dependency PAN-4939 (W-SCHED1) closed 2026-11-04; rank unchanged since other Part A tools remain open. Dependency PAN-4932 (W-INJ1) closed 2026-11-04; rank unchanged.",
@@ -12224,19 +12208,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "dependsOn": [],
       "why": "Dashboard Settings → Anywhere Account card with PKCE sign-in; no code deps (the PAN-4959 page it linked to has closed).",
       "rationale": "PAN-4959 closed since the prior run; the informs edge is dropped and rank holds.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4970",
-      "rank": 3,
-      "size": "M",
-      "importance": "high",
-      "score": 78,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Per-PR auto-merge and UAT batch reconciler race on same PRs: 30 generations invalidated in a day; Merge batch button silently 409s.",
-      "rationale": "New in-pipeline substrate-improvement bug filed 2026-11-03: the per-PR auto-merge train and the UAT batch reconciler both act on the same ready Overdeck PRs, so every per-PR merge invalidates the current batch and the Merge train page offers a promote action that returns 409 without telling the operator. PRs still land through the per-PR path, so this is high rather than critical, but it makes merge ownership and deploy units unclear. It takes the free rank 3 because in-pipeline work is pinned at the top, and no other node moves. The fix direction and acceptance tests are concrete, so condition is ok.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13426,13 +13397,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
     },
     {
       "from": "PAN-4927",
-      "to": "PAN-4944",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4927",
       "to": "PAN-4945",
       "type": "contains",
       "source": "github-ref",
@@ -13664,13 +13628,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
     },
     {
       "from": "PAN-4943",
-      "to": "PAN-4935",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4944",
       "to": "PAN-4935",
       "type": "unblocks",
       "source": "github-ref",
