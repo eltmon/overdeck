@@ -194,8 +194,13 @@ new one.
 If `pan start` fails with "Disk low — new workspace starts are held", the
 disk cannot take another workspace setup. Launch nothing more this tick, put
 `needs-you=disk low (<free> GiB free)` in the tick marker (the free GiB is in
-the message), and do not retry that issue until a later tick. A planning
-handoff that was deferred for low disk retries on its own once space returns.
+the message), and do not retry that issue until a later tick. If the message
+instead says "the disk reservation ledger at <path> is unavailable", the disk
+is not the problem: put `needs-you=disk reservation ledger unavailable at
+<path>` in the marker, because every start is held until that directory is
+fixed. A planning handoff deferred for low disk retries on its own for 2 hours;
+after that it needs `pan start <id>`, which the loop runs on a later tick once
+starts succeed again.
 
 ## Phase 4 — Watch to landing
 

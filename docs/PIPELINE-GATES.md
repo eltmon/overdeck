@@ -1510,8 +1510,12 @@ whose stack is already healthy adds no disk cost and is never held. The hold
 counts no rebuild attempt and sets no cooldown or escalation, so the first
 start after space returns rebuilds at once. Both spawn-refusal classifiers map
 `diskLow: true` to the retryable `guardrails` reason, so the finalize
-auto-handoff records the refusal as deferred and deacon-lite retries it with
-its usual backoff until free space recovers.
+auto-handoff records the refusal as deferred and deacon-lite retries it on its
+usual backoff (2, 4, 8, 16, then every 20 minutes). Like every deferred
+handoff, the retries stop after `DEFERRED_HANDOFF_WINDOW_MS` (2 hours): if the
+disk is still low then, deacon-lite records `planning.failed
+stage=auto-handoff` and a warn activity asking for `pan start <id>`, and the
+work agent starts only when someone runs it.
 
 ## GitHub quota policy (PAN-4264)
 

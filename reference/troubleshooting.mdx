@@ -304,7 +304,7 @@ Disk low — new workspace starts are held: …
 Below 10 GiB free, a write that runs out of space can zero-fill a file instead of failing. Overdeck therefore admits each disk-heavy step (creating a workspace and installing its packages, or building its Docker stack) only if the step's measured cost still leaves 10 GiB free after the setups already in progress. The message names the free space, the space reserved by setups in progress, the space this step needs, and the floor.
 
 - `pan start` and the dashboard Start button refuse the work agent when its stack would need a rebuild that does not fit. The dashboard answers HTTP 507 with `diskLow: true`.
-- A plan finalized with auto-start defers the work agent. Deacon-lite retries it on its usual backoff, so it starts by itself once space returns.
+- A plan finalized with auto-start defers the work agent. Deacon-lite retries it for up to 2 hours, so it starts by itself if space returns in that time. After 2 hours the retries stop, and you start it with `pan start ISSUE-123` once space is back.
 - A start whose stack is already healthy is never held.
 
 If the message instead says the disk reservation ledger is unavailable, Overdeck could not read or write `~/.overdeck/disk-reservations/`. Fix that directory's permissions and retry.
