@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4947",
   "created": "2026-11-04T05:30:29.044Z",
-  "updated": "2026-11-04T05:50:23.119Z",
+  "updated": "2026-11-04T05:52:36.882Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -46,9 +46,10 @@
       "doneAt": "2026-11-04T05:50:17.680Z"
     },
     "public-mcp-panel": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4947",
-      "claimedAt": "2026-11-04T05:50:23.119Z"
+      "claimedAt": "2026-11-04T05:50:23.119Z",
+      "doneAt": "2026-11-04T05:52:36.882Z"
     }
   }
 }
