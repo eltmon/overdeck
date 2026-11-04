@@ -98,6 +98,8 @@ import { pushRouteLayer } from './routes/push.js'
 import { tailscaleRouteLayer } from './routes/tailscale.js'
 import { accessTokensRouteLayer } from './routes/access-tokens.js'
 import { mcpRouteLayer } from './routes/mcp.js'
+import { mcpOAuthRouteLayer } from './routes/mcp-oauth.js'
+import { mcpOAuthAdminRouteLayer } from './routes/mcp-oauth-admin.js'
 import { remoteRequestGateLayer } from './remote-request-gate.js'
 import { linkedConversationProxyLayer } from './linked-conversation-proxy.js';
 import { settingsRouteLayer } from './routes/settings.js'
@@ -476,6 +478,8 @@ export const makeRoutesLayer = Layer.mergeAll(
   tailscaleRouteLayer,
   accessTokensRouteLayer,
   mcpRouteLayer,
+  mcpOAuthRouteLayer,
+  mcpOAuthAdminRouteLayer,
   staticRouteLayer,
 );
 
