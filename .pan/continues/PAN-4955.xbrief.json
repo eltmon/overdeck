@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4955",
   "created": "2026-11-04T14:23:26.498Z",
-  "updated": "2026-11-04T14:56:50.992Z",
+  "updated": "2026-11-04T14:57:05.233Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -112,6 +112,10 @@
     "mcp-docs.ac2": {
       "status": "completed",
       "doneAt": "2026-11-04T14:56:50.991Z"
+    },
+    "live-verify.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:57:05.233Z"
     }
   }
 }
