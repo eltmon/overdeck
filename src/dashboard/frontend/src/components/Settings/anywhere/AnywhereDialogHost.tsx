@@ -16,6 +16,7 @@ import { AddSshMachineDialog } from './AddSshMachineDialog';
 import { SetUpPhoneDialog } from './SetUpPhoneDialog';
 import { PairDeviceDialog } from './PairDeviceDialog';
 import { TailscaleSetupDialog } from './TailscaleSetupDialog';
+import { ConnectBotDialog } from './ConnectBotDialog';
 
 export function AnywhereDialogHost() {
   const dialog = useAnywhereDialogStore((s) => s.dialog);
@@ -48,6 +49,7 @@ export function AnywhereDialogHost() {
         onClose={close}
         onPair={() => openAnywhereDialog('pair-device')}
       />
+      <ConnectBotDialog open={dialog === 'connect-bot'} onClose={close} />
     </>
   );
 }

@@ -124,4 +124,10 @@ describe('AnywhereDialogHost', () => {
     expect(screen.queryByTestId('dialog-tailscale-setup')).toBeNull();
     expect(useAnywhereDialogStore.getState().dialog).toBeNull();
   });
+
+  it("opens connect-bot as the real ConnectBotDialog (not a stub)", () => {
+    renderHost();
+    act(() => openAnywhereDialog('connect-bot'));
+    expect(document.querySelector('[data-component="connect-bot-dialog"]')).toBeTruthy();
+  });
 });
