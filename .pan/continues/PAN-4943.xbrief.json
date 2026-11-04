@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4943",
   "created": "2026-11-04T04:27:55.646Z",
-  "updated": "2026-11-04T06:28:04.590Z",
+  "updated": "2026-11-04T06:28:56.221Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -66,6 +66,10 @@
     "pr-route-scopes.ac1": {
       "status": "completed",
       "doneAt": "2026-11-04T06:28:04.590Z"
+    },
+    "pr-route-scopes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:28:56.220Z"
     }
   }
 }
