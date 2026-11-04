@@ -1,12 +1,11 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-04T09:03:21.944378Z · model: claude-opus-5-5 · open: 870_
+_Last sequenced: 2026-11-04T09:06:52.940835Z · model: claude-opus-5-5 · open: 868_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-4702 | S | critical | ok |  |  | Merge gate orders reviews by skewed submitted_at, so a stale ancestor approval hides head approval; blocks 3 approved PRs. |
-| 2 | PAN-4993 | S | critical | ok |  |  | Convergence gate reads 0→2 blockers after an approval as a regression and withholds review feedback; agent idles. Scope to last episode |
 | 3 | PAN-4995 | S | high | ok |  |  | pan review request verifies a half-adopted workspace; its main merge trips adoption's head check -> false Needs-you on handoff PRs |
 | 4 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 5 | PAN-4553 | S | critical | ok |  |  | Duplicate of PAN-4929, now in review as PR #4963; close PAN-4553 when that PR merges. |
@@ -435,7 +434,6 @@ _Last sequenced: 2026-11-04T09:03:21.944378Z · model: claude-opus-5-5 · open: 
 | 434 | PAN-1461 | S | medium | ok |  |  | Conversation transcript: in-page search (Ctrl+F) only finds text in currently-rendered virtualized rows |
 | 435 | PAN-1449 | S | medium | ok |  |  | Memory extraction still failing; the live symptom PAN-4370 closed and PAN-4374 adds a working provider; layout half remains |
 | 436 | PAN-1446 | S | medium | ok |  |  | PAN-1231 follow-up: remove or implement Table + Timeline modes in FleetAgentsView (scope-creep stubs) |
-| 437 | PAN-4947 | L | medium | ok |  |  | Opt-in public /mcp via Tailscale Funnel, TLS ends on the user machine; OAuth server closed, now unblocked. |
 | 438 | PAN-1445 | S | medium | ok |  |  | PAN-1389 follow-up: remove or implement Files + Comments tabs in SessionFeedSidebar (scope-creep stubs) |
 | 439 | PAN-3616 | S | medium | ok |  |  | Planned deploy restarts show the alarm-toned Reconnecting banner; use the lifecycle signal for calm 'updating' copy. |
 | 440 | PAN-2982 | XS | medium | ok |  |  | Nothing runs a skill's own selftest when sync-sources/skills/** changes; a convoy passed a PR with its selftest red. |
@@ -873,7 +871,7 @@ _Last sequenced: 2026-11-04T09:03:21.944378Z · model: claude-opus-5-5 · open: 
 | 904 | PAN-4953 | M | medium | ok |  | PAN-4950 | integrations/hermes/: Hermes plugin with its own revocable scoped token. |
 | 905 | PAN-4954 | M | medium | ok |  | PAN-4950 | integrations/openclaw/: OpenClaw plugin with its own revocable scoped token. |
 | 906 | PAN-4955 | S | medium | ok |  | PAN-4950 | integrations/grok-build/: Grok Build plugin with its own revocable scoped token. |
-| 907 | PAN-4956 | S | low | ok |  | PAN-4947 | integrations/grok-bot/ and xAI API example; needs OAuth UI and public Funnel /mcp, not the connector. |
+| 907 | PAN-4956 | S | low | ok |  |  | integrations/grok-bot/ and xAI API example; needs OAuth UI and public Funnel /mcp, not the connector. |
 | 909 | PAN-4957 | S | low | ok |  | PAN-4953, PAN-4954, PAN-4955, PAN-4956 | CI for the four integration packages; lands after all integrations exist. |
 
 ## Rationale detail
@@ -881,10 +879,6 @@ _Last sequenced: 2026-11-04T09:03:21.944378Z · model: claude-opus-5-5 · open: 
 ### PAN-4702 (rank 1)
 
 New substrate bug in the merge door: on 2026-11-01 it refused three approved, green PRs (#4699, #4692, #4686) because latestTrustedVerdicts in pr-facts.ts ranks a reviewer's verdicts by submitted_at, and GitHub returned future-skewed timestamps for stale approvals on ancestor commits. It blocks merging for in-pipeline PAN-4649, PAN-4681 and PAN-4641, so it takes the free rank 1 with no other node moving. It carries needs-handoff (TENET-10), so it runs as a supervised strike, never an autonomous Flywheel pickup.
-
-### PAN-4993 (rank 2)
-
-New issue, placed in the open rank-2 slot. Any approved PR that is re-reviewed after a main merge and then blocks trips the reversal rule in evaluateReviewConvergence, so the work agent never receives the findings and the issue parks as needs-you; PAN-4947 is stuck on it right now. The fix is small and fully specified (evaluate only rounds after the last zero-blocker round, with named test series), and it unblocks review feedback delivery for the whole pipeline, so it ranks critical ahead of routine work.
 
 ### PAN-4995 (rank 3)
 
@@ -1198,6 +1192,10 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
 
 New this pass. shouldHoldForUat is consulted on exactly one merge path, so every other path merges a ready issue without asking whether its project holds for UAT — verified at code level on a real MIN-901 merge. This defeats the batch-train model directly: issues merge one at a time before a generation can assemble them.
 
+### PAN-3100 (rank 81)
+
+New this pass. The test role evaluates the workspace working tree rather than the reviewed commit, so a live work agent's in-progress uncommitted edits are counted against the issue — the gate's own artifact diagnosed it exactly, failing on a file the reviewed commit never touched. Combined with PAN-3104, which replays the stale artifact, it becomes a durable trap.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1205,10 +1203,10 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-04T09:03:21.944378Z",
+  "generatedAt": "2026-11-04T09:06:52.940835Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 870,
+  "openCount": 868,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -1220,19 +1218,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "dependsOn": [],
       "why": "Merge gate orders reviews by skewed submitted_at, so a stale ancestor approval hides head approval; blocks 3 approved PRs.",
       "rationale": "New substrate bug in the merge door: on 2026-11-01 it refused three approved, green PRs (#4699, #4692, #4686) because latestTrustedVerdicts in pr-facts.ts ranks a reviewer's verdicts by submitted_at, and GitHub returned future-skewed timestamps for stale approvals on ancestor commits. It blocks merging for in-pipeline PAN-4649, PAN-4681 and PAN-4641, so it takes the free rank 1 with no other node moving. It carries needs-handoff (TENET-10), so it runs as a supervised strike, never an autonomous Flywheel pickup.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4993",
-      "rank": 2,
-      "size": "S",
-      "importance": "critical",
-      "score": 90,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Convergence gate reads 0→2 blockers after an approval as a regression and withholds review feedback; agent idles. Scope to last episode",
-      "rationale": "New issue, placed in the open rank-2 slot. Any approved PR that is re-reviewed after a main merge and then blocks trips the reversal rule in evaluateReviewConvergence, so the work agent never receives the findings and the issue parks as needs-you; PAN-4947 is stuck on it right now. The fix is small and fully specified (evaluate only rounds after the last zero-blocker round, with named test series), and it unblocks review feedback delivery for the whole pipeline, so it ranks critical ahead of routine work.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6604,19 +6589,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "condition": "ok",
       "dependsOn": [],
       "why": "PAN-1231 follow-up: remove or implement Table + Timeline modes in FleetAgentsView (scope-creep stubs)",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4947",
-      "rank": 437,
-      "size": "L",
-      "importance": "medium",
-      "score": 38,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Opt-in public /mcp via Tailscale Funnel, TLS ends on the user machine; OAuth server closed, now unblocked.",
-      "rationale": "Its only dependency, the /mcp OAuth server (PAN-4945), closed as completed, so this child is now workable and moves from the tail into a free slot in the epic's band.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12013,9 +11985,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "importance": "low",
       "score": 32,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4947"
-      ],
+      "dependsOn": [],
       "why": "integrations/grok-bot/ and xAI API example; needs OAuth UI and public Funnel /mcp, not the connector.",
       "rationale": "Rank held: dependency PAN-4952 (shared skill text) closed completed 2026-11-04; still waits on PAN-4946 and PAN-4947.",
       "gate": "auto",
@@ -13231,13 +13201,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "confidence": 1
     },
     {
-      "from": "PAN-4927",
-      "to": "PAN-4947",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-4950",
       "to": "PAN-4953",
       "type": "unblocks",
@@ -13276,13 +13239,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "from": "PAN-4927",
       "to": "PAN-4955",
       "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4947",
-      "to": "PAN-4956",
-      "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
     },
@@ -13341,13 +13297,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "type": "contains",
       "source": "github-ref",
       "confidence": 1
-    },
-    {
-      "from": "PAN-4993",
-      "to": "PAN-4947",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.7
     },
     {
       "from": "PAN-4995",
