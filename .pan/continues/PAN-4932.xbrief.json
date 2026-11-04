@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4932",
   "created": "2026-11-04T01:06:56.441Z",
-  "updated": "2026-11-04T01:57:08.252Z",
+  "updated": "2026-11-04T01:57:27.423Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -174,6 +174,10 @@
     "role-allowlist-overdeck.ac2": {
       "status": "completed",
       "doneAt": "2026-11-04T01:57:08.251Z"
+    },
+    "spawn-run-wiring.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:57:27.423Z"
     }
   }
 }
