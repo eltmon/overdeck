@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4841",
   "created": "2026-11-04T10:01:07.580Z",
-  "updated": "2026-11-04T17:38:01.278Z",
+  "updated": "2026-11-04T17:38:13.947Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -254,6 +254,10 @@
     "rel-first-android-release.ac2": {
       "status": "completed",
       "doneAt": "2026-11-04T17:38:01.278Z"
+    },
+    "rel-first-android-release.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:38:13.947Z"
     }
   }
 }
