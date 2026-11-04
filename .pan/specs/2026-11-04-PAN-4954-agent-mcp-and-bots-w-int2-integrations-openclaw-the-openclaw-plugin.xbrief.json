@@ -4,17 +4,17 @@
     "created": "2026-11-04T13:58:24.594Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4954: Agent MCP and bots (W-INT2): integrations/openclaw/: the OpenClaw plugin",
-    "updated": "2026-11-04T13:58:31.107Z"
+    "updated": "2026-11-04T14:47:49.342Z"
   },
   "plan": {
     "id": "pan-4954",
     "title": "Agent MCP and bots (W-INT2): integrations/openclaw/: the OpenClaw plugin",
-    "status": "proposed",
+    "status": "running",
     "uid": "6e9dd60f-36a4-41f4-a6bd-8d042646015d",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-11-04T13:58:24.594Z",
-    "updated": "2026-11-04T13:58:31.107Z",
+    "updated": "2026-11-04T14:47:49.342Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4954",
@@ -1002,5 +1002,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
