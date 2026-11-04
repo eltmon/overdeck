@@ -96,6 +96,17 @@ describe('parseRoleMcpServers', () => {
     expect(config).toContain('args = ["-y", "@playwright/mcp@0.0.78"]');
   });
 
+  it('merges a passed overdeck server map after the role servers (PAN-4933)', () => {
+    const fields = getCodexLauncherFields('agent-test-mcp-overdeck', 'gpt-5.6', tempDir, 'test', undefined, {
+      overdeck: { type: 'stdio', command: 'overdeck', args: ['mcp', 'serve'], defaultToolsApprovalMode: 'approve' },
+    });
+
+    const config = readFileSync(join(fields.codexHome, 'config.toml'), 'utf8');
+    expect(config).toContain('[mcp_servers.playwright]');
+    expect(config).toContain('[mcp_servers.overdeck]');
+    expect(config).toContain('default_tools_approval_mode = "approve"');
+  });
+
   it('writes no MCP section for a role without declared servers', () => {
     const fields = getCodexLauncherFields('agent-work-no-mcp', 'gpt-5.6', tempDir, 'work');
     const config = readFileSync(join(fields.codexHome, 'config.toml'), 'utf8');
