@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4932",
   "created": "2026-11-04T01:06:56.441Z",
-  "updated": "2026-11-04T01:52:43.843Z",
+  "updated": "2026-11-04T01:53:00.495Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -110,6 +110,10 @@
     "overdeck-mcp-capability.ac3": {
       "status": "completed",
       "doneAt": "2026-11-04T01:52:43.842Z"
+    },
+    "launcher-overdeck-mcp-flags.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:53:00.494Z"
     }
   }
 }
