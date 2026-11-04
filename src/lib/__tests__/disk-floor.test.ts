@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import {
   checkDiskFloor,
   DISK_LOW_HELD_PREFIX,
+  DISK_RESERVATION_HEARTBEAT_MS,
   DISK_RESERVATION_STALE_MS,
   DISK_SAFETY_FLOOR_BYTES,
   previewDiskFloor,
@@ -155,10 +156,15 @@ describe('reserveDiskFloor', () => {
     const [name] = readdirSync(ledgerDir).filter((entry) => entry.endsWith('.json'));
     const file = join(ledgerDir, name);
 
-    await vi.advanceTimersByTimeAsync(30 * 60_000);
-    await vi.waitFor(async () => {
-      expect(Date.now() - (await stat(file)).mtimeMs).toBeLessThan(DISK_RESERVATION_STALE_MS);
-    });
+    // Advance one heartbeat at a time and let each renewal's real file I/O
+    // land: jumping 30 minutes at once fires every tick within microseconds,
+    // and the heartbeat skips a tick while the previous utimes is in flight.
+    for (let minute = 0; minute < 30; minute++) {
+      await vi.advanceTimersByTimeAsync(DISK_RESERVATION_HEARTBEAT_MS);
+      await vi.waitFor(async () => {
+        expect(Date.now() - (await stat(file)).mtimeMs).toBeLessThan(DISK_RESERVATION_STALE_MS / 2);
+      });
+    }
 
     const second = await reserve();
     expect(second.ok).toBe(false);
