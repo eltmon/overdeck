@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4937",
   "created": "2026-11-04T02:50:38.682Z",
-  "updated": "2026-11-04T03:43:43.246Z",
+  "updated": "2026-11-04T03:43:50.897Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -44,6 +44,11 @@
       "claimedBy": "agent-pan-4937",
       "claimedAt": "2026-11-04T03:37:36.378Z",
       "doneAt": "2026-11-04T03:43:43.246Z"
+    },
+    "self-workflow-docs": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4937",
+      "claimedAt": "2026-11-04T03:43:50.897Z"
     }
   }
 }
