@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4938",
   "created": "2026-11-04T03:39:16.629Z",
-  "updated": "2026-11-04T04:37:18.766Z",
+  "updated": "2026-11-04T04:37:35.138Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -218,6 +218,10 @@
     "task-cancel.ac3": {
       "status": "completed",
       "doneAt": "2026-11-04T04:37:18.765Z"
+    },
+    "lane-start-status-stop.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:37:35.138Z"
     }
   }
 }
