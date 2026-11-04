@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5000",
   "created": "2026-11-04T11:38:38.802Z",
-  "updated": "2026-11-04T12:46:24.717Z",
+  "updated": "2026-11-04T12:46:38.800Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -160,6 +160,10 @@
     "after-fix-screenshots.ac1": {
       "status": "completed",
       "doneAt": "2026-11-04T12:46:24.716Z"
+    },
+    "after-fix-screenshots.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T12:46:38.800Z"
     }
   }
 }
