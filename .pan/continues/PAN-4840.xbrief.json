@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4840",
   "created": "2026-11-03T20:58:06.302Z",
-  "updated": "2026-11-04T18:55:15.988Z",
+  "updated": "2026-11-04T18:55:33.304Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -146,6 +146,10 @@
     "ci-android-unit-tests.ac1": {
       "status": "completed",
       "doneAt": "2026-11-04T18:55:15.987Z"
+    },
+    "device-acceptance.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:55:33.304Z"
     }
   }
 }
