@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5015",
   "created": "2026-11-04T15:25:55.139Z",
-  "updated": "2026-11-04T15:38:47.999Z",
+  "updated": "2026-11-04T15:39:23.544Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -54,6 +54,10 @@
     "done-defers-github-5xx.ac3": {
       "status": "completed",
       "doneAt": "2026-11-04T15:38:47.998Z"
+    },
+    "docs-pipeline-gates.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:39:23.544Z"
     }
   }
 }
