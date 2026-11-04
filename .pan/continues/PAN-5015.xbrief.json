@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5015",
   "created": "2026-11-04T15:25:55.139Z",
-  "updated": "2026-11-04T15:37:39.223Z",
+  "updated": "2026-11-04T15:38:21.003Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -42,6 +42,10 @@
     "transient-regex.ac4": {
       "status": "completed",
       "doneAt": "2026-11-04T15:37:39.223Z"
+    },
+    "done-defers-github-5xx.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:38:21.003Z"
     }
   }
 }
