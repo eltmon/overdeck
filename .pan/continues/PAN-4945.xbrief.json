@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4945",
   "created": "2026-11-04T01:22:40.341Z",
-  "updated": "2026-11-04T02:04:55.859Z",
+  "updated": "2026-11-04T02:05:03.248Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -48,6 +48,11 @@
       "claimedBy": "agent-pan-4945",
       "claimedAt": "2026-11-04T02:00:33.744Z",
       "doneAt": "2026-11-04T02:04:55.859Z"
+    },
+    "routes-authorize": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4945",
+      "claimedAt": "2026-11-04T02:05:03.248Z"
     }
   }
 }
