@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-04T06:49:07.882108Z · model: claude-opus-5-5 · open: 874_
+_Last sequenced: 2026-11-04T06:52:08.600091Z · model: claude-opus-5-5 · open: 873_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -661,7 +661,6 @@ _Last sequenced: 2026-11-04T06:49:07.882108Z · model: claude-opus-5-5 · open: 
 | 662 | PAN-2353 | M | low | needs-refinement |  |  | Overdeck Anywhere P1b: Hermes external-agent bridge (scoped API + Fly 6PN) |
 | 663 | PAN-4294 | L | low | ok |  |  | Anywhere paid tier: Creem subscription, entitlement API, quotas; pricing decided 2026-09-28; waits on PAN-4293 account service |
 | 664 | PAN-3133 | S | low | ok |  |  | Evaluation spike for TRON encoding of prompt-bound xBRIEF payloads; savings are modest today since agents get a bounded slice. |
-| 665 | PAN-4896 | XS | low | ok |  |  | pan connect on macOS prints the Linux-only PAN-2804 systemd-run warning; gate it on process.platform linux and add a darwin test. |
 | 666 | PAN-4638 | L | medium | ok |  |  | Anywhere: run gauntlet lanes on linked machines/Fly VMs; waits on unfiled machine-link plan items; Fly stack + creds open |
 | 667 | PAN-3011 | M | low | ok |  | PAN-465 | Add poolside Laguna S 2.1 as a model target; the honest hardware note says it will not fit this machine's GPU. |
 | 668 | PAN-2282 | M | low | ok |  |  | Conversation view shows no history for ohmypi-harness conversations |
@@ -1209,10 +1208,10 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-04T06:49:07.882108Z",
+  "generatedAt": "2026-11-04T06:52:08.600091Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 874,
+  "openCount": 873,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -9392,19 +9391,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "why": "Evaluation spike for TRON encoding of prompt-bound xBRIEF payloads; savings are modest today since agents get a bounded slice.",
       "gate": "auto",
       "planning": "interactive"
-    },
-    {
-      "issue": "PAN-4896",
-      "rank": 665,
-      "size": "XS",
-      "importance": "low",
-      "score": 30,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan connect on macOS prints the Linux-only PAN-2804 systemd-run warning; gate it on process.platform linux and add a darwin test.",
-      "rationale": "New issue filed 2026-11-03 from the Mac rig: a misleading but harmless warning during Anywhere onboarding with a one-line fix and clear AC, so it takes free rank 664 beside the Anywhere work.",
-      "gate": "auto",
-      "planning": "auto"
     },
     {
       "issue": "PAN-4638",
