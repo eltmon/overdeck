@@ -4,17 +4,17 @@
     "created": "2026-11-04T11:39:07Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5005: Command Deck tree shows no report or verdict for remote gauntlet lanes",
-    "updated": "2026-11-04T11:40:55.664Z"
+    "updated": "2026-11-04T11:42:20.492Z"
   },
   "plan": {
     "id": "pan-5005",
     "title": "Command Deck tree shows no report or verdict for remote gauntlet lanes (\"8 lanes · 4 reported\" when all 8 reported)",
-    "status": "proposed",
+    "status": "running",
     "uid": "8fda6ca6-169e-4422-a056-3c7868078598",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-04T11:39:07Z",
-    "updated": "2026-11-04T11:40:55.664Z",
+    "updated": "2026-11-04T11:42:20.492Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5005",
@@ -370,5 +370,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
