@@ -146,3 +146,25 @@ describe('task_block (PAN-4927 W-SELF2)', () => {
     expect(api.calls).toEqual([]);
   });
 });
+
+describe('done (PAN-4927 W-SELF2)', () => {
+  it('is hidden from an agent token without operate and listed for one with operate', async () => {
+    const api = fakeApi({});
+    const agentNoOperate = await connectClient(api, ['tell'], true);
+    expect((await agentNoOperate.listTools()).tools.map((tool) => tool.name)).not.toContain('done');
+    const call = await callTool(agentNoOperate, 'done');
+    expect(call.isError).toBe(true);
+    expect(resultText(call)).toBe('Unknown tool done');
+
+    const agentWithOperate = await connectClient(api, ['tell', 'operate'], true);
+    expect((await agentWithOperate.listTools()).tools.map((tool) => tool.name)).toContain('done');
+  });
+
+  it('posts {}', async () => {
+    const running = { status: 'running', jobId: 'j1', verb: 'done', startedAt: '2026-11-03T00:00:00.000Z', next: { tool: 'wait_job', arguments: { jobId: 'j1' } } };
+    const api = fakeApi({ 'POST /api/self/done': { status: 200, json: running } });
+    const client = await connectClient(api, ['tell', 'operate'], true);
+    expect(resultJson(await callTool(client, 'done'))).toEqual(running);
+    expect(api.calls).toEqual([{ method: 'POST', path: '/api/self/done', body: {} }]);
+  });
+});

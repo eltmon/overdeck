@@ -94,4 +94,16 @@ const taskBlock: OverdeckTool = {
   },
 };
 
-export const SELF_TOOLS: readonly OverdeckTool[] = [waitJob, taskClaim, taskDone, taskBlock];
+const done: OverdeckTool = {
+  name: 'done',
+  description:
+    'Signal that your issue\'s work is complete (runs pan done): commits pending plan files, rebases, pushes, opens or updates the PR, moves the tracker to In Review and starts review. It usually takes longer than 50 s, so expect status "running" and call next. A non-zero exitCode means a completion check failed; stderr says what to fix. Call task_done for every item first.',
+  scope: 'operate',
+  audience: 'agent',
+  inputSchema: { type: 'object', properties: {} },
+  async run(_args, ctx) {
+    return postSelf(ctx, '/api/self/done', {});
+  },
+};
+
+export const SELF_TOOLS: readonly OverdeckTool[] = [waitJob, taskClaim, taskDone, taskBlock, done];

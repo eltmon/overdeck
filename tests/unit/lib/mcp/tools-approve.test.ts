@@ -19,7 +19,7 @@ describe('MCP approval tools (PAN-4649 W-7)', () => {
       'send_message', 'start_conversation', 'start_worker',
       'schedule_message', 'schedule_recurring', 'list_scheduled', 'update_scheduled', 'delete_scheduled',
       'list_pending_input', 'answer_question', 'answer_permission',
-      'wait_job', 'task_claim', 'task_done', 'task_block',
+      'wait_job', 'task_claim', 'task_done', 'task_block', 'done',
     ]);
   });
 

@@ -150,6 +150,19 @@ export async function handleSelfTaskBlock(
   return startSelfJobAnswer(jobs, caller, 'task-block', args, {}, signal);
 }
 
+export async function handleSelfDone(
+  credential: DashboardCredential | null,
+  text: string,
+  signal?: AbortSignal,
+  deps: SelfWorkflowRouteDeps = {},
+): Promise<SelfRouteResult> {
+  const prepared = prelude(credential, text, deps);
+  if (!prepared.ok) return prepared.result;
+  const { caller, jobs } = prepared;
+  if (caller.issueId === null) return { status: 409, body: NO_ISSUE };
+  return startSelfJobAnswer(jobs, caller, 'done', [{ ref: caller.issueId }], {}, signal);
+}
+
 export function makeSelfWorkflowRouteLayer(deps: SelfWorkflowRouteDeps = {}) {
   const selfTaskClaimRoute = HttpRouter.add(
     'POST',
@@ -187,7 +200,19 @@ export function makeSelfWorkflowRouteLayer(deps: SelfWorkflowRouteDeps = {}) {
     })),
   );
 
-  return Layer.mergeAll(selfTaskClaimRoute, selfTaskDoneRoute, selfTaskBlockRoute);
+  const selfDoneRoute = HttpRouter.add(
+    'POST',
+    '/api/self/done',
+    httpHandler(Effect.gen(function* () {
+      const request = yield* HttpServerRequest.HttpServerRequest;
+      const text = yield* request.text;
+      const credential = resolveRequestCredential(request);
+      const result = yield* Effect.promise((signal) => handleSelfDone(credential, text, signal, deps));
+      return jsonResponse(result.body, { status: result.status });
+    })),
+  );
+
+  return Layer.mergeAll(selfTaskClaimRoute, selfTaskDoneRoute, selfTaskBlockRoute, selfDoneRoute);
 }
 
 export const selfWorkflowRouteLayer = makeSelfWorkflowRouteLayer();

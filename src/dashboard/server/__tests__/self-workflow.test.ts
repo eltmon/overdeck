@@ -29,6 +29,7 @@ const { requiredScopeFor } = await import('../route-scopes.js');
 const { createSelfJobs } = await import('../services/self-jobs.js');
 const {
   badRequest,
+  handleSelfDone,
   handleSelfTaskBlock,
   handleSelfTaskClaim,
   handleSelfTaskDone,
@@ -214,6 +215,26 @@ describe('handleSelfTaskBlock', () => {
   });
 });
 
+describe('handleSelfDone', () => {
+  it('builds argv done <caller issue> only, ignoring body fields', async () => {
+    const { jobs, recorded, finish } = controlledJobs();
+    const promise = handleSelfDone(agentCredential('agent-pan-1'), '{"issueId":"PAN-9","force":true}', undefined, { jobs, caller: callerDeps });
+    finish(0, { exitCode: 0, stdout: 'ok' });
+    const result = await promise;
+    expect(result.status).toBe(200);
+    expect(recorded[0]?.args.slice(1)).toEqual(['done', 'PAN-1']);
+  });
+
+  it('refuses a caller without an issue with 409 no-issue', async () => {
+    const { jobs } = controlledJobs();
+    const deps: SelfCallerDeps = { getAgentState: () => ({ workspace: '/w/x', issueId: '' }), getConversationByName: () => null };
+    expect(await handleSelfDone(agentCredential('agent-pan-1'), '{}', undefined, { jobs, caller: deps })).toEqual({
+      status: 409,
+      body: { error: 'this agent has no issue', code: 'no-issue' },
+    });
+  });
+});
+
 describe('waits', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -281,9 +302,38 @@ describe('self workflow routes through the gate', () => {
     expect(doneResponse.json).toMatchObject({ status: 'done', exitCode: 0, stdout: 'ok' });
   });
 
-  it('requires tell for all three task routes', () => {
+  it('requires tell for all three task routes, and operate for done', () => {
     expect(requiredScopeFor('POST', '/api/self/tasks/claim')).toBe('tell');
     expect(requiredScopeFor('POST', '/api/self/tasks/done')).toBe('tell');
     expect(requiredScopeFor('POST', '/api/self/tasks/block')).toBe('tell');
+    expect(requiredScopeFor('POST', '/api/self/done')).toBe('operate');
+  });
+
+  it('refuses a review-role agent token with 403 missingScope operate on /api/self/done, and allows a work agent token', async () => {
+    const jobs = createSelfJobs({ runner: async () => ({ exitCode: 0, signal: null, timedOut: false, stdout: 'ok', stderr: '', error: null }) });
+    const app = Layer.mergeAll(remoteRequestGateLayer, makeSelfWorkflowRouteLayer({ jobs, caller: callerDeps }));
+    const { token: reviewToken } = await createAccessToken({
+      name: 'agent:review:agent-pan-1',
+      kind: 'token',
+      scopes: ['read:events', 'read:state', 'read:conversations', 'tell'],
+      agentId: 'agent-pan-1',
+      agentKind: 'agent',
+      role: 'review',
+    });
+    const reviewResponse = await send(app, 'POST', '/api/self/done', bearer(reviewToken));
+    expect(reviewResponse.status).toBe(403);
+    expect(reviewResponse.json).toMatchObject({ missingScope: 'operate' });
+
+    const { token: workToken } = await createAccessToken({
+      name: 'agent:work:agent-pan-1',
+      kind: 'token',
+      scopes: ['tell', 'operate'],
+      agentId: 'agent-pan-1',
+      agentKind: 'agent',
+      role: 'work',
+    });
+    const workResponse = await send(app, 'POST', '/api/self/done', bearer(workToken));
+    expect(workResponse.status).toBe(200);
+    expect(workResponse.json).toMatchObject({ status: 'done', exitCode: 0, stdout: 'ok' });
   });
 });

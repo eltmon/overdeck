@@ -24,6 +24,7 @@ const SINGLE_ROUTE_PATHS: Record<string, { method: string; path: string }> = {
   task_claim: { method: 'POST', path: '/api/self/tasks/claim' },
   task_done: { method: 'POST', path: '/api/self/tasks/done' },
   task_block: { method: 'POST', path: '/api/self/tasks/block' },
+  done: { method: 'POST', path: '/api/self/done' },
 };
 
 describe('MCP tool annotations (PAN-4927 W-MCP1)', () => {
