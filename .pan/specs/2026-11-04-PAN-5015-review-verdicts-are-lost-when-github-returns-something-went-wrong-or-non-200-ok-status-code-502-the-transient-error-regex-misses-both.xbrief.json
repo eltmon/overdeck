@@ -1,0 +1,256 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-04T15:21:23Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5015: Review verdicts are lost when GitHub returns 'Something went wrong' or 'non-200 OK status code: 502': the transient-error regex misses both",
+    "updated": "2026-11-04T15:25:40.135Z"
+  },
+  "plan": {
+    "id": "pan-5015",
+    "title": "Review verdicts are lost when GitHub returns 'Something went wrong' or 'non-200 OK status code: 502': the transient-error regex misses both",
+    "status": "running",
+    "uid": "3013da2d-93f8-4de1-b3e3-38bd8ea4f103",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-04T15:21:23Z",
+    "updated": "2026-11-04T15:25:40.135Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5015",
+        "label": "PAN-5015",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5015.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "forge",
+      "review-pipeline",
+      "transient-errors",
+      "bugfix"
+    ],
+    "narratives": {
+      "Problem": "TRANSIENT_FORGE_ERROR in src/lib/forge-transient.ts misses GitHub's GraphQL 5xx message ('Something went wrong while executing your query') and gh's raw-5xx wording ('non-200 OK status code: 502 Bad Gateway'). isTransientForgeError therefore returns false, `pan admin specialists done review` does not journal review.verdict-deferred, and the verdict is lost (PAN-4956 and PAN-4960 approvals on 2026-11-04).",
+      "Proposal": "Add the literal phrase 'something went wrong while executing your query' and a third anchored prefix 'non-200 OK status code: ' to the existing (?:failed: |HTTP )50[234]\\b group. Prove it with forge-transient unit tests (both shapes transient; 404, 500 and a /pull/502 URL not transient) and two specialists-done tests showing a post failure with the GraphQL message and a lookup failure with the raw-502 message both journal review.verdict-deferred. Document both shapes in docs/PIPELINE-GATES.md.",
+      "NonGoals": "- No retry or deferral added to `gh pr merge` or `gh pr update-branch`; they do not call isTransientForgeError.\n- No change to src/lib/cloister/deacon-api-recovery.ts (it classifies Claude API pane errors, not forge errors).\n- No classification of HTTP 500 or bare 'Something went wrong' as transient.\n- No bare 50[234] alternative outside the anchored prefix group.\n- No change to retry delays (2 s / 8 s), the deferral cap (7) or the 10-minute replay cooldown.\n- No changelog.mdx entry (written at release time)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Extend the anchored status group with 'non-200 OK status code: ' instead of adding a bare 502 alternative.",
+        "rationale": "The issue requires keeping the anchoring that stops /pull/504 from matching; a third prefix preserves it."
+      },
+      {
+        "summary": "Match the GraphQL error by the full phrase 'something went wrong while executing your query', not bare 'Something went wrong'.",
+        "rationale": "The issue names this exact phrase; the bare phrase is generic enough to catch unrelated permanent failures."
+      },
+      {
+        "summary": "HTTP 500 stays non-transient.",
+        "rationale": "The current regex excludes 500 and the issue's fix names 50[234]; GitHub's GraphQL 5xx is covered by the phrase match."
+      },
+      {
+        "summary": "The merge and update-branch 502 failures cited in the issue are out of scope.",
+        "rationale": "The issue's Fix section is regex plus tests; those paths never consult isTransientForgeError, so they need separate retry design."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Three small items across one subsystem; no decomposition needed.",
+      "canonicalFilename": "2026-11-04-PAN-5015-review-verdicts-are-lost-when-github-returns-something-went-wrong-or-non-200-ok-status-code-502-the-transient-error-regex-misses-both.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "transient-regex",
+        "title": "Classify GitHub GraphQL 'Something went wrong' and gh 'non-200 OK status code: 50x' as transient",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T15:21:23Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5015",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/forge-transient.ts",
+            "tests/unit/lib/forge-transient.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/forge-transient.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tests/unit/lib/forge-transient.test.ts passes including the new PAN-5015 strings",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1 exactly. In src/lib/forge-transient.ts replace TRANSIENT_FORGE_ERROR (grep `const TRANSIENT_FORGE_ERROR =`) with /rate limit|secondary rate|abuse detection|ECONNRESET|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|ECONNREFUSED|socket hang up|timed out|something went wrong while executing your query|(?:failed: |HTTP |non-200 OK status code: )50[234]\\b/i and update the doc comment above it to name the three prefixes and the GraphQL phrase (PAN-5015). In tests/unit/lib/forge-transient.test.ts add the five transient strings and three non-transient strings listed in the PRD, plus one exec-shaped stderr case with the GraphQL message. Change nothing else in production code."
+        },
+        "items": [
+          {
+            "id": "transient-regex.ac1",
+            "title": "Given the GraphQL message 'GraphQL: Something went wrong while executing your query on 2026-11-04T10:15:14Z. Please include `...` when reporting this issue.', when passed to isTransientForgeError as an Error, a string, or as stderr of an exec-shaped object, then it returns true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "transient-regex.ac2",
+            "title": "Given 'non-200 OK status code: 502 Bad Gateway body: \"<html>...\"' (and the 503 and 504 variants, and the same text after 'gh pr view <branch> failed: '), isTransientForgeError returns true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "transient-regex.ac3",
+            "title": "isTransientForgeError returns false for 'non-200 OK status code: 404 Not Found', 'non-200 OK status code: 500 Internal Server Error', and a message containing https://github.com/o/r/pull/502 with no 5xx text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "transient-regex.ac4",
+            "title": "Given the diff of src/lib/forge-transient.ts, it contains changes only to the TRANSIENT_FORGE_ERROR literal and its doc comment, and every 50[234] in the regex follows one of the prefixes 'failed: ', 'HTTP ', 'non-200 OK status code: '",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "done-defers-github-5xx",
+        "title": "Prove specialists done defers a verdict that hits GitHub's GraphQL 5xx or gh's raw 502",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T15:21:23Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-5015",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/__tests__/specialists-done-forge-lookup.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/specialists-done-forge-lookup.test.ts"
+          ],
+          "expected_outputs": [
+            "specialists-done-forge-lookup.test.ts passes, including the two PAN-5015 cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2. In src/cli/commands/__tests__/specialists-done-forge-lookup.test.ts add the two `it` cases from the PRD after the existing 'defers a verdict whose post hit a transient forge failure' case: (1) postReviewVerdict resolves { posted: false, reason: 'gh pr review failed: ...GraphQL: Something went wrong while executing your query...' } for status 'passed'; (2) discoverArtifact fails with 'gh pr view feature/pan-4222 failed: non-200 OK status code: 502 Bad Gateway body: \"<html>\"'. Keep lib/forge-transient.js unmocked so the real regex runs. Add a PAN-5015 line to the file header comment. Do not touch done.ts: the lookup error already carries gh's stderr in its message (src/lib/forge.ts line 189) and the post reason already carries stderr (pr-review-verdict.ts errorText)."
+        },
+        "items": [
+          {
+            "id": "done-defers-github-5xx.ac1",
+            "title": "Given postReviewVerdict returns posted:false with a reason containing 'GraphQL: Something went wrong while executing your query', when `doneCommand('review', ..., { status: 'passed' })` runs, then it exits 1, prints 'The verdict is saved and deacon-lite will retry recording it.', and appends exactly one review.verdict-deferred entry with status 'passed', the run id, and a reason containing the GraphQL phrase",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "done-defers-github-5xx.ac2",
+            "title": "Given discoverArtifact fails with 'gh pr view feature/pan-4222 failed: non-200 OK status code: 502 Bad Gateway ...', when the review verdict runs, then it exits 1, never calls postReviewVerdict, and appends one review.verdict-deferred entry whose reason contains 'non-200 OK status code: 502'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "done-defers-github-5xx.ac3",
+            "title": "The test file does not mock '../../../lib/forge-transient.js', so both cases exercise the production regex; the cases fail when run against the pre-PAN-5015 regex",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-pipeline-gates",
+        "title": "Document the GitHub 5xx shapes in docs/PIPELINE-GATES.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T15:21:23Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5015",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/PIPELINE-GATES.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n \"Something went wrong while executing your query\" docs/PIPELINE-GATES.md",
+            "grep -n \"non-200 OK status code\" docs/PIPELINE-GATES.md"
+          ],
+          "expected_outputs": [
+            "each grep prints exactly one line inside the 'Recording retries transient forge failures (PAN-4263)' paragraph"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3. In docs/PIPELINE-GATES.md, in the paragraph beginning '**Recording retries transient forge failures (PAN-4263).**' (about line 749), after the sentence ending '(`lib/forge-transient.ts`).' insert: 'A 502/503/504 counts in any of gh's wordings (`HTTP 502`, `failed: 502`, `non-200 OK status code: 502`), and so does GitHub's GraphQL `Something went wrong while executing your query` (PAN-5015). A 500 does not.' Reflow only that paragraph. Do not edit changelog.mdx."
+        },
+        "items": [
+          {
+            "id": "docs-pipeline-gates.ac1",
+            "title": "Given docs/PIPELINE-GATES.md, the PAN-4263 paragraph contains `non-200 OK status code: 502` and GitHub's GraphQL `Something went wrong while executing your query`, says both are retried and deferred as transient, and cites PAN-5015",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-pipeline-gates.ac2",
+            "title": "Given docs/PIPELINE-GATES.md, the same paragraph contains the sentence that a 500 does not count as transient, and `git diff main -- docs/PIPELINE-GATES.md` shows changes only inside that paragraph",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "transient-regex",
+        "to": "done-defers-github-5xx",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

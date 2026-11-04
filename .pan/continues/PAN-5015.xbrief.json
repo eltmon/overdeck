@@ -1,0 +1,67 @@
+{
+  "version": "1",
+  "issueId": "PAN-5015",
+  "created": "2026-11-04T15:25:55.139Z",
+  "updated": "2026-11-04T15:39:38.712Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "transient-regex": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5015",
+      "claimedAt": "2026-11-04T15:25:55.139Z",
+      "doneAt": "2026-11-04T15:27:29.519Z"
+    },
+    "done-defers-github-5xx": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5015",
+      "claimedAt": "2026-11-04T15:27:40.171Z",
+      "doneAt": "2026-11-04T15:28:39.374Z"
+    },
+    "docs-pipeline-gates": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5015",
+      "claimedAt": "2026-11-04T15:28:43.359Z",
+      "doneAt": "2026-11-04T15:29:50.129Z"
+    },
+    "transient-regex.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:36:41.140Z"
+    },
+    "transient-regex.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:37:08.674Z"
+    },
+    "transient-regex.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:37:23.679Z"
+    },
+    "transient-regex.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:37:39.223Z"
+    },
+    "done-defers-github-5xx.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:38:21.003Z"
+    },
+    "done-defers-github-5xx.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:38:34.620Z"
+    },
+    "done-defers-github-5xx.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:38:47.998Z"
+    },
+    "docs-pipeline-gates.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:39:23.544Z"
+    },
+    "docs-pipeline-gates.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:39:38.712Z"
+    }
+  }
+}

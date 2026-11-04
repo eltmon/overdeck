@@ -17,6 +17,11 @@ describe('isTransientForgeError (PAN-4263)', () => {
     'GitHub API GET /x failed: 503 upstream',
     'HTTP 502: Bad Gateway',
     'HTTP 504: Gateway Timeout',
+    'GraphQL: Something went wrong while executing your query on 2026-11-04T10:15:14Z. Please include `abc123` when reporting this issue.',
+    'non-200 OK status code: 502 Bad Gateway body: "<html>..."',
+    'non-200 OK status code: 503 Service Unavailable',
+    'non-200 OK status code: 504 Gateway Timeout',
+    'gh pr view feature/x failed: non-200 OK status code: 502 Bad Gateway',
   ])('treats %j as transient', (message) => {
     expect(isTransientForgeError(new Error(message))).toBe(true);
     expect(isTransientForgeError(message)).toBe(true);
@@ -27,6 +32,9 @@ describe('isTransientForgeError (PAN-4263)', () => {
     'HTTP 404: Not Found',
     'glab mr list failed: 401 Unauthorized',
     'unrecognized artifact URL https://github.com/o/r/pull/504',
+    'non-200 OK status code: 404 Not Found',
+    'non-200 OK status code: 500 Internal Server Error',
+    'unrecognized artifact URL https://github.com/o/r/pull/502',
   ])('treats %j as not transient', (message) => {
     expect(isTransientForgeError(new Error(message))).toBe(false);
   });
@@ -34,6 +42,13 @@ describe('isTransientForgeError (PAN-4263)', () => {
   it('reads stderr on exec-shaped errors', () => {
     expect(isTransientForgeError({ message: 'Command failed', stderr: 'API rate limit exceeded' })).toBe(true);
     expect(isTransientForgeError(undefined)).toBe(false);
+  });
+
+  it('reads the GraphQL 5xx phrase on exec-shaped stderr', () => {
+    expect(isTransientForgeError({
+      message: 'Command failed',
+      stderr: 'GraphQL: Something went wrong while executing your query on 2026-11-04T10:15:14Z. Please include `abc123` when reporting this issue.',
+    })).toBe(true);
   });
 });
 

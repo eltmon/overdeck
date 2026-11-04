@@ -33,6 +33,7 @@ import { startCodexPluginImporter, stopCodexPluginImporter } from './services/co
 import { startRestartAnnouncer, stopRestartAnnouncer } from './services/restart-announcer.js';
 import { startUatTrainReconciler, stopUatTrainReconciler } from './services/uat-train.js';
 import { runAutoMergeSchedulerTick } from './services/auto-merge-scheduler.js';
+import { invalidatePullRequestListingOnApproval } from './services/issue-pr-refresh.js';
 import { runApprovalAtHeadRefreshTick } from './services/approval-at-head-refresh.js';
 import { startTtsSummarizer, stopTtsSummarizer } from './services/tts-summarizer.js';
 import { startTtsPlayback, stopTtsPlayback } from './services/tts-playback.js';
@@ -347,6 +348,7 @@ setPipelineHandler((event) => {
       } catch (err) {
         console.error('[pipeline] Failed to append pipeline.journal event:', err);
       }
+      invalidatePullRequestListingOnApproval(event.entry);
       return;
     }
 

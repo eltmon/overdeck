@@ -27,6 +27,8 @@ export interface NotScheduledAutoMergeRow {
   reason: string;
   head?: string;
   at: string;
+  /** PAN-5036: the whole project was skipped; `issueId` carries the project key. */
+  scope?: 'project';
 }
 
 export interface PendingAutoMergesPayload {
@@ -109,14 +111,21 @@ export function PendingAutoMergesCard({ onNavigateIssue }: { onNavigateIssue?: (
             </li>
           );
         })}
-        {notScheduled.map((entry) => (
-          <li key={`not-scheduled-${entry.issueId}`} className="flex flex-wrap items-baseline gap-2 text-xs" data-testid={`not-scheduled-auto-merge-${entry.issueId}`}>
-            <button type="button" className="font-mono text-foreground hover:underline" onClick={() => onNavigateIssue?.(entry.issueId)}>
-              {entry.issueId}
-            </button>
-            <span className="min-w-0 break-words text-muted-foreground">Not scheduled: {entry.reason}</span>
-          </li>
-        ))}
+        {notScheduled.map((entry) => {
+          const id = entry.scope === 'project' ? `project-${entry.projectKey}` : entry.issueId;
+          return (
+            <li key={`not-scheduled-${id}`} className="flex flex-wrap items-baseline gap-2 text-xs" data-testid={`not-scheduled-auto-merge-${id}`}>
+              {entry.scope === 'project' ? (
+                <span className="font-mono text-foreground">{entry.projectKey}</span>
+              ) : (
+                <button type="button" className="font-mono text-foreground hover:underline" onClick={() => onNavigateIssue?.(entry.issueId)}>
+                  {entry.issueId}
+                </button>
+              )}
+              <span className="min-w-0 break-words text-muted-foreground">Not scheduled: {entry.reason}</span>
+            </li>
+          );
+        })}
       </ul>
       {cancel.error && <p className="mt-2 text-xs text-destructive" role="alert">{cancel.error.message}</p>}
     </RailCard>

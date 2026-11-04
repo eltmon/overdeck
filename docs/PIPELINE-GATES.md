@@ -749,7 +749,10 @@ the entry after it.
 **Recording retries transient forge failures (PAN-4263).** `pan admin
 specialists done` finds the PR through `discoverArtifact` (`lib/forge.ts`),
 which retries a rate-limit, network or 502/503/504 failure twice, after 2 s
-and 8 s (`lib/forge-transient.ts`). A lookup that still fails is reported as
+and 8 s (`lib/forge-transient.ts`). A 502/503/504 counts in any of gh's
+wordings (`HTTP 502`, `failed: 502`, `non-200 OK status code: 502`), and so
+does GitHub's GraphQL `Something went wrong while executing your query`
+(PAN-5015). A 500 does not. A lookup that still fails is reported as
 `Couldn't reach <forge> to find the review artifact for <branch>: <reason>`,
 never as "No open review artifact": only gh's own "no pull requests found"
 answer (or an empty `glab mr list`) means there is no PR, and a closed PR on
@@ -844,6 +847,16 @@ nothing while a review is already running. Every completed pass keeps each candi
 `GET /api/merge-train/auto-merge/pending` and shown on the Flywheel page's
 Pending auto-merges card as "Not scheduled: <reason>". A reason is logged only
 when it changes.
+PAN-5036: the scheduler never schedules nothing silently. When the project's
+PR listing read fails (`readRepoPullRequests` answers `null`), the project gets
+one skip entry, "PR listing unavailable", with `scope: 'project'` and the
+project key as `issueId`; it logs once when it appears and once when it clears.
+An open `feature/<id>` PR that the cached listing rules out (checks not green, or
+conflicting) passes through the free checks (policy, Deft hold, latest row)
+and is then skipped with a reason naming the head it judged, for example
+"checks pending in the PR listing at 697a05f8". A journaled `review.verdict`
+APPROVED drops that repo's cached listing (`invalidatePullRequestListingOnApproval`
+in `issue-pr-refresh.ts`), so the next pass reads fresh checks.
 Auto-merge eligibility applies the same rule. Nothing is stored; each input is
 read when the question is asked. The PR is merge-ready when, in order:
 

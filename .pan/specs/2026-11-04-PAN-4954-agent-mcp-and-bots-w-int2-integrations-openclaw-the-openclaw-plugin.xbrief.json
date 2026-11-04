@@ -1,0 +1,1006 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-04T13:58:24.594Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4954: Agent MCP and bots (W-INT2): integrations/openclaw/: the OpenClaw plugin",
+    "updated": "2026-11-04T14:47:49.342Z"
+  },
+  "plan": {
+    "id": "pan-4954",
+    "title": "Agent MCP and bots (W-INT2): integrations/openclaw/: the OpenClaw plugin",
+    "status": "running",
+    "uid": "6e9dd60f-36a4-41f4-a6bd-8d042646015d",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 4,
+    "created": "2026-11-04T13:58:24.594Z",
+    "updated": "2026-11-04T14:47:49.342Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4954",
+        "label": "PAN-4954",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/pan-4954.md",
+        "label": "PRD draft (.pan/drafts/pan-4954.md)",
+        "type": "prd"
+      },
+      {
+        "uri": ".pan/drafts/pan-4927.md",
+        "label": "Parent epic PRD PAN-4927, work item W-INT2",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "integrations",
+      "openclaw",
+      "mcp",
+      "plugin",
+      "pan-4927"
+    ],
+    "metadata": {
+      "sizeJustification": "One npm package delivered as one parent work item (PAN-4927 W-INT2): 15 small package files plus one test file per source module (8) and 4 docs/verification files, in 3 subsystems (integrations/openclaw, tests/unit, configuration). Splitting the package across sibling issues would ship a plugin whose manifest contracts.tools cannot match its registrations; the items are already sliced per module so they run in parallel.",
+      "canonicalFilename": "2026-11-04-PAN-4954-agent-mcp-and-bots-w-int2-integrations-openclaw-the-openclaw-plugin.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "PAN-4927 FR-15 needs a real, installable OpenClaw plugin so an OpenClaw gateway can see and steer Overdeck through the Overdeck connector or Tailscale. integrations/openclaw/ holds only the shared skill copy today. The parent W-INT2 text was written against the 2026-05 OpenClaw checkout; the current release (2026.10.10) reads only documented manifest keys, keeps entry points in package.json, and its SDK package is 274 MB and needs Node 24.16+.",
+      "Proposal": "Build @overdeck/openclaw 0.1.0 as a zero-dependency ESM package: a plain-object plugin entry typed by local structural interfaces (no openclaw import), a manifest with documented keys only and contracts.tools [overdeck_pending, overdeck_answer], a fetch-based JSON-RPC client to the connector (or the dashboard over Tailscale), a 5-minute-throttled before_prompt_build needs-you summary, and two chat tools. overdeck_answer is off unless allowAnswers is true, takes { item, ref, choice }, refuses when the ref no longer matches, and maps each prompt kind to one Overdeck answer tool with named arguments only. The Overdeck MCP tools themselves reach OpenClaw through mcp.servers with transport streamable-http; the README carries the exact openclawConfig snippets. CP-7 is answered from the 2026.10.10 docs and confirmed live with openclaw plugins validate / mcp probe / plugins inspect under Node 24.17 against the dashboard /mcp, recorded in docs/verification.md.",
+      "NonGoals": "- Publishing the package to npm, ClawHub or any catalog (PAN-4927 D-5).\n- The CI job that builds and tests this package (W-CI1).\n- configuration/bots.mdx and the other W-DOC pages.\n- Native proxy tools for every Overdeck tool (the CP-7(a) fallback); only a follow-up issue if CP-7(a) fails.\n- Manifest mcpServers, OpenClaw MCP OAuth (auth: \"oauth\"), and public /mcp for OpenClaw.\n- Editing integrations/shared/SKILL.md or any skill copy.\n- Any change to Overdeck server code, botSnippets.ts or the connector.\n- Answering multi-question prompts through overdeck_answer (D-7).\n- Reporting list_pending_input fleetError in overdeck_pending or the summary.\n- A runtime or development dependency on the openclaw package."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Export a plain plugin-definition object typed by local interfaces instead of importing definePluginEntry (changes parent D-22 wording).",
+        "rationale": "definePluginEntry in openclaw 2026.10.10 is a pure builder of the same object; importing it needs the 274 MB openclaw package with Node >=24.16 in a Node 22 repo, and local-path installs would not resolve it. The MYN model ships this shape in production; the live CP-7 check runs the real host."
+      },
+      {
+        "summary": "Manifest uses documented keys only; drop the parent draft's entry and license keys; the entry is package.json openclaw.extensions.",
+        "rationale": "OpenClaw 2026.10.10 docs: only documented manifest fields are read; entry points and compat live in package.json#openclaw."
+      },
+      {
+        "summary": "Compatibility floor >=2026.5.6 in openclaw.compat.pluginApi, openclaw.install.minHostVersion and an optional peer dependency.",
+        "rationale": "Only 2026.5.6 (local checkout) and 2026.10.10 were checked; an optional peer keeps npm ci from installing the host."
+      },
+      {
+        "summary": "configSchema does not mark localToken required; the tools answer a setup error instead.",
+        "rationale": "plugins install enables the plugin by default, and a required field missing from config would invalidate the whole OpenClaw config."
+      },
+      {
+        "summary": "register always registers both contracted tools; a bad URL or missing token becomes the tools' answer text.",
+        "rationale": "Runtime registrations must match contracts.tools."
+      },
+      {
+        "summary": "overdeck_answer takes { item, ref, choice } with an 8-hex ref and refuses when the ref no longer matches item.",
+        "rationale": "The pending list can change between listing and answering; without the check an item number could answer a different prompt."
+      },
+      {
+        "summary": "overdeck_answer answers single-question prompts only; multi-question prompts point at overdeck__answer_question or the dashboard.",
+        "rationale": "One choice string cannot carry several answers without a separator free text could contain."
+      },
+      {
+        "summary": "Summary fetches at most once per 5 minutes per gateway and injects only on the fetching turn.",
+        "rationale": "Avoids repeating the same context every turn and bounds connector load."
+      },
+      {
+        "summary": "CP-7 runs live against the dashboard's own /mcp with a short-lived read-only token, not through a paired connector.",
+        "rationale": "The dashboard /mcp uses the same sessionless JSON Streamable HTTP as the connector; a connector pairing needs the operator's overdeck.ai sign-in."
+      },
+      {
+        "summary": "If CP-7(a) fails, record it, file a follow-up issue for native proxy tools and tell the orchestrator instead of building the fallback here.",
+        "rationale": "The 2026.10.10 docs state embedded OpenClaw exposes mcp.servers tools, so the fallback is unlikely and large."
+      },
+      {
+        "summary": "Behavior tests live in the package; a root tests/unit/integrations/openclaw.test.ts covers package shape so CI checks it before W-CI1 exists.",
+        "rationale": "Root vitest does not include integrations/; grok-bot set the same precedent."
+      }
+    ],
+    "items": [
+      {
+        "id": "scaffold",
+        "title": "Scaffold the @overdeck/openclaw package (package.json, lockfile, tsconfig, vitest config, LICENSE, local OpenClaw types)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T13:58:24.594Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-4954",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "integrations/openclaw/package.json",
+            "integrations/openclaw/package-lock.json",
+            "integrations/openclaw/tsconfig.json",
+            "integrations/openclaw/vitest.config.ts",
+            "integrations/openclaw/src/openclaw-api.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd integrations/openclaw && npm ci && npm run build",
+            "cmp integrations/LICENSE integrations/openclaw/LICENSE",
+            "git ls-files integrations/openclaw | grep -E \"(^|/)(dist|node_modules)/\" ; test $? -eq 1"
+          ],
+          "expected_outputs": [
+            "npm run build exits 0 and writes dist/openclaw-api.js",
+            "cmp exits 0",
+            "git ls-files lists no dist/ or node_modules/ path"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/pan-4954.md WI-1. Create package.json exactly as in WI-1 step 1 (name @overdeck/openclaw, version 0.1.0, type module, openclaw.extensions [\"./dist/index.js\"], openclaw.compat.pluginApi and openclaw.install.minHostVersion \">=2026.5.6\", optional peer openclaw >=2026.5.6, devDependencies typescript ^5.9.3, vitest ^4.1.11, @types/node ^22.0.0, NO dependencies key). Run `cd integrations/openclaw && npm install` on Node 22 to create package-lock.json and commit it. tsconfig.json: ES2022, NodeNext, strict, rootDir src, outDir dist, declaration, include [\"src\"]. vitest.config.ts: include tests/**/*.test.ts, environment node. LICENSE (integrations/openclaw/LICENSE) = byte copy of integrations/LICENSE. src/openclaw-api.ts = the structural types listed in WI-1 step 6 (JsonSchema, PluginLogger, ToolResult, PluginTool, PromptBuildResult, PromptBuildHandler, OpenClawPluginApi, OpenClawPluginDefinition); no runtime code and no import of the `openclaw` package (D-1)."
+        },
+        "items": [
+          {
+            "id": "scaffold.ac1",
+            "title": "Given a clean checkout on Node 22, when `cd integrations/openclaw && npm ci && npm run build` runs, then it exits 0 without installing the openclaw package into node_modules",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scaffold.ac2",
+            "title": "package.json contains openclaw.extensions [\"./dist/index.js\"] and openclaw.compat.pluginApi \">=2026.5.6\" and has no dependencies key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scaffold.ac3",
+            "title": "git ls-files integrations/openclaw returns no dist/ or node_modules/ path, and LICENSE is byte-equal to integrations/LICENSE",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "config",
+        "title": "Plugin config reader and connectorUrl rule (config.ts)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T13:58:24.594Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4954",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "integrations/openclaw/src/config.ts",
+            "integrations/openclaw/tests/config.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd integrations/openclaw && npx vitest run tests/config.test.ts",
+            "cd integrations/openclaw && npm run build"
+          ],
+          "expected_outputs": [
+            "tests/config.test.ts passes",
+            "npm run build exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Export DEFAULT_CONNECTOR_URL, CONFIG_SCHEMA (no `required` key, D-4), OverdeckPluginConfig, readConfig(raw) and checkConnectorUrl(value) with the exact rules in WI-2 steps 2-3: parse with `new URL`, refuse user name/password, accept https:, accept http: only when url.hostname is exactly 127.0.0.1, localhost or [::1]; reasons never echo the input. An unresolved \"${VAR}\" localToken reads as null; allowAnswers is true only for boolean true; summary is false only for boolean false. Tests: every accepted and refused input listed in WI-2."
+        },
+        "items": [
+          {
+            "id": "config.ac1",
+            "title": "checkConnectorUrl accepts http://127.0.0.1:7466/mcp, http://localhost:7466/mcp, http://[::1]:7466/mcp and https://box.tail1.ts.net/mcp",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config.ac2",
+            "title": "checkConnectorUrl refuses http://example.com/mcp, http://localhost.example.com/mcp, http://127.0.0.1.nip.io/mcp, ftp://127.0.0.1/mcp, a URL with user:password, and \"not a url\", and no refusal reason contains the input text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config.ac3",
+            "title": "readConfig returns localToken null for \"${OVERDECK_CONNECTOR_LOCAL_TOKEN}\", allowAnswers false for the string \"true\", and defaults to connectorUrl http://127.0.0.1:7466/mcp with summary true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mcp-client",
+        "title": "JSON-RPC tools/call client over fetch (mcp-client.ts)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T13:58:24.594Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4954",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "integrations/openclaw/src/mcp-client.ts",
+            "integrations/openclaw/tests/mcp-client.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd integrations/openclaw && npx vitest run tests/mcp-client.test.ts",
+            "cd integrations/openclaw && npm run build"
+          ],
+          "expected_outputs": [
+            "tests/mcp-client.test.ts passes, including the fake-timer timeout case",
+            "npm run build exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-1",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. createMcpClient({ url, token, fetch? }) returns callTool(name, args, { timeoutMs? }). One POST to url.href with content-type application/json, accept \"application/json, text/event-stream\" (the SDK transport answers 406 without text/event-stream) and authorization Bearer <token>; body { jsonrpc: \"2.0\", id: counter, method: \"tools/call\", params: { name, arguments: args } }. Timeout 10 s default via AbortController + setTimeout cleared in finally (never AbortSignal.timeout). Throw OverdeckMcpError with exactly the WI-3 step 4 messages; messages name at most url.origin and never the token. Build the test token at runtime as ['odl', 'a'.repeat(64)].join('_') so no token-shaped literal is committed (WI-10 scan, GitHub push protection). Success returns { isError: result.isError === true, text: joined text blocks }."
+        },
+        "items": [
+          {
+            "id": "mcp-client.ac1",
+            "title": "callTool sends one POST whose headers include accept \"application/json, text/event-stream\" and authorization \"Bearer <token>\" and whose body is a JSON-RPC tools/call with the given name and arguments",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-client.ac2",
+            "title": "Given HTTP 401, HTTP 500, a fetch rejection, a JSON-RPC error, a non-JSON body and a 10 s timeout on fake timers, callTool throws OverdeckMcpError with the WI-3 messages and none contains the token string",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-client.ac3",
+            "title": "A result with two text blocks returns their texts joined by a newline, and result.isError true returns isError true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "schema",
+        "title": "Tool parameter schemas and the portable-schema guard (schema.ts)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T13:58:24.594Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4954",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "integrations/openclaw/src/schema.ts",
+            "integrations/openclaw/tests/schema.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd integrations/openclaw && npx vitest run tests/schema.test.ts",
+            "cd integrations/openclaw && npm run build"
+          ],
+          "expected_outputs": [
+            "tests/schema.test.ts passes",
+            "npm run build exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-3",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. Export ALLOWED_SCHEMA_KEYS (type, properties, required, items, enum, description), schemaViolations(schema, path) that returns \"<path>.<key>\" for every other key and recurses into properties values and items, PENDING_PARAMETERS ({ type: object, properties: {} }) and ANSWER_PARAMETERS (item integer, ref string, choice string, all required; descriptions as in WI-4)."
+        },
+        "items": [
+          {
+            "id": "schema.ac1",
+            "title": "schemaViolations returns [] for PENDING_PARAMETERS and for ANSWER_PARAMETERS",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "schema.ac2",
+            "title": "schemaViolations reports anyOf, oneOf, const, format, minimum and additionalProperties, including when nested under properties and items, each with its path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pending",
+        "title": "Pending-item model: parse list_pending_input, refs, list and summary text (pending.ts)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T13:58:24.594Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4954",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "answer",
+            "tools",
+            "summary"
+          ],
+          "files_scope": [
+            "integrations/openclaw/src/pending.ts",
+            "integrations/openclaw/tests/pending.test.ts",
+            "integrations/openclaw/tests/fixtures/pending-input.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd integrations/openclaw && npx vitest run tests/pending.test.ts",
+            "cd integrations/openclaw && npm run build"
+          ],
+          "expected_outputs": [
+            "tests/pending.test.ts passes against tests/fixtures/pending-input.json",
+            "npm run build exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "NFR-6",
+            "NFR-7"
+          ],
+          "parallelSafeReason": "Touches only src/pending.ts, its test and its fixture; no other item edits those files."
+        },
+        "narrative": {
+          "Action": "PRD WI-5 (the full rules are there; follow them literally). parsePendingInput(text) flattens list_pending_input JSON in order: machines, then each machine's conversations (surfaces in order permission, ask, plan, pane choice, held kickoff), then its agents (ask, each permission request, exitPlanMode, other kinds). Kind by harness: codex-approval when toolUseId starts with \"codex-approval:\" or harness codex; pi-ask for ohmypi or pi; question for claude-code; dashboard-only otherwise. Single-question rule (D-7). Remote agents (remote true or id starting with \"@\") are not answerable. ref = first 8 hex of sha256(JSON.stringify([kind, targetKey, refKey])). formatPendingList and summaryText produce exactly the WI-5 step 6-7 texts, collapse whitespace with oneLine, cap summary at 5 items of 300 characters. Non-JSON or missing machines throws \"list_pending_input returned an unexpected answer\". Build the fixture covering every branch listed in WI-5 with invented values only."
+        },
+        "items": [
+          {
+            "id": "pending.ac1",
+            "title": "Given tests/fixtures/pending-input.json, parsePendingInput returns items whose kinds appear in the exact WI-5 order, and linked conversation names keep their \"@env-1/\" prefix",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pending.ac2",
+            "title": "Each item ref is 8 lowercase hex characters, equal across two parses, and different when only the item signature changes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pending.ac3",
+            "title": "parsePendingInput returns answerable false with the WI-5 reason for the two-question ask, the opencode ask, the held kickoff and the remote agent items",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pending.ac4",
+            "title": "summaryText returns null for an empty list and otherwise at most 5 item lines of at most 302 characters plus an \"and N more\" line, and a prompt containing blank lines comes out on one line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pending.ac5",
+            "title": "parsePendingInput throws \"list_pending_input returned an unexpected answer\" for text that is not JSON",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "answer",
+        "title": "Choice-to-answer-tool mapping with named arguments only (answer.ts)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T13:58:24.594Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4954",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "tools"
+          ],
+          "files_scope": [
+            "integrations/openclaw/src/answer.ts",
+            "integrations/openclaw/tests/answer.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd integrations/openclaw && npx vitest run tests/answer.test.ts",
+            "cd integrations/openclaw && npm run build"
+          ],
+          "expected_outputs": [
+            "tests/answer.test.ts passes with one case per mapping-table row",
+            "npm run build exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. planAnswer(item, choice) returns { ok, tool, arguments, done } or { ok: false, error }. Trim the choice; refuse empty, longer than 2000 characters, or an item that is not answerable (error = item.reason). resolveOption: option number, then case-insensitive label, then free text. Map each kind to the exact tool and argument object in the WI-6 table (answer_permission, answer_question, answer_pi_ask, answer_codex_approval, answer_plan, answer_pane_choice with selectedIndex = index of the matching option number, answer_agent_permission, answer_agent_plan). Arguments are object literals built from named PendingItem fields only (security review W2). done text as in WI-6 step 5."
+        },
+        "items": [
+          {
+            "id": "answer.ac1",
+            "title": "For each of the 9 kinds in the WI-6 table, planAnswer returns that row's tool and an arguments object that toEqual-matches the row exactly",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "answer.ac2",
+            "title": "A permission item accepts \"Allow-Once\" as allow-once, and refuses \"allow\" with \"choice must be one of: allow-once, allow-always, deny\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "answer.ac3",
+            "title": "A pane-choice item with option numbers [1, 2] maps \"2\" to selectedIndex 1 and refuses \"9\"; a plan item maps \"reject-feedback: shorter\" to action reject-feedback with feedback \"shorter\" and refuses \"reject-feedback:\" with no text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "answer.ac4",
+            "title": "A question item resolves \"1\" to the first option label, \"YES\" to the label \"Yes\", and other text to that text unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tools",
+        "title": "Native tools overdeck_pending and overdeck_answer (tools.ts)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T13:58:24.594Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4954",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "integrations/openclaw/src/tools.ts",
+            "integrations/openclaw/tests/tools.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd integrations/openclaw && npx vitest run tests/tools.test.ts",
+            "cd integrations/openclaw && npm run build"
+          ],
+          "expected_outputs": [
+            "tests/tools.test.ts passes",
+            "npm run build exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "NFR-1",
+            "NFR-2",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. Export TOOL_NAMES [\"overdeck_pending\", \"overdeck_answer\"] and createTools({ getConfig, client, setupError }). Tools never throw; they return text. overdeck_pending: list_pending_input -> formatPendingList(parsePendingInput(text)). overdeck_answer steps in WI-7 step 4 order: (1) getConfig().allowAnswers false -> refusal with zero client calls; (2) client null -> setup text; (3) read only item, ref, choice and validate them; (4) list again and refuse unless items[item-1].ref === ref; (5) planAnswer; (6) callTool(plan.tool, plan.arguments) and return plan.done. Test tokens are built at runtime as in mcp-client, never as one literal. Map \"Unknown tool list_pending_input\" and \"Unknown tool answer_*\" to the read-access and approve-access texts in WI-7 step 2."
+        },
+        "items": [
+          {
+            "id": "tools.ac1",
+            "title": "Given allowAnswers false, overdeck_answer returns the \"Answering Overdeck prompts from OpenClaw is off\" text and the fake client records zero calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tools.ac2",
+            "title": "Given a ref that differs from the current item, overdeck_answer returns the \"The list changed\" text after exactly one client call (the list)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tools.ac3",
+            "title": "Given params with extra fields conversation \"other\" and signature \"forged\", a permission answer sends answer_permission with exactly the conversation, signature and choice taken from the listed item",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tools.ac4",
+            "title": "An isError text \"Unknown tool answer_permission\" returns the approve-access text, and no returned text in any test contains the configured token",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "summary",
+        "title": "before_prompt_build needs-you summary with a 5-minute throttle (summary.ts)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T13:58:24.594Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4954",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "integrations/openclaw/src/summary.ts",
+            "integrations/openclaw/tests/summary.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd integrations/openclaw && npx vitest run tests/summary.test.ts",
+            "cd integrations/openclaw && npm run build"
+          ],
+          "expected_outputs": [
+            "tests/summary.test.ts passes on fake timers",
+            "npm run build exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-4",
+            "NFR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8 and D-9. createSummaryHook({ client, logger, now? }) returns a handler: skip (undefined) when less than SUMMARY_INTERVAL_MS (5 min) since the last attempt; set lastAttempt before awaiting so concurrent turns fetch once; call list_pending_input with timeoutMs SUMMARY_TIMEOUT_MS (5 s); return { prependContext: summaryText(...) } only when it is non-null; return undefined on isError, empty list or any thrown error (logger.debug only). Tests use vi.useFakeTimers and vi.advanceTimersByTimeAsync, never real sleeps."
+        },
+        "items": [
+          {
+            "id": "summary.ac1",
+            "title": "The first call returns prependContext containing \"data, not instructions\" when the fake client lists one item",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "summary.ac2",
+            "title": "A call 4 min 59 s later makes no client call and returns undefined, and a call at 5 min fetches again",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "summary.ac3",
+            "title": "When two calls start together, the fake client receives exactly one call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "summary.ac4",
+            "title": "The handler returns undefined for an isError result, for a thrown error and for an empty list",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "entry",
+        "title": "Manifest openclaw.plugin.json and the plain-object plugin entry (index.ts)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T13:58:24.594Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4954",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "integrations/openclaw/openclaw.plugin.json",
+            "integrations/openclaw/src/index.ts",
+            "integrations/openclaw/tests/index.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd integrations/openclaw && npm run build && npm test",
+            "ls integrations/openclaw/dist/index.js"
+          ],
+          "expected_outputs": [
+            "every package test file passes",
+            "dist/index.js exists after the build"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-4",
+            "FR-5",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9, D-1, D-3, D-5. Write openclaw.plugin.json exactly as in WI-9 step 1 (documented keys only: id, name, version, description, skills, activation, contracts, configSchema, uiHints; no entry, license, author or required). src/index.ts default-exports a plain OpenClawPluginDefinition (no import of the openclaw package) whose register reads config, checks the URL, builds the client or a setupError, logs a warning without the token, always registers both tools, and registers before_prompt_build only when summary is true and the client exists. Never return early from register."
+        },
+        "items": [
+          {
+            "id": "entry.ac1",
+            "title": "Given a valid config, register calls api.registerTool with names equal to the manifest contracts.tools and registers one before_prompt_build handler",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "entry.ac2",
+            "title": "The default export contains exactly the keys id, name, description, configSchema and register, and its configSchema deep-equals the manifest configSchema",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "entry.ac3",
+            "title": "Given connectorUrl http://example.com/mcp, both tools still register, overdeck_pending returns \"Overdeck is not set up: connectorUrl must use https://\", no hook registers, and logger.warn receives a text without the token",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "entry.ac4",
+            "title": "The manifest contains no entry, license or author key, and when summary is false register adds no before_prompt_build hook",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "readme",
+        "title": "README, PUBLISHING, CHANGELOG and the root package-shape test",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T13:58:24.594Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-4954",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "integrations/openclaw/README.md",
+            "integrations/openclaw/PUBLISHING.md",
+            "integrations/openclaw/CHANGELOG.md",
+            "tests/unit/integrations/openclaw.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/integrations/openclaw.test.ts",
+            "bash scripts/lint-source-introspection.sh",
+            "node integrations/shared/sync-skill.mjs --check"
+          ],
+          "expected_outputs": [
+            "tests/unit/integrations/openclaw.test.ts passes",
+            "lint-source-introspection exits 0",
+            "sync-skill --check prints that 4 skill copies match"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-8",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10. README sections in the WI-10 order: what it is, status, contents, requirements, install from the checkout, connector route with a json5 block byte-equal to openclawConfig({ reach: \"connector\", url: CONNECTOR_LOCAL_URL }), running the connector next to OpenClaw (second process or sidecar with network_mode \"service:openclaw\"; Fly), Tailscale route with a json5 block byte-equal to openclawConfig({ reach: \"tailscale\", url: TAILSCALE_PLACEHOLDER_ORIGIN + \"/mcp\" }), what the plugin adds with the shared-channel privacy note, config table, security, troubleshooting (openclaw mcp probe overdeck, sse default, minimal profile, tools.deny bundle-mcp, mcp doctor), license. PUBLISHING.md and CHANGELOG.md as in WI-10 steps 2-3. Root test tests/unit/integrations/openclaw.test.ts with every assertion in WI-10 step 4; it reads only .json/.md files and imports the plugin source and botSnippets (no readFile of a .ts path)."
+        },
+        "items": [
+          {
+            "id": "readme.ac1",
+            "title": "The README contains the connector output of openclawConfig (url http://127.0.0.1:7466/mcp) and its Tailscale output (url https://YOUR-MACHINE.YOUR-TAILNET.ts.net/mcp) byte for byte, as the root test asserts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "readme.ac2",
+            "title": "The README contains the summary privacy note telling operators to set summary: false on a gateway that serves group chats",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "readme.ac3",
+            "title": "When the root test registers the plugin from integrations/openclaw/src/index.ts on a fake api, the registered tool names match the manifest contracts.tools",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "readme.ac4",
+            "title": "A scan of integrations/openclaw (excluding node_modules, dist and package-lock.json) finds no match of /od[klr]_[0-9a-f]{8}/, and bash scripts/lint-source-introspection.sh exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-mcp",
+        "title": "configuration/mcp.mdx: OpenClaw paragraph and config block in \"Connect a bot\"",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T13:58:24.594Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4954",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/mcp.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c \"integrations/openclaw\" configuration/mcp.mdx",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "grep prints 1 or more",
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-11. In configuration/mcp.mdx \"## Connect a bot\", directly after the Hermes config block and before the line starting \"**Remove** in the Bots panel\", add the \"**OpenClaw.**\" paragraph (link to https://github.com/eltmon/overdeck/tree/main/integrations/openclaw; streamable-http is required because OpenClaw defaults to sse; the summary at most every 5 minutes; overdeck_pending and overdeck_answer; answering off until allowAnswers true and approve access) and a json5 block equal to the openclawConfig connector output."
+        },
+        "items": [
+          {
+            "id": "docs-mcp.ac1",
+            "title": "configuration/mcp.mdx contains a link to integrations/openclaw/ inside the \"Connect a bot\" section, before the \"**Remove** in the Bots panel\" line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-mcp.ac2",
+            "title": "configuration/mcp.mdx contains the line `  transport: \"streamable-http\",   // the default is \"sse\", which Overdeck does not serve` and names overdeck_pending, overdeck_answer and allowAnswers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-mcp.ac3",
+            "title": "npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cp7",
+        "title": "CP-7 live check against OpenClaw 2026.10.10 and docs/verification.md",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T13:58:24.594Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "test",
+          "issueLabel": "pan-4954",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "integrations/openclaw/docs/verification.md",
+            "integrations/openclaw/README.md"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "grep -cE \"^\\| CP-7\\((a|b|c)\\)\" integrations/openclaw/docs/verification.md",
+            "grep -c \"2026.10.10\" integrations/openclaw/docs/verification.md",
+            "grep -rE \"od[klr]_[0-9a-f]{8}\" integrations/openclaw --exclude-dir=node_modules --exclude-dir=dist ; test $? -eq 1"
+          ],
+          "expected_outputs": [
+            "grep prints 3",
+            "grep prints 1 or more",
+            "no token literal found"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ],
+          "parallelSafeReason": "Runs after entry and readme; it edits README.md only when a CP-7 check finds a renamed key, and no later item touches README.md."
+        },
+        "narrative": {
+          "Action": "PRD WI-12, steps 1-10, exactly. Build the package on Node 22. In a shell with PATH prefixed by /home/eltmon/.config/nvm/versions/node/v24.17.0/bin, install openclaw@2026.10.10 into $HOME/.overdeck/tmp/pan-4954-cp7/host and isolate it with OPENCLAW_HOME, OPENCLAW_STATE_DIR and OPENCLAW_CONFIG_PATH under that directory (never /tmp, never the repo). Run `openclaw plugins validate --root <abs integrations/openclaw> --entry ./dist/index.js` (b). Mint a read-only token with `pan token create cp7-openclaw-probe --scopes read:state,read:conversations --json`, keep it only in OVERDECK_CP7_TOKEN, write the WI-12 step 5 config pointing mcp.servers.overdeck and the plugin at http://127.0.0.1:3011/mcp, run `openclaw mcp probe overdeck --json` (a) and `openclaw plugins inspect overdeck --runtime --json` (b, c). If plugins.load.paths stops on a trust or capability-consent prompt, use `openclaw plugins install <abs integrations/openclaw> --accept-capabilities` instead (WI-12 step 7a). Revoke the token with `pan token revoke <id>`. Write docs/verification.md in the WI-12 step 10 format. If a check fails because of OpenClaw, follow the WI-12 checkpoint: renamed keys -> fix manifest/README and record; (a) failure -> record the error, create the follow-up GitHub issue for native proxy tools, and pan tell flywheel-orchestrator; do not build the proxies here."
+        },
+        "items": [
+          {
+            "id": "cp7.ac1",
+            "title": "integrations/openclaw/docs/verification.md contains one table row each for CP-7(a), CP-7(b) and CP-7(c) naming OpenClaw 2026.10.10, the command run and its result",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cp7.ac2",
+            "title": "When the probe passes, the CP-7(a) row records that `openclaw mcp probe overdeck` listed list_conversations and list_pending_input over streamable-http; when OpenClaw fails it, the row records the error and a follow-up issue link; when the host cannot run it, the row records Not run with the exact message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cp7.ac3",
+            "title": "After the check, `pan token list` shows no active token named cp7-openclaw-probe, and verification.md contains no od[klr]_ token literal",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "scaffold",
+        "to": "config",
+        "type": "blocks"
+      },
+      {
+        "from": "scaffold",
+        "to": "mcp-client",
+        "type": "blocks"
+      },
+      {
+        "from": "scaffold",
+        "to": "schema",
+        "type": "blocks"
+      },
+      {
+        "from": "scaffold",
+        "to": "pending",
+        "type": "blocks"
+      },
+      {
+        "from": "pending",
+        "to": "answer",
+        "type": "blocks"
+      },
+      {
+        "from": "config",
+        "to": "tools",
+        "type": "blocks"
+      },
+      {
+        "from": "mcp-client",
+        "to": "tools",
+        "type": "blocks"
+      },
+      {
+        "from": "schema",
+        "to": "tools",
+        "type": "blocks"
+      },
+      {
+        "from": "pending",
+        "to": "tools",
+        "type": "blocks"
+      },
+      {
+        "from": "answer",
+        "to": "tools",
+        "type": "blocks"
+      },
+      {
+        "from": "mcp-client",
+        "to": "summary",
+        "type": "blocks"
+      },
+      {
+        "from": "pending",
+        "to": "summary",
+        "type": "blocks"
+      },
+      {
+        "from": "config",
+        "to": "entry",
+        "type": "blocks"
+      },
+      {
+        "from": "tools",
+        "to": "entry",
+        "type": "blocks"
+      },
+      {
+        "from": "summary",
+        "to": "entry",
+        "type": "blocks"
+      },
+      {
+        "from": "entry",
+        "to": "readme",
+        "type": "blocks"
+      },
+      {
+        "from": "entry",
+        "to": "cp7",
+        "type": "blocks"
+      },
+      {
+        "from": "readme",
+        "to": "cp7",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

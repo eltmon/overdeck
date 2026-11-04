@@ -51,6 +51,7 @@ export {
   parkedListedIn,
   prFromGhRow,
   readIssueFromTracker,
+  readRepoPullRequests,
   specExistsFor,
   toChecksState,
   toChecksStateFromPipeline,

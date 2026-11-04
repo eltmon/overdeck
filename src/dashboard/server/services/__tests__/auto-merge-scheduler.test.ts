@@ -16,7 +16,8 @@ import type {
 } from '../../../../lib/overdeck/merge-sync.js';
 import type { GitHubReviewsAtHead, PrFacts } from '../../../../lib/cloister/pr-facts.js';
 import type { IssuePullRequestData } from '../../../../lib/overdeck/pull-requests.js';
-import type { listRepoPullRequests } from '../derived-issue-state.js';
+import type { GhPrRow } from '../../../../lib/overdeck/derived-issue-state.js';
+import type { ScheduleCandidates } from '../auto-merge-scheduler.js';
 
 vi.mock('../../../../lib/activity-logger.js', () => ({ emitActivityTts: vi.fn() }));
 vi.mock('../../../../lib/cloister/merge-eligibility.js', () => ({
@@ -41,7 +42,12 @@ const { evaluateIssueMergeGate } = await import('../../../../lib/cloister/merge-
 const { getPrFacts } = await import('../../../../lib/cloister/pr-facts.js');
 const { isAutoMergeEligible } = await import('../../../../lib/cloister/auto-merge-eligibility.js');
 
-type ListedPr = Awaited<ReturnType<typeof listRepoPullRequests>>[number];
+type ListedPr = GhPrRow;
+
+/** A listing that names only these candidates and rules nothing out. */
+function only(...candidates: string[]): ScheduleCandidates {
+  return { candidates, dropped: [] };
+}
 
 const PR_URL = 'https://github.com/eltmon/overdeck/pull/42';
 const OVERDECK: { key: string; config: ProjectConfig } = {
@@ -108,7 +114,7 @@ function world(options: WorldOptions = {}) {
     }
     return { created: true, entry: row('pending', input.headSha ? { headSha: input.headSha } : {}) };
   });
-  const listCandidates = vi.fn(async (_projectPath: string): Promise<readonly string[]> => ['pan-42']);
+  const listCandidates = vi.fn(async (_projectPath: string): Promise<ScheduleCandidates | null> => only('pan-42'));
   const globalRequireUat = options.globalRequireUat ?? true;
   const trainEnabled = options.trainEnabled ?? true;
   const labels = options.labels ?? [];
@@ -221,6 +227,7 @@ function listed(overrides: Partial<ListedPr> = {}): ListedPr {
     mergedAt: null,
     mergeable: 'MERGEABLE',
     headRefName: 'feature/pan-42',
+    headRefOid: 'abc123',
     isDraft: false,
     reviewDecision: '',
     reviewRequests: [],
@@ -499,9 +506,9 @@ describe('scheduleReadyAutoMerges (#3983)', () => {
   it('keeps going when one project fails to list its candidates', async () => {
     const { deps, insert } = world({ labels: ['auto-merge'] });
     deps.listProjects = () => [{ key: 'broken', config: { name: 'Broken', path: '/repos/broken' } }, OVERDECK];
-    deps.listCandidates = vi.fn(async (projectPath: string): Promise<readonly string[]> => {
+    deps.listCandidates = vi.fn(async (projectPath: string): Promise<ScheduleCandidates | null> => {
       if (projectPath === '/repos/broken') throw new Error('gh failed');
-      return ['PAN-42'];
+      return only('PAN-42');
     });
     const outcomes = await scheduleReadyAutoMerges(deps);
     expect(outcomes).toEqual([{ projectKey: 'overdeck', issueId: 'PAN-42', scheduled: true }]);
@@ -560,7 +567,22 @@ describe('listScheduleCandidates (#3983)', () => {
       listed({ number: 52, headRefName: 'feature/pan-52', mergeable: 'UNKNOWN' }),
     ];
     await expect(listScheduleCandidates('/repos/overdeck', { listPullRequests: async () => rows }))
-      .resolves.toEqual(['PAN-42', 'PAN-52']);
+      .resolves.toEqual({
+        candidates: ['PAN-42', 'PAN-52'],
+        // PAN-5036: open gate-linked PRs the listing rules out, with the head it judged.
+        dropped: [
+          { issueId: 'PAN-47', head: 'abc123', reason: 'checks red in the PR listing at abc123' },
+          { issueId: 'PAN-48', head: 'abc123', reason: 'checks pending in the PR listing at abc123' },
+          { issueId: 'PAN-53', head: 'abc123', reason: 'checks red in the PR listing at abc123' },
+          { issueId: 'PAN-49', head: 'abc123', reason: 'PR conflicts with its base in the PR listing at abc123' },
+        ],
+      });
+  });
+
+  it('answers null when the listing read failed, and an empty listing when there are no PRs (PAN-5036)', async () => {
+    await expect(listScheduleCandidates('/repos/overdeck', { listPullRequests: async () => null })).resolves.toBeNull();
+    await expect(listScheduleCandidates('/repos/overdeck', { listPullRequests: async () => [] }))
+      .resolves.toEqual({ candidates: [], dropped: [] });
   });
 
   it('links an issue by its feature branch only, never a strike branch', () => {
@@ -575,13 +597,13 @@ describe('runAutoMergeSchedulerTick (#3983)', () => {
   it('lets an abandoned pass that wakes up later start no forge read and write nothing', async () => {
     vi.useFakeTimers();
     try {
-      let releaseList!: (ids: readonly string[]) => void;
+      let releaseList!: (listing: ScheduleCandidates) => void;
       const { deps, insert, factsReads } = world({ labels: ['auto-merge'] });
       let calls = 0;
-      deps.listCandidates = vi.fn(async (): Promise<readonly string[]> => {
+      deps.listCandidates = vi.fn(async (): Promise<ScheduleCandidates | null> => {
         calls += 1;
         // The first pass hangs on its listing; the next tick's pass lists nothing.
-        return calls === 1 ? new Promise((resolve) => { releaseList = resolve; }) : [];
+        return calls === 1 ? new Promise((resolve) => { releaseList = resolve; }) : only();
       });
 
       const stale = runAutoMergeSchedulerTick(deps, 1_000);
@@ -591,7 +613,7 @@ describe('runAutoMergeSchedulerTick (#3983)', () => {
       await next;
 
       // The hung listing finally answers, long after the pass was abandoned.
-      releaseList(['PAN-42']);
+      releaseList(only('PAN-42'));
       await vi.advanceTimersByTimeAsync(0);
       expect(factsReads).not.toHaveBeenCalled();
       expect(insert).not.toHaveBeenCalled();
@@ -640,7 +662,7 @@ describe('runAutoMergeSchedulerTick (#3983)', () => {
       forgeOf: (): 'github' | 'gitlab' => 'github',
       policyRefusal: () => null,
       latestAutoMerge: () => null,
-      listCandidates: async () => { await gate; return []; },
+      listCandidates: async () => { await gate; return only(); },
       log: vi.fn(),
       env: {},
     };
@@ -787,5 +809,97 @@ describe('stale approval re-review and visible skip reasons (PAN-4772)', () => {
       vi.useRealTimers();
       resetSchedulerOutcomes();
     }
+  });
+});
+
+/**
+ * PAN-5036: three approved, green, CLEAN PRs sat unscheduled for 40 minutes
+ * with `notScheduled: []` and no log line, because a failed or stale PR
+ * listing looked exactly like "nothing to schedule".
+ */
+describe('a failed or stale PR listing is never silent (PAN-5036)', () => {
+  const HEAD = '697a05f820000000000000000000000000000000';
+
+  it('records a project skip reason and one log line while the listing read fails, and logs when it clears', async () => {
+    vi.useFakeTimers();
+    resetSchedulerOutcomes();
+    try {
+      vi.setSystemTime(new Date('2026-11-04T15:00:00.000Z'));
+      const { deps, insert, factsReads } = world({ labels: ['auto-merge'] });
+      let rows: readonly ListedPr[] | null = null;
+      deps.listCandidates = vi.fn((projectPath: string) => listScheduleCandidates(projectPath, { listPullRequests: async () => rows }));
+      const unavailableLogs = () => deps.log.mock.calls.filter(([line]) => String(line).includes('PR listing unavailable')).length;
+
+      await runAutoMergeSchedulerTick(deps, 1_000);
+      await runAutoMergeSchedulerTick(deps, 1_000);
+      expect(listNotScheduledAutoMerges()).toEqual([{
+        issueId: 'overdeck', projectKey: 'overdeck', scope: 'project',
+        reason: expect.stringContaining('PR listing unavailable'), at: '2026-11-04T15:00:00.000Z',
+      }]);
+      expect(unavailableLogs()).toBe(1);
+      expect(factsReads).not.toHaveBeenCalled();
+      expect(insert).not.toHaveBeenCalled();
+
+      // The forge answers again: the PR schedules and the project skip clears.
+      rows = [listed()];
+      await runAutoMergeSchedulerTick(deps, 1_000);
+      expect(insert).toHaveBeenCalledTimes(1);
+      expect(listNotScheduledAutoMerges()).toEqual([]);
+      expect(deps.log).toHaveBeenCalledWith(expect.stringContaining('project overdeck: cleared "PR listing unavailable'));
+    } finally {
+      vi.useRealTimers();
+      resetSchedulerOutcomes();
+    }
+  });
+
+  it('names the head when an approved PR is ruled out by pending checks in the cached listing, with no forge read', async () => {
+    vi.useFakeTimers();
+    resetSchedulerOutcomes();
+    try {
+      vi.setSystemTime(new Date('2026-11-04T15:00:00.000Z'));
+      const { deps, insert, factsReads } = world({ labels: ['auto-merge'] });
+      const pending = listed({ headRefOid: HEAD, statusCheckRollup: [{ status: 'IN_PROGRESS', conclusion: null }] });
+      deps.listCandidates = vi.fn((projectPath: string) => listScheduleCandidates(projectPath, { listPullRequests: async () => [pending] }));
+
+      await expect(runAutoMergeSchedulerTick(deps, 1_000)).resolves.toEqual([{
+        projectKey: 'overdeck', issueId: 'PAN-42', scheduled: false, head: HEAD,
+        reason: 'checks pending in the PR listing at 697a05f8',
+      }]);
+      expect(listNotScheduledAutoMerges()).toEqual([{
+        issueId: 'PAN-42', projectKey: 'overdeck', head: HEAD,
+        reason: 'checks pending in the PR listing at 697a05f8', at: '2026-11-04T15:00:00.000Z',
+      }]);
+      expect(deps.log).toHaveBeenCalledWith('[auto-merge-scheduler] PAN-42 not scheduled: checks pending in the PR listing at 697a05f8');
+      expect(factsReads).not.toHaveBeenCalled();
+      expect(insert).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+      resetSchedulerOutcomes();
+    }
+  });
+
+  it('runs a ruled-out PR through the free checks first, so policy and pending rows keep their meaning', async () => {
+    const conflicting = listed({ headRefOid: HEAD, mergeable: 'CONFLICTING' });
+    const listCandidates = vi.fn((projectPath: string) => listScheduleCandidates(projectPath, { listPullRequests: async () => [conflicting] }));
+
+    const notOptedIn = world();
+    notOptedIn.deps.listCandidates = listCandidates;
+    const [refused] = await scheduleReadyAutoMerges(notOptedIn.deps);
+    expect(refused).toMatchObject({ issueId: 'PAN-42', scheduled: false });
+    expect(refused.reason).not.toContain('PR listing');
+
+    const alreadyPending = world({ labels: ['auto-merge'], latest: row('pending') });
+    alreadyPending.deps.listCandidates = listCandidates;
+    await expect(scheduleReadyAutoMerges(alreadyPending.deps)).resolves.toEqual([{
+      projectKey: 'overdeck', issueId: 'PAN-42', scheduled: false, reason: 'auto-merge already pending', alreadyScheduled: true,
+    }]);
+
+    const optedIn = world({ labels: ['auto-merge'] });
+    optedIn.deps.listCandidates = listCandidates;
+    await expect(scheduleReadyAutoMerges(optedIn.deps)).resolves.toEqual([{
+      projectKey: 'overdeck', issueId: 'PAN-42', scheduled: false, head: HEAD,
+      reason: 'PR conflicts with its base in the PR listing at 697a05f8',
+    }]);
+    expect(optedIn.factsReads).not.toHaveBeenCalled();
   });
 });

@@ -1,0 +1,19 @@
+{
+  "id": "overdeck",
+  "name": "Overdeck",
+  "version": "0.1.0",
+  "description": "See and steer your Overdeck coding agents from OpenClaw.",
+  "skills": ["skills/overdeck"],
+  "activation": { "onStartup": true },
+  "contracts": { "tools": ["overdeck_pending", "overdeck_answer"] },
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "connectorUrl": { "type": "string", "default": "http://127.0.0.1:7466/mcp", "description": "The Overdeck connector (or dashboard over Tailscale) MCP URL." },
+      "localToken": { "type": "string", "description": "The connector local token, or an Overdeck access token on the Tailscale route." },
+      "summary": { "type": "boolean", "default": true, "description": "Add a needs-you summary to agent turns, at most every 5 minutes." },
+      "allowAnswers": { "type": "boolean", "default": false, "description": "Let overdeck_answer answer Overdeck prompts." }
+    }
+  },
+  "uiHints": { "localToken": { "label": "Connector local token", "sensitive": true } }
+}
