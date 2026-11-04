@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4935",
   "created": "2026-11-04T08:09:37.402Z",
-  "updated": "2026-11-04T08:25:07.343Z",
+  "updated": "2026-11-04T08:35:55.519Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -16,9 +16,10 @@
       "doneAt": "2026-11-04T08:24:30.861Z"
     },
     "mcp-gate-leaf": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4935",
-      "claimedAt": "2026-11-04T08:25:07.343Z"
+      "claimedAt": "2026-11-04T08:25:07.343Z",
+      "doneAt": "2026-11-04T08:35:55.519Z"
     }
   }
 }
