@@ -663,3 +663,9 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
 ## 2026-11-04 — PAN-5020: architecture.md's last-verified line conflicts every parallel PR
 
 - About six conflict-repair rounds today came from one line: agents prepend their issue id to the trailing `<!-- last-verified: ... (PAN-..., ...) -->` line of `.overdeck/context/codebase/architecture.md`, so any two PRs touching the codebase map conflict. The role and skill text asks for a date only. Filed PAN-5020 (date-only line, explicit instruction, lint guard) and started it. Each instance otherwise costs a repair, a re-verify and a re-review, and can trip PAN-5003 at merge.
+
+## 2026-11-04 — PAN-5036: auto-merge scheduler went silent for three ready PRs
+
+- #5032, #5034 and #5035 were approved, green and CLEAN, yet the train showed `pending: []` and `notScheduled: []` for 40+ minutes. `listScheduleCandidates` (`src/dashboard/server/services/auto-merge-scheduler.ts`) builds candidates from `listRepoPullRequests`, which returns `[]` on a failed read and is TTL-cached. A failed or stale listing therefore looks like "nothing to schedule", with no skip reason and no log. Filed PAN-5036 (merge-train machinery, so it goes via handoff once disk allows). The cause is not fully confirmed: a failed listing versus a stale cache.
+- Recognize it: approved, green, CLEAN PRs and an empty `notScheduled`. Merge through `POST /api/issues/<id>/merge` (the memory-sanctioned door), not `gh pr merge`. Both worked at once today.
+- Correction to earlier entries: hand merges today used `gh pr merge --squash`. The operator's standing rule (memory `flywheel-may-merge-ready-prs`) is the Overdeck merge door, which runs the gate and post-merge lifecycle. Use the door unless it is the thing that's broken (PAN-5003 rebase failure).
