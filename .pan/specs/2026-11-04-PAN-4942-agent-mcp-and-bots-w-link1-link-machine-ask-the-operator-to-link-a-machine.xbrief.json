@@ -4,17 +4,17 @@
     "created": "2026-11-04T05:19:45Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4942: Agent MCP and bots (W-LINK1): link_machine: ask the operator to link a machine",
-    "updated": "2026-11-04T05:28:02.098Z"
+    "updated": "2026-11-04T05:29:21.938Z"
   },
   "plan": {
     "id": "pan-4942",
     "title": "Agent MCP and bots (W-LINK1): link_machine: ask the operator to link a machine",
-    "status": "proposed",
+    "status": "running",
     "uid": "4e03f36f-7b40-4540-a727-04f469f0b071",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-04T05:19:45Z",
-    "updated": "2026-11-04T05:28:02.098Z",
+    "updated": "2026-11-04T05:29:21.938Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4942",
@@ -779,5 +779,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
