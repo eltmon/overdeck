@@ -753,7 +753,7 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   `channel refused (<code>, <mode>)`; an unexpected handshake exception has the new accept code `internal`.
   Routine lines need `OVERDECK_ANYWHERE_DEBUG=1` (`src/lib/anywhere/debug-log.ts`). The phone evicts its
   peer connections to a machine after a handshake `timeout`/`protocol` failure instead of reusing a zombie.
-<!-- last-verified: 2026-11-04 (PAN-4905, PAN-4917, PAN-4925, PAN-4929, PAN-4930, PAN-4931, PAN-4932, PAN-4933, PAN-4934, PAN-4937, PAN-4938, PAN-4940, PAN-4943, PAN-4944, PAN-4945, PAN-4970, PAN-4482, PAN-4885, PAN-5018) -->
+<!-- last-verified: 2026-11-04 -->
 - **A local Auto lane pick dropped its explanation** (PAN-5006 planning) — `laneMachineResolver`
   (`src/dashboard/server/routes/lanes.ts`) returned `null` for `target.self`, so `pan lane start --machine auto`
   printed no `Auto → …` line when Auto chose this machine, and `FleetTarget` never carried `answer.rejections`.
