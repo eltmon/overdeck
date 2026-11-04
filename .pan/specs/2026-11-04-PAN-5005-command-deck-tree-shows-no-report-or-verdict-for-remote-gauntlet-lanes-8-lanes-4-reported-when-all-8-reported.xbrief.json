@@ -1,0 +1,374 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-04T11:39:07Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5005: Command Deck tree shows no report or verdict for remote gauntlet lanes",
+    "updated": "2026-11-04T11:40:55.664Z"
+  },
+  "plan": {
+    "id": "pan-5005",
+    "title": "Command Deck tree shows no report or verdict for remote gauntlet lanes (\"8 lanes · 4 reported\" when all 8 reported)",
+    "status": "proposed",
+    "uid": "8fda6ca6-169e-4422-a056-3c7868078598",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-04T11:39:07Z",
+    "updated": "2026-11-04T11:40:55.664Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5005",
+        "label": "PAN-5005",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5005.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "lanes",
+      "gauntlet",
+      "anywhere",
+      "command-deck",
+      "conversation-list"
+    ],
+    "narratives": {
+      "Problem": "The conversation list computes lane report, iteration and verdict fields (laneEnrichment in src/lib/overdeck/conversation-list.ts) from home's conversations table only, and before linked rows are merged. So remote lane rows in GET /api/conversations carry no laneReport/laneVerdict, a home builder judged by a remote critic gets no laneLatestVerdict, and the Command Deck group summary undercounts reported lanes (\"8 lanes · 4 reported\"). pan lane list is correct because views.ts pairs over listAllLaneRows.",
+      "Proposal": "Extract laneEnrichment into a new leaf module src/lib/lanes/lane-list-fields.ts (laneFieldsByRun) that pairs over listAllLaneRows (local rows plus stand-ins, mirrored reports, lane-link.json sidecars). conversation-list.ts uses it for local rows; getMergedConversationList uses it for the runs of unarchived stand-ins and passes the fields to mergeConversationRows through a new optional RemoteLaneEntry.fields, which the merge spreads onto the stamped linked row. laneLatestVerdict gains a server-computed criticRoute (String(id) or @<environmentId>/<name>) and criticId becomes number|null; the builder row's verdict link uses criticRoute. Docs in reference/lanes.mdx, docs/ANYWHERE-ARCHITECTURE.md and the codebase map describe the new behavior. Full detail: .pan/drafts/PAN-5005.md.",
+      "NonGoals": "- Do not change groupSummary, badge colors, or the badge vocabulary.\n- Do not stamp lane fields on linked rows of archived stand-ins.\n- Do not add a cache for laneFieldsByRun.\n- Do not change pan lane list, GET /api/lanes, src/lib/lanes/views.ts, or the remote-lane follower.\n- Do not show remote lane activity, git facts or cost in the tree.\n- Do not address the Auto-placement reason gap (#5006).\n- Do not import views.ts or conversation-list.ts from the new module."
+    },
+    "autoDecisions": [
+      {
+        "summary": "One shared laneFieldsByRun function in a new module src/lib/lanes/lane-list-fields.ts serves both the local enriched list and the merged list.",
+        "rationale": "One computation keeps the tree and pan lane list in agreement, mirrors views.ts, shrinks conversation-list.ts, and avoids an import cycle with views.ts."
+      },
+      {
+        "summary": "Remote lane fields travel to the pure merge through an optional RemoteLaneEntry.fields.",
+        "rationale": "Reuses the existing PAN-4638 stamping seam and keeps mergeConversationRows pure and unit-testable."
+      },
+      {
+        "summary": "laneLatestVerdict gains a server-computed criticRoute (String(id) locally, linkedConversationName(environmentId, name) remotely); criticId becomes number|null.",
+        "rationale": "A remote critic has no local id, so /conv/${criticId} would become /conv/null; the server already has the environment id, and the frontend router already opens /conv/@<env>/<name>."
+      },
+      {
+        "summary": "Pairing activity for a remote row is mirror.activity, or 'stopped' when archived or unmirrored; a local row keeps conversation status.",
+        "rationale": "Activity only feeds CriticSummary.activity, which no emitted field uses; importing remoteActivity from views.ts would create an import cycle."
+      },
+      {
+        "summary": "Accept recomputing pairing in the merged path for runs that also have home lanes; no new cache.",
+        "rationale": "Bounded by the lanes of runs with remote lanes; reports are small file reads; NFR-1 skips the work entirely when there are no unarchived stand-ins."
+      },
+      {
+        "summary": "No live three-machine check is required for merge; unit tests cover each FR.",
+        "rationale": "Reproducing needs linked machines that CI and the work agent do not have; the fix is a data-shape change fully observable in unit tests."
+      }
+    ],
+    "items": [
+      {
+        "id": "lane-fields-module",
+        "title": "Pair conversation-list lane fields over local and remote lanes in a new laneFieldsByRun module",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T11:39:07Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5005",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "remote-row-stamp",
+            "verdict-link-route"
+          ],
+          "files_scope": [
+            "src/lib/lanes/lane-list-fields.ts",
+            "src/lib/overdeck/conversation-list.ts",
+            "src/lib/lanes/iteration.ts",
+            "src/lib/lanes/__tests__/lane-list-fields.test.ts",
+            "src/lib/overdeck/__tests__/conversation-list-lane-pairing.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/lanes/__tests__/lane-list-fields.test.ts src/lib/overdeck/__tests__/conversation-list-lane-pairing.test.ts src/lib/lanes/__tests__/views-pairing.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "lane-list-fields.test.ts, conversation-list-lane-pairing.test.ts and views-pairing.test.ts pass",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-5",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-5005.md WI-1 exactly. Create src/lib/lanes/lane-list-fields.ts exporting interface LaneListFields and async laneFieldsByRun(runs: readonly string[]): Promise<Map<string, LaneListFields>> (code given in the PRD). It builds context from listAllLaneRows({ run }) per unique run, computes laneIterations(context), reads latestWorkerReport(`conv-${name}`) per lane with concurrency 8, builds PairingRows (activity: 'stopped' if archived, else local.status, else remote.mirror?.activity ?? 'stopped'), and returns for every lane: laneReport {seq,at,status,verdict}, laneIteration, laneVerdict for critic/verifier, laneLatestVerdict for builders as {value, defects, criticId: number|null, criticRoute} where criticRoute is String(id) for a local critic and linkedConversationName(remote.facts.environmentId, name) for a remote critic. It must not import views.ts or conversation-list.ts. In conversation-list.ts delete laneEnrichment, call laneFieldsByRun with the page's lane runs, spread fields only when row.laneKey is set (`...(row.laneKey ? lanes.get(row.name) ?? {} : {})`), and remove the imports this orphans. Delete localIterationRow from iteration.ts (its only caller is gone) and narrow its import to LaneRole. Add lane-list-fields.test.ts (temp OVERDECK_HOME, real DB and stand-in store, pattern from views-remote.test.ts) and update conversation-list-lane-pairing.test.ts to mock ../../lanes/remote-lanes.js and expect criticRoute '2'."
+        },
+        "items": [
+          {
+            "id": "lane-fields-module.ac1",
+            "title": "Given a home builder b1 and a remote critic stand-in c-fly on env-fly with criticOfName b1 and a done PASS report with 0 defects, laneFieldsByRun(['hotel']) returns b1.laneLatestVerdict equal to { value: 'PASS', defects: 0, criticId: null, criticRoute: '@env-fly/c-fly' } and c-fly.laneVerdict equal to { value: 'PASS', defects: 0 }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-fields-module.ac2",
+            "title": "Given a home critic c1 whose only link to remote builder b-fly is lane-link.json written by writeCriticLink, laneFieldsByRun returns b-fly.laneLatestVerdict.criticRoute equal to String(c1.id)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-fields-module.ac3",
+            "title": "Given a remote play stand-in with a done report, laneFieldsByRun returns laneReport.status 'done' and the entry has no laneVerdict or laneLatestVerdict key; laneFieldsByRun([]) resolves to an empty map",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-fields-module.ac4",
+            "title": "conversation-list-lane-pairing.test.ts passes with the builder row expecting laneLatestVerdict { criticId: 2, criticRoute: '2' } and the root row having no laneReport property; conversation-list.ts no longer defines laneEnrichment and iteration.ts no longer exports localIterationRow",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-fields-module.ac5",
+            "title": "npm run lint:circular exits 0 and src/lib/lanes/lane-list-fields.ts contains no import of views.js or conversation-list.js",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "remote-row-stamp",
+        "title": "Stamp lane list fields onto remote lane rows in the merged conversation list",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T11:39:07Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5005",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/linked-conversations-merge.ts",
+            "src/dashboard/server/services/conversation-list-merged.ts",
+            "tests/unit/lib/overdeck/linked-conversations-merge.test.ts",
+            "tests/unit/dashboard/server/services/conversation-list-merged.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/linked-conversations-merge.test.ts tests/unit/dashboard/server/services/conversation-list-merged.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "linked-conversations-merge.test.ts and conversation-list-merged.test.ts pass",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "NFR-1",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2. Add optional `fields?: LaneListFields` (type import from ../lanes/lane-list-fields.js) to RemoteLaneEntry in src/lib/overdeck/linked-conversations-merge.ts and spread `...(lane.fields ?? {})` after the lane facts in the stamped row; add one sentence to the module header's FR-8 bullet. In getMergedConversationList (src/dashboard/server/services/conversation-list-merged.ts) collect unarchived stand-ins first, then if any exist call laneFieldsByRun(unique runs).catch(() => new Map()) once and set each entry's fields from the map by facts.name; when there are no unarchived stand-ins do not call it. Add merge tests (fields spread; no fields => no laneReport key) and merged-list tests mocking remote-lanes.js and lane-list-fields.js (fields reach @env-desk/conv-x; one call with ['r1']; no stand-ins => no call)."
+        },
+        "items": [
+          {
+            "id": "remote-row-stamp.ac1",
+            "title": "Given a RemoteLaneEntry with fields { laneReport: {status 'done', verdict 'PASS'}, laneIteration: 1, laneVerdict: {value 'PASS', defects 0} }, mergeConversationRows returns the @env-fly/lane-a row carrying those three fields",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remote-row-stamp.ac2",
+            "title": "Given a RemoteLaneEntry without fields, mergeConversationRows returns the stamped row with laneKey set and no laneReport property",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remote-row-stamp.ac3",
+            "title": "Given one unarchived critic stand-in for conv-x on env-desk in run r1, getMergedConversationList returns the @env-desk/conv-x row with laneReport and laneVerdict from laneFieldsByRun, and laneFieldsByRun is called exactly once with ['r1']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remote-row-stamp.ac4",
+            "title": "Given listRemoteLanes returns no unarchived stand-ins, getMergedConversationList returns the linked rows without calling laneFieldsByRun",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "verdict-link-route",
+        "title": "Open a builder's remote critic from its verdict link via criticRoute",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T11:39:07Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5005",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationList.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationRow.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationRow.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/conversation-tree.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/CommandDeck/__tests__/ConversationRow.test.tsx src/components/CommandDeck/__tests__/conversation-tree.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ConversationRow.test.tsx and conversation-tree.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3. In ConversationList.tsx line 142 change laneLatestVerdict to { value: string; defects: number | null; criticId: number | null; criticRoute: string } | null. In ConversationRow.tsx (verdict link near line 245) use `/conv/${latestVerdict.criticRoute}` for both href and the onClick navigation, unencoded, and set aria-label to `open critic #${criticId}` when criticId is a number, else `open critic ${criticRoute}`. Update the existing ConversationRow test fixture to include criticRoute '42' (href /conv/42, name 'open critic #42' unchanged) and add a remote case. Add a conversation-tree.test.ts case where a root has one local and one linked (origin 'linked', negative id) lane child, both with laneReport."
+        },
+        "items": [
+          {
+            "id": "verdict-link-route.ac1",
+            "title": "Given a builder row with laneLatestVerdict { value: 'PASS', defects: 0, criticId: null, criticRoute: '@env-fly/c-fly' }, ConversationRow renders a link named 'open critic @env-fly/c-fly' with href '/conv/@env-fly/c-fly' and text PASS",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verdict-link-route.ac2",
+            "title": "Given a builder row with laneLatestVerdict { value: 'WOWED', defects: null, criticId: 42, criticRoute: '42' }, ConversationRow still renders the link named 'open critic #42' with href '/conv/42'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verdict-link-route.ac3",
+            "title": "Given a root with one local lane child and one linked lane child (origin 'linked', negative id) that both carry laneReport, groupSummary returns lanes 2 and reported 2",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-remote-lane-badges",
+        "title": "Document remote lane report and verdict badges in the lanes reference, Anywhere architecture and codebase map",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T11:39:07Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5005",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "reference/lanes.mdx",
+            "docs/ANYWHERE-ARCHITECTURE.md",
+            ".overdeck/context/codebase/architecture.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n \"lane-list-fields\" docs/ANYWHERE-ARCHITECTURE.md .overdeck/context/codebase/architecture.md"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "grep prints a match in both docs/ANYWHERE-ARCHITECTURE.md and .overdeck/context/codebase/architecture.md"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-4. reference/lanes.mdx, section 'Lanes on other machines': extend the bullet starting 'The Command Deck nests a remote lane under the orchestrator that launched it' to say the row shows the lane's report badge (DONE, BLOCKED, FAILED) and a critic's or verifier's verdict, a builder's verdict link opens its newest critic on whichever machine it ran, and the group summary counts remote lanes as reported. docs/ANYWHERE-ARCHITECTURE.md '### Nesting (FR-8)': add a paragraph naming laneFieldsByRun in lanes/lane-list-fields.ts (pairs over listAllLaneRows), RemoteLaneEntry.fields, and laneLatestVerdict.criticRoute (@<environmentId>/<name> for a remote critic); in the 2026-11-04 live-check paragraph state that #5005 fixed the missing remote report badges. .overdeck/context/codebase/architecture.md line 339 paragraph: add the new module and RemoteLaneEntry.fields; add PAN-5005 to the single last-verified line at the end."
+        },
+        "items": [
+          {
+            "id": "docs-remote-lane-badges.ac1",
+            "title": "reference/lanes.mdx 'Lanes on other machines' states that a remote lane row in the Command Deck shows its report badge and, for a critic or verifier, its verdict, and that the group summary counts it as reported",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-remote-lane-badges.ac2",
+            "title": "When a reader opens docs/ANYWHERE-ARCHITECTURE.md 'Nesting (FR-8)', the section names laneFieldsByRun, RemoteLaneEntry.fields and criticRoute, and its 2026-11-04 live-check paragraph shows the missing remote badges as fixed by #5005",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-remote-lane-badges.ac3",
+            "title": "grep -c 'last-verified' .overdeck/context/codebase/architecture.md prints 1, that line contains PAN-5005, and the file contains src/lib/lanes/lane-list-fields.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "lane-fields-module",
+        "to": "remote-row-stamp",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-04-PAN-5005-command-deck-tree-shows-no-report-or-verdict-for-remote-gauntlet-lanes-8-lanes-4-reported-when-all-8-reported.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
