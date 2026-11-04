@@ -170,6 +170,7 @@ export function sendTestPush(): Promise<ProviderSendOutcome[]> {
   const dispatcher = state?.dispatcher ?? createNeedsYouDispatcher({ providers: defaultProviders(), readConfig: readPushConfig });
   return dispatcher.sendNow({
     kind: 'test',
+    category: 'test',
     tag: 'test',
     title: 'Overdeck test notification',
     publicTitle: 'Overdeck test notification',

@@ -8,13 +8,15 @@
  * earlier active phone record with the same `clientId` (D-2). A code issued
  * for an Overdeck connector is refused (PAN-4927 W-CONN1).
  *
- * `DELETE /api/phones/self` and `PUT /api/phones/self/push-key` are the
- * phone's own self-service routes: the scope table admits them with `tell`,
- * and the handler then requires a `phone` credential (D-9).
+ * `DELETE /api/phones/self`, `PUT /api/phones/self/push-key` and
+ * `PUT /api/phones/self/notification-preferences` are the phone's own
+ * self-service routes: the scope table admits them with `tell`, and the
+ * handler then requires a `phone` credential (D-9).
  */
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest, type HttpServerResponse } from 'effect/unstable/http';
 
+import { parsePhoneNotificationPreferences, type PhoneNotificationPreferences } from '@overdeck/contracts';
 import {
   createAccessToken,
   findActiveChannelTokenByKey,
@@ -24,6 +26,7 @@ import {
   setPhonePushKey,
 } from '../../../lib/access-tokens.js';
 import { emitActivityEntry } from '../../../lib/activity-logger.js';
+import { setPhoneNotificationPreferences } from '../../../lib/push/phone-preferences-store.js';
 import { capturePhonePaired, capturePhoneRemoved } from '../../../lib/telemetry/anywhere.js';
 import { closeChannelsForPeer } from '../channel-listener.js';
 import { type ChannelMarker, channelOfRequest } from '../channel-peer.js';
@@ -41,6 +44,8 @@ interface PhoneExchangeBody {
   clientId: string;
   label: string;
   pushKeyHex: string;
+  /** Invalid or absent prefs are never a 400 (PAN-5019 WI-6): pairing proceeds without them. */
+  notificationPreferences: PhoneNotificationPreferences | null;
 }
 
 function parsePhoneExchangeBody(text: string): PhoneExchangeBody | string {
@@ -58,7 +63,12 @@ function parsePhoneExchangeBody(text: string): PhoneExchangeBody | string {
     return `label must be a string of 1-${MAX_LABEL_LENGTH} characters`;
   }
   if (typeof body.pushKeyHex !== 'string' || !KEY_HEX.test(body.pushKeyHex)) return 'pushKeyHex must be 64 lowercase hex characters';
-  return { clientId: body.clientId, label: body.label.trim(), pushKeyHex: body.pushKeyHex };
+  return {
+    clientId: body.clientId,
+    label: body.label.trim(),
+    pushKeyHex: body.pushKeyHex,
+    notificationPreferences: parsePhoneNotificationPreferences(body.notificationPreferences),
+  };
 }
 
 /**
@@ -100,6 +110,16 @@ export async function handlePhonesExchange(
   for (const other of replaced) await revokeAccessToken(other.id);
   capturePhonePaired(replaced.length > 0);
 
+  let notificationPreferencesStored = false;
+  if (body.notificationPreferences) {
+    try {
+      await setPhoneNotificationPreferences(body.clientId, body.notificationPreferences);
+      notificationPreferencesStored = true;
+    } catch (error) {
+      console.warn('[push] storing notification preferences at pairing failed:', error instanceof Error ? error.message : error);
+    }
+  }
+
   emitActivityEntry({
     source: 'dashboard',
     level: 'info',
@@ -107,7 +127,10 @@ export async function handlePhonesExchange(
     details: JSON.stringify({ tokenId: record.id, clientId: body.clientId, replaced: replaced.length }),
   });
   const descriptor = await buildEnvironmentDescriptor();
-  return jsonResponse({ v: 1, token, tokenId: record.id, descriptor }, { headers: { 'Cache-Control': 'no-store' } });
+  return jsonResponse(
+    { v: 1, token, tokenId: record.id, descriptor, ...(notificationPreferencesStored ? { notificationPreferencesStored: true } : {}) },
+    { headers: { 'Cache-Control': 'no-store' } },
+  );
 }
 
 const exchangeRoute = HttpRouter.add(
@@ -182,4 +205,36 @@ const pushKeyRoute = HttpRouter.add(
   }),
 );
 
-export const phonesRouteLayer = Layer.mergeAll(exchangeRoute, selfRevokeRoute, pushKeyRoute);
+/** The calling phone replaces its own notification preferences. Exactly a phone credential may call this. */
+export async function handlePhonesNotificationPreferences(
+  credential: DashboardCredential | null,
+  bodyText: string,
+): Promise<HttpServerResponse.HttpServerResponse> {
+  if (credential?.kind !== 'phone') {
+    return jsonResponse({ error: 'only a paired phone may set its notification preferences' }, { status: 403 });
+  }
+  let value: unknown;
+  try {
+    value = bodyText ? JSON.parse(bodyText) : null;
+  } catch {
+    return jsonResponse({ error: 'body is not JSON' }, { status: 400 });
+  }
+  const prefs = parsePhoneNotificationPreferences(value);
+  if (!prefs) return jsonResponse({ error: 'invalid notification preferences' }, { status: 400 });
+  await setPhoneNotificationPreferences(credential.clientId, prefs);
+  return jsonResponse({ ok: true });
+}
+
+const notificationPreferencesRoute = HttpRouter.add(
+  'PUT',
+  '/api/phones/self/notification-preferences',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
+    const text = yield* request.text;
+    return yield* Effect.promise(() => handlePhonesNotificationPreferences(resolveRequestCredential(request), text));
+  }),
+);
+
+export const phonesRouteLayer = Layer.mergeAll(exchangeRoute, selfRevokeRoute, pushKeyRoute, notificationPreferencesRoute);

@@ -8,7 +8,7 @@
  * nothing is retried on a new channel.
  */
 import { generateStaticKeyPair, requestOnChannel, type StaticKeyPair } from '@overdeck/anywhere-channel/web';
-import type { DirectoryMachine, EnvironmentDescriptor } from '@overdeck/contracts';
+import type { DirectoryMachine, EnvironmentDescriptor, PhoneNotificationPreferences } from '@overdeck/contracts';
 import { parsePhonePairLink } from '@overdeck/contracts';
 import { bytesToHex } from '@noble/hashes/utils.js';
 
@@ -43,6 +43,10 @@ export interface PairingDeps {
   generateKey?: () => StaticKeyPair;
   request?: typeof requestOnChannel;
   now?: () => Date;
+  /** PAN-5019 WI-6: the phone's current notification preferences, carried in the exchange body. */
+  notificationPreferences?: () => { revision: number; prefs: PhoneNotificationPreferences };
+  /** Called after the machine record is written when the answer has `notificationPreferencesStored: true`. */
+  onPreferencesStored?: (environmentId: string, revision: number) => void;
 }
 
 const encoder = new TextEncoder();
@@ -80,7 +84,14 @@ export async function pairMachine(linkText: string, deps: PairingDeps): Promise<
     if (descriptor?.capabilities?.phoneApp !== true) throw new ConnectionError('outdated', connectionText.outdated(label));
     if (descriptor.machineKey !== link.machineKeyHex) throw new ConnectionError('identity', connectionText.identity(label));
 
-    const body = { v: 1, clientId: deps.identity.clientId, label: exchangeLabel(deps.phoneLabel), pushKeyHex: deps.identity.pushPublicKeyHex };
+    const notificationPreferences = deps.notificationPreferences?.();
+    const body = {
+      v: 1,
+      clientId: deps.identity.clientId,
+      label: exchangeLabel(deps.phoneLabel),
+      pushKeyHex: deps.identity.pushPublicKeyHex,
+      ...(notificationPreferences ? { notificationPreferences: notificationPreferences.prefs } : {}),
+    };
     const exchange = await request(stream, {
       method: 'POST',
       path: '/api/phones/exchange',
@@ -111,6 +122,9 @@ export async function pairMachine(linkText: string, deps: PairingDeps): Promise<
     const machines = [...(await readMachines()).filter((m) => m.environmentId !== record.environmentId), record];
     await writeMachines(machines);
     useShellStore.getState().setMachines(machines);
+    if (answer?.notificationPreferencesStored === true && notificationPreferences) {
+      deps.onPreferencesStored?.(link.environmentId, notificationPreferences.revision);
+    }
     return record;
   } finally {
     stream.destroy();

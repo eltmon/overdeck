@@ -3,8 +3,9 @@
  * to the pairing channel's remote key, refuses plain sockets and link
  * channels, and revokes a previous active phone record with the same
  * clientId; a key already held by an active phone record gets 409.
- * DELETE /api/phones/self and PUT /api/phones/self/push-key take exactly a
- * phone credential.
+ * DELETE /api/phones/self, PUT /api/phones/self/push-key and
+ * PUT /api/phones/self/notification-preferences (PAN-5019 WI-5) take exactly
+ * a phone credential.
  */
 import { createRequire } from 'node:module';
 import { createServer } from 'node:http';
@@ -30,7 +31,8 @@ const { openChannel } = await import('../../../lib/anywhere/channel/open.js');
 const { _resetChannelListenerForTests, installChannelListener, liveChannelCount } = await import('../channel-listener.js');
 const { remoteGateRejection } = await import('../remote-request-gate.js');
 const { resolveDashboardCredential } = await import('../routes/dashboard-auth.js');
-const { handlePhonesExchange, handlePhonesPushKey, handlePhonesSelfRevoke } = await import('../routes/phones.js');
+const { handlePhonesExchange, handlePhonesNotificationPreferences, handlePhonesPushKey, handlePhonesSelfRevoke } = await import('../routes/phones.js');
+const { loadPhoneNotificationPreferences, resetPhoneNotificationPreferencesCacheForTests } = await import('../../../lib/push/phone-preferences-store.js');
 type ChannelMarker = import('../channel-peer.js').ChannelMarker;
 type MachineKeyPair = import('../../../lib/anywhere/machine-key.js').MachineKeyPair;
 
@@ -58,6 +60,7 @@ beforeEach(async () => {
   process.env.OVERDECK_HOME = home;
   _resetAccessTokensForTests();
   _resetChannelListenerForTests();
+  resetPhoneNotificationPreferencesCacheForTests();
   telemetry.capturePhonePaired.mockClear();
   telemetry.capturePhoneRemoved.mockClear();
 });
@@ -67,6 +70,7 @@ afterEach(async () => {
   await _settleAccessTokenWritesForTests();
   _resetAccessTokensForTests();
   _resetChannelListenerForTests();
+  resetPhoneNotificationPreferencesCacheForTests();
   if (originalHome === undefined) delete process.env.OVERDECK_HOME;
   else process.env.OVERDECK_HOME = originalHome;
   await rm(home, { recursive: true, force: true });
@@ -125,6 +129,20 @@ describe('POST /api/phones/exchange (PAN-4835 WI-7)', () => {
     expect(repeat.json.code).toBe('link-key-in-use');
     expect(verifyAccessToken(first.json.token as string).ok).toBe(true);
     expect(listActiveRecordsOfKind('phone')).toHaveLength(1);
+  });
+
+  it('ac-5019: an exchange carrying valid notification preferences stores them and answers notificationPreferencesStored', async () => {
+    const prefs = { v: 1, pause: null, muted: ['failed'] };
+    const { status, json } = await read(await handlePhonesExchange(body({ notificationPreferences: prefs }), PAIRING));
+    expect(status).toBe(200);
+    expect(json.notificationPreferencesStored).toBe(true);
+    expect((await loadPhoneNotificationPreferences()).get(CLIENT_ID)).toEqual(prefs);
+  });
+
+  it('ac-5019: an exchange carrying invalid notification preferences still answers 200 without the flag', async () => {
+    const { status, json } = await read(await handlePhonesExchange(body({ notificationPreferences: { v: 2 } }), PAIRING));
+    expect(status).toBe(200);
+    expect(json.notificationPreferencesStored).toBeUndefined();
   });
 
   it('remoteGateRejection admits the exchange on a pairing marker and refuses it on a plain request', async () => {
@@ -196,6 +214,23 @@ describe('DELETE /api/phones/self and PUT /api/phones/self/push-key (PAN-4835 WI
     expect(listActiveRecordsOfKind('phone')[0]?.pushKey).toBe(newKey);
 
     expect((await read(await handlePhonesPushKey(asPhone, JSON.stringify({ pushKeyHex: 'not-hex' })))).status).toBe(400);
+  });
+
+  it('ac-5019: notification-preferences takes exactly a phone credential, stores valid prefs, and 400s an invalid body', async () => {
+    const { json: exchanged } = await read(await handlePhonesExchange(body(), PAIRING));
+    const asPhone = resolveDashboardCredential({ authorization: `Bearer ${exchanged.token}` }, LINK);
+    expect(asPhone?.kind).toBe('phone');
+
+    const asMachine = { kind: 'machine', tokenId: 'm', environmentId: 'e', scopes: ['admin'], actor: { agentId: 'unknown' }, access: 'operator' } as const;
+    expect((await read(await handlePhonesNotificationPreferences(asMachine, JSON.stringify({ v: 1, pause: null, muted: [] })))).status).toBe(403);
+
+    const prefs = { v: 1, pause: { until: null }, muted: ['failed'] };
+    expect((await read(await handlePhonesNotificationPreferences(asPhone, JSON.stringify(prefs)))).json).toEqual({ ok: true });
+    const stored = await loadPhoneNotificationPreferences();
+    expect(stored.get(CLIENT_ID)).toEqual(prefs);
+
+    expect((await read(await handlePhonesNotificationPreferences(asPhone, JSON.stringify({ v: 2, pause: null, muted: [] })))).status).toBe(400);
+    expect((await read(await handlePhonesNotificationPreferences(asPhone, 'not json'))).status).toBe(400);
   });
 });
 
