@@ -1,6 +1,7 @@
 /**
  * HTTP client for the overdeck.ai account service: base URL resolution, the RFC 8628 device
- * flow, `/v1/me` and device revocation (PRD PAN-4330 W-3, D-2, D-3, D-5).
+ * flow, the PKCE authorization-code exchange (PAN-4960), `/v1/me` and device revocation
+ * (PRD PAN-4330 W-3, D-2, D-3, D-5).
  *
  * Every poll wait is a `setTimeout` promise so fake timers in tests drive them; nothing here
  * waits on real wall-clock time. No error message or thrown value ever includes the device
@@ -51,6 +52,10 @@ export type MeResult =
   | { ok: true; me: Me }
   | { ok: false; kind: 'unauthorized'; error: string }
   | { ok: false; kind: 'unreachable'; detail: string };
+
+export type CodeExchangeOutcome =
+  | { ok: true; accessToken: string; deviceId: string; label: string }
+  | { ok: false; reason: 'access_denied' | 'refused' | 'unreachable'; detail: string };
 
 export type RevokeResult = { ok: true; status: 204 | 401 | 404 } | { ok: false; detail: string };
 
@@ -204,6 +209,45 @@ export async function pollForToken(
         return { ok: false, reason: 'failed', detail: body.error ?? `HTTP ${res.status}` };
     }
   }
+}
+
+/**
+ * POST /oauth/token with grant_type=authorization_code (PKCE loopback flow, PAN-4960).
+ * `detail` never carries the code or the verifier.
+ */
+export async function exchangeAuthorizationCode(
+  baseUrl: string,
+  input: { code: string; codeVerifier: string; redirectUri: string },
+  opts: ClientOptions = {},
+): Promise<CodeExchangeOutcome> {
+  const doFetch = opts.fetch ?? fetch;
+  let res: Response;
+  try {
+    res = await postForm(
+      baseUrl,
+      '/oauth/token',
+      new URLSearchParams({
+        grant_type: 'authorization_code',
+        code: input.code,
+        code_verifier: input.codeVerifier,
+        redirect_uri: input.redirectUri,
+      }),
+      doFetch,
+    );
+  } catch (error) {
+    return { ok: false, reason: 'unreachable', detail: describeError(error) };
+  }
+  if (res.status >= 500) {
+    return { ok: false, reason: 'unreachable', detail: `HTTP ${res.status}` };
+  }
+  const body = (await res.json().catch(() => ({}))) as { access_token?: unknown; device_id?: unknown; label?: unknown; error?: unknown };
+  if (res.ok && typeof body.access_token === 'string' && typeof body.device_id === 'string') {
+    return { ok: true, accessToken: body.access_token, deviceId: body.device_id, label: typeof body.label === 'string' ? body.label : '' };
+  }
+  if (body.error === 'access_denied') {
+    return { ok: false, reason: 'access_denied', detail: 'access_denied' };
+  }
+  return { ok: false, reason: 'refused', detail: typeof body.error === 'string' ? body.error : `HTTP ${res.status}` };
 }
 
 /** GET /v1/me */
