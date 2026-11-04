@@ -1,6 +1,6 @@
 ---
 title: "MCP server"
-description: Drive this machine's Overdeck from another tool over the Model Context Protocol, with a scoped, revocable token
+description: Overdeck's MCP server: the tools every managed agent gets, and scoped, revocable access for outside tools and bots
 ---
 
 # MCP server
@@ -10,9 +10,11 @@ Desktop, another agent harness, a chat bot) can list conversations, read one,
 send a message, start a conversation or a worker, and answer prompts that wait
 on you. It reaches this machine and the machines it is linked to (see Fleet reach).
 
-This is separate from the Channels bridge (`overdeck-bridge`), which delivers
-messages into one running agent. The MCP server is a control surface for
-outside tools.
+Every agent Overdeck launches on Claude Code, Codex, `acp` or `opencode` gets
+this server with its own token (see [Agents get these tools](#agents-get-these-tools)),
+and outside tools and bots reach it with a token you create. It is separate
+from the Channels bridge (`overdeck-bridge`), which delivers messages into one
+running agent.
 
 Every tool calls an existing dashboard route with the token the client
 presents, so a tool can do only what that token's scopes allow on that route.
@@ -76,16 +78,16 @@ agent tokens.
 | `link_machine_wait` | Waits up to 50 s. Answers `pending` with `next`, `linked` with `machine` (`environmentId` and `label`), `declined` or `expired`. | `read:state` (agent tokens only) |
 | `memory_add` | Records a curated memory fact by running `pan memory add` in the agent's checkout: `id`, `type` (`feedback`, `project`, `reference`, `user`), a one-line `description`, optional `title`, `body`, `tags` and `store` (`project` by default, `user` for type `user`, or `machine`). A project fact is written uncommitted, so the agent commits `.overdeck/memory/<id>.md`. | `tell` (agent tokens only) |
 | `memory_search` | Searches memory by running `pan memory search --facts`: up to 5 matching facts from the agent's checkout, the operator store and the machine store, each with its file path, then observations from the agent's project (`limit` 1-20, default 10). | `read:state` (agent tokens only) |
-| `delegate_task` | Starts a worker on your own issue to do `task`, here or on `machine`; you are its parent. Optional `harness`, `model`, `effort`, `readOnly`, `name`, `needs`. A caller without an issue gets `delegate_task needs an issue; use start_conversation`. | `operate` |
-| `task_wait` | Waits up to 50 s for one of your workers to report. Answers `done` with the report, `ended` when it stopped without one (with its last message), or `running` with `next`. Pass `afterSeq` for the report after the one you consumed. | `read:state` |
-| `task_status` | One of your workers: state, idle time, where it runs and its newest report's seq, time and status. Your workers only, including ones on linked machines. | `read:state` |
-| `list_workers` | Every worker you started, on this machine or linked ones, with the same fields as `task_status`. | `read:state` |
-| `task_cancel` | Stops one of your workers, on this machine or another. Its reports so far stay readable. | `operate` |
-| `lane_start` | Launches a gauntlet lane (`role`, `brief`, with `key` or `for`, and optional `run`, `project`, `model`, `harness`, `effort`, `title`, `branch`, `from`, `at`, `machine`, `needs`, `reuse`, `replace`). Conversations only: the lane's parent is the calling conversation. | `operate` |
-| `lane_status` | Reads one lane by name. | `read:state` |
-| `lane_stop` | Stops one lane, here or on the machine it runs on. | `operate` |
-| `lane_wait` | Waits up to 50 s for the next report of any lane you launched, or of `run`. Answers `done` with the report and a cursor, or `running`; pass the cursor as `after` for the next report. Stopped lanes that never reported come back as `warnings`. | `read:state` |
-| `lane_report` | Files this lane's report (`report`, optional `status`, `verdict`, `defects`). Lane conversations only. | `tell` |
+| `delegate_task` | Starts a worker on your own issue to do `task`, here or on `machine`; you are its parent. Optional `harness`, `model`, `effort`, `readOnly`, `name`, `needs`. A caller without an issue gets `delegate_task needs an issue; use start_conversation`. | `operate` (agent tokens only) |
+| `task_wait` | Waits up to 50 s for one of your workers to report. Answers `done` with the report, `ended` when it stopped without one (with its last message), or `running` with `next`. Pass `afterSeq` for the report after the one you consumed. | `read:state` (agent tokens only) |
+| `task_status` | One of your workers: state, idle time, where it runs and its newest report's seq, time and status. Your workers only, including ones on linked machines. | `read:state` (agent tokens only) |
+| `list_workers` | Every worker you started, on this machine or linked ones, with the same fields as `task_status`. | `read:state` (agent tokens only) |
+| `task_cancel` | Stops one of your workers, on this machine or another. Its reports so far stay readable. | `operate` (agent tokens only) |
+| `lane_start` | Launches a gauntlet lane (`role`, `brief`, with `key` or `for`, and optional `run`, `project`, `model`, `harness`, `effort`, `title`, `branch`, `from`, `at`, `machine`, `needs`, `reuse`, `replace`). Conversations only: the lane's parent is the calling conversation. | `operate` (agent tokens only) |
+| `lane_status` | Reads one lane by name. | `read:state` (agent tokens only) |
+| `lane_stop` | Stops one lane, here or on the machine it runs on. | `operate` (agent tokens only) |
+| `lane_wait` | Waits up to 50 s for the next report of any lane you launched, or of `run`. Answers `done` with the report and a cursor, or `running`; pass the cursor as `after` for the next report. Stopped lanes that never reported come back as `warnings`. | `read:state` (agent tokens only) |
+| `lane_report` | Files this lane's report (`report`, optional `status`, `verdict`, `defects`). Lane conversations only. | `tell` (agent tokens only) |
 
 A worker or lane wait returns within 50 s; call its `next` again instead of polling.
 
