@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5016",
   "created": "2026-11-04T13:28:40.332Z",
-  "updated": "2026-11-04T13:43:17.088Z",
+  "updated": "2026-11-04T13:43:40.472Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -56,6 +56,11 @@
       "claimedBy": "agent-pan-5016",
       "claimedAt": "2026-11-04T13:42:28.786Z",
       "doneAt": "2026-11-04T13:43:17.088Z"
+    },
+    "phone-removed": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5016",
+      "claimedAt": "2026-11-04T13:43:40.472Z"
     }
   }
 }
