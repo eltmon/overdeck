@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4482",
   "created": "2026-11-03T23:55:28.272Z",
-  "updated": "2026-11-04T00:11:07.122Z",
+  "updated": "2026-11-04T00:11:12.585Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -44,6 +44,11 @@
       "claimedBy": "agent-pan-4482",
       "claimedAt": "2026-11-04T00:09:08.316Z",
       "doneAt": "2026-11-04T00:11:07.122Z"
+    },
+    "rate-limit-integration": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4482",
+      "claimedAt": "2026-11-04T00:11:12.585Z"
     }
   }
 }
