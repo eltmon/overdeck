@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4954",
   "created": "2026-11-04T14:48:01.762Z",
-  "updated": "2026-11-04T15:09:50.246Z",
+  "updated": "2026-11-04T15:10:05.604Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -106,6 +106,10 @@
     "mcp-client.ac1": {
       "status": "completed",
       "doneAt": "2026-11-04T15:09:50.246Z"
+    },
+    "mcp-client.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:10:05.604Z"
     }
   }
 }
