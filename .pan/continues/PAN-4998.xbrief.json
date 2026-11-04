@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4998",
   "created": "2026-11-04T10:12:10.948Z",
-  "updated": "2026-11-04T10:48:15.623Z",
+  "updated": "2026-11-04T10:49:03.991Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -78,6 +78,10 @@
     "w4-sweep-schedule.ac2": {
       "status": "completed",
       "doneAt": "2026-11-04T10:48:15.622Z"
+    },
+    "w5-doctor-size.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:49:03.990Z"
     }
   }
 }
