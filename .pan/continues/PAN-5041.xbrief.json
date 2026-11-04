@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5041",
   "created": "2026-11-04T17:22:54.161Z",
-  "updated": "2026-11-04T18:19:56.405Z",
+  "updated": "2026-11-04T18:20:20.745Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -176,6 +176,10 @@
     "wi8-docs.ac3": {
       "status": "completed",
       "doneAt": "2026-11-04T18:19:56.404Z"
+    },
+    "wi9-simulator-acceptance.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:20:20.745Z"
     }
   }
 }
