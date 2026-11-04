@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4934",
   "created": "2026-11-04T02:59:33.455Z",
-  "updated": "2026-11-04T03:39:36.430Z",
+  "updated": "2026-11-04T03:39:55.261Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -90,6 +90,10 @@
     "acp-host-mcp-flag.ac3": {
       "status": "completed",
       "doneAt": "2026-11-04T03:39:36.430Z"
+    },
+    "acp-injection-guard.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:39:55.261Z"
     }
   }
 }
