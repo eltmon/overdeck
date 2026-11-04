@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4961",
   "created": "2026-11-03T23:57:34.038Z",
-  "updated": "2026-11-04T00:07:04.621Z",
+  "updated": "2026-11-04T00:07:22.968Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -40,6 +40,10 @@
       "claimedBy": "agent-pan-4961",
       "claimedAt": "2026-11-04T00:03:40.344Z",
       "doneAt": "2026-11-04T00:07:04.621Z"
+    },
+    "disk-cost-estimate.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T00:07:22.967Z"
     }
   }
 }
