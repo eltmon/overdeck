@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5046",
   "created": "2026-11-04T18:10:57.891Z",
-  "updated": "2026-11-04T18:51:30.934Z",
+  "updated": "2026-11-04T18:51:45.593Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -150,6 +150,10 @@
     "boot-wiring-order.ac1": {
       "status": "completed",
       "doneAt": "2026-11-04T18:51:30.934Z"
+    },
+    "boot-wiring-order.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:51:45.593Z"
     }
   }
 }
