@@ -1,6 +1,7 @@
 /**
  * PAN-4927 W-SELF1 WI-5: `wait_job` is listed only to agent tokens and passes
- * the wait route's answer through, `running` with `next` or `done`.
+ * the wait route's answer through, `running` with `next` or `done`. Also the
+ * workflow, secret (W-SEC1) and machine-link (PAN-4942 W-LINK1) self tools.
  */
 import { describe, expect, it } from 'vitest';
 
@@ -121,6 +122,62 @@ describe('MCP self tools (PAN-4927 W-SELF1)', () => {
       const api = fakeApi({ [WAIT_R1]: { status: 404, json: { error: 'no such request; a dashboard restart forgets requests, so call request_secret again', code: 'unknown-request' } } });
       const client = await connectClient(api, ['read:state'], true);
       const result = await callTool(client, 'secret_wait', { requestId: 'r1' });
+      expect(result.isError).toBe(true);
+      expect(resultText(result).startsWith('HTTP 404')).toBe(true);
+    });
+  });
+
+  describe('link_machine and link_machine_wait (PAN-4942 W-LINK1)', () => {
+    const WAIT_L1 = 'GET /api/self/machine-link-requests/l1/wait?timeoutMs=50000';
+
+    it('hides both tools from a non-agent token and lists them for an agent token with tell', async () => {
+      const api = fakeApi({});
+      const human = await connectClient(api, ['read:state', 'tell']);
+      const names = (await human.listTools()).tools.map((tool) => tool.name);
+      expect(names).not.toContain('link_machine');
+      expect(names).not.toContain('link_machine_wait');
+      expect(resultText(await callTool(human, 'link_machine', { hint: 'my desk Mac' }))).toBe('Unknown tool link_machine');
+      expect(api.calls).toEqual([]);
+
+      const agent = await connectClient(api, ['read:state', 'tell'], true);
+      const agentNames = (await agent.listTools()).tools.map((tool) => tool.name);
+      expect(agentNames).toContain('link_machine');
+      expect(agentNames).toContain('link_machine_wait');
+    });
+
+    it('link_machine posts exactly { hint } and passes the answer through', async () => {
+      const pending = { requestId: 'l1', status: 'pending', expiresAt: '2026-11-05T00:00:00.000Z', next: { tool: 'link_machine_wait', arguments: { requestId: 'l1' } } };
+      const api = fakeApi({ 'POST /api/self/machine-link-requests': { status: 201, json: pending } });
+      const client = await connectClient(api, ['tell'], true);
+      expect(resultJson(await callTool(client, 'link_machine', { hint: 'my desk Mac' }))).toEqual(pending);
+      expect(api.calls).toEqual([{ method: 'POST', path: '/api/self/machine-link-requests', body: { hint: 'my desk Mac' } }]);
+    });
+
+    it('link_machine rejects a missing hint before any call', async () => {
+      const api = fakeApi({});
+      const client = await connectClient(api, ['tell'], true);
+      const missing = await callTool(client, 'link_machine', {});
+      expect(missing.isError).toBe(true);
+      expect(resultText(missing)).toContain('hint');
+      expect(api.calls).toEqual([]);
+    });
+
+    it('link_machine_wait encodes the id, waits 50 s and passes a linked answer through', async () => {
+      const linked = { requestId: 'l1', status: 'linked', machine: { environmentId: 'env-1', label: 'desk' } };
+      const api = fakeApi({ [WAIT_L1]: { status: 200, json: linked } });
+      const client = await connectClient(api, ['read:state'], true);
+      expect(resultJson(await callTool(client, 'link_machine_wait', { requestId: 'l1' }))).toEqual(linked);
+      await callTool(client, 'link_machine_wait', { requestId: 'a/b' });
+      expect(api.calls).toEqual([
+        { method: 'GET', path: '/api/self/machine-link-requests/l1/wait?timeoutMs=50000' },
+        { method: 'GET', path: '/api/self/machine-link-requests/a%2Fb/wait?timeoutMs=50000' },
+      ]);
+    });
+
+    it('link_machine_wait maps a route 404 to a tool error starting HTTP 404', async () => {
+      const api = fakeApi({ [WAIT_L1]: { status: 404, json: { error: 'no such request; a dashboard restart forgets requests, so call link_machine again', code: 'unknown-request' } } });
+      const client = await connectClient(api, ['read:state'], true);
+      const result = await callTool(client, 'link_machine_wait', { requestId: 'l1' });
       expect(result.isError).toBe(true);
       expect(resultText(result).startsWith('HTTP 404')).toBe(true);
     });
