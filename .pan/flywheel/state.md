@@ -603,3 +603,10 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
 - 2026-11-03 operator put PAN-4970 (dual merge paths) into the pipeline via pan start, overriding the TENET-10 handoff routing for this issue.
 
 - 2026-11-04 PAN-4950 (W-CONN2) is held until the operator redeploys the connect Worker for PAN-4948 (W-DIR1): the PRD says W-CONN2 needs W-DIR1 'and its deploy'. All its other deps (W-CONN1 PAN-4949, W-MCP1) are merged.
+
+## 2026-11-04 — PAN-4993: convergence gate withheld review feedback after an approval
+
+- PAN-4947 (#4990) was approved twice; a conflict-repair merge brought in PAN-4951's ConnectBotDialog, and the next review blocked with 2 findings. `pan specialists done` printed "Review loop not converging (cycle counts: 0 → 0 → 2)" and sent needs-you instead of messaging the agent, so it idled 25+ min. Evidence: no `feedback.delivered` kind=review in `.overdeck/pipeline.jsonl`; the reason is in the review agent's transcript tool result.
+- Cause: `evaluateReviewConvergence` (`src/lib/cloister/review-convergence.ts`) judges the whole series; the reversal rule fires on 0 → 2. A 0-blocker round is a converged loop, so blockers after it start a new episode. Filed PAN-4993 and launched a supervised handoff (conv 3601, worktree ~/Projects/hoff-pan-4993) because it is review-gate machinery (TENET-10).
+- Instance recovery: `pan tell` re-delivered the feedback-file path. Learning: when an agent idles on CHANGES_REQUESTED, check the reviewer's `specialists done` output for "[feedback-target]" before assuming delivery failed.
+- `pan handoff self` fails in conv-flywheel ("Could not determine the current conversation"); pass the conversation id (3399) instead.
