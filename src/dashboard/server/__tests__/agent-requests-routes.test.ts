@@ -4,7 +4,7 @@
  * handlers' caller, input, ownership and wait checks with injected deps.
  */
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
-import { readFile, stat } from 'node:fs/promises';
+import { readFile, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -12,6 +12,8 @@ import { Effect, Layer, Option } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { DashboardApi } from '../../../lib/mcp/dashboard-api.js';
+import { callTool, connectClient, resultJson } from '../../../../tests/unit/lib/mcp/harness.js';
 import type { SelfCallerDeps } from '../self-caller.js';
 import type { DashboardCredential } from '../routes/dashboard-auth.js';
 
@@ -28,6 +30,7 @@ process.env.OVERDECK_HOME = home;
 
 const { _resetAccessTokensForTests, _settleAccessTokenWritesForTests, createAccessToken } = await import('../../../lib/access-tokens.js');
 const { _resetDashboardSessionTokenForTests } = await import('../routes/dashboard-auth.js');
+const { _resetInternalTokenCacheForTests, INTERNAL_TOKEN_HEADER } = await import('../../../lib/internal-token.js');
 const { remoteRequestGateLayer } = await import('../remote-request-gate.js');
 const { requiredScopeFor } = await import('../route-scopes.js');
 const { createAgentRequests } = await import('../services/agent-requests.js');
@@ -429,6 +432,76 @@ describe('operator agent request handlers', () => {
       expect(JSON.stringify(result)).not.toContain(canary);
       for (const spy of spies) expect(JSON.stringify(spy.mock.calls)).not.toContain(canary);
       expect(JSON.stringify(emitActivityEntryMock.mock.calls)).not.toContain(canary);
+    } finally {
+      for (const spy of spies) spy.mockRestore();
+    }
+  });
+});
+
+describe('secret request flow (AC-12)', () => {
+  const INTERNAL_TOKEN = 'pan-4941-internal-token-0123456789';
+
+  beforeEach(async () => {
+    await writeFile(join(home, 'internal-token'), INTERNAL_TOKEN, { mode: 0o600 });
+    _resetInternalTokenCacheForTests();
+  });
+  afterEach(() => {
+    rmSync(join(home, 'internal-token'), { force: true });
+    rmSync(join(home, 'agents'), { recursive: true, force: true });
+    _resetInternalTokenCacheForTests();
+  });
+
+  it('delivers the value only as a 0600 file: the canary is in no answer, tool result, activity entry or console call', async () => {
+    const canary = `canary-${crypto.randomUUID()}`;
+    const spies = (['log', 'info', 'warn', 'error', 'debug'] as const).map((method) => vi.spyOn(console, method).mockImplementation(() => undefined));
+    const outputs: unknown[] = [];
+    try {
+      const requests = createAgentRequests();
+      const app = Layer.mergeAll(
+        remoteRequestGateLayer,
+        makeSelfRequestsRouteLayer({ requests, caller: callerDeps }),
+        makeAgentRequestsRouteLayer({ requests }),
+      );
+      const scopes = ['read:events', 'read:state', 'read:conversations', 'tell', 'operate'] as const;
+      const { token } = await createAccessToken({ name: 'agent:work:agent-pan-1', kind: 'token', scopes: [...scopes], agentId: 'agent-pan-1', agentKind: 'agent', role: 'work' });
+
+      // The agent's MCP tools call the real routes through the real gate with its agent token.
+      const api: DashboardApi = {
+        async request(method, path, body) {
+          const response = await send(app, method as 'GET' | 'POST', path, bearer(token), body === undefined ? undefined : JSON.stringify(body));
+          outputs.push(response);
+          return response;
+        },
+      };
+      const client = await connectClient(api, scopes, true);
+
+      const asked = await callTool(client, 'request_secret', { name: 'EVAL_API_KEY', prompt: 'The key for the eval run' });
+      outputs.push(asked);
+      const { requestId } = resultJson(asked) as { requestId: string };
+
+      const root = { [INTERNAL_TOKEN_HEADER]: INTERNAL_TOKEN };
+      const listed = await send(app, 'GET', '/api/agent-requests', root);
+      outputs.push(listed);
+      expect((listed.json as { requests: Array<{ id: string }> }).requests.map((row) => row.id)).toEqual([requestId]);
+
+      const answered = await send(app, 'POST', `/api/agent-requests/${requestId}/secret`, root, JSON.stringify({ value: canary }));
+      outputs.push(answered);
+      expect(answered).toEqual({ status: 200, json: { requestId, status: 'delivered' } });
+
+      const waited = await callTool(client, 'secret_wait', { requestId });
+      outputs.push(waited);
+      const file = join(home, 'agents', 'agent-pan-1', 'secrets', 'EVAL_API_KEY');
+      expect(resultJson(waited)).toEqual({ requestId, status: 'delivered', file });
+
+      expect(await readFile(file, 'utf8')).toBe(canary);
+      expect((await stat(file)).mode & 0o777).toBe(0o600);
+      expect((await stat(join(home, 'agents', 'agent-pan-1', 'secrets'))).mode & 0o777).toBe(0o700);
+
+      expect(outputs.length).toBeGreaterThanOrEqual(6);
+      for (const output of outputs) expect(JSON.stringify(output)).not.toContain(canary);
+      expect(JSON.stringify(emitActivityEntryMock.mock.calls)).not.toContain(canary);
+      for (const spy of spies) expect(JSON.stringify(spy.mock.calls)).not.toContain(canary);
+      expect(emitActivityEntryMock).toHaveBeenCalledWith(expect.objectContaining({ message: 'Secret EVAL_API_KEY delivered to agent-pan-1 · PAN-1' }));
     } finally {
       for (const spy of spies) spy.mockRestore();
     }
