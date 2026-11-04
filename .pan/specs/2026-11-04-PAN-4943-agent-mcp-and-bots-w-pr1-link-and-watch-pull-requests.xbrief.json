@@ -4,17 +4,17 @@
     "created": "2026-11-04T04:23:10Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4943: Agent MCP and bots (W-PR1): Link and watch pull requests",
-    "updated": "2026-11-04T04:26:14.441Z"
+    "updated": "2026-11-04T04:27:32.318Z"
   },
   "plan": {
     "id": "pan-4943",
     "title": "Agent MCP and bots (W-PR1): Link and watch pull requests",
-    "status": "proposed",
+    "status": "running",
     "uid": "abe85546-aa65-456e-8664-89b9f16bd06c",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-04T04:23:10Z",
-    "updated": "2026-11-04T04:26:14.441Z",
+    "updated": "2026-11-04T04:27:32.318Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4943",
@@ -792,5 +792,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
