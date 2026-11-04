@@ -143,6 +143,26 @@ iOS 26.5, deleted afterwards.
   and that `npx wrangler tail overdeck-connect --format json` shows no title text. Those steps
   are in the [PAN-4841 comment](https://github.com/eltmon/overdeck/issues/4841#issuecomment-6615975677).
 
+### Device run (PAN-4841)
+
+Run on 2026-11-04 with TestFlight "Overdeck Anywhere" 1.0 (1) on the operator's iPhone, signed in,
+notifications allowed, paired with `eltmon-z790`, app swiped closed and the phone locked.
+`healthz` reported `apns: true` (see "PAN-4841 store builds" → "Directory secrets").
+
+- Send: a scratch conversation on `eltmon-z790` called AskUserQuestion with the unique title
+  "PAN-4841 device check 1212 - tap me" at 12:13:01 UTC.
+- Display: the notification showed on the locked iPhone in under 10 seconds (operator's report;
+  target 10 seconds or less). Pass.
+- Decryption: earlier the same phone also showed a real needs-you push, "Failed PAN-5006 The agent
+  stopped responding", in readable text, so the Notification Service Extension read the shared
+  Keychain push key and decrypted it on the device. Pass.
+- Cold-launch tap: **fail.** Tapping the notification from the closed state opened the app, which
+  then showed "Could not open a secure channel to eltmon-z790." instead of the Needs-you card. The
+  same error appears when opening the machine right after pairing. This is the link channel, not
+  push: filed as [PAN-5018](https://github.com/eltmon/overdeck/issues/5018).
+- `wrangler tail overdeck-connect --format json` during the run: 59 events captured; the unique
+  title occurs 0 times (`grep -c 'PAN-4841 device check'` prints `0`).
+
 ## Live Activity (PAN-4839)
 
 Evidence for PRD WI-11. The Simulator run checks that the widget extension builds, embeds and draws
