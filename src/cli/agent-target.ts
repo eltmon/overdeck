@@ -33,7 +33,7 @@ export type AgentTargetFailure = Exclude<AgentTargetResolution, { kind: 'agent' 
 export const ACCEPTED_TARGET_FORMS: readonly string[] = [
   'issue ID       PAN-1148 (a bare 1148 works when it is unambiguous)',
   'agent ID       agent-pan-1148, strike-pan-1723, conv-20260928-7563',
-  'conversation   conv/2972, conv:2972, or a dashboard URL such as https://overdeck.localhost/conv/2972',
+  'conversation   its name 20260928-7563, conv/2972, conv:2972, or a dashboard URL such as https://overdeck.localhost/conv/2972',
   'bare number    an issue agent if one exists, else that conversation; both → this list',
 ];
 
