@@ -143,6 +143,37 @@ iOS 26.5, deleted afterwards.
   and that `npx wrangler tail overdeck-connect --format json` shows no title text. Those steps
   are in the [PAN-4841 comment](https://github.com/eltmon/overdeck/issues/4841#issuecomment-6615975677).
 
+### Device run (PAN-4841)
+
+Run on 2026-11-04 with TestFlight "Overdeck Anywhere" 1.0 (1) on the operator's iPhone, signed in,
+notifications allowed, paired with `eltmon-z790`, app swiped closed and the phone locked.
+`healthz` reported `apns: true` (see "PAN-4841 store builds" → "Directory secrets").
+
+- Send: a scratch conversation on `eltmon-z790` called AskUserQuestion with the unique title
+  "PAN-4841 device check 1212 - tap me" at 12:13:01 UTC.
+- Display: the notification showed on the locked iPhone in under 10 seconds (operator's report;
+  target 10 seconds or less). Pass.
+- Decryption: earlier the same phone also showed a real needs-you push, "Failed PAN-5006 The agent
+  stopped responding", in readable text, so the Notification Service Extension read the shared
+  Keychain push key and decrypted it on the device. Pass.
+- Cold-launch tap: **fail.** Tapping the notification from the closed state opened the app, which
+  then showed "Could not open a secure channel to eltmon-z790." instead of the Needs-you card. The
+  same error appears when opening the machine right after pairing. This is the link channel, not
+  push: filed as [PAN-5018](https://github.com/eltmon/overdeck/issues/5018).
+- `wrangler tail overdeck-connect --format json` during the run: 59 events captured; the unique
+  title occurs 0 times (`grep -c 'PAN-4841 device check'` prints `0`).
+
+Rerun on 2026-11-04 with TestFlight 1.0 (3), which carries the PAN-5018 link fixes and the
+pair-link fix (see "Simulator check before the device run"):
+
+- Send: a scratch conversation raised "PAN-4841 build 3 check 1706 - tap me" at 17:07:19.5 UTC; the
+  directory handed it to APNs (`push` `delivered`) for the new install at 17:07:25.4 UTC (5.9 s).
+- Display, decryption and tap: **pass.** The operator confirmed the exact title showed on the locked
+  phone, and tapping it from the closed state opened `eltmon-z790`'s Needs-you screen with that
+  question and no error (answer "All good"). This replaces the build 1 cold-launch tap failure
+  (PAN-5018).
+- `wrangler tail` during the rerun: 34 events; the unique title occurs 0 times.
+
 ## Live Activity (PAN-4839)
 
 Evidence for PRD WI-11. The Simulator run checks that the widget extension builds, embeds and draws
@@ -173,11 +204,113 @@ window, unlock, open another app, and run `xcrun simctl io $U screenshot 11-live
 
 ### Device checkpoint (AC-12, D-16)
 
-**Not run: APNs secrets unset (PAN-4841).** On 2026-11-03, `GET https://connect.overdeck.ai/healthz`
+**Run on 2026-11-04 with TestFlight 1.0 (3) (PAN-4841): pass.** The operator's iPhone, signed in
+and paired with `eltmon-z790`, app closed and phone locked, Live Activity card on the lock screen.
+A scratch conversation raised one AskUserQuestion at 17:07:19.5 UTC, which raised the needs-you
+count by one. The directory handed the Live Activity update to APNs (`push-activity` `pushed`)
+at 17:07:36.1 UTC, 16.6 s after the question (target: the card shows the new count within 30 s).
+The operator confirmed the card's "need you" count went up by one (answer "All good") and, asked
+afterwards, that the lock-screen card showed the higher count **under 10 s** after the notification
+(well within the 30 s target). Counts: before N, after N + 1 (one new needs-you question); the exact
+numbers on the card were not reported. Run date: 2026-11-04.
+
+Earlier note — **not run: APNs secrets unset (PAN-4841).** On 2026-11-03, `GET https://connect.overdeck.ai/healthz`
 answered `{"ok":true,"configured":true,"turn":true,"apns":false,"fcm":false}`. The AC-12 timing,
 the widget App ID `ai.overdeck.app.widgets` and the reuse of the existing APNs key are handed to
 PAN-4841's TestFlight run:
 https://github.com/eltmon/overdeck/issues/4841#issuecomment-6616154481
+
+## PAN-4841 store builds
+
+### Directory secrets
+
+On 2026-11-04 at 11:07:21 UTC, after the agent set the five push secrets on `overdeck-connect`
+with `wrangler secret put` (no `wrangler deploy`), `GET https://connect.overdeck.ai/healthz`
+answered:
+
+```json
+{"ok":true,"configured":true,"turn":true,"apns":true,"fcm":true}
+```
+
+- `wrangler secret list` names `APNS_KEY_P8`, `APNS_KEY_ID`, `APNS_TEAM_ID`,
+  `FCM_SERVICE_ACCOUNT_JSON` and `FCM_PROJECT_ID` (plus the TURN pair).
+- APNs: a new team-scoped auth key "Overdeck Push Notifications" (Sandbox & Production) for team
+  `KUU2VM9GB9`. MYN's existing key was not reused.
+- FCM: service account `overdeck-fcm-sender` with only `roles/firebasecloudmessaging.admin` in the
+  new Firebase project `overdeck-app`; `FCM_PROJECT_ID` is `project_info.project_id` of
+  `apps/mobile/android/app/google-services.json`.
+- `apns: true` means the values are present and parse. The delivered-push proof is the device
+  run below ("PAN-4838 iOS notifications", "Device run (PAN-4841)").
+
+### Google Play
+
+- Date: 2026-11-04. Built with `apps/mobile/scripts/build-android.sh --build 1` from `feature/pan-4841`.
+- versionCode 1, versionName 1.0 (Play shows "1 (1.0)", API 24+, target SDK 36).
+- Upload certificate SHA-1: `25:B5:5E:5B:55:8F:1E:67:46:5A:E2:DC:D3:68:FF:54:16:E3:F5:7F` (equals
+  `apps/mobile/android/upload-certificate.sha1`; the script checked it).
+- AAB SHA-256: `f2e63057b14908bc16827c2af48f2cf0f154f51aa8e6ce1170d022deb6f9f9ce`.
+- Play app "Overdeck" (`ai.overdeck.app`), Play App Signing with a Google-generated key.
+- Internal testing release `1.0 (1)`: "Available to internal testers", released 2026-11-04, tester
+  list "Operator". Until the app is reviewed, testers see the temporary name
+  "ai.overdeck.app (unreviewed)".
+- Includes PAN-4840 (Android push decryption): no. PAN-4840 was still open, so this build has the
+  FCM config but not the handler (D-6); a later build ships it.
+- Later builds on the same track (same signing key): **1.0 (2)**, 2026-11-04, with `main` merged in
+  (PAN-5018 link fixes, PAN-5019 notification controls, PAN-5016 telemetry events), and **1.0 (3)**,
+  2026-11-04, adding the pair-link fix. Both "Available to internal testers"; neither includes
+  PAN-4840.
+
+### TestFlight
+
+- Date: 2026-11-04. Built with `apps/mobile/scripts/build-ios-on-rig.sh --build 1 --rig eltmon@192.168.1.83`
+  from `feature/pan-4841`; the log ended `== DONE ==` after "Upload succeeded" and `** EXPORT SUCCEEDED **`.
+- Archive: CFBundleShortVersionString 1.0, CFBundleVersion 1. `App.app` contains
+  `PrivacyInfo.xcprivacy`, `NotificationService.appex` and `OverdeckWidgets.appex`.
+- Entitlements of a local App Store export of the same archive (`codesign -d --entitlements`):
+  aps-environment production for `App.app`; application identifiers `KUU2VM9GB9.ai.overdeck.app`,
+  `KUU2VM9GB9.ai.overdeck.app.NotificationService`, `KUU2VM9GB9.ai.overdeck.app.widgets`.
+- App Store Connect app "Overdeck Anywhere" ("Overdeck" was taken; the name under the icon stays
+  "Overdeck"), bundle id `ai.overdeck.app`, SKU `overdeck-ios`.
+- TestFlight status: build 1 processing state VALID; export compliance answered by the operator
+  as exempt (mass-market), so `usesNonExemptEncryption` is false; internal build state
+  READY_FOR_BETA_TESTING; in the internal group "Operator" (automatic distribution on), whose
+  tester (the operator) is INVITED.
+- Later builds, each processed VALID, exempt (mass-market) and in beta testing for "Operator":
+  **1.0 (2)**, 2026-11-04, with `main` merged in (PAN-5018, PAN-5019, PAN-5016), and **1.0 (3)**,
+  2026-11-04, adding the pair-link fix. 1.0 (3) is the build the device checks below ran on.
+
+### Simulator check before the device run (2026-11-04)
+
+The operator asked for every fix to be proven on the Mac rig before more phone tests. Run on
+the rig's iOS Simulator (`overdeck-5018`, iPhone 17 Pro, iOS 26.5), 16:42–16:55 UTC, with this
+branch after merging `main` (PAN-5018, PAN-5019, PAN-5016), i.e. TestFlight 1.0 (2)'s code:
+
+- **Stack:** the PAN-5018 local overdeck.ai stand-in (the real `services/connect` Worker in
+  Miniflare with an `AccountRpc` stub, a stub account service for sign-in, an SSH reverse tunnel to
+  the rig), and a test machine (`pan5018-test`) running this branch's `dist/` stamped 0.74.0. A
+  Debug app built with `VITE_OVERDECK_DEBUG_ERRORS=1` and the stand-in URLs, installed fresh.
+- **Sign-in, pairing:** sign-in through the stub worked; pairing through a Safari pair link
+  succeeded on the machine (device record created, `rtc session … connected`).
+- **Link:** opening the machine ×4 and background/foreground ×2 each logged a new
+  `rtc session … connected` on the machine, and the phone showed "Nothing needs you." with no
+  failure text every time.
+- **Tap from closed:** with the app terminated on the machine list, a sealed test push
+  (`tests/fixtures/phone-push/seal-apns.mjs`, with the `machine` and `url` keys the Notification
+  Service Extension adds, since `simctl push` does not run the extension) showed a banner; tapping
+  it cold-launched the app into `pan5018-test`'s Needs-you screen, and the machine logged a new
+  link. The banner shows the placeholder text on the Simulator by design.
+- **Live Activity:** the card started on the lock screen and in the Dynamic Island ("– need you ·
+  – running"); counts need push updates, which this stand-in stack cannot send, so the update
+  timing stays a device check.
+- **PAN-5019 controls:** Settings shows "Pause notifications" (1 hour, until tomorrow 8:00) and a
+  switch per type (agent questions, plan approvals, permission prompts, finished work, failures,
+  agent stopped responding).
+- **Bug found and fixed:** after pairing through a pair link, the app stayed on the Pair screen
+  with the used link prefilled (PAN-5018's run saw the same). On iOS `App.getLaunchUrl()` answers
+  with a URL that arrived through `appUrlOpen`, and only `getLaunchUrl()` URLs were recorded as
+  handled, so the reload after pairing replayed the link. Fixed in `ShellApp.tsx` with a
+  regression test; rerun on the Simulator at 16:54 UTC, pairing went straight to the machine's
+  Needs-you screen. Ships in 1.0 (3).
 
 ## PAN-5018 link after a long machine uptime
 

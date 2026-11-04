@@ -1,5 +1,11 @@
 apply plugin: 'com.android.application'
 
+// Release signing comes from the environment (apps/mobile/scripts/build-android.sh); debug and CI builds have none.
+def uploadKeystorePath = System.getenv("OVERDECK_UPLOAD_KEYSTORE")
+def uploadStorePassword = System.getenv("OVERDECK_UPLOAD_STORE_PASSWORD")
+def uploadKeyAlias = System.getenv("OVERDECK_UPLOAD_KEY_ALIAS")
+def uploadKeyPassword = System.getenv("OVERDECK_UPLOAD_KEY_PASSWORD")
+
 android {
     namespace = "ai.overdeck.app"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,8 +13,8 @@ android {
         applicationId "ai.overdeck.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode((project.findProperty("overdeckVersionCode") ?: "1") as Integer)
+        versionName((project.findProperty("overdeckVersionName") ?: "1.0") as String)
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,8 +22,21 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        release {
+            if (uploadKeystorePath) {
+                storeFile file(uploadKeystorePath)
+                storePassword uploadStorePassword
+                keyAlias uploadKeyAlias
+                keyPassword uploadKeyPassword
+            }
+        }
+    }
     buildTypes {
         release {
+            if (uploadKeystorePath) {
+                signingConfig signingConfigs.release
+            }
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
