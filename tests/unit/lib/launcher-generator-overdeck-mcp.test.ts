@@ -96,3 +96,51 @@ describe('generateLauncherScript — overdeck MCP (PAN-4932)', () => {
     expect(without).not.toContain('--allowedTools');
   });
 });
+
+const ACP_CONFIG: LauncherConfig = {
+  role: 'work',
+  workingDir: '/workspace/project',
+  harness: 'opencode',
+  acpAgentId: 'agent-a',
+  acpProvider: 'opencode',
+  acpWorkspace: '/workspace/project',
+  acpBinaryPath: '/opt/opencode',
+  model: 'opencode/big-pickle',
+  overdeckEnv: { agentId: 'agent-a' },
+};
+
+function hostLine(script: string): string {
+  const line = script.split('\n').find((l) => l.includes('acp-host.js'));
+  expect(line).toBeDefined();
+  return line!;
+}
+
+describe('generateLauncherScript — overdeck MCP for ACP launches (PAN-4934)', () => {
+  it('adds the host flag to an opencode launch', () => {
+    const script = generateLauncherScript({ ...ACP_CONFIG, overdeckMcpConfig: CONFIG_PATH });
+    const line = hostLine(script);
+
+    expect(line).toContain(` --mcp-config '${CONFIG_PATH}'`);
+    expect(count(line, /--mcp-config/)).toBe(1);
+    expect(script).not.toContain('--allowedTools');
+  });
+
+  it('adds the host flag to a kimi acp launch', () => {
+    const script = generateLauncherScript({
+      ...ACP_CONFIG,
+      harness: 'acp',
+      acpProvider: 'kimi',
+      model: 'kimi-for-coding',
+      overdeckMcpConfig: CONFIG_PATH,
+    });
+    const line = hostLine(script);
+
+    expect(line).toContain(` --mcp-config '${CONFIG_PATH}'`);
+    expect(count(line, /--mcp-config/)).toBe(1);
+    expect(script).not.toContain('--allowedTools');
+  });
+
+  it('adds no host flag when the field is unset', () => {
+    expect(hostLine(generateLauncherScript(ACP_CONFIG))).not.toContain('--mcp-config');
+  });
+});
