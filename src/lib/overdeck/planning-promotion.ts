@@ -348,6 +348,7 @@ function getInternalDashboardOrigin(): string {
 
 function classifyAutoSpawnSkip(status: number, body: Record<string, unknown>): NonNullable<CompletePlanningAutoSpawnResult['workAgentSkipReason']> {
   const error = typeof body['error'] === 'string' ? body['error'] : '';
+  if (body['diskLow'] === true) return 'guardrails'; // PAN-4961: retryable once space returns
   if (status === 401 || status === 403) return 'unauthorized';
   if (body['stackHealth'] || /workspace docker stack/i.test(error)) return 'stack-unhealthy';
   if (body['paused'] === true) return 'paused';
@@ -530,7 +531,7 @@ export async function completePlanningAutoSpawn(options: {
       workAgentError: error,
       workAgentSkipReason: skipReason,
       workAgentHttpStatus: response.status,
-      ...((skipReason === 'guardrails' && body['guardrails']) || skipReason === 'stack-unhealthy' ? { workAgentDeferred: true } : {}),
+      ...((skipReason === 'guardrails' && (body['guardrails'] || body['diskLow'] === true)) || skipReason === 'stack-unhealthy' ? { workAgentDeferred: true } : {}),
     };
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
