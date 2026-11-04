@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4841",
   "created": "2026-11-04T10:01:07.580Z",
-  "updated": "2026-11-04T17:37:36.559Z",
+  "updated": "2026-11-04T17:37:48.732Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -246,6 +246,10 @@
     "rel-directory-push-secrets.ac5": {
       "status": "completed",
       "doneAt": "2026-11-04T17:37:36.558Z"
+    },
+    "rel-first-android-release.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:37:48.732Z"
     }
   }
 }
