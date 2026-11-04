@@ -4,7 +4,7 @@
  * OVERDECK_HOME with the real access-token registry. The dashboard API the
  * tools would call is a stub; the end-to-end proxying is `mcp-acceptance`.
  */
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -26,6 +26,7 @@ delete process.env.DASHBOARD_URL;
 const { _resetAccessTokensForTests, _settleAccessTokenWritesForTests, createAccessToken, revokeAccessToken } = await import('../../../lib/access-tokens.js');
 const { _resetInternalTokenCacheForTests, INTERNAL_TOKEN_HEADER } = await import('../../../lib/internal-token.js');
 const { ALL_TOOLS } = await import('../../../lib/mcp/server.js');
+const { invalidatePublicMcpConfig } = await import('../../../lib/mcp/public-mcp.js');
 const { _resetDashboardSessionTokenForTests } = await import('../routes/dashboard-auth.js');
 const { _resetTrustedOriginsForTests } = await import('../routes/origin-validation.js');
 const { remoteRequestGateLayer } = await import('../remote-request-gate.js');
@@ -176,5 +177,49 @@ describe('/mcp OAuth challenge (PAN-4945)', () => {
     const expired = await send('POST', headers, TOOLS_LIST);
     expect(expired.status).toBe(401);
     expect(expired.headers['www-authenticate']).toBe(CHALLENGE);
+  });
+});
+
+describe('/mcp over Tailscale Funnel (PAN-4947 FR-3)', () => {
+  const FUNNEL = { 'tailscale-funnel-request': '?1' };
+
+  beforeEach(() => {
+    // The gate opens /mcp to Funnel only while the public MCP switch is on.
+    writeFileSync(join(home, 'config.yaml'), 'mcp:\n  public:\n    enabled: true\n');
+    invalidatePublicMcpConfig();
+  });
+
+  afterEach(() => {
+    rmSync(join(home, 'config.yaml'), { force: true });
+    invalidatePublicMcpConfig();
+  });
+
+  it('refuses a plain token over Funnel and serves it without Funnel', async () => {
+    const { token } = await createAccessToken({ name: 'cli', scopes: ['read:state'], kind: 'token' });
+    const funneled = await send('POST', { ...MCP_HEADERS, ...FUNNEL, ...bearer(token) }, TOOLS_LIST);
+    expect(funneled.status).toBe(403);
+    expect(funneled.json).toEqual({ error: 'public MCP accepts only OAuth sign-ins' });
+    expect((await send('POST', { ...MCP_HEADERS, ...bearer(token) }, TOOLS_LIST)).status).toBe(200);
+  });
+
+  it('serves an OAuth token over Funnel', async () => {
+    const { token } = await createAccessToken({
+      name: 'xAI (OAuth)', scopes: ['read:state', 'read:conversations', 'tell'], kind: 'token',
+      oauthClientId: `odc_${'3'.repeat(32)}`, oauthFamilyId: '4'.repeat(32),
+      expiresAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+    });
+    const listed = await send('POST', { ...MCP_HEADERS, ...FUNNEL, ...bearer(token) }, TOOLS_LIST);
+    expect(listed.status).toBe(200);
+    expect((listed.json as { result: { tools: unknown[] } }).result.tools.length).toBeGreaterThan(0);
+  });
+
+  it('refuses an agent token over Funnel', async () => {
+    const { token } = await createAccessToken({
+      name: 'agent', scopes: ['read:state', 'operate'], kind: 'token',
+      agentId: 'agent-pan-1', agentKind: 'agent', role: 'work',
+    });
+    const funneled = await send('POST', { ...MCP_HEADERS, ...FUNNEL, ...bearer(token) }, TOOLS_LIST);
+    expect(funneled.status).toBe(403);
+    expect(funneled.json).toEqual({ error: 'public MCP accepts only OAuth sign-ins' });
   });
 });

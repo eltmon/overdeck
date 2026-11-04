@@ -6,7 +6,6 @@ import {
   botScopes,
   createConnectorPairing,
   loadConnectors,
-  loadPublicMcp,
   removeConnector,
 } from '../botsApi';
 
@@ -40,22 +39,6 @@ describe('botScopes', () => {
 
   it('returns the default scopes in choice order when every default is chosen', () => {
     expect(botScopes(BOT_DEFAULT_SCOPES)).toEqual(['read:state', 'read:conversations', 'tell']);
-  });
-});
-
-describe('loadPublicMcp', () => {
-  it('reads a 404 as unavailable and off (D-6)', async () => {
-    fetchMock.mockResolvedValue(jsonResponse({ error: 'not found' }, 404));
-    await expect(loadPublicMcp()).resolves.toEqual({ available: false, enabled: false, url: null });
-  });
-
-  it('maps an enabled route to its base URL', async () => {
-    fetchMock.mockResolvedValue(jsonResponse({ enabled: true, baseUrl: 'https://h.ts.net:8443/mcp' }));
-    await expect(loadPublicMcp()).resolves.toEqual({
-      available: true,
-      enabled: true,
-      url: 'https://h.ts.net:8443/mcp',
-    });
   });
 });
 

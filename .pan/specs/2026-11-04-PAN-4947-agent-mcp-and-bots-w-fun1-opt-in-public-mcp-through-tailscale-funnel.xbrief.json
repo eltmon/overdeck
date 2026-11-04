@@ -1,0 +1,806 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-04T05:05:20Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4947: Agent MCP and bots (W-FUN1): Opt-in public /mcp through Tailscale Funnel",
+    "updated": "2026-11-04T05:30:12.865Z"
+  },
+  "plan": {
+    "id": "pan-4947",
+    "title": "Agent MCP and bots (W-FUN1): Opt-in public /mcp through Tailscale Funnel",
+    "status": "running",
+    "metadata": {
+      "sizeJustification": "27 files over 7 lint subsystems, but this is already one child of the decomposed PAN-4927 epic: switch, gate, middleware, route and panel are gated by one flag and verified together by one end-to-end acceptance (AC-18). 9 files are tests and 5 are docs; a further split would ship a switch with no surface or a public surface with no rate limit or audit.",
+      "canonicalFilename": "2026-11-04-PAN-4947-agent-mcp-and-bots-w-fun1-opt-in-public-mcp-through-tailscale-funnel.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "uid": "88355e51-a7dc-4a9a-ba9b-b63180935f2a",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-04T05:05:20Z",
+    "updated": "2026-11-04T05:30:12.865Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4947",
+        "label": "PAN-4947",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4927",
+        "label": "PAN-4927 (epic)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/main/.pan/drafts/pan-4927.md",
+        "label": "Epic PRD (W-FUN1)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "mcp",
+      "oauth",
+      "tailscale-funnel",
+      "security",
+      "remote-request-gate",
+      "settings"
+    ],
+    "narratives": {
+      "Problem": "Hosted bots (Grok Bot, the xAI API) cannot join the tailnet or run the Overdeck connector, so they need a public HTTPS URL for /mcp. Gate rule 0 (src/dashboard/server/remote-request-gate.ts:134-136) answers 404 to every Tailscale Funnel request except POST /hooks/*, so /mcp and the OAuth endpoints shipped by W-OAUTH1 are unreachable from the internet.",
+      "Proposal": "Add an operator-only switch mcp.public.enabled (global config.yaml only, cached read, narrow write door, stripped from the project layer). While it is on, gate rule 0 admits exactly nine raw-path surfaces (POST /mcp, three /.well-known metadata GETs, five /oauth/mcp endpoints); /mcp over Funnel accepts only OAuth tokens (403 otherwise); one global middleware rate-limits Funnel requests (60/min per OAuth token on /mcp, 60/min per IP for the authorize status poll, 20/min per IP otherwise; 429 + Retry-After) and writes one activity entry per request without any token. A root-only GET/PUT /api/mcp/public and a Settings > Anywhere panel turn it on and print the three Funnel commands. Overdeck never runs tailscale. Full detail in .pan/drafts/PAN-4947.md.",
+      "NonGoals": "- Overdeck running `tailscale` or checking Funnel mounts (CP-10 is an operator step after merge)\n- A `pan mcp public` CLI verb\n- Revoking or expiring OAuth sign-ins when the switch turns off\n- Any behavior change to the OAuth server (W-OAUTH1), the approval card or sign-in list (W-OAUTH2), or bot integrations\n- Public reach for any /api/*, /events/*, /ws/*, SPA path, GET /mcp or DELETE /mcp\n- Rate limiting or auditing non-Funnel requests\n- Persisting rate-limit counters across restarts\n- Changing src/lib/settings-api.ts or the whole-document Settings save\n- Reading the switch from a project .pan.yaml"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Read mcp.public.enabled from the global config.yaml only, cached with invalidatePublicMcpConfig(), instead of the epic's loadConfigSync().",
+        "rationale": "loadConfigSync merges the project layer (a committed .pan.yaml could open Funnel), stats files on every gate call, and is bound to a module-constant path that tests cannot redirect; remote-access/config.ts already uses the cached global-read pattern for the gate."
+      },
+      {
+        "summary": "Write the switch through a narrow YAML write door (public-mcp-write.ts) and drop the epic's settings-api.ts change and public-mcp.json fallback (CP-4 resolved at plan time).",
+        "rationale": "saveSettingsApi never writes or deletes the mcp block (verified in writeYamlConfigPreservingComments), so the epic's approach would silently save nothing; selection-write.ts is the established narrow-door precedent."
+      },
+      {
+        "summary": "Give GET /oauth/mcp/authorize/status its own 60/min per-IP bucket instead of sharing the 20/min OAuth bucket.",
+        "rationale": "The authorize page polls every 2 s (30/min) for up to 10 minutes, so a shared 20/min bucket would throttle every browser sign-in."
+      },
+      {
+        "summary": "Rate limiting and audit live in one global middleware (public-mcp-funnel.ts) rather than in routes/mcp.ts and eight OAuth handlers.",
+        "rationale": "One place covers all nine surfaces without touching mcp-oauth.ts handlers; the middleware re-checks the gate's admit condition so middleware order does not matter (linked-conversation-proxy precedent)."
+      },
+      {
+        "summary": "Audit entries are written only while the switch is on.",
+        "rationale": "AC-18's 'each request writes one entry' sits in the switch-on clause; while off, surface requests are ordinary Funnel 404s and a public scanner must not fill the activity feed."
+      },
+      {
+        "summary": "Match surfaces on the exact raw path (no decoding or normalization).",
+        "rationale": "The router matches the raw path; a path that only normalizes to a surface (/api/../mcp, //mcp, /mcp/) must not pass the gate."
+      },
+      {
+        "summary": "Name the API field mcpUrl instead of the epic's baseUrl, and add no CLI verb.",
+        "rationale": "The value is the /mcp URL; the epic names no CLI verb for this switch, and the Settings panel plus PUT /api/mcp/public are sufficient doors."
+      }
+    ],
+    "items": [
+      {
+        "id": "public-mcp-flag",
+        "title": "Add the public MCP switch module: surfaces, cached global-only read, write door, project-layer strip",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T05:05:20Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4947",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "foundationFor": [
+            "funnel-gate",
+            "funnel-middleware",
+            "public-mcp-route",
+            "public-mcp-acceptance"
+          ],
+          "files_scope": [
+            "src/lib/mcp/public-mcp.ts",
+            "src/lib/mcp/public-mcp-write.ts",
+            "src/lib/config-yaml/load.ts",
+            "tests/unit/lib/mcp/public-mcp.test.ts",
+            "src/lib/config-yaml/__tests__/semgrep-project-layer.test.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/mcp/public-mcp.test.ts src/lib/config-yaml/__tests__/semgrep-project-layer.test.ts",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "public-mcp.test.ts and semgrep-project-layer.test.ts pass",
+            "lint:circular reports no new cycle"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1",
+            "NFR-2",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-4947.md WI-1 exactly. Create src/lib/mcp/public-mcp.ts (read side: PUBLIC_MCP_FUNNEL_PORT, PUBLIC_MCP_MOUNTS, PUBLIC_MCP_SURFACES with the nine 'METHOD path' strings, publicMcpSurface(method, url) matching the raw path before ?/# exactly with no decoding or normalization, isPublicMcpEnabled() reading join(getOverdeckHome(),'config.yaml') with readFileSync + js-yaml folded through mergeMcpConfig(defaultMcpConfig(), parsed), cached, false on any error, invalidatePublicMcpConfig(), publicMcpFunnelCommands(port = triggerDashboardPort()) and publicMcpFunnelOffCommands() producing the D-10 strings). This module must NOT import settings-api.ts. Create src/lib/mcp/public-mcp-write.ts with savePublicMcpEnabled(enabled) modelled on src/lib/color-themes/selection-write.ts: runSettingsWriteSerialized, parseDocument, ensure mcp and mcp.public are maps, doc.setIn(['mcp','public','enabled'], enabled), writeFileAtomic(path, text, 0o600), clearConfigCache(), invalidatePublicMcpConfig(). Extend stripProjectSecurity in src/lib/config-yaml/load.ts to also drop mcp.public (keep mcp.agents) using the PRD's after-snippet. Do not touch src/lib/settings-api.ts."
+        },
+        "items": [
+          {
+            "id": "public-mcp-flag.ac1",
+            "title": "Given no config.yaml, an unparsable one, or mcp.public.enabled set to a non-boolean, when isPublicMcpEnabled() runs, then it returns false; given 'mcp:\\n  public:\\n    enabled: true' in the temp OVERDECK_HOME config.yaml, it returns true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "public-mcp-flag.ac2",
+            "title": "Given a cached value, when config.yaml is rewritten without calling invalidatePublicMcpConfig(), then isPublicMcpEnabled() returns the old value, and after invalidatePublicMcpConfig() it returns the new value",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "public-mcp-flag.ac3",
+            "title": "When savePublicMcpEnabled(true) runs on a config.yaml with other keys and a comment, then those keys and the comment are preserved, the file mode is 0600, and isPublicMcpEnabled() returns true with no manual invalidate",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "public-mcp-flag.ac4",
+            "title": "publicMcpSurface returns 'POST /mcp' for ('POST','/mcp?x=1') and returns null for '/mcp/', '//mcp', '/api/../mcp', '/%6Dcp', ('GET','/mcp') and 'http://h/mcp'; publicMcpFunnelCommands(4000) returns exactly the three D-10 commands",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "public-mcp-flag.ac5",
+            "title": "stripProjectSecurity({ mcp: { agents: false, public: { enabled: true } } }) returns { mcp: { agents: false } }, so a project .pan.yaml cannot turn public MCP on",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "funnel-gate",
+        "title": "Open gate rule 0 to the nine public MCP surfaces while the switch is on",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T05:05:20Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4947",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "src/dashboard/server/remote-request-gate.ts",
+            "src/dashboard/server/__tests__/remote-request-gate-public-mcp.test.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/__tests__/remote-request-gate-public-mcp.test.ts src/dashboard/server/__tests__/remote-request-gate.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "both gate test files pass"
+          ],
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2. In src/dashboard/server/remote-request-gate.ts rule 0 (currently lines 134-136), keep POST /hooks/* and otherwise return null only when isPublicMcpEnabled() && publicMcpSurface(request.method, request.url) !== null, else { status: 404 }. Update the header comment rule 0 to name the nine surfaces and PUBLIC_MCP_SURFACES. Add src/dashboard/server/__tests__/remote-request-gate-public-mcp.test.ts modelled on remote-request-gate.test.ts (gate + catch-all route, temp OVERDECK_HOME, write config.yaml, call invalidatePublicMcpConfig()). Build raw-path cases (/api/../mcp, //mcp, /%6Dcp) with makeRequest(...).modify({ url: '<raw path>' }) because new Request() normalizes dot segments before the gate sees them."
+        },
+        "items": [
+          {
+            "id": "funnel-gate.ac1",
+            "title": "Given the switch off, when each of the nine surfaces is requested with the Tailscale-Funnel-Request header, then the gate returns 404, and POST /hooks/x/y still reaches its route",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "funnel-gate.ac2",
+            "title": "Given the switch on, when each of the nine surfaces is requested through Funnel, then the request reaches the route",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "funnel-gate.ac3",
+            "title": "Given the switch on, when GET /api/agents, GET /mcp, DELETE /mcp, GET /, POST /mcp/, POST //mcp, POST /api/../mcp or POST /%6Dcp arrives through Funnel (with or without a credential), then the gate returns 404",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "funnel-gate.ac4",
+            "title": "Given no mcp: block in config.yaml, when GET /api/health or POST /api/dashboard/session arrives through Funnel, then the gate returns 404, so the existing remote-request-gate.test.ts Funnel cases keep passing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mcp-oauth-only",
+        "title": "Refuse plain tokens on POST /mcp over Funnel with 403",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T05:05:20Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4947",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "src/dashboard/server/routes/mcp.ts",
+            "src/dashboard/server/__tests__/mcp-route.test.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/__tests__/mcp-route.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "mcp-route.test.ts passes including the new Funnel cases"
+          ],
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3. In src/dashboard/server/routes/mcp.ts, after the existing fenced 403 block, return 403 { error: 'public MCP accepts only OAuth sign-ins' } with Cache-Control no-store when isTailscaleFunnelRequest(headers) and the token credential has no oauthClientId. Add one sentence to the header comment. Add cases to src/dashboard/server/__tests__/mcp-route.test.ts."
+        },
+        "items": [
+          {
+            "id": "mcp-oauth-only.ac1",
+            "title": "Given a Funnel POST /mcp with a pan-token-create style token (no oauthClientId), then the route returns 403 with body { \"error\": \"public MCP accepts only OAuth sign-ins\" }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-oauth-only.ac2",
+            "title": "Given the same plain token without the Funnel header, then POST /mcp returns 200",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-oauth-only.ac3",
+            "title": "Given a Funnel POST /mcp with an OAuth token (oauthClientId set), then tools/list returns 200 with a JSON-RPC result",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-oauth-only.ac4",
+            "title": "Given a Funnel POST /mcp with an agent token (record with agentId, no oauthClientId), then the route returns 403",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rate-limiter",
+        "title": "Add the fixed-window rate limiter with an injected clock and key cap",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T05:05:20Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4947",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "src/dashboard/server/public-mcp-rate-limit.ts",
+            "src/dashboard/server/__tests__/public-mcp-rate-limit.test.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/__tests__/public-mcp-rate-limit.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "public-mcp-rate-limit.test.ts passes"
+          ],
+          "traces": [
+            "FR-4",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-4. Create src/dashboard/server/public-mcp-rate-limit.ts exporting PUBLIC_MCP_WINDOW_MS = 60_000, PUBLIC_MCP_MAX_KEYS = 10_000, RateDecision, FixedWindowLimiter { hit(key, limit); size() } and createFixedWindowLimiter({ now?, windowMs?, maxKeys? }). The window starts at a key's first request; a refused hit does not increment; retryAfterSeconds = max(1, ceil((windowStart + windowMs - now)/1000)); inserting a new key while size >= maxKeys evicts the first (oldest-inserted) Map key. Test with an injected now(); never real sleeps."
+        },
+        "items": [
+          {
+            "id": "rate-limiter.ac1",
+            "title": "Given limit 60 and one key, when hit is called 61 times at the same instant, then the first 60 return allowed and the 61st returns allowed:false with retryAfterSeconds 60, and 45 s later a refused hit returns retryAfterSeconds 15",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rate-limiter.ac2",
+            "title": "Given a refused key, when the injected clock advances 60 s, then the next hit is allowed and starts a fresh count",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rate-limiter.ac3",
+            "title": "Given two keys, then hits on one never change the other's decision, and limit 20 refuses the 21st hit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rate-limiter.ac4",
+            "title": "Given maxKeys 3, when a fourth key is hit, then size() stays 3 and the oldest-inserted key starts a fresh window on its next hit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "funnel-middleware",
+        "title": "Add the Funnel middleware that rate-limits and audits every public MCP request",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T05:05:20Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4947",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "foundationFor": [
+            "public-mcp-acceptance"
+          ],
+          "files_scope": [
+            "src/dashboard/server/public-mcp-funnel.ts",
+            "src/dashboard/server/server.ts",
+            "src/dashboard/server/__tests__/public-mcp-funnel.test.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/__tests__/public-mcp-funnel.test.ts",
+            "npm run lint:effect-facades"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "public-mcp-funnel.test.ts passes",
+            "lint:effect-facades count does not rise"
+          ],
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "NFR-3",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-5 and decisions D-5..D-8. Create src/dashboard/server/public-mcp-funnel.ts exporting makePublicMcpFunnelLayer({ limiter, audit }) and publicMcpFunnelLayer (createFixedWindowLimiter() + emitActivityEntry), a global HttpRouter.middleware. It passes through untouched unless the request is a Funnel request, isPublicMcpEnabled() is true and publicMcpSurface(method, url) is not null. Keys: token:<tokenId>/60 for POST /mcp whose resolveDashboardCredential is a token with oauthClientId; poll:<ip>/60 for GET /oauth/mcp/authorize/status; ip:<ip>/20 otherwise; ip = first x-forwarded-for entry trimmed, else 'unknown'. Over the limit: 429 { error: 'rate_limited' } with Retry-After and Cache-Control no-store, audited at level warn. Otherwise run httpEffect and audit its status once (a failing inner effect audits 500 and the failure propagates unchanged). Audit = { source: 'dashboard', level, message: 'Public MCP <METHOD> <rawPath-without-query> <status>', details: JSON.stringify({ clientId }) }, clientId from the OAuth credential, or the client_id query parameter on GET /oauth/mcp/authorize, else null. Never read a body. Merge publicMcpFunnelLayer into makeRoutesLayer in src/dashboard/server/server.ts right after remoteRequestGateLayer."
+        },
+        "items": [
+          {
+            "id": "funnel-middleware.ac1",
+            "title": "Given the switch on and one x-forwarded-for IP, when POST /oauth/mcp/register arrives through Funnel 21 times in one window, then the 21st returns 429 with a Retry-After header while a request from a different IP is still allowed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "funnel-middleware.ac2",
+            "title": "Given the switch on, when GET /oauth/mcp/authorize/status arrives 61 times from one IP, then the first 60 pass and the 61st returns 429; when POST /mcp arrives 61 times with one OAuth token, then the 61st returns 429 while a second OAuth token still passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "funnel-middleware.ac3",
+            "title": "Given the switch on, when any of the nine surfaces is requested through Funnel, then the audit function is called exactly once with message 'Public MCP <METHOD> <path> <status>' and details containing clientId, and no audit message or details contains the bearer token, '?', 'code=' or 'code_verifier'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "funnel-middleware.ac4",
+            "title": "Given a non-Funnel request or the switch off, then the middleware calls the audit function zero times and never returns 429",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "funnel-middleware.ac5",
+            "title": "Given an inner route that fails, when a Funnel surface request runs, then the audit function records status 500 once and the failure still reaches the caller",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "public-mcp-route",
+        "title": "Add root-only GET and PUT /api/mcp/public",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T05:05:20Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4947",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "src/dashboard/server/routes/mcp-public.ts",
+            "src/dashboard/server/server.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/__tests__/mcp-public-route.test.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/__tests__/mcp-public-route.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts src/dashboard/server/__tests__/route-scopes.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "mcp-public-route, no-loss-matrix and route-scopes tests pass"
+          ],
+          "traces": [
+            "FR-6",
+            "NFR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-6 and D-9. Create src/dashboard/server/routes/mcp-public.ts with makeMcpPublicRouteLayer({ save, isEnabled, port, trustedOrigins }) and mcpPublicRouteLayer wired to savePublicMcpEnabled, isPublicMcpEnabled, triggerDashboardPort, getTrustedOrigins. Copy the root-only rejectRequest check from routes/mcp-oauth-admin.ts:38-44. GET answers { enabled, funnelCommands, funnelOffCommands, mcpUrl } with Cache-Control no-store (mcpUrl = triggerFunnelBaseUrl(trustedOrigins()) + '/mcp' or null). PUT takes { enabled: boolean } (else 400 'body must be { enabled: boolean }'), awaits save, answers the GET body. Register the layer in server.ts next to mcpOAuthAdminRouteLayer. Add the two no-loss-matrix rows from the PRD. No route-scopes.ts row."
+        },
+        "items": [
+          {
+            "id": "public-mcp-route.ac1",
+            "title": "Given the internal token, when GET /api/mcp/public runs, then it returns 200 with enabled, three funnelCommands, three funnelOffCommands, and mcpUrl null without a .ts.net trusted origin or 'https://m.t.ts.net:8443/mcp' with trusted origin https://m.t.ts.net",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "public-mcp-route.ac2",
+            "title": "Given the internal token, when PUT /api/mcp/public sends { enabled: true }, then save is called with true and the response body carries the GET shape; when it sends { enabled: \"yes\" }, then it returns 400 and save is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "public-mcp-route.ac3",
+            "title": "Given a plain token with read:state, when it calls GET or PUT /api/mcp/public, then it receives 403",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "public-mcp-route.ac4",
+            "title": "tests/unit/lib/overdeck/no-loss-matrix.ts contains rows for GET /api/mcp/public and PUT /api/mcp/public, and no-loss-matrix.test.ts plus route-scopes.test.ts exit 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "public-mcp-panel",
+        "title": "Add the Public MCP panel to Settings > Anywhere",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T05:05:20Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4947",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/anywhere/PublicMcpPanel.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/anywhereApi.ts",
+            "src/dashboard/frontend/src/components/Settings/sections/AnywhereSection.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/PublicMcpPanel.test.tsx"
+          ],
+          "verify_commands": [
+            "npm run typecheck",
+            "cd src/dashboard/frontend && npx vitest run src/components/Settings/anywhere/__tests__/PublicMcpPanel.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "PublicMcpPanel.test.tsx passes"
+          ],
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-7. Add ANYWHERE_PUBLIC_MCP_QUERY_KEY, PublicMcpStatus, loadPublicMcp() and savePublicMcp(enabled) (PUT with dashboardMutationJsonHeaders) to src/dashboard/frontend/src/components/Settings/anywhere/anywhereApi.ts. Create PublicMcpPanel.tsx (data-component anywhere-public-mcp-panel) with heading and Toggle 'Public MCP for hosted bots', the warning text from the PRD always shown, and: when on, the three commands each with a Copy button (navigator.clipboard.writeText then toast.success('Copied')) plus the public URL with Copy or, when mcpUrl is null, the trusted-address hint; when off, the line 'Off. Funnel requests to /mcp and the sign-in pages get 404.' and a <details> 'Remove the Funnel paths' with funnelOffCommands. Mount it in components/Settings/sections/AnywhereSection.tsx after <AccessTokensPanel />."
+        },
+        "items": [
+          {
+            "id": "public-mcp-panel.ac1",
+            "title": "Given GET /api/mcp/public answers enabled false, then the panel renders the warning and the off line and no text 'tailscale funnel --bg'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "public-mcp-panel.ac2",
+            "title": "When the operator clicks the switch, then the panel sends PUT /api/mcp/public with body {\"enabled\":true}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "public-mcp-panel.ac3",
+            "title": "Given enabled true and an mcpUrl, then the panel renders the three funnel commands and the public URL; given mcpUrl null, then it renders the trusted-address hint instead of a URL",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "public-mcp-panel.ac4",
+            "title": "When the Copy button next to the first command is clicked, then navigator.clipboard.writeText receives that command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "public-mcp-acceptance",
+        "title": "Add the AC-18 end-to-end acceptance test over the real gate, middleware, /mcp and OAuth layers",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T05:05:20Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4947",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "src/dashboard/server/__tests__/public-mcp-acceptance.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/public-mcp-acceptance.test.ts"
+          ],
+          "expected_outputs": [
+            "public-mcp-acceptance.test.ts passes"
+          ],
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-8. Create src/dashboard/server/__tests__/public-mcp-acceptance.test.ts modelled on mcp-oauth-acceptance.test.ts: temp OVERDECK_HOME and DASHBOARD_URL='https://m.t.ts.net' set before dynamic imports, _resetTrustedOriginsForTests(); app = remoteRequestGateLayer + makePublicMcpFunnelLayer({ limiter: createFixedWindowLimiter(), audit: vi.fn() }) + makeMcpRouteLayer(fake api) + makeMcpOAuthRouteLayer + makeMcpOAuthAdminRouteLayer. Funnel requests carry tailscale-funnel-request: ?1 and x-forwarded-for: 203.0.113.7 from peer 127.0.0.1. OAuth token via POST /api/mcp-oauth/issue with the internal token; plain token via createAccessToken. Toggle the switch with savePublicMcpEnabled."
+        },
+        "items": [
+          {
+            "id": "public-mcp-acceptance.ac1",
+            "title": "Given the switch off, when each of the nine surfaces is requested through Funnel, then every response is 404 and the audit mock is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "public-mcp-acceptance.ac2",
+            "title": "Given the switch on, when a Funnel POST /mcp tools/list carries the OAuth token, then it returns 200 with a JSON-RPC result, and a Funnel GET /.well-known/oauth-authorization-server returns issuer https://m.t.ts.net:8443",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "public-mcp-acceptance.ac3",
+            "title": "Given the switch on, when a Funnel POST /mcp carries a createAccessToken (pan token create) token, then it returns 403, and a Funnel GET /api/agents with the OAuth token returns 404",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "public-mcp-acceptance.ac4",
+            "title": "Given the switch on, when the 61st Funnel POST /mcp with the OAuth token arrives in one window, then it returns 429 with a Retry-After header",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "public-mcp-acceptance.ac5",
+            "title": "Every Funnel surface request made while on produces exactly one audit call, and the serialized audit calls contain neither token string",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "public-mcp-docs",
+        "title": "Document public MCP in mcp.mdx, triggers.mdx, DASHBOARD-AUTH.md, route headers and the codebase map",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T05:05:20Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4947",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "files_scope": [
+            "configuration/mcp.mdx",
+            "configuration/triggers.mdx",
+            "docs/DASHBOARD-AUTH.md",
+            "src/dashboard/server/routes/mcp-oauth.ts",
+            ".overdeck/context/codebase/architecture.md"
+          ],
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n 'Public MCP for hosted bots' configuration/mcp.mdx",
+            "grep -n 'PUBLIC_MCP_SURFACES' docs/DASHBOARD-AUTH.md"
+          ],
+          "expected_outputs": [
+            "lint:docs completes without errors",
+            "grep finds the new mcp.mdx section heading",
+            "grep finds PUBLIC_MCP_SURFACES in DASHBOARD-AUTH.md"
+          ],
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-9 exactly. configuration/mcp.mdx: change the 'A Tailscale Funnel request gets 404.' sentence and add a '## Public MCP for hosted bots' section after 'Sign in with OAuth' with the content listed in the PRD (switch location, the three on and three off Funnel commands, public URL, prerequisites, nine surfaces, OAuth-only rule, the three limits with 429/Retry-After, the audit entry format, project-layer cannot enable, hand edits need a restart, turning off does not end sign-ins). configuration/triggers.mdx: replace 'Overdeck publishes only the /hooks path, on port 8443.' with the PRD sentence. docs/DASHBOARD-AUTH.md: rule 0 (~line 765), the Funnel section (~793) gets a 'Public MCP (PAN-4947)' paragraph, and line ~178. src/dashboard/server/routes/mcp-oauth.ts header lines 8-9 per the PRD. .overdeck/context/codebase/architecture.md line ~326 Funnel sentence plus last-verified date."
+        },
+        "items": [
+          {
+            "id": "public-mcp-docs.ac1",
+            "title": "configuration/mcp.mdx contains a '## Public MCP for hosted bots' section that lists 'tailscale funnel --bg --https=8443 --set-path=/mcp', states that pan token create tokens get 403 over Funnel, and states the 60/60/20 per-minute limits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "public-mcp-docs.ac2",
+            "title": "configuration/triggers.mdx no longer contains the sentence 'Overdeck publishes only the `/hooks` path' and names /mcp, /.well-known and /oauth as the Public MCP mounts on port 8443",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "public-mcp-docs.ac3",
+            "title": "docs/DASHBOARD-AUTH.md rule 0 names PUBLIC_MCP_SURFACES and the mcp.public.enabled switch, and routes/mcp-oauth.ts no longer says 'until W-FUN1 opens it'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "public-mcp-docs.ac4",
+            "title": "npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "public-mcp-flag",
+        "to": "funnel-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "public-mcp-flag",
+        "to": "funnel-middleware",
+        "type": "blocks"
+      },
+      {
+        "from": "rate-limiter",
+        "to": "funnel-middleware",
+        "type": "blocks"
+      },
+      {
+        "from": "public-mcp-flag",
+        "to": "public-mcp-route",
+        "type": "blocks"
+      },
+      {
+        "from": "funnel-middleware",
+        "to": "public-mcp-route",
+        "type": "blocks"
+      },
+      {
+        "from": "public-mcp-route",
+        "to": "public-mcp-panel",
+        "type": "blocks"
+      },
+      {
+        "from": "funnel-gate",
+        "to": "public-mcp-acceptance",
+        "type": "blocks"
+      },
+      {
+        "from": "mcp-oauth-only",
+        "to": "public-mcp-acceptance",
+        "type": "blocks"
+      },
+      {
+        "from": "funnel-middleware",
+        "to": "public-mcp-acceptance",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

@@ -1,11 +1,12 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-04T07:50:33.959663Z · model: claude-opus-5-5 · open: 869_
+_Last sequenced: 2026-11-04T09:22:07.321631Z · model: claude-opus-5-5 · open: 868_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-4702 | S | critical | ok |  |  | Merge gate orders reviews by skewed submitted_at, so a stale ancestor approval hides head approval; blocks 3 approved PRs. |
+| 3 | PAN-4995 | S | high | ok |  |  | pan review request verifies a half-adopted workspace; its main merge trips adoption's head check -> false Needs-you on handoff PRs |
 | 4 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 5 | PAN-4553 | S | critical | ok |  |  | Duplicate of PAN-4929, now in review as PR #4963; close PAN-4553 when that PR merges. |
 | 6 | PAN-4733 | M | high | ok |  |  | Follow-up to closed PAN-4732: root-cause the title-bar spec, move 4 browser specs to a gating test-e2e lane, un-quarantine it. |
@@ -416,8 +417,7 @@ _Last sequenced: 2026-11-04T07:50:33.959663Z · model: claude-opus-5-5 · open: 
 | 416 | PAN-3016 | M | medium | ok |  |  | Operator ask: every view should be URL-addressable; cockpit tabs, stage panes and several drawers are still local state. |
 | 417 | PAN-3890 | S | medium | ok |  |  | opencode provider stream errors (rate limit) are invisible in the feed and never retried; first message dies silently |
 | 418 | PAN-3822 | L | medium | ok |  |  | PRD landed (12 items, FR-1..14): link PRs to conversations via branch detection + explicit override; unblocks PAN-3920 |
-| 419 | PAN-4943 | S | medium | ok |  |  | Link and watch pull requests from an agent via MCP tools; W-SELF1 closed, now unblocked. |
-| 420 | PAN-4935 | M | medium | ok |  | PAN-4943 | Instruction blocks and no-MCP fallback; only W-PR1 (PAN-4943, in review) remains before it can start. |
+| 420 | PAN-4935 | M | medium | ok |  |  | Instruction blocks and no-MCP fallback; only W-PR1 (PAN-4943, in review) remains before it can start. |
 | 421 | PAN-1673 | S | medium | ok |  |  | Regression: pi + gpt-5.5 fails with 'No API key for provider: openai-codex' (worked previously) |
 | 422 | PAN-1669 | S | medium | ok |  |  | restart-with-model doesn't emit a live event |
 | 423 | PAN-1668 | S | medium | ok |  |  | right-click 'restart with <model>' carries model only, never harness |
@@ -434,7 +434,6 @@ _Last sequenced: 2026-11-04T07:50:33.959663Z · model: claude-opus-5-5 · open: 
 | 434 | PAN-1461 | S | medium | ok |  |  | Conversation transcript: in-page search (Ctrl+F) only finds text in currently-rendered virtualized rows |
 | 435 | PAN-1449 | S | medium | ok |  |  | Memory extraction still failing; the live symptom PAN-4370 closed and PAN-4374 adds a working provider; layout half remains |
 | 436 | PAN-1446 | S | medium | ok |  |  | PAN-1231 follow-up: remove or implement Table + Timeline modes in FleetAgentsView (scope-creep stubs) |
-| 437 | PAN-4947 | L | medium | ok |  |  | Opt-in public /mcp via Tailscale Funnel, TLS ends on the user machine; OAuth server closed, now unblocked. |
 | 438 | PAN-1445 | S | medium | ok |  |  | PAN-1389 follow-up: remove or implement Files + Comments tabs in SessionFeedSidebar (scope-creep stubs) |
 | 439 | PAN-3616 | S | medium | ok |  |  | Planned deploy restarts show the alarm-toned Reconnecting banner; use the lifecycle signal for calm 'updating' copy. |
 | 440 | PAN-2982 | XS | medium | ok |  |  | Nothing runs a skill's own selftest when sync-sources/skills/** changes; a convoy passed a PR with its selftest red. |
@@ -872,7 +871,7 @@ _Last sequenced: 2026-11-04T07:50:33.959663Z · model: claude-opus-5-5 · open: 
 | 904 | PAN-4953 | M | medium | ok |  | PAN-4950 | integrations/hermes/: Hermes plugin with its own revocable scoped token. |
 | 905 | PAN-4954 | M | medium | ok |  | PAN-4950 | integrations/openclaw/: OpenClaw plugin with its own revocable scoped token. |
 | 906 | PAN-4955 | S | medium | ok |  | PAN-4950 | integrations/grok-build/: Grok Build plugin with its own revocable scoped token. |
-| 907 | PAN-4956 | S | low | ok |  | PAN-4947 | integrations/grok-bot/ and xAI API example; needs OAuth UI and public Funnel /mcp, not the connector. |
+| 907 | PAN-4956 | S | low | ok |  |  | integrations/grok-bot/ and xAI API example; needs OAuth UI and public Funnel /mcp, not the connector. |
 | 909 | PAN-4957 | S | low | ok |  | PAN-4953, PAN-4954, PAN-4955, PAN-4956 | CI for the four integration packages; lands after all integrations exist. |
 
 ## Rationale detail
@@ -880,6 +879,10 @@ _Last sequenced: 2026-11-04T07:50:33.959663Z · model: claude-opus-5-5 · open: 
 ### PAN-4702 (rank 1)
 
 New substrate bug in the merge door: on 2026-11-01 it refused three approved, green PRs (#4699, #4692, #4686) because latestTrustedVerdicts in pr-facts.ts ranks a reviewer's verdicts by submitted_at, and GitHub returned future-skewed timestamps for stale approvals on ancestor commits. It blocks merging for in-pipeline PAN-4649, PAN-4681 and PAN-4641, so it takes the free rank 1 with no other node moving. It carries needs-handoff (TENET-10), so it runs as a supervised strike, never an autonomous Flywheel pickup.
+
+### PAN-4995 (rank 3)
+
+New substrate-improvement issue, placed in the open rank-3 slot so no other rank moves. Every handoff that opens a PR and then runs pan review request (the order the handoff brief prescribes) can race the PR-opened adoption: verification merges origin/main into the workspace before adoption's final head check, so adoption journals workspace-head-mismatch and the issue shows a false needs pr-outside-pipeline. Nothing is stranded, but each occurrence costs operator attention. The issue names the cause and picks the fix (await an in-flight adoptPrAndStartReview from the request-review path), so it is small and ready to plan.
 
 ### PAN-4636 (rank 4)
 
@@ -1193,10 +1196,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
 
 New this pass. The test role evaluates the workspace working tree rather than the reviewed commit, so a live work agent's in-progress uncommitted edits are counted against the issue — the gate's own artifact diagnosed it exactly, failing on a file the reviewed commit never touched. Combined with PAN-3104, which replays the stale artifact, it becomes a durable trap.
 
-### PAN-4213 (rank 82)
-
-Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066 merged, so these seven follow-ups now harden code that is on main. Items 2 and 5 are real merge-path correctness hazards: a success status can sit on a head that never landed, and git reset --keep can move an agent commit off its branch. Each item names its file, so the work is well defined and is now startable.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1204,10 +1203,10 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-04T07:50:33.959663Z",
+  "generatedAt": "2026-11-04T09:22:07.321631Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 869,
+  "openCount": 868,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -6384,15 +6383,15 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "planning": "auto"
     },
     {
-      "issue": "PAN-4943",
-      "rank": 419,
-      "size": "S",
+      "issue": "PAN-4935",
+      "rank": 420,
+      "size": "M",
       "importance": "medium",
-      "score": 43,
+      "score": 45,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Link and watch pull requests from an agent via MCP tools; W-SELF1 closed, now unblocked.",
-      "rationale": "Its only dependency, W-SELF1 (PAN-4936), closed as completed, so this child is now workable and moves up from the tail into the slot band W-SELF1 held.",
+      "why": "Instruction blocks and no-MCP fallback; only W-PR1 (PAN-4943, in review) remains before it can start.",
+      "rationale": "Dependency PAN-4942 (W-LINK1 link_machine) closed as completed, leaving only in-review PAN-4943, so it moves from the tail into the freed slot right after it.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6590,19 +6589,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "condition": "ok",
       "dependsOn": [],
       "why": "PAN-1231 follow-up: remove or implement Table + Timeline modes in FleetAgentsView (scope-creep stubs)",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4947",
-      "rank": 437,
-      "size": "L",
-      "importance": "medium",
-      "score": 38,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Opt-in public /mcp via Tailscale Funnel, TLS ends on the user machine; OAuth server closed, now unblocked.",
-      "rationale": "Its only dependency, the /mcp OAuth server (PAN-4945), closed as completed, so this child is now workable and moves from the tail into a free slot in the epic's band.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11999,26 +11985,9 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "importance": "low",
       "score": 32,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4947"
-      ],
+      "dependsOn": [],
       "why": "integrations/grok-bot/ and xAI API example; needs OAuth UI and public Funnel /mcp, not the connector.",
       "rationale": "Rank held: dependency PAN-4952 (shared skill text) closed completed 2026-11-04; still waits on PAN-4946 and PAN-4947.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4935",
-      "rank": 420,
-      "size": "M",
-      "importance": "medium",
-      "score": 45,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-4943"
-      ],
-      "why": "Instruction blocks and no-MCP fallback; only W-PR1 (PAN-4943, in review) remains before it can start.",
-      "rationale": "Dependency PAN-4942 (W-LINK1 link_machine) closed as completed, leaving only in-review PAN-4943, so it moves from the tail into the freed slot right after it.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12037,6 +12006,19 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       ],
       "why": "CI for the four integration packages; lands after all integrations exist.",
       "rationale": "New child W-CI1 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4995",
+      "rank": 3,
+      "size": "S",
+      "importance": "high",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan review request verifies a half-adopted workspace; its main merge trips adoption's head check -> false Needs-you on handoff PRs",
+      "rationale": "New substrate-improvement issue, placed in the open rank-3 slot so no other rank moves. Every handoff that opens a PR and then runs pan review request (the order the handoff brief prescribes) can race the PR-opened adoption: verification merges origin/main into the workspace before adoption's final head check, so adoption journals workspace-head-mismatch and the issue shows a false needs pr-outside-pipeline. Nothing is stranded, but each occurrence costs operator attention. The issue names the cause and picks the fix (await an in-flight adoptPrAndStartReview from the request-review path), so it is small and ready to plan.",
       "gate": "auto",
       "planning": "auto"
     }
@@ -13213,26 +13195,12 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "from": "PAN-4927",
-      "to": "PAN-4943",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4927",
       "to": "PAN-4950",
       "type": "contains",
       "source": "github-ref",
       "confidence": 1
     },
     {
-      "from": "PAN-4927",
-      "to": "PAN-4947",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-4950",
       "to": "PAN-4953",
       "type": "unblocks",
@@ -13275,23 +13243,9 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "confidence": 1
     },
     {
-      "from": "PAN-4947",
-      "to": "PAN-4956",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-4927",
       "to": "PAN-4956",
       "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4943",
-      "to": "PAN-4935",
-      "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
     },
@@ -13343,6 +13297,13 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "type": "contains",
       "source": "github-ref",
       "confidence": 1
+    },
+    {
+      "from": "PAN-4995",
+      "to": "PAN-4636",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
     }
   ]
 }

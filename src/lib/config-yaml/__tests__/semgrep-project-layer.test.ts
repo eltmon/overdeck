@@ -9,6 +9,12 @@ describe('config-yaml project-layer security strip (PAN-4585 FR-11)', () => {
     ).toEqual({ jev: {} });
   });
 
+  it('removes mcp.public but keeps mcp.agents (PAN-4947 D-2)', () => {
+    expect(stripProjectSecurity({ mcp: { agents: false, public: { enabled: true } } })).toEqual({
+      mcp: { agents: false },
+    });
+  });
+
   it('returns null unchanged', () => {
     expect(stripProjectSecurity(null)).toBeNull();
   });

@@ -1,0 +1,264 @@
+{
+  "version": "1",
+  "issueId": "PAN-4947",
+  "created": "2026-11-04T05:30:29.044Z",
+  "updated": "2026-11-04T07:53:13.153Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-04T06:52:06.688Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-04T07:35:41.758Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-04T07:39Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-11-04T07:39:44.254Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-04T07:46Z] coderabbit → FINDINGS — seq 2",
+      "timestamp": "2026-11-04T07:46:41.606Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-04T07:51:25.485Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-04T07:53Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-11-04T07:53:13.152Z"
+    }
+  ],
+  "items": {
+    "public-mcp-flag": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4947",
+      "claimedAt": "2026-11-04T05:30:29.043Z",
+      "doneAt": "2026-11-04T05:39:36.895Z"
+    },
+    "funnel-gate": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4947",
+      "claimedAt": "2026-11-04T05:39:44.058Z",
+      "doneAt": "2026-11-04T05:42:00.107Z"
+    },
+    "mcp-oauth-only": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4947",
+      "claimedAt": "2026-11-04T05:42:10.200Z",
+      "doneAt": "2026-11-04T05:43:29.421Z"
+    },
+    "rate-limiter": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4947",
+      "claimedAt": "2026-11-04T05:43:30.877Z",
+      "doneAt": "2026-11-04T05:44:48.371Z"
+    },
+    "funnel-middleware": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4947",
+      "claimedAt": "2026-11-04T05:44:50.811Z",
+      "doneAt": "2026-11-04T05:47:45.876Z"
+    },
+    "public-mcp-route": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4947",
+      "claimedAt": "2026-11-04T05:47:48.356Z",
+      "doneAt": "2026-11-04T05:50:17.680Z"
+    },
+    "public-mcp-panel": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4947",
+      "claimedAt": "2026-11-04T05:50:23.119Z",
+      "doneAt": "2026-11-04T05:52:36.882Z"
+    },
+    "public-mcp-acceptance": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4947",
+      "claimedAt": "2026-11-04T05:52:38.275Z",
+      "doneAt": "2026-11-04T05:54:17.398Z"
+    },
+    "public-mcp-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4947",
+      "claimedAt": "2026-11-04T05:54:18.790Z",
+      "doneAt": "2026-11-04T05:55:22.486Z"
+    },
+    "funnel-gate.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:11:28.354Z"
+    },
+    "funnel-gate.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:11:43.470Z"
+    },
+    "funnel-gate.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:11:59.336Z"
+    },
+    "funnel-gate.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:12:15.668Z"
+    },
+    "funnel-middleware.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:12:32.383Z"
+    },
+    "funnel-middleware.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:12:47.533Z"
+    },
+    "funnel-middleware.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:13:01.054Z"
+    },
+    "funnel-middleware.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:13:14.506Z"
+    },
+    "funnel-middleware.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:13:30.974Z"
+    },
+    "mcp-oauth-only.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:13:47.854Z"
+    },
+    "mcp-oauth-only.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:14:02.627Z"
+    },
+    "mcp-oauth-only.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:14:17.064Z"
+    },
+    "mcp-oauth-only.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:14:31.401Z"
+    },
+    "public-mcp-acceptance.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:14:48.077Z"
+    },
+    "public-mcp-acceptance.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:15:04.705Z"
+    },
+    "public-mcp-acceptance.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:15:20.381Z"
+    },
+    "public-mcp-acceptance.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:15:36.769Z"
+    },
+    "public-mcp-acceptance.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:15:53.314Z"
+    },
+    "public-mcp-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:16:09.896Z"
+    },
+    "public-mcp-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:16:25.615Z"
+    },
+    "public-mcp-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:16:41.860Z"
+    },
+    "public-mcp-docs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:16:58.154Z"
+    },
+    "public-mcp-flag.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:17:13.831Z"
+    },
+    "public-mcp-flag.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:17:28.983Z"
+    },
+    "public-mcp-flag.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:17:42.252Z"
+    },
+    "public-mcp-flag.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:17:55.405Z"
+    },
+    "public-mcp-flag.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:18:09.064Z"
+    },
+    "public-mcp-panel.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:18:23.964Z"
+    },
+    "public-mcp-panel.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:18:39.458Z"
+    },
+    "public-mcp-panel.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:18:54.127Z"
+    },
+    "public-mcp-panel.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:19:09.405Z"
+    },
+    "public-mcp-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:19:23.701Z"
+    },
+    "public-mcp-route.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:19:38.195Z"
+    },
+    "public-mcp-route.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:19:52.757Z"
+    },
+    "public-mcp-route.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:20:07.687Z"
+    },
+    "rate-limiter.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:20:23.989Z"
+    },
+    "rate-limiter.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:20:38.958Z"
+    },
+    "rate-limiter.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:20:53.483Z"
+    },
+    "rate-limiter.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:21:08.461Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-11-04T07:53:13Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-4947\n\n# Review — PAN-4947\n## Verdict: CHANGES REQUESTED — cycle-3 blocker unaddressed: PublicMcpPanel and PAN-4951's Connect-a-bot dialog share query key `['anywhere-public-mcp']` with different shapes (panel crashes) and the dialog reads `baseUrl`, which this route does not answer\n\n## Context\n- Run ID: agent-pan-4947-review-dd96bb77\n- Manifest: .pan/review/agent-pan-4947-review-dd96bb77/context.json\n- Branch / workspace: feature/pan-4947 / /home/eltmon/Projects/overdeck/workspaces/feature-pan-4947\n- PR: https://github.com/eltmon/overdeck/pull/4990 (MERGEABLE)\n- HEAD reviewed: dd96bb775f3e1bd18c61fa822eba391290f5f0b7\n- Prior cycles: e1f1ec8862f (APPROVED), 1b3283a7fcc (APPROVED), ffde40aa577 (CHANGES REQUESTED, posted on the PR 2026-11-04T07:39:41Z)\n\n## Cycle 4 delta\nSince ffde40aa the branch gained `bcc9c4557de fix(dashboard): address CodeRabbit findings on public MCP`, a session-history commit and a merge of `origin/main`. The fix commit changes only `public-mcp-funnel.ts` (+ its test), `configuration/mcp.mdx` and `docs/DASHBOARD-AUTH.md`:\n- Audit `clientId` from the authorize query is now kept only when it matches `^odc_[0-9a-f]{32}$`, the exact shape `registerClient` mints (`oauth-service.ts:272`: `CLIENT_ID_PREFIX` + `randomBytes(16)` hex). Otherwise it is null. This resolves my cycle-1 advisory about unbounded attacker-chosen `client_id` text in the activity log. A new test covers a 5,000-char value, short, uppercase and newline cases. Correct.\n- Docs now state that `/hooks/*` stays reachable while Public MCP is off, that the `/mcp` limit is per access token (a refresh starts a new count), and that audit entries are best-effort. Each statement matches the code (`emitActivityEntry` is `void …catch(() => undefined)`, `activity-logger.ts:245-247`).\n\n`git diff ffde40aa577..HEAD -- src/dashboard/frontend/ src/dashboard/server/routes/mcp-public.ts` is empty, so both cycle-3 blockers are present unchanged at this head. The runtime probe from cycle 3 still applies byte-for-byte.\n\n**The sibling contract is explicit.** PAN-4951's PRD (on main, `.pan/drafts/PAN-4951.md`) records it as hazard H-2 (line 288): \"PAN-4947 must keep `{ enabled, baseUrl }` and `data-component=\\\"public-mcp-panel\\\"`.\" D-7 (line 79) and the code comment at `ConnectBotDialog.tsx:145` repeat the `data-component` obligation. The epic PRD (`.pan/drafts/pan-4927.md:623`) also specifies `baseUrl` for this route. PAN-4947's D-9 renamed the field to `mcpUrl` without reconciling that obligation.\n\n## Blocking Findings\n\n### [correctness] Shared React Query key with two incompatible data shapes crashes the Public MCP panel — `src/dashboard/frontend/src/components/Settings/anywhere/anywhereApi.ts:378`, `botsApi.ts:9`\n- Severity: ! MUST\n- Classification / requirement scope: implementation defect (integration), in_pr_scope — this PR lands the route and the panel that collide with the already-merged W-BOT1 client; before this PR the route was 404 and no panel existed.\n- Trigger and changed-code connection:\n  - This PR: `ANYWHERE_PUBLIC_MCP_QUERY_KEY = ['anywhere-public-mcp']` with `loadPublicMcp()` → `{ enabled, funnelCommands, funnelOffCommands, mcpUrl }`; `PublicMcpPanel.tsx:38` reads it and calls `data.funnelCommands.map` (line 75) / `data.funnelOffCommands.map` (line 92).\n  - Main (PAN-4951): `PUBLIC_MCP_QUERY_KEY = ['anywhere-public-mcp']` with its own `loadPublicMcp()` → `{ available, enabled, url }`; `ConnectBotDialog.tsx:77` reads it whenever the \"public\" reach is selected. The dialog is mounted globally (`main.tsx:88` via `AnywhereDialogHost`) and opens from the command palette (`palette-anywhere-actions.ts:72` `anywhere-connect-bot`) or from the Bots panel in Settings → Anywhere.\n  - React Query stores data per key, not per `queryFn`, so whichever loader ran last decides the shape both components see.\n- Expected / observed / impact:\n  - Palette → Connect a bot → a public-reach platform, then Settings → Anywhere within the 5-minute cache lifetime: the panel renders the cached `{ available, enabled, url }` (React Query renders cached data even while refetching), `data.funnelOffCommands` is undefined, and the render throws `Cannot read properties of undefined (reading 'map')`. No error boundary exists under `components/Settings/`, so the throw propagates to the nearest app-level boundary.\n  - Settings → Anywhere → Connect a bot → public reach more than 30 s after the panel loaded (`staleTime: 30_000`, `main.tsx:55`): the dialog refetches with its loader, overwrites the shared entry, and the panel behind the dialog crashes the same way.\n  - Within 30 s the dialog instead reads the panel's shape: `publicMcp.url` is `undefined`, so the setup snippet shows the placeholder URL with `urlUnknown: false`.\n- Evidence: runtime probe in a gitignored scratch dir (`src/dashboard/frontend/.tmp/review-probe`, deleted afterwards; no tracked files touched) with the frontend Vitest config. Rendering `<PublicMcpPanel />` against the real response shape, then mounting a second observer that uses `botsApi`'s `PUBLIC_MCP_QUERY_KEY` + `loadPublicMcp` (staleTime 0, which matches the >30 s path), made an error boundary catch `Cannot read properties of undefined (reading 'map')`. Limitation: the probe used a minimal observer standing in for `ConnectBotDialog`, not the full dialog render.\n- Fix: one key, one loader, one shape. For example, delete `PUBLIC_MCP_QUERY_KEY`/`loadPublicMcp`/`PublicMcpState` from `botsApi.ts` and have `ConnectBotDialog` use `anywhereApi.ts`'s `ANYWHERE_PUBLIC_MCP_QUERY_KEY` + `loadPublicMcp` (`PublicMcpStatus`), reading `enabled` and `mcpUrl`. If you keep the bots adapter instead, give it a distinct key. Add a test that renders both consumers against one `QueryClient`.\n\n### [requirements] Connect-a-bot never shows the public `/mcp` URL: it reads `baseUrl`, the route answers `mcpUrl` — `botsApi.ts:76-77` vs `routes/mcp-public.ts:59`\n- Severity: ! MUST\n- Classification / requirement scope: specification defect between sibling work items, exposed by this PR at HEAD. PAN-4947 D-9 deliberately renamed the epic's `baseUrl` to `mcpUrl` (\"The response field is `mcpUrl` … not the epic's `baseUrl`\"). W-BOT1 implemented the epic's name.\n- Trigger: `botsApi.loadPublicMcp` returns `url: result.body.baseUrl ?? null`, so `url` is always `null` against this route (probe output: `{\"available\":true,\"enabled\":true,\"url\":null}` for a body with `mcpUrl: \"https://m.t.ts.net:8443/mcp\"`).\n- Impact: with Public MCP on and the URL known, \"Show setup\" (`ConnectBotDialog.tsx:153-160`) fills every hosted-bot snippet with `PUBLIC_MCP_PLACEHOLDER_URL` and sets `urlUnknown: true`, telling the operator that the URL is unknown. The hosted-bot setup that W-FUN1 exists for gives a wrong answer.\n- Fix: read `mcpUrl`, which the shared loader in the fix above does. W-BOT1 treats `url` as the full `/mcp` URL (the placeholder ends in `/mcp`), and that matches `mcpUrl`. Record the field name in the epic PRD so later items use `mcpUrl`.\n\n## Non-blocking Findings\n\n### [requirements] \"Show Public MCP settings\" scrolls to nothing (violates PAN-4951 H-2/D-7) — `ConnectBotDialog.tsx:149` vs `PublicMcpPanel.tsx:56`\n- Severity: ~ SHOULD (same integration root; fix with the above)\n- The dialog targets `[data-component=\"public-mcp-panel\"]`, but the panel is `data-component=\"anywhere-public-mcp-panel\"`, so the button closes the dialog and does not scroll. Align the two names.\n\n### Note on non-goal 4 (\"no behavior change to … bot integrations\")\nThe fix touches `botsApi.ts`/`ConnectBotDialog.tsx`, which are W-BOT1 files. That is adapter wiring for this PR's own route (the dialog's stated contract is \"this route, or off on 404\"), not a change to bot behavior. The fix keeps the 404 → off fallback. The alternative is changing this PR's key, field name and `data-component` to match W-BOT1. Either way works; the fix must leave one shape per key.\n\n### Carried from earlier cycles\n- ~ `PublicMcpPanel.test.tsx` is still missing from `scripts/frontend-test-subset.txt`, so CI never runs it (repo process requirement, project memory `ci-runs-frontend-test-allowlist`). A combined-consumer test added for the blocker above must also go on that list.\n- ? The per-IP limit uses the first `x-forwarded-for` entry. Confirm tailscaled's behavior at CP-10: send one request with no `X-Forwarded-For` (if the header is absent, every caller shares one `unknown` bucket) and twenty with a different forged value each (if none returns 429, the forged first entry survives).\n- ? Audit entries per public request, 429s included, are unbounded under a flood (FR-5 as specified). The `client_id` part of this advisory is resolved in cycle 4.\n- Stub-UI flag at `PublicMcpPanel.tsx:39` is a false positive: the `saving` flag is written by `setSaving` in `change()`.\n\n## Coverage\n\n### Changed-file ledger\n| File | Status |\n| --- | --- |\n| src/dashboard/server/public-mcp-funnel.ts | re-reviewed (cycle 4 change) — client-id shape filter correct; limiter, audit and onExit unchanged |\n| src/dashboard/server/__tests__/public-mcp-funnel.test.ts | re-reviewed — new malformed-client_id cases; passes |\n| configuration/mcp.mdx, docs/DASHBOARD-AUTH.md | re-reviewed — new statements match the code |\n| src/dashboard/server/routes/mcp-public.ts | unchanged since cycle 1; its `mcpUrl` field breaks the sibling contract (blocker 2) |\n| PublicMcpPanel.tsx, anywhereApi.ts, AnywhereSection.tsx | unchanged since cycle 3; blocker 1 still present |\n| routes/mcp-oauth.ts, routes/mcp.ts, remote-request-gate.ts, public-mcp-rate-limit.ts, server.ts, lib/mcp/public-mcp*.ts, config-yaml/load.ts, remaining tests, triggers.mdx, architecture.md, no-loss-matrix | unchanged since cycle 1 review; reviewed |\n| main's botsApi.ts / ConnectBotDialog.tsx (not in the PR diff) | traced as the colliding consumer |\n| .pan/* plan artifacts | not applicable |\n\n### Dimensions\n- Correctness: server code correct. The frontend integration defect persists (blocker 1).\n- Security: the cycle-4 client-id filter removes attacker-chosen text from audit details. The XFF advisory is still carried.\n- Performance: no change.\n- Requirements/UX: blockers 1 and 2. The PAN-4951 H-2 contract is unmet.\n\n### Acceptance criteria\n| AC | Status | Evidence |\n| --- | --- | --- |\n| AC-1 … AC-4, AC-6, AC-8 | met | server code unchanged except the funnel middleware; earlier focused runs and cycle-2 CI |\n| AC-5 middleware | met | public-mcp-funnel.test.ts and public-mcp-acceptance.test.ts: 15/15 passed at dd96bb77 |\n| AC-7 panel | met in isolation; broken at HEAD by the PAN-4951 consumer (blocker 1) | cycle-3 probe; the files involved are byte-identical since |\n| AC-9 docs | met | cycle-4 doc edits consistent with code |\n\n## Verification\n- `npx vitest run src/dashboard/server/__tests__/public-mcp-funnel.test.ts src/dashboard/server/__tests__/public-mcp-acceptance.test.ts`: 2 files, 15 tests passed at dd96bb77.\n- `gh pr checks` at dd96bb77: no CI jobs had started when the verdict was recorded. This blocked verdict does not rely on CI.\n- Blocker evidence: the cycle-3 runtime probe (panel render crash `Cannot read properties of undefined (reading 'map')`; bots loader `url: null` against the real body). `git diff ffde40aa577..HEAD -- src/dashboard/frontend/ src/dashboard/server/routes/mcp-public.ts` is empty, so the evidence still applies.\n\n## Scope Note\n**Repeated cycle, prior blocker not addressed.** The cycle-3 CHANGES REQUESTED verdict was posted on PR #4990 at 07:39:41Z and written to feedback seq 1. The next work round (`bcc9c4557de`) addressed only CodeRabbit's comments, and the issue timeline shows `feedback.delivered coderabbit feedback` after the verdict. Either the review feedback did not reach the work agent, or the agent acted on CodeRabbit alone. The pipeline reported \"Review loop not converging\" in cycle 3. The fix is small and fully specified:\n1. Rename the `data-component` on `PublicMcpPanel.tsx:55` to `public-mcp-panel`.\n2. Either add `baseUrl` (the same value as `mcpUrl`) to the `GET`/`PUT /api/mcp/public` body (`routes/mcp-public.ts` `status()`), or switch `botsApi.loadPublicMcp` to read `mcpUrl`.\n3. Resolve the key collision: `ConnectBotDialog` must use `anywhereApi.ts`'s key and loader, or `PublicMcpPanel` must use a key distinct from `['anywhere-public-mcp']`.\n4. Add one test that renders both consumers on one `QueryClient`, and add it and `PublicMcpPanel.test.tsx` to `scripts/frontend-test-subset.txt`.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-4947/.pan/review/agent-pan-4947-review-dd96bb77/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-4947 -m \"Fixed review issues\"`"
+    }
+  ],
+  "agentModel": "claude-opus-5-5"
+}

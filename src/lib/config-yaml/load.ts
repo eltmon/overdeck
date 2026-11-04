@@ -76,11 +76,15 @@ export function stripProjectTtsEndpoint(config: YamlConfig | null): YamlConfig |
 /**
  * PAN-4585 (FR-11): security settings come only from operator-owned files. A work agent
  * can commit a .pan.yaml to the branch it is on, so the project layer never sets them.
+ * PAN-4947 D-2: the same holds for `mcp.public` (public MCP through Tailscale Funnel).
  */
 export function stripProjectSecurity(config: YamlConfig | null): YamlConfig | null {
-  if (!config || config.security === undefined) return config;
+  if (!config) return config;
   const { security: _security, ...rest } = config;
-  return rest;
+  // PAN-4947 D-2: public MCP (Tailscale Funnel) is operator-only too.
+  if (rest.mcp?.public === undefined) return rest;
+  const { public: _public, ...mcp } = rest.mcp;
+  return { ...rest, mcp };
 }
 
 /**
