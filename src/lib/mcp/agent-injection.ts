@@ -1,5 +1,6 @@
 /**
  * PAN-4927 W-INJ1 (PAN-4932): give a Claude Code launch the overdeck MCP server with its owner's token file (D-2, D-3, D-4).
+ * PAN-4927 W-INJ2 (PAN-4933): same for Codex launches via `prepareCodexOverdeckMcp`, which merges into the role's `[mcp_servers]` map instead of a config file.
  *
  * Every launch site spreads `await prepareClaudeOverdeckMcp(owner)` into its
  * `generateLauncherScript` config. The helper mints (or reuses) the owner's agent
@@ -86,6 +87,15 @@ export interface OverdeckMcpLaunchOwner {
   dir?: string;
 }
 
+/** Shared mint path: enabled check, owner dir resolution, and the token mint itself. */
+async function mintOverdeckTokenFile(owner: OverdeckMcpLaunchOwner): Promise<{ dir: string; tokenFile: string } | null> {
+  if (!(await overdeckMcpEnabledFor(owner.harness))) return null;
+  const dir = owner.dir ?? (owner.agentKind === 'agent' ? getAgentDir(normalizeAgentId(owner.agentId)) : undefined);
+  if (dir === undefined) throw new Error('a conversation launch needs its state dir');
+  const { tokenFile } = await ensureAgentMcpToken({ agentId: owner.agentId, agentKind: owner.agentKind, role: owner.role, dir });
+  return { dir, tokenFile };
+}
+
 /** Launch kinds whose command builder reads `overdeckMcpConfig`: Claude Code `--mcp-config=` and the ACP host's `--mcp-config` (PAN-4934). */
 const OVERDECK_MCP_JSON_LAUNCH_KINDS: ReadonlySet<string> = new Set(['claude-code', 'acp-host']);
 
@@ -93,11 +103,37 @@ const OVERDECK_MCP_JSON_LAUNCH_KINDS: ReadonlySet<string> = new Set(['claude-cod
 export async function prepareClaudeOverdeckMcp(owner: OverdeckMcpLaunchOwner): Promise<{ overdeckMcpConfig?: string }> {
   if (!OVERDECK_MCP_JSON_LAUNCH_KINDS.has(getHarnessBehavior(owner.harness).launchCommandKind)) return {};
   try {
-    if (!(await overdeckMcpEnabledFor(owner.harness))) return {};
-    const dir = owner.dir ?? (owner.agentKind === 'agent' ? getAgentDir(normalizeAgentId(owner.agentId)) : undefined);
-    if (dir === undefined) throw new Error('a conversation launch needs its state dir');
-    const { tokenFile } = await ensureAgentMcpToken({ agentId: owner.agentId, agentKind: owner.agentKind, role: owner.role, dir });
-    return { overdeckMcpConfig: await writeClaudeOverdeckMcpConfig(dir, tokenFile) };
+    const minted = await mintOverdeckTokenFile(owner);
+    if (minted === null) return {};
+    return { overdeckMcpConfig: await writeClaudeOverdeckMcpConfig(minted.dir, minted.tokenFile) };
+  } catch (error) {
+    console.warn(`[agent-injection] overdeck MCP skipped for ${owner.agentId}: ${(error as Error).message}`);
+    return {};
+  }
+}
+
+/** The `[mcp_servers.overdeck]` table entry a Codex launch merges into its server map. */
+export interface CodexOverdeckMcpServer {
+  type: 'stdio';
+  command: string;
+  args: string[];
+  env: Record<string, string>;
+  defaultToolsApprovalMode: 'approve';
+}
+
+/**
+ * PAN-4933 W-INJ2: `{}` unless the harness uses a Codex home; never throws.
+ * `defaultToolsApprovalMode: 'approve'` is required because Overdeck's MCP tools
+ * carry no `readOnlyHint` annotations, so Codex would otherwise refuse every
+ * model-initiated call under `approval_policy = "never"` (planning landmine,
+ * see .overdeck/context/codebase/concerns.md).
+ */
+export async function prepareCodexOverdeckMcp(owner: OverdeckMcpLaunchOwner): Promise<Record<string, CodexOverdeckMcpServer>> {
+  if (!getHarnessBehavior(owner.harness).usesCodexHome) return {};
+  try {
+    const minted = await mintOverdeckTokenFile(owner);
+    if (minted === null) return {};
+    return { overdeck: { ...overdeckStdioServer(minted.tokenFile), defaultToolsApprovalMode: 'approve' } };
   } catch (error) {
     console.warn(`[agent-injection] overdeck MCP skipped for ${owner.agentId}: ${(error as Error).message}`);
     return {};

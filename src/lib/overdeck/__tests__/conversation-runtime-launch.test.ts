@@ -16,6 +16,7 @@ const writePtyToken = vi.hoisted(() => vi.fn(async () => {}));
 const setOption = vi.hoisted(() => vi.fn(() => Effect.succeed(undefined)));
 const closeConversationPane = vi.hoisted(() => vi.fn(async () => {}));
 const claudeSystemPromptFiles = vi.hoisted(() => vi.fn(async (): Promise<string[]> => []));
+const initCodexHomeMock = vi.hoisted(() => vi.fn());
 
 vi.mock('../../harness-binary.js', () => ({
   prepareHarnessLaunch: vi.fn(async () => ({ binaryPath: '/usr/bin/claude', pathExport: "export PATH='/usr/bin':\"$PATH\"" })),
@@ -68,6 +69,18 @@ vi.mock('../conversation-liveness.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../conversation-liveness.js')>()),
   closeConversationPane,
 }));
+// PAN-4933: spy on the real initCodexHome (keeping its behavior) so Codex
+// launch cases can assert the mcpServers it was given.
+vi.mock('../../runtimes/codex.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../runtimes/codex.js')>();
+  return {
+    ...actual,
+    initCodexHome: (...args: Parameters<typeof actual.initCodexHome>) => {
+      initCodexHomeMock(...args);
+      return actual.initCodexHome(...args);
+    },
+  };
+});
 
 const { conversationUsesSupervisor, spawnConversationSession } = await import('../conversation-runtime.js');
 const { toPaneRole } = await import('../../terminal-backends/prompt-guard.js');
@@ -127,6 +140,7 @@ beforeEach(() => {
   writePtyToken.mockClear();
   setOption.mockClear();
   closeConversationPane.mockClear();
+  initCodexHomeMock.mockClear();
 });
 
 afterEach(() => {
@@ -341,5 +355,39 @@ describe('conversations get the overdeck MCP server (PAN-4932)', () => {
     expect(launcherConfigs[0]!['overdeckMcpConfig']).toBe(join(overdeckHome, 'conversations', 'conv-lane-c1', 'overdeck-mcp.json'));
     expect(await tokenFor('lane-c1')).toEqual([expect.objectContaining({ agentKind: 'conversation', role: 'worker' })]);
     expect((await tokenFor('lane-c1'))[0]!.scopes).not.toContain('approve');
+  });
+
+  it('gives a Codex conversation the overdeck MCP server under its own [mcp_servers.overdeck] table (PAN-4933)', async () => {
+    const { createConversation } = await import('../conversations.js');
+    createConversation({ name: 'cx', tmuxSession: 'conv-cx', cwd: overdeckHome, workspaceId: null });
+
+    await spawnConversationSession(
+      'conv-cx', overdeckHome, '11111111-1111-4111-8111-111111111111', 'gpt-5.5', 'high',
+      undefined, false, 'codex', false, { backend: fakeBackend('herdr').backend },
+    );
+
+    expect(initCodexHomeMock).toHaveBeenCalledTimes(1);
+    const opts = initCodexHomeMock.mock.calls[0]![1] as {
+      mcpServers?: Record<string, { env: Record<string, string>; defaultToolsApprovalMode?: string }>;
+    };
+    expect(opts.mcpServers?.overdeck?.env.OVERDECK_MCP_TOKEN_FILE).toBe(join(overdeckHome, 'conversations', 'conv-cx', 'mcp-token'));
+    expect(opts.mcpServers?.overdeck?.defaultToolsApprovalMode).toBe('approve');
+    expect(await tokenFor('cx')).toEqual([expect.objectContaining({ agentKind: 'conversation', role: 'conversation' })]);
+
+    const config = readFileSync(join(overdeckHome, 'agents', 'conv-cx', 'codex-home-v2', 'config.toml'), 'utf8');
+    expect(config).toContain('[mcp_servers.overdeck]');
+    expect(config).not.toContain('odk_');
+  });
+
+  it('passes mcpServers undefined and mints no token for a bare Codex conversation (PAN-4933)', async () => {
+    await spawnConversationSession(
+      'conv-codex-bare', overdeckHome, '11111111-1111-4111-8111-111111111111', 'gpt-5.5', 'high',
+      undefined, false, 'codex', false, { backend: fakeBackend('herdr').backend, bareContext: true },
+    );
+
+    expect(initCodexHomeMock).toHaveBeenCalledTimes(1);
+    const opts = initCodexHomeMock.mock.calls[0]![1] as { mcpServers?: unknown };
+    expect(opts.mcpServers).toBeUndefined();
+    expect(await tokenFor('conv-codex-bare')).toEqual([]);
   });
 });
