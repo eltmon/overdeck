@@ -1,17 +1,25 @@
 /**
  * PAN-4927 W-BOT1 (PAN-4951): "Connect a bot" — one form (D-5) that gives an outside MCP
  * client (Hermes, OpenClaw, Grok Build, Grok Bot, the xAI API) scoped, revocable access to
- * this machine. Only the connector reach is wired here; tailscale, this-computer and public
- * land with dialog-token-reaches and dialog-public-reach.
+ * this machine. The connector, tailscale and this-computer reaches are wired here; public
+ * lands with dialog-public-reach.
  */
 import { useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { X } from 'lucide-react';
 
-import { apiError, isOk } from './anywhereApi';
+import {
+  ANYWHERE_ACCESS_TOKENS_QUERY_KEY,
+  ANYWHERE_STATUS_QUERY_KEY,
+  apiError,
+  createAccessToken,
+  isOk,
+  loadAnywhereStatus,
+} from './anywhereApi';
 import {
   BOT_PLATFORMS,
   REACH_LABELS,
+  TAILSCALE_PLACEHOLDER_ORIGIN,
   defaultBotName,
   type BotPlatform,
   type BotReach,
@@ -24,7 +32,7 @@ import {
   botScopes,
   createConnectorPairing,
 } from './botsApi';
-import { ConnectBotOutput } from './ConnectBotOutput';
+import { ConnectBotOutput, type ConnectBotResult } from './ConnectBotOutput';
 
 const TICKABLE_SCOPES = BOT_SCOPE_CHOICES.filter((scope) => scope !== 'read:state');
 
@@ -41,11 +49,6 @@ interface ConnectBotDialogProps {
   onClose: () => void;
 }
 
-interface PairingOutput {
-  pairingString: string;
-  expiresAt: string;
-}
-
 function defaultTicked(): Set<BotScope> {
   return new Set(BOT_DEFAULT_SCOPES.filter((scope) => scope !== 'read:state'));
 }
@@ -57,6 +60,7 @@ export function ConnectBotDialog({ open, onClose }: ConnectBotDialogProps) {
 
 function ConnectBotDialogBody({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient();
+  const { data: status } = useQuery({ queryKey: ANYWHERE_STATUS_QUERY_KEY, queryFn: loadAnywhereStatus });
 
   const [platform, setPlatform] = useState<BotPlatform>('hermes');
   const [reach, setReach] = useState<BotReach>(BOT_PLATFORMS[0]!.reaches[0]!);
@@ -65,9 +69,12 @@ function ConnectBotDialogBody({ onClose }: { onClose: () => void }) {
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [forbidden, setForbidden] = useState(false);
-  const [output, setOutput] = useState<PairingOutput | null>(null);
+  const [output, setOutput] = useState<ConnectBotResult | null>(null);
 
   const platformEntry = BOT_PLATFORMS.find((entry) => entry.id === platform) ?? BOT_PLATFORMS[0]!;
+  // D-10: Tailscale Serve's URL, or the placeholder plus a "not set up" note.
+  const tailscaleSetUp = Boolean(status?.tailscale.serveUrl);
+  const tailscaleOrigin = (status?.tailscale.serveUrl ?? TAILSCALE_PLACEHOLDER_ORIGIN).replace(/\/+$/, '');
 
   const handlePlatformChange = (next: BotPlatform) => {
     const entry = BOT_PLATFORMS.find((candidate) => candidate.id === next) ?? BOT_PLATFORMS[0]!;
@@ -93,17 +100,33 @@ function ConnectBotDialogBody({ onClose }: { onClose: () => void }) {
     setError(null);
     setForbidden(false);
     try {
-      const result = await createConnectorPairing(name.trim(), botScopes(ticked));
-      if (result.status === 403) {
-        setForbidden(true);
+      if (reach === 'connector') {
+        const result = await createConnectorPairing(name.trim(), botScopes(ticked));
+        if (result.status === 403) {
+          setForbidden(true);
+          return;
+        }
+        if (!isOk(result)) {
+          setError(apiError(result));
+          return;
+        }
+        setOutput({ kind: 'connector', pairingString: result.body.pairingString, expiresAt: result.body.expiresAt });
+        void queryClient.invalidateQueries({ queryKey: BOTS_CONNECTORS_QUERY_KEY });
         return;
       }
-      if (!isOk(result)) {
-        setError(apiError(result));
-        return;
+      if (reach === 'tailscale' || reach === 'this-computer') {
+        const result = await createAccessToken(name.trim(), botScopes(ticked));
+        if (result.status === 403) {
+          setForbidden(true);
+          return;
+        }
+        if (!isOk(result)) {
+          setError(apiError(result));
+          return;
+        }
+        setOutput({ kind: 'token', reach, token: result.body.token, origin: tailscaleOrigin, tailscaleSetUp });
+        void queryClient.invalidateQueries({ queryKey: ANYWHERE_ACCESS_TOKENS_QUERY_KEY });
       }
-      setOutput(result.body);
-      void queryClient.invalidateQueries({ queryKey: BOTS_CONNECTORS_QUERY_KEY });
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -111,7 +134,8 @@ function ConnectBotDialogBody({ onClose }: { onClose: () => void }) {
     }
   };
 
-  const canSubmit = reach === 'connector' && name.trim().length > 0 && !creating;
+  const canSubmit = (reach === 'connector' || reach === 'tailscale' || reach === 'this-computer')
+    && name.trim().length > 0 && !creating;
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
@@ -132,7 +156,7 @@ function ConnectBotDialogBody({ onClose }: { onClose: () => void }) {
 
         <div className="p-4 space-y-4 text-sm">
           {output ? (
-            <ConnectBotOutput platform={platform} pairingString={output.pairingString} expiresAt={output.expiresAt} onDone={onClose} />
+            <ConnectBotOutput platform={platform} result={output} onDone={onClose} />
           ) : (
             <>
               <div className="space-y-1">
@@ -216,7 +240,7 @@ function ConnectBotDialogBody({ onClose }: { onClose: () => void }) {
                   disabled={!canSubmit}
                   className="rounded-md bg-primary px-3 py-1.5 text-xs text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
                 >
-                  {reach === 'connector' ? 'Create pairing code' : 'Connect'}
+                  {reach === 'connector' ? 'Create pairing code' : reach === 'tailscale' || reach === 'this-computer' ? 'Create token' : 'Connect'}
                 </button>
               )}
               {error && <p className="text-xs text-destructive">{error}</p>}

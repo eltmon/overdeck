@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { buildConnectorPairLink, parseConnectorPairLink } from '@overdeck/contracts';
 
+import { ANYWHERE_STATUS_QUERY_KEY } from '../anywhereApi';
 import { ConnectBotDialog } from '../ConnectBotDialog';
 
 vi.mock('../../../../lib/wsTransport', () => ({
@@ -30,32 +31,59 @@ const PAIRING_STRING = buildConnectorPairLink({
   code: `odp_${'2'.repeat(64)}`,
 });
 
+const TOKEN = 'odk_0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcd';
+
+function statusBody(serveUrl: string | null) {
+  return {
+    machine: { environmentId: '0f0e0d0c-0000-4000-8000-000000000000', label: 'desk' },
+    addresses: [],
+    devices: { active: 0 },
+    vault: { state: 'off', backend: null },
+    problems: [],
+    tailscale: { nextStep: 'none', serveUrl, magicDnsName: null },
+    viewer: { kind: 'root-session' },
+  };
+}
+
 let fetchMock: ReturnType<typeof vi.fn>;
 
-function mockServer(pairingStatus: number) {
+function mockServer(opts: { pairingStatus?: number; tokenStatus?: number; serveUrl?: string | null } = {}) {
+  const { pairingStatus = 200, tokenStatus = 200, serveUrl = null } = opts;
   fetchMock = vi.fn((input: string | URL | Request, init?: RequestInit) => {
     const url = input.toString();
     if (url === '/api/environment') return Promise.resolve(jsonResponse(200, ENVIRONMENT));
+    if (url === '/api/anywhere/status') return Promise.resolve(jsonResponse(200, statusBody(serveUrl)));
     if (url === '/api/connectors/pairing' && init?.method === 'POST') {
       return Promise.resolve(pairingStatus === 200
         ? jsonResponse(200, { pairingString: PAIRING_STRING, expiresAt: '2026-11-03T00:10:00Z' })
         : jsonResponse(403, { error: 'only the internal token or the root session can manage connectors' }));
+    }
+    if (url === '/api/access-tokens' && init?.method === 'POST') {
+      const { name, scopes } = JSON.parse(String(init.body)) as { name: string; scopes: string[] };
+      return Promise.resolve(tokenStatus === 200
+        ? jsonResponse(200, { token: TOKEN, record: { id: 'tok-1', name, scopes } })
+        : jsonResponse(403, { error: 'only the internal token or the root session can create access tokens' }));
     }
     return Promise.resolve(jsonResponse(404, { error: 'not found' }));
   });
   vi.stubGlobal('fetch', fetchMock);
 }
 
-function postedPairingBody(): { name: string; scopes: string[] } {
-  const call = fetchMock.mock.calls.find(([input, init]) => input.toString() === '/api/connectors/pairing' && (init as RequestInit | undefined)?.method === 'POST');
+function postedBody(path: string): { name: string; scopes: string[] } {
+  const call = fetchMock.mock.calls.find(([input, init]) => input.toString() === path && (init as RequestInit | undefined)?.method === 'POST');
   return JSON.parse(String((call?.[1] as RequestInit).body)) as { name: string; scopes: string[] };
 }
 
-async function renderDialog() {
+async function renderDialog(opts: { serveUrl?: string | null } = {}) {
   const user = userEvent.setup();
   const writeText = vi.fn(async () => undefined);
   Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+  if ('serveUrl' in opts) {
+    // staleTime: Infinity keeps the mount-triggered background refetch from clobbering this with mockServer's default (null) response.
+    queryClient.setQueryDefaults(ANYWHERE_STATUS_QUERY_KEY, { staleTime: Infinity });
+    queryClient.setQueryData(ANYWHERE_STATUS_QUERY_KEY, statusBody(opts.serveUrl ?? null));
+  }
   render(
     <QueryClientProvider client={queryClient}>
       <ConnectBotDialog open onClose={() => undefined} />
@@ -64,36 +92,36 @@ async function renderDialog() {
   return { user };
 }
 
-describe('ConnectBotDialog (PAN-4951 WI-3)', () => {
+describe('ConnectBotDialog (PAN-4951 WI-3, WI-4)', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
   });
 
   it('sends the default scopes and the default Hermes name on the default form', async () => {
-    mockServer(200);
+    mockServer();
     const { user } = await renderDialog();
 
     await user.click(screen.getByRole('button', { name: 'Create pairing code' }));
     await screen.findByLabelText('Pairing string');
 
-    const body = postedPairingBody();
+    const body = postedBody('/api/connectors/pairing');
     expect(body.scopes).toEqual(['read:state', 'read:conversations', 'tell']);
     expect(body.name).toBe('Hermes bot');
   });
 
   it('adds approve to the body once it is ticked', async () => {
-    mockServer(200);
+    mockServer();
     const { user } = await renderDialog();
 
     await user.click(screen.getByLabelText('Approve', { exact: false }));
     await user.click(screen.getByRole('button', { name: 'Create pairing code' }));
     await screen.findByLabelText('Pairing string');
 
-    expect(postedPairingBody().scopes).toContain('approve');
+    expect(postedBody('/api/connectors/pairing').scopes).toContain('approve');
   });
 
   it('renders read:state as checked and disabled, and unticking tell removes it from the body', async () => {
-    mockServer(200);
+    mockServer();
     const { user } = await renderDialog();
 
     expect(screen.getByLabelText('Read state (always on)')).toBeChecked();
@@ -103,11 +131,11 @@ describe('ConnectBotDialog (PAN-4951 WI-3)', () => {
     await user.click(screen.getByRole('button', { name: 'Create pairing code' }));
     await screen.findByLabelText('Pairing string');
 
-    expect(postedPairingBody().scopes).not.toContain('tell');
+    expect(postedBody('/api/connectors/pairing').scopes).not.toContain('tell');
   });
 
   it('renders a parseable pairing string and the connector pair command with the server version', async () => {
-    mockServer(200);
+    mockServer();
     const { user } = await renderDialog();
 
     await user.click(screen.getByRole('button', { name: 'Create pairing code' }));
@@ -121,12 +149,64 @@ describe('ConnectBotDialog (PAN-4951 WI-3)', () => {
     });
   });
 
-  it('explains a 403 from a browser that is not on this machine', async () => {
-    mockServer(403);
+  it('explains a 403 from a browser that is not on this machine (connector)', async () => {
+    mockServer({ pairingStatus: 403 });
     const { user } = await renderDialog();
 
     await user.click(screen.getByRole('button', { name: 'Create pairing code' }));
 
     expect(await screen.findByText('Only a browser on this machine can connect bots.')).toBeInTheDocument();
+  });
+
+  it('defaults Grok Build to the This computer reach and sends the default scopes to /api/access-tokens', async () => {
+    mockServer();
+    const { user } = await renderDialog();
+
+    await user.click(screen.getByLabelText('Grok Build'));
+    expect(screen.getByLabelText('This computer')).toBeChecked();
+
+    await user.click(screen.getByRole('button', { name: 'Create token' }));
+    await screen.findByLabelText('Token setup');
+
+    expect(postedBody('/api/access-tokens').scopes).toEqual(['read:state', 'read:conversations', 'tell']);
+    expect(postedBody('/api/access-tokens').name).toBe('Grok Build bot');
+  });
+
+  it('shows the token once in Token setup, and keeps it out of the config snippet', async () => {
+    mockServer();
+    const { user } = await renderDialog();
+
+    await user.click(screen.getByLabelText('Grok Build'));
+    await user.click(screen.getByRole('button', { name: 'Create token' }));
+
+    const setupField = await screen.findByLabelText('Token setup');
+    expect(String((setupField as HTMLTextAreaElement).value)).toContain(TOKEN);
+
+    const configField = screen.getByLabelText('Grok Build config');
+    expect(String((configField as HTMLTextAreaElement).value)).not.toMatch(/od[krl]_/);
+  });
+
+  it('renders the Tailscale serve URL in the Hermes config when Tailscale is set up', async () => {
+    mockServer();
+    const { user } = await renderDialog({ serveUrl: 'https://box.tail1.ts.net' });
+
+    await user.click(screen.getByLabelText('Tailscale'));
+    await user.click(screen.getByRole('button', { name: 'Create token' }));
+
+    const configField = await screen.findByLabelText('Hermes config');
+    expect(String((configField as HTMLTextAreaElement).value)).toContain('url: "https://box.tail1.ts.net/mcp"');
+    expect(screen.queryByText(/Tailscale Serve is not set up/)).not.toBeInTheDocument();
+  });
+
+  it('renders the placeholder and the D-10 note when Tailscale is not set up', async () => {
+    mockServer();
+    const { user } = await renderDialog({ serveUrl: null });
+
+    await user.click(screen.getByLabelText('Tailscale'));
+    await user.click(screen.getByRole('button', { name: 'Create token' }));
+
+    const configField = await screen.findByLabelText('Hermes config');
+    expect(String((configField as HTMLTextAreaElement).value)).toContain('url: "https://YOUR-MACHINE.YOUR-TAILNET.ts.net/mcp"');
+    expect(screen.getByText(/Tailscale Serve is not set up on this machine yet/)).toBeInTheDocument();
   });
 });
