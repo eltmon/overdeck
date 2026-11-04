@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4841",
   "created": "2026-11-04T10:01:07.580Z",
-  "updated": "2026-11-04T17:40:12.099Z",
+  "updated": "2026-11-04T17:40:27.783Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -294,6 +294,10 @@
     "rel-docs.ac3": {
       "status": "completed",
       "doneAt": "2026-11-04T17:40:12.099Z"
+    },
+    "rel-docs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:40:27.783Z"
     }
   }
 }
