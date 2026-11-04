@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4958",
   "created": "2026-11-04T18:35:00.768Z",
-  "updated": "2026-11-04T19:05:05.898Z",
+  "updated": "2026-11-04T19:05:24.538Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -194,6 +194,10 @@
     "connect-service-clients.ac2": {
       "status": "completed",
       "doneAt": "2026-11-04T19:05:05.898Z"
+    },
+    "public-mcp-tailscale.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:05:24.538Z"
     }
   }
 }
