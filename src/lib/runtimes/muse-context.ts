@@ -8,6 +8,8 @@ import { renderGlobalLayer, renderProjectLayer } from '../context-layers/render.
 import { resolveWorkspaceContextFile } from '../context-layers/layers.js';
 import { renderForHarness } from '../context-layers/harness.js';
 import { workspaceContextWithoutProjectLayer } from '../context-layers/assemble.js';
+import { overdeckInstructionsBlock } from '../mcp/agent-instructions.js';
+import { overdeckMcpEnabledFor } from '../mcp/overdeck-mcp-gate.js';
 import { museDataHome } from './storage/muse.js';
 
 export async function materializeMuseContext(agentId: string, workspace: string, roleFile?: string): Promise<string> {
@@ -21,6 +23,8 @@ export async function materializeMuseContext(agentId: string, workspace: string,
     throw error;
   });
   sections.push(renderForHarness(project ? workspaceContextWithoutProjectLayer(workspaceLayer) : workspaceLayer, 'muse'));
+  // PAN-4935: Muse is a no-MCP harness (F-1), so this always resolves to the CLI block.
+  sections.push(overdeckInstructionsBlock(await overdeckMcpEnabledFor('muse')));
   if (roleFile) sections.push(await readFile(roleFile, 'utf8'));
   const dir = join(getOverdeckHome(), 'agents', agentId);
   await mkdir(dir, { recursive: true });
