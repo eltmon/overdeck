@@ -124,6 +124,7 @@ test('the phone shell installs, answers a question in two taps and pairs', async
     const posts: Array<{ url: string; body: { message?: string } }> = [];
     await page.route('**/api/conversations/pending-input', (route) => route.fulfill({ json: PENDING }));
     await page.route('**/api/conversations', (route) => route.fulfill({ json: CONVERSATIONS }));
+    await page.route('**/api/registered-projects', (route) => route.fulfill({ json: [] }));
     await page.route('**/api/conversations/*/message', async (route) => {
       posts.push({ url: route.request().url(), body: route.request().postDataJSON() as { message?: string } });
       await route.fulfill({ json: { ok: true } });
@@ -157,8 +158,9 @@ test('the phone shell installs, answers a question in two taps and pairs', async
 
     // 5. Conversations tab.
     await page.getByRole('button', { name: 'Conversations' }).tap();
-    await expect(page.getByRole('list', { name: 'Conversations' })).toBeVisible();
-    await expect(page.getByRole('list', { name: 'Conversations' }).locator('li').first()).toContainText('Ship the phone shell');
+    await expect(page.getByRole('region', { name: 'Conversations' })).toBeVisible();
+    await page.getByRole('button', { name: 'No project' }).tap();
+    await expect(page.getByRole('list', { name: 'No project' }).locator('li').first()).toContainText('Ship the phone shell');
     await expectTapTargets(page);
     // The shell never widens or pans the page (the ?subject= scroll stays in the list).
     expect(await page.evaluate(() => [window.innerWidth, window.scrollX, window.scrollY])).toEqual([390, 0, 0]);
