@@ -4,17 +4,17 @@
     "created": "2026-11-04T09:53:53Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4841: Phone app: store, Firebase, APNs and directory setup, and first TestFlight and Play builds",
-    "updated": "2026-11-04T09:59:19.255Z"
+    "updated": "2026-11-04T10:00:51.616Z"
   },
   "plan": {
     "id": "pan-4841",
     "title": "Phone app: store, Firebase, APNs and directory setup, and first TestFlight and Play builds",
-    "status": "proposed",
+    "status": "running",
     "uid": "349cf6dc-a2d9-46eb-9f1e-63e348e95a4d",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-04T09:53:53Z",
-    "updated": "2026-11-04T09:59:19.255Z",
+    "updated": "2026-11-04T10:00:51.616Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4841",
@@ -1185,5 +1185,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
