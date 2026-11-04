@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4956",
   "created": "2026-11-04T09:00:33.744Z",
-  "updated": "2026-11-04T09:27:46.069Z",
+  "updated": "2026-11-04T09:28:00.889Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -76,6 +76,10 @@
     "ts-example.ac1": {
       "status": "completed",
       "doneAt": "2026-11-04T09:27:46.069Z"
+    },
+    "ts-example.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T09:28:00.889Z"
     }
   }
 }
