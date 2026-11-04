@@ -326,6 +326,40 @@ describe('runPullRequestSyncOnce — snapshots', () => {
     expect(result.updated).toBe(0);
     expect(listConversationPullRequests(name)[0]?.snapshot?.title).toBe('PR 5');
   });
+
+  it('carries a link\'s last observed checks forward for a merged row with no statusCheckRollup (PAN-5042)', async () => {
+    const name = conversation('feature/checks-carry');
+    prRows = [pr(60, 'feature/checks-carry', { statusCheckRollup: [{ status: 'COMPLETED', conclusion: 'FAILURE' }] })];
+    await runPullRequestSyncOnce();
+    expect(listConversationPullRequests(name)[0]?.snapshot).toEqual(
+      expect.objectContaining({ state: 'open', checks: 'red' }),
+    );
+
+    // The closed listing never carries statusCheckRollup (PAN-5042); without
+    // the link's previous snapshot, this would read as a bare 'green' guess.
+    prRows = [pr(60, 'feature/checks-carry', {
+      state: 'MERGED', mergedAt: '2026-09-25T00:00:00Z', statusCheckRollup: undefined,
+    })];
+    const result = await runPullRequestSyncOnce();
+
+    expect(result.updated).toBe(1);
+    expect(listConversationPullRequests(name)[0]?.snapshot).toEqual(
+      expect.objectContaining({ state: 'merged', checks: 'red' }),
+    );
+  });
+
+  it('a fresh branch-detected link for a merged row with no statusCheckRollup gets checks green (PAN-5042)', async () => {
+    const name = conversation('feature/new-merged');
+    prRows = [pr(61, 'feature/new-merged', {
+      state: 'MERGED', mergedAt: '2026-09-25T00:00:00Z', statusCheckRollup: undefined,
+    })];
+
+    await runPullRequestSyncOnce();
+
+    expect(listConversationPullRequests(name)[0]?.snapshot).toEqual(
+      expect.objectContaining({ state: 'merged', checks: 'green' }),
+    );
+  });
 });
 
 describe('runPullRequestSyncOnce — slow lane, fallback, backoff (WI-4)', () => {

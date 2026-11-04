@@ -6,8 +6,10 @@
  *
  *   1. Load every non-archived conversation and group it by registered project.
  *   2. Read each project's PR list ONCE per sweep (`readRepoPullRequests`,
- *      `gh pr list --state all`, cached 30 s), and only when the project has a
- *      conversation with a branch to detect or a link due for refresh. A failed
+ *      PAN-5042: the open listing with every field plus the closed listing
+ *      without `statusCheckRollup`, each cached separately), and only when
+ *      the project has a conversation with a branch to detect or a link due
+ *      for refresh. A failed
  *      listing (a rate limit included) counts toward the same 3-strike backoff
  *      as the fallback reads and leaves that project's links for a later sweep.
  *      During a GitHub quota pause of the user GraphQL bucket (PAN-4264) the
@@ -60,9 +62,9 @@ import {
   type PullRequestSyncConversation,
 } from '../../../lib/overdeck/conversation-pull-requests.js';
 import {
+  checksFromGhRow,
   forgeForProject,
   readRepoPullRequests,
-  toChecksState,
   toReviewState,
   type GhPrRow,
 } from '../../../lib/overdeck/derived-issue-state.js';
@@ -108,8 +110,18 @@ export function githubPullRequestKeyFromUrl(url: string): (PullRequestKey & { ur
   return { host, repository, number, url: `https://${host}/${repository}/pull/${number}` };
 }
 
-/** One `gh pr list` row → the stored snapshot. */
-export function snapshotFromGhRow(row: GhPrRow, syncedAt: string): PullRequestSnapshot {
+/**
+ * One `gh pr list` row → the stored snapshot. `previous`, the link's current
+ * snapshot, carries the checks forward when `row` has no `statusCheckRollup`
+ * (PAN-5042: the closed listing never fetches it) instead of letting
+ * `checksFromGhRow`'s mergedAt/state fallback downgrade a known red or
+ * pending state to a bare 'green'/'pending' guess.
+ */
+export function snapshotFromGhRow(
+  row: GhPrRow,
+  syncedAt: string,
+  previous?: PullRequestSnapshot | null,
+): PullRequestSnapshot {
   const upperState = (row.state ?? '').toUpperCase();
   const state = row.mergedAt || upperState === 'MERGED' ? 'merged' : upperState === 'CLOSED' ? 'closed' : 'open';
   return {
@@ -119,7 +131,7 @@ export function snapshotFromGhRow(row: GhPrRow, syncedAt: string): PullRequestSn
     headBranch: row.headRefName ?? null,
     baseBranch: row.baseRefName ?? null,
     reviewState: toReviewState(row.reviewDecision, (row.reviewRequests?.length ?? 0) > 0),
-    checks: toChecksState(row.statusCheckRollup),
+    checks: row.statusCheckRollup === undefined && previous ? previous.checks : checksFromGhRow(row),
     mergeable: row.mergeable === 'MERGEABLE' ? true : row.mergeable === 'CONFLICTING' ? false : null,
     additions: null,
     deletions: null,
@@ -183,7 +195,7 @@ function isDue(link: PullRequestLink, now: number): boolean {
 
 function applySnapshot(link: PullRequestLink, row: GhPrRow, ctx: SweepContext): number {
   lastReadAt.set(keyString(link), ctx.now);
-  const snapshot = snapshotFromGhRow(row, ctx.syncedAt);
+  const snapshot = snapshotFromGhRow(row, ctx.syncedAt, link.snapshot);
   ctx.snapshots.set(keyString(link), snapshot);
   const changed = setPullRequestLinkSnapshot(link, snapshot);
   // Only an observed open → merged/closed transition counts (a first read of an
