@@ -15,6 +15,7 @@ import { reapOrphanedDashboardServers } from './orphan-dashboard-server-reaper.j
 import { reapLeftoverPlaywrightBrowsers } from './playwright-mcp-reaper.js';
 import { reapHerdrResiduePanes } from './herdr-residue-reaper.js';
 import { sweepTranscriptRetention } from './transcript-retention.js';
+import { sweepAgentTmpDirs } from './agent-tmp-sweep.js';
 import { reapMergedStrikeWorkspaces } from './strike-workspace-reaper.js';
 import { reconcileMergedIssueDocker } from './merged-docker-reconcile.js';
 import { sweepOrphanedSwarmSlots } from './swarm-orphan-sweep.js';
@@ -36,6 +37,7 @@ const ORPHAN_DASHBOARD_SERVER_INTERVAL_MS = 10 * 60_000;
 const PLAYWRIGHT_REAPER_INTERVAL_MS = 10 * 60_000;
 const HERDR_RESIDUE_INTERVAL_MS = 10 * 60_000;
 const TRANSCRIPT_RETENTION_INTERVAL_MS = 60 * 60_000;
+const AGENT_TMP_SWEEP_INTERVAL_MS = 60 * 60_000; // PAN-4998: hourly, like transcript retention
 const RESOURCE_PRESSURE_INTERVAL_MS = 15_000;
 // Both carried over from deacon.ts's 60s runScheduledPatrol cadence: the
 // merged-issue Docker half of the closed-issue reaper (PAN-3917 FR-11) and the
@@ -106,6 +108,7 @@ export function startHygieneScheduler(): void {
     ['reapLeftoverPlaywrightBrowsers', reapLeftoverPlaywrightBrowsers, PLAYWRIGHT_REAPER_INTERVAL_MS],
     ['reapHerdrResiduePanes', reapHerdrResiduePanes, HERDR_RESIDUE_INTERVAL_MS],
     ['sweepTranscriptRetention', runTranscriptRetention, TRANSCRIPT_RETENTION_INTERVAL_MS],
+    ['sweepAgentTmpDirs', () => sweepAgentTmpDirs(), AGENT_TMP_SWEEP_INTERVAL_MS],
     ['patrolDiskPressure', patrolDiskPressure, RESOURCE_PRESSURE_INTERVAL_MS],
     ['patrolMemoryPressure', patrolMemoryPressure, RESOURCE_PRESSURE_INTERVAL_MS],
   ];
