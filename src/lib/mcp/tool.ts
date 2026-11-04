@@ -29,6 +29,9 @@ export interface OverdeckTool {
   run(args: Record<string, unknown>, ctx: McpToolContext): Promise<CallToolResult>;
 }
 
+/** PAN-4927 D-12: no wait route or wait tool blocks longer than this. */
+export const WAIT_CHUNK_MS = 50_000;
+
 /**
  * True when a token record or credential names a managed agent (PAN-4927 D-6,
  * D-14): `agentId` is a non-empty string. Reads the field structurally, so it
