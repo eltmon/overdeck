@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4935",
   "created": "2026-11-04T08:09:37.402Z",
-  "updated": "2026-11-04T09:19:42.704Z",
+  "updated": "2026-11-04T09:19:55.548Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -48,6 +48,10 @@
     "instructions-text.ac1": {
       "status": "completed",
       "doneAt": "2026-11-04T09:19:42.703Z"
+    },
+    "instructions-text.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T09:19:55.548Z"
     }
   }
 }
