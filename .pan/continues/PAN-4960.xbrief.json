@@ -1,0 +1,185 @@
+{
+  "version": "1",
+  "issueId": "PAN-4960",
+  "created": "2026-11-04T10:12:59.940Z",
+  "updated": "2026-11-04T11:10:08.394Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "me-entitlement": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4960",
+      "claimedAt": "2026-11-04T10:12:59.940Z",
+      "doneAt": "2026-11-04T10:19:21.132Z"
+    },
+    "pkce-client": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4960",
+      "claimedAt": "2026-11-04T10:19:27.589Z",
+      "doneAt": "2026-11-04T10:21:03.257Z"
+    },
+    "directory-recheck": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4960",
+      "claimedAt": "2026-11-04T10:21:04.955Z",
+      "doneAt": "2026-11-04T10:22:50.793Z"
+    },
+    "account-view-route": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4960",
+      "claimedAt": "2026-11-04T10:22:51.973Z",
+      "doneAt": "2026-11-04T10:28:07.395Z"
+    },
+    "sign-in-service": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4960",
+      "claimedAt": "2026-11-04T10:28:15.163Z",
+      "doneAt": "2026-11-04T10:31:24.817Z"
+    },
+    "sign-in-routes": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4960",
+      "claimedAt": "2026-11-04T10:31:26.217Z",
+      "doneAt": "2026-11-04T10:33:53.029Z"
+    },
+    "account-card": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4960",
+      "claimedAt": "2026-11-04T10:33:54.372Z",
+      "doneAt": "2026-11-04T10:36:59.384Z"
+    },
+    "docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4960",
+      "claimedAt": "2026-11-04T10:37:01.141Z",
+      "doneAt": "2026-11-04T10:38:00.220Z"
+    },
+    "me-entitlement.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:52:33.851Z"
+    },
+    "pkce-client.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:53:48.975Z"
+    },
+    "pkce-client.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:54:25.888Z"
+    },
+    "pkce-client.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:54:54.463Z"
+    },
+    "pkce-client.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:55:24.975Z"
+    },
+    "directory-recheck.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:55:51.475Z"
+    },
+    "directory-recheck.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:56:12.490Z"
+    },
+    "account-view-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:56:45.693Z"
+    },
+    "account-view-route.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:57:14.260Z"
+    },
+    "account-view-route.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:57:38.446Z"
+    },
+    "account-view-route.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:58:01.256Z"
+    },
+    "account-view-route.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:58:27.670Z"
+    },
+    "sign-in-service.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:58:55.959Z"
+    },
+    "sign-in-service.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:59:25.052Z"
+    },
+    "sign-in-service.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:59:48.127Z"
+    },
+    "sign-in-routes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T11:01:13.392Z"
+    },
+    "sign-in-routes.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-04T11:02:15.760Z"
+    },
+    "account-card.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T11:02:49.980Z"
+    },
+    "account-card.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T11:03:09.149Z"
+    },
+    "account-card.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T11:03:41.640Z"
+    },
+    "account-card.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T11:04:15.886Z"
+    },
+    "account-card.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-04T11:04:54.018Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T11:05:35.539Z"
+    },
+    "docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T11:06:10.515Z"
+    },
+    "me-entitlement.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T11:06:41.808Z"
+    },
+    "sign-in-service.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T11:07:05.626Z"
+    },
+    "sign-in-service.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-04T11:07:34.992Z"
+    },
+    "sign-in-routes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T11:07:56.928Z"
+    },
+    "sign-in-routes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T11:09:17.680Z"
+    },
+    "sign-in-routes.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T11:09:38.639Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T11:10:08.394Z"
+    }
+  }
+}

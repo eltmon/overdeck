@@ -98,6 +98,7 @@ import { fleetUsageRouteLayer } from './routes/fleet-usage.js'
 import { settingsResolvedRouteLayer } from './routes/settings-resolved.js'
 import { fleetSettingsRouteLayer } from './routes/fleet-settings.js'
 import { directoryRouteLayer } from './routes/directory.js'
+import { accountRouteLayer } from './routes/account.js'
 import { directoryApprovalRouteLayer } from './routes/directory-approval.js'
 import { pushRouteLayer } from './routes/push.js'
 import { tailscaleRouteLayer } from './routes/tailscale.js'
@@ -487,6 +488,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   settingsResolvedRouteLayer,
   fleetSettingsRouteLayer,
   directoryRouteLayer,
+  accountRouteLayer,
   directoryApprovalRouteLayer,
   pushRouteLayer,
   tailscaleRouteLayer,

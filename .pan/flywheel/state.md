@@ -653,3 +653,9 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
 ## 2026-11-04 — Reload hold lifted
 
 - The operator lifted the live-check reload hold (Fly VMs destroyed; PAN-4638 passed, PAN-4886 not run). Normal deploys resumed.
+
+## 2026-11-04 — PAN-5015: review verdicts lost on GitHub GraphQL errors (a class)
+
+- PAN-4956 and PAN-4960 reviewers both APPROVED, but `pan admin specialists done` failed twice each on `gh pr review --approve` with "GraphQL: Something went wrong while executing your query". `src/lib/forge-transient.ts` `TRANSIENT_FORGE_ERROR` doesn't match that string, or gh's "non-200 OK status code: 502", so `done.ts` never deferred the verdict for deacon-lite to replay. Filed PAN-5015.
+- Recovery: if the PR head still equals the reviewed head, re-run `pan admin specialists done review PAN-<n> --status passed --run-id <run>` from the workspace (done for PAN-4960). If the head moved, have the agent request a fresh review (PAN-4956, which also conflicted again).
+- Reviewers' `pan tell flywheel-orchestrator` reported "orchestrator isn't running" during this window; the name lives in `roles/{plan,review,work,strike}.md`. PAN-4841's work agent reached this conversation with the same name, so delivery depends on context (likely sandbox). Watch for a second instance before filing.
