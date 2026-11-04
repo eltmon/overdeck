@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4936",
   "created": "2026-11-04T00:57:11.277Z",
-  "updated": "2026-11-04T00:57:11.277Z",
+  "updated": "2026-11-04T01:08:10.269Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,10 @@
   "sessionHistory": [],
   "items": {
     "self-caller": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4936",
-      "claimedAt": "2026-11-04T00:57:11.277Z"
+      "claimedAt": "2026-11-04T00:57:11.277Z",
+      "doneAt": "2026-11-04T01:08:10.269Z"
     }
   }
 }
