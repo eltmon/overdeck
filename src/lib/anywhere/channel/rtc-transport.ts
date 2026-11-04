@@ -287,6 +287,9 @@ export class RtcTransport {
           // werift starts gathering the new ICE generation inside setRemote; hold those candidates until the answer
           // is out, or the phone adds them against its old remote description and drops them.
           known.localSent = false;
+          // The phone's new-generation candidates can arrive while the offer is still being applied; queue them
+          // until it is, since werift's ICE restart inside setRemote would discard any added before it.
+          known.remoteSet = false;
           progress.step = 'remote-description';
           await this.setRemote(known, 'offer', data.sdp.sdp);
           progress.step = 'answer';

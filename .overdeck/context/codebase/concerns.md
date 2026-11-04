@@ -777,9 +777,6 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   and route sources. A link that came online in between ran the linked syncs, whose `linkFetch` threw
   "Machine links are not running on this dashboard" (a burst after every boot, never between boots).
   `startLinkSupervisorWired` (`src/dashboard/server/services/link-supervisor-wiring.ts`) wires them first.
-<!-- last-verified: 2026-11-04 -->
-  Routine lines need `OVERDECK_ANYWHERE_DEBUG=1` (`src/lib/anywhere/debug-log.ts`). The phone evicts its
-  peer connections to a machine after a handshake `timeout`/`protocol` failure instead of reusing a zombie.
 - **A local Auto lane pick dropped its explanation** (PAN-5006 planning) — `laneMachineResolver`
   (`src/dashboard/server/routes/lanes.ts`) returned `null` for `target.self`, so `pan lane start --machine auto`
   printed no `Auto → …` line when Auto chose this machine, and `FleetTarget` never carried `answer.rejections`.
