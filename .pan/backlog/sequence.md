@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-04T09:57:30.844268Z · model: claude-opus-5-5 · open: 870_
+_Last sequenced: 2026-11-04T10:02:53.704471Z · model: claude-opus-5-5 · open: 869_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -334,7 +334,6 @@ _Last sequenced: 2026-11-04T09:57:30.844268Z · model: claude-opus-5-5 · open: 
 | 328 | PAN-1480 | L | high | ok |  |  | TLDR: 93% bypass rate |
 | 329 | PAN-1479 | M | high | ok |  |  | RTK: Add telemetry to measure token savings from bash output compression |
 | 330 | PAN-2950 | L | high | ok |  |  | Refactor god files back under file-size ceilings after the UX overhaul |
-| 331 | PAN-4950 | M | medium | ok |  |  | pan mcp connector process bridging outside bots to /mcp; gates Hermes, OpenClaw and Grok Build plugins. |
 | 332 | PAN-2720 | M | high | ok |  |  | File-size ratchet counts lines, so it rewards line-packing on the god files it means to improve |
 | 333 | PAN-2650 | S | high | ok |  |  | Shed-stack half is moot (slot merges verify on host); remaining: pan swarm recover path for a stuck ready-to-merge slot. |
 | 334 | PAN-2358 | M | high | ok |  |  | PAN-2145 follow-up: restore PAN-1535 hardening in transformMessageForHarness (rewritten during conversations.ts decomposition) |
@@ -870,9 +869,9 @@ _Last sequenced: 2026-11-04T09:57:30.844268Z · model: claude-opus-5-5 · open: 
 | 881 | PAN-4851 | S | low | needs-refinement |  |  | Open question: opt-in Overdeck reviewer for Deft-pipeline issues; operator says low priority, do not plan or start without them |
 | 882 | PAN-4887 | M | medium | ok |  |  | Phone app: let phone credentials reach linked machines (fleet Needs-you, linked-conv proxy, /ws/linked); PAN-4835 merged. |
 | 885 | PAN-4958 | S | low | ok |  |  | Docs for agent MCP and bot plugins; no hard deps but best written once Part A and B surfaces have landed. |
-| 904 | PAN-4953 | M | medium | ok |  | PAN-4950 | integrations/hermes/: Hermes plugin with its own revocable scoped token. |
-| 905 | PAN-4954 | M | medium | ok |  | PAN-4950 | integrations/openclaw/: OpenClaw plugin with its own revocable scoped token. |
-| 906 | PAN-4955 | S | medium | ok |  | PAN-4950 | integrations/grok-build/: Grok Build plugin with its own revocable scoped token. |
+| 904 | PAN-4953 | M | medium | ok |  |  | integrations/hermes/: Hermes plugin with its own revocable scoped token. Waits on in-progress PAN-4950. |
+| 905 | PAN-4954 | M | medium | ok |  |  | integrations/openclaw/: OpenClaw plugin with its own revocable scoped token. Waits on in-progress PAN-4950. |
+| 906 | PAN-4955 | S | medium | ok |  |  | integrations/grok-build/: Grok Build plugin with its own revocable scoped token. Waits on in-progress PAN-4950. |
 | 907 | PAN-4956 | S | low | ok |  |  | integrations/grok-bot/ and xAI API example; needs OAuth UI and public Funnel /mcp, not the connector. |
 | 909 | PAN-4957 | S | low | ok |  | PAN-4953, PAN-4954, PAN-4955, PAN-4956 | CI for the four integration packages; lands after all integrations exist. |
 
@@ -1205,10 +1204,10 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-04T09:57:30.844268Z",
+  "generatedAt": "2026-11-04T10:02:53.704471Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 870,
+  "openCount": 869,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -5348,19 +5347,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "why": "Refactor god files back under file-size ceilings after the UX overhaul",
       "gate": "auto",
       "planning": "interactive"
-    },
-    {
-      "issue": "PAN-4950",
-      "rank": 331,
-      "size": "M",
-      "importance": "medium",
-      "score": 44,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan mcp connector process bridging outside bots to /mcp; gates Hermes, OpenClaw and Grok Build plugins.",
-      "rationale": "Its only dependency PAN-4949 (W-CONN1) closed on 2026-11-04, so this now-unblocked connector bridge moves from the tail into slot 331, which PAN-4949 vacated next to the epic.",
-      "gate": "auto",
-      "planning": "auto"
     },
     {
       "issue": "PAN-2720",
@@ -11942,11 +11928,9 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "importance": "medium",
       "score": 40,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4950"
-      ],
-      "why": "integrations/hermes/: Hermes plugin with its own revocable scoped token.",
-      "rationale": "Rank held: dependency PAN-4952 (shared skill text) closed completed 2026-11-04; still waits on PAN-4950.",
+      "dependsOn": [],
+      "why": "integrations/hermes/: Hermes plugin with its own revocable scoped token. Waits on in-progress PAN-4950.",
+      "rationale": "Rank held: its blocker PAN-4950 (connector process) left the backlog because work started on it; this plugin still waits for that merge.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11957,11 +11941,9 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "importance": "medium",
       "score": 38,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4950"
-      ],
-      "why": "integrations/openclaw/: OpenClaw plugin with its own revocable scoped token.",
-      "rationale": "Rank held: dependency PAN-4952 (shared skill text) closed completed 2026-11-04; still waits on PAN-4950.",
+      "dependsOn": [],
+      "why": "integrations/openclaw/: OpenClaw plugin with its own revocable scoped token. Waits on in-progress PAN-4950.",
+      "rationale": "Rank held: its blocker PAN-4950 (connector process) left the backlog because work started on it; this plugin still waits for that merge.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11972,11 +11954,9 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "importance": "medium",
       "score": 36,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4950"
-      ],
-      "why": "integrations/grok-build/: Grok Build plugin with its own revocable scoped token.",
-      "rationale": "Rank held: dependency PAN-4952 (shared skill text) closed completed 2026-11-04; still waits on PAN-4950.",
+      "dependsOn": [],
+      "why": "integrations/grok-build/: Grok Build plugin with its own revocable scoped token. Waits on in-progress PAN-4950.",
+      "rationale": "Rank held: its blocker PAN-4950 (connector process) left the backlog because work started on it; this plugin still waits for that merge.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13223,29 +13203,8 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "from": "PAN-4927",
-      "to": "PAN-4950",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4950",
-      "to": "PAN-4953",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4927",
       "to": "PAN-4953",
       "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4950",
-      "to": "PAN-4954",
-      "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
     },
@@ -13253,13 +13212,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "from": "PAN-4927",
       "to": "PAN-4954",
       "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4950",
-      "to": "PAN-4955",
-      "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
     },
