@@ -358,8 +358,10 @@ describe('spawnAgent PTY supervisor wiring', () => {
     expect(persisted.supervisorEnabled).toBe(true);
     expect(persisted.channelsEnabled).toBeUndefined();
     expect(launcher).toContain(`exec node '${supervisorScriptPath}' claude`);
-    expect(launcher).not.toContain('--mcp-config');
+    // The Channels bridge config is the space form; the overdeck MCP server (PAN-4932) is the equals form.
+    expect(launcher).not.toContain(`--mcp-config '${join(workspace, '.pan', 'agent-mcp.json')}'`);
     expect(launcher).not.toContain('--dangerously-load-development-channels');
+    expect(launcher).toContain(`--mcp-config='${join(agentDir, 'overdeck-mcp.json')}'`);
     expect(sendRawKeystrokeMock).not.toHaveBeenCalled();
     expect(ensureLifecycleHooksMock).toHaveBeenCalledWith('agent-pan-1405', 'claude-code');
     expect(ensureLifecycleHooksMock.mock.invocationCallOrder[0]).toBeLessThan(

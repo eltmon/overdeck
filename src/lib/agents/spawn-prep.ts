@@ -17,6 +17,7 @@ import { getWorkspaceStackHealth } from '../workspace/stack-health.js';
 import { resolveIssueStackDiskHold } from '../workspace/disk-cost.js';
 import { getPrFacts } from '../cloister/pr-facts.js';
 import { generateLauncherScript } from '../launcher-generator.js';
+import { prepareClaudeOverdeckMcp } from '../mcp/agent-injection.js';
 import { getProviderForModel, setupCredentialFileAuth, clearCredentialFileAuth } from '../providers.js';
 import type { ModelId } from '../settings.js';
 import { requireModelOverride } from '../model-validation.js';
@@ -727,6 +728,7 @@ export async function buildAgentLaunchConfig(opts: {
   // A resumed review/test/ship run loads the wrong frontmatter (and wrong
   // tool permissions) if it always points at roles/work.md.
   const launchRole: Role = opts.isPlanning ? 'plan' : opts.role;
+  const overdeckMcp = await prepareClaudeOverdeckMcp({ agentId: opts.agentId, agentKind: 'agent', role: launchRole, harness: opts.harness ?? 'claude-code' });
 
   // PAN-1055: ohmypi harness needs --session-dir + fifo redirect threaded into
   // the launcher; getOhmypiLauncherFields() resolves them from the agent state
@@ -818,6 +820,7 @@ export async function buildAgentLaunchConfig(opts: {
       ...kimiCodeLauncherFields,
       ...museLauncherFields,
       ...(primeLaunch?.fields ?? {}),
+      ...overdeckMcp,
     });
     return { launcherContent, providerEnv };
   }
@@ -859,6 +862,7 @@ export async function buildAgentLaunchConfig(opts: {
     ...kimiCodeLauncherFields,
     ...museLauncherFields,
     ...(primeLaunch?.fields ?? {}),
+    ...overdeckMcp,
     ...(opts.channelsBridgeMcpConfig
       ? {
           channelsBridgeMcpConfig: opts.channelsBridgeMcpConfig,
