@@ -4,17 +4,17 @@
     "created": "2026-11-03T20:46:37Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4840: Phone app (Android): FCM data handler that decrypts and posts notifications",
-    "updated": "2026-11-03T20:56:04.088Z"
+    "updated": "2026-11-03T20:57:06.476Z"
   },
   "plan": {
     "id": "pan-4840",
     "title": "Phone app (Android): FCM data handler that decrypts and posts notifications",
-    "status": "proposed",
+    "status": "running",
     "uid": "abc3a9a5-dad0-41ae-9e12-e1ffa22200ef",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-03T20:46:37Z",
-    "updated": "2026-11-03T20:56:04.088Z",
+    "updated": "2026-11-03T20:57:06.476Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4840",
@@ -832,5 +832,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
