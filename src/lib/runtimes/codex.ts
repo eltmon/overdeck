@@ -63,11 +63,14 @@ function hasImmutableNpxPackageSelector(args: string[] | undefined): boolean {
   return /^(?:@[^/]+\/[^@]+|[^@/][^@]*)@\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(selector)
 }
 
+const CODEX_MCP_APPROVAL_MODES = new Set(['auto', 'prompt', 'writes', 'approve'])
+
 export interface CodexMcpServerDef {
   type?: string
   command?: string
   args?: string[]
   env?: Record<string, string>
+  defaultToolsApprovalMode?: 'auto' | 'prompt' | 'writes' | 'approve'
 }
 
 function overdeckDir(): string {
@@ -340,6 +343,13 @@ export function initCodexHome(codexHomeDir: string, opts: InitCodexHomeOpts): vo
       if (env.length > 0) {
         const values = env.map(([key, value]) => `"${escapeTomlBasicString(key)}" = "${escapeTomlBasicString(value)}"`)
         lines.push(`env = { ${values.join(', ')} }`)
+      }
+      if (definition.defaultToolsApprovalMode !== undefined) {
+        if (CODEX_MCP_APPROVAL_MODES.has(definition.defaultToolsApprovalMode)) {
+          lines.push(`default_tools_approval_mode = "${definition.defaultToolsApprovalMode}"`)
+        } else {
+          console.warn(`[codex] MCP server "${name}" has an invalid defaultToolsApprovalMode "${definition.defaultToolsApprovalMode}" — omitting default_tools_approval_mode`)
+        }
       }
     }
     lines.push('')
