@@ -37,6 +37,7 @@ There is no second path to any operation.
 | `list_scheduled` | Lists a conversation's pending one-shot messages (`once`) and its schedules (`recurring`). | `read:conversations` |
 | `update_scheduled` | `kind: once` replaces a pending message's text; `kind: recurring` changes `prompt`, `cron`, `timeZone` or `enabled` (pause or resume). | `tell` |
 | `delete_scheduled` | `kind: once` cancels an unsent message; `kind: recurring` deletes a schedule. | `tell` |
+| `link_pull_request` | Links a pull or merge request (`ref`: a URL, `#42`, or `owner/repo#42`) to a conversation (`conversation`, `@<machine>/<name>` for one on a linked machine). An Overdeck agent may omit `conversation` to link to its own conversation. | `tell` |
 | `list_pending_input` | Lists what waits on input on this machine and every online linked machine, conversations and agents, grouped by machine. | `read:conversations` |
 | `answer_question` | Answers a pending question of a Claude Code conversation (`conversation`) or of an agent on this machine (`agentId`, optional `toolUseId`). | `tell` and `approve` |
 | `answer_permission` | Answers a Claude Code permission prompt with `allow-once`, `allow-always` or `deny`. | `approve` |
@@ -68,6 +69,9 @@ agent tokens.
 | `worker_report` | Records a worker's report with `status` `done`, `blocked` or `failed` (`pan worker report`). Workers only. | `tell` (agent tokens only) |
 | `request_secret` | Asks the operator for a secret, such as an API key, by an environment-variable-style `name` and a short `prompt`; answers a `requestId` and `next`, the `secret_wait` call to make. | `tell` (agent tokens only) |
 | `secret_wait` | Waits up to 50 s for the operator's answer. Answers `pending` with `next`, `delivered` with `file` (the path of the secret, never the value), `declined` or `expired`. | `read:state` (agent tokens only) |
+| `watch_pull_request` | Watches a GitHub pull request (`url`); get a message in this conversation when its checks fail or pass, its review changes, it gets merge conflicts, or it is merged or closed. | `tell` (agent tokens only) |
+| `list_pull_request_watches` | Lists your own pull request watches. | `read:state` (agent tokens only) |
+| `unwatch_pull_request` | Stops a watch by its `id` (from `watch_pull_request` or `list_pull_request_watches`). | `tell` (agent tokens only) |
 | `delegate_task` | Starts a worker on your own issue to do `task`, here or on `machine`; you are its parent. Optional `harness`, `model`, `effort`, `readOnly`, `name`, `needs`. A caller without an issue gets `delegate_task needs an issue; use start_conversation`. | `operate` |
 | `task_wait` | Waits up to 50 s for one of your workers to report. Answers `done` with the report, `ended` when it stopped without one (with its last message), or `running` with `next`. Pass `afterSeq` for the report after the one you consumed. | `read:state` |
 | `task_status` | One of your workers: state, idle time, where it runs and its newest report's seq, time and status. Your workers only, including ones on linked machines. | `read:state` |
@@ -117,6 +121,25 @@ of asking in chat, so the value never enters its transcript.
 A tool the token's scopes hide answers `Unknown tool <name>`. A route can
 still refuse a listed tool, for example a linked machine's ceiling, with
 `HTTP 403: insufficient_scope (missingScope: approve)`.
+
+### Pull requests
+
+`watch_pull_request` gets an agent a message when a GitHub pull request it
+cares about changes, without needing a conversation of its own. Overdeck
+checks watched pull requests about once a minute, through the existing PR
+sync sweep on this machine's primary dashboard — never a separate poller.
+GitHub pull requests only; GitLab merge requests are refused.
+
+A watch delivers one message per change, naming every event the change
+produced: the checks failed or passed, the review state changed, merge
+conflicts appeared, or the pull request was merged or closed. A merged or
+closed pull request ends the watch, as does the eleventh consecutive
+message that only reports a review-state change (`watch_pull_request` again
+to keep watching after that). Each agent may hold 20 watches, and 50 may
+exist across every agent on this machine; past either limit,
+`watch_pull_request` answers an error instead of a new watch. A watch works
+whether or not its pull request is linked to any conversation, and a
+stopped agent's watches are removed when its token is revoked.
 
 ## Over HTTP
 

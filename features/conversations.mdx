@@ -681,6 +681,12 @@ dashboard, so every open client updates at once. With the dashboard down they
 write the link directly. They exit 2 when no conversation matches, and 1 on any
 other error.
 
+An Overdeck agent over MCP links a pull request with the `link_pull_request`
+tool instead (source `agent`), and can watch it with `watch_pull_request` to
+get a message here when its checks, review state, mergeability, or merged/closed
+state changes — see [`configuration/mcp.mdx`](../configuration/mcp.mdx)
+("Pull requests").
+
 Rules:
 
 - Only a repository configured for the conversation's project can be linked:
