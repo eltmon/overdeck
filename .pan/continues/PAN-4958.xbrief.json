@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4958",
   "created": "2026-11-04T18:35:00.768Z",
-  "updated": "2026-11-04T19:03:53.055Z",
+  "updated": "2026-11-04T19:04:10.477Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -178,6 +178,10 @@
     "roles-scope-rows.ac1": {
       "status": "completed",
       "doneAt": "2026-11-04T19:03:53.055Z"
+    },
+    "roles-scope-rows.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:04:10.476Z"
     }
   }
 }
