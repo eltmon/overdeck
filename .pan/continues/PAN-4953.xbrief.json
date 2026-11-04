@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4953",
   "created": "2026-11-04T13:46:40.439Z",
-  "updated": "2026-11-04T14:27:08.602Z",
+  "updated": "2026-11-04T14:27:23.642Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -120,6 +120,10 @@
     "overdeck-commands.ac4": {
       "status": "completed",
       "doneAt": "2026-11-04T14:27:08.602Z"
+    },
+    "overdeck-commands.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:27:23.642Z"
     }
   }
 }
