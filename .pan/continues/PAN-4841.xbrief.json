@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4841",
   "created": "2026-11-04T10:01:07.580Z",
-  "updated": "2026-11-04T17:36:31.606Z",
+  "updated": "2026-11-04T17:36:43.823Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -226,6 +226,10 @@
     "rel-google-services-json.ac3": {
       "status": "completed",
       "doneAt": "2026-11-04T17:36:31.606Z"
+    },
+    "rel-directory-push-secrets.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:36:43.822Z"
     }
   }
 }
