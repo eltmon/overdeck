@@ -72,6 +72,10 @@ not shown ([#4862](https://github.com/eltmon/overdeck/issues/4862); `ac-03-direc
 device codes expired unapproved over 57 min, so no relay channel opened to capture
 ([#4886](https://github.com/eltmon/overdeck/issues/4886); `.pan/uat/pan-4882/ac-02-03-relay.md`).
 
+**2026-11-04 re-run (PAN-4886, build 65e3b1adf86):** not-run — the relay VM never signed in: two
+device codes expired unapproved (10:52–11:23 UTC) because the approving browser was not connected
+(`.pan/uat/pan-4638/check-2-pan-4886-relay.md`).
+
 ## AC-3 — Tailscale, direct, relay with UDP blocked
 
 **Commands.**
@@ -105,6 +109,10 @@ blocked on an operator decision (`ac-03-tailscale.md`).
 **2026-11-03 re-run (PAN-4882, build b1d9d9dc554):** not-run — UDP blocked and TCP 443 only both
 need the relay VM signed in, and three device codes expired unapproved over 57 min
 ([#4886](https://github.com/eltmon/overdeck/issues/4886); `.pan/uat/pan-4882/ac-02-03-relay.md`).
+
+**2026-11-04 re-run (PAN-4886, build 65e3b1adf86):** not-run — UDP blocked and TCP 443 only both
+need the relay VM signed in, and two device codes expired unapproved
+(`.pan/uat/pan-4638/check-2-pan-4886-relay.md`).
 
 ## AC-4 — remote worker and a three-machine gauntlet
 
