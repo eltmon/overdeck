@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5054",
   "created": "2026-11-04T19:57:03.624Z",
-  "updated": "2026-11-04T20:01:32.457Z",
+  "updated": "2026-11-04T20:16:28.790Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -44,6 +44,10 @@
       "claimedBy": "agent-pan-5054",
       "claimedAt": "2026-11-04T20:00:53.717Z",
       "doneAt": "2026-11-04T20:01:32.457Z"
+    },
+    "acceptance-note.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T20:16:28.790Z"
     }
   }
 }
