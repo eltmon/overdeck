@@ -55,12 +55,14 @@ first call to a tool.
 When the user runs `/overdeck` followed by one of these words, do this:
 
 - `status`: if your tool list has `list_machines`, call it and report each
-  machine. Otherwise you reach one paired machine; call
-  `list_conversations` and report how many conversations it has.
+  machine. Otherwise, call `list_conversations` with `limit: 200` and
+  report the returned conversation count, not a total; do not assume why
+  `list_machines` is unavailable (a connector or a token missing
+  `read:state` both hide it the same way).
 - `pending`: call `list_pending_input` and show a numbered list with the
   machine, conversation, kind and question of each item, or say that
-  nothing waits. Mention a `fleetError` field only when the user asked
-  about linked machines.
+  nothing waits. If the result has a `fleetError` field, say that
+  linked-machine results are unavailable, so the list may be incomplete.
 - `answer <n> <choice>`: answer item `<n>` of the last `pending` list
   with `<choice>`, under safety rule 3.
 
