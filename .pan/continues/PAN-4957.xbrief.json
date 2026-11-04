@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4957",
   "created": "2026-11-04T16:52:59.952Z",
-  "updated": "2026-11-04T16:57:12.995Z",
+  "updated": "2026-11-04T16:57:16.959Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,6 +32,11 @@
       "claimedBy": "agent-pan-4957",
       "claimedAt": "2026-11-04T16:56:34.388Z",
       "doneAt": "2026-11-04T16:57:12.994Z"
+    },
+    "docs-integrations-ci": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4957",
+      "claimedAt": "2026-11-04T16:57:16.959Z"
     }
   }
 }
