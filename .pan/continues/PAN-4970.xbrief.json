@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4970",
   "created": "2026-11-04T00:20:58.327Z",
-  "updated": "2026-11-04T00:20:58.328Z",
+  "updated": "2026-11-04T00:36:31.348Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,10 @@
   "sessionHistory": [],
   "items": {
     "owner-rule": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4970",
-      "claimedAt": "2026-11-04T00:20:58.327Z"
+      "claimedAt": "2026-11-04T00:20:58.327Z",
+      "doneAt": "2026-11-04T00:36:31.348Z"
     }
   }
 }
