@@ -65,6 +65,8 @@ describe('overdeck MCP injection (PAN-4932 W-4)', () => {
     expect(harnessGetsOverdeckMcp('claude-code')).toBe(true);
     expect(harnessGetsOverdeckMcp('codex')).toBe(false);
     expect(harnessGetsOverdeckMcp('kimi-code')).toBe(false);
+    expect(harnessGetsOverdeckMcp('acp')).toBe(true);
+    expect(harnessGetsOverdeckMcp('opencode')).toBe(true);
   });
 
   it('is enabled for claude-code unless Docker or the config switch says no', async () => {
@@ -102,6 +104,13 @@ describe('overdeck MCP injection (PAN-4932 W-4)', () => {
     expect(Object.keys(parsed.mcpServers)).toEqual(['overdeck']);
     expect(parsed.mcpServers.overdeck!.env.OVERDECK_MCP_TOKEN_FILE).toBe(tokenFile);
     expect(await readFile(tokenFile, 'utf8')).toContain('odk_');
+  });
+
+  it('writes the config for acp and opencode launches (PAN-4934)', async () => {
+    expect(await prepareClaudeOverdeckMcp({ agentId: 'agent-pan-2', agentKind: 'agent', role: 'work', harness: 'opencode' }))
+      .toEqual({ overdeckMcpConfig: join(home, 'agents', 'agent-pan-2', 'overdeck-mcp.json') });
+    expect(await prepareClaudeOverdeckMcp({ agentId: 'agent-pan-3', agentKind: 'agent', role: 'work', harness: 'acp' }))
+      .toEqual({ overdeckMcpConfig: join(home, 'agents', 'agent-pan-3', 'overdeck-mcp.json') });
   });
 
   it('returns {} for kimi-code, mcp.agents false, Docker env, and a conversation without a dir', async () => {
