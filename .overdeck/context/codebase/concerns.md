@@ -747,4 +747,12 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   the open misses 2.5 s often enough that two of three `pan worker run --machine fly-…` starts failed against an
   `online` link. PAN-4885 gives the open its own `LINK_OPEN_MS`; `LINK_WAIT_MS` stays the connecting wait. Callers
   that need a shorter bound pass their own `signal` to `linkFetch` (fleet search, versions: 2.5 s per link).
-<!-- last-verified: 2026-11-04 (PAN-4905, PAN-4917, PAN-4925, PAN-4929, PAN-4930, PAN-4931, PAN-4932, PAN-4933, PAN-4934, PAN-4937, PAN-4938, PAN-4940, PAN-4943, PAN-4944, PAN-4945, PAN-4970, PAN-4482, PAN-4885) -->
+- **Anywhere link failures used to be silent** (PAN-5018) — `RtcTransport.onSignal` swallowed every
+  error and returned silently on its drop branches, the channel listener hid `closed`/`timeout` refusals
+  (and `toAcceptError` mapped any unexpected exception to `closed`), and `DirectoryClient` logged nothing.
+  Now each offer logs `rtc offer from …` plus `answered`, `dropped: <reason>` or `failed at <step>`; the
+  directory client logs `directory online|socket closed (<code>)|refused: …`; refusals log
+  `channel refused (<code>, <mode>)`; an unexpected handshake exception has the new accept code `internal`.
+  Routine lines need `OVERDECK_ANYWHERE_DEBUG=1` (`src/lib/anywhere/debug-log.ts`). The phone evicts its
+  peer connections to a machine after a handshake `timeout`/`protocol` failure instead of reusing a zombie.
+<!-- last-verified: 2026-11-04 (PAN-4905, PAN-4917, PAN-4925, PAN-4929, PAN-4930, PAN-4931, PAN-4932, PAN-4933, PAN-4934, PAN-4937, PAN-4938, PAN-4940, PAN-4943, PAN-4944, PAN-4945, PAN-4970, PAN-4482, PAN-4885, PAN-5018) -->
