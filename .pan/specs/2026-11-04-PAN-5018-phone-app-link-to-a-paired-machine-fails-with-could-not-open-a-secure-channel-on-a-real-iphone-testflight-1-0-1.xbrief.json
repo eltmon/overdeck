@@ -1,0 +1,785 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-04T12:36:37Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5018: Phone app: link to a paired machine fails with \"Could not open a secure channel\" on a real iPhone (TestFlight 1.0 (1))",
+    "updated": "2026-11-04T12:41:25.160Z"
+  },
+  "plan": {
+    "id": "pan-5018",
+    "title": "Phone app: link to a paired machine fails with \"Could not open a secure channel\" on a real iPhone (TestFlight 1.0 (1))",
+    "status": "proposed",
+    "uid": "a63a5e3f-d6bb-4fde-b8ea-d729103470e6",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-04T12:36:37Z",
+    "updated": "2026-11-04T12:41:25.160Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5018",
+        "label": "PAN-5018",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/pan-5018.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "anywhere",
+      "mobile",
+      "webrtc",
+      "diagnostics",
+      "bug"
+    ],
+    "narratives": {
+      "Problem": "On a real iPhone, pairing with eltmon-z790 works but every later link fails with 'Could not open a secure channel'. The directory tail shows the long-running machine process did not answer the phone's offers (no ice-servers request) until a restart, and nothing logged why: RtcTransport.onSignal swallows errors and early returns, the channel listener hides closed/timeout refusals (and unexpected handshake exceptions map to 'closed'), the directory client logs no transitions, and the phone maps most error codes to one text. The phone also reuses a peer connection forever after a handshake failure on it, which makes the failure sticky.",
+      "Proposal": "Add diagnostics at every layer (phone dial and secure-open logs with codes, the code in debug-build text, accept errors with mode and an 'internal' code, listener refusal logs, RtcTransport per-offer outcome and state logs, DirectoryClient transition logs, debug detail behind OVERDECK_ANYWHERE_DEBUG=1); evict the phone's peer connection after a handshake timeout or protocol failure; reproduce on the Mac rig iOS Simulator against a peer test dashboard built from this branch; fix the cause the logs identify with a regression test; document the diagnostics.",
+      "NonGoals": "- No change to or deploy of the Worker services/connect\n- No new log-level system or logger abstraction beyond src/lib/anywhere/debug-log.ts\n- No change to the Noise protocol, wire format, preamble or pairing flow\n- No TestFlight or real-iPhone run; phone tests come only after the Simulator proof\n- No phone UI change beyond the ' (<code>)' suffix when VITE_OVERDECK_DEBUG_ERRORS=1\n- No RTC diagnostics API; GET /api/directory stays unchanged\n- No log line with SDP text, ICE candidate strings, keys, tokens, pairing codes or plaintext\n- No speculative fix for a cause the Simulator run did not show"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Diagnose first: add logs on phone, listener, RtcTransport and DirectoryClient, reproduce on the iOS Simulator, then fix the cause the logs show",
+        "rationale": "The issue's suggested steps and the operator comment both prescribe this order; the long-uptime cause cannot be proven by reading code."
+      },
+      {
+        "summary": "'Debug build' for the on-screen error code means the web bundle flag VITE_OVERDECK_DEBUG_ERRORS=1",
+        "rationale": "Xcode Debug/Release does not reach the Vite bundle; the only native signal (pushEnvironment) is async and iOS-only; a build flag matches VITE_OVERDECK_REQUEST_LOG."
+      },
+      {
+        "summary": "Machine debug lines are gated by OVERDECK_ANYWHERE_DEBUG=1 through one helper src/lib/anywhere/debug-log.ts",
+        "rationale": "No log-level system exists; closed refusals happen in normal phased probing and would flood dashboard.log."
+      },
+      {
+        "summary": "Per-offer, per-outcome, per-state-change RTC lines and directory transitions are always on",
+        "rationale": "The failure only shows in a long-running process, so a flag set afterwards would miss it; these events are rare."
+      },
+      {
+        "summary": "The phone evicts its peer connections to a machine after a handshake timeout or protocol failure, not after a definitive refusal or busy",
+        "rationale": "'Could not open a secure channel' is only produced after a raw channel opened, and a reused zombie connection is never evicted today, which makes the failure sticky."
+      },
+      {
+        "summary": "Unexpected exceptions inside acceptChannel get the new code 'internal' instead of 'closed'",
+        "rationale": "Today a real handshake bug maps to 'closed', which the listener never logs."
+      },
+      {
+        "summary": "The Simulator run uses a peer test dashboard built from this branch with its own HOME, not the operator's live dashboard",
+        "rationale": "The operator's dashboard runs main; the new logs and fixes must be on the machine side of the test."
+      },
+      {
+        "summary": "The Worker services/connect is not changed or deployed in this issue",
+        "rationale": "Keeps the change inside the repo's deploy path; if logs prove frames never reach the machine, a follow-up issue covers a Worker delivery count."
+      },
+      {
+        "summary": "If the Simulator scenario does not reproduce the failure, ship the diagnostics and the eviction, post the evidence on the issue and use 'Refs PAN-5018'",
+        "rationale": "A speculative fix for an unobserved cause would violate the no-speculation rule; the operator still gets the logs for the next phone test."
+      }
+    ],
+    "items": [
+      {
+        "id": "phone-dial-logging",
+        "title": "Phone logs each failed dial and secure open with its code",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T12:36:37Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5018",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/src/shell/connection.ts",
+            "apps/mobile/src/shell/__tests__/connection.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix apps/mobile run test -- src/shell/__tests__/connection.test.ts",
+            "npm run typecheck:mobile"
+          ],
+          "expected_outputs": [
+            "connection.test.ts passes including the two new logging tests",
+            "typecheck:mobile completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/pan-5018.md WI-1. Add optional dep `log` to ConnectionDeps (default console.warn with '[overdeck] ' prefix). In dialRaw log the swallowed remembered-relay failure, the direct failure and the relay failure ('link <label>: direct dial failed: <message>' / 'relay dial failed'). In secure() log 'link <label>: secure open failed over <direct|relay> (<code>): <message>' before throwing channelError. Track the route with an internal helper; the public dialRaw signature stays unchanged. Never log keys, tokens or SDP."
+        },
+        "items": [
+          {
+            "id": "phone-dial-logging.ac1",
+            "title": "Given the direct and relay dials both fail, when openLink runs, then the injected log receives a line containing 'direct dial failed' and a line containing 'relay dial failed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "phone-dial-logging.ac2",
+            "title": "Given openSecureChannel rejects with ChannelOpenError('timeout'), when openLink runs, then the injected log receives a line containing 'secure open failed over direct (timeout)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "phone-dial-logging.ac3",
+            "title": "Given the existing it.each error-mapping table, when connection.test.ts runs, then every existing case still returns the same on-screen text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "phone-debug-codes-and-evict",
+        "title": "Phone shows the error code in debug builds and evicts a peer connection after a handshake timeout",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T12:36:37Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5018",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/src/shell/config.ts",
+            "apps/mobile/src/shell/connection.ts",
+            "apps/mobile/src/shell/__tests__/connection.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix apps/mobile run test -- src/shell/__tests__/connection.test.ts",
+            "npm run typecheck:mobile"
+          ],
+          "expected_outputs": [
+            "connection.test.ts passes including the code-suffix and eviction tests",
+            "typecheck:mobile completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. config.ts: export DEBUG_ERRORS = env.VITE_OVERDECK_DEBUG_ERRORS === '1'. connection.ts: optional dep showErrorCodes (default DEBUG_ERRORS); channelError(error, label, showCode) appends ' (<code>)' for a ChannelOpenError when showCode is true. In secure()'s catch, when the ChannelOpenError code is 'timeout' or 'protocol', delete the remembered route and call directory.dialer.close(environmentId) before throwing (decision D-5). Never evict on unknown-peer, pairing-refused, identity-refused, unsupported or busy."
+        },
+        "items": [
+          {
+            "id": "phone-debug-codes-and-evict.ac1",
+            "title": "Given showErrorCodes is true and the secure open rejects with ChannelOpenError('timeout'), when openLink runs, then the ConnectionError message equals 'Could not open a secure channel to desk. (timeout)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "phone-debug-codes-and-evict.ac2",
+            "title": "Given showErrorCodes is false, when the same failure happens, then the message equals 'Could not open a secure channel to desk.' with no suffix",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "phone-debug-codes-and-evict.ac3",
+            "title": "Given the secure open rejects with code 'timeout', when openLink runs, then the fake dialer's close is called with the machine's environment id and the next dialRaw dials direct first",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "phone-debug-codes-and-evict.ac4",
+            "title": "Given the secure open rejects with code 'unknown-peer', when openLink runs, then the fake dialer's close is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "anywhere-debug-helper",
+        "title": "Add the OVERDECK_ANYWHERE_DEBUG debug-log helper",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T12:36:37Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5018",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/anywhere/debug-log.ts",
+            "src/lib/anywhere/__tests__/debug-log.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/anywhere/__tests__/debug-log.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "debug-log.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. New module src/lib/anywhere/debug-log.ts exporting anywhereDebugEnabled(env), anywhereDebug(message, env) (console.warn '[anywhere] <message>' only when OVERDECK_ANYWHERE_DEBUG === '1') and shortId(id) (first 8 characters). Code shape is in the PRD."
+        },
+        "items": [
+          {
+            "id": "anywhere-debug-helper.ac1",
+            "title": "Given OVERDECK_ANYWHERE_DEBUG=1, when anywhereDebug('x') runs, then console.warn receives '[anywhere] x'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "anywhere-debug-helper.ac2",
+            "title": "Given the variable is unset or '0', when anywhereDebug runs, then console.warn is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "anywhere-debug-helper.ac3",
+            "title": "Given a 36-character id, when shortId runs, then it returns the first 8 characters",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "accept-error-mode-and-internal",
+        "title": "Accept errors carry the handshake mode and an internal code",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T12:36:37Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5018",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/anywhere/channel/accept.ts",
+            "src/lib/anywhere/channel/__tests__/channel.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/anywhere/channel/__tests__/channel.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "channel.test.ts passes including the three new mode/internal tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ],
+          "foundationFor": [
+            "listener-refusal-logging"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. Add 'internal' to ChannelAcceptErrorCode; add optional constructor param mode: ChannelMode | null (ChannelMode from packages/anywhere-channel/src/wire.ts line 24). In acceptChannel set mode after parsePreambleHead and pass it to toAcceptError(error, mode). toAcceptError: ChannelAcceptError keeps its code (gains mode if missing); WireError closed -> closed, other WireError -> bad-preamble; every other error -> internal. Before/after code is in the PRD."
+        },
+        "items": [
+          {
+            "id": "accept-error-mode-and-internal.ac1",
+            "title": "Given a link preamble followed by silence and timeoutMs 50 under fake timers, when acceptChannel runs, then it rejects with code 'timeout' and mode 'link'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "accept-error-mode-and-internal.ac2",
+            "title": "Given isPinnedPeer throws Error('boom'), when a link handshake arrives, then acceptChannel rejects with code 'internal', mode 'link' and message 'boom'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "accept-error-mode-and-internal.ac3",
+            "title": "Given the raw stream ends before the preamble, when acceptChannel runs, then it rejects with code 'closed' and mode null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "listener-refusal-logging",
+        "title": "Channel listener logs every refusal with its code and mode",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T12:36:37Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5018",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/channel-listener.ts",
+            "src/dashboard/server/__tests__/channel-listener.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/channel-listener.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "channel-listener.test.ts passes including the two new refusal-log tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. Add optional dep debug (default anywhereDebug) to ChannelListenerDeps. In accept's catch build 'channel refused (<code>, <mode|unknown>): <message>'; send closed and timeout refusals to debug, every other code (including internal) to log."
+        },
+        "items": [
+          {
+            "id": "listener-refusal-logging.ac1",
+            "title": "Given a socket that sends a link preamble and then nothing, when the handshake times out, then the debug dep receives 'channel refused (timeout, link)' and the log dep receives nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "listener-refusal-logging.ac2",
+            "title": "Given isPinnedPeer throws, when a link handshake arrives, then the log dep receives a line starting 'channel refused (internal, link)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "listener-refusal-logging.ac3",
+            "title": "Given 33 pending handshakes, when the existing busy test runs, then it still refuses the 33rd with code 04",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rtc-transport-offer-logging",
+        "title": "RtcTransport logs each offer's outcome and its connection states",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T12:36:37Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5018",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/anywhere/channel/rtc-transport.ts",
+            "src/lib/anywhere/channel/__tests__/rtc-transport.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/anywhere/channel/__tests__/rtc-transport.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "rtc-transport.test.ts passes including the four new logging tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. Constructor gains optional third param {log, debug} (defaults console.warn '[anywhere] ' and anywhereDebug); directory-rtc.ts keeps its two-argument call. onSignal logs every early return for sdp frames (peer mismatch, closed session, unknown session non-offer) always, candidate-only drops via debug; logs 'rtc offer from <from8> session <s8> (<purpose>, <direct|relay>)'. accept logs 'answered' after sendLocalDescription, 'closing session <prev8> … replaced' when it closes a previous entry, and the catch logs 'rtc session <s8> from <from8> failed at <step>: <message>' with step in ice-servers|peer-connection|remote-description|answer. register logs connectionState connected|failed|closed. Never log SDP or candidate text. Keep real timers (file uses real UDP)."
+        },
+        "items": [
+          {
+            "id": "rtc-transport-offer-logging.ac1",
+            "title": "Given two transports joined by the test hub, when A dials B, then B's log receives a line containing 'rtc offer from' and a line containing 'answered'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rtc-transport-offer-logging.ac2",
+            "title": "Given B's iceServers rejects with Error('no directory'), when A dials B, then B's log receives a line containing 'failed at ice-servers: no directory'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rtc-transport-offer-logging.ac3",
+            "title": "Given B closed its session with A, when a frame with that session and an sdp offer arrives, then B's log receives a line containing 'dropped:' and 'is closed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rtc-transport-offer-logging.ac4",
+            "title": "Given one complete dial, when every log and debug line from both transports is collected, then no line contains 'v=0', 'a=' or 'candidate:'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "directory-client-transition-logging",
+        "title": "DirectoryClient logs its connection transitions",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T12:36:37Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5018",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/directory-client.ts",
+            "src/dashboard/server/services/__tests__/directory-client.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/directory-client.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "directory-client.test.ts passes including the three new logging tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. Optional deps log (default console.warn '[anywhere] directory ...') and debug (default anywhereDebug). Always: 'directory online (plan <plan>, <n> machines)' on welcome, 'directory socket closed (<code>)', 'directory refused: <message>' in refuse(), pong-timeout reconnect, account-change reconnect, 'directory upgrade refused (<status>)'. Debug: each signal frame 'directory signal from <from8> session <s8> (<offer|answer|candidate>)' and 'directory message on a replaced socket ignored' when a message arrives on a non-current socket."
+        },
+        "items": [
+          {
+            "id": "directory-client-transition-logging.ac1",
+            "title": "Given a welcome frame then a close with code 1006, when the client runs, then log receives 'directory online' and 'directory socket closed (1006)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "directory-client-transition-logging.ac2",
+            "title": "Given a close with CONNECT_CLOSE_CODES.replaced, when the client runs, then log receives 'directory refused: Another Overdeck process registered this machine with the directory'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "directory-client-transition-logging.ac3",
+            "title": "Given an account change replaced the first socket, when a message arrives on the first socket, then debug receives a line containing 'replaced socket ignored'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "simulator-repro",
+        "title": "Reproduce the link failure on the iOS Simulator with the new logs",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T12:36:37Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "test",
+          "issueLabel": "pan-5018",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/ACCEPTANCE.md"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "grep -n 'PAN-5018' apps/mobile/ACCEPTANCE.md"
+          ],
+          "expected_outputs": [
+            "ACCEPTANCE.md contains a PAN-5018 section with scenario times, on-screen texts and log lines"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8 (implementation checkpoint). Build this branch; start a peer test dashboard with its own HOME/OVERDECK_HOME, PORT=3061, OVERDECK_ANYWHERE_SUPERVISOR=1, OVERDECK_ANYWHERE_DEBUG=1, launched through a symlink path that does not contain dist/dashboard/server.js; sign it in (ask the operator only to type credentials, D-8). Build the phone bundle with VITE_OVERDECK_DEBUG_ERRORS=1 and run it in a dedicated Mac rig Simulator per apps/mobile/README.md; pair via simctl openurl. Run the scenario (>=30 min uptime, 5 open/close, 3 background/foreground, one SIGSTOP 90 s directory reconnect, one cold launch), record each step's on-screen text and matching phone ([overdeck]) and machine ([anywhere]) log lines, and classify the failure with the PRD decision table. Fallback: rerun with 2 h uptime; if still not reproduced, record 'not reproduced'."
+        },
+        "items": [
+          {
+            "id": "simulator-repro.ac1",
+            "title": "Given the scenario has run, when apps/mobile/ACCEPTANCE.md is read, then its PAN-5018 section lists each step with its time, the on-screen text and the matching phone and machine log lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "simulator-repro.ac2",
+            "title": "Given a step failed, when the section is read, then it names the matching decision-table row; given no step failed after the 2 h rerun, then it states 'not reproduced'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "root-cause-fix",
+        "title": "Fix the cause the Simulator run identified, with a regression test",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T12:36:37Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-5018",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/anywhere/channel/rtc-transport.ts",
+            "src/lib/anywhere/channel/__tests__/rtc-transport.test.ts",
+            "src/dashboard/server/services/directory-client.ts",
+            "src/dashboard/server/services/__tests__/directory-client.test.ts",
+            "packages/anywhere-channel/src/dial-machine.ts",
+            "packages/anywhere-channel/src/__tests__/dial-machine.test.ts",
+            "apps/mobile/ACCEPTANCE.md"
+          ],
+          "files_scope_confidence": "low",
+          "verify_commands": [
+            "npx vitest run src/lib/anywhere/channel/__tests__/rtc-transport.test.ts src/dashboard/server/services/__tests__/directory-client.test.ts packages/anywhere-channel/src/__tests__/dial-machine.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "all three test files pass, including the new regression test in the file the fix touched",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-8",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. Apply the fix named by the matched decision-table row in WI-8. Write a regression test that builds the faulty state directly and asserts the right outcome; check it fails on the pre-fix code (never git stash; comment the fix out locally or use git show HEAD~1:<file> into a scratch copy) and say so in the commit message. Rerun the WI-8 scenario on the Simulator and add the passing result to ACCEPTANCE.md. Fallback when WI-8 recorded 'not reproduced': post an issue comment on PAN-5018 with the scenario, run times and log lines, write 'Refs PAN-5018' (not 'Fixes') in the PR body, and add no speculative fix."
+        },
+        "items": [
+          {
+            "id": "root-cause-fix.ac1",
+            "title": "Given WI-8 identified a cause, when the regression test runs on the fixed code, then it passes, and the commit message states it failed before the fix",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "root-cause-fix.ac2",
+            "title": "Given the fixed build, when the WI-8 step that failed is rerun on the Simulator, then the machine view loads and ACCEPTANCE.md records the passing rerun",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "root-cause-fix.ac3",
+            "title": "Given WI-8 recorded 'not reproduced', when this item completes, then PAN-5018 has a comment with the evidence and the PR body contains 'Refs PAN-5018' and no 'Fixes PAN-5018'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-link-diagnostics",
+        "title": "Document the link diagnostics, debug flags and the phone's eviction",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T12:36:37Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5018",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/ANYWHERE-ARCHITECTURE.md",
+            "configuration/linked-machines.mdx",
+            "apps/mobile/README.md",
+            ".overdeck/context/codebase/concerns.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'Diagnosing a link that does not open' docs/ANYWHERE-ARCHITECTURE.md",
+            "grep -n 'When a link does not open' configuration/linked-machines.mdx",
+            "grep -n 'VITE_OVERDECK_DEBUG_ERRORS' apps/mobile/README.md"
+          ],
+          "expected_outputs": [
+            "each grep prints at least one matching line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10. docs/ANYWHERE-ARCHITECTURE.md: new subsection 'Diagnosing a link that does not open (PAN-5018)' under 'Directory and direct connections (D-3)' listing the always-on and OVERDECK_ANYWHERE_DEBUG lines (quote the exact text the code emits) and the 'internal' accept code; one paragraph in 'Phone side' on [overdeck] link lines and the eviction after timeout/protocol. configuration/linked-machines.mdx: section 'When a link does not open' after '## States'. apps/mobile/README.md: VITE_OVERDECK_DEBUG_ERRORS row in the Environment variables table and the simctl log show command for [overdeck] lines. .overdeck/context/codebase/concerns.md: one concern entry; keep a single last-verified line at the end."
+        },
+        "items": [
+          {
+            "id": "docs-link-diagnostics.ac1",
+            "title": "Given the merged docs, when docs/ANYWHERE-ARCHITECTURE.md is read, then it contains the heading 'Diagnosing a link that does not open' and names OVERDECK_ANYWHERE_DEBUG and the 'internal' accept code",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-link-diagnostics.ac2",
+            "title": "Given the merged docs, when configuration/linked-machines.mdx is read, then a 'When a link does not open' section tells the reader to set OVERDECK_ANYWHERE_DEBUG=1 and read ~/.overdeck/logs/dashboard.log for [anywhere] lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-link-diagnostics.ac3",
+            "title": "Given the merged docs, when apps/mobile/README.md is read, then its Environment variables table has a VITE_OVERDECK_DEBUG_ERRORS row that says 1 appends the error code to a failed link's text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "phone-dial-logging",
+        "to": "phone-debug-codes-and-evict",
+        "type": "blocks"
+      },
+      {
+        "from": "anywhere-debug-helper",
+        "to": "listener-refusal-logging",
+        "type": "blocks"
+      },
+      {
+        "from": "accept-error-mode-and-internal",
+        "to": "listener-refusal-logging",
+        "type": "blocks"
+      },
+      {
+        "from": "anywhere-debug-helper",
+        "to": "rtc-transport-offer-logging",
+        "type": "blocks"
+      },
+      {
+        "from": "anywhere-debug-helper",
+        "to": "directory-client-transition-logging",
+        "type": "blocks"
+      },
+      {
+        "from": "phone-debug-codes-and-evict",
+        "to": "simulator-repro",
+        "type": "blocks"
+      },
+      {
+        "from": "listener-refusal-logging",
+        "to": "simulator-repro",
+        "type": "blocks"
+      },
+      {
+        "from": "rtc-transport-offer-logging",
+        "to": "simulator-repro",
+        "type": "blocks"
+      },
+      {
+        "from": "directory-client-transition-logging",
+        "to": "simulator-repro",
+        "type": "blocks"
+      },
+      {
+        "from": "simulator-repro",
+        "to": "root-cause-fix",
+        "type": "blocks"
+      },
+      {
+        "from": "phone-debug-codes-and-evict",
+        "to": "docs-link-diagnostics",
+        "type": "blocks"
+      },
+      {
+        "from": "listener-refusal-logging",
+        "to": "docs-link-diagnostics",
+        "type": "blocks"
+      },
+      {
+        "from": "rtc-transport-offer-logging",
+        "to": "docs-link-diagnostics",
+        "type": "blocks"
+      },
+      {
+        "from": "directory-client-transition-logging",
+        "to": "docs-link-diagnostics",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "One bug on one phone-to-machine link: the diagnostics must exist on both ends (apps/mobile, packages/anywhere-channel, src/lib/anywhere, src/dashboard/server) before the single Simulator reproduction can classify the cause, and the fix depends on that run. Sibling issues would split the reproduction from the logs it reads. The 7th subsystem is documentation (docs/, configuration/, .overdeck/context). 20 files, under the 25-file limit.",
+      "canonicalFilename": "2026-11-04-PAN-5018-phone-app-link-to-a-paired-machine-fails-with-could-not-open-a-secure-channel-on-a-real-iphone-testflight-1-0-1.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
