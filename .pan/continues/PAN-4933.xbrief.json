@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4933",
   "created": "2026-11-04T03:01:37.295Z",
-  "updated": "2026-11-04T03:17:27.435Z",
+  "updated": "2026-11-04T03:19:18.242Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -22,9 +22,10 @@
       "doneAt": "2026-11-04T03:17:19.330Z"
     },
     "codex-launcher-fields-param": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4933",
-      "claimedAt": "2026-11-04T03:17:27.434Z"
+      "claimedAt": "2026-11-04T03:17:27.434Z",
+      "doneAt": "2026-11-04T03:19:18.242Z"
     }
   }
 }
