@@ -57,6 +57,7 @@ function harness(remoteOverrides: Partial<Remote> = {}) {
     label: 'desk',
     reason: 'least loaded',
     isFly: false,
+    rejections: [],
     launch: vi.fn(async (spec: Spec) => ({ status: 201, body: { name: spec.name, cwd: ownerCwd(spec), branch: spec.branch, warnings: ['owner says hi'] } as Record<string, unknown> })),
     stop: vi.fn(async (name: string) => {
       const lane = await readRemoteLane(name);
@@ -311,5 +312,19 @@ describe('launchLane on another machine (PAN-4638 WI-4)', () => {
     expect(critic.machine).toBeNull();
     expect(getConversationByName(critic.conversation.name)?.criticOfConversationId).toBeNull();
     expect(await readCriticLink(critic.conversation.name)).toBe(builder.conversation.name);
+  });
+
+  it('PAN-5006: a LocalLanePlacement from resolveMachine launches here with placement set and machine null', async () => {
+    const { deps } = harness();
+    const parent = root();
+    const rejections = [{ environmentId: 'env-desk', label: 'desk', reason: 'no docker' }];
+    const resolveMachine = vi.fn(async () => ({ self: true as const, label: 'home', reason: 'Auto → home (CPU pressure 3%, 41 GB free, 2 agents)', rejections }));
+    const result = await launchLane(
+      request(parent, { key: 'b10', machine: 'auto' }),
+      { ...deps, remote: undefined, resolveMachine, cpuPressure: vi.fn(async () => ({ ...CPU_SATURATED, saturated: false })) },
+    );
+    expect(result.machine).toBeNull();
+    expect(result.placement).toEqual({ label: 'home', reason: 'Auto → home (CPU pressure 3%, 41 GB free, 2 agents)', rejections });
+    expect(getConversationByName(result.conversation.name)).not.toBeNull();
   });
 });
