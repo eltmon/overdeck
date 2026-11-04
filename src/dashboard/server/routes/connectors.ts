@@ -13,6 +13,12 @@
  * admits it with `read:state`, and the handler then requires a `connector`
  * credential. The `:id` route hands `self` to the same handler, whichever of
  * the two routes the router matched.
+ *
+ * `POST /api/connectors/exchange` is reachable only through a pairing-mode
+ * secure channel. It takes the intent of the channel's pairingId first, so any
+ * outcome burns it (D-8), then mints the `connector` token bound to the
+ * channel's proved key with the intent's name and scopes, and revokes an
+ * earlier active connector with the same `clientId`.
  */
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
@@ -20,13 +26,18 @@ import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstab
 import {
   BOT_DEFAULT_SCOPES,
   CONNECTOR_SCOPE_CHOICES,
+  createAccessToken,
+  findActiveChannelTokenByKey,
   listAccessTokens,
+  listActiveRecordsOfKind,
   revokeAccessToken,
   type AccessTokenScope,
 } from '../../../lib/access-tokens.js';
+import { UUID_V4 } from '../../../lib/access-token-records.js';
 import { emitActivityEntry } from '../../../lib/activity-logger.js';
 import { closeChannelsForPeer } from '../channel-listener.js';
-import { issueConnectorPairing } from '../connector-pairing.js';
+import { type ChannelMarker, channelOfRequest } from '../channel-peer.js';
+import { issueConnectorPairing, takeConnectorIntent } from '../connector-pairing.js';
 import { closeDeviceConnections } from '../device-connections.js';
 import { jsonResponse } from '../http-helpers.js';
 import {
@@ -35,8 +46,10 @@ import {
   rejectUnsafeDashboardMutationRequest,
   resolveRequestCredential,
 } from './dashboard-auth.js';
+import { buildEnvironmentDescriptor } from './environment.js';
 
 const MAX_NAME_LENGTH = 64;
+const MAX_LABEL_LENGTH = 64;
 
 type CredentialKind = DashboardCredential['kind'] | null | undefined;
 
@@ -138,6 +151,82 @@ export async function handleConnectorSelfRevoke(credential: DashboardCredential 
   return noStore(jsonResponse({ ok: true }));
 }
 
+function parseExchangeBody(text: string): { clientId: string; label: string } | string {
+  let value: unknown;
+  try {
+    value = text ? JSON.parse(text) : null;
+  } catch {
+    return 'body is not JSON';
+  }
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return 'body must be an object';
+  const body = value as Record<string, unknown>;
+  if (body.v !== 1) return 'v must be 1';
+  if (typeof body.clientId !== 'string' || !UUID_V4.test(body.clientId)) return 'clientId must be a UUID v4';
+  if (typeof body.label !== 'string' || body.label.trim() === '' || body.label.trim().length > MAX_LABEL_LENGTH) {
+    return `label must be a string of 1-${MAX_LABEL_LENGTH} characters`;
+  }
+  return { clientId: body.clientId, label: body.label.trim() };
+}
+
+/**
+ * The exchange, separated from the route so tests can pass the channel marker
+ * directly. `channel` must be a pairing-mode marker whose code was issued for
+ * a connector (D-8).
+ */
+export async function handleConnectorsExchange(
+  bodyText: string,
+  channel: ChannelMarker | null,
+): Promise<HttpServerResponse.HttpServerResponse> {
+  if (channel?.mode !== 'pairing') {
+    return noStore(jsonResponse({ error: 'connector exchange is accepted only inside a pairing channel' }, { status: 403 }));
+  }
+  const intent = takeConnectorIntent(channel.pairingId ?? '');
+  if (intent === null) {
+    return noStore(jsonResponse({ error: 'this pairing code was not issued for an Overdeck connector', code: 'not-a-connector-code' }, { status: 403 }));
+  }
+  const body = parseExchangeBody(bodyText);
+  if (typeof body === 'string') return noStore(jsonResponse({ error: body }, { status: 400 }));
+
+  // Never revoke a record holding the pairing channel's own key (PAN-4835 D-2).
+  if (findActiveChannelTokenByKey(channel.remoteKeyHex) !== null) {
+    return noStore(jsonResponse(
+      { error: 'this link key is already paired with this machine; pair again with a new key', code: 'link-key-in-use' },
+      { status: 409 },
+    ));
+  }
+
+  const { token, record } = await createAccessToken({
+    name: intent.name,
+    scopes: intent.scopes,
+    kind: 'connector',
+    connectorKey: channel.remoteKeyHex,
+    clientId: body.clientId,
+  });
+
+  const replaced = listActiveRecordsOfKind('connector').filter((other) => other.clientId === body.clientId && other.id !== record.id);
+  for (const other of replaced) await revokeAccessToken(other.id);
+
+  emitActivityEntry({
+    source: 'dashboard',
+    level: 'info',
+    message: `Paired connector "${intent.name}"`,
+    details: JSON.stringify({ tokenId: record.id, clientId: body.clientId, label: body.label, replaced: replaced.length }),
+  });
+  const descriptor = await buildEnvironmentDescriptor();
+  return noStore(jsonResponse({ v: 1, token, tokenId: record.id, scopes: record.scopes, descriptor }));
+}
+
+const exchangeRoute = HttpRouter.add(
+  'POST',
+  '/api/connectors/exchange',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const channel = channelOfRequest(request);
+    const text = yield* request.text;
+    return yield* Effect.promise(() => handleConnectorsExchange(text, channel));
+  }),
+);
+
 const pairingRoute = HttpRouter.add(
   'POST',
   '/api/connectors/pairing',
@@ -184,4 +273,4 @@ const revokeRoute = HttpRouter.add(
   }),
 );
 
-export const connectorsRouteLayer = Layer.mergeAll(pairingRoute, listRoute, selfRevokeRoute, revokeRoute);
+export const connectorsRouteLayer = Layer.mergeAll(exchangeRoute, pairingRoute, listRoute, selfRevokeRoute, revokeRoute);

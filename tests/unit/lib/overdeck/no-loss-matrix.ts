@@ -461,6 +461,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/connectors',                         kind: 'http', disposition: 'READ',        door: 'access-tokens.listAccessTokens (kind connector) (PAN-4927)' },
   { surface: 'DELETE /api/connectors/:id',                  kind: 'http', disposition: 'WRITE',       door: 'access-tokens.revokeAccessToken (connector) (PAN-4927)' },
   { surface: 'DELETE /api/connectors/self',                 kind: 'http', disposition: 'WRITE',       door: 'access-tokens.revokeAccessToken (own connector token) (PAN-4927)' },
+  { surface: 'POST /api/connectors/exchange',              kind: 'http', disposition: 'WRITE',       door: 'access-tokens.createAccessToken (connector) (PAN-4927, pairing channel only)' },
   { surface: 'POST /api/machines/link',                    kind: 'http', disposition: 'WRITE',       door: 'machine-link-service.createMachineLink -> link-store.upsertLink (PAN-4645)' },
   { surface: 'GET /api/machines',                          kind: 'http', disposition: 'AGGREGATE',   door: 'link-store.listLinks + access-tokens.listActiveRecordsOfKind (machine) (PAN-4645)' },
   { surface: 'DELETE /api/machines/self',                  kind: 'http', disposition: 'WRITE',       door: 'access-tokens.revokeAccessToken (own machine token) (PAN-4645)' },

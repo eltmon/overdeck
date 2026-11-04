@@ -25,15 +25,18 @@ const {
   createAccessToken,
   PHONE_TOKEN_SCOPES,
   revokeAccessToken,
+  listActiveRecordsOfKind,
   verifyAccessToken,
 } = await import('../../../lib/access-tokens.js');
 const { openChannel } = await import('../../../lib/anywhere/channel/open.js');
 const { _resetChannelListenerForTests, installChannelListener, liveChannelCount } = await import('../channel-listener.js');
 const { _resetConnectorPairingForTests, takeConnectorIntent } = await import('../connector-pairing.js');
-const { _resetPairingCredentialsForTests } = await import('../pairing-credentials.js');
+const { _resetPairingCredentialsForTests, issuePairingCredential } = await import('../pairing-credentials.js');
+const { remoteGateRejection } = await import('../remote-request-gate.js');
 const { resolveDashboardCredential } = await import('../routes/dashboard-auth.js');
-const { connectorsRouteLayer, handleConnectorList, handleConnectorPairing, handleConnectorRevoke, handleConnectorSelfRevoke } = await import('../routes/connectors.js');
+const { connectorsRouteLayer, handleConnectorList, handleConnectorsExchange, handleConnectorPairing, handleConnectorRevoke, handleConnectorSelfRevoke } = await import('../routes/connectors.js');
 type MachineKeyPair = import('../../../lib/anywhere/machine-key.js').MachineKeyPair;
+type ChannelMarker = import('../channel-peer.js').ChannelMarker;
 
 const _require = createRequire(import.meta.url);
 const dh = _require('noise-handshake/dh') as { generateKeyPair(): MachineKeyPair };
@@ -183,5 +186,80 @@ describe('DELETE /api/connectors/:id and /self (PAN-4949 D-13, D-16)', () => {
     const { status, json } = await read(response);
     expect(status).toBe(403);
     expect(json.error).toBe('only a paired connector may revoke itself');
+  });
+});
+
+/** Issue a connector pairing as root and return a pairing marker for its code, as the handshake would produce. */
+async function connectorPairingMarker(remoteKeyHex: string, body: Record<string, unknown> = { name: 'bot:desk', scopes: ['tell'] }): Promise<ChannelMarker> {
+  const { json } = await read(await handleConnectorPairing('internal-token', JSON.stringify(body)));
+  const code = parseConnectorPairLink(json.pairingString as string)!.code;
+  return { mode: 'pairing', remoteKeyHex, pairingId: pairingSecrets(nodeCrypto, code).pairingId };
+}
+
+function exchangeBody(overrides: Record<string, unknown> = {}): string {
+  return JSON.stringify({ v: 1, clientId: CLIENT_ID, label: 'desk-host', ...overrides });
+}
+
+describe('POST /api/connectors/exchange (PAN-4949 D-8, D-17)', () => {
+  it('mints a connector token bound to the channel key with the intent name and scopes', async () => {
+    const { status, json, cacheControl } = await read(await handleConnectorsExchange(exchangeBody(), await connectorPairingMarker(CONNECTOR_KEY)));
+    expect(status).toBe(200);
+    expect(cacheControl).toBe('no-store');
+    expect(json.v).toBe(1);
+    expect(json.token).toMatch(/^odk_/);
+    expect(json.scopes).toEqual(['read:state', 'tell']);
+    expect((json.descriptor as { capabilities: { connector?: boolean } }).capabilities.connector).toBe(true);
+    const verified = verifyAccessToken(json.token as string);
+    expect(verified.ok).toBe(true);
+    if (!verified.ok) return;
+    expect(verified.record).toMatchObject({ id: json.tokenId, kind: 'connector', connectorKey: CONNECTOR_KEY, clientId: CLIENT_ID, name: 'bot:desk' });
+
+    const link: ChannelMarker = { mode: 'link', remoteKeyHex: CONNECTOR_KEY, pairingId: null };
+    expect(resolveDashboardCredential({ authorization: `Bearer ${json.token}` }, link)?.kind).toBe('connector');
+    expect(resolveDashboardCredential({ authorization: `Bearer ${json.token}` })).toBeNull();
+  });
+
+  it('refuses a plain pairing code, a link or missing marker, and a second use of the same pairingId', async () => {
+    const plain = issuePairingCredential().credential;
+    const plainMarker: ChannelMarker = { mode: 'pairing', remoteKeyHex: CONNECTOR_KEY, pairingId: pairingSecrets(nodeCrypto, plain).pairingId };
+    const refused = await read(await handleConnectorsExchange(exchangeBody(), plainMarker));
+    expect(refused.status).toBe(403);
+    expect(refused.json.code).toBe('not-a-connector-code');
+    expect((await read(await handleConnectorsExchange(exchangeBody(), { mode: 'link', remoteKeyHex: CONNECTOR_KEY, pairingId: null }))).status).toBe(403);
+    expect((await read(await handleConnectorsExchange(exchangeBody(), null))).status).toBe(403);
+
+    const marker = await connectorPairingMarker(CONNECTOR_KEY);
+    expect((await read(await handleConnectorsExchange(exchangeBody(), marker))).status).toBe(200);
+    expect((await read(await handleConnectorsExchange(exchangeBody(), { ...marker, remoteKeyHex: 'c3'.repeat(32) }))).status).toBe(403);
+  });
+
+  it('answers 409 link-key-in-use for a key already bound to an active phone or connector', async () => {
+    await createAccessToken({ name: 'phone', kind: 'phone', scopes: [...PHONE_TOKEN_SCOPES], phoneKey: 'a1'.repeat(32), clientId: '55555555-5555-4555-8555-555555555555' });
+    const byPhone = await read(await handleConnectorsExchange(exchangeBody(), await connectorPairingMarker('a1'.repeat(32))));
+    expect(byPhone.status).toBe(409);
+    expect(byPhone.json.code).toBe('link-key-in-use');
+
+    await mintConnector();
+    const byConnector = await read(await handleConnectorsExchange(exchangeBody({ clientId: '66666666-6666-4666-8666-666666666666' }), await connectorPairingMarker(CONNECTOR_KEY)));
+    expect(byConnector.status).toBe(409);
+    expect(byConnector.json.code).toBe('link-key-in-use');
+  });
+
+  it('revokes the earlier connector with the same clientId', async () => {
+    const first = await read(await handleConnectorsExchange(exchangeBody(), await connectorPairingMarker(CONNECTOR_KEY)));
+    const second = await read(await handleConnectorsExchange(exchangeBody(), await connectorPairingMarker('c2'.repeat(32))));
+    expect(second.status).toBe(200);
+    expect(verifyAccessToken(first.json.token as string)).toEqual({ ok: false });
+    expect(listActiveRecordsOfKind('connector').map((record) => record.id)).toEqual([second.json.tokenId]);
+  });
+
+  it('remoteGateRejection admits the exchange only from a pairing marker', async () => {
+    const request = (peer: string | undefined) => HttpServerRequest
+      .fromWeb(new Request('http://dashboard.test/api/connectors/exchange', { method: 'POST' }))
+      .modify({ remoteAddress: peer ? Option.some(peer) : Option.none() });
+    const pairing: ChannelMarker = { mode: 'pairing', remoteKeyHex: CONNECTOR_KEY, pairingId: 'cd'.repeat(16) };
+    expect(remoteGateRejection(request(undefined), pairing)).toBeNull();
+    expect(remoteGateRejection(request('127.0.0.1'), null)).toEqual({ status: 401 });
+    expect(remoteGateRejection(request(undefined), { mode: 'link', remoteKeyHex: CONNECTOR_KEY, pairingId: null })).toEqual({ status: 401 });
   });
 });
