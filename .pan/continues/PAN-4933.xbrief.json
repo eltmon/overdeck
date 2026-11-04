@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4933",
   "created": "2026-11-04T03:01:37.295Z",
-  "updated": "2026-11-04T03:31:22.353Z",
+  "updated": "2026-11-04T03:31:27.496Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -44,6 +44,11 @@
       "claimedBy": "agent-pan-4933",
       "claimedAt": "2026-11-04T03:27:23.679Z",
       "doneAt": "2026-11-04T03:31:22.352Z"
+    },
+    "codex-mcp-docs": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4933",
+      "claimedAt": "2026-11-04T03:31:27.496Z"
     }
   }
 }
