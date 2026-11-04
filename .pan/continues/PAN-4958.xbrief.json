@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4958",
   "created": "2026-11-04T18:35:00.768Z",
-  "updated": "2026-11-04T19:05:56.138Z",
+  "updated": "2026-11-04T19:06:15.028Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -206,6 +206,10 @@
     "public-mcp-tailscale.ac3": {
       "status": "completed",
       "doneAt": "2026-11-04T19:05:56.137Z"
+    },
+    "anywhere-bots.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:06:15.028Z"
     }
   }
 }
