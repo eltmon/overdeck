@@ -14,6 +14,7 @@ const DIALOG_ROWS: ReadonlyArray<{ id: string; label: string; dialog: string }> 
   { id: 'anywhere-set-up-phone', label: 'Set up a phone', dialog: 'set-up-phone' },
   { id: 'anywhere-pair-device', label: 'Pair a device', dialog: 'pair-device' },
   { id: 'anywhere-tailscale-setup', label: 'Set up Tailscale', dialog: 'tailscale-setup' },
+  { id: 'anywhere-connect-bot', label: 'Connect a bot', dialog: 'connect-bot' },
 ];
 
 beforeEach(() => {
@@ -21,7 +22,7 @@ beforeEach(() => {
 });
 
 describe('anywherePaletteActions', () => {
-  it('lists the seven Anywhere actions in order', () => {
+  it('lists the eight Anywhere actions in order', () => {
     const onNavigate = vi.fn();
     const actions = anywherePaletteActions(onNavigate);
     expect(actions.map((a) => a.label)).toEqual([
@@ -31,6 +32,7 @@ describe('anywherePaletteActions', () => {
       'Set up a phone',
       'Pair a device',
       'Set up Tailscale',
+      'Connect a bot',
       'Open Anywhere settings',
     ]);
     expect(actions.every((a) => a.group === ANYWHERE_PALETTE_GROUP)).toBe(true);

@@ -1,0 +1,683 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-04T04:00:40Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4951: Agent MCP and bots (W-BOT1): \"Connect a bot\" in Settings → Anywhere",
+    "updated": "2026-11-04T04:03:47.214Z"
+  },
+  "plan": {
+    "id": "pan-4951",
+    "title": "Agent MCP and bots (W-BOT1): \"Connect a bot\" in Settings → Anywhere",
+    "status": "running",
+    "uid": "3955b46a-c7f6-4e1c-8526-d054962520f5",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-04T04:00:40Z",
+    "updated": "2026-11-04T04:03:47.214Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4951",
+        "label": "PAN-4951",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4927",
+        "label": "PAN-4927",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "frontend",
+      "anywhere",
+      "mcp",
+      "bots",
+      "settings"
+    ],
+    "narratives": {
+      "Problem": "Outside bots (Hermes, OpenClaw, Grok Build, Grok Bot, the xAI API) need a way to get scoped, revocable access to this machine, but Settings → Anywhere only offers Copy MCP URL with operate-level defaults and no per-platform setup.",
+      "Proposal": "A frontend-only 'Connect a bot' dialog (opened from a new Bots panel and the command palette) that picks a platform, a reach (Overdeck connector, Tailscale, This computer, Public MCP) and bot scopes (default read:state, read:conversations, tell; read:state locked on), then mints a connector pairing string (POST /api/connectors/pairing) or an access token (POST /api/access-tokens, clamped to the five bot scopes) or shows public MCP setup, plus the exact platform config from pure snippet functions in botSnippets.ts. Full spec: .pan/drafts/PAN-4951.md.",
+      "NonGoals": "- No server route, route-scopes row or no-loss-matrix row is added or changed.\n- No connector process, OAuth server, public MCP switch/panel, approval card or integration package (W-CONN2, W-OAUTH1/2, W-FUN1, W-INT1..4).\n- No configuration/bots.mdx and no docs.json change (W-DOC, PAN-4958).\n- Config snippets never contain token text; only the once-shown 'Token setup' field may.\n- The dialog never sends admin, forward, read:settings, read:costs or read:events.\n- No QR code for the pairing string.\n- No change to the Access tokens or Devices panels.\n- MCP_DEFAULT_SCOPES in anywhereApi.ts is not reused or changed."
+    },
+    "autoDecisions": [
+      {
+        "summary": "botSnippets.ts and the PRD's 'Snippet text' are the reference; the not-yet-written W-INT READMEs must match them.",
+        "rationale": "No integration README exists yet; the epic PRD already fixes the README text, which the PRD quotes verbatim, so AC-23 is checkable now."
+      },
+      {
+        "summary": "Config snippets use env placeholders; the token appears only in a once-shown 'Token setup' field.",
+        "rationale": "Matches the README text (${OVERDECK_MCP_TOKEN}) and is stricter than the epic's test sentence, keeping tokens out of config files (epic NFR-2)."
+      },
+      {
+        "summary": "read:state is locked on; read:conversations and tell are default-on but can be unticked.",
+        "rationale": "PAN-4949 D-14 says the dialog shows read:state as always on; AC-23 and FR-14 call the others defaults."
+      },
+      {
+        "summary": "Scopes are clamped client-side to the five bot scopes for both reaches.",
+        "rationale": "POST /api/access-tokens accepts any scope, so the dialog must enforce epic NFR-11 itself."
+      },
+      {
+        "summary": "Public MCP reach treats a 404 from GET /api/mcp/public as 'off'.",
+        "rationale": "W-FUN1 (PAN-4947) has not landed; the dialog ships complete and lights up when it does."
+      },
+      {
+        "summary": "Single form with three numbered sections instead of a Next/Back wizard.",
+        "rationale": "Matches McpUrlDialog, fewer states and simpler tests while still presenting the PRD's three steps."
+      },
+      {
+        "summary": "Add a 'Connect a bot' command-palette row alongside the store/host entry.",
+        "rationale": "The PRD adds 'connect-bot' to the dialog store; a host entry without the palette opener would be half-done."
+      },
+      {
+        "summary": "Docs go into the existing configuration/mcp.mdx as a 'Connect a bot' section.",
+        "rationale": "Avoids colliding with W-DOC (PAN-4958), which creates configuration/bots.mdx and edits docs.json."
+      }
+    ],
+    "items": [
+      {
+        "id": "bot-snippets",
+        "title": "Add the pure bot snippet module botSnippets.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T04:00:40Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4951",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/anywhere/botSnippets.ts",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/botSnippets.test.ts",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "cd src/dashboard/frontend && npx vitest run src/components/Settings/anywhere/__tests__/botSnippets.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors",
+            "botSnippets.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-2",
+            "NFR-4"
+          ],
+          "foundationFor": [
+            "dialog-connector",
+            "dialog-token-reaches",
+            "dialog-public-reach"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement every constant and function in the PRD section 'Snippet text' (.pan/drafts/PAN-4951.md) exactly, in new botSnippets.ts (<=250 lines): CONNECTOR_LOCAL_URL, TAILSCALE_PLACEHOLDER_ORIGIN, PUBLIC_MCP_PLACEHOLDER_URL, XAI_ALLOWED_TOOLS, BotPlatform, BotReach, OauthLevel, BOT_PLATFORMS, REACH_LABELS, defaultBotName, shellQuote, hermesConfig, openclawConfig, grokBuildMcpJson, grokBotMcpJson, xaiExample, oauthIssueCommand, oauthLevelForScopes, connectorCommands, tokenSetup. Only tokenSetup may emit token text; config snippets use ${OVERDECK_MCP_TOKEN} / ${OVERDECK_CONNECTOR_LOCAL_TOKEN} placeholders. Module header names PAN-4927 W-BOT1 (PAN-4951) and says the integration READMEs must match these functions. Add the test path to scripts/frontend-test-subset.txt in sorted position. Tests must not read source/doc files and must not skip."
+        },
+        "items": [
+          {
+            "id": "bot-snippets.ac1",
+            "title": "Given hermesConfig({ reach: 'connector', url: CONNECTOR_LOCAL_URL }), it returns text containing 'http://127.0.0.1:7466/mcp' and 'Bearer ${OVERDECK_CONNECTOR_LOCAL_TOKEN}', and openclawConfig returns text containing 'transport: \"streamable-http\"'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bot-snippets.ac2",
+            "title": "grokBuildMcpJson() returns JSON whose mcpServers.overdeck.command equals '${GROK_PLUGIN_ROOT}/scripts/run-mcp.sh', and grokBotMcpJson({ url: 'https://box.tail1.ts.net:8443/mcp' }) returns JSON with exactly one server whose url ends in ':8443/mcp'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bot-snippets.ac3",
+            "title": "For every input in the test table, no function except tokenSetup returns text matching /od[krl]_/, and tokenSetup returns text containing the given token",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bot-snippets.ac4",
+            "title": "oauthLevelForScopes returns 'approve', 'operate', 'message' and 'read' for the four D-8 cases, shellQuote(\"it's\") returns 'it'\\''s', and defaultBotName('grok-bot') returns 'Grok Bot'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "bots-api",
+        "title": "Add botsApi.ts: connectors, pairing, public MCP and the scope clamp",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T04:00:40Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4951",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/anywhere/botsApi.ts",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/botsApi.test.ts",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "cd src/dashboard/frontend && npx vitest run src/components/Settings/anywhere/__tests__/botsApi.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors",
+            "botsApi.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-8",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Create botsApi.ts (<=150 lines) exactly as WI-2 in .pan/drafts/PAN-4951.md: BOTS_CONNECTORS_QUERY_KEY ['anywhere-connectors'], PUBLIC_MCP_QUERY_KEY ['anywhere-public-mcp'], BOT_SCOPE_CHOICES (read:state, read:conversations, tell, operate, approve), BotScope, BOT_DEFAULT_SCOPES (read:state, read:conversations, tell), botScopes(chosen) (filter to choices, always add read:state, choice order), ConnectorRow, BotsForbiddenError, loadConnectors (GET /api/connectors; 403 throws BotsForbiddenError), removeConnector (DELETE /api/connectors/:id), createConnectorPairing (POST /api/connectors/pairing with { name, scopes }), PublicMcpState and loadPublicMcp (GET /api/mcp/public; 404 maps to { available:false, enabled:false, url:null }; ok maps baseUrl to url). Keep a private readResult like directoryApi.ts; import apiError/isOk/ApiResult from anywhereApi.ts; mutations use dashboardMutationJsonHeaders(). Add the test path to scripts/frontend-test-subset.txt sorted."
+        },
+        "items": [
+          {
+            "id": "bots-api.ac1",
+            "title": "botScopes(['tell', 'admin', 'forward']) returns ['read:state', 'tell'] and botScopes([]) returns ['read:state']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bots-api.ac2",
+            "title": "Given /api/mcp/public answers 404, loadPublicMcp resolves { available: false, enabled: false, url: null }; given { enabled: true, baseUrl: 'https://h.ts.net:8443/mcp' } it resolves { available: true, enabled: true, url: 'https://h.ts.net:8443/mcp' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bots-api.ac3",
+            "title": "Given /api/connectors answers 403, loadConnectors rejects with BotsForbiddenError, and createConnectorPairing sends POST /api/connectors/pairing with JSON body { name, scopes }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dialog-connector",
+        "title": "Build ConnectBotDialog with the connector reach output",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T04:00:40Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4951",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/anywhere/ConnectBotDialog.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/ConnectBotOutput.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/McpUrlDialog.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/ConnectBotDialog.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "cd src/dashboard/frontend && npx vitest run src/components/Settings/anywhere/__tests__/ConnectBotDialog.test.tsx src/components/Settings/anywhere/__tests__/McpUrlDialog.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors",
+            "ConnectBotDialog.test.tsx and McpUrlDialog.test.tsx pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "NFR-1",
+            "NFR-3",
+            "NFR-4",
+            "NFR-5"
+          ],
+          "foundationFor": [
+            "dialog-token-reaches",
+            "dialog-public-reach",
+            "dialog-entry"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow WI-3 in .pan/drafts/PAN-4951.md. New ConnectBotDialog.tsx (<=300 lines): one form (D-5) with sections '1. Platform' (radios over BOT_PLATFORMS), '2. Reach' (only the platform's reaches, REACH_LABELS, reset on platform change), '3. Access' (five checkboxes in BOT_SCOPE_CHOICES order; read:state checked and disabled 'always on'; read:conversations and tell default on and tickable; operate 'can start and stop work' and approve 'can answer questions and permission prompts' default off; Grok Bot shows the FR-4 sentence instead), Name (default defaultBotName, maxLength 64, trimmed, empty disables the button). data-component='connect-bot-dialog', role='dialog', aria-labelledby='connect-bot-title', title 'Connect a bot'. For reach connector the button 'Create pairing code' calls createConnectorPairing(name.trim(), botScopes(scopes)); 403 renders 'Only a browser on this machine can connect bots.'; success invalidates BOTS_CONNECTORS_QUERY_KEY and shows ConnectBotOutput (new file, <=300 lines): CopyField 'Pairing string' + pairingExpiresInText(Date.parse(expiresAt)), CopyField multiline 'Connector commands' = connectorCommands({ version, pairingString, serve: platform !== 'grok-build' }) with version from loadEnvironment().serverVersion ('latest' until loaded), CopyField multiline '<label> config' (hermesConfig/openclawConfig with CONNECTOR_LOCAL_URL, or grokBuildMcpJson()), and a Done button. Export CopyField from McpUrlDialog.tsx by adding the export keyword only (D-14). Other reaches keep the action button disabled until the next items land. Add the test path to scripts/frontend-test-subset.txt sorted."
+        },
+        "items": [
+          {
+            "id": "dialog-connector.ac1",
+            "title": "Given the default form, when 'Create pairing code' is clicked, then fetch receives POST /api/connectors/pairing whose body scopes are exactly ['read:state', 'read:conversations', 'tell'] and name is 'Hermes bot'; ticking approve first adds 'approve' to the body",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-connector.ac2",
+            "title": "The read:state checkbox renders checked and disabled, and unticking tell removes 'tell' from the pairing request body",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-connector.ac3",
+            "title": "Given a mocked pairing response, the dialog renders a pairing string that parseConnectorPairLink from @overdeck/contracts parses to a non-null value, and a 'Connector commands' field containing 'npx -y @overdeck/core@<serverVersion> mcp connector pair'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-connector.ac4",
+            "title": "Given POST /api/connectors/pairing answers 403, the dialog renders 'Only a browser on this machine can connect bots.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dialog-token-reaches",
+        "title": "Add the Tailscale and This computer token reaches to the dialog",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T04:00:40Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4951",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/anywhere/ConnectBotDialog.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/ConnectBotOutput.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/ConnectBotDialog.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "cd src/dashboard/frontend && npx vitest run src/components/Settings/anywhere/__tests__/ConnectBotDialog.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors",
+            "ConnectBotDialog.test.tsx passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow WI-4 in .pan/drafts/PAN-4951.md. For reaches tailscale and this-computer the button is 'Create token' and calls createAccessToken(name.trim(), botScopes(scopes)) from anywhereApi.ts; success invalidates ANYWHERE_ACCESS_TOKENS_QUERY_KEY. Output: 'This token is shown once.', CopyField multiline 'Token setup' = tokenSetup({ platform, reach, token, origin }), CopyField multiline '<label> config' = hermesConfig({ reach: 'tailscale', url: origin + '/mcp' }) / openclawConfig(...) / grokBuildMcpJson(). origin = AnywhereStatus.tailscale.serveUrl without trailing slashes, else TAILSCALE_PLACEHOLDER_ORIGIN with the note 'Tailscale Serve is not set up on this machine yet. Set up Tailscale, then replace the placeholder.' (D-10). 403 renders the D-13 forbidden text."
+        },
+        "items": [
+          {
+            "id": "dialog-token-reaches.ac1",
+            "title": "Given platform Grok Build, the reach defaults to 'This computer', and 'Create token' sends POST /api/access-tokens whose body scopes are exactly ['read:state', 'read:conversations', 'tell']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-token-reaches.ac2",
+            "title": "Given a minted token, the 'Token setup' field contains the token text and the config field contains no odk_ text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-token-reaches.ac3",
+            "title": "Given Hermes with Tailscale and serveUrl 'https://box.tail1.ts.net', the config field renders 'url: \"https://box.tail1.ts.net/mcp\"'; given serveUrl null, it renders 'https://YOUR-MACHINE.YOUR-TAILNET.ts.net/mcp' and the D-10 note",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dialog-public-reach",
+        "title": "Add the Public MCP reach for Grok Bot and the xAI API",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T04:00:40Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4951",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/anywhere/ConnectBotDialog.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/ConnectBotOutput.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/ConnectBotDialog.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "cd src/dashboard/frontend && npx vitest run src/components/Settings/anywhere/__tests__/ConnectBotDialog.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors",
+            "ConnectBotDialog.test.tsx passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow WI-5 in .pan/drafts/PAN-4951.md. For reach public, query loadPublicMcp (PUBLIC_MCP_QUERY_KEY). When enabled is false (a 404 included): text 'Public MCP is off. Hosted bots need it: turn it on under Public MCP in Settings → Anywhere.' and button 'Show Public MCP settings' that calls requestSettingsSection('anywhere'), closes the dialog, then document.querySelector('[data-component=\"public-mcp-panel\"]')?.scrollIntoView({ block: 'center' }) (D-7); no create button. When enabled: button 'Show setup'. Output: CopyField 'Public MCP URL' = url ?? PUBLIC_MCP_PLACEHOLDER_URL (D-6 note when null). Grok Bot: CopyField multiline 'Grok Bot mcp.json' = grokBotMcpJson({ url }) plus 'Grok Bot signs in with OAuth on first use. Approve the sign-in in this dashboard and pick its access level there.' xAI API: CopyField 'Get a token' = oauthIssueCommand({ name: name.trim(), level: oauthLevelForScopes(botScopes(scopes)) }) and CopyField multiline 'xAI API example' = xaiExample({ url }). The dialog mints nothing for either platform."
+        },
+        "items": [
+          {
+            "id": "dialog-public-reach.ac1",
+            "title": "Given platform Grok Bot, the Reach section renders only the 'Public MCP' option and no 'Overdeck connector' option",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-public-reach.ac2",
+            "title": "Given GET /api/mcp/public answers 404, the dialog renders 'Public MCP is off' and the 'Show Public MCP settings' button, and sends no POST request",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-public-reach.ac3",
+            "title": "Given { enabled: true, baseUrl: 'https://box.tail1.ts.net:8443/mcp' }, Grok Bot's mcp.json field contains that URL, and xAI API with operate ticked renders '--level operate'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-public-reach.ac4",
+            "title": "For Grok Bot and xAI API, the dialog sends no request to /api/access-tokens or /api/connectors/pairing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dialog-entry",
+        "title": "Wire 'connect-bot' into the Anywhere dialog store, host and command palette",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T04:00:40Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4951",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/anywhere/anywhereDialogStore.ts",
+            "src/dashboard/frontend/src/components/Settings/anywhere/AnywhereDialogHost.tsx",
+            "src/dashboard/frontend/src/components/palette-anywhere-actions.ts",
+            "src/dashboard/frontend/src/components/__tests__/palette-anywhere-actions.test.ts",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/AnywhereDialogHost.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "cd src/dashboard/frontend && npx vitest run src/components/__tests__/palette-anywhere-actions.test.ts src/components/Settings/anywhere/__tests__/AnywhereDialogHost.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors",
+            "palette-anywhere-actions.test.ts and AnywhereDialogHost.test.tsx pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "D-12 in .pan/drafts/PAN-4951.md: add 'connect-bot' to the AnywhereDialog union; render <ConnectBotDialog open={dialog === 'connect-bot'} onClose={close} /> in AnywhereDialogHost; add a DIALOG_ROWS entry { id: 'anywhere-connect-bot', label: 'Connect a bot', icon: Bot (lucide-react), dialog: 'connect-bot', description: 'Give Hermes, OpenClaw or Grok access to this machine', keywords: ['anywhere', 'bot', 'mcp', 'hermes', 'openclaw', 'grok'] } after 'Set up Tailscale'; update the header comment count ('Six open' -> 'Seven open'). Update palette-anywhere-actions.test.ts (eight labels, new DIALOG_ROWS row, test title 'lists the eight Anywhere actions in order') and add a host test case."
+        },
+        "items": [
+          {
+            "id": "dialog-entry.ac1",
+            "title": "anywherePaletteActions returns eight labels with 'Connect a bot' after 'Set up Tailscale' and before 'Open Anywhere settings'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-entry.ac2",
+            "title": "The 'Connect a bot' palette action opens the dialog: selecting it calls openAnywhereDialog('connect-bot')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dialog-entry.ac3",
+            "title": "Given the dialog store holds 'connect-bot', AnywhereDialogHost renders an element with data-component='connect-bot-dialog'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "bots-panel",
+        "title": "Add the Bots panel to Settings → Anywhere",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T04:00:40Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4951",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/anywhere/BotsPanel.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/AnywhereSection.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/BotsPanel.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "cd src/dashboard/frontend && npx vitest run src/components/Settings/anywhere/__tests__/BotsPanel.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors",
+            "BotsPanel.test.tsx passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow WI-7 in .pan/drafts/PAN-4951.md. New BotsPanel.tsx (<=150 lines), data-component='anywhere-bots-panel', heading 'Bots', useQuery({ queryKey: BOTS_CONNECTORS_QUERY_KEY, queryFn: loadConnectors, refetchInterval: 5000, retry: false }). States like AccessTokensPanel.tsx: 'Loading bots…'; BotsForbiddenError -> 'Only a browser on this machine can manage bots.' and no button; other errors 'Could not load bots: <message>'; empty 'No bots connected.'; rows with name, scopes joined by ', ', created and last used (formatRelativeTime), and Remove -> useConfirm({ title: 'Remove <name>?', message: 'The connector loses access at once.', confirmLabel: 'Remove', variant: 'destructive' }) -> removeConnector(id) -> toast.error on failure -> invalidate. A 'Connect a bot' button (unless forbidden) calls openAnywhereDialog('connect-bot'). Mount <BotsPanel /> in AnywhereSection.tsx directly after <AccessTokensPanel />. Add the test path to scripts/frontend-test-subset.txt sorted."
+        },
+        "items": [
+          {
+            "id": "bots-panel.ac1",
+            "title": "Given GET /api/connectors returns one connector, the panel renders its name and its scopes joined by ', '",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bots-panel.ac2",
+            "title": "When Remove is clicked and confirmed, the panel sends DELETE /api/connectors/<id>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bots-panel.ac3",
+            "title": "Given GET /api/connectors answers 403, the panel renders 'Only a browser on this machine can manage bots.' and no 'Connect a bot' button",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bots-panel.ac4",
+            "title": "Clicking 'Connect a bot' opens the dialog: the Anywhere dialog store updates to 'connect-bot'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document Connect a bot in configuration/mcp.mdx",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T04:00:40Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4951",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/mcp.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "lint (including lint:docs) completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow WI-8 in .pan/drafts/PAN-4951.md: add '## Connect a bot' after the '## Revoking' section of configuration/mcp.mdx with: where it is (Settings → Anywhere → Bots → Connect a bot, or the command palette); the platform → reach table (Hermes/OpenClaw: Overdeck connector (default) or Tailscale; Grok Build: This computer (default), Overdeck connector or Tailscale; Grok Bot/xAI API: Public MCP); access defaults (read:state always on; read:conversations and tell on; operate and approve off) and that bots never get admin, forward, read:settings or read:costs; what each reach produces (pairing string works once within 10 minutes plus npx -y @overdeck/core@<version> mcp connector login|pair|serve; access token shown once and kept out of config via OVERDECK_MCP_TOKEN / OVERDECK_MCP_TOKEN_FILE; public URL and the pan mcp oauth issue command); the Hermes connector config block verbatim from 'Snippet text' §3; Remove in the Bots panel revokes a connector at once; the connector and public MCP commands arrive with PAN-4950 and PAN-4947. No docs.json change."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "configuration/mcp.mdx contains a '## Connect a bot' heading after '## Revoking' whose text states the defaults read:state, read:conversations and tell, and states that operate and approve are off by default",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "The section contains the Hermes connector block with 'http://127.0.0.1:7466/mcp' and 'Bearer ${OVERDECK_CONNECTOR_LOCAL_TOKEN}', and npm run lint exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "bot-snippets",
+        "to": "dialog-connector",
+        "type": "blocks"
+      },
+      {
+        "from": "bot-snippets",
+        "to": "dialog-token-reaches",
+        "type": "blocks"
+      },
+      {
+        "from": "bot-snippets",
+        "to": "dialog-public-reach",
+        "type": "blocks"
+      },
+      {
+        "from": "bots-api",
+        "to": "dialog-connector",
+        "type": "blocks"
+      },
+      {
+        "from": "bots-api",
+        "to": "bots-panel",
+        "type": "blocks"
+      },
+      {
+        "from": "dialog-connector",
+        "to": "dialog-token-reaches",
+        "type": "blocks"
+      },
+      {
+        "from": "dialog-token-reaches",
+        "to": "dialog-public-reach",
+        "type": "blocks"
+      },
+      {
+        "from": "dialog-connector",
+        "to": "dialog-entry",
+        "type": "blocks"
+      },
+      {
+        "from": "dialog-entry",
+        "to": "bots-panel",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-04-PAN-4951-agent-mcp-and-bots-w-bot1-connect-a-bot-in-settings-anywhere.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}

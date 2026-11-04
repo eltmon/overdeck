@@ -11,7 +11,8 @@ export type AnywhereDialog =
   | 'add-ssh-machine'
   | 'set-up-phone'
   | 'pair-device'
-  | 'tailscale-setup';
+  | 'tailscale-setup'
+  | 'connect-bot';
 
 interface AnywhereDialogState {
   dialog: AnywhereDialog | null;

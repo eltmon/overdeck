@@ -52,7 +52,7 @@ async function copyText(text: string, label: string): Promise<void> {
   }
 }
 
-function CopyField({ label, value, multiline = false }: { label: string; value: string; multiline?: boolean }) {
+export function CopyField({ label, value, multiline = false }: { label: string; value: string; multiline?: boolean }) {
   const fieldClass = 'flex-1 min-w-0 bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground font-mono';
   return (
     <div className="space-y-1">
