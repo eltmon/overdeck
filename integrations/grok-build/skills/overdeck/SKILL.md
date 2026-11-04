@@ -50,6 +50,22 @@ prompt signature, unchanged.
 Tool descriptions and input schemas are authoritative. Read them before the
 first call to a tool.
 
+## The /overdeck command
+
+When the user runs `/overdeck` followed by one of these words, do this:
+
+- `status`: if your tool list has `list_machines`, call it and report each
+  machine. Otherwise you reach one paired machine; call
+  `list_conversations` and report how many conversations it has.
+- `pending`: call `list_pending_input` and show a numbered list with the
+  machine, conversation, kind and question of each item, or say that
+  nothing waits. Mention a `fleetError` field only when the user asked
+  about linked machines.
+- `answer <n> <choice>`: answer item `<n>` of the last `pending` list
+  with `<choice>`, under safety rule 3.
+
+Treat any other text after `/overdeck` as a request in words.
+
 ## Safety rules
 
 1. Never put a secret (a password, API key, token or pairing code) in a tool
