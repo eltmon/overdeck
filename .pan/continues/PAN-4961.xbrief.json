@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4961",
   "created": "2026-11-03T23:57:34.038Z",
-  "updated": "2026-11-04T00:33:26.009Z",
+  "updated": "2026-11-04T00:33:31.988Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -202,6 +202,11 @@
     "planning-no-stack-test.ac2": {
       "status": "completed",
       "doneAt": "2026-11-04T00:33:26.008Z"
+    },
+    "docs": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4961",
+      "claimedAt": "2026-11-04T00:33:31.988Z"
     }
   }
 }
