@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4951",
   "created": "2026-11-04T04:17:47.457Z",
-  "updated": "2026-11-04T06:02:45.430Z",
+  "updated": "2026-11-04T06:03:04.651Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -82,6 +82,10 @@
     "bots-api.ac3": {
       "status": "completed",
       "doneAt": "2026-11-04T06:02:45.430Z"
+    },
+    "dialog-connector.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:03:04.651Z"
     }
   }
 }
