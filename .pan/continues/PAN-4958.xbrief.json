@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4958",
   "created": "2026-11-04T18:35:00.768Z",
-  "updated": "2026-11-04T18:38:35.664Z",
+  "updated": "2026-11-04T18:39:01.520Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,9 +34,10 @@
       "doneAt": "2026-11-04T18:38:30.458Z"
     },
     "harnesses-matrix": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4958",
-      "claimedAt": "2026-11-04T18:38:35.664Z"
+      "claimedAt": "2026-11-04T18:38:35.664Z",
+      "doneAt": "2026-11-04T18:39:01.519Z"
     }
   }
 }
