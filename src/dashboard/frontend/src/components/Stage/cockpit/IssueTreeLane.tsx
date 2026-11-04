@@ -1,10 +1,10 @@
 import { useEffect, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react'
-import type { ProjectSessionTree, SessionNode } from '@overdeck/contracts'
+import { indexPanesByAgentKey, presenceForPaneState, type ProjectSessionTree, type SessionNode } from '@overdeck/contracts'
 import { type ProjectFeature } from '../../CommandDeck/ProjectTree/ProjectNode'
 import { useIssueActions } from '../../IssueActionMenu/useIssueActions'
-import { useActivityQuery } from '../../CommandDeck/ZoneCOverviewTabs/queries'
+import { useActivityQuery, type ActivitySection } from '../../CommandDeck/ZoneCOverviewTabs/queries'
 import { useBackendPanes, useDerivedIssueState } from '../../../lib/store'
 import type { BackendPane, DerivedIssueState } from '../../../types'
 import { AgentsLane } from './AgentsLane'
@@ -28,26 +28,27 @@ const PANE_ROLE_TO_SESSION_TYPE: Record<BackendPane['role'], SessionNode['type']
   conversation: null,
 }
 
-/** The backend owns pane state; this is the only place it becomes a row status. */
+/**
+ * The backend owns pane state; this is the only place it becomes a row
+ * status. PAN-5011: Herdr `done` is a finished turn, not an exit — only
+ * `exited` (via presenceForPaneState) ends the row.
+ */
 function paneStatus(state: BackendPane['state']): { status: SessionNode['status']; presence: SessionNode['presence'] } {
-  switch (state) {
-    case 'working': return { status: 'running', presence: 'active' }
-    case 'blocked': return { status: 'running', presence: 'active' }
-    case 'idle': return { status: 'running', presence: 'idle' }
-    case 'done': return { status: 'stopped', presence: 'ended' }
-    case 'exited': return { status: 'stopped', presence: 'ended' }
-    default: return { status: 'unknown', presence: 'ended' }
-  }
+  const presence = presenceForPaneState(state)
+  if (presence === 'ended') return { status: 'stopped', presence }
+  return { status: state === 'unknown' ? 'unknown' : 'running', presence }
 }
 
-function paneToSession(pane: BackendPane): SessionNode | null {
+export function paneToSession(pane: BackendPane): SessionNode | null {
   const type = PANE_ROLE_TO_SESSION_TYPE[pane.role]
   if (!type) return null
   const { status, presence } = paneStatus(pane.state)
   return {
     type,
     role: pane.role,
-    sessionId: pane.id,
+    // PAN-5011: Herdr's own id (e.g. 'w1JA:p3') is a backend handle, never an
+    // agent id — the composer and /api/agents/:id routes need the agent id.
+    sessionId: pane.agentId ?? pane.id,
     model: pane.model,
     harness: pane.harness,
     startedAt: new Date(0).toISOString(),
@@ -105,6 +106,32 @@ function toCockpitSession(section: {
     status: normalizedStatus,
     presence: normalizedStatus === 'running' || normalizedStatus === 'starting' ? 'active' : 'ended',
   }
+}
+
+/**
+ * Pane rows first (live, backend-owned), each enriched with `hasJsonl` from
+ * the matching activity section, then the non-pane section types activity
+ * still owns (PAN-5011 W5b — hasJsonl decides whether SessionPanel renders
+ * ConversationPanel, i.e. whether the composer appears at all).
+ */
+export function cockpitSessions(panes: readonly BackendPane[], sections: readonly ActivitySection[]): SessionNode[] {
+  // PAN-5011 CodeRabbit: a restarted agent can leave its exited pane beside
+  // the new one; both would map to the same sessionId (pane.agentId ?? id)
+  // and double the row. Dedupe by agent key first — a live pane wins.
+  const dedupedPanes = [...indexPanesByAgentKey(panes).values()]
+  const base = dedupedPanes
+    .map(paneToSession)
+    .filter((session): session is SessionNode => session !== null)
+    .map((session) => {
+      const match = sections.find((section) => section.sessionId === session.sessionId)
+      return match?.hasJsonl ? { ...session, hasJsonl: true } : session
+    })
+  const paneTypes = new Set(base.map((session) => session.type))
+  for (const section of sections) {
+    const session = toCockpitSession(section)
+    if (session && !paneTypes.has(session.type)) base.push(session)
+  }
+  return base
 }
 
 const ISSUE_TREE_STATE_LABEL: Record<DerivedIssueState['state'], string> = {
@@ -209,12 +236,7 @@ export function IssueTreeLane({
   const sessions = useMemo(() => {
     // Live rows come from the backend's pane inventory; the transcript-derived
     // activity sections fill in the finished sessions the backend no longer owns.
-    const base = panes.map(paneToSession).filter((session): session is SessionNode => session !== null)
-    const paneTypes = new Set(base.map((session) => session.type))
-    for (const section of activity.data?.sections ?? []) {
-      const session = toCockpitSession(section)
-      if (session && !paneTypes.has(session.type)) base.push(session)
-    }
+    const base = cockpitSessions(panes, activity.data?.sections ?? [])
     if (actions.state.hasPlan && !base.some((session) => session.type === 'planning' || session.type === 'legacy')) {
       base.push({
         type: 'legacy',
