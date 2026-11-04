@@ -148,7 +148,11 @@ export function createMachineDialer(
       // Already closed.
     }
     for (const waiter of [...entry.waiters]) waiter(error);
-    for (const duplex of [...entry.duplexes]) duplex.destroy(new Error(`direct connection closed: ${error.message}`));
+    for (const duplex of [...entry.duplexes]) {
+      // With an error, so a handshake reading it fails at once; a channel nobody watches for errors just
+      // closes, since an error event without a listener would be thrown.
+      duplex.destroy(duplex.listenerCount('error') > 0 ? new Error(`direct connection closed: ${error.message}`) : undefined);
+    }
     entry.duplexes.clear();
   }
 

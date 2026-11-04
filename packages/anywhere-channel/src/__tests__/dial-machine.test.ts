@@ -302,6 +302,19 @@ describe('createMachineDialer', () => {
     expect(FakePeerConnection.instances[0]!.channels[0]!.closed).toBe(true);
   });
 
+  it('closes a raw channel nobody watches for errors without an error event', async () => {
+    const { dialer } = setup();
+    const raw = await openRaw(dialer, 'env-1');
+    const events: string[] = [];
+    raw.on('close', () => events.push('close'));
+
+    dialer.close('env-1');
+    await flush();
+
+    expect(events).toEqual(['close']);
+    expect(raw.destroyed).toBe(true);
+  });
+
   it('a handshake running on a closed connection fails as unreachable', async () => {
     const { dialer } = setup();
     const raw = await openRaw(dialer, 'env-1');
