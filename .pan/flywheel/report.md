@@ -1,25 +1,30 @@
-# Flywheel report — 2026-11-01 (conv-flywheel, ticks 1–65)
+# Flywheel report — 2026-11-04
 
-Stopped for an operator machine reboot at 15:25 UTC. Every pipeline agent was paused first (`pan pause`, reason "Operator machine reboot"). The full list of live conversations and paused agents, with the unpause command, is in `~/reboot-2026-11-01-active-sessions.md`.
+## Shipped (merged, deployed, closed out)
 
-## Shipped (merged, deployed, closed)
+- **Agent MCP epic PAN-4927, complete:** all 29 items (PAN-4930 to PAN-4958), including the Hermes, OpenClaw, grok-build and grok-bot integration packages, their CI (PAN-4957) and docs (PAN-4958). The epic is closed.
+- **Phone app (PAN-4823):** store, Firebase and APNs setup and first builds (PAN-4841), Android push decrypt (PAN-4840), link fixes (PAN-5018, PAN-5046), notification preferences (PAN-5019), PostHog (PAN-5016), light mode (PAN-5041), conversations grouped by project (PAN-5045).
+- **Orchestrator and operator requests:** PAN-4998 (scratch out of /tmp), PAN-4999 (`pan tell` bare names), PAN-4960 (Account card), PAN-4885 (Fly secure-channel budget), PAN-5000 (Anywhere display bugs), PAN-5005 and PAN-5006 (lane display), and five strike PRs (PAN-4669, PAN-4673, PAN-4674, PAN-4690, PAN-4702).
 
-PAN-4299, PAN-4640, PAN-4402, PAN-4647, PAN-4642, PAN-4643, PAN-4626, PAN-4330, PAN-2354, PAN-4672, PAN-2355, PAN-4628, PAN-4697, PAN-1254, PAN-4641, PAN-4680, PAN-4681, PAN-4649, PAN-4639, PAN-4648, PAN-4644, PAN-4663, PAN-4670, PAN-4295, PAN-4645 (Anywhere foundation), PAN-4714, PAN-4654.
+## Substrate fixes driven this run
 
-Merged, waiting for deploy and close-out: PAN-4656, PAN-4717 (run `pan reload` after the reboot; main `7601a44a8f8` is green).
+- PAN-4993: review convergence check treated the first block after an approval as a stuck loop and withheld feedback.
+- PAN-5003: merge door rebased away merge-main conflict resolutions.
+- PAN-5011: composer locked on every idle Herdr work agent.
+- PAN-5015: review verdicts lost on GitHub GraphQL errors.
+- PAN-5020: `architecture.md` last-verified line conflicted every parallel PR.
+- PAN-5036: auto-merge scheduler skipped PRs silently; now reports reasons.
+- PAN-5042: PR listing read flapped (heavy query, swallowed errors).
+- PAN-5054: `apps/mobile/ACCEPTANCE.md` marked merge=union.
+- PAN-5007: operator-owned restart hold (`pan restart hold` / `release`).
 
-## In flight (paused for the reboot)
+## In flight
 
-- Anywhere: PAN-4650 (approved mockup build), PAN-2356, PAN-4404 (PR #4720, approved, needs a merge-main). Gated on PAN-4650: PAN-4651, PAN-4652, then PAN-4296, PAN-4638.
-- PAN-4723 (flaky create-workspace-row test).
-- Strike PRs waiting for the operator's merge: #4698 (PAN-4669 reaper), #4701 (PAN-4690 review dispatch), #4707 (PAN-4702 merge-gate timestamps), #4678 (PAN-4673 model names), #4679 (PAN-4674 crew removal).
+Nothing.
 
-## Waiting on the operator
+## Parked or waiting on the operator
 
-- Merge the five strike PRs above.
-- Approve machinery fixes: PAN-4666 (status hides live agents), PAN-4671 (late CodeRabbit findings; recurred 3x), PAN-4675 (post-merge cleanup cannot resume), PAN-4710 (deferred hand-off retries give up).
-- Pick an option for PAN-4708 (docs.json conflicts).
-
-## Substrate fixes this run
-
-Filed with root cause: PAN-4663, 4666, 4669, 4670, 4671, 4672, 4675, 4680, 4681, 4690, 4697, 4702, 4708, 4710, 4717, 4723. Landed: PAN-4663 (Docker subnets), PAN-4670 (simple-mode CSRF), PAN-4680 (ledger flake), PAN-4697 (test-list conflict cascade). Learnings are in `.pan/flywheel/state.md`.
+- PAN-4886 (live relay check): parked until an approver with a connected browser is present.
+- PAN-4842 (phone docs): orchestrator-owned.
+- Not released, no workspace: PAN-4887, PAN-5021, PAN-5022, PAN-5043, PAN-5048 (phone follow-ups).
+- Operator step: publish the integration packages to external registries (PAN-4927 D-5).
