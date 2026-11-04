@@ -4,17 +4,17 @@
     "created": "2026-11-04T02:33:49Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4937: Agent MCP and bots (W-SELF2): Checklist, done, handoff and worker report tools",
-    "updated": "2026-11-04T02:38:28.081Z"
+    "updated": "2026-11-04T02:50:17.674Z"
   },
   "plan": {
     "id": "pan-4937",
     "title": "Agent MCP and bots (W-SELF2): Checklist, done, handoff and worker report tools",
-    "status": "proposed",
+    "status": "running",
     "uid": "25055148-15c4-4a9a-93bd-55b150e7207d",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-04T02:33:49Z",
-    "updated": "2026-11-04T02:38:28.081Z",
+    "updated": "2026-11-04T02:50:17.674Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4937",
@@ -632,5 +632,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
