@@ -4,12 +4,12 @@
     "created": "2026-11-04T05:05:20Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4947: Agent MCP and bots (W-FUN1): Opt-in public /mcp through Tailscale Funnel",
-    "updated": "2026-11-04T05:11:25.825Z"
+    "updated": "2026-11-04T05:30:12.865Z"
   },
   "plan": {
     "id": "pan-4947",
     "title": "Agent MCP and bots (W-FUN1): Opt-in public /mcp through Tailscale Funnel",
-    "status": "proposed",
+    "status": "running",
     "metadata": {
       "sizeJustification": "27 files over 7 lint subsystems, but this is already one child of the decomposed PAN-4927 epic: switch, gate, middleware, route and panel are gated by one flag and verified together by one end-to-end acceptance (AC-18). 9 files are tests and 5 are docs; a further split would ship a switch with no surface or a public surface with no rate limit or audit.",
       "canonicalFilename": "2026-11-04-PAN-4947-agent-mcp-and-bots-w-fun1-opt-in-public-mcp-through-tailscale-funnel.xbrief.json",
@@ -17,9 +17,9 @@
     },
     "uid": "88355e51-a7dc-4a9a-ba9b-b63180935f2a",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-04T05:05:20Z",
-    "updated": "2026-11-04T05:11:25.825Z",
+    "updated": "2026-11-04T05:30:12.865Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4947",
@@ -802,5 +802,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
