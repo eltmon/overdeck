@@ -1,7 +1,7 @@
 /**
  * The OAuth 2.1 authorization server for `/mcp` (PAN-4945, PAN-4927 D-15):
- * discovery metadata, dynamic client registration, and the authorize page
- * with its status poll.
+ * discovery metadata, dynamic client registration, the authorize page with
+ * its status poll, and the token and revocation endpoints.
  *
  * These paths are outside `/api/` and `/events/`, so the remote request gate
  * does not judge them; every handler checks its own input, and none needs a
@@ -125,6 +125,31 @@ export function makeMcpOAuthRouteLayer(deps: McpOAuthRouteDeps) {
     return jsonResponse(deps.service.approvalStatus(queryOf(request).get('request') ?? ''), { headers: NO_STORE });
   })));
 
+  const tokenRoute = HttpRouter.add('POST', '/oauth/mcp/token', httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const headers = { 'Cache-Control': 'no-store', Pragma: 'no-cache' };
+    if (!hasMediaType(request, 'application/x-www-form-urlencoded')) {
+      return jsonResponse(oauthErrorBody('invalid_request', 'the body must be application/x-www-form-urlencoded'), { status: 400, headers });
+    }
+    const form = new URLSearchParams(yield* request.text);
+    const grantType = form.get('grant_type');
+    if (grantType !== 'authorization_code' && grantType !== 'refresh_token') {
+      return jsonResponse(oauthErrorBody('unsupported_grant_type'), { status: 400, headers });
+    }
+    const result = yield* Effect.promise(() => (grantType === 'authorization_code' ? deps.service.exchangeCode(form) : deps.service.refresh(form)));
+    return jsonResponse(result.body, { status: result.ok ? 200 : result.status, headers });
+  })));
+
+  const revokeRoute = HttpRouter.add('POST', '/oauth/mcp/revoke', httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    // RFC 7009 §2.2: answer 200 whether or not the token was known.
+    if (hasMediaType(request, 'application/x-www-form-urlencoded')) {
+      const form = new URLSearchParams(yield* request.text);
+      yield* Effect.promise(() => deps.service.revokeToken(form.get('token') ?? ''));
+    }
+    return jsonResponse({}, { headers: NO_STORE });
+  })));
+
   return Layer.mergeAll(
     HttpRouter.add('GET', '/.well-known/oauth-protected-resource', metadataHandler(protectedResourceMetadata)),
     HttpRouter.add('GET', '/.well-known/oauth-protected-resource/mcp', metadataHandler(protectedResourceMetadata)),
@@ -132,6 +157,8 @@ export function makeMcpOAuthRouteLayer(deps: McpOAuthRouteDeps) {
     registerRoute,
     authorizeRoute,
     authorizeStatusRoute,
+    tokenRoute,
+    revokeRoute,
   );
 }
 

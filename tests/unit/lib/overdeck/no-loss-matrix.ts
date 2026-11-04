@@ -77,6 +77,8 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /oauth/mcp/register',                                 kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'MCP OAuth (PAN-4945): RFC 7591 dynamic client registration' },
   { surface: 'GET /oauth/mcp/authorize',                                 kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'MCP OAuth (PAN-4945): the authorize page that waits for the operator approval' },
   { surface: 'GET /oauth/mcp/authorize/status',                          kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'MCP OAuth (PAN-4945): the authorize page status poll' },
+  { surface: 'POST /oauth/mcp/token',                                    kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'MCP OAuth (PAN-4945): code exchange and refresh rotation' },
+  { surface: 'POST /oauth/mcp/revoke',                                   kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'MCP OAuth (PAN-4945): RFC 7009 token revocation, ends the sign-in' },
   { surface: 'POST /api/lanes',                                          kind: 'http', disposition: 'WRITE',      door: 'Lane door launchLane: write-once lane facts on a new conversation row, shared with pan lane start (PAN-4223)' },
   { surface: 'GET /api/lanes',                                           kind: 'http', disposition: 'AGGREGATE',  door: 'Lane views: lane rows + list liveness + worker reports + git facts, derived on read (PAN-4223)' },
   { surface: 'GET /api/lanes/:name',                                     kind: 'http', disposition: 'AGGREGATE',  door: 'Lane views: one lane, derived on read (PAN-4223)' },

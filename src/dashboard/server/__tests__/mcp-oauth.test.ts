@@ -16,6 +16,8 @@ import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 const LOOPBACK = '127.0.0.1';
 const REDIRECT = 'http://127.0.0.1:8123/callback';
 const CHALLENGE = 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM';
+const VERIFIER = 'dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk';
+const FORM = { 'content-type': 'application/x-www-form-urlencoded' };
 const originalHome = process.env.OVERDECK_HOME;
 const originalPort = { API_PORT: process.env.API_PORT, PORT: process.env.PORT, DASHBOARD_URL: process.env.DASHBOARD_URL };
 const home = mkdtempSync(join(tmpdir(), 'pan-4945-oauth-routes-'));
@@ -181,5 +183,41 @@ describe('the authorize page and its status (PAN-4945)', () => {
     expect(response.text).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
     expect(response.text).not.toContain('<script>alert(1)');
     await expect(send('GET', '/oauth/mcp/authorize/status?request=nope')).resolves.toMatchObject({ status: 200, json: { status: 'expired' } });
+  });
+});
+
+describe('the token and revocation endpoints (PAN-4945)', () => {
+  it('refuses a JSON body and an unsupported grant type', async () => {
+    const json = await send('POST', '/oauth/mcp/token', { 'content-type': 'application/json' }, JSON.stringify({ grant_type: 'authorization_code' }));
+    expect(json).toMatchObject({ status: 400, json: { error: 'invalid_request' } });
+    const password = await send('POST', '/oauth/mcp/token', FORM, 'grant_type=password&username=a&password=b');
+    expect(password).toMatchObject({ status: 400, json: { error: 'unsupported_grant_type' } });
+    expect(password.headers['cache-control']).toBe('no-store');
+  });
+
+  it('swaps an approved code for tokens, then rotates them with the refresh token', async () => {
+    const clientId = await registerClient();
+    await send('GET', authorizePath(clientId));
+    const [approval] = service.listApprovals();
+    service.decideApproval(approval!.id, 'approve', 'message');
+    const status = await send('GET', `/oauth/mcp/authorize/status?request=${approval!.id}`);
+    const code = new URL((status.json as { redirect: string }).redirect).searchParams.get('code')!;
+
+    const form = new URLSearchParams({ grant_type: 'authorization_code', code, client_id: clientId, redirect_uri: REDIRECT, code_verifier: VERIFIER });
+    const response = await send('POST', '/oauth/mcp/token', FORM, form.toString());
+    expect(response).toMatchObject({ status: 200, json: { token_type: 'Bearer', expires_in: 2_592_000, scope: 'message' } });
+    expect(response.headers['cache-control']).toBe('no-store');
+    expect(response.headers.pragma).toBe('no-cache');
+
+    const refreshToken = (response.json as { refresh_token: string }).refresh_token;
+    const rotated = await send('POST', '/oauth/mcp/token', FORM, new URLSearchParams({ grant_type: 'refresh_token', refresh_token: refreshToken, client_id: clientId }).toString());
+    expect(rotated).toMatchObject({ status: 200, json: { token_type: 'Bearer' } });
+    const reused = await send('POST', '/oauth/mcp/token', FORM, new URLSearchParams({ grant_type: 'refresh_token', refresh_token: refreshToken, client_id: clientId }).toString());
+    expect(reused).toMatchObject({ status: 400, json: { error: 'invalid_grant' } });
+  });
+
+  it('answers 200 for an unknown token at the revocation endpoint', async () => {
+    await expect(send('POST', '/oauth/mcp/revoke', FORM, 'token=odk_unknown')).resolves.toMatchObject({ status: 200, json: {} });
+    await expect(send('POST', '/oauth/mcp/revoke', FORM, 'token=garbage&token_type_hint=refresh_token')).resolves.toMatchObject({ status: 200, json: {} });
   });
 });
