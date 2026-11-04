@@ -1110,6 +1110,10 @@ online links. "Add this project" uses the project-creation core in both directio
 1 MiB (`projects/ignored-files.ts`), cross only an operator-level link for the operator,
 are written 0600 and never overwrite.
 
+`GET /api/needs-you` (`read:conversations`, PAN-4944) serves this machine's feed to any
+token, with agent question and permission-request ids; `GET /api/machines/needs-you` stays
+machine-credential only and unchanged.
+
 ### MCP fleet reach (D-21, D-4651-17/18)
 
 `requiredScopeFor` judges `/api/conversations/@<machine>/<rest>` by `/api/conversations/<rest>`,

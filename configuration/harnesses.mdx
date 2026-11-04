@@ -1054,7 +1054,7 @@ name. Every field is required, so a harness cannot leave a decision undeclared.
 | `workspaceResolution` | How the conversation scanner finds a transcript's workspace: `claude-project-hash`, `agent-dir`, or `first-message-only`. |
 | `correlatesBySessionId` | The conversation scanner correlates transcripts to agents by session id. |
 | `answersQuestionByMessage` | The MCP `answer_question` tool may answer this harness's pending question with a composed message. It is narrower than `askAnswerDelivery`: the tool carries no tool-use id, so it cannot tell a Codex approval from a question, and only Claude Code declares it. |
-| `askAnswerDelivery` | How the dashboard delivers an answer to a conversation's pending question: `message` sends it as a message; `pi-ask-modal` drives the open ask modal with keystrokes. |
+| `askAnswerDelivery` | How the dashboard delivers an answer to a conversation's pending question: `message` sends it as a message; `pi-ask-modal` drives the open ask modal with keystrokes; `codex-approval` means it is really a numbered approval prompt, answered with `answer_codex_approval` (PAN-4944), not a question. |
 | `runsOnFlyMachine` | A conversation may be started on a Fly machine (`pan machines add-fly`). Only Claude Code declares it; other harnesses on Fly are #4296. |
 
 The rule for harness-specific code:

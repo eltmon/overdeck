@@ -12,7 +12,7 @@
  * — today Claude Code (D-4649-6). The other four tools each proxy exactly one
  * `approve`-scoped conversation route (PAN-4944 D-1, NFR-1).
  */
-import { getHarnessBehavior, normalizeHarnessName } from '@overdeck/contracts';
+import { getHarnessBehavior, normalizeHarnessName, type HarnessAskAnswerDelivery } from '@overdeck/contracts';
 
 import { scopeSatisfies } from '../access-tokens.js';
 import { errorResult, isOk, jsonResult, optionalInteger, optionalString, requiredString, routeErrorResult, routeResult, type ArgResult, type OverdeckTool } from './tool.js';
@@ -73,8 +73,9 @@ function questionRedirectText(conversation: unknown): string | null {
   const harness = normalizeHarnessName(harnessField);
   if (harnessField !== undefined && harnessField !== null && harness === null) return NOT_CLAUDE_CODE_TEXT;
   const behavior = getHarnessBehavior(harness);
-  if (behavior.capabilities.askAnswerDelivery === 'pi-ask-modal') return NOT_CLAUDE_CODE_PI_TEXT;
-  if (behavior.transcriptKind === 'codex-rollout-jsonl') return NOT_CLAUDE_CODE_CODEX_TEXT;
+  const delivery: HarnessAskAnswerDelivery = behavior.capabilities.askAnswerDelivery;
+  if (delivery === 'pi-ask-modal') return NOT_CLAUDE_CODE_PI_TEXT;
+  if (delivery === 'codex-approval') return NOT_CLAUDE_CODE_CODEX_TEXT;
   return behavior.capabilities.answersQuestionByMessage ? null : NOT_CLAUDE_CODE_TEXT;
 }
 
