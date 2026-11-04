@@ -103,6 +103,7 @@ import { accessTokensRouteLayer } from './routes/access-tokens.js'
 import { mcpRouteLayer } from './routes/mcp.js'
 import { mcpOAuthRouteLayer } from './routes/mcp-oauth.js'
 import { mcpOAuthAdminRouteLayer } from './routes/mcp-oauth-admin.js'
+import { mcpPublicRouteLayer } from './routes/mcp-public.js';
 import { remoteRequestGateLayer } from './remote-request-gate.js'
 import { linkedConversationProxyLayer } from './linked-conversation-proxy.js';
 import { publicMcpFunnelLayer } from './public-mcp-funnel.js';
@@ -489,6 +490,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   mcpRouteLayer,
   mcpOAuthRouteLayer,
   mcpOAuthAdminRouteLayer,
+  mcpPublicRouteLayer,
   staticRouteLayer,
 );
 

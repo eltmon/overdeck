@@ -84,6 +84,8 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/mcp-oauth/sign-ins',                              kind: 'http', disposition: 'READ',       door: 'MCP OAuth sign-ins (PAN-4945): active sign-ins, mcpOAuthService.listSignIns' },
   { surface: 'DELETE /api/mcp-oauth/sign-ins/:familyId',                 kind: 'http', disposition: 'WRITE',      door: 'MCP OAuth sign-ins (PAN-4945): end a sign-in, mcpOAuthService.revokeFamily' },
   { surface: 'POST /api/mcp-oauth/issue',                                kind: 'http', disposition: 'WRITE',      door: 'MCP OAuth sign-ins (PAN-4945): headless sign-in, mcpOAuthService.issueHeadless' },
+  { surface: 'GET /api/mcp/public',                                      kind: 'http', disposition: 'READ',       door: 'Public MCP over Tailscale Funnel (PAN-4947): switch, Funnel commands, public /mcp URL' },
+  { surface: 'PUT /api/mcp/public',                                      kind: 'http', disposition: 'WRITE',      door: 'Public MCP over Tailscale Funnel (PAN-4947): savePublicMcpEnabled' },
   { surface: 'POST /api/lanes',                                          kind: 'http', disposition: 'WRITE',      door: 'Lane door launchLane: write-once lane facts on a new conversation row, shared with pan lane start (PAN-4223)' },
   { surface: 'GET /api/lanes',                                           kind: 'http', disposition: 'AGGREGATE',  door: 'Lane views: lane rows + list liveness + worker reports + git facts, derived on read (PAN-4223)' },
   { surface: 'GET /api/lanes/:name',                                     kind: 'http', disposition: 'AGGREGATE',  door: 'Lane views: one lane, derived on read (PAN-4223)' },
