@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-04T02:39:14.215379Z · model: claude-opus-5-5 · open: 884_
+_Last sequenced: 2026-11-04T02:41:10.945499Z · model: claude-opus-5-5 · open: 883_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -337,7 +337,6 @@ _Last sequenced: 2026-11-04T02:39:14.215379Z · model: claude-opus-5-5 · open: 
 | 333 | PAN-2650 | S | high | ok |  |  | Shed-stack half is moot (slot merges verify on host); remaining: pan swarm recover path for a stuck ready-to-merge slot. |
 | 334 | PAN-2358 | M | high | ok |  |  | PAN-2145 follow-up: restore PAN-1535 hardening in transformMessageForHarness (rewritten during conversations.ts decomposition) |
 | 335 | PAN-2334 | XS | high | ok |  |  | write a Definition of Ready (DoR) |
-| 336 | PAN-4932 | M | high | ok |  |  | Inject Overdeck MCP server into Claude Code agents, role runs and conversations; W-MCP1 closed, now waits only on PAN-4930. |
 | 337 | PAN-2193 | S | high | ok |  |  | Held issues (objection/parked/vetoed/needs-handoff) are invisible in the Command Deck tree |
 | 338 | PAN-1984 | XS | high | ok |  |  | Migrate or delete the 18 dead panopticon.db modules referenced by ~30 test files (#1983 follow-up) |
 | 339 | PAN-1913 | XS | high | ok |  |  | Project description: show on click, edit in dashboard, mirror into the project layer (and document what's in .pan and ~/.panopticon) |
@@ -876,18 +875,18 @@ _Last sequenced: 2026-11-04T02:39:14.215379Z · model: claude-opus-5-5 · open: 
 | 890 | PAN-4945 | L | medium | ok |  |  | OAuth 2.1 server for /mcp with access levels and expiry; gates dashboard OAuth UI, Funnel and Grok bot. |
 | 892 | PAN-4937 | M | medium | ok |  |  | Checklist, done, handoff and worker-report as MCP tools so agents stop shelling to pan over Bash. |
 | 895 | PAN-4941 | M | medium | ok |  |  | request_secret tool: agent asks operator for a secret without it entering the transcript; unblocks link_machine. |
-| 897 | PAN-4933 | S | medium | ok |  | PAN-4932 | Codex harness: write [mcp_servers.overdeck] so Codex agents get the Overdeck tools. |
-| 898 | PAN-4934 | S | medium | ok |  | PAN-4932 | ACP harnesses (acp, opencode) get the Overdeck MCP server injected. |
+| 897 | PAN-4933 | S | medium | ok |  |  | Codex harness: write [mcp_servers.overdeck] so Codex agents get the Overdeck tools. |
+| 898 | PAN-4934 | S | medium | ok |  |  | ACP harnesses (acp, opencode) get the Overdeck MCP server injected. |
 | 899 | PAN-4942 | S | medium | ok |  | PAN-4941 | link_machine tool: a conversation asks the operator to link a machine; builds on request_secret. |
 | 900 | PAN-4946 | M | medium | ok |  | PAN-4945 | Dashboard OAuth approval card and sign-in list for /mcp clients. |
 | 901 | PAN-4950 | M | medium | ok |  | PAN-4949 | pan mcp connector process bridging outside bots to /mcp; gates Hermes, OpenClaw and Grok Build plugins. |
 | 902 | PAN-4951 | M | medium | ok |  | PAN-4949 | "Connect a bot" flow in Settings > Anywhere for pairing outside bots. |
-| 903 | PAN-4947 | L | medium | ok |  | PAN-4945, PAN-4932 | Opt-in public /mcp via Tailscale Funnel, TLS ends on the user machine; no plaintext relay on overdeck.ai. |
+| 903 | PAN-4947 | L | medium | ok |  | PAN-4945 | Opt-in public /mcp via Tailscale Funnel, TLS ends on the user machine; no plaintext relay on overdeck.ai. |
 | 904 | PAN-4953 | M | medium | ok |  | PAN-4950 | integrations/hermes/: Hermes plugin with its own revocable scoped token. |
 | 905 | PAN-4954 | M | medium | ok |  | PAN-4950 | integrations/openclaw/: OpenClaw plugin with its own revocable scoped token. |
 | 906 | PAN-4955 | S | medium | ok |  | PAN-4950 | integrations/grok-build/: Grok Build plugin with its own revocable scoped token. |
 | 907 | PAN-4956 | S | low | ok |  | PAN-4946, PAN-4947 | integrations/grok-bot/ and xAI API example; needs OAuth UI and public Funnel /mcp, not the connector. |
-| 908 | PAN-4935 | M | medium | ok |  | PAN-4932, PAN-4937, PAN-4938, PAN-4940, PAN-4941, PAN-4942, PAN-4943, PAN-4944 | Instruction blocks and no-MCP fallback; lands last in Part A since it documents every tool to agents. |
+| 908 | PAN-4935 | M | medium | ok |  | PAN-4937, PAN-4938, PAN-4940, PAN-4941, PAN-4942, PAN-4943, PAN-4944 | Instruction blocks and no-MCP fallback; lands last in Part A since it documents every tool to agents. |
 | 909 | PAN-4957 | S | low | ok |  | PAN-4953, PAN-4954, PAN-4955, PAN-4956 | CI for the four integration packages; lands after all integrations exist. |
 
 ## Rationale detail
@@ -1219,10 +1218,10 @@ New this pass. The test role evaluates the workspace working tree rather than th
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-04T02:39:14.215379Z",
+  "generatedAt": "2026-11-04T02:41:10.945499Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 884,
+  "openCount": 883,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -11911,19 +11910,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "planning": "auto"
     },
     {
-      "issue": "PAN-4932",
-      "rank": 336,
-      "size": "M",
-      "importance": "high",
-      "score": 58,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Inject Overdeck MCP server into Claude Code agents, role runs and conversations; W-MCP1 closed, now waits only on PAN-4930.",
-      "rationale": "W-MCP1 (PAN-4931) closed, so this now depends only on the in-pipeline token work PAN-4930; lifted into the slot PAN-4931 vacated.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4944",
       "rank": 889,
       "size": "M",
@@ -12034,9 +12020,7 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "importance": "medium",
       "score": 46,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4932"
-      ],
+      "dependsOn": [],
       "why": "Codex harness: write [mcp_servers.overdeck] so Codex agents get the Overdeck tools.",
       "rationale": "New child W-INJ2 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic.",
       "gate": "auto",
@@ -12049,9 +12033,7 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "importance": "medium",
       "score": 44,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4932"
-      ],
+      "dependsOn": [],
       "why": "ACP harnesses (acp, opencode) get the Overdeck MCP server injected.",
       "rationale": "New child W-INJ3 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic.",
       "gate": "auto",
@@ -12125,11 +12107,10 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "score": 38,
       "condition": "ok",
       "dependsOn": [
-        "PAN-4945",
-        "PAN-4932"
+        "PAN-4945"
       ],
       "why": "Opt-in public /mcp via Tailscale Funnel, TLS ends on the user machine; no plaintext relay on overdeck.ai.",
-      "rationale": "New child W-FUN1 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic.",
+      "rationale": "New child W-FUN1 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic. Dependency PAN-4932 (W-INJ1) closed 2026-11-04; rank unchanged.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12202,7 +12183,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "score": 42,
       "condition": "ok",
       "dependsOn": [
-        "PAN-4932",
         "PAN-4937",
         "PAN-4938",
         "PAN-4940",
@@ -12212,7 +12192,7 @@ New this pass. The test role evaluates the workspace working tree rather than th
         "PAN-4944"
       ],
       "why": "Instruction blocks and no-MCP fallback; lands last in Part A since it documents every tool to agents.",
-      "rationale": "New child W-INJ4 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic. Dependency PAN-4939 (W-SCHED1) closed 2026-11-04; rank unchanged since other Part A tools remain open.",
+      "rationale": "New child W-INJ4 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic. Dependency PAN-4939 (W-SCHED1) closed 2026-11-04; rank unchanged since other Part A tools remain open. Dependency PAN-4932 (W-INJ1) closed 2026-11-04; rank unchanged.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13446,13 +13426,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
     },
     {
       "from": "PAN-4927",
-      "to": "PAN-4932",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4927",
       "to": "PAN-4944",
       "type": "contains",
       "source": "github-ref",
@@ -13508,23 +13481,9 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "confidence": 1
     },
     {
-      "from": "PAN-4932",
-      "to": "PAN-4933",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-4927",
       "to": "PAN-4933",
       "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4932",
-      "to": "PAN-4934",
-      "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
     },
@@ -13599,13 +13558,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "confidence": 1
     },
     {
-      "from": "PAN-4932",
-      "to": "PAN-4947",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-4927",
       "to": "PAN-4947",
       "type": "contains",
@@ -13672,13 +13624,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "from": "PAN-4927",
       "to": "PAN-4956",
       "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4932",
-      "to": "PAN-4935",
-      "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
     },
