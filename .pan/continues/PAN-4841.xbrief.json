@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4841",
   "created": "2026-11-04T10:01:07.580Z",
-  "updated": "2026-11-04T17:34:04.622Z",
+  "updated": "2026-11-04T17:34:17.206Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -182,6 +182,10 @@
     "rel-brand-assets.ac3": {
       "status": "completed",
       "doneAt": "2026-11-04T17:34:04.621Z"
+    },
+    "rel-brand-assets.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:34:17.206Z"
     }
   }
 }
