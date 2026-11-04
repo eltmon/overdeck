@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4932",
   "created": "2026-11-04T01:06:56.441Z",
-  "updated": "2026-11-04T01:09:56.195Z",
+  "updated": "2026-11-04T01:09:57.620Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -20,6 +20,11 @@
       "claimedBy": "agent-pan-4932",
       "claimedAt": "2026-11-04T01:08:33.762Z",
       "doneAt": "2026-11-04T01:09:56.195Z"
+    },
+    "launcher-overdeck-mcp-flags": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4932",
+      "claimedAt": "2026-11-04T01:09:57.620Z"
     }
   }
 }
