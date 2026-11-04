@@ -184,4 +184,33 @@ describe('remote lanes nest under their orchestrator (PAN-4638 WI-10)', () => {
     expect(row.parentConversationId).toBeUndefined();
     expect(row.projectKey).toBe('owner-key');
   });
+
+  it('PAN-5005: stamps a remote lane\'s report and verdict', () => {
+    const rows = merge({
+      links: [FLY],
+      linked: [linked('env-fly', 'lane-a')],
+      remoteLanes: new Map([[remoteLaneKey('env-fly', 'lane-a'), entry({
+        fields: {
+          laneReport: { seq: 1, at: '2026-11-04T12:00:00.000Z', status: 'done', verdict: 'PASS' },
+          laneIteration: 1,
+          laneVerdict: { value: 'PASS', defects: 0 },
+        },
+      })]]),
+    });
+    expect(rows.find((row) => row.remoteName === 'lane-a')).toMatchObject({
+      laneReport: { seq: 1, at: '2026-11-04T12:00:00.000Z', status: 'done', verdict: 'PASS' },
+      laneIteration: 1,
+      laneVerdict: { value: 'PASS', defects: 0 },
+    });
+  });
+
+  it('PAN-5005: an entry without fields stamps facts only', () => {
+    const rows = merge({
+      links: [FLY],
+      linked: [linked('env-fly', 'lane-a')],
+      remoteLanes: new Map([[remoteLaneKey('env-fly', 'lane-a'), entry()]]),
+    });
+    const row = rows.find((candidate) => candidate.remoteName === 'lane-a')!;
+    expect(row).not.toHaveProperty('laneReport');
+  });
 });

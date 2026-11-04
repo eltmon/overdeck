@@ -11,6 +11,7 @@ import { linksSnapshot, type MachineLink } from '../../../lib/anywhere/link-stor
 import { readEnvironmentIdentity } from '../../../lib/environment-identity.js';
 import { getConversationListWithVaultCopies } from '../../../lib/overdeck/conversation-list.js';
 import { listLinkedConversations } from '../../../lib/overdeck/linked-conversations.js';
+import { laneFieldsByRun, type LaneListFields } from '../../../lib/lanes/lane-list-fields.js';
 import { listRemoteLanes } from '../../../lib/lanes/remote-lanes.js';
 import { type LinkPresence, mergeConversationRows, remoteLaneKey, type RemoteLaneEntry } from '../../../lib/overdeck/linked-conversations-merge.js';
 
@@ -40,11 +41,17 @@ export async function getMergedConversationList(limit: number, offset: number, p
   if (linked.length === 0) return rows;
   const identity = await readEnvironmentIdentity();
   // PAN-4638 FR-8: remote lanes nest under the orchestrator that launched them.
+  const unarchived = (await listRemoteLanes({}).catch(() => [])).filter((lane) => lane.archivedAt === null);
+  // PAN-5005 NFR-1: only compute lane list fields when there is a stand-in to stamp them onto.
+  const runs = [...new Set(unarchived.map(({ facts }) => facts.run))];
+  const fields: ReadonlyMap<string, LaneListFields> = runs.length > 0
+    ? await laneFieldsByRun(runs).catch(() => new Map<string, LaneListFields>())
+    : new Map();
   const remoteLanes = new Map<string, RemoteLaneEntry>();
-  for (const { facts, archivedAt } of await listRemoteLanes({}).catch(() => [])) {
-    if (archivedAt !== null) continue;
+  for (const { facts } of unarchived) {
     remoteLanes.set(remoteLaneKey(facts.environmentId, facts.name), {
       parentName: facts.parentName, run: facts.run, key: facts.key, role: facts.role, criticOfName: facts.criticOfName, projectKey: facts.projectKey,
+      fields: fields.get(facts.name),
     });
   }
   return mergeConversationRows({
