@@ -80,4 +80,4 @@
   Realtime TURN credentials; see `docs/SHARED-SESSIONS.md`. The machine side adds `werift` (WebRTC, bundled) and
   `sodium-native` (sealed-box open) as root dependencies.
 
-<!-- last-verified: 2026-11-03 -->
+<!-- last-verified: 2026-11-04 (PAN-4841) -->
