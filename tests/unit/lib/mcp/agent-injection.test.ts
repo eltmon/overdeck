@@ -111,6 +111,8 @@ describe('overdeck MCP injection (PAN-4932 W-4)', () => {
       .toEqual({ overdeckMcpConfig: join(home, 'agents', 'agent-pan-2', 'overdeck-mcp.json') });
     expect(await prepareClaudeOverdeckMcp({ agentId: 'agent-pan-3', agentKind: 'agent', role: 'work', harness: 'acp' }))
       .toEqual({ overdeckMcpConfig: join(home, 'agents', 'agent-pan-3', 'overdeck-mcp.json') });
+    expect((await stat(join(home, 'agents', 'agent-pan-2', 'mcp-token'))).mode & 0o777).toBe(0o600);
+    expect((await stat(join(home, 'agents', 'agent-pan-3', 'mcp-token'))).mode & 0o777).toBe(0o600);
   });
 
   it('returns {} for kimi-code, mcp.agents false, Docker env, and a conversation without a dir', async () => {
