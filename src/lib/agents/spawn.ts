@@ -17,7 +17,7 @@ import { createConversation, getConversationByName, reactivateConversationForSpa
 import { startWork } from '../cv.js';
 import { generateFixedPointPrompt, checkHook, initHook } from '../hooks.js';
 import { generateLauncherScript } from '../launcher-generator.js';
-import { prepareClaudeOverdeckMcp } from '../mcp/agent-injection.js';
+import { prepareClaudeOverdeckMcp, prepareCodexOverdeckMcp } from '../mcp/agent-injection.js';
 import { getProviderForModel, setupCredentialFileAuth, clearCredentialFileAuth } from '../providers.js';
 import { resolveHarness } from '../harness-resolve.js';
 import { prepareHarnessLaunch } from '../harness-binary.js';
@@ -321,7 +321,7 @@ async function spawnRunWithoutConsentClaim(
     ? await getOhmypiLauncherFields(agentId, selectedModel, options.effort)
     : {};
   const codexLauncherFields = resolvedHarness === 'codex'
-    ? getCodexLauncherFields(agentId, selectedModel, workspace, role, options.effort)
+    ? getCodexLauncherFields(agentId, selectedModel, workspace, role, options.effort, await prepareCodexOverdeckMcp({ agentId, agentKind: 'agent', role, harness: resolvedHarness }))
     : {};
   const acpLauncherFields = isAcp
     ? getAcpLauncherFields(

@@ -27,6 +27,12 @@ export const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-
 export const AGENT_ID = /^[A-Za-z0-9._:/-]{1,200}$/;
 /** An agent token's `role`: a role name, or 'conversation'. */
 export const AGENT_ROLE = /^[a-z][a-z0-9-]{0,63}$/;
+/** An OAuth client id (PAN-4945): `odc_` + 32 lowercase hex. */
+export const OAUTH_CLIENT_ID = /^odc_[0-9a-f]{32}$/;
+/** An OAuth sign-in (family) id: 32 lowercase hex. */
+export const OAUTH_FAMILY_ID = /^[0-9a-f]{32}$/;
+/** How long an OAuth refresh token works after its sign-in begins (PAN-4945 D-7): 90 days. */
+export const OAUTH_REFRESH_WINDOW_MS = 90 * 24 * 60 * 60_000;
 
 export interface AccessTokenRecord {
   id: string;
@@ -58,6 +64,12 @@ export interface AccessTokenRecord {
   agentKind?: 'agent' | 'conversation';
   /** `token` only: the agent's role, or 'conversation'. */
   role?: string;
+  /** `token` only (PAN-4945): the OAuth client this access token was issued to. */
+  oauthClientId?: string;
+  /** `token` only: the OAuth sign-in (family) this access token belongs to. */
+  oauthFamilyId?: string;
+  /** `token` only, with the OAuth fields: when this token stops working (ISO 8601). */
+  expiresAt?: string;
 }
 
 export function isMachineAccess(value: unknown): value is MachineAccess {
@@ -72,6 +84,18 @@ export function agentFieldsValid(r: { agentId?: unknown; agentKind?: unknown; ro
     (r.agentKind === 'agent' || r.agentKind === 'conversation') &&
     typeof r.role === 'string' &&
     AGENT_ROLE.test(r.role)
+  );
+}
+
+/** True when `oauthClientId`, `oauthFamilyId` and `expiresAt` are all present and well-formed. */
+export function oauthFieldsValid(r: { oauthClientId?: unknown; oauthFamilyId?: unknown; expiresAt?: unknown }): boolean {
+  return (
+    typeof r.oauthClientId === 'string' &&
+    OAUTH_CLIENT_ID.test(r.oauthClientId) &&
+    typeof r.oauthFamilyId === 'string' &&
+    OAUTH_FAMILY_ID.test(r.oauthFamilyId) &&
+    typeof r.expiresAt === 'string' &&
+    !Number.isNaN(Date.parse(r.expiresAt))
   );
 }
 
@@ -98,14 +122,16 @@ export function isRecord(value: unknown): value is AccessTokenRecord {
   const pushKeyOk = r.pushKey === undefined || (typeof r.pushKey === 'string' && MACHINE_KEY_HEX.test(r.pushKey));
   const connectorKeyOk = typeof r.connectorKey === 'string' && MACHINE_KEY_HEX.test(r.connectorKey);
   const agentFieldsAbsent = r.agentId === undefined && r.agentKind === undefined && r.role === undefined;
+  const oauthFieldsAbsent = r.oauthClientId === undefined && r.oauthFamilyId === undefined && r.expiresAt === undefined;
   // A machine record needs all three binding fields; a phone record needs its
   // own two plus an optional push key; a connector record needs its link key
   // and client id (PAN-4927 D-17); other kinds may carry none of those sets,
   // and any field present must still be well-formed. Only a `token` record
-  // may carry the agent fields, and then all three (PAN-4927).
-  if (r.kind === 'machine') return machineKeyOk && environmentOk && accessOk && r.phoneKey === undefined && r.clientId === undefined && r.pushKey === undefined && r.connectorKey === undefined && agentFieldsAbsent;
-  if (r.kind === 'phone') return phoneKeyOk && clientIdOk && pushKeyOk && r.machineKey === undefined && r.environmentId === undefined && r.access === undefined && r.connectorKey === undefined && agentFieldsAbsent;
-  if (r.kind === 'connector') return connectorKeyOk && clientIdOk && r.machineKey === undefined && r.environmentId === undefined && r.access === undefined && r.phoneKey === undefined && r.pushKey === undefined && agentFieldsAbsent;
+  // may carry the agent fields, and then all three (PAN-4927); the same holds
+  // for the OAuth fields, never together with the agent fields (PAN-4945).
+  if (r.kind === 'machine') return machineKeyOk && environmentOk && accessOk && r.phoneKey === undefined && r.clientId === undefined && r.pushKey === undefined && r.connectorKey === undefined && agentFieldsAbsent && oauthFieldsAbsent;
+  if (r.kind === 'phone') return phoneKeyOk && clientIdOk && pushKeyOk && r.machineKey === undefined && r.environmentId === undefined && r.access === undefined && r.connectorKey === undefined && agentFieldsAbsent && oauthFieldsAbsent;
+  if (r.kind === 'connector') return connectorKeyOk && clientIdOk && r.machineKey === undefined && r.environmentId === undefined && r.access === undefined && r.phoneKey === undefined && r.pushKey === undefined && agentFieldsAbsent && oauthFieldsAbsent;
   return (
     (r.machineKey === undefined || machineKeyOk) &&
     (r.environmentId === undefined || environmentOk) &&
@@ -114,6 +140,7 @@ export function isRecord(value: unknown): value is AccessTokenRecord {
     r.clientId === undefined &&
     r.pushKey === undefined &&
     r.connectorKey === undefined &&
-    (agentFieldsAbsent || (r.kind === 'token' && agentFieldsValid(r)))
+    (agentFieldsAbsent || (r.kind === 'token' && agentFieldsValid(r))) &&
+    (oauthFieldsAbsent || (r.kind === 'token' && agentFieldsAbsent && oauthFieldsValid(r)))
   );
 }

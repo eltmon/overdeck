@@ -32,6 +32,7 @@ import {
   LinkForwardTooLargeError,
   linkForward,
   LinkUnavailableError,
+  type LinkActorInit,
   type LinkForwardInit,
   type LinkForwardResponse,
 } from '../../lib/anywhere/link-client.js';
@@ -97,6 +98,11 @@ export function actorForSender(sender: string | undefined): LinkActor | null {
   return AGENT_ID.test(sender) ? { agentId: sender } : null;
 }
 
+/** PAN-4927 D-9: an agent-kind agent token acts as its agent; a plain or conversation token as the operator (a conversation's `pan` does too). */
+export function tokenLinkActor(credential: Extract<DashboardCredential, { kind: 'token' }>): LinkActorInit {
+  return credential.agentKind === 'agent' && credential.agentId ? { agentId: credential.agentId } : 'operator';
+}
+
 export interface LinkedProxyDeps {
   getLink: (idOrEnvOrLabel: string) => Promise<MachineLink | null>;
   forward: (environmentId: string, init: LinkForwardInit) => Promise<LinkForwardResponse>;
@@ -124,12 +130,13 @@ export async function forwardLinkedConversationRequest(
   input: { method: string; target: LinkedTarget; query: string; contentType?: string; sender?: string; body?: Buffer; credential?: DashboardCredential | null },
   deps: LinkedProxyDeps = defaultDeps,
 ): Promise<HttpServerResponse.HttpServerResponse> {
-  // PAN-4651 D-4651-17: an `odk_` token acts as the operator, limited to its own
-  // scopes on the owner (derived from the resolved credential, never a header).
+  // PAN-4651 D-4651-17: an `odk_` token is limited to its own scopes on the owner
+  // (derived from the resolved credential, never a header). PAN-4927 D-9: an
+  // agent-kind agent token acts as its agent there; any other token as the operator.
   const tokenCeiling = input.credential?.kind === 'token'
     ? credentialScopes(input.credential).filter((scope): scope is AccessTokenScope => scope !== 'admin') as AccessTokenScope[]
     : null;
-  const actor = tokenCeiling ? 'operator' : actorForSender(input.sender);
+  const actor = input.credential?.kind === 'token' ? tokenLinkActor(input.credential) : actorForSender(input.sender);
   if (actor === null) return jsonResponse({ error: `invalid ${SENDER_HEADER} header` }, { status: 400 });
   const link = await deps.getLink(input.target.target);
   if (!link || link.revokedAt !== null) {

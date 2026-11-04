@@ -1,0 +1,291 @@
+{
+  "version": "1",
+  "issueId": "PAN-4938",
+  "created": "2026-11-04T03:39:16.629Z",
+  "updated": "2026-11-04T04:49:41.434Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "tool-list-tests": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4938",
+      "claimedAt": "2026-11-04T03:39:16.629Z",
+      "doneAt": "2026-11-04T03:40:21.432Z"
+    },
+    "extract-stand-in-wait": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4938",
+      "claimedAt": "2026-11-04T03:40:51.509Z",
+      "doneAt": "2026-11-04T03:42:42.456Z"
+    },
+    "token-link-actor": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4938",
+      "claimedAt": "2026-11-04T03:42:47.470Z",
+      "doneAt": "2026-11-04T03:44:44.640Z"
+    },
+    "start-issue-local": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4938",
+      "claimedAt": "2026-11-04T03:44:50.228Z",
+      "doneAt": "2026-11-04T03:51:42.236Z"
+    },
+    "conversation-stop-interrupt": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4938",
+      "claimedAt": "2026-11-04T03:51:43.543Z",
+      "doneAt": "2026-11-04T03:52:52.552Z"
+    },
+    "delegate-task": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4938",
+      "claimedAt": "2026-11-04T03:52:53.848Z",
+      "doneAt": "2026-11-04T03:56:27.801Z"
+    },
+    "task-wait": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4938",
+      "claimedAt": "2026-11-04T03:56:29.037Z",
+      "doneAt": "2026-11-04T03:59:22.435Z"
+    },
+    "worker-list-status": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4938",
+      "claimedAt": "2026-11-04T03:59:23.587Z",
+      "doneAt": "2026-11-04T04:01:35.185Z"
+    },
+    "task-cancel": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4938",
+      "claimedAt": "2026-11-04T04:01:36.447Z",
+      "doneAt": "2026-11-04T04:02:37.187Z"
+    },
+    "lane-start-status-stop": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4938",
+      "claimedAt": "2026-11-04T04:02:38.743Z",
+      "doneAt": "2026-11-04T04:05:43.088Z"
+    },
+    "lane-wait": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4938",
+      "claimedAt": "2026-11-04T04:05:44.349Z",
+      "doneAt": "2026-11-04T04:07:45.180Z"
+    },
+    "lane-report": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4938",
+      "claimedAt": "2026-11-04T04:07:46.342Z",
+      "doneAt": "2026-11-04T04:09:58.683Z"
+    },
+    "docs-delegation": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4938",
+      "claimedAt": "2026-11-04T04:09:59.837Z",
+      "doneAt": "2026-11-04T04:10:56.021Z"
+    },
+    "tool-list-tests.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:27:56.621Z"
+    },
+    "tool-list-tests.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:28:13.745Z"
+    },
+    "tool-list-tests.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:28:35.706Z"
+    },
+    "extract-stand-in-wait.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:28:55.320Z"
+    },
+    "extract-stand-in-wait.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:29:14.762Z"
+    },
+    "extract-stand-in-wait.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:29:32.017Z"
+    },
+    "token-link-actor.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:29:48.939Z"
+    },
+    "token-link-actor.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:30:07.822Z"
+    },
+    "token-link-actor.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:30:26.318Z"
+    },
+    "start-issue-local.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:30:42.729Z"
+    },
+    "start-issue-local.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:31:00.264Z"
+    },
+    "start-issue-local.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:31:17.576Z"
+    },
+    "start-issue-local.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:31:34.074Z"
+    },
+    "conversation-stop-interrupt.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:31:49.916Z"
+    },
+    "conversation-stop-interrupt.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:32:05.495Z"
+    },
+    "conversation-stop-interrupt.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:32:21.563Z"
+    },
+    "delegate-task.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:32:37.456Z"
+    },
+    "delegate-task.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:32:52.995Z"
+    },
+    "delegate-task.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:33:09.615Z"
+    },
+    "delegate-task.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:33:25.246Z"
+    },
+    "delegate-task.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:33:40.037Z"
+    },
+    "task-wait.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:33:54.869Z"
+    },
+    "task-wait.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:34:11.050Z"
+    },
+    "task-wait.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:34:27.476Z"
+    },
+    "task-wait.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:34:47.144Z"
+    },
+    "task-wait.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:35:08.068Z"
+    },
+    "worker-list-status.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:35:28.505Z"
+    },
+    "worker-list-status.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:35:49.996Z"
+    },
+    "worker-list-status.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:36:08.810Z"
+    },
+    "worker-list-status.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:36:27.617Z"
+    },
+    "task-cancel.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:36:45.720Z"
+    },
+    "task-cancel.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:37:02.240Z"
+    },
+    "task-cancel.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:37:18.765Z"
+    },
+    "lane-start-status-stop.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:37:35.138Z"
+    },
+    "lane-start-status-stop.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:37:53.027Z"
+    },
+    "lane-start-status-stop.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:38:09.976Z"
+    },
+    "lane-start-status-stop.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:38:26.452Z"
+    },
+    "lane-wait.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:38:42.720Z"
+    },
+    "lane-wait.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:38:59.467Z"
+    },
+    "lane-wait.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:39:16.789Z"
+    },
+    "lane-wait.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:39:32.608Z"
+    },
+    "lane-report.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:39:48.612Z"
+    },
+    "lane-report.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:40:05.192Z"
+    },
+    "lane-report.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:40:22.755Z"
+    },
+    "lane-report.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:40:40.808Z"
+    },
+    "docs-delegation.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:40:59.011Z"
+    },
+    "docs-delegation.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:41:15.777Z"
+    },
+    "docs-delegation.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:41:32.184Z"
+    },
+    "docs-delegation.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T04:41:46.017Z"
+    },
+    "tool-list-tests.ac4": {
+      "status": "cancelled"
+    }
+  },
+  "feedback": []
+}
