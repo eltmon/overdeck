@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4955",
   "created": "2026-11-04T14:23:26.498Z",
-  "updated": "2026-11-04T14:57:05.233Z",
+  "updated": "2026-11-04T14:57:20.162Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -116,6 +116,10 @@
     "live-verify.ac1": {
       "status": "completed",
       "doneAt": "2026-11-04T14:57:05.233Z"
+    },
+    "live-verify.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:57:20.162Z"
     }
   }
 }
