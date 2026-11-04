@@ -1,0 +1,538 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-04T08:55:54Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4956: Agent MCP and bots (W-INT4): integrations/grok-bot/ and the xAI API example",
+    "updated": "2026-11-04T09:00:13.386Z"
+  },
+  "plan": {
+    "id": "pan-4956",
+    "title": "Agent MCP and bots (W-INT4): integrations/grok-bot/ and the xAI API example",
+    "status": "running",
+    "uid": "a441facd-6d18-4b45-8c58-442c0f1e62cb",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-04T08:55:54Z",
+    "updated": "2026-11-04T09:00:13.386Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4956",
+        "label": "PAN-4956",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4927",
+        "label": "PAN-4927 (epic)",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4956.md",
+        "label": "PRD",
+        "type": "document"
+      }
+    ],
+    "tags": [
+      "mcp",
+      "integrations",
+      "grok-bot",
+      "xai",
+      "pan-4927"
+    ],
+    "narratives": {
+      "Problem": "Hosted bots (Grok Bot, the xAI API) cannot run a process next to Overdeck, so they need a ready plugin and a working API example that reach Overdeck through the opt-in public /mcp with OAuth. integrations/grok-bot/ holds only the skill copy today, and the Connect a bot dialog's xAI snippet uses a model xAI no longer lists and omits the required server_label.",
+      "Proposal": "Ship integrations/grok-bot/ as a Cursor-format plugin (manifest, mcp.json with the dialog's placeholder URL, the shared skill, LICENSE), runnable dependency-free xAI Responses API examples in TypeScript and Python tested against a local fake xAI server, a README that embeds the dialog snippets verbatim, PUBLISHING and CHANGELOG, and a docs/verification.md that records CP-8. Fix botSnippets.xaiExample first. Add a pointer in configuration/mcp.mdx.",
+      "NonGoals": "- Running CP-8 live, turning Public MCP on, running tailscale, or calling api.x.ai from the work agent.\n- Any change under src/dashboard/server/ or src/lib/, including the SSE fallback for routes/mcp.ts and widening bearerToken().\n- Publishing the plugin to any catalog or registry.\n- A plugin logo asset.\n- configuration/bots.mdx, docs.json changes, and the stale <Info> block in configuration/mcp.mdx (W-DOC).\n- CI workflow changes (W-CI1).\n- Hooks or answer commands in the Grok Bot plugin; connector or Tailscale reach for Grok Bot.\n- Changing any botSnippets.ts function other than xaiExample."
+    },
+    "autoDecisions": [
+      {
+        "summary": "This issue fixes botSnippets.xaiExample (model grok-4.7, add server_label) instead of copying the stale snippet into the README.",
+        "rationale": "W-BOT1 is merged, the README must match the snippet, and xAI docs (2026-11-04) make server_label required and do not list grok-4; the xAI item owns its example."
+      },
+      {
+        "summary": "The examples pass the bare access token in the xAI `authorization` field; CP-8c checks it live with \"Bearer <token>\" as the documented fallback.",
+        "rationale": "xAI documents the field as the token it sets in the Authorization header (OpenAI Responses semantics); widening Overdeck bearerToken() is an auth-boundary change outside this item."
+      },
+      {
+        "summary": "Both examples use raw REST with no SDK: Node built-in fetch and the Python standard library.",
+        "rationale": "One request shape to verify, no install step, and the xAI Python SDK spells two fields differently."
+      },
+      {
+        "summary": "The work agent records CP-8 as \"Not run: <reason>\" with operator steps and does not run it.",
+        "rationale": "The host has no tailscale CLI and no XAI_API_KEY, and turning Public MCP on publishes a sign-in page to the internet, which is the operator's call; epic AC-28 allows CP-8 to record why."
+      },
+      {
+        "summary": "No logo in plugin.json; PUBLISHING.md lists adding one before submission.",
+        "rationale": "The repo has no PNG plugin logo and the epic W-INT4 step 1 does not list the key."
+      },
+      {
+        "summary": "Each example has its own test file with its own fake server, so the two example items can run in parallel.",
+        "rationale": "Avoids a shared-file edge between the TypeScript and Python items."
+      },
+      {
+        "summary": "The package secret scan reads files by a directory walk, and the example tests run the scripts instead of reading them.",
+        "rationale": "lint:source-introspection fails any new test whose readFile call contains a .ts string literal."
+      },
+      {
+        "summary": "Runnable examples accept XAI_BASE_URL (default https://api.x.ai/v1) and XAI_MODEL (default grok-4.7).",
+        "rationale": "Lets the tests use a local fake server and lets users follow xAI model changes without editing code."
+      }
+    ],
+    "items": [
+      {
+        "id": "snippet-fix",
+        "title": "Correct the xAI snippet in botSnippets.ts (model grok-4.7, server_label overdeck)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T08:55:54Z",
+        "metadata": {
+          "issueLabel": "pan-4956",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "frontend",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/anywhere/botSnippets.ts",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/botSnippets.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "cd src/dashboard/frontend && npx vitest run src/components/Settings/anywhere/__tests__/botSnippets.test.ts src/components/Settings/anywhere/__tests__/ConnectBotDialog.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors",
+            "botSnippets.test.ts and ConnectBotDialog.test.tsx pass"
+          ],
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1 (.pan/drafts/PAN-4956.md). In botSnippets.ts add exported constants XAI_DEFAULT_MODEL = \"grok-4.7\" and XAI_SERVER_LABEL = \"overdeck\" after XAI_ALLOWED_TOOLS; in xaiExample replace the line `model: \"grok-4\",` with the constant and add `server_label: \"overdeck\",` directly after the server_url line. Change nothing else in the file. Extend the xaiExample describe in botSnippets.test.ts with one it() asserting the new text. Run ConnectBotDialog.test.tsx too, because ConnectBotOutput.tsx renders xaiExample."
+        },
+        "items": [
+          {
+            "id": "snippet-fix.ac1",
+            "title": "When xaiExample({ url }) is called, then it returns text that contains `model: \"grok-4.7\"`, `server_label: \"overdeck\"` and `authorization: process.env.OVERDECK_MCP_TOKEN`, and does not contain `\"grok-4\",`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "snippet-fix.ac2",
+            "title": "botSnippets.ts exports XAI_DEFAULT_MODEL equal to \"grok-4.7\" and XAI_SERVER_LABEL equal to \"overdeck\", and every other exported function returns the same text as before.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "snippet-fix.ac3",
+            "title": "When run under the frontend vitest config, botSnippets.test.ts and ConnectBotDialog.test.tsx pass with zero failures.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "manifest",
+        "title": "Grok Bot plugin manifest, mcp.json and LICENSE with their unit test",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T08:55:54Z",
+        "metadata": {
+          "issueLabel": "pan-4956",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "infra",
+          "files_scope": [
+            "integrations/grok-bot/.cursor-plugin/plugin.json",
+            "integrations/grok-bot/mcp.json",
+            "integrations/grok-bot/LICENSE*",
+            "tests/unit/integrations/grok-bot.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/integrations/grok-bot.test.ts",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "grok-bot.test.ts \"integrations/grok-bot manifest\" passes",
+            "lint completes without errors, including lint:source-introspection"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Create integrations/grok-bot/.cursor-plugin/plugin.json with exactly the keys and values in the PRD (no logo key, decision D-7), mcp.json equal to grokBotMcpJson({ url: PUBLIC_MCP_PLACEHOLDER_URL }) plus one newline, and LICENSE as a byte copy of integrations/LICENSE. Create tests/unit/integrations/grok-bot.test.ts with describe(\"integrations/grok-bot manifest\") importing grokBotMcpJson and PUBLIC_MCP_PLACEHOLDER_URL from the frontend botSnippets module (precedent: tests/unit/dashboard/access-token-scopes-parity.test.ts). Read only .json, .md and LICENSE files in the test."
+        },
+        "items": [
+          {
+            "id": "manifest.ac1",
+            "title": "Given the committed plugin.json, the test parses it and finds name \"overdeck\", displayName \"Overdeck\", version \"0.1.0\", license \"MIT\", skills \"./skills/\" and mcpServers \"./mcp.json\".",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "manifest.ac2",
+            "title": "The mcp.json text equals grokBotMcpJson({ url: \"https://YOUR-MACHINE.YOUR-TAILNET.ts.net:8443/mcp\" }) plus a newline and contains exactly one server whose url starts with https:// and ends with :8443/mcp.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "manifest.ac3",
+            "title": "Given the committed package, the test reads integrations/grok-bot/LICENSE and integrations/LICENSE and they contain identical bytes, and the package contains skills/overdeck/SKILL.md.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "manifest.ac4",
+            "title": "npm run lint passes with the new test file, so lint:source-introspection reports no new offender.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ts-example",
+        "title": "Runnable xAI Responses API example in TypeScript with a fake-server test",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T08:55:54Z",
+        "metadata": {
+          "issueLabel": "pan-4956",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "test",
+          "files_scope": [
+            "integrations/grok-bot/examples/xai-api.ts",
+            "tests/unit/integrations/grok-bot-example-ts.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/integrations/grok-bot-example-ts.test.ts",
+            "node --experimental-strip-types --no-warnings integrations/grok-bot/examples/xai-api.ts; test $? -eq 2",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "grok-bot-example-ts.test.ts passes all four cases",
+            "running the example with no variables exits 2",
+            "lint completes without errors"
+          ],
+          "traces": [
+            "FR-4",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. Write integrations/grok-bot/examples/xai-api.ts to the behavior contract in the PRD: env-only secrets (XAI_API_KEY, OVERDECK_MCP_TOKEN, OVERDECK_MCP_URL, optional XAI_MODEL default grok-4.7 and XAI_BASE_URL default https://api.x.ai/v1), https-only MCP URL, one POST to <base>/responses with the exact mcp tool body including server_label \"overdeck\", redaction of both secrets in all output, exit codes 0/1/2. No import statements, no top-level await (async function main). Write grok-bot-example-ts.test.ts that runs the script with promisified execFile (never spawnSync, hazard H-2) against an in-process node:http fake xAI server for the four PRD cases."
+        },
+        "items": [
+          {
+            "id": "ts-example.ac1",
+            "title": "When the fake xAI server answers 200 with an output_text item, the example exits 0, prints that text, and sends one POST /v1/responses whose tools array deep-equals the PRD body with server_label XAI_SERVER_LABEL, model XAI_DEFAULT_MODEL and allowed_tools XAI_ALLOWED_TOOLS.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ts-example.ac2",
+            "title": "When the fake server answers 401 with a body that echoes both secrets, the example exits 1 and prints `xAI API answered 401` with `[redacted]`, and stdout and stderr contain neither secret.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ts-example.ac3",
+            "title": "When OVERDECK_MCP_TOKEN is unset, or OVERDECK_MCP_URL starts with http://, the example exits 2 with the PRD message and the fake server receives 0 requests.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "py-example",
+        "title": "Runnable xAI Responses API example in Python (stdlib only) with a fake-server test",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T08:55:54Z",
+        "metadata": {
+          "issueLabel": "pan-4956",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "test",
+          "files_scope": [
+            "integrations/grok-bot/examples/xai-api.py",
+            "tests/unit/integrations/grok-bot-example-py.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/integrations/grok-bot-example-py.test.ts",
+            "python3 -c \"import ast,sys; ast.parse(open(sys.argv[1]).read())\" integrations/grok-bot/examples/xai-api.py",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "grok-bot-example-py.test.ts passes all four cases",
+            "the ast parse exits 0",
+            "lint completes without errors"
+          ],
+          "traces": [
+            "FR-5",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. Write integrations/grok-bot/examples/xai-api.py with the same behavior contract as the TypeScript example, using only json, os, sys, urllib.error and urllib.request, valid on Python 3.9+, with a User-Agent header overdeck-grok-bot-example/0.1.0. Write grok-bot-example-py.test.ts that runs python3 on the script with promisified execFile and PYTHONDONTWRITEBYTECODE=1 against an in-process fake xAI server for the same four cases. No skip when python3 is absent. Never commit __pycache__."
+        },
+        "items": [
+          {
+            "id": "py-example.ac1",
+            "title": "When the fake xAI server answers 200 with an output_text item, the Python example exits 0, prints that text, and sends the same request body the TypeScript example sends.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "py-example.ac2",
+            "title": "When the fake server answers 401 echoing both secrets, the Python example exits 1 and its output contains `[redacted]` and neither secret.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "py-example.ac3",
+            "title": "When a required variable is missing or OVERDECK_MCP_URL is not https, the Python example exits 2 and the fake server receives 0 requests.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "py-example.ac4",
+            "title": "git status shows no __pycache__ directory under integrations/grok-bot after the test run.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-readme",
+        "title": "Grok Bot README, configuration/mcp.mdx pointer, and README plus secret-scan tests",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T08:55:54Z",
+        "metadata": {
+          "issueLabel": "pan-4956",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "docs",
+          "files_scope": [
+            "integrations/grok-bot/README.md",
+            "configuration/mcp.mdx",
+            "tests/unit/integrations/grok-bot.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/integrations/grok-bot.test.ts",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "grok-bot.test.ts passes, including the README and secrets describes",
+            "lint completes without errors, including lint:docs"
+          ],
+          "traces": [
+            "FR-6",
+            "FR-9",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5, the documentation work item. Write integrations/grok-bot/README.md with the sections listed in the PRD, embedding verbatim grokBotMcpJson({ url: PUBLIC_MCP_PLACEHOLDER_URL }), xaiExample({ url: PUBLIC_MCP_PLACEHOLDER_URL }) and oauthIssueCommand({ name: \"xai-api\", level: \"read\" }). Add the one-paragraph \"Grok Bot and the xAI API\" pointer to configuration/mcp.mdx right after the line starting \"Give the bot the public URL\" (no $ in prose, no < before a digit). Add describe blocks \"integrations/grok-bot README\" and \"integrations/grok-bot secrets\" to grok-bot.test.ts; the secret scan walks the package with readdirSync and reads each file by a joined path (decision D-9). Do not edit the stale <Info> block in mcp.mdx (W-DOC owns it)."
+        },
+        "items": [
+          {
+            "id": "docs-readme.ac1",
+            "title": "The README contains each of the three snippet outputs as an exact substring, and names examples/xai-api.ts and examples/xai-api.py with their run commands.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-readme.ac2",
+            "title": "When the secret scan walks integrations/grok-bot, it reads at least 7 files and produces no match for /\\bod[klr]_[0-9a-f]{16,}/ in any of them.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-readme.ac3",
+            "title": "configuration/mcp.mdx contains a link to integrations/grok-bot and the words server_label and authorization in the Public MCP for hosted bots section, and npm run lint passes (lint:docs included).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "publish-meta",
+        "title": "PUBLISHING.md, CHANGELOG.md and the CP-8 verification record",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T08:55:54Z",
+        "metadata": {
+          "issueLabel": "pan-4956",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "docs",
+          "files_scope": [
+            "integrations/grok-bot/PUBLISHING.md",
+            "integrations/grok-bot/CHANGELOG.md",
+            "integrations/grok-bot/docs/verification.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c '^| CP-8' integrations/grok-bot/docs/verification.md",
+            "grep -q 'separate step the operator approves' integrations/grok-bot/PUBLISHING.md",
+            "grep -q '^## 0.1.0' integrations/grok-bot/CHANGELOG.md"
+          ],
+          "expected_outputs": [
+            "the CP-8 row count prints 4",
+            "both greps exit 0"
+          ],
+          "traces": [
+            "FR-7",
+            "FR-8",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. Write PUBLISHING.md (operator-approved publishing, logo needed before submission, subdirectory-vs-own-repository choice, Cursor publish form with Grok Bot catalog as destination, never the Grok Build marketplace), CHANGELOG.md with a \"## 0.1.0 — unreleased\" entry, and docs/verification.md with the seven fixed rows from the PRD, each a result or \"Not run: <reason>\", plus the numbered operator steps for the live checks and the Bearer fallback. The work agent never runs tailscale, never turns Public MCP on, and never calls api.x.ai (decision D-6). This record satisfies epic AC-28."
+        },
+        "items": [
+          {
+            "id": "publish-meta.ac1",
+            "title": "docs/verification.md contains a Check | Result table with the rows Package structure, xAI request shape, xAI field names and exactly four rows starting CP-8a, CP-8b, CP-8c and CP-8d, each with a result or text starting \"Not run:\".",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "publish-meta.ac2",
+            "title": "docs/verification.md contains a \"Running the live checks\" section that names the three Funnel paths, the pan mcp oauth issue command, both example run commands and the Bearer <token> fallback.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "publish-meta.ac3",
+            "title": "PUBLISHING.md contains the sentence \"Publishing is a separate step the operator approves\" and refuses submission to the Grok Build marketplace; CHANGELOG.md contains a \"## 0.1.0\" heading.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "snippet-fix",
+        "to": "ts-example",
+        "type": "blocks"
+      },
+      {
+        "from": "snippet-fix",
+        "to": "py-example",
+        "type": "blocks"
+      },
+      {
+        "from": "snippet-fix",
+        "to": "docs-readme",
+        "type": "blocks"
+      },
+      {
+        "from": "manifest",
+        "to": "docs-readme",
+        "type": "blocks"
+      },
+      {
+        "from": "ts-example",
+        "to": "docs-readme",
+        "type": "blocks"
+      },
+      {
+        "from": "py-example",
+        "to": "docs-readme",
+        "type": "blocks"
+      },
+      {
+        "from": "manifest",
+        "to": "publish-meta",
+        "type": "blocks"
+      },
+      {
+        "from": "ts-example",
+        "to": "publish-meta",
+        "type": "blocks"
+      },
+      {
+        "from": "py-example",
+        "to": "publish-meta",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-04-PAN-4956-agent-mcp-and-bots-w-int4-integrations-grok-bot-and-the-xai-api-example.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}

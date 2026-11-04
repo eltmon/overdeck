@@ -73,6 +73,14 @@ describe('xaiExample', () => {
       expect(text).toContain(tool);
     }
   });
+
+  it('uses the current xAI model and the overdeck server label', () => {
+    const text = xaiExample({ url: PUBLIC_MCP_PLACEHOLDER_URL });
+    expect(text).toContain('model: "grok-4.7"');
+    expect(text).toContain('server_label: "overdeck"');
+    expect(text).toContain('authorization: process.env.OVERDECK_MCP_TOKEN');
+    expect(text).not.toContain('"grok-4",');
+  });
 });
 
 describe('oauthIssueCommand', () => {
