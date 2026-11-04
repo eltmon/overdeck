@@ -102,3 +102,7 @@ def test_setup_cli_prints_setup_text(capsys):
     assert "      settings:\n        summary: true\n        allow_answers: false" in SETUP_TEXT
     assert len(SETUP_TEXT.splitlines()) == 14
     assert not SETUP_TEXT.endswith("\n")
+
+
+def test_readme_contains_setup_text():
+    assert SETUP_TEXT in (PACKAGE_ROOT / "README.md").read_text(encoding="utf-8")
