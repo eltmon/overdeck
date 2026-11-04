@@ -310,6 +310,16 @@ describe('refresh rotation and revocation (D-8, D-9)', () => {
     expect((await store.readMcpOAuthData(Date.now())).families[0]!.revokedAt).toBeDefined();
   });
 
+  it('ends the sign-in at the next refresh even after the 7-day prune of a token revoked elsewhere', async () => {
+    const first = await signIn();
+    const family = (await store.readMcpOAuthData(Date.now())).families[0]!;
+    await registry.revokeAccessToken(family.accessTokenId);
+    offset += 8 * 24 * 60 * 60_000;
+    await expect(registry.pruneEndedAccessTokens(7 * 24 * 60 * 60_000, Date.now() + offset)).resolves.toBe(0);
+    await expect(service.refresh(refreshForm(first.clientId, first.refresh))).resolves.toMatchObject({ ok: false, body: { error: 'invalid_grant' } });
+    expect((await store.readMcpOAuthData(Date.now() + offset)).families[0]!.revokedAt).toBeDefined();
+  });
+
   it('still refreshes when the current access record was pruned from the registry', async () => {
     const first = await signIn();
     const path = join(home, 'access-tokens.json');

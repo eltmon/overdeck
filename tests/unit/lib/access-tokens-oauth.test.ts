@@ -103,7 +103,7 @@ describe('OAuth tokens in the access-token registry (PAN-4945)', () => {
     expect(registry.verifyAccessToken(token)).toEqual({ ok: false });
   });
 
-  it('prunes OAuth records ended more than olderThanMs ago and keeps the rest', async () => {
+  it('prunes OAuth records expired more than olderThanMs ago and keeps the rest, even long-revoked ones', async () => {
     const ago = (days: number) => new Date(NOW.getTime() - days * DAY_MS).toISOString();
     const oauth = { kind: 'token', oauthClientId: CLIENT_ID, oauthFamilyId: FAMILY_ID };
     await writeRegistryFile([
@@ -112,8 +112,9 @@ describe('OAuth tokens in the access-token registry (PAN-4945)', () => {
       baseRecord({ id: 'revoked-9d-expires-later', ...oauth, revokedAt: ago(9), expiresAt: ago(-20) }),
       baseRecord({ id: 'plain-revoked-30d', kind: 'token', revokedAt: ago(30) }),
     ]);
-    await expect(registry.pruneEndedAccessTokens(7 * DAY_MS)).resolves.toBe(2);
-    expect((await readFileRecords()).map((r) => r.id)).toEqual(['expired-6d', 'plain-revoked-30d']);
+    await expect(registry.pruneEndedAccessTokens(7 * DAY_MS)).resolves.toBe(1);
+    // A revoked OAuth record stays until it expires, so a refresh can still tell revoked from expired.
+    expect((await readFileRecords()).map((r) => r.id)).toEqual(['expired-6d', 'revoked-9d-expires-later', 'plain-revoked-30d']);
   });
 
   it('resolves an OAuth Bearer token to a token credential naming its client', async () => {

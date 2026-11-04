@@ -508,15 +508,15 @@ export async function revokeAccessTokensMatching(match: (record: PublicAccessTok
 
 /**
  * Remove records that ended more than `olderThanMs` before `now`: agent tokens by `revokedAt`, OAuth tokens
- * (PAN-4945) by the earlier of `revokedAt` and `expiresAt`. Never removes any other record. Returns the count removed.
+ * (PAN-4945) by `expiresAt` only, so a missing OAuth record always means expired, never revoked (D-8.6).
+ * Never removes any other record. Returns the count removed.
  */
 export async function pruneEndedAccessTokens(olderThanMs: number, now = Date.now()): Promise<number> {
   return mutate((records) => {
     const kept = records.filter((record) => {
-      const revoked = record.revokedAt !== undefined ? Date.parse(record.revokedAt) : Infinity;
       // NaN (a record that never ends) fails the comparison and is kept.
-      const ended = record.oauthClientId !== undefined ? Math.min(revoked, Date.parse(record.expiresAt!))
-        : record.agentId !== undefined && record.revokedAt !== undefined ? revoked : NaN;
+      const ended = record.oauthClientId !== undefined ? Date.parse(record.expiresAt!)
+        : record.agentId !== undefined && record.revokedAt !== undefined ? Date.parse(record.revokedAt) : NaN;
       return !(now - ended > olderThanMs);
     });
     const removed = records.length - kept.length;

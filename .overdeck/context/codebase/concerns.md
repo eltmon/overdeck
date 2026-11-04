@@ -682,8 +682,6 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   (checked against `getTrustedOrigins()`), never a fixed `127.0.0.1`. A stock SDK client also requests
   every `scopes_supported` value at once (`auth.js:229`) and may send no `state` (`auth.js:732`).
 <!-- last-verified: 2026-11-04 (PAN-4905, PAN-4917, PAN-4925, PAN-4929, PAN-4930, PAN-4931, PAN-4482, PAN-4945) -->
-<!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4930) -->
-<!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4925, PAN-4929, PAN-4482) -->
 - **One merge path per feature (PAN-4970)** — the UAT reconciler drops features
   `mergePathOwner` (`src/dashboard/server/services/merge-path-owner.ts`) assigns to the
   per-PR train from its ready set before it ever assembles a batch; any new merge path
