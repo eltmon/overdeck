@@ -2,12 +2,18 @@
   "version": "1",
   "issueId": "PAN-4944",
   "created": "2026-11-04T00:25:07.459Z",
-  "updated": "2026-11-04T02:30:01.791Z",
+  "updated": "2026-11-04T02:31:06.849Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
   "resumePoint": null,
-  "sessionHistory": [],
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-04T02:31:06.849Z"
+    }
+  ],
   "items": {
     "needs-you-route": {
       "status": "completed",
@@ -146,5 +152,6 @@
       "doneAt": "2026-11-04T01:47:36.526Z"
     }
   },
-  "feedback": []
+  "feedback": [],
+  "agentModel": "claude-opus-5-5"
 }
