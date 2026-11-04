@@ -23,6 +23,13 @@ vi.mock('../harness-binary.js', async (importOriginal) => {
   };
 });
 
+// PAN-4961: the spawn gate consults the disk-floor hold before rebuilding a
+// stack. The real resolver runs git, docker and statfs, so report no hold.
+vi.mock('../workspace/disk-cost.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../workspace/disk-cost.js')>()),
+  resolveIssueStackDiskHold: vi.fn(async () => null),
+}));
+
 let tempHome: string;
 
 function ensurePtySupervisorArtifact(): void {
