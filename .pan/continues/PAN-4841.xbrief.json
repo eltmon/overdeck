@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4841",
   "created": "2026-11-04T10:01:07.580Z",
-  "updated": "2026-11-04T17:38:53.034Z",
+  "updated": "2026-11-04T17:39:06.167Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -270,6 +270,10 @@
     "rel-first-testflight-build.ac3": {
       "status": "completed",
       "doneAt": "2026-11-04T17:38:53.034Z"
+    },
+    "rel-device-push-check.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:39:06.167Z"
     }
   }
 }
