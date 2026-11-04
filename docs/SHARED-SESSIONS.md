@@ -121,6 +121,8 @@ Facts verified against the Cloudflare docs on 2026-10-02:
 - **Sees:** room membership (GitHub id, login and avatar of the host and participants), the controller's admit, kick, revoke, contributor and handoff decisions, connect and disconnect times, SDP and ICE blobs, and the opaque scope descriptor (a conversation id). For a browser viewer it also sees the sealed session cookie, which holds that browser's device token encrypted with `WEB_SESSION_KEY`.
 - **Never sees:** conversation messages, terminal bytes or prompt drafts. Content flows only over DTLS DataChannels opened after admission. Cloudflare TURN may relay those encrypted packets but cannot read them.
 
+`tests/integration/services/share/signaling-privacy.test.ts` checks this on every CI run: it plants a unique string in every kind of content, proves each one arrives over a DataChannel, and fails if any appears in the host or viewer signaling traffic or if any frame carries a type or key outside the protocol table.
+
 ## Configuration
 
 | Name | Where | Meaning |
@@ -463,6 +465,8 @@ npx vitest run tests/unit/services/share/                     # reducer, decoder
 npx vitest run tests/integration/services/share/              # real workerd via Miniflare, account and TURN stubbed
 npm --prefix services/share run build:web                     # esbuild → public/viewer/viewer.js (the hosted viewer)
 npm --prefix services/share run build:dry                     # wrangler deploy --dry-run --outdir dist (runs build:web first; no credentials)
+npx vitest run tests/helpers/share/                           # capture, candidate and harness helpers
+npx vitest run tests/integration/services/share/signaling-privacy.test.ts tests/integration/services/share/rate-limit.test.ts
 ```
 
 A local `ACCOUNT` binding needs PAN-4293's `npm --prefix services/account run dev` running in another terminal; wrangler's local dev registry connects service bindings between local sessions.
@@ -470,6 +474,40 @@ A local `ACCOUNT` binding needs PAN-4293's `npm --prefix services/account run de
 Unit tests drive the reducer with an injected clock and `routes.handle()` with injected `Deps`, a fake `ROOMS` namespace and a fake `ACCOUNT`, so the 5-minute window and the 5-second TURN timeout never wait. The integration test bundles the Worker with `wrangler deploy --dry-run`, runs it in Miniflare beside an inline `AccountRpc` stub bound by named entrypoint, stubs `rtc.live.cloudflare.com` through `outboundService`, and drives a room through the lobby, admission, signaling, kick, revoke and deletion over real WebSockets.
 
 Agents may run `wrangler dev --local` and `wrangler deploy --dry-run`; nothing else. Deploying is operator-only.
+
+## Verification
+
+Three tests back the service's security claims (PAN-4482). The first two run in the default vitest run on CI; the third is an operator checkpoint. All three use `startShareWorker` (`tests/helpers/share/share-worker.ts`), which bundles the Worker with `wrangler deploy --dry-run` and runs it in Miniflare beside an account stub.
+
+### Signaling privacy
+
+`tests/integration/services/share/signaling-privacy.test.ts` runs one share end to end on real workerd and real werift: a `ShareManager` with a `PeerHub` on the host side, and two `JoinManager`s with werift `LoopbackViewer`s on the viewer side. A unique canary sits in each kind of content: the conversation history, a live append, the stream label, a viewer draft, a contributor submit, a host controller send, a viewer-controller send, and the terminal snapshot and output. A second viewer stays in the lobby the whole time.
+
+`SignalingCapture` (`tests/helpers/share/signaling-capture.ts`) records every frame and HTTP body both local servers exchange with the service. The test then asserts four things:
+
+1. **Positive control.** Every canary reached its destination over a DataChannel, and the queue delivered the three prompts in order.
+2. **No content in signaling.** No canary appears in any captured frame or HTTP body, plain, case-folded or base64-encoded.
+3. **Protocol shape.** Every frame's `type` and keys belong to the protocol table above for its socket and direction, `signal.data` holds only `sdp` and `candidate`, the `room` snapshot holds only its seven keys, and no binary frame crossed.
+4. **Live path.** The capture saw the SDP offer and answer, ICE candidates in both directions, `room` snapshots, `POST /v1/rooms` and `DELETE /v1/rooms/:code`. The lobby viewer received exactly one frame, `status lobby`, and its socket closed with 4004 when the share ended.
+
+The capture wraps the injected `openSocket`, `createRoom` and `deleteRoom` seams rather than logging TCP bytes. RFC 6455 masks every client-to-server frame with a random key, so a canary sent by a local server never appears in raw bytes, and a byte-level check would pass even if content leaked.
+
+### Room-creation rate limit
+
+`tests/integration/services/share/rate-limit.test.ts` reads the `ROOM_CREATE_LIMIT` entry from the committed `services/share/wrangler.jsonc` and binds it in Miniflare, so a change to the committed limit fails the test. One GitHub id gets `201` ten times, then `429` `rate_limited` with `Retry-After: 60`; another account still gets `201`.
+
+### Forced-relay checkpoint (operator)
+
+`tests/integration/services/share/forced-turn.slow.test.ts` proves the symmetric-NAT case of NFR-7: both peers connect relay-only through Cloudflare Realtime TURN. It forces `iceTransportPolicy: 'relay'` on the host (through `PeerHubDeps.createPeerConnection`) and on the viewer (through `LoopbackViewer`'s configuration, built from `JoinManager.iceServers`). Only the operator runs it:
+
+```bash
+TURN_KEY_ID=<key id> TURN_KEY_API_TOKEN=<api token> VITEST_INCLUDE_SLOW=1 \
+  npx vitest run tests/integration/services/share/forced-turn.slow.test.ts
+```
+
+It needs the same Realtime TURN key as the deployed Worker, and the local Worker makes one real credential request to Cloudflare per run. Without the two env vars it fails with `forced-TURN checkpoint needs TURN_KEY_ID and TURN_KEY_API_TOKEN`; it never skips, and no assertion prints an ICE URL, username or credential. A pass means the conversation history arrived over the DataChannel and every candidate both sides signaled was `typ relay`. Post the result (`PASS`, or the failing assertion) as a comment on PAN-4482.
+
+werift 0.25.1 uses only the first TURN URL in the list, and the test passes the Worker's list unchanged, as production does. If the run fails because the operator's network blocks that first transport, that is a real finding: file an issue to order the hub's TURN URLs (as PAN-4862 did for Anywhere) and re-run the checkpoint after it lands.
 
 ## Deploy
 
