@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4841",
   "created": "2026-11-04T10:01:07.580Z",
-  "updated": "2026-11-04T17:31:42.929Z",
+  "updated": "2026-11-04T17:31:55.362Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -138,6 +138,10 @@
     "rel-upload-keystore.ac2": {
       "status": "completed",
       "doneAt": "2026-11-04T17:31:42.928Z"
+    },
+    "rel-upload-keystore.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:31:55.362Z"
     }
   }
 }
