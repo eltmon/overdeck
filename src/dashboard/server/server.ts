@@ -105,6 +105,7 @@ import { mcpOAuthRouteLayer } from './routes/mcp-oauth.js'
 import { mcpOAuthAdminRouteLayer } from './routes/mcp-oauth-admin.js'
 import { remoteRequestGateLayer } from './remote-request-gate.js'
 import { linkedConversationProxyLayer } from './linked-conversation-proxy.js';
+import { publicMcpFunnelLayer } from './public-mcp-funnel.js';
 import { settingsRouteLayer } from './routes/settings.js'
 import { modelPresetsRouteLayer } from './routes/model-presets.js'
 import { jevRouteLayer } from './routes/jev.js'
@@ -365,6 +366,8 @@ const staticRouteLayer = HttpRouter.add(
 export const makeRoutesLayer = Layer.mergeAll(
   // PAN-3762: global middleware; requires a credential for non-local /api and /events requests.
   remoteRequestGateLayer,
+  // PAN-4947 D-5: rate limit and audit public MCP requests through Tailscale Funnel.
+  publicMcpFunnelLayer,
   // PAN-4650 D-4650-4: /api/conversations/@<machine>/… forwards to the owner (admitted requests only).
   linkedConversationProxyLayer,
   healthRouteLayer,
