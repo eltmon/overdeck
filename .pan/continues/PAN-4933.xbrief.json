@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4933",
   "created": "2026-11-04T03:01:37.295Z",
-  "updated": "2026-11-04T03:03:51.523Z",
+  "updated": "2026-11-04T03:04:23.094Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -14,6 +14,11 @@
       "claimedBy": "agent-pan-4933",
       "claimedAt": "2026-11-04T03:01:37.295Z",
       "doneAt": "2026-11-04T03:03:51.523Z"
+    },
+    "codex-overdeck-helper": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4933",
+      "claimedAt": "2026-11-04T03:04:23.094Z"
     }
   }
 }
