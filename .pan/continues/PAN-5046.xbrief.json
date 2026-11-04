@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5046",
   "created": "2026-11-04T18:10:57.891Z",
-  "updated": "2026-11-04T18:10:57.892Z",
+  "updated": "2026-11-04T18:12:50.404Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,10 @@
   "sessionHistory": [],
   "items": {
     "dialer-ends-duplexes": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5046",
-      "claimedAt": "2026-11-04T18:10:57.891Z"
+      "claimedAt": "2026-11-04T18:10:57.891Z",
+      "doneAt": "2026-11-04T18:12:50.403Z"
     }
   }
 }
