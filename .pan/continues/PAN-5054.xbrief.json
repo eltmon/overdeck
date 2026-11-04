@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5054",
   "created": "2026-11-04T19:57:03.624Z",
-  "updated": "2026-11-04T20:19:25.744Z",
+  "updated": "2026-11-04T20:19:38.199Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -104,6 +104,10 @@
     "conventions-map-note.ac1": {
       "status": "completed",
       "doneAt": "2026-11-04T20:19:25.744Z"
+    },
+    "conventions-map-note.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T20:19:38.198Z"
     }
   }
 }
