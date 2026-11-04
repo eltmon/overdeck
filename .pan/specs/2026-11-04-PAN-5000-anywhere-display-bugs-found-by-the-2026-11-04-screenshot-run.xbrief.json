@@ -4,17 +4,17 @@
     "created": "2026-11-04T11:30:03Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5000: Anywhere display bugs found by the 2026-11-04 screenshot run",
-    "updated": "2026-11-04T11:37:23.901Z"
+    "updated": "2026-11-04T11:38:25.328Z"
   },
   "plan": {
     "id": "pan-5000",
     "title": "Anywhere display bugs found by the 2026-11-04 screenshot run",
-    "status": "proposed",
+    "status": "running",
     "uid": "1d853f13-689e-44b6-9dfe-7105f9059e01",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-04T11:30:03Z",
-    "updated": "2026-11-04T11:37:23.901Z",
+    "updated": "2026-11-04T11:38:25.328Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5000",
@@ -664,5 +664,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
