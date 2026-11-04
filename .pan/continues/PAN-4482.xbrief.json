@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4482",
   "created": "2026-11-03T23:55:28.272Z",
-  "updated": "2026-11-04T00:31:43.406Z",
+  "updated": "2026-11-04T00:32:02.195Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -106,6 +106,10 @@
     "signaling-privacy-e2e.ac4": {
       "status": "completed",
       "doneAt": "2026-11-04T00:31:43.406Z"
+    },
+    "loopback-viewer-ice-config.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T00:32:02.194Z"
     }
   }
 }
