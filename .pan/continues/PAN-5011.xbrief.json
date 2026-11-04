@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5011",
   "created": "2026-11-04T11:42:07.971Z",
-  "updated": "2026-11-04T13:23:17.320Z",
+  "updated": "2026-11-04T13:23:32.072Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -162,6 +162,10 @@
     "docs-presence-table.ac1": {
       "status": "completed",
       "doneAt": "2026-11-04T13:23:17.320Z"
+    },
+    "docs-presence-table.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:23:32.071Z"
     }
   }
 }
