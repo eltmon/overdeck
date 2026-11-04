@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5011",
   "created": "2026-11-04T11:42:07.971Z",
-  "updated": "2026-11-04T13:22:32.226Z",
+  "updated": "2026-11-04T13:22:47.282Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -150,6 +150,10 @@
     "specialist-presence.ac2": {
       "status": "completed",
       "doneAt": "2026-11-04T13:22:32.226Z"
+    },
+    "sessionpanel-alive-test.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:22:47.282Z"
     }
   }
 }
