@@ -332,6 +332,20 @@ export function toChecksState(
   return 'green';
 }
 
+/**
+ * A `gh` row's check state, whether or not it carries `statusCheckRollup`.
+ * The closed PR listing (PAN-5042) never fetches the rollup — it would cost
+ * the same GraphQL timeout the split exists to avoid — so a merged/closed
+ * row answers from `mergedAt`/`state` instead: 'green' for anything that
+ * merged, 'pending' otherwise. This value is display only; nothing gates on
+ * a closed row's checks.
+ */
+export function checksFromGhRow(row: Pick<GhPrRow, 'statusCheckRollup' | 'mergedAt' | 'state'>): PrChecksState {
+  if (row.statusCheckRollup !== undefined) return toChecksState(row.statusCheckRollup);
+  if (row.mergedAt || (row.state ?? '').toUpperCase() === 'MERGED') return 'green';
+  return 'pending';
+}
+
 /** A `gh` row → the PR facts, or null when the PR is closed without merging. */
 export function prFromGhRow(row: GhPrRow): LoadedPr | null {
   if (typeof row.number !== 'number') return null;
@@ -343,7 +357,7 @@ export function prFromGhRow(row: GhPrRow): LoadedPr | null {
     url: row.url ?? '',
     number: row.number,
     reviewState: toReviewState(row.reviewDecision, (row.reviewRequests?.length ?? 0) > 0),
-    checks: toChecksState(row.statusCheckRollup),
+    checks: checksFromGhRow(row),
     mergeable: row.mergeable === 'MERGEABLE' ? true : row.mergeable === 'CONFLICTING' ? false : null,
     merged,
     headSha: row.headRefOid ?? null,
