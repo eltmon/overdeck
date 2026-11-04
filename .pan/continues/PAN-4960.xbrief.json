@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4960",
   "created": "2026-11-04T10:12:59.940Z",
-  "updated": "2026-11-04T10:52:33.852Z",
+  "updated": "2026-11-04T10:53:48.976Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -60,6 +60,10 @@
     "me-entitlement.ac1": {
       "status": "completed",
       "doneAt": "2026-11-04T10:52:33.851Z"
+    },
+    "pkce-client.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:53:48.975Z"
     }
   }
 }
