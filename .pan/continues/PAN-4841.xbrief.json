@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4841",
   "created": "2026-11-04T10:01:07.580Z",
-  "updated": "2026-11-04T11:21:21.287Z",
+  "updated": "2026-11-04T11:21:22.289Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -80,6 +80,11 @@
       "claimedBy": "agent-pan-4841",
       "claimedAt": "2026-11-04T11:11:27.172Z",
       "doneAt": "2026-11-04T11:21:21.286Z"
+    },
+    "rel-first-testflight-build": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4841",
+      "claimedAt": "2026-11-04T11:21:22.288Z"
     }
   }
 }
