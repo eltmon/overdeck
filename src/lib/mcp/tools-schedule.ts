@@ -13,6 +13,12 @@ function requiredId(args: Record<string, unknown>): ArgResult<number> {
   return { ok: true, value };
 }
 
+function requiredKind(args: Record<string, unknown>): ArgResult<'once' | 'recurring'> {
+  const value = args['kind'];
+  if (value !== 'once' && value !== 'recurring') return { ok: false, error: errorResult('kind must be once or recurring') };
+  return { ok: true, value };
+}
+
 const CONVERSATION_PROPERTY = {
   type: 'string',
   description: 'The conversation name; @<machine>/<name> for one on a linked machine.',
@@ -105,4 +111,61 @@ const listScheduled: OverdeckTool = {
   },
 };
 
-export const SCHEDULE_TOOLS: readonly OverdeckTool[] = [scheduleMessage, scheduleRecurring, listScheduled];
+const updateScheduled: OverdeckTool = {
+  name: 'update_scheduled',
+  description:
+    'Change a scheduled item. kind once: replace the text of a pending one-shot message (`message`). kind recurring: change any of `prompt`, `cron`, `timeZone`, `enabled` (false pauses, true resumes) of a schedule.',
+  scope: 'tell',
+  audience: 'any',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      conversation: CONVERSATION_PROPERTY,
+      kind: { type: 'string', enum: ['once', 'recurring'], description: 'Which kind of scheduled item id refers to.' },
+      id: { type: 'number', description: 'The id of the scheduled message or schedule.' },
+      message: { type: 'string', description: 'kind once only: the new message text.' },
+      prompt: { type: 'string', description: 'kind recurring only: the new stored prompt.' },
+      cron: { type: 'string', description: 'kind recurring only: the new 5-field cron expression.' },
+      timeZone: { type: 'string', description: 'kind recurring only: the new IANA time zone.' },
+      enabled: { type: 'boolean', description: 'kind recurring only: false pauses, true resumes.' },
+    },
+    required: ['conversation', 'kind', 'id'],
+  },
+  async run(args, ctx) {
+    const conversation = requiredString(args, 'conversation');
+    if (!conversation.ok) return conversation.error;
+    const kind = requiredKind(args);
+    if (!kind.ok) return kind.error;
+    const id = requiredId(args);
+    if (!id.ok) return id.error;
+    const base = conversationPath(conversation.value);
+
+    if (kind.value === 'once') {
+      if (args['prompt'] !== undefined || args['cron'] !== undefined || args['timeZone'] !== undefined || args['enabled'] !== undefined) {
+        return errorResult('prompt, cron, timeZone and enabled apply only to kind recurring');
+      }
+      const message = requiredString(args, 'message');
+      if (!message.ok) return message.error;
+      return routeResult(await ctx.api.request('PATCH', `${base}/scheduled-messages/${id.value}`, { message: message.value }));
+    }
+
+    if (args['message'] !== undefined) return errorResult('message applies only to kind once');
+    const body: Record<string, unknown> = {};
+    const prompt = optionalString(args, 'prompt');
+    if (!prompt.ok) return prompt.error;
+    if (prompt.value !== undefined) body['prompt'] = prompt.value;
+    const cron = optionalString(args, 'cron');
+    if (!cron.ok) return cron.error;
+    if (cron.value !== undefined) body['cron'] = cron.value;
+    const timeZone = optionalString(args, 'timeZone');
+    if (!timeZone.ok) return timeZone.error;
+    if (timeZone.value !== undefined) body['timeZone'] = timeZone.value;
+    if (args['enabled'] !== undefined) {
+      if (typeof args['enabled'] !== 'boolean') return errorResult('enabled must be a boolean');
+      body['enabled'] = args['enabled'];
+    }
+    return routeResult(await ctx.api.request('PATCH', `${base}/schedules/${id.value}`, body));
+  },
+};
+
+export const SCHEDULE_TOOLS: readonly OverdeckTool[] = [scheduleMessage, scheduleRecurring, listScheduled, updateScheduled];

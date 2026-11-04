@@ -136,3 +136,45 @@ describe('MCP schedule tools: list_scheduled (PAN-4927 WI-4)', () => {
     expect(resultText(result)).toContain('missingScope: read:conversations');
   });
 });
+
+describe('MCP schedule tools: update_scheduled (PAN-4927 WI-5)', () => {
+  it('kind once patches { message } on scheduled-messages/:id', async () => {
+    const api = fakeApi({ 'PATCH /api/conversations/conv-a/scheduled-messages/1': { status: 200, json: { id: 1, message: 'new text' } } });
+    const client = await connectClient(api, SCOPES, false, SCHEDULE_TOOLS);
+    const result = await callTool(client, 'update_scheduled', { conversation: 'conv-a', kind: 'once', id: 1, message: 'new text' });
+    expect(result.isError).toBeFalsy();
+    expect(api.calls).toEqual([{ method: 'PATCH', path: '/api/conversations/conv-a/scheduled-messages/1', body: { message: 'new text' } }]);
+  });
+
+  it('kind recurring patches only the present fields on schedules/:id', async () => {
+    const api = fakeApi({ 'PATCH /api/conversations/conv-a/schedules/2': { status: 200, json: { id: 2 } } });
+    const client = await connectClient(api, SCOPES, false, SCHEDULE_TOOLS);
+    const result = await callTool(client, 'update_scheduled', { conversation: 'conv-a', kind: 'recurring', id: 2, enabled: false });
+    expect(result.isError).toBeFalsy();
+    expect(api.calls).toEqual([{ method: 'PATCH', path: '/api/conversations/conv-a/schedules/2', body: { enabled: false } }]);
+  });
+
+  it('kind once with cron is a tool error and sends no request', async () => {
+    const api = fakeApi({});
+    const client = await connectClient(api, SCOPES, false, SCHEDULE_TOOLS);
+    const result = await callTool(client, 'update_scheduled', { conversation: 'conv-a', kind: 'once', id: 1, message: 'x', cron: '0 9 * * *' });
+    expect(result.isError).toBe(true);
+    expect(api.calls).toEqual([]);
+  });
+
+  it('kind recurring with message is a tool error', async () => {
+    const api = fakeApi({});
+    const client = await connectClient(api, SCOPES, false, SCHEDULE_TOOLS);
+    const result = await callTool(client, 'update_scheduled', { conversation: 'conv-a', kind: 'recurring', id: 2, message: 'x' });
+    expect(result.isError).toBe(true);
+    expect(api.calls).toEqual([]);
+  });
+
+  it('id 0 and kind "later" are tool errors', async () => {
+    const api = fakeApi({});
+    const client = await connectClient(api, SCOPES, false, SCHEDULE_TOOLS);
+    expect((await callTool(client, 'update_scheduled', { conversation: 'conv-a', kind: 'once', id: 0, message: 'x' })).isError).toBe(true);
+    expect((await callTool(client, 'update_scheduled', { conversation: 'conv-a', kind: 'later', id: 1, message: 'x' })).isError).toBe(true);
+    expect(api.calls).toEqual([]);
+  });
+});
