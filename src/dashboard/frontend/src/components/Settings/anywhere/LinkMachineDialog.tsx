@@ -2,19 +2,28 @@
  * Link a machine (PAN-4645 FR-1, FR-4): paste the pairing link another
  * dashboard printed, pick the access level, and link one way or both ways.
  * Three fields, so a modal (page-not-modal doctrine allows 4 or fewer).
+ *
+ * PAN-4942 W-LINK1 D-12: opened from a machine-link card, the dialog carries
+ * the agent request id. After a successful link it posts the new link's
+ * environment id to `/api/agent-requests/<id>/linked`, so the agent's
+ * `link_machine_wait` answers the machine's label; the pairing link never
+ * leaves this dialog. A failed resolve shows a toast and never undoes the
+ * link; the dialog closes either way.
  */
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
 import { Modal } from '../../shared/Modal';
-import { ANYWHERE_STATUS_QUERY_KEY, isOk } from './anywhereApi';
+import { ANYWHERE_STATUS_QUERY_KEY, apiError, isOk } from './anywhereApi';
 import styles from './anywhereDialog.module.css';
-import { type LinkAccess, linkErrorText, linkMachine, MACHINES_QUERY_KEY } from './machinesApi';
+import { type LinkAccess, linkErrorText, linkMachine, MACHINES_QUERY_KEY, markAgentRequestLinked } from './machinesApi';
 
 interface LinkMachineDialogProps {
   open: boolean;
   onClose: () => void;
+  /** PAN-4942: the agent request this link answers, when a machine-link card opened the dialog. */
+  agentRequestId?: string | null;
 }
 
 export const OPERATOR_ACCESS_TEXT =
@@ -22,12 +31,26 @@ export const OPERATOR_ACCESS_TEXT =
 export const AGENT_FENCED_ACCESS_TEXT =
   'Only what agents on this machine may do within their own scopes; no operator-level control of the other machine.';
 
-export function LinkMachineDialog({ open, onClose }: LinkMachineDialogProps) {
+export function LinkMachineDialog({ open, onClose, agentRequestId = null }: LinkMachineDialogProps) {
   if (!open) return null;
-  return <LinkMachineDialogBody onClose={onClose} />;
+  return <LinkMachineDialogBody onClose={onClose} agentRequestId={agentRequestId} />;
 }
 
-function LinkMachineDialogBody({ onClose }: { onClose: () => void }) {
+/** Tell the agent that asked which machine was linked; a failure only shows a toast. */
+async function tellAgent(requestId: string, link: { environmentId: string; label: string }): Promise<void> {
+  try {
+    const resolved = await markAgentRequestLinked(requestId, link.environmentId);
+    if (resolved.status === 409 && (resolved.body as { code?: string } | null)?.code === 'agent-stopped') {
+      toast.info(`Linked ${link.label}, but the agent that asked has stopped.`);
+    } else if (!isOk(resolved)) {
+      toast.error(`Linked ${link.label}, but could not tell the agent: ${apiError(resolved)}`);
+    }
+  } catch (err) {
+    toast.error(`Linked ${link.label}, but could not tell the agent: ${(err as Error).message}`);
+  }
+}
+
+function LinkMachineDialogBody({ onClose, agentRequestId }: { onClose: () => void; agentRequestId: string | null }) {
   const queryClient = useQueryClient();
   const [pairingUrl, setPairingUrl] = useState('');
   const [access, setAccess] = useState<LinkAccess>('operator');
@@ -47,9 +70,11 @@ function LinkMachineDialogBody({ onClose }: { onClose: () => void }) {
         return;
       }
       toast.success(`Linked ${result.body.label}`);
+      if (agentRequestId) await tellAgent(agentRequestId, result.body);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: MACHINES_QUERY_KEY }),
         queryClient.invalidateQueries({ queryKey: ANYWHERE_STATUS_QUERY_KEY }),
+        queryClient.invalidateQueries({ queryKey: ['agent-requests'] }),
       ]);
       onClose();
     } catch (err) {

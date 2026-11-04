@@ -3,7 +3,9 @@
  * the command palette calls `openAnywhereDialog`, and this host — mounted once
  * in main.tsx — renders the same dialog component the Settings page renders,
  * over whatever page the operator is on. The Tailscale dialog is gated here:
- * only a root session (a browser on this machine) may open it (D7).
+ * only a root session (a browser on this machine) may open it (D7). Link a
+ * machine gets the agent request id a machine-link card opened it with
+ * (PAN-4942 D-11).
  */
 import { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -20,6 +22,7 @@ import { TailscaleSetupDialog } from './TailscaleSetupDialog';
 export function AnywhereDialogHost() {
   const dialog = useAnywhereDialogStore((s) => s.dialog);
   const close = useAnywhereDialogStore((s) => s.close);
+  const agentRequestId = useAnywhereDialogStore((s) => s.agentRequestId);
   const wantsTailscale = dialog === 'tailscale-setup';
   const { data: status, isError } = useQuery({
     queryKey: ANYWHERE_STATUS_QUERY_KEY,
@@ -38,7 +41,7 @@ export function AnywhereDialogHost() {
 
   return (
     <>
-      <LinkMachineDialog open={dialog === 'link-machine'} onClose={close} />
+      <LinkMachineDialog open={dialog === 'link-machine'} onClose={close} agentRequestId={agentRequestId} />
       <AddFlyMachineDialog open={dialog === 'add-fly-machine'} onClose={close} />
       <AddSshMachineDialog open={dialog === 'add-ssh-machine'} onClose={close} />
       <SetUpPhoneDialog open={dialog === 'set-up-phone'} onClose={close} />
