@@ -131,6 +131,28 @@ describe('MobileNeedsYou', () => {
     expect(screen.queryByRole('button', { name: 'Send' })).not.toBeInTheDocument();
   });
 
+  it('PAN-4941: shows "Answer on the desktop" and no Open for a secret request, even from a conversation', () => {
+    decisions = [{
+      id: '0123456789abcdef0123456789abcdef',
+      source: 'conversation',
+      label: 'abc',
+      kinds: ['secretRequest'],
+      since: '2026-11-04T00:00:00.000Z',
+      blocking: true,
+      agentRequest: {
+        id: '0123456789abcdef0123456789abcdef',
+        kind: 'secret',
+        name: 'OPENAI_API_KEY',
+        prompt: 'The key',
+        agentId: 'abc',
+        expiresAt: '2026-11-04T00:10:00.000Z',
+      },
+    }];
+    render(<MobileNeedsYou subjectId={null} />);
+    expect(screen.getByText('Answer on the desktop')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Open' })).not.toBeInTheDocument();
+  });
+
   it('shows the server error under the card and un-marks the question', async () => {
     decisions = [auq('a1', 'agent', 't1', ['Yes'])];
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ error: 'boom' }), { status: 500 })));

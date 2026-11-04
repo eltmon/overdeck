@@ -28,7 +28,7 @@ const originalHome = process.env.OVERDECK_HOME;
 const home = mkdtempSync(join(tmpdir(), 'pan-4941-agent-requests-'));
 process.env.OVERDECK_HOME = home;
 
-const { _resetAccessTokensForTests, _settleAccessTokenWritesForTests, createAccessToken } = await import('../../../lib/access-tokens.js');
+const { _resetAccessTokensForTests, _settleAccessTokenWritesForTests, createAccessToken, revokeAccessToken } = await import('../../../lib/access-tokens.js');
 const { _resetDashboardSessionTokenForTests } = await import('../routes/dashboard-auth.js');
 const { _resetInternalTokenCacheForTests, INTERNAL_TOKEN_HEADER } = await import('../../../lib/internal-token.js');
 const { remoteRequestGateLayer } = await import('../remote-request-gate.js');
@@ -376,17 +376,26 @@ describe('operator agent request handlers', () => {
     expect(result).toEqual({ status: 409, body: { error: 'the agent stopped; its request expired', code: 'agent-stopped' } });
     expect(existsSync(join(home, 'agents', 'agent-pan-1', 'secrets', 'STOPPED_KEY'))).toBe(false);
     expect(requests.getForAnswer(requestId)?.view.status).toBe('expired');
+    await expect(handleSecretRequestWait(agentCredential('agent-pan-1'), requestId, null, undefined, { requests, caller: callerDeps })).resolves.toEqual({
+      status: 200,
+      body: { requestId, status: 'expired' },
+    });
   });
 
-  it('checks the agent token in the registry by default', async () => {
+  it('checks the agent token in the registry by default: active delivers, revoked is agent-stopped', async () => {
     const { requests, requestId } = storeWithRequest('REGISTRY_KEY');
     // No agent token for agent-pan-1 exists in the temporary registry.
     await expect(handleAgentRequestSecret(ROOT, requestId, JSON.stringify({ value: 'v' }), { requests })).resolves.toMatchObject({ status: 409, body: { code: 'agent-stopped' } });
 
     const second = storeWithRequest('REGISTRY_KEY');
-    await createAccessToken({ name: 'agent:work:agent-pan-1', scopes: ['read:state', 'tell'], kind: 'token', agentId: 'agent-pan-1', agentKind: 'agent', role: 'work' });
+    const { record } = await createAccessToken({ name: 'agent:work:agent-pan-1', scopes: ['read:state', 'tell'], kind: 'token', agentId: 'agent-pan-1', agentKind: 'agent', role: 'work' });
     await expect(handleAgentRequestSecret(ROOT, second.requestId, JSON.stringify({ value: 'v' }), { requests: second.requests })).resolves.toMatchObject({ status: 200 });
     rmSync(join(home, 'agents'), { recursive: true, force: true });
+
+    const third = storeWithRequest('REVOKED_KEY');
+    await revokeAccessToken(record.id);
+    await expect(handleAgentRequestSecret(ROOT, third.requestId, JSON.stringify({ value: 'v' }), { requests: third.requests })).resolves.toMatchObject({ status: 409, body: { code: 'agent-stopped' } });
+    expect(existsSync(join(home, 'agents', 'agent-pan-1', 'secrets', 'REVOKED_KEY'))).toBe(false);
   });
 
   it('declines a request, and the wait answers declined', async () => {
@@ -428,7 +437,7 @@ describe('operator agent request handlers', () => {
     try {
       const { requests, requestId } = storeWithRequest();
       const result = await handleAgentRequestSecret(ROOT, requestId, `{"value": "${canary}"`, { requests, hasActiveAgentToken: active });
-      expect(result.status).toBe(400);
+      expect(result).toMatchObject({ status: 400, body: { code: 'bad-value' } });
       expect(JSON.stringify(result)).not.toContain(canary);
       for (const spy of spies) expect(JSON.stringify(spy.mock.calls)).not.toContain(canary);
       expect(JSON.stringify(emitActivityEntryMock.mock.calls)).not.toContain(canary);
@@ -501,7 +510,8 @@ describe('secret request flow (AC-12)', () => {
       for (const output of outputs) expect(JSON.stringify(output)).not.toContain(canary);
       expect(JSON.stringify(emitActivityEntryMock.mock.calls)).not.toContain(canary);
       for (const spy of spies) expect(JSON.stringify(spy.mock.calls)).not.toContain(canary);
-      expect(emitActivityEntryMock).toHaveBeenCalledWith(expect.objectContaining({ message: 'Secret EVAL_API_KEY delivered to agent-pan-1 · PAN-1' }));
+      const delivered = emitActivityEntryMock.mock.calls.filter(([entry]) => String((entry as { message?: unknown }).message).startsWith('Secret '));
+      expect(delivered).toEqual([[{ source: 'dashboard', level: 'info', message: 'Secret EVAL_API_KEY delivered to agent-pan-1 · PAN-1' }]]);
     } finally {
       for (const spy of spies) spy.mockRestore();
     }
