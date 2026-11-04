@@ -1,10 +1,10 @@
 import { EventEmitter } from 'node:events';
 
-import { ChannelOpenError, type ChannelOpenErrorCode, type MachineDialer, type RtcDuplexWeb } from '@overdeck/anywhere-channel/web';
+import { ChannelOpenError, type ChannelOpenErrorCode, type DirectoryWebState, type MachineDialer, type RtcDuplexWeb } from '@overdeck/anywhere-channel/web';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { MIN_PAN_VERSION } from '../config';
-import { ConnectionError, createConnection, DIRECT_TIMEOUT_WITH_RELAY_MS, type ConnectionDirectory } from '../connection';
+import { ConnectionError, createConnection, DIRECT_TIMEOUT_WITH_RELAY_MS, DIRECTORY_WAIT_MS, type ConnectionDirectory } from '../connection';
 import { createRelayMeter, type RelayMeter } from '../relayMeter';
 import type { PairedMachine } from '../types';
 
@@ -35,12 +35,23 @@ function fakeDirectory(opts: { relayAllowed: boolean; online?: boolean; direct: 
     }),
     close: vi.fn(),
   };
-  const directory: ConnectionDirectory = {
-    client: { state: opts.online === false ? 'connecting' : 'online', relayAllowed: opts.relayAllowed },
-    dialer,
-    relayStopped: () => relayStopped,
+  const stateListeners = new Set<(state: DirectoryWebState) => void>();
+  const client = {
+    state: (opts.online === false ? 'connecting' : 'online') as DirectoryWebState,
+    relayAllowed: opts.relayAllowed,
+    onStateChange(listener: (state: DirectoryWebState) => void) {
+      stateListeners.add(listener);
+      return () => {
+        stateListeners.delete(listener);
+      };
+    },
   };
-  return { directory, dials, raws, dialer, stopRelay: () => (relayStopped = true) };
+  const setState = (state: DirectoryWebState): void => {
+    client.state = state;
+    for (const listener of [...stateListeners]) listener(state);
+  };
+  const directory: ConnectionDirectory = { client, dialer, relayStopped: () => relayStopped };
+  return { directory, dials, raws, dialer, setState, stopRelay: () => (relayStopped = true) };
 }
 
 const MACHINE: PairedMachine = {
@@ -115,11 +126,44 @@ describe('dialRaw', () => {
     expect(f.dials).toEqual([{ relay: false }]);
   });
 
-  it('refuses with directory-offline while the directory is not online', async () => {
+  it('refuses with directory-offline when the directory does not come online in time', async () => {
     const f = fakeDirectory({ relayAllowed: true, online: false, direct: 'ok' });
-    const error = await rejection(createConnection({ directory: f.directory, meter }).dialRaw(MACHINE.environmentId, 'desk'));
+    const log = vi.fn();
+    const pending = rejection(createConnection({ directory: f.directory, meter, log }).dialRaw(MACHINE.environmentId, 'desk'));
+    await vi.advanceTimersByTimeAsync(DIRECTORY_WAIT_MS);
+    const error = await pending;
     expect(error.kind).toBe('directory-offline');
     expect(error.message).toBe('Not connected to overdeck.ai.');
+    expect(f.dials).toEqual([]);
+    expect(log).toHaveBeenCalledWith(`link desk: directory not online after ${DIRECTORY_WAIT_MS} ms (connecting)`);
+  });
+
+  it('waits for a connecting directory and dials once it is online (PAN-5018)', async () => {
+    const f = fakeDirectory({ relayAllowed: false, online: false, direct: 'ok' });
+    const dialed = createConnection({ directory: f.directory, meter, log: vi.fn() }).dialRaw(MACHINE.environmentId, 'desk');
+    await vi.advanceTimersByTimeAsync(DIRECTORY_WAIT_MS - 1);
+    expect(f.dials).toEqual([]);
+    f.setState('online');
+    const raw = await dialed;
+    expect(raw).toBe(f.raws[0]);
+    expect(f.dials).toEqual([{ relay: false }]);
+  });
+
+  it('stops waiting at once when the directory refuses', async () => {
+    const f = fakeDirectory({ relayAllowed: false, online: false, direct: 'ok' });
+    const pending = rejection(createConnection({ directory: f.directory, meter, log: vi.fn() }).dialRaw(MACHINE.environmentId, 'desk'));
+    f.setState('refused');
+    expect((await pending).kind).toBe('directory-offline');
+  });
+
+  it('stops waiting when the dial is aborted', async () => {
+    const f = fakeDirectory({ relayAllowed: false, online: false, direct: 'ok' });
+    const controller = new AbortController();
+    const pending = createConnection({ directory: f.directory, meter, log: vi.fn() })
+      .dialRaw(MACHINE.environmentId, 'desk', { signal: controller.signal })
+      .catch((error: unknown) => error);
+    controller.abort();
+    expect(await pending).toMatchObject({ name: 'AbortError' });
     expect(f.dials).toEqual([]);
   });
 

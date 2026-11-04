@@ -258,3 +258,27 @@ Two phone-side causes were reproduced every time:
    ("dialer closed") and the relay fallback then fails because the directory socket is reconnecting.
 
 Root-cause fixes and the rerun are in the next section.
+
+### Fix and rerun (PAN-5018 WI-9)
+
+- **Fix 1 (`session.ts`):** a dial that succeeds clears the stored dial error and notifies the shell,
+  so a transient failure no longer stays over the machine view.
+- **Fix 2 (`connection.ts`):** `dialRaw` waits up to `DIRECTORY_WAIT_MS` (10 s) for an off or
+  connecting directory socket to come online before it reports `directory-offline`, gives up at once
+  on `refused` or an abort, and logs `link <label>: directory not online after 10000 ms (<state>)`
+  when it gives up (this failure path logged nothing before).
+- **Regression tests:** `session.test.ts` "clears the dial error when a later dial succeeds" and
+  `connection.test.ts` "waits for a connecting directory and dials once it is online", "refuses with
+  directory-offline when the directory does not come online in time", "stops waiting when the dial is
+  aborted". All four failed on the pre-fix code and pass after it.
+
+Rerun on the same Simulator and the same test machine process (up since 14:28 UTC), fixed phone
+build installed 14:48:39:
+
+| Time (UTC) | Step | Phone on screen | Machine |
+| --- | --- | --- | --- |
+| 14:48:43–14:49:58 | Open the machine ×4 (each a page reload) | "Nothing needs you.", no failure text | each: `rtc offer from ae6b5071 … (link, direct)`, `connected` |
+| 14:50:46–14:52:14 | Background/foreground ×3 | Machine view, no failure text | each resume: new offer, `connected`; no `dialer closed` on the phone |
+| 14:52:3x–14:53:5x | Machine `kill -STOP` 75 s, then `kill -CONT` | "Nothing needs you.", no failure text | `directory silent for 85 s; reconnecting`, `directory online`, new offer `connected` |
+
+The step that failed before (open the machine, and resume) now links every time.

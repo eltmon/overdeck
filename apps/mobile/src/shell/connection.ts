@@ -1,6 +1,10 @@
 /**
  * Dialing a machine and opening a secure channel to it (PAN-4837 FR-7, FR-10, D-7, D-8).
  *
+ * The directory socket starts over on every page load (opening a machine reloads the page) and on
+ * resume, so a dial waits up to {@link DIRECTORY_WAIT_MS} for a connecting socket before it reports
+ * `directory-offline` (PAN-5018).
+ *
  * Dial policy: direct first (8 s when the relay could take over, else the dialer's 15 s), then
  * through TURN when the directory allows the relay and this month's allowance is not used. The route
  * that worked is remembered per machine until `forgetRoutes()`. Every relayed raw channel is metered.
@@ -18,6 +22,8 @@ import type { RelayMeter } from './relayMeter';
 import type { PairedMachine } from './types';
 
 export const DIRECT_TIMEOUT_WITH_RELAY_MS = 8_000;
+/** How long a dial waits for the directory socket to come online. */
+export const DIRECTORY_WAIT_MS = 10_000;
 
 export type ConnectionErrorKind = 'directory-offline' | 'no-path' | 'removed' | 'pairing-refused' | 'identity' | 'outdated' | 'other';
 
@@ -45,7 +51,7 @@ export const connectionText = {
 
 /** What the connection layer needs from the directory: its state and the relay gates. */
 export interface ConnectionDirectory {
-  readonly client: Pick<DirectoryWebClient, 'state' | 'relayAllowed'>;
+  readonly client: Pick<DirectoryWebClient, 'state' | 'relayAllowed' | 'onStateChange'>;
   readonly dialer: MachineDialer;
   relayStopped(): boolean;
 }
@@ -130,9 +136,39 @@ export function createConnection({
     return raw;
   }
 
+  /** Resolves once the directory socket is online; waits while it is off or connecting, up to the limit. */
+  function waitOnline(label: string, signal: AbortSignal | undefined): Promise<void> {
+    const { client } = directory;
+    if (client.state === 'online') return Promise.resolve();
+    return new Promise<void>((resolve, reject) => {
+      const finish = (error: unknown): void => {
+        clearTimeout(timer);
+        off();
+        signal?.removeEventListener('abort', onAbort);
+        if (error === null) resolve();
+        else reject(error);
+      };
+      const offline = (): void => {
+        log(`link ${label}: directory not online after ${DIRECTORY_WAIT_MS} ms (${client.state})`);
+        finish(new ConnectionError('directory-offline', connectionText.directoryOffline()));
+      };
+      const onAbort = (): void => finish(signal?.reason ?? new DOMException('The dial was aborted', 'AbortError'));
+      const timer = setTimeout(offline, DIRECTORY_WAIT_MS);
+      const off = client.onStateChange((state) => {
+        if (state === 'online') finish(null);
+        else if (state === 'refused') {
+          log(`link ${label}: directory refused this phone`);
+          finish(new ConnectionError('directory-offline', connectionText.directoryOffline()));
+        }
+      });
+      if (signal?.aborted) onAbort();
+      else signal?.addEventListener('abort', onAbort, { once: true });
+    });
+  }
+
   async function dialRawWithRoute(environmentId: string, label: string, opts: { signal?: AbortSignal } = {}): Promise<{ raw: RtcDuplexWeb; route: Route }> {
-    if (directory.client.state !== 'online') throw new ConnectionError('directory-offline', connectionText.directoryOffline());
     const signal = opts.signal;
+    await waitOnline(label, signal);
     if (routes.get(environmentId) === true && relayAvailable()) {
       try {
         return { raw: await dialRelay(environmentId, signal), route: 'relay' };
