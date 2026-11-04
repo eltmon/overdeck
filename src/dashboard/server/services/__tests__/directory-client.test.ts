@@ -222,6 +222,32 @@ describe('DirectoryClient (PAN-2356 WI-9)', () => {
     h.client.stop();
   });
 
+  it('opens a socket at once when recheckAccount() sees a new account.json (PAN-4960 WI-3)', async () => {
+    vi.useFakeTimers(FAKE_TIMERS);
+    const h = harness();
+    h.setAccount(null);
+    await h.client.start();
+    expect(h.sockets).toEqual([]);
+    h.setAccount(ACCOUNT);
+    await h.client.recheckAccount();
+    expect(h.sockets).toHaveLength(1);
+    expect(h.sockets[0]!.headers['Authorization']).toBe(`Bearer ${ACCOUNT.accessToken}`);
+    h.client.stop();
+  });
+
+  it('retries a refused machine at once through recheckAccount() after a new token (PAN-4960 WI-3)', async () => {
+    vi.useFakeTimers(FAKE_TIMERS);
+    const h = harness();
+    await h.client.start();
+    h.sockets[0]!.drop(4001);
+    expect(h.client.status().state).toBe('refused');
+    h.setAccount({ ...ACCOUNT, accessToken: `odd_${'c'.repeat(64)}` });
+    await h.client.recheckAccount();
+    expect(h.sockets).toHaveLength(2);
+    expect(h.sockets[1]!.headers['Authorization']).toBe(`Bearer odd_${'c'.repeat(64)}`);
+    h.client.stop();
+  });
+
   it('reconnects a dropped socket after 1 s, then 2 s, and resets on welcome', async () => {
     vi.useFakeTimers(FAKE_TIMERS);
     const h = harness();
