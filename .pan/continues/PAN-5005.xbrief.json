@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5005",
   "created": "2026-11-04T11:43:00.100Z",
-  "updated": "2026-11-04T12:13:47.808Z",
+  "updated": "2026-11-04T12:14:01.664Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -60,6 +60,10 @@
     "remote-row-stamp.ac2": {
       "status": "completed",
       "doneAt": "2026-11-04T12:13:47.808Z"
+    },
+    "remote-row-stamp.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T12:14:01.663Z"
     }
   }
 }
