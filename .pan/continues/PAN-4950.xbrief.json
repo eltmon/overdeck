@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4950",
   "created": "2026-11-04T10:02:21.153Z",
-  "updated": "2026-11-04T11:10:44.590Z",
+  "updated": "2026-11-04T11:11:14.675Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -104,6 +104,10 @@
     "conn-account.ac1": {
       "status": "completed",
       "doneAt": "2026-11-04T11:10:44.590Z"
+    },
+    "conn-account.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T11:11:14.675Z"
     }
   }
 }
