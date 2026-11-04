@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4841",
+  "created": "2026-11-04T10:01:07.580Z",
+  "updated": "2026-11-04T10:01:07.581Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "rel-operator-checklist": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4841",
+      "claimedAt": "2026-11-04T10:01:07.580Z"
+    }
+  }
+}
