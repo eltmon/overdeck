@@ -54,6 +54,10 @@
       </array>
     </dict>
 	</dict>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
+	<key>NSSupportsLiveActivitiesFrequentUpdates</key>
+	<true/>
 	<key>OverdeckSharedKeychainGroup</key>
 	<string>$(AppIdentifierPrefix)ai.overdeck.shared</string>
 	<key>NSCameraUsageDescription</key>

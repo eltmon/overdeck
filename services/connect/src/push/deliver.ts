@@ -4,11 +4,12 @@
  *
  * iOS goes to APNs, Android to FCM. A 5xx answer, network error or timeout of the send is retried
  * once after 2 s; nothing else is. Worst case is OAuth 2 s + send 2 s + wait 2 s + send 2 s = 8 s,
- * inside the machine's 10 s wait for `push-result`.
+ * inside the machine's 10 s wait for `push-result`. A Live Activity update (PAN-4839) is iOS only and
+ * follows the same retry rule.
  */
-import { sendApns } from './apns.ts';
+import { sendApns, sendApnsActivity } from './apns.ts';
 import type { ApnsTokenCache } from './apns.ts';
-import type { PushConfig, PushOutcome, PushRequest, SendResult } from './config.ts';
+import type { ActivityPushRequest, PushConfig, PushOutcome, PushRequest, SendResult } from './config.ts';
 import { sendFcm } from './fcm.ts';
 import type { FcmTokenCache } from './fcm.ts';
 
@@ -36,6 +37,17 @@ export async function deliverPush(req: PushRequest, opts: DeliverOptions): Promi
     if (fcm === null) return { kind: 'not_configured' };
     send = () => sendFcm(req, { config: fcm, fetch: opts.fetch, now: opts.now, tokens: opts.fcmTokens });
   }
+  return sendWithRetry(send, opts);
+}
+
+/** A Live Activity update to one phone: APNs only, with the same single retry. */
+export async function deliverActivity(req: ActivityPushRequest, opts: DeliverOptions): Promise<PushOutcome> {
+  const apns = opts.config.apns;
+  if (apns === null) return { kind: 'not_configured' };
+  return sendWithRetry(() => sendApnsActivity(req, { config: apns, fetch: opts.fetch, now: opts.now, tokens: opts.apnsTokens }), opts);
+}
+
+async function sendWithRetry(send: () => Promise<SendResult>, opts: DeliverOptions): Promise<PushOutcome> {
   let result = await send();
   if (result.kind === 'retryable') {
     await (opts.sleep ?? defaultSleep)(PUSH_RETRY_DELAY_MS);

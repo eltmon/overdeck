@@ -6,5 +6,6 @@ final class MainViewController: CAPBridgeViewController {
     override func capacitorDidLoad() {
         super.capacitorDidLoad()
         bridge?.registerPluginInstance(OverdeckKeysPlugin())
+        bridge?.registerPluginInstance(OverdeckLiveActivityPlugin())
     }
 }

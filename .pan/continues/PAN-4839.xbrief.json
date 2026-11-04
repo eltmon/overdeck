@@ -1,0 +1,290 @@
+{
+  "version": "1",
+  "issueId": "PAN-4839",
+  "created": "2026-11-03T21:01:30.274Z",
+  "updated": "2026-11-03T23:38:34.582Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-03T23:12Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-03T23:12:33.006Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-03T23:13Z] coderabbit → FINDINGS — seq 2",
+      "timestamp": "2026-11-03T23:13:43.974Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-03T23:38:34.582Z"
+    }
+  ],
+  "items": {
+    "contracts": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4839",
+      "claimedAt": "2026-11-03T21:01:30.274Z",
+      "doneAt": "2026-11-03T21:04:18.111Z"
+    },
+    "decoder": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4839",
+      "claimedAt": "2026-11-03T21:06:35.796Z",
+      "doneAt": "2026-11-03T21:07:39.263Z"
+    },
+    "apns-liveactivity": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4839",
+      "claimedAt": "2026-11-03T21:07:44.886Z",
+      "doneAt": "2026-11-03T21:09:05.031Z"
+    },
+    "directory-activity": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4839",
+      "claimedAt": "2026-11-03T21:09:06.185Z",
+      "doneAt": "2026-11-03T21:14:14.983Z"
+    },
+    "machine-sender": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4839",
+      "claimedAt": "2026-11-03T21:14:20.497Z",
+      "doneAt": "2026-11-03T21:17:15.376Z"
+    },
+    "machine-service": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4839",
+      "claimedAt": "2026-11-03T21:17:24.334Z",
+      "doneAt": "2026-11-03T21:19:46.092Z"
+    },
+    "app-bridge": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4839",
+      "claimedAt": "2026-11-03T21:19:47.341Z",
+      "doneAt": "2026-11-03T21:22:19.719Z"
+    },
+    "app-wiring": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4839",
+      "claimedAt": "2026-11-03T21:22:25.486Z",
+      "doneAt": "2026-11-03T21:25:58.577Z"
+    },
+    "ios-widget-target": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4839",
+      "claimedAt": "2026-11-03T21:26:56.341Z",
+      "doneAt": "2026-11-03T21:32:17.684Z"
+    },
+    "ios-plugin": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4839",
+      "claimedAt": "2026-11-03T21:32:28.546Z",
+      "doneAt": "2026-11-03T21:34:28.031Z"
+    },
+    "acceptance": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4839",
+      "claimedAt": "2026-11-03T21:43:27.905Z",
+      "doneAt": "2026-11-03T21:44:26.469Z"
+    },
+    "docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4839",
+      "claimedAt": "2026-11-03T21:44:30.679Z",
+      "doneAt": "2026-11-03T21:57:04.024Z"
+    },
+    "acceptance.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:02:55.159Z"
+    },
+    "acceptance.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:03:14.330Z"
+    },
+    "apns-liveactivity.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:03:34.443Z"
+    },
+    "apns-liveactivity.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:03:52.999Z"
+    },
+    "apns-liveactivity.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:04:13.274Z"
+    },
+    "apns-liveactivity.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:04:33.184Z"
+    },
+    "app-bridge.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:04:53.416Z"
+    },
+    "app-bridge.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:05:12.879Z"
+    },
+    "app-bridge.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:05:33.816Z"
+    },
+    "app-bridge.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:05:54.401Z"
+    },
+    "app-wiring.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:06:17.174Z"
+    },
+    "app-wiring.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:06:40.094Z"
+    },
+    "app-wiring.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:07:00.047Z"
+    },
+    "app-wiring.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:07:22.730Z"
+    },
+    "contracts.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:07:48.176Z"
+    },
+    "contracts.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:08:14.749Z"
+    },
+    "contracts.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:08:44.718Z"
+    },
+    "decoder.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:09:15.570Z"
+    },
+    "decoder.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:09:41.927Z"
+    },
+    "decoder.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:10:25.965Z"
+    },
+    "decoder.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:10:51.061Z"
+    },
+    "directory-activity.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:11:15.252Z"
+    },
+    "directory-activity.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:11:39.137Z"
+    },
+    "directory-activity.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:11:55.572Z"
+    },
+    "directory-activity.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:12:12.599Z"
+    },
+    "directory-activity.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:12:32.115Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:12:51.988Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:13:10.322Z"
+    },
+    "docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:13:26.528Z"
+    },
+    "docs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:13:42.263Z"
+    },
+    "ios-plugin.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:13:58.383Z"
+    },
+    "ios-plugin.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:14:13.866Z"
+    },
+    "ios-plugin.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:14:30.638Z"
+    },
+    "ios-plugin.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:14:46.207Z"
+    },
+    "ios-widget-target.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:15:02.951Z"
+    },
+    "ios-widget-target.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:15:23.060Z"
+    },
+    "ios-widget-target.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:15:43.160Z"
+    },
+    "ios-widget-target.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:16:00.367Z"
+    },
+    "machine-sender.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:16:18.487Z"
+    },
+    "machine-sender.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:16:37.997Z"
+    },
+    "machine-sender.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:16:53.043Z"
+    },
+    "machine-sender.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:17:09.183Z"
+    },
+    "machine-sender.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:17:24.642Z"
+    },
+    "machine-service.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:17:41.203Z"
+    },
+    "machine-service.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:17:57.419Z"
+    },
+    "machine-service.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:18:13.071Z"
+    },
+    "acceptance.ac1": {
+      "status": "cancelled"
+    }
+  },
+  "feedback": [],
+  "agentModel": "claude-opus-5-5"
+}

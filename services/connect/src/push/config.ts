@@ -24,6 +24,15 @@ export interface PushRequest {
   readonly collapseId: string;
 }
 
+/** One Live Activity update to one phone (PAN-4839). Only the two counts reach APNs. */
+export interface ActivityPushRequest {
+  readonly token: string;
+  readonly apsEnvironment: ApsEnvironment;
+  readonly needsYou: number;
+  readonly running: number;
+  readonly priority: 'high' | 'normal';
+}
+
 export interface ApnsConfig {
   /** PEM text of the `.p8` auth key. */
   readonly keyP8: string;
