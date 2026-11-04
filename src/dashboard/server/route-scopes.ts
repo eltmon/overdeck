@@ -74,6 +74,9 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   { method: 'POST', path: '/api/lanes', scope: 'operate' },
   // PAN-4638 WI-8: stop a lane here, or on its owner through the link.
   { method: 'POST', path: '/api/lanes/:name/stop', scope: 'operate' },
+  // PAN-4938 D-11: lane_status reads one lane; lanes are state.
+  { method: 'GET', path: '/api/lanes', scope: 'read:state' },
+  { method: 'GET', path: '/api/lanes/:name', scope: 'read:state' },
   // PAN-4645 WI-13: a linked machine revokes its own token (the route then
   // requires exactly a machine credential).
   { method: 'DELETE', path: '/api/machines/self', scope: 'read:state' },
@@ -132,6 +135,7 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   { method: 'GET', path: '/api/self/workers/:id/wait', scope: 'read:state' },
   { method: 'GET', path: '/api/self/workers', scope: 'read:state' },
   { method: 'GET', path: '/api/self/workers/:id', scope: 'read:state' },
+  { method: 'POST', path: '/api/self/lanes', scope: 'operate' },
   // PAN-4650 WI-9: the owner's half of Pull here (a linked machine's operator only, checked by the routes).
   { method: 'POST', path: '/api/conversations/:name/release', scope: 'operate' },
   { method: 'GET', path: '/api/conversations/:name/release/transfer/:transferId', scope: 'operate' },
