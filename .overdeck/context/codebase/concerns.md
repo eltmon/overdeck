@@ -669,15 +669,17 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   missing from the `✓ root <file>` list. Spy `process.kill` in any test whose code under test
   signals a fixture PID. 39 test files carry literal PIDs without a `process.kill` spy; most only
   use the PID as data, but none were audited.
-<!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4925) -->
-<!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917) -->
-<!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4931) -->
-<!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4929) -->
 - **The access-token snapshot is per process** (PAN-4930 planning) — `verifyAccessToken` and
   `listActiveRecordsOfKind` (`src/lib/access-tokens.ts`) read an in-memory snapshot that only the dashboard
   fills (`startAccessTokenRefresh`, every 5 s). A CLI process (`pan kill`, `pan start`) sees zero records
   unless it calls `refreshAccessTokens()` first (as `pan mcp serve` does) or reads the file with
   `listAccessTokens()`. `verifyAccessToken` also writes `lastUsedAt`, and `mutate` serializes writes only
   within one process, so a CLI write and a dashboard `lastUsedAt` write can lose each other.
-<!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4930) -->
-<!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4925, PAN-4929, PAN-4482) -->
+- **Self jobs see only the identity env they are given** (PAN-4937 planning) — a self route's `pan` job
+  (`src/dashboard/server/services/self-jobs.ts` `selfJobEnv`) has no `$TMUX` and drops every inherited
+  identity variable. `pan handoff self` finds its source through `OVERDECK_AGENT_ID` (`src/lib/conversations/current.ts`)
+  and `pan task claim` records `OVERDECK_CLAIM_ID || OVERDECK_AGENT_ID || cli-<pid>` (`src/lib/xbrief/claim-check.ts`),
+  so a job for a conversation needs `OVERDECK_AGENT_ID=<tmuxSession>` like the conversation's own launcher, or
+  handoff fails and the claim is a `cli-<pid>` that `probeHolder` treats as dead. Work agents have no conversation
+  row (only `*-review` role runs do), so `pan handoff self` refuses them.
+<!-- last-verified: 2026-11-04 (PAN-4905, PAN-4917, PAN-4925, PAN-4929, PAN-4930, PAN-4931, PAN-4482, PAN-4937) -->
