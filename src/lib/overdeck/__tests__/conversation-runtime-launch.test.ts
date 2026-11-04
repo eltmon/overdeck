@@ -321,6 +321,7 @@ describe('conversations get the overdeck MCP server (PAN-4932)', () => {
   it('passes no config for a conversation without a row', async () => {
     await launch('conv-norow');
     expect(launcherConfigs[0]!['overdeckMcpConfig']).toBeUndefined();
+    expect(await tokenFor('norow')).toEqual([]);
   });
 
   it('mints a worker token for a lane row', async () => {
@@ -339,5 +340,6 @@ describe('conversations get the overdeck MCP server (PAN-4932)', () => {
 
     expect(launcherConfigs[0]!['overdeckMcpConfig']).toBe(join(overdeckHome, 'conversations', 'conv-lane-c1', 'overdeck-mcp.json'));
     expect(await tokenFor('lane-c1')).toEqual([expect.objectContaining({ agentKind: 'conversation', role: 'worker' })]);
+    expect((await tokenFor('lane-c1'))[0]!.scopes).not.toContain('approve');
   });
 });

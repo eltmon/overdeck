@@ -12,7 +12,7 @@
  * Every terminal and liveness call is mocked; nothing touches tmux or Herdr.
  */
 import { existsSync } from 'node:fs';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -190,6 +190,10 @@ describe('POST /api/planning/:issueId/message (M1)', () => {
     expect(response.status).toBe(200);
     expect(mocks.launcherConfigs).toHaveLength(1);
     expect(mocks.launcherConfigs[0]!.overdeckMcpConfig).toBe(join(mocks.projectPath, 'home', 'agents', PLANNER, 'overdeck-mcp.json'));
+    expect(JSON.stringify(mocks.launcherConfigs[0])).not.toContain('odk_');
+    const agentDir = join(mocks.projectPath, 'home', 'agents', PLANNER);
+    expect(await readFile(join(agentDir, 'continuation-launcher.sh'), 'utf8')).not.toContain('odk_');
+    expect((await stat(join(agentDir, 'mcp-token'))).mode & 0o777).toBe(0o600);
   });
 
   it('records the relaunched claude-code harness, so the oracle probes the right process next time', async () => {

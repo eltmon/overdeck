@@ -7,7 +7,7 @@
  * Herdr socket.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Effect } from 'effect';
@@ -174,6 +174,8 @@ describe('spawnPlanningSession launches through the host backend (PAN-3960)', ()
     else expect(launcher).not.toContain('while true; do sleep 60; done');
     // PAN-4932: the planner gets the overdeck MCP server with its own token file.
     expect(launcher).toContain(`--mcp-config='${join(tempHome, '.overdeck', 'agents', sessionName, 'overdeck-mcp.json')}'`);
+    expect(launcher).not.toContain('odk_');
+    expect(statSync(join(tempHome, '.overdeck', 'agents', sessionName, 'mcp-token')).mode & 0o777).toBe(0o600);
   });
 
   it('keeps the tmux-only server hygiene on tmux and skips it on Herdr', async () => {

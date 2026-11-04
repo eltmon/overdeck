@@ -31,7 +31,7 @@ vi.mock('../../../../src/lib/mcp/agent-token.js', async (importOriginal) => {
   };
 });
 
-import { _resetAccessTokensForTests, _settleAccessTokenWritesForTests } from '../../../../src/lib/access-tokens.js';
+import { _resetAccessTokensForTests, _settleAccessTokenWritesForTests, listAccessTokens } from '../../../../src/lib/access-tokens.js';
 import {
   conversationTokenRole,
   harnessGetsOverdeckMcp,
@@ -121,6 +121,15 @@ describe('overdeck MCP injection (PAN-4932 W-4)', () => {
       if (previous === undefined) delete process.env.OVERDECK_DOCKER_WORKSPACE;
       else process.env.OVERDECK_DOCKER_WORKSPACE = previous;
     }
+    const previousPan = process.env.PAN_DOCKER;
+    process.env.PAN_DOCKER = '1';
+    try {
+      expect(await prepareClaudeOverdeckMcp({ agentId: 'agent-pan-1', agentKind: 'agent', role: 'work', harness: 'claude-code' })).toEqual({});
+    } finally {
+      if (previousPan === undefined) delete process.env.PAN_DOCKER;
+      else process.env.PAN_DOCKER = previousPan;
+    }
+    expect(await listAccessTokens()).toEqual([]);
   });
 
   it('degrades to {} with one warning that names the agent when the mint fails', async () => {
