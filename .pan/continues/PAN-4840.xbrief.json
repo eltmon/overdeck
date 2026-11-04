@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4840",
   "created": "2026-11-03T20:58:06.302Z",
-  "updated": "2026-11-04T18:56:07.162Z",
+  "updated": "2026-11-04T18:56:24.006Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -158,6 +158,10 @@
     "device-acceptance.ac3": {
       "status": "completed",
       "doneAt": "2026-11-04T18:56:07.161Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:56:24.005Z"
     }
   }
 }
