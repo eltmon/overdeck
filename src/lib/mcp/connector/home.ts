@@ -229,14 +229,6 @@ export async function replaceLinkKey(home: string, identity: ConnectorIdentity, 
   return next;
 }
 
-/** The link key pair in the shape the Noise initiator takes. */
-export function linkKeyPair(identity: ConnectorIdentity): StaticKeyPair {
-  return {
-    publicKey: Buffer.from(identity.linkPublicKey, 'hex'),
-    secretKey: Buffer.from(identity.linkSecretKey, 'hex'),
-  };
-}
-
 /** The local token, or `null` when the file is absent or does not hold an `odl_` token. */
 export async function readLocalToken(home: string): Promise<string | null> {
   const text = await readSecretFile(home, LOCAL_TOKEN_FILE);
