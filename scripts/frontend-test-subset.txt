@@ -81,6 +81,7 @@ src/components/Settings/anywhere/__tests__/TailscaleSetupDialog.test.tsx
 src/components/Settings/anywhere/__tests__/botSnippets.test.ts
 src/components/Settings/anywhere/__tests__/botsApi.test.ts
 src/components/Settings/anywhere/__tests__/mcpOAuthApi.test.ts
+src/components/Settings/primitives/__tests__/SettingsSection.test.tsx
 src/components/Settings/sections/__tests__/AccessTokensSection.test.tsx
 src/components/Settings/sections/__tests__/AutoSettleIdleRow.test.tsx
 src/components/Settings/sections/__tests__/AutoSettleOnMergeRow.test.tsx
