@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4482",
   "created": "2026-11-03T23:55:28.272Z",
-  "updated": "2026-11-04T00:30:41.921Z",
+  "updated": "2026-11-04T00:31:03.449Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -94,6 +94,10 @@
     "signaling-privacy-e2e.ac1": {
       "status": "completed",
       "doneAt": "2026-11-04T00:30:41.921Z"
+    },
+    "signaling-privacy-e2e.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T00:31:03.449Z"
     }
   }
 }
