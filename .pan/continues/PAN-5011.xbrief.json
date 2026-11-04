@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5011",
   "created": "2026-11-04T11:42:07.971Z",
-  "updated": "2026-11-04T13:20:44.689Z",
+  "updated": "2026-11-04T13:21:01.684Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -122,6 +122,10 @@
     "activity-route-presence.ac5": {
       "status": "completed",
       "doneAt": "2026-11-04T13:20:44.689Z"
+    },
+    "cockpit-pane-status.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:21:01.684Z"
     }
   }
 }
