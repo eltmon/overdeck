@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5006",
   "created": "2026-11-04T12:27:52.516Z",
-  "updated": "2026-11-04T13:00:47.731Z",
+  "updated": "2026-11-04T13:01:07.236Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -82,6 +82,10 @@
     "route-self-placement.ac4": {
       "status": "completed",
       "doneAt": "2026-11-04T13:00:47.731Z"
+    },
+    "cli-auto-reason.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:01:07.236Z"
     }
   }
 }
