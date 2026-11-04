@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4951",
   "created": "2026-11-04T04:17:47.457Z",
-  "updated": "2026-11-04T06:04:03.920Z",
+  "updated": "2026-11-04T06:04:22.854Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -98,6 +98,10 @@
     "dialog-connector.ac4": {
       "status": "completed",
       "doneAt": "2026-11-04T06:04:03.920Z"
+    },
+    "dialog-token-reaches.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:04:22.854Z"
     }
   }
 }
