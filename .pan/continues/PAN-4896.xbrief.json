@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4896",
   "created": "2026-11-04T05:35:39.263Z",
-  "updated": "2026-11-04T05:52:10.221Z",
+  "updated": "2026-11-04T05:52:25.755Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,6 +34,10 @@
     "gate-pan2804-warning-linux.ac2": {
       "status": "completed",
       "doneAt": "2026-11-04T05:52:10.221Z"
+    },
+    "gate-pan2804-warning-linux.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T05:52:25.754Z"
     }
   }
 }
