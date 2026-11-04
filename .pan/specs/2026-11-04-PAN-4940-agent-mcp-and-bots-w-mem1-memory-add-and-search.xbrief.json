@@ -1,0 +1,481 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-04T04:21:06Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4940: Agent MCP and bots (W-MEM1): Memory add and search",
+    "updated": "2026-11-04T04:26:35.312Z"
+  },
+  "plan": {
+    "id": "pan-4940",
+    "title": "Agent MCP and bots (W-MEM1): Memory add and search",
+    "status": "proposed",
+    "uid": "35fa413f-13e1-4cbc-b5a3-7067f21bc055",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-04T04:21:06Z",
+    "updated": "2026-11-04T04:26:35.312Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4940",
+        "label": "PAN-4940",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4927",
+        "label": "PAN-4927 epic",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4940.md",
+        "label": "PRD",
+        "type": "document"
+      }
+    ],
+    "tags": [
+      "mcp",
+      "memory",
+      "self-routes",
+      "agent-tools",
+      "pan-4927"
+    ],
+    "metadata": {
+      "sizeJustification": "One feature (epic FR-6) spanning about 18 files. The subsystem count exceeds 6 only because the lint counts each top-level doc file (configuration/memory.mdx, configuration/mcp.mdx, docs/DASHBOARD-AUTH.md) and the generated contracts manifest as separate subsystems. The code changes are three tightly coupled layers that one tool pair needs together: the pan memory CLI, the /api/self memory routes, and the MCP tools. Splitting them into sibling issues would ship routes whose search half cannot meet AC-11.",
+      "canonicalFilename": "2026-11-04-PAN-4940-agent-mcp-and-bots-w-mem1-memory-add-and-search.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Managed agents can record and search Overdeck memory only by running pan over Bash with the admin internal token. The epic (PAN-4927 FR-6) gives every managed agent memory_add and memory_search MCP tools over agent-token self routes. The epic's W-MEM1 steps cannot meet the issue's AC-11 as written: pan memory search --json returns observations only, a read-mode search reads the primary checkout while add writes the agent's worktree, observations default to project overdeck whatever the cwd, and type user facts need a store flag the steps never pass.",
+      "Proposal": "Add a --facts flag to pan memory search that, with --json, prints one line { facts, observations }: up to 5 active matching facts per store (cwd checkout unless --project, operator, machine) without bodies, and short observations scoped to the cwd's project. Add routes/self-memory.ts with POST /api/self/memory/facts (tell) and POST /api/self/memory/search (read:state); each validates its body, builds argv only from SelfJobArg pieces, starts the pre-registered memory-add or memory-search self job in the caller's cwd, waits up to 50 s and answers 200 with selfJobAnswer. Add agent-only tools memory_add and memory_search to SELF_TOOLS. Prove AC-11 with a round-trip test that feeds the routes' exact argv into the real commander program. Document the flag, tools and routes.",
+      "NonGoals": "- Changing the plain pan memory search default project (overdeck) or its plain --json array shape.\n- memory_edit, memory_retire, memory_show or memory_list tools.\n- Committing a fact for the agent, or writing to the primary checkout from a workspace.\n- Returning fact bodies in search results.\n- Any change to observation extraction or ranking.\n- Importing W-SELF2's startSelfJobAnswer or waiting for PAN-4937 to merge."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Extend pan memory search with a --facts flag instead of halting on the epic's search step.",
+        "rationale": "The issue's AC-11 is authoritative; plain --json returns observations only and has consumers (memory-facts.test.ts:527, the OKF skill), so a new opt-in flag is the only way the CLI-backed search can return facts."
+      },
+      {
+        "summary": "Under --facts, project facts come from the cwd checkout unless --project is given.",
+        "rationale": "pan memory add writes the cwd checkout (resolveFactTarget write mode), so search must read the same store to find a fact an agent just wrote in its worktree."
+      },
+      {
+        "summary": "Under --facts with no scope flag, observations come from the cwd's project (resolveProjectKeyForCwdAsync), or global outside every project.",
+        "rationale": "The CLI's DEFAULT_PROJECT_ID is 'overdeck' for every cwd, which is wrong for agents in other projects; the default changes only under the new flag so human usage is untouched."
+      },
+      {
+        "summary": "memory_add takes an optional store field (project | user | machine); type user defaults to user and refuses project.",
+        "rationale": "pan memory add exits 1 for --type user without --user or --machine; the project-memory rule names --user and --machine as the doors for operator and machine facts."
+      },
+      {
+        "summary": "memory_search limit is 1-20, default 10 (the epic said 1-50), and the envelope is single-line JSON with no fact bodies and short observations.",
+        "rationale": "A self job keeps only the last 16 KiB of stdout, so a larger result arrives as an unparseable JSON tail."
+      },
+      {
+        "summary": "routes/self-memory.ts carries a private start-and-wait helper instead of importing W-SELF2's startSelfJobAnswer.",
+        "rationale": "PAN-4937 is not merged on main; the issue depends only on W-SELF1, and duplicating a 12-line helper is cheaper than a cross-issue ordering dependency."
+      },
+      {
+        "summary": "The route validates id with the store's MEMORY_FACT_ID ({0,79}) instead of the epic's {0,63} pattern.",
+        "rationale": "One authority for fact ids; a stricter route pattern would refuse ids the CLI accepts."
+      }
+    ],
+    "items": [
+      {
+        "id": "cli-search-facts",
+        "title": "pan memory search --facts: one-line { facts, observations } envelope scoped from the cwd",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T04:21:06Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4940",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "mem-search-route",
+            "mem-roundtrip-test"
+          ],
+          "files_scope": [
+            "src/cli/commands/memory-facts.ts",
+            "src/cli/commands/memory.ts",
+            "tests/unit/cli/memory-search-facts.test.ts",
+            "tests/unit/cli/memory-facts.test.ts",
+            "packages/contracts/src/composer-commands.generated.ts",
+            "sync-sources/skills/pan-memory/SKILL.md",
+            "configuration/memory.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run tests/unit/cli/memory-search-facts.test.ts tests/unit/cli/memory-facts.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes, including lint:skills and lint:slash-commands reporting the manifest matches the CLI registry",
+            "vitest reports every test in memory-search-facts.test.ts and memory-facts.test.ts green, including 'reads project facts from the cwd checkout' and '--json output is unchanged'"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-4",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1 exactly. In memory-facts.ts extract findMatchingFacts(query, { project?, here? }) returning { project, operator, machine } (at most MATCHING_FACTS_LIMIT each, active only) and make printMatchingFacts call it with unchanged output. In memory.ts add facts?: boolean to MemorySearchCommandOptions and the --facts option; --facts without --json exits 1 with '--facts needs --json'; under --facts with no --project/--workspace/--issue/--global/--target, search observations with project = await resolveProjectKeyForCwdAsync(process.cwd()) or global: true when null; print JSON.stringify({ facts, observations }) on one line, facts mapped to { scope, type, id, title, description, tags, file } from findMatchingFacts(query, options.project !== undefined ? { project } : { here: true }), observations mapped to { score, id, timestamp, projectId, workspaceId, issueId, actionStatus, summary, files }; the --target no-workspace branch prints the envelope with observations []. Leave the plain --json branch untouched. Regenerate the composer manifest with npm run build:cli && npm run generate:slash-commands, and document --facts in sync-sources/skills/pan-memory/SKILL.md (usage line and Notes bullet) and configuration/memory.mdx 'Search'. Write tests/unit/cli/memory-search-facts.test.ts with the six named cases from the PRD. If tests/unit/cli/memory-facts.test.ts fails to load because its projects.js mock lacks resolveProjectKeyForCwdAsync, add that export to its mock and change nothing else in that file."
+        },
+        "items": [
+          {
+            "id": "cli-search-facts.ac1",
+            "title": "Given cwd is <project>/workspaces/feature-x, when pan memory search <q> --facts --json runs, then it prints one line of JSON whose facts contains a matching fact from the workspace's .overdeck/memory/ with scope project and its file path, and excludes a fact present only in the primary checkout",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-search-facts.ac2",
+            "title": "pan memory search <q> --facts without --json exits 1 and prints '--facts needs --json'; pan memory search <q> --json without --facts still prints the observation array (memory-facts.test.ts '--json output is unchanged' stays green)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-search-facts.ac3",
+            "title": "Under --facts with no scope flag, searchMemory receives project equal to the cwd's project key, or global: true when the cwd is in no registered project; with --global passed, --facts sets no project",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-search-facts.ac4",
+            "title": "The envelope returns at most 5 active facts per store (project, operator, machine), no fact body, and observations that contain summary but no narrative or tokens field",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-search-facts.ac5",
+            "title": "npm run lint:slash-commands and npm run lint:skills each exits 0; the regenerated composer-commands.generated.ts contains --facts in the pan-memory-search entry and SKILL.md usage shows [--facts]",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mem-add-route",
+        "title": "memory_add: POST /api/self/memory/facts route, tool, scope and no-loss rows, server registration",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T04:21:06Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4940",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "mem-search-route",
+            "mem-roundtrip-test"
+          ],
+          "files_scope": [
+            "src/dashboard/server/routes/self-memory.ts",
+            "src/dashboard/server/server.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/lib/mcp/tools-self.ts",
+            "src/dashboard/server/__tests__/self-memory.test.ts",
+            "tests/unit/lib/mcp/tools-self.test.ts",
+            "tests/unit/lib/mcp/tool-annotations.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run src/dashboard/server/__tests__/self-memory.test.ts tests/unit/lib/mcp/tools-self.test.ts tests/unit/lib/mcp/tool-annotations.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts src/dashboard/server/__tests__/route-scopes.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes, including lint:circular and lint:effect-facades with no new findings",
+            "vitest reports every test green in self-memory.test.ts, tools-self.test.ts, tool-annotations.test.ts, no-loss-matrix.test.ts and route-scopes.test.ts"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-5",
+            "NFR-1",
+            "NFR-2",
+            "NFR-4",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2 exactly. Create src/dashboard/server/routes/self-memory.ts with the PRD header, SelfMemoryRouteDeps, the body limit constants, parseJsonObject, badRequest, the private startMemoryJob helper (start, SelfJobArgError to 400 bad-job-arg, too-many-jobs to 429, wait WAIT_CHUNK_MS, 200 selfJobAnswer, null to 404 unknown-job), exported memoryAddJobArgs (D-6 store default, D-7 limits, argv order ref id, --type, --description, --title, --body, --tags, --user or --machine, --json), exported handleSelfMemoryAdd, makeSelfMemoryRouteLayer with POST /api/self/memory/facts, and selfMemoryRouteLayer. Register the layer in server.ts after selfRequestsRouteLayer. Add the route-scopes row (tell) and the no-loss-matrix WRITE row. Add the memory_add tool (scope tell, audience agent, the PRD's description including the commit instruction) to SELF_TOOLS and update the tools-self.ts header. Write self-memory.test.ts cases 1-6 and extend tools-self.test.ts and tool-annotations.test.ts as the PRD names. If lint:circular reports a cycle through lib/memory/facts/store.js, copy the three constants with a comment naming store.ts:17-21."
+        },
+        "items": [
+          {
+            "id": "mem-add-route.ac1",
+            "title": "Given an agent token for agent-pan-1 with workspace /w/agent-pan-1, when POST /api/self/memory/facts receives { id: 'my-fact', type: 'feedback', description: ' Decide fast. ', title: 'T', body: 'B', tags: ['a','b'] }, then the job runs argv memory add my-fact --type=feedback --description=Decide fast. --title=T --body=B --tags=a,b --json in /w/agent-pan-1 with OVERDECK_AGENT_ID=agent-pan-1 and the route returns 200 with status done",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mem-add-route.ac2",
+            "title": "type user defaults to the operator store and the argv ends --user --json; store machine ends --machine --json; type user with store project returns 400 bad-request",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mem-add-route.ac3",
+            "title": "The route rejects with 400 bad-request, before any job starts, an id like Bad_Id or -x, type note, an empty, 201-character or multi-line description, a 16,385-character body, a tag containing a comma and 21 tags; a non-object body returns 400 bad-body",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mem-add-route.ac4",
+            "title": "A token without agentId receives 403 not-an-agent-token, an unknown agent receives 404 agent-gone, requiredScopeFor('POST', '/api/self/memory/facts') returns tell, and with fake timers a job that never ends returns 200 status running with next wait_job after 50 s",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mem-add-route.ac5",
+            "title": "memory_add is hidden from a non-agent token with tell (calling it returns Unknown tool memory_add), is listed for an agent token with tell, and sends exactly POST /api/self/memory/facts with the given fields",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mem-search-route",
+        "title": "memory_search: POST /api/self/memory/search route, tool and rows",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T04:21:06Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4940",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/server/routes/self-memory.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/lib/mcp/tools-self.ts",
+            "src/dashboard/server/__tests__/self-memory.test.ts",
+            "tests/unit/lib/mcp/tools-self.test.ts",
+            "tests/unit/lib/mcp/tool-annotations.test.ts",
+            "tests/unit/lib/mcp/visibility.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run src/dashboard/server/__tests__/self-memory.test.ts tests/unit/lib/mcp/tools-self.test.ts tests/unit/lib/mcp/tool-annotations.test.ts tests/unit/lib/mcp/visibility.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts src/dashboard/server/__tests__/route-scopes.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes with no new findings",
+            "vitest reports every test green in self-memory.test.ts, tools-self.test.ts, tool-annotations.test.ts, visibility.test.ts, no-loss-matrix.test.ts and route-scopes.test.ts"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-5",
+            "NFR-2",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3 exactly. In routes/self-memory.ts add the search constants, exported memorySearchJobArgs (query trimmed 1-500, limit integer 1-20 default 10; argv --limit=<n>, --facts, --json, then rest [query]), exported handleSelfMemorySearch with the same order as handleSelfMemoryAdd and verb memory-search, and the POST /api/self/memory/search route in makeSelfMemoryRouteLayer. Add the route-scopes row (read:state) and the no-loss-matrix READ row. Add the memory_search tool (scope read:state, audience agent, the PRD's description) after memory_add in SELF_TOOLS. Extend self-memory.test.ts, tools-self.test.ts and tool-annotations.test.ts, and change visibility.test.ts so a read:state agent token lists list_machines, wait_job, secret_wait, memory_search."
+        },
+        "items": [
+          {
+            "id": "mem-search-route.ac1",
+            "title": "POST /api/self/memory/search with { query: ' release notes ' } runs argv memory search --limit=10 --facts --json -- release notes in the caller's cwd, and { query: '--project x', limit: 3 } produces --limit=3 with '--project x' after --",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mem-search-route.ac2",
+            "title": "The route rejects a blank query, a 501-character query and limit 0, 21 or 2.5 with 400 bad-request before any job; a token without agentId receives 403 not-an-agent-token; requiredScopeFor('POST', '/api/self/memory/search') returns read:state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mem-search-route.ac3",
+            "title": "memory_search is listed for a read:state agent token (the list is list_machines, wait_job, secret_wait, memory_search), is hidden from a non-agent token, sends POST /api/self/memory/search with { query, limit }, and refuses limit 21 as a tool error with no call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mem-roundtrip-test",
+        "title": "Round-trip test: route argv through the real pan memory program returns the added fact (issue AC-11)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T04:21:06Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4940",
+          "requiresInspection": false,
+          "files_scope": [
+            "tests/unit/cli/memory-self-roundtrip.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run tests/unit/cli/memory-self-roundtrip.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "vitest reports the three named round-trip cases green"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-4 exactly. Create tests/unit/cli/memory-self-roundtrip.test.ts with a projects.js mock that spreads importOriginal, a searchMemory mock resolving [], a temp OVERDECK_HOME, project root and workspace, and an in-process SelfJobRunner that chdirs to input.cwd and runs createMemoryCommand().exitOverride().parseAsync(input.args.slice(2), { from: 'user' }) while capturing console.log as stdout and console.error as stderr (a refusal reaches the catch because exitCli calls process.exit, which the test's spy turns into a throw; return exitCode 1 there). Use createSelfJobs({ runner }) and agent caller deps pointing at the workspace. Cover the three named cases: add then list --here then search returns the fact; a type user fact lands in the operator store and search returns it with scope user; adding an existing id returns status done with exitCode 1 and stderr mentioning already exists."
+        },
+        "items": [
+          {
+            "id": "mem-roundtrip-test.ac1",
+            "title": "Given an agent whose workspace is a temp worktree, when handleSelfMemoryAdd writes round-trip-fact through the real commander program, then it returns 200 done with exitCode 0 and stdout file <workspace>/.overdeck/memory/round-trip-fact.md, and memoryFactListCommand({ here: true, json: true }) in that cwd prints facts containing round-trip-fact",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mem-roundtrip-test.ac2",
+            "title": "handleSelfMemorySearch with query 'signed tag' then returns done with stdout facts containing { id: 'round-trip-fact', scope: 'project' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mem-roundtrip-test.ac3",
+            "title": "A type user fact is written under <OVERDECK_HOME>/context/memory/ and search returns it with scope user; adding an existing id returns status done with exitCode 1 and stderr containing already exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mem-docs",
+        "title": "Document memory_add, memory_search and the /api/self/memory routes",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T04:21:06Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4940",
+          "requiresInspection": false,
+          "files_scope": [
+            "configuration/mcp.mdx",
+            "docs/DASHBOARD-AUTH.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n 'memory_add' configuration/mcp.mdx docs/DASHBOARD-AUTH.md"
+          ],
+          "expected_outputs": [
+            "lint:docs completes without errors",
+            "grep prints at least one memory_add line from each of the two files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-5 exactly. In configuration/mcp.mdx add memory_add (tell) and memory_search (read:state) rows to the Agent-only tools table after secret_wait, and a '### Memory' section after '### Secrets' covering the job answer, refusal exit codes, the uncommitted project fact and pan memory list --here, linking /configuration/memory. In docs/DASHBOARD-AUTH.md, after the secret-requests paragraph of the /api/self/* section, add the memory routes paragraph with scopes, bodies, limits, argv and error codes, naming the memory_add and memory_search tools."
+        },
+        "items": [
+          {
+            "id": "mem-docs.ac1",
+            "title": "configuration/mcp.mdx contains memory_add with scope tell and memory_search with scope read:state in the Agent-only tools table, and a Memory section that states a project fact is written uncommitted into the agent's checkout and shows in pan memory list --here",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mem-docs.ac2",
+            "title": "docs/DASHBOARD-AUTH.md contains POST /api/self/memory/facts (tell) and POST /api/self/memory/search (read:state) with their body fields, the 1-20 limit, and the 400 bad-body, bad-request, bad-job-arg and 429 too-many-jobs codes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "cli-search-facts",
+        "to": "mem-search-route",
+        "type": "blocks"
+      },
+      {
+        "from": "mem-add-route",
+        "to": "mem-search-route",
+        "type": "blocks"
+      },
+      {
+        "from": "mem-add-route",
+        "to": "mem-roundtrip-test",
+        "type": "blocks"
+      },
+      {
+        "from": "mem-search-route",
+        "to": "mem-roundtrip-test",
+        "type": "blocks"
+      },
+      {
+        "from": "mem-add-route",
+        "to": "mem-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "mem-search-route",
+        "to": "mem-docs",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
