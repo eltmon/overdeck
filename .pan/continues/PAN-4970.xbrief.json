@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4970",
   "created": "2026-11-04T00:20:58.327Z",
-  "updated": "2026-11-04T01:53:14.530Z",
+  "updated": "2026-11-04T01:53:31.098Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -150,6 +150,10 @@
     "fe-promote-failure.ac1": {
       "status": "completed",
       "doneAt": "2026-11-04T01:53:14.529Z"
+    },
+    "fe-promote-failure.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:53:31.098Z"
     }
   }
 }
