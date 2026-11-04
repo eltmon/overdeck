@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4970",
   "created": "2026-11-04T00:20:58.327Z",
-  "updated": "2026-11-04T01:47:46.896Z",
+  "updated": "2026-11-04T01:48:05.123Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -74,6 +74,10 @@
     "owner-rule.ac3": {
       "status": "completed",
       "doneAt": "2026-11-04T01:47:46.895Z"
+    },
+    "owner-rule.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:48:05.122Z"
     }
   }
 }
