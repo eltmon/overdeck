@@ -96,6 +96,19 @@ vi.mock('../../../../../src/lib/xbrief/io.js', () => ({
   isPlanningComplete: mockIsPlanningComplete,
 }));
 
+// PAN-5011: collectSessionTreeNodes now reads each agent's backend pane for
+// pane-first presence. Override only getBackendPanesForIssue (default: no
+// panes, matching the tmux-only behavior the rest of this file assumes) so
+// individual tests can seed a pane without disturbing listBackendPanes et al.
+const mockGetBackendPanesForIssue = vi.hoisted(() => vi.fn(async () => []));
+vi.mock(import('../../../../../src/dashboard/server/services/backend-inventory.js'), async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    getBackendPanesForIssue: mockGetBackendPanesForIssue,
+  };
+});
+
 import {
   fetchProjectSessionTree,
   getSessionTreeWorkspacePath,
@@ -107,6 +120,7 @@ import { getAgentRuntimeState } from '../../../../../src/lib/agents.js';
 import { resolveJsonlPath } from '../../../../../src/dashboard/server/routes/jsonl-resolver.js';
 import { buildReviewerNodes } from '../../../../../src/dashboard/server/routes/reviewer-tree.js';
 import { access, readdir, readFile, stat } from 'node:fs/promises';
+import type { BackendPane } from '@overdeck/contracts';
 
 const RECENT_PLANNING_MTIME = new Date(Date.now() - 60_000);
 const FEATURE_PAN_539_DIRENT = { name: 'feature-pan-539', isDirectory: () => true, isFile: () => false };
@@ -134,6 +148,19 @@ function mockWorkspaceReaddir(entries: Array<{ name: string; isDirectory: () => 
     (err as any).code = 'ENOENT';
     return Promise.reject(err);
   });
+}
+
+function backendPane(overrides: Partial<BackendPane> = {}): BackendPane {
+  return {
+    id: 'w1:p1',
+    agentId: 'agent-pan-539',
+    issue: 'PAN-539',
+    role: 'work',
+    harness: 'claude-code',
+    model: 'claude-sonnet-5',
+    state: 'done',
+    ...overrides,
+  };
 }
 
 function mockAccess(paths: Set<string>) {
@@ -521,6 +548,85 @@ describe('fetchProjectSessionTree', () => {
     expect(session?.presence).toBe('ended');
     expect(typeof session?.duration).toBe('number');
     expect(Number.isFinite(session?.duration)).toBe(true);
+  });
+
+  it('reads presence idle and no endedAt for a done backend pane with no tmux session (PAN-5011)', async () => {
+    (listProjectsSync as any).mockReturnValue([
+      {
+        key: 'overdeck',
+        config: { name: 'overdeck', path: '/tmp/overdeck', workspace: { workspaces_dir: 'workspaces' } },
+      },
+    ]);
+    (listSessionNames as any).mockReturnValue(Effect.succeed([]));
+    (getAgentRuntimeState as any).mockReturnValue(Effect.succeed(null));
+    mockGetBackendPanesForIssue.mockResolvedValueOnce([backendPane({ state: 'done' })]);
+    mockAgentStates.set('agent-pan-539', agentState({ status: 'stopped' }));
+    mockAccess(new Set([
+      '/tmp/overdeck/workspaces',
+      join(getOverdeckHome(), 'agents', 'agent-pan-539'),
+      '/tmp/overdeck/workspaces/feature-pan-539/.pan',
+    ]));
+    mockWorkspaceReaddir([FEATURE_PAN_539_DIRENT]);
+
+    const result = await fetchProjectSessionTree('overdeck');
+
+    const tree = result as { features: Array<{ issueId: string; sessions: Array<Record<string, unknown>> }> };
+    const session = tree.features.find((feature) => feature.issueId === 'PAN-539')?.sessions[0];
+    expect(session?.presence).toBe('idle');
+    expect(session?.endedAt).toBeUndefined();
+  });
+
+  it('reads presence ended for an exited backend pane (PAN-5011)', async () => {
+    (listProjectsSync as any).mockReturnValue([
+      {
+        key: 'overdeck',
+        config: { name: 'overdeck', path: '/tmp/overdeck', workspace: { workspaces_dir: 'workspaces' } },
+      },
+    ]);
+    (listSessionNames as any).mockReturnValue(Effect.succeed([]));
+    (getAgentRuntimeState as any).mockReturnValue(Effect.succeed(null));
+    mockGetBackendPanesForIssue.mockResolvedValueOnce([backendPane({ state: 'exited' })]);
+    mockAgentStates.set('agent-pan-539', agentState({ status: 'stopped' }));
+    mockAccess(new Set([
+      '/tmp/overdeck/workspaces',
+      join(getOverdeckHome(), 'agents', 'agent-pan-539'),
+      '/tmp/overdeck/workspaces/feature-pan-539/.pan',
+    ]));
+    mockWorkspaceReaddir([FEATURE_PAN_539_DIRENT]);
+
+    const result = await fetchProjectSessionTree('overdeck');
+
+    const tree = result as { features: Array<{ issueId: string; sessions: Array<Record<string, unknown>> }> };
+    const session = tree.features.find((feature) => feature.issueId === 'PAN-539')?.sessions[0];
+    expect(session?.presence).toBe('ended');
+  });
+
+  it('leaves endedAt undefined for a live done pane even with a suspended runtime state and a stoppedAt (PAN-5011)', async () => {
+    (listProjectsSync as any).mockReturnValue([
+      {
+        key: 'overdeck',
+        config: { name: 'overdeck', path: '/tmp/overdeck', workspace: { workspaces_dir: 'workspaces' } },
+      },
+    ]);
+    (listSessionNames as any).mockReturnValue(Effect.succeed([]));
+    (getAgentRuntimeState as any).mockReturnValue(Effect.succeed({ state: 'suspended' }));
+    mockGetBackendPanesForIssue.mockResolvedValueOnce([backendPane({ state: 'done' })]);
+    mockAgentStates.set('agent-pan-539', agentState({
+      status: 'stopped',
+      stoppedAt: '2026-01-01T02:30:00Z',
+    }));
+    mockAccess(new Set([
+      '/tmp/overdeck/workspaces',
+      join(getOverdeckHome(), 'agents', 'agent-pan-539'),
+      '/tmp/overdeck/workspaces/feature-pan-539/.pan',
+    ]));
+    mockWorkspaceReaddir([FEATURE_PAN_539_DIRENT]);
+
+    const result = await fetchProjectSessionTree('overdeck');
+
+    const tree = result as { features: Array<{ issueId: string; sessions: Array<Record<string, unknown>> }> };
+    const session = tree.features.find((feature) => feature.issueId === 'PAN-539')?.sessions[0];
+    expect(session?.endedAt).toBeUndefined();
   });
 
   it('sets planningComplete true when a canonical spec has a finished planning status', async () => {
