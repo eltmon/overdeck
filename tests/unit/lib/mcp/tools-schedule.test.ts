@@ -92,3 +92,47 @@ describe('MCP schedule tools: schedule_recurring (PAN-4927 WI-3)', () => {
     expect(api.calls).toEqual([]);
   });
 });
+
+describe('MCP schedule tools: list_scheduled (PAN-4927 WI-4)', () => {
+  it('list_scheduled merges both GETs into { once, recurring, onceSupported, usageLimit }', async () => {
+    const api = fakeApi({
+      'GET /api/conversations/conv-a/scheduled-messages': { status: 200, json: { messages: [{ id: 1, message: 'later' }], supported: true, limit: null } },
+      'GET /api/conversations/conv-a/schedules': { status: 200, json: { schedules: [{ id: 2, prompt: 'check in' }] } },
+    });
+    const client = await connectClient(api, SCOPES, false, SCHEDULE_TOOLS);
+    const result = await callTool(client, 'list_scheduled', { conversation: 'conv-a' });
+    expect(result.isError).toBeFalsy();
+    expect(resultJson(result)).toEqual({
+      once: [{ id: 1, message: 'later' }],
+      recurring: [{ id: 2, prompt: 'check in' }],
+      onceSupported: true,
+      usageLimit: null,
+    });
+    expect(api.calls).toEqual([
+      { method: 'GET', path: '/api/conversations/conv-a/scheduled-messages' },
+      { method: 'GET', path: '/api/conversations/conv-a/schedules' },
+    ]);
+  });
+
+  it('a 404 on the scheduled-messages GET is the tool error', async () => {
+    const api = fakeApi({
+      'GET /api/conversations/conv-a/scheduled-messages': { status: 404, json: { error: 'conversation not found' } },
+      'GET /api/conversations/conv-a/schedules': { status: 200, json: { schedules: [] } },
+    });
+    const client = await connectClient(api, SCOPES, false, SCHEDULE_TOOLS);
+    const result = await callTool(client, 'list_scheduled', { conversation: 'conv-a' });
+    expect(result.isError).toBe(true);
+    expect(resultText(result)).toContain('conversation not found');
+  });
+
+  it('a 403 on the schedules GET is the tool error, never a partial result', async () => {
+    const api = fakeApi({
+      'GET /api/conversations/conv-a/scheduled-messages': { status: 200, json: { messages: [], supported: true, limit: null } },
+      'GET /api/conversations/conv-a/schedules': { status: 403, json: { error: 'insufficient_scope', missingScope: 'read:conversations' } },
+    });
+    const client = await connectClient(api, SCOPES, false, SCHEDULE_TOOLS);
+    const result = await callTool(client, 'list_scheduled', { conversation: 'conv-a' });
+    expect(result.isError).toBe(true);
+    expect(resultText(result)).toContain('missingScope: read:conversations');
+  });
+});

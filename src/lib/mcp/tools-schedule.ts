@@ -1,5 +1,5 @@
 /** The schedule tools of the Overdeck MCP server (PAN-4927 W-SCHED1, FR-5): one-shot scheduled messages (PAN-4641) and recurring schedules (PAN-4640). Each proxies the conversation's existing routes; the route-scope table judges each call. A one-shot message has no time: the server sends it after the conversation's usage limit resets, or at once when it is not limited. */
-import { errorResult, optionalString, requiredString, routeResult, type ArgResult, type OverdeckTool } from './tool.js';
+import { errorResult, isOk, jsonResult, optionalString, requiredString, routeErrorResult, routeResult, type ArgResult, type OverdeckTool } from './tool.js';
 
 function conversationPath(name: string): string {
   return `/api/conversations/${encodeURIComponent(name)}`;
@@ -79,4 +79,30 @@ const scheduleRecurring: OverdeckTool = {
   },
 };
 
-export const SCHEDULE_TOOLS: readonly OverdeckTool[] = [scheduleMessage, scheduleRecurring];
+const listScheduled: OverdeckTool = {
+  name: 'list_scheduled',
+  description:
+    "List a conversation's pending one-shot scheduled messages (`once`) and its recurring schedules (`recurring`). `onceSupported` is false for conversations that cannot hold one-shot messages; `usageLimit` is the conversation's current usage-limit state.",
+  scope: 'read:conversations',
+  audience: 'any',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      conversation: CONVERSATION_PROPERTY,
+    },
+    required: ['conversation'],
+  },
+  async run(args, ctx) {
+    const conversation = requiredString(args, 'conversation');
+    if (!conversation.ok) return conversation.error;
+    const base = conversationPath(conversation.value);
+    const [once, recurring] = await Promise.all([ctx.api.request('GET', `${base}/scheduled-messages`), ctx.api.request('GET', `${base}/schedules`)]);
+    if (!isOk(once)) return routeErrorResult(once);
+    if (!isOk(recurring)) return routeErrorResult(recurring);
+    const o = (once.json ?? {}) as Record<string, unknown>;
+    const r = (recurring.json ?? {}) as Record<string, unknown>;
+    return jsonResult({ once: o['messages'] ?? [], recurring: r['schedules'] ?? [], onceSupported: o['supported'] ?? false, usageLimit: o['limit'] ?? null });
+  },
+};
+
+export const SCHEDULE_TOOLS: readonly OverdeckTool[] = [scheduleMessage, scheduleRecurring, listScheduled];
