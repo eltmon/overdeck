@@ -4,17 +4,17 @@
     "created": "2026-11-03T23:39:13Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4961: Workspace disk floor is checked once per creation, so concurrent starts run the disk out (6 starts took 15 GB to 4.9 GB)",
-    "updated": "2026-11-03T23:56:26.964Z"
+    "updated": "2026-11-03T23:57:29.068Z"
   },
   "plan": {
     "id": "pan-4961",
     "title": "Workspace disk floor is checked once per creation, so concurrent starts run the disk out (6 starts took 15 GB to 4.9 GB)",
-    "status": "proposed",
+    "status": "running",
     "uid": "ec8b0346-396b-4234-97dc-9ee432ed50c8",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-03T23:39:13Z",
-    "updated": "2026-11-03T23:56:26.964Z",
+    "updated": "2026-11-03T23:57:29.068Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4961",
@@ -885,5 +885,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
