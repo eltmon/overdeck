@@ -674,3 +674,8 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
 
 - With the newest main run in progress (e0f55929d29, PAN-5003) and the previous one green, `pan reload` built and deployed e0f55929d29. The memory note "reload ships CI-green origin/main" does not hold today. CI later passed, so no harm, but the deploy rule stands: when the newest main CI run is queued or in progress, wait for it before reloading. Don't count on reload to pick an older green commit.
 - PAN-5003 (merge door no longer rebases branches that already merged main) and PAN-5036 (scheduler skip reasons) are live. Hand merges should become rare; watch `notScheduled` for real reasons now.
+
+## 2026-11-04 — PAN-5042: the PR listing read flaps (the cause behind today's silent train stalls)
+
+- With PAN-5036 live, `notScheduled` reports "PR listing unavailable: the forge read failed" for panopticon-cli, botland and orca, flapping every few minutes. `readRepoPullRequests` (`src/lib/overdeck/derived-issue-state.ts`) runs `gh pr list --state all --limit 100` with `statusCheckRollup`, which took 9.9 s by hand, against a 20 s timeout, and its `catch` logs nothing. Filed PAN-5042 (log the reason; split open and closed listing) and started it.
+- Until it ships, an approved green PR that the train skips with that reason can go through the merge door (`POST /api/issues/<id>/merge`).
