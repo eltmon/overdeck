@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4937",
   "created": "2026-11-04T02:50:38.682Z",
-  "updated": "2026-11-04T03:32:15.576Z",
+  "updated": "2026-11-04T03:37:29.754Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,9 +34,10 @@
       "doneAt": "2026-11-04T03:32:07.562Z"
     },
     "handoff-tool": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4937",
-      "claimedAt": "2026-11-04T03:32:15.576Z"
+      "claimedAt": "2026-11-04T03:32:15.576Z",
+      "doneAt": "2026-11-04T03:37:29.754Z"
     }
   }
 }
