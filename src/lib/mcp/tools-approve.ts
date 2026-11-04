@@ -39,9 +39,22 @@ function conversationPath(args: Record<string, unknown>, suffix: string): ArgRes
 
 const CONVERSATION_PROPERTY = { type: 'string', description: 'The conversation name or id; @<machine>/<name> for one on a linked machine.' } as const;
 
+export const AGENT_ON_LINKED_MACHINE_TEXT =
+  'agentId names an agent on a linked machine; answer it on that machine. These tools reach agents on this machine only.';
+
+/** The `agentId` argument as an encoded path segment; refuses `@<machine>/…` ids (D-4). */
+function agentIdArg(args: Record<string, unknown>): ArgResult<string> {
+  const agentId = requiredString(args, 'agentId');
+  if (!agentId.ok) return agentId;
+  if (agentId.value.startsWith('@')) return { ok: false, error: errorResult(AGENT_ON_LINKED_MACHINE_TEXT) };
+  return { ok: true, value: encodeURIComponent(agentId.value) };
+}
+
 export const MISSING_APPROVE_TEXT =
   'This token lacks the approve scope. Create one with "Allow answering questions and approving permissions" checked.';
 export const NOT_CLAUDE_CODE_TEXT = 'answer_question supports Claude Code conversations; answer this one from the dashboard';
+export const NOT_CLAUDE_CODE_PI_TEXT = 'answer_question cannot answer a Pi ask; use answer_pi_ask with the toolUseId from list_pending_input';
+export const NOT_CLAUDE_CODE_CODEX_TEXT = 'answer_question cannot answer a Codex approval; use answer_codex_approval with the option number and toolUseId from list_pending_input';
 
 /** The message the dashboard composes for answered AskUserQuestion prompts. */
 export function composeQuestionAnswer(answers: readonly string[], questions?: readonly string[]): string {
@@ -50,14 +63,19 @@ export function composeQuestionAnswer(answers: readonly string[], questions?: re
 }
 
 /**
- * True when the conversation's harness answers a pending question through a
- * composed message (`answersQuestionByMessage`). A missing or null harness is
- * Claude Code; an unrecognized harness name is refused.
+ * `null` when the conversation's harness answers a pending question through a
+ * composed message (`answersQuestionByMessage`); otherwise the refusal text
+ * naming the right tool. A missing or null harness is Claude Code. An
+ * unrecognized harness name gets `NOT_CLAUDE_CODE_TEXT` (FR-9).
  */
-function answersQuestionByMessage(conversation: unknown): boolean {
-  const harness = conversation && typeof conversation === 'object' ? (conversation as Record<string, unknown>)['harness'] : undefined;
-  if (harness !== undefined && harness !== null && normalizeHarnessName(harness) === null) return false;
-  return getHarnessBehavior(normalizeHarnessName(harness)).capabilities.answersQuestionByMessage;
+function questionRedirectText(conversation: unknown): string | null {
+  const harnessField = conversation && typeof conversation === 'object' ? (conversation as Record<string, unknown>)['harness'] : undefined;
+  const harness = normalizeHarnessName(harnessField);
+  if (harnessField !== undefined && harnessField !== null && harness === null) return NOT_CLAUDE_CODE_TEXT;
+  const behavior = getHarnessBehavior(harness);
+  if (behavior.capabilities.askAnswerDelivery === 'pi-ask-modal') return NOT_CLAUDE_CODE_PI_TEXT;
+  if (behavior.transcriptKind === 'codex-rollout-jsonl') return NOT_CLAUDE_CODE_CODEX_TEXT;
+  return behavior.capabilities.answersQuestionByMessage ? null : NOT_CLAUDE_CODE_TEXT;
 }
 
 function stringArray(value: unknown): string[] | null {
@@ -77,31 +95,49 @@ const listPendingInput: OverdeckTool = {
 
 const answerQuestion: OverdeckTool = {
   name: 'answer_question',
-  description: 'Answer the pending question of a Claude Code conversation. Needs the approve scope.',
+  description: 'Answer a pending question: a Claude Code conversation (conversation) or an agent on this machine (agentId). Needs the approve scope.',
   scope: 'approve',
   audience: 'any',
   inputSchema: {
     type: 'object',
     properties: {
       conversation: { type: 'string', description: 'The conversation name or id.' },
+      agentId: { type: 'string', description: 'The agent id from list_pending_input (this machine only).' },
+      toolUseId: { type: 'string', description: 'pendingAskUserQuestion.toolUseId of the agent row; omit to answer its first open question.' },
       answers: { type: 'array', items: { type: 'string' }, description: 'One answer per pending question, in order.' },
       questions: { type: 'array', items: { type: 'string' }, description: 'The question texts, in the same order, quoted in the reply.' },
     },
-    required: ['conversation', 'answers'],
+    required: ['answers'],
   },
   async run(args, ctx) {
     if (!scopeSatisfies(ctx.scopes, 'approve')) return errorResult(MISSING_APPROVE_TEXT);
-    const conversation = requiredString(args, 'conversation');
-    if (!conversation.ok) return conversation.error;
     const answers = stringArray(args['answers']);
     if (!answers || answers.length === 0) return errorResult('answers is required and must be a non-empty array of strings');
+
+    const hasConversation = typeof args['conversation'] === 'string';
+    const hasAgentId = typeof args['agentId'] === 'string';
+    if (hasConversation === hasAgentId) return errorResult('pass exactly one of conversation or agentId');
+
+    if (hasAgentId) {
+      const agentId = agentIdArg(args);
+      if (!agentId.ok) return agentId.error;
+      const toolUseId = optionalString(args, 'toolUseId');
+      if (!toolUseId.ok) return toolUseId.error;
+      const body: Record<string, unknown> = { answers };
+      if (toolUseId.value !== undefined) body['toolUseId'] = toolUseId.value;
+      return routeResult(await ctx.api.request('POST', `/api/agents/${agentId.value}/answer-question`, body));
+    }
+
+    const conversation = requiredString(args, 'conversation');
+    if (!conversation.ok) return conversation.error;
     const questions = args['questions'] === undefined ? undefined : stringArray(args['questions']);
     if (questions === null) return errorResult('questions must be an array of strings');
 
     const name = encodeURIComponent(conversation.value);
     const read = await ctx.api.request('GET', `/api/conversations/${name}`);
     if (!isOk(read)) return routeErrorResult(read);
-    if (!answersQuestionByMessage(read.json)) return errorResult(NOT_CLAUDE_CODE_TEXT);
+    const redirect = questionRedirectText(read.json);
+    if (redirect) return errorResult(redirect);
 
     const message = composeQuestionAnswer(answers, questions);
     return routeResult(await ctx.api.request('POST', `/api/conversations/${name}/message`, { message }));
@@ -242,6 +278,61 @@ const answerPlan: OverdeckTool = {
   },
 };
 
+const answerAgentPlan: OverdeckTool = {
+  name: 'answer_agent_plan',
+  description: 'Approve or reject a plan an agent on this machine is waiting on. Needs the approve scope.',
+  scope: 'approve',
+  audience: 'any',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      agentId: { type: 'string', description: 'The agent id from list_pending_input (this machine only).' },
+      action: { type: 'string', enum: [...PLAN_ACTIONS] },
+      feedback: { type: 'string', description: 'What to change; used with reject-feedback.' },
+    },
+    required: ['agentId', 'action'],
+  },
+  async run(args, ctx) {
+    const agentId = agentIdArg(args);
+    if (!agentId.ok) return agentId.error;
+    const action = args['action'];
+    if (typeof action !== 'string' || !(PLAN_ACTIONS as readonly string[]).includes(action)) {
+      return errorResult(`action must be one of ${PLAN_ACTIONS.join(', ')}`);
+    }
+    const feedback = optionalString(args, 'feedback');
+    if (!feedback.ok) return feedback.error;
+    const body: Record<string, unknown> = { action };
+    if (feedback.value !== undefined) body['feedback'] = feedback.value;
+    return routeResult(await ctx.api.request('POST', `/api/agents/${agentId.value}/plan-action`, body));
+  },
+};
+
+const answerAgentPermission: OverdeckTool = {
+  name: 'answer_agent_permission',
+  description: 'Allow or deny a tool-permission request from an agent on this machine. Needs the approve scope.',
+  scope: 'approve',
+  audience: 'any',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      agentId: { type: 'string', description: 'The agent id from list_pending_input (this machine only).' },
+      requestId: { type: 'string', description: 'permissionRequests[].requestId from list_pending_input.' },
+      behavior: { type: 'string', enum: ['allow', 'deny'] },
+    },
+    required: ['agentId', 'requestId', 'behavior'],
+  },
+  async run(args, ctx) {
+    const agentId = agentIdArg(args);
+    if (!agentId.ok) return agentId.error;
+    const requestId = requiredString(args, 'requestId');
+    if (!requestId.ok) return requestId.error;
+    const behavior = args['behavior'];
+    if (behavior !== 'allow' && behavior !== 'deny') return errorResult('behavior must be allow or deny');
+    const path = `/api/agents/${agentId.value}/permissions/${encodeURIComponent(requestId.value)}/respond`;
+    return routeResult(await ctx.api.request('POST', path, { behavior }));
+  },
+};
+
 export const APPROVE_TOOLS: readonly OverdeckTool[] = [
   listPendingInput,
   answerQuestion,
@@ -250,4 +341,6 @@ export const APPROVE_TOOLS: readonly OverdeckTool[] = [
   answerCodexApproval,
   answerPiAsk,
   answerPlan,
+  answerAgentPlan,
+  answerAgentPermission,
 ];

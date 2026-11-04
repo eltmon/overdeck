@@ -6,22 +6,31 @@
 import { describe, expect, it } from 'vitest';
 
 import { ALL_TOOLS } from '../../../../src/lib/mcp/server.js';
-import { APPROVE_TOOLS, MISSING_APPROVE_TEXT, NOT_CLAUDE_CODE_TEXT } from '../../../../src/lib/mcp/tools-approve.js';
+import {
+  AGENT_ON_LINKED_MACHINE_TEXT,
+  APPROVE_TOOLS,
+  MISSING_APPROVE_TEXT,
+  NOT_CLAUDE_CODE_CODEX_TEXT,
+  NOT_CLAUDE_CODE_PI_TEXT,
+  NOT_CLAUDE_CODE_TEXT,
+} from '../../../../src/lib/mcp/tools-approve.js';
 import { callTool, connectClient, fakeApi, resultJson, resultText } from './harness.js';
 
 const APPROVER = ['approve', 'tell', 'read:conversations'];
 
 describe('MCP approval tools (PAN-4649 W-7)', () => {
-  it('the approval tools close the list, making fourteen tools in all', () => {
+  it('the approval tools close the list, making sixteen tools in all', () => {
     expect(APPROVE_TOOLS.map((tool) => tool.name)).toEqual([
       'list_pending_input', 'answer_question', 'answer_permission',
       'answer_pane_choice', 'answer_codex_approval', 'answer_pi_ask', 'answer_plan',
+      'answer_agent_plan', 'answer_agent_permission',
     ]);
     expect(ALL_TOOLS.map((tool) => tool.name)).toEqual([
       'list_machines', 'list_conversations', 'search_conversations', 'read_conversation',
       'send_message', 'start_conversation', 'start_worker',
       'list_pending_input', 'answer_question', 'answer_permission',
       'answer_pane_choice', 'answer_codex_approval', 'answer_pi_ask', 'answer_plan',
+      'answer_agent_plan', 'answer_agent_permission',
     ]);
   });
 
@@ -64,12 +73,21 @@ describe('MCP approval tools (PAN-4649 W-7)', () => {
     });
   });
 
-  it('answer_question refuses a codex conversation and posts nothing', async () => {
+  it('answer_question refuses a codex conversation, naming answer_codex_approval', async () => {
     const api = fakeApi({ 'GET /api/conversations/conv-c': { status: 200, json: { name: 'conv-c', harness: 'codex' } } });
     const client = await connectClient(api, APPROVER);
     const result = await callTool(client, 'answer_question', { conversation: 'conv-c', answers: ['Yes'] });
     expect(result.isError).toBe(true);
-    expect(resultText(result)).toBe(NOT_CLAUDE_CODE_TEXT);
+    expect(resultText(result)).toBe(NOT_CLAUDE_CODE_CODEX_TEXT);
+    expect(api.calls.filter((call) => call.method === 'POST')).toEqual([]);
+  });
+
+  it('answer_question refuses an ohmypi (Pi) conversation, naming answer_pi_ask', async () => {
+    const api = fakeApi({ 'GET /api/conversations/conv-p': { status: 200, json: { name: 'conv-p', harness: 'ohmypi' } } });
+    const client = await connectClient(api, APPROVER);
+    const result = await callTool(client, 'answer_question', { conversation: 'conv-p', answers: ['Yes'] });
+    expect(result.isError).toBe(true);
+    expect(resultText(result)).toBe(NOT_CLAUDE_CODE_PI_TEXT);
     expect(api.calls.filter((call) => call.method === 'POST')).toEqual([]);
   });
 
@@ -173,6 +191,55 @@ describe('MCP approval tools (PAN-4649 W-7)', () => {
     const client = await connectClient(api, APPROVER);
     const result = await callTool(client, 'answer_plan', { conversation: 'conv-a', action: 'approve' });
     expect(result.isError).toBe(true);
+    expect(api.calls).toEqual([]);
+  });
+
+  it('answer_agent_plan posts to /api/agents/agent-pan-1/plan-action', async () => {
+    const api = fakeApi({ 'POST /api/agents/agent-pan-1/plan-action': { status: 200, json: { ok: true } } });
+    const client = await connectClient(api, APPROVER);
+    const result = await callTool(client, 'answer_agent_plan', { agentId: 'agent-pan-1', action: 'approve-auto' });
+    expect(result.isError).toBeFalsy();
+    expect(api.calls).toEqual([{ method: 'POST', path: '/api/agents/agent-pan-1/plan-action', body: { action: 'approve-auto' } }]);
+  });
+
+  it('answer_agent_plan refuses an agent on a linked machine with zero requests', async () => {
+    const api = fakeApi({});
+    const client = await connectClient(api, APPROVER);
+    const result = await callTool(client, 'answer_agent_plan', { agentId: '@desk/agent-pan-1', action: 'approve-auto' });
+    expect(result.isError).toBe(true);
+    expect(resultText(result)).toBe(AGENT_ON_LINKED_MACHINE_TEXT);
+    expect(api.calls).toEqual([]);
+  });
+
+  it('answer_agent_permission posts { behavior } to the encoded respond path', async () => {
+    const api = fakeApi({ 'POST /api/agents/agent-pan-1/permissions/req%201/respond': { status: 200, json: { ok: true } } });
+    const client = await connectClient(api, APPROVER);
+    const result = await callTool(client, 'answer_agent_permission', { agentId: 'agent-pan-1', requestId: 'req 1', behavior: 'deny' });
+    expect(result.isError).toBeFalsy();
+    expect(api.calls).toEqual([{ method: 'POST', path: '/api/agents/agent-pan-1/permissions/req%201/respond', body: { behavior: 'deny' } }]);
+  });
+
+  it('answer_agent_permission makes zero requests for an invalid behavior or a linked agentId', async () => {
+    const api = fakeApi({});
+    const client = await connectClient(api, APPROVER);
+    expect((await callTool(client, 'answer_agent_permission', { agentId: 'agent-pan-1', requestId: 'req-1', behavior: 'maybe' })).isError).toBe(true);
+    expect((await callTool(client, 'answer_agent_permission', { agentId: '@desk/agent-pan-1', requestId: 'req-1', behavior: 'deny' })).isError).toBe(true);
+    expect(api.calls).toEqual([]);
+  });
+
+  it('answer_question with agentId posts { answers, toolUseId } to the agent answer-question route', async () => {
+    const api = fakeApi({ 'POST /api/agents/agent-pan-1/answer-question': { status: 200, json: { ok: true } } });
+    const client = await connectClient(api, APPROVER);
+    const result = await callTool(client, 'answer_question', { agentId: 'agent-pan-1', answers: ['Yes'], toolUseId: 't1' });
+    expect(result.isError).toBeFalsy();
+    expect(api.calls).toEqual([{ method: 'POST', path: '/api/agents/agent-pan-1/answer-question', body: { answers: ['Yes'], toolUseId: 't1' } }]);
+  });
+
+  it('answer_question makes zero requests when both or neither of conversation/agentId are given', async () => {
+    const api = fakeApi({});
+    const client = await connectClient(api, APPROVER);
+    expect((await callTool(client, 'answer_question', { conversation: 'conv-a', agentId: 'agent-pan-1', answers: ['Yes'] })).isError).toBe(true);
+    expect((await callTool(client, 'answer_question', { answers: ['Yes'] })).isError).toBe(true);
     expect(api.calls).toEqual([]);
   });
 });
