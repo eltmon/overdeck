@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5019",
   "created": "2026-11-04T13:12:00.752Z",
-  "updated": "2026-11-04T14:34:52.752Z",
+  "updated": "2026-11-04T14:35:06.557Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -112,6 +112,10 @@
     "machine-store.ac3": {
       "status": "completed",
       "doneAt": "2026-11-04T14:34:52.752Z"
+    },
+    "native-filter.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:35:06.557Z"
     }
   }
 }
