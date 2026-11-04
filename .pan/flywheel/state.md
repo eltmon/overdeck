@@ -624,3 +624,8 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
 - Until PAN-4995 (PR adoption races `pan review request`) is fixed, handoff briefs must not run `pan review request` right after `gh pr create`. Opening the PR already triggers webhook adoption plus review; an immediate request-review starts verification mid-adoption and causes a false `workspace-head-mismatch` needs-you (seen on PAN-4993 / #4994). The PAN-4993 brief in this log prescribed exactly that order; don't copy it.
 - PAN-4841 belongs to the Flywheel now; the orchestrator keeps only PAN-4842 (phone docs).
 - Strike PRs (`pan strike`) bypass plan/review/test and wait for an operator merge; the merge train never schedules them. Five (#4678, #4679, #4698, #4701, #4707) sat green and unreviewed from Nov 1. Their issues were still open with no fix on main, so on the orchestrator's instruction they were updated with main and merged once fresh CI was green. Check `gh pr list --search "head:strike/"` each tick, because nothing else drains them.
+
+## 2026-11-04 — Reload hold for the live three-machine Anywhere check
+
+- From about 10:35Z the operator holds every `pan reload` of home while conv hoff-pan-4638-live runs PAN-4638 then PAN-4886 against build 65e3b1adf86 (Fly VM in pan-workspaces plus the Mac rig). A reload mid-run drops the links and lanes. Do not deploy until the operator says the VMs are torn down; a later entry here records the lift.
+- Merged but held from deploy meanwhile: strike PRs #4678, #4679, #4698, #4707.
