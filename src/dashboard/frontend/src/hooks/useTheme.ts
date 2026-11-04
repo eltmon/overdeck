@@ -71,7 +71,11 @@ export const useTheme = create<ThemeState>((set, get) => ({
 
   setTheme: (theme: Theme) => {
     applyTheme(theme, true);
-    localStorage.setItem(STORAGE_KEY, theme);
+    try {
+      localStorage.setItem(STORAGE_KEY, theme);
+    } catch {
+      // Storage unavailable or full: the theme still applies for this session.
+    }
     syncThemeToServer(theme);
     set({ theme, resolvedTheme: theme });
   },

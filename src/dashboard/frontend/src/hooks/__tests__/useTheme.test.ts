@@ -199,6 +199,22 @@ describe('useTheme', () => {
       expect(fetchControl.fetchMock.mock.calls[0]?.[0]).toBe('/api/settings/ui-theme');
       expect(fetchControl.fetchMock.mock.calls[0]?.[1]?.method).toBe('PUT');
     });
+
+    it('still applies the theme and updates state when localStorage.setItem throws', () => {
+      vi.mocked(localStorage.setItem).mockImplementation(() => {
+        throw new Error('QuotaExceededError');
+      });
+      const { result } = renderHook(() => useTheme());
+
+      act(() => {
+        result.current.setTheme('light');
+      });
+
+      expect(document.documentElement.classList.contains('dark')).toBe(false);
+      expect(result.current.theme).toBe('light');
+      expect(result.current.resolvedTheme).toBe('light');
+      expect(fetchControl.fetchMock).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('native shell', () => {
