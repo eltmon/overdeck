@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5019",
   "created": "2026-11-04T13:12:00.752Z",
-  "updated": "2026-11-04T14:38:15.344Z",
+  "updated": "2026-11-04T14:38:29.373Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -168,6 +168,10 @@
     "prefs-sync.ac1": {
       "status": "completed",
       "doneAt": "2026-11-04T14:38:15.344Z"
+    },
+    "prefs-sync.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:38:29.373Z"
     }
   }
 }
