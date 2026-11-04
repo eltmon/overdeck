@@ -759,8 +759,16 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   Now each offer logs `rtc offer from …` plus `answered`, `dropped: <reason>` or `failed at <step>`; the
   directory client logs `directory online|socket closed (<code>)|refused: …`; refusals log
   `channel refused (<code>, <mode>)`; an unexpected handshake exception has the new accept code `internal`.
-  Routine lines need `OVERDECK_ANYWHERE_DEBUG=1` (`src/lib/anywhere/debug-log.ts`). The phone evicts its
-  peer connections to a machine after a handshake `timeout`/`protocol` failure instead of reusing a zombie.
+  Routine lines need `OVERDECK_ANYWHERE_DEBUG=1` (`src/lib/anywhere/debug-log.ts`). After a handshake
+  `timeout`/`protocol` failure the phone evicts the one peer connection that carried the channel, and only
+  while it is current (PAN-5046 `dialer.evict`); evicting every connection to the machine fed a re-offer loop,
+  because `RTCPeerConnection.close()` fires no `close` on its data channels and the stranded handshakes timed
+  out and evicted the next, healthy connection. The dialer now ends its raw channels itself on close.
+- **Link sources wired after the supervisor started** (PAN-5046) — `startAnywhere` started the
+  `LinkSupervisor`, awaited the remote worker and lane followers, and only then set the link status, presence
+  and route sources. A link that came online in between ran the linked syncs, whose `linkFetch` threw
+  "Machine links are not running on this dashboard" (a burst after every boot, never between boots).
+  `startLinkSupervisorWired` (`src/dashboard/server/services/link-supervisor-wiring.ts`) wires them first.
 <!-- last-verified: 2026-11-04 -->
 - **A local Auto lane pick dropped its explanation** (PAN-5006 planning) — `laneMachineResolver`
   (`src/dashboard/server/routes/lanes.ts`) returned `null` for `target.self`, so `pan lane start --machine auto`
