@@ -75,6 +75,8 @@ vi.mock('../../../../src/lib/overdeck/conversation-liveness.js', async (importOr
 
 vi.mock('../../../../src/lib/prime-agent/launcher-fields.js', () => ({ getPrimeAgentLauncherFields }));
 vi.mock('../../../../src/lib/prime-agent/daemon.js', () => ({ reapPrimeAgentDaemon }));
+const revokeAgentMcpTokens = vi.hoisted(() => vi.fn(async (_agentId: string, _opts?: { agentKind?: string; dir?: string }) => 1));
+vi.mock('../../../../src/lib/mcp/agent-token.js', () => ({ revokeAgentMcpTokens }));
 
 const { spawnConversationSession, stopConversationRuntime, waitForConversationRuntimeReady } = await import('../../../../src/lib/overdeck/conversation-runtime.js');
 
@@ -125,6 +127,7 @@ beforeEach(() => {
   closeConversationPane.mockClear();
   getPrimeAgentLauncherFields.mockReset();
   reapPrimeAgentDaemon.mockClear();
+  revokeAgentMcpTokens.mockClear();
   waitForHostReady.mockClear();
 });
 
@@ -198,5 +201,11 @@ describe('Prime Agent conversations (PAN-3668 WI-14)', () => {
   it('never reaps for a non-Prime conversation', async () => {
     await stopConversationRuntime({ name: 'conv-claude', tmuxSession: 'conv-claude', harness: 'claude-code' } as never, 'conv-claude');
     expect(reapPrimeAgentDaemon).not.toHaveBeenCalled();
+  });
+
+  it('revokes the conversation MCP token by name and state dir when a conversation stops (PAN-4930)', async () => {
+    await stopConversationRuntime({ name: 'conv-claude', tmuxSession: 'conv-claude', harness: 'claude-code' } as never, 'conv-claude');
+    expect(revokeAgentMcpTokens).toHaveBeenCalledTimes(1);
+    expect(revokeAgentMcpTokens).toHaveBeenCalledWith('conv-claude', { agentKind: 'conversation', dir: join(overdeckHome, 'conversations', 'conv-claude') });
   });
 });

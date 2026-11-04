@@ -32,6 +32,10 @@ const reapPrimeAgentDaemon = vi.hoisted(() => vi.fn(async (_agentId: string) => 
 
 vi.mock('../prime-agent/daemon.js', () => ({ reapPrimeAgentDaemon }));
 
+const revokeAgentMcpTokens = vi.hoisted(() => vi.fn(async (_agentId: string) => 1));
+
+vi.mock('../mcp/agent-token.js', () => ({ revokeAgentMcpTokens }));
+
 vi.mock('../paths.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../paths.js')>();
   return {
@@ -114,7 +118,7 @@ vi.mock('../agent-runtime.js', async (importOriginal) => {
   return { ...actual, emitAgentEvent: vi.fn(() => E.void) };
 });
 
-import { saveAgentStateSync, stopAgent } from '../agents.js';
+import { saveAgentStateSync, stopAgent, stopAgentSync } from '../agents.js';
 import { getAgentStateFilePath } from '../agents/agent-state-read.js';
 import { closeAgentPane, closeIssuePanes } from '../terminal-backends/launch.js';
 import { findHerdrAgentPane, HerdrBackend } from '../terminal-backends/herdr.js';
@@ -160,6 +164,7 @@ beforeEach(() => {
   tmux.live.clear();
   tmux.killed.length = 0;
   vi.spyOn(console, 'log').mockImplementation(() => undefined);
+  revokeAgentMcpTokens.mockClear();
 });
 
 describe('stopAgent terminates through the terminal backend (PAN-3947)', () => {
@@ -192,6 +197,24 @@ describe('stopAgent terminates through the terminal backend (PAN-3947)', () => {
     // closeAgentPaneDetailed); the stop itself still completes.
     await expect(Effect.runPromise(stopAgent(AGENT, 'operator'))).resolves.toEqual({ outcome: 'absent' });
     expect(herdrPaneCloses()).toEqual([]);
+  });
+});
+
+describe('stop revokes the agent MCP token (PAN-4930)', () => {
+  it('stopAgent revokes once with the normalized agent id', async () => {
+    backendSelection.name = 'tmux';
+
+    await Effect.runPromise(stopAgent('PAN-3947', 'operator'));
+
+    expect(revokeAgentMcpTokens).toHaveBeenCalledTimes(1);
+    expect(revokeAgentMcpTokens).toHaveBeenCalledWith(AGENT);
+  });
+
+  it('stopAgentSync revokes once', () => {
+    stopAgentSync(AGENT);
+
+    expect(revokeAgentMcpTokens).toHaveBeenCalledTimes(1);
+    expect(revokeAgentMcpTokens).toHaveBeenCalledWith(AGENT);
   });
 });
 

@@ -155,7 +155,7 @@ export type DashboardCredential =
   | { kind: 'internal-token' }
   | { kind: 'root-session' }
   | { kind: 'device'; deviceId: string; scopes: AccessTokenScope[] }
-  | { kind: 'token'; tokenId: string; scopes: AccessTokenScope[] }
+  | { kind: 'token'; tokenId: string; scopes: AccessTokenScope[]; agentId?: string; agentKind?: 'agent' | 'conversation'; role?: string }
   | { kind: 'machine'; tokenId: string; environmentId: string; scopes: AccessTokenScope[]; actor: LinkActor; access: MachineAccess }
   | { kind: 'phone'; tokenId: string; clientId: string; phoneKey: string; scopes: AccessTokenScope[] };
 
@@ -219,7 +219,10 @@ export function resolveDashboardCredential(headers: HeaderMap, channel: ChannelM
   if (record.kind === 'phone') return null;
   if (record.kind === 'token') {
     // PAN-2351 D-9: a token authenticates only from the Bearer header.
-    return cookieToken === undefined ? { kind: 'token', tokenId: record.id, scopes: record.scopes } : null;
+    // PAN-4927 D-6: an agent token also names its agent; a plain token keeps the three keys.
+    return cookieToken === undefined
+      ? { kind: 'token', tokenId: record.id, scopes: record.scopes, ...(record.agentId ? { agentId: record.agentId, agentKind: record.agentKind, role: record.role } : {}) }
+      : null;
   }
   // A record with no kind is a device (PAN-2351 FR-10).
   return { kind: 'device', deviceId: record.id, scopes: record.scopes };
