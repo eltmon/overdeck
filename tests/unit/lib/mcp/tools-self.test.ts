@@ -104,3 +104,45 @@ describe.each(['task_claim', 'task_done'] as const)('%s (PAN-4927 W-SELF2)', (na
     expect(resultText(result).startsWith('HTTP 409')).toBe(true);
   });
 });
+
+describe('task_block (PAN-4927 W-SELF2)', () => {
+  const path = '/api/self/tasks/block';
+
+  it('is hidden from a non-agent token with tell and listed for an agent token with tell', async () => {
+    const api = fakeApi({});
+    const human = await connectClient(api, ['tell']);
+    expect((await human.listTools()).tools.map((tool) => tool.name)).not.toContain('task_block');
+    const call = await callTool(human, 'task_block', { itemId: 'item-a' });
+    expect(call.isError).toBe(true);
+    expect(resultText(call)).toBe('Unknown tool task_block');
+
+    const agent = await connectClient(api, ['tell'], true);
+    expect((await agent.listTools()).tools.map((tool) => tool.name)).toContain('task_block');
+  });
+
+  it('posts on through when given, and omits it when absent', async () => {
+    const done = { status: 'done', jobId: 'j1', verb: 'task-block', exitCode: 0, stdout: '', stderr: '', error: null };
+    const api = fakeApi({ [`POST ${path}`]: { status: 200, json: done } });
+    const client = await connectClient(api, ['tell'], true);
+
+    await callTool(client, 'task_block', { itemId: 'item-a', on: ['PAN-2', '#45'] });
+    expect(api.calls[0]).toEqual({ method: 'POST', path, body: { itemId: 'item-a', on: ['PAN-2', '#45'] } });
+
+    await callTool(client, 'task_block', { itemId: 'item-a' });
+    expect(api.calls[1]).toEqual({ method: 'POST', path, body: { itemId: 'item-a' } });
+  });
+
+  it('requires itemId and rejects a non-string-array on', async () => {
+    const api = fakeApi({});
+    const client = await connectClient(api, ['tell'], true);
+
+    const missing = await callTool(client, 'task_block', {});
+    expect(missing.isError).toBe(true);
+    expect(resultText(missing)).toContain('itemId');
+
+    const badOn = await callTool(client, 'task_block', { itemId: 'item-a', on: 'not-an-array' });
+    expect(badOn.isError).toBe(true);
+    expect(resultText(badOn)).toContain('on must be a list of strings');
+    expect(api.calls).toEqual([]);
+  });
+});

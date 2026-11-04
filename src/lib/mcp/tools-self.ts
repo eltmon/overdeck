@@ -9,7 +9,7 @@
  */
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 
-import { type McpToolContext, type OverdeckTool, requiredString, routeResult, WAIT_CHUNK_MS } from './tool.js';
+import { errorResult, type McpToolContext, type OverdeckTool, requiredString, routeResult, WAIT_CHUNK_MS } from './tool.js';
 
 async function postSelf(ctx: McpToolContext, path: string, body: Record<string, unknown>): Promise<CallToolResult> {
   return routeResult(await ctx.api.request('POST', path, body));
@@ -69,4 +69,29 @@ const taskDone: OverdeckTool = {
   },
 };
 
-export const SELF_TOOLS: readonly OverdeckTool[] = [waitJob, taskClaim, taskDone];
+const taskBlock: OverdeckTool = {
+  name: 'task_block',
+  description:
+    'Mark a checklist item blocked (runs pan task block). Pass on: the issues or PRs it waits on (PAN-123, #45, owner/repo#45 or a PR URL); Overdeck wakes you when all have merged. Answers like task_claim.',
+  scope: 'tell',
+  audience: 'agent',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      itemId: { type: 'string', description: 'The checklist item id to block.' },
+      on: { type: 'array', items: { type: 'string' }, maxItems: 20, description: 'Issues or PRs this item waits on.' },
+    },
+    required: ['itemId'],
+  },
+  async run(args, ctx) {
+    const itemId = requiredString(args, 'itemId');
+    if (!itemId.ok) return itemId.error;
+    const on = args['on'];
+    if (on !== undefined && (!Array.isArray(on) || on.some((value) => typeof value !== 'string'))) {
+      return errorResult('on must be a list of strings');
+    }
+    return postSelf(ctx, '/api/self/tasks/block', { itemId: itemId.value, ...(on !== undefined ? { on } : {}) });
+  },
+};
+
+export const SELF_TOOLS: readonly OverdeckTool[] = [waitJob, taskClaim, taskDone, taskBlock];

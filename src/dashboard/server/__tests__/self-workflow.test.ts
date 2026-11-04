@@ -1,7 +1,8 @@
 /**
- * PAN-4927 W-SELF2 WI-2: the self workflow route file's shared helpers,
- * `task_claim` and `task_done`, at the handler level, under fake timers, and
- * through the real remote request gate and access-token registry.
+ * PAN-4927 W-SELF2 WI-2, WI-3: the self workflow route file's shared
+ * helpers, `task_claim`, `task_done` and `task_block`, at the handler level,
+ * under fake timers, and through the real remote request gate and
+ * access-token registry.
  */
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -28,6 +29,7 @@ const { requiredScopeFor } = await import('../route-scopes.js');
 const { createSelfJobs } = await import('../services/self-jobs.js');
 const {
   badRequest,
+  handleSelfTaskBlock,
   handleSelfTaskClaim,
   handleSelfTaskDone,
   makeSelfWorkflowRouteLayer,
@@ -175,6 +177,43 @@ describe.each([
   });
 });
 
+describe('handleSelfTaskBlock', () => {
+  it('builds argv with each on ref as its own --on flag', async () => {
+    const { jobs, recorded, finish } = controlledJobs();
+    const promise = handleSelfTaskBlock(agentCredential('agent-pan-1'), '{"itemId":"item-a","on":["PAN-2","#45"]}', undefined, { jobs, caller: callerDeps });
+    finish(0, { exitCode: 0, stdout: 'ok' });
+    const result = await promise;
+    expect(result.status).toBe(200);
+    expect(recorded[0]?.args.slice(1)).toEqual(['task', 'block', 'PAN-1', 'item-a', '--on=PAN-2', '--on=#45', '--json']);
+  });
+
+  it('builds argv with no --on flags when on is absent', async () => {
+    const { jobs, recorded, finish } = controlledJobs();
+    const promise = handleSelfTaskBlock(agentCredential('agent-pan-1'), '{"itemId":"item-a"}', undefined, { jobs, caller: callerDeps });
+    finish(0, { exitCode: 0, stdout: 'ok' });
+    await promise;
+    expect(recorded[0]?.args.slice(1)).toEqual(['task', 'block', 'PAN-1', 'item-a', '--json']);
+  });
+
+  it('turns an on value of --steal into a single --on=--steal argv element', async () => {
+    const { jobs, recorded, finish } = controlledJobs();
+    const promise = handleSelfTaskBlock(agentCredential('agent-pan-1'), '{"itemId":"item-a","on":["--steal"]}', undefined, { jobs, caller: callerDeps });
+    finish(0, { exitCode: 0, stdout: 'ok' });
+    await promise;
+    expect(recorded[0]?.args.slice(1)).toEqual(['task', 'block', 'PAN-1', 'item-a', '--on=--steal', '--json']);
+  });
+
+  it('refuses 21 refs, a non-array on, and an empty-string ref with 400 bad-request and starts no job', async () => {
+    const tooMany = Array.from({ length: 21 }, (_, i) => `PAN-${i}`);
+    for (const on of [tooMany, 'not-an-array', ['']]) {
+      const { jobs, recorded } = controlledJobs();
+      const result = await handleSelfTaskBlock(agentCredential('agent-pan-1'), JSON.stringify({ itemId: 'item-a', on }), undefined, { jobs, caller: callerDeps });
+      expect(result).toEqual({ status: 400, body: { error: 'on must be a list of at most 20 issue or PR references', code: 'bad-request' } });
+      expect(recorded).toEqual([]);
+    }
+  });
+});
+
 describe('waits', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -242,8 +281,9 @@ describe('self workflow routes through the gate', () => {
     expect(doneResponse.json).toMatchObject({ status: 'done', exitCode: 0, stdout: 'ok' });
   });
 
-  it('requires tell for both routes', () => {
+  it('requires tell for all three task routes', () => {
     expect(requiredScopeFor('POST', '/api/self/tasks/claim')).toBe('tell');
     expect(requiredScopeFor('POST', '/api/self/tasks/done')).toBe('tell');
+    expect(requiredScopeFor('POST', '/api/self/tasks/block')).toBe('tell');
   });
 });

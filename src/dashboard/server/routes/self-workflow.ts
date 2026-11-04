@@ -120,6 +120,36 @@ export async function handleSelfTaskDone(
   return startSelfJobAnswer(jobs, caller, 'task-done', [{ ref: caller.issueId }, { ref: itemId.value }, { switch: 'json' }], {}, signal);
 }
 
+/** `body.on`: undefined → []; else an array of at most 20 non-empty, at-most-500-char strings, else the refusal. */
+function parseOn(body: Record<string, unknown>): { ok: true; value: readonly string[] } | { ok: false; result: SelfRouteResult } {
+  const on = body['on'];
+  if (on === undefined) return { ok: true, value: [] };
+  const bad = { ok: false, result: badRequest('on must be a list of at most 20 issue or PR references') } as const;
+  if (!Array.isArray(on) || on.length > 20) return bad;
+  for (const value of on) {
+    if (typeof value !== 'string' || !value.trim() || value.length > 500) return bad;
+  }
+  return { ok: true, value: on as readonly string[] };
+}
+
+export async function handleSelfTaskBlock(
+  credential: DashboardCredential | null,
+  text: string,
+  signal?: AbortSignal,
+  deps: SelfWorkflowRouteDeps = {},
+): Promise<SelfRouteResult> {
+  const prepared = prelude(credential, text, deps);
+  if (!prepared.ok) return prepared.result;
+  const { caller, body, jobs } = prepared;
+  const itemId = requiredBodyString(body, 'itemId', 200);
+  if (!itemId.ok) return itemId.result;
+  const on = parseOn(body);
+  if (!on.ok) return on.result;
+  if (caller.issueId === null) return { status: 409, body: NO_ISSUE };
+  const args: SelfJobArg[] = [{ ref: caller.issueId }, { ref: itemId.value }, ...on.value.map((value) => ({ flag: 'on', value })), { switch: 'json' }];
+  return startSelfJobAnswer(jobs, caller, 'task-block', args, {}, signal);
+}
+
 export function makeSelfWorkflowRouteLayer(deps: SelfWorkflowRouteDeps = {}) {
   const selfTaskClaimRoute = HttpRouter.add(
     'POST',
@@ -145,7 +175,19 @@ export function makeSelfWorkflowRouteLayer(deps: SelfWorkflowRouteDeps = {}) {
     })),
   );
 
-  return Layer.mergeAll(selfTaskClaimRoute, selfTaskDoneRoute);
+  const selfTaskBlockRoute = HttpRouter.add(
+    'POST',
+    '/api/self/tasks/block',
+    httpHandler(Effect.gen(function* () {
+      const request = yield* HttpServerRequest.HttpServerRequest;
+      const text = yield* request.text;
+      const credential = resolveRequestCredential(request);
+      const result = yield* Effect.promise((signal) => handleSelfTaskBlock(credential, text, signal, deps));
+      return jsonResponse(result.body, { status: result.status });
+    })),
+  );
+
+  return Layer.mergeAll(selfTaskClaimRoute, selfTaskDoneRoute, selfTaskBlockRoute);
 }
 
 export const selfWorkflowRouteLayer = makeSelfWorkflowRouteLayer();
