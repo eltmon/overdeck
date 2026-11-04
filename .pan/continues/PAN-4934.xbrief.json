@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4934",
   "created": "2026-11-04T02:59:33.455Z",
-  "updated": "2026-11-04T03:42:30.770Z",
+  "updated": "2026-11-04T03:42:48.246Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -126,6 +126,10 @@
     "acp-mcp-config-reader.ac1": {
       "status": "completed",
       "doneAt": "2026-11-04T03:42:30.770Z"
+    },
+    "acp-mcp-config-reader.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:42:48.246Z"
     }
   }
 }
