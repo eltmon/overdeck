@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4955",
   "created": "2026-11-04T14:23:26.498Z",
-  "updated": "2026-11-04T14:26:14.155Z",
+  "updated": "2026-11-04T14:28:39.384Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -16,9 +16,10 @@
       "doneAt": "2026-11-04T14:26:07.849Z"
     },
     "run-mcp": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4955",
-      "claimedAt": "2026-11-04T14:26:14.155Z"
+      "claimedAt": "2026-11-04T14:26:14.155Z",
+      "doneAt": "2026-11-04T14:28:39.384Z"
     }
   }
 }
