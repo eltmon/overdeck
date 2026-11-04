@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4945",
   "created": "2026-11-04T01:22:40.341Z",
-  "updated": "2026-11-04T02:09:26.911Z",
+  "updated": "2026-11-04T02:09:50.636Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -54,6 +54,11 @@
       "claimedBy": "agent-pan-4945",
       "claimedAt": "2026-11-04T02:05:03.248Z",
       "doneAt": "2026-11-04T02:09:26.911Z"
+    },
+    "routes-token-revoke": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4945",
+      "claimedAt": "2026-11-04T02:09:50.635Z"
     }
   }
 }
