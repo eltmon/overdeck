@@ -75,7 +75,9 @@
   operator-only. See `docs/ACCOUNT-SERVICE.md`. `services/connect/` (PAN-2356, the
   overdeck.ai directory, relay credentials and webhook inbox) follows the same rules
   with one SQLite Durable Object per account and pure-JS `@noble/*` sealing; see
-  `docs/CONNECT-SERVICE.md`. The machine side adds `werift` (WebRTC, bundled) and
+  `docs/CONNECT-SERVICE.md`. `services/share/` (PAN-658 Shared Sessions) follows them
+  too: one SQLite `ShareRoom` Durable Object per room for the lobby, SDP/ICE relay and
+  Realtime TURN credentials; see `docs/SHARED-SESSIONS.md`. The machine side adds `werift` (WebRTC, bundled) and
   `sodium-native` (sealed-box open) as root dependencies.
 
 <!-- last-verified: 2026-11-03 -->

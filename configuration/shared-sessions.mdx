@@ -180,6 +180,14 @@ prompts run on your machine, with your agent's permissions.
 - **The host sent your suggestion.**: the host picked your suggestion and sent it.
 - **You can no longer send prompts directly.**: the host removed your contributor role.
 
+## Networks and privacy
+
+The two machines connect directly when they can. When a firewall or a strict NAT blocks a
+direct connection, Cloudflare's TURN service relays the encrypted packets, and it cannot read
+them. The share service only introduces the machines and checks who may join. An automated test
+checks on every build that no conversation text, prompt, draft or terminal output passes
+through it.
+
 ## Limits
 
 - A room holds at most 50 people, of whom at most 20 can wait in the lobby at once.

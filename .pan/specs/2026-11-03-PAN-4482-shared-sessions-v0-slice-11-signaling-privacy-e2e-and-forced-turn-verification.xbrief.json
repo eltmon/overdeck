@@ -1,0 +1,739 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-03T23:55:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4482: Shared Sessions v0 (slice 11): signaling-privacy e2e and forced-TURN verification",
+    "updated": "2026-11-03T23:55:14.088Z"
+  },
+  "plan": {
+    "id": "pan-4482",
+    "title": "Shared Sessions v0 (slice 11): signaling-privacy e2e and forced-TURN verification",
+    "status": "running",
+    "uid": "bef660f6-6f43-410f-829f-b93fbd551bd6",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-03T23:55:00Z",
+    "updated": "2026-11-03T23:55:14.088Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4482",
+        "label": "PAN-4482",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/658",
+        "label": "PAN-658",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "shared-sessions",
+      "share-service",
+      "webrtc",
+      "turn",
+      "privacy",
+      "e2e",
+      "testing"
+    ],
+    "narratives": {
+      "Problem": "Shared Sessions v0 (PAN-658 and slices PAN-4473..PAN-4481) is merged, but two security claims lack proof: NFR-1/AC-17 (the share service never sees conversation, draft or terminal content) has only structural evidence, and NFR-7/AC-15 (sessions work through symmetric NATs via Cloudflare Realtime TURN) has only credential-plumbing tests. The room-creation rate limit is tested only with a stub, and the full PAN-658 acceptance list has not been swept.",
+      "Proposal": "Add a CI-run signaling-privacy integration test on real workerd and werift that plants canaries in every content kind, proves each arrives over a DataChannel, and asserts no canary, unknown frame type, unknown key or binary frame appears in the host or viewer signaling traffic (captured at the message layer through the injected seams). Add an opt-in forced-relay operator checkpoint test that forces iceTransportPolicy relay on both peers through real Cloudflare TURN and proves every signaled candidate is typ relay. Add a CI-run rate-limit test that binds the committed wrangler.jsonc limit. Document verification in docs/SHARED-SESSIONS.md and the user page, and record an acceptance sweep table, filing the one real gap (AC-7 viewer roster) as its own issue.",
+      "NonGoals": "- A Playwright two-browser variant of the signaling-privacy test\n- A CI-run forced-relay test through a local TURN server, or any new TURN server dependency\n- Running the forced-relay checkpoint with real credentials, deploying the share Worker, reading or creating services/share/.dev.vars, or any wrangler deploy/secret/login command\n- Building the AC-7 viewer roster UI (filed as its own issue)\n- Re-ordering the PeerHub's TURN URLs for werift (only a follow-up if the operator checkpoint fails for that reason)\n- Adding src/lib/errors.ts tags for AC-18 (waived)\n- An import-boundary lint for PanRpcGroup (AC-16 is covered by allow-list construction)\n- Refactoring the five existing share integration tests onto the new harness\n- Editing .pan/drafts/pan-658.md\n- Any production code change, except a confined NFR-1 leak fix under the WI-3 decision rule\n- Loosening findLeaks or frameViolations to make a test pass"
+    },
+    "autoDecisions": [
+      {
+        "summary": "The signaling-privacy e2e is a Vitest integration test on real workerd (Miniflare) and real werift, in the default CI run, not a Playwright two-browser test.",
+        "rationale": "In the dashboard path the browser never talks to the share service (parent D-R3-2), the existing Playwright Shared Sessions specs are excluded from test:playwright (PAN-4475 D-20), and the Miniflare integration tests are the established CI coverage; a CI-run test keeps NFR-1 enforced on every change."
+      },
+      {
+        "summary": "Signaling traffic is captured by wrapping the injected openSocket/createRoom/deleteRoom seams, recording decoded text; a raw TCP byte logger and a WebSocket-terminating proxy were rejected.",
+        "rationale": "RFC 6455 masks every client-to-server frame and ws may negotiate permessage-deflate, so canaries sent by the host or viewer never appear in raw bytes (a vacuous pass); the seams are the only paths to the service (share-join.ts makes no HTTP call), so wrapping them is complete with no network change."
+      },
+      {
+        "summary": "Leak detection combines planted canaries (plain, case-folded, base64) with per-socket, per-direction frame type and key allow-lists, plus positive delivery checks and capture-liveness counts.",
+        "rationale": "Canaries alone only catch the planted strings; the structural check catches any new field that could carry content; positive checks and the offer/answer/candidate counts prove the test is not passing vacuously."
+      },
+      {
+        "summary": "The forced-relay test is an opt-in *.slow.test.ts operator checkpoint that throws on missing TURN_KEY_ID/TURN_KEY_API_TOKEN; the work agent never runs it with credentials.",
+        "rationale": "The issue names it an operator checkpoint because it needs real TURN credentials; NFR-8 forbids agents any remote Cloudflare action; the test-skip gate forbids skipIf, so preconditions fail loudly like tests/integration/anywhere/two-machine-ac1.slow.test.ts."
+      },
+      {
+        "summary": "Relay is forced on both peers (host via PeerHubDeps.createPeerConnection, viewer via a new optional LoopbackViewer config) and proven from signaled candidates, not getStats().",
+        "rationale": "Both ends relay-only models two symmetric NATs; the host seam needs no production change; if every signaled candidate on both sides is typ relay and content arrives, the nominated pair is relay-to-relay regardless of werift's stats support."
+      },
+      {
+        "summary": "No local TURN server dependency is added to make forced relay CI-runnable.",
+        "rationale": "werift ships no TURN server, the issue scopes forced relay as an operator checkpoint, and a new dependency is unrequested scope; the relay classifier is unit-tested in CI instead."
+      },
+      {
+        "summary": "The rev-2 WI-12 rate-limit verification is included as a CI-run Miniflare test that binds the committed wrangler.jsonc ROOM_CREATE_LIMIT entry.",
+        "rationale": "Rev-2 WI-12 names rate-limit verification; a plan-time probe proved {type:'rate-limit', namespace, simple} yields 201x10 then 429 Retry-After 60 on real workerd, so the test is cheap and catches config drift."
+      },
+      {
+        "summary": "The acceptance sweep records evidence and fixes no product code; the one real gap found (AC-7: a plain viewer does not see every participant) is filed as its own issue.",
+        "rationale": "This slice verifies; a frontend roster feature needs its own review, test and UAT; PAN-4475 D-19 deferred the full roster UI and no later slice built it."
+      },
+      {
+        "summary": "AC-18 (new src/lib/errors.ts tags) is recorded as waived, not built.",
+        "rationale": "PAN-4473 D-9 and PAN-4474 D-19 decided string error codes because nothing runs in an Effect error channel; adding unused tags would be speculative code."
+      },
+      {
+        "summary": "A shared tests/helpers/share/share-worker.ts harness serves the three new tests; the five existing share integration tests are not refactored onto it.",
+        "rationale": "Three new consumers justify one helper; the existing files copy their bootstrap by stated convention and changing them is outside this slice (surgical changes)."
+      },
+      {
+        "summary": "The forced-relay test passes the Worker's ICE list to werift unchanged, even though werift uses only the first TURN URL.",
+        "rationale": "The checkpoint must test production behavior; if the operator's network blocks that transport, the failure is a real finding to file (as PAN-4862 did for Anywhere), not something to mask in the test."
+      }
+    ],
+    "items": [
+      {
+        "id": "share-worker-harness",
+        "title": "Shared Miniflare harness that boots the bundled share Worker",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T23:55:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4482",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/helpers/share/share-worker.ts",
+            "tests/helpers/share/__tests__/share-worker.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/helpers/share/__tests__/share-worker.test.ts"
+          ],
+          "expected_outputs": [
+            "share-worker.test.ts: 2 tests pass on real workerd"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-5",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4482.md WI-1. Create tests/helpers/share/share-worker.ts exporting tokenFor, ShareTestUser, StartShareWorkerOptions {users, turn?, rateLimit?}, ShareWorker {mf, url, base, dispose} and startShareWorker(). Move the bootstrap that tests/integration/services/share/join-manager.test.ts lines 40-140 repeats: wrangler deploy --dry-run --outdir <mkdtemp> via promisify(execFile) with cwd services/share and env WRANGLER_SEND_METRICS=false CI=1; createRequire(services/share/package.json)('miniflare'); the AccountRpc stub built from options.users; env ROOMS, ACCOUNT, PUBLIC_BASE_URL=https://share.test. turn adds TURN_KEY_ID/TURN_KEY_API_TOKEN as {type:'secret', value} (implementation checkpoint: fall back to {type:'text', value} if Miniflare rejects 'secret'); never an outboundService stub. rateLimit adds ROOM_CREATE_LIMIT: {type:'rate-limit', namespace, simple:{limit, period}} (shape verified by a plan-time probe; 'ratelimit' and namespace_id are rejected). url = String(await mf.ready) without trailing slash; dispose() disposes Miniflare and rm -r the temp dir. Do NOT edit the five existing share integration tests. No readFile of a .ts path (lint-source-introspection)."
+        },
+        "items": [
+          {
+            "id": "share-worker-harness.ac1",
+            "title": "Given startShareWorker({users:[{id:1,login:'owner'}]}), GET <url>/healthz returns ok:true, configured:true and turn:false, and mf.dispatchFetch POST <base>/v1/rooms with tokenFor(1) returns 201",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-worker-harness.ac2",
+            "title": "Given turn:{keyId:'k', apiToken:'t'}, GET /healthz returns turn:true (the route only checks that both secrets are bound)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "share-worker-harness.ac3",
+            "title": "dispose() resolves and removes the temporary bundle directory it created (existsSync on that path returns false afterwards)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "signaling-capture",
+        "title": "Signaling capture helper with leak, frame-allow-list and summary checks",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T23:55:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4482",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/helpers/share/signaling-capture.ts",
+            "tests/helpers/share/__tests__/signaling-capture.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/helpers/share/__tests__/signaling-capture.test.ts"
+          ],
+          "expected_outputs": [
+            "signaling-capture.test.ts: 4 tests pass with no network"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "NFR-3"
+          ],
+          "foundationFor": [
+            "signaling-privacy-e2e",
+            "forced-turn-checkpoint"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4482.md WI-2. Create SignalingCapture (entries; openSocket(role,label,open) wrapping send/message/close of the socket returned by open without changing behavior; createRoom/deleteRoom that call the real src/lib/sharing/share-service.ts functions with opts.fetch = a recording fetch storing method, path, status, request body and res.clone().text(); framesFor(label, direction)). Export pure findLeaks (plain, case-folded, base64 at offsets 0-2 with edge chars trimmed, >=8 chars), frameViolations (binary always a violation; non-JSON only exact 'ping' viewer to-service / 'pong' viewer from-service; per role+direction type and exact top-level key allow-lists from the PRD table, signal.data keys subset of sdp/candidate with their own key lists, room.snapshot keys subset of RoomSnapshot keys, scope keys subset of kind/conversationId) and summarize (offers, answers, host/viewer candidates, room snapshots, POST and DELETE counts). Violation and leak descriptions name the entry index, role, label, direction, type and key, never a frame value. Tests use an EventEmitter fake socket, no network."
+        },
+        "items": [
+          {
+            "id": "signaling-capture.ac1",
+            "title": "Given a wrapped fake socket, send('x') still reaches the original send and is recorded to-service; an emitted text message is recorded from-service; an emitted binary message is recorded as ws-binary; a close with 4004 is recorded",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "signaling-capture.ac2",
+            "title": "findLeaks returns one leak each for a canary planted in plain, lowercased and base64 (offset 2) form, and returns [] for clean traffic",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "signaling-capture.ac3",
+            "title": "frameViolations returns [] for one valid frame of every documented type, and exactly one violation each for {\"type\":\"chat\"}, a signal with data.content, a room snapshot with a messages key, a viewer admit, the non-JSON text hello and a binary frame",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "signaling-capture.ac4",
+            "title": "summarize returns the exact offer, answer, per-role candidate, room-snapshot, POST and DELETE counts for a fixture capture",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "signaling-privacy-e2e",
+        "title": "Signaling-privacy integration test on real workerd and werift (NFR-1, AC-17)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T23:55:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "test",
+          "issueLabel": "pan-4482",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/integration/services/share/signaling-privacy.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/integration/services/share/signaling-privacy.test.ts"
+          ],
+          "expected_outputs": [
+            "signaling-privacy.test.ts: 1 test passes; findLeaks and frameViolations both return []"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ],
+          "parallelSafeReason": "It creates one new test file only; its inputs (share-worker-harness, signaling-capture) are ordered by blocks edges, and it shares no file with forced-turn-checkpoint or rate-limit-integration."
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4482.md WI-3, steps 1-11 and the assertions, exactly. Real ShareManager + PeerHub(werift) host and two real JoinManagers (alice admitted as contributor, bob left in the lobby) against startShareWorker, every seam wrapped by one SignalingCapture. Nine canaries PRIVACY-CANARY-<KIND>-<randomUUID>: history (fixture JSONL), append (fake watch delta), label (streamLabel), draft (viewer drafts envelope), submit (contributor control submit), hostSend (manager.sendPrompt), viewerSend (controller-send after set-controller to alice, then reclaim), terminalSnapshot and terminalOutput (terminal attach stub). queue.activity returns lastMessageId `delivered-${delivered.length}` so each turn is seen at once. Assert positive delivery of every canary, findLeaks [] , frameViolations [], summary counts (offers/answers/candidates/room >=1, posts===1, deletes===1), framesFor('bob','from-service') equals [{type:'status',status:'lobby'}] plus a 4004 close for bob, and delivered equals [submit, hostSend, viewerSend]. Waits are vi.waitFor/events only; no sleeps; capture stays in memory. Leak decision rule: a production leak under ~30 lines in share-host.ts/share-join.ts/peer-hub.ts is fixed here with its own commit and unit test; otherwise file an issue, pan tell flywheel-orchestrator, and stop. Never loosen the checks; a missed documented protocol key is added to the WI-2 table and the docs protocol table in one commit. The viewer-to-service signal frames in this test come from LoopbackViewer; the browser's signal shape is covered separately by the known-keys rebuild in src/dashboard/server/routes/joins.ts line 66 (unit-tested), so do not widen the allow-list for browser-only keys."
+        },
+        "items": [
+          {
+            "id": "signaling-privacy-e2e.ac1",
+            "title": "Given the full flow, the admitted viewer receives over DataChannels the history, append, stream label, terminal snapshot and terminal output canaries, the host lists the draft canary in manager.list() drafts, and delivered equals the submit, host-send and viewer-send canaries in that order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "signaling-privacy-e2e.ac2",
+            "title": "After the share ends, findLeaks(capture.entries, all nine canaries) returns [] and frameViolations(capture.entries) returns []",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "signaling-privacy-e2e.ac3",
+            "title": "summarize(capture.entries) returns at least one host offer, one viewer answer, one candidate per role and one room snapshot, exactly one POST /v1/rooms and exactly one DELETE",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "signaling-privacy-e2e.ac4",
+            "title": "The lobby viewer bob's join socket receives exactly one frame, {\"type\":\"status\",\"status\":\"lobby\"}, then closes with 4004, and bob's subscriber receives no signal event",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "loopback-viewer-ice-config",
+        "title": "LoopbackViewer accepts optional ICE servers and iceTransportPolicy",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T23:55:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4482",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/sharing/__tests__/loopback-viewer.ts",
+            "src/dashboard/server/sharing/__tests__/loopback-viewer.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/sharing/__tests__/loopback-viewer.test.ts src/dashboard/server/sharing/__tests__/peer-hub-loopback.test.ts tests/integration/services/share/join-manager.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "the three test files pass",
+            "typecheck completes without errors",
+            "lint exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4482.md WI-4. Replace the field initializer `readonly pc = new RTCPeerConnection({ iceServers: [] })` with `readonly pc: RTCPeerConnection` assigned first in a new `constructor(config: LoopbackViewerConfig = {})` that passes iceServers (default []) and iceTransportPolicy only when given; export LoopbackViewerConfig. Keep every existing subscription and every existing `new LoopbackViewer()` call unchanged. Update the header comment's first sentence. Add loopback-viewer.test.ts with the two tests from the PRD (read werift's public pc.config; close each viewer)."
+        },
+        "items": [
+          {
+            "id": "loopback-viewer-ice-config.ac1",
+            "title": "new LoopbackViewer().pc.config returns iceServers [] and iceTransportPolicy 'all'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "loopback-viewer-ice-config.ac2",
+            "title": "new LoopbackViewer({iceServers:[{urls:['turn:127.0.0.1:3478?transport=udp'],username:'u',credential:'c'}], iceTransportPolicy:'relay'}).pc.config returns those servers and iceTransportPolicy 'relay'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "loopback-viewer-ice-config.ac3",
+            "title": "npx vitest run on peer-hub-loopback.test.ts and join-manager.test.ts exits 0 with no edits to their LoopbackViewer calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ice-candidate-classifier",
+        "title": "Relay-candidate classifier for signals and SDP",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T23:55:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4482",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/helpers/share/ice-candidates.ts",
+            "tests/helpers/share/__tests__/ice-candidates.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/helpers/share/__tests__/ice-candidates.test.ts"
+          ],
+          "expected_outputs": [
+            "ice-candidates.test.ts: 2 tests pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4482.md WI-5. Export candidateType(line) (the token after ' typ ', else 'unknown') and signaledCandidates(signals: SignalData[]) returning {type, source:'candidate'|'sdp'} for data.candidate.candidate (skipping an empty end-of-candidates string) and for each 'a=candidate:' line of data.sdp.sdp. Import SignalData as a type from @overdeck/contracts."
+        },
+        "items": [
+          {
+            "id": "ice-candidate-classifier.ac1",
+            "title": "candidateType returns host, srflx and relay for the three PRD sample lines and unknown for a line without typ",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ice-candidate-classifier.ac2",
+            "title": "signaledCandidates returns three entries with the right source for an SDP holding one relay and one host a=candidate line plus one relay candidate signal, and returns none for an empty candidate string",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "forced-turn-checkpoint",
+        "title": "Forced-relay operator checkpoint test through Cloudflare Realtime TURN (NFR-7, AC-15)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T23:55:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4482",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/integration/services/share/forced-turn.slow.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "env -u TURN_KEY_ID -u TURN_KEY_API_TOKEN VITEST_INCLUDE_SLOW=1 npx vitest run tests/integration/services/share/forced-turn.slow.test.ts; test $? -ne 0",
+            "! npx vitest list tests/integration/services/share/ 2>&1 | grep -q forced-turn"
+          ],
+          "expected_outputs": [
+            "the slow run exits non-zero and prints 'forced-TURN checkpoint needs TURN_KEY_ID and TURN_KEY_API_TOKEN'",
+            "exits 0: vitest list shows no forced-turn test in the default run (the .slow file is excluded)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4482.md WI-6, steps 1-8. Header comment states it is an operator checkpoint and gives the exact command `TURN_KEY_ID=<key id> TURN_KEY_API_TOKEN=<api token> VITEST_INCLUDE_SLOW=1 npx vitest run tests/integration/services/share/forced-turn.slow.test.ts`. beforeAll throws the named precondition error when either env var is missing or empty (never skipIf). startShareWorker with turn bound and no outbound stub. Host createPeerConnection records the config and returns new RTCPeerConnection({...config, iceTransportPolicy:'relay'}); viewer JoinManager subscriber buffers signals until a LoopbackViewer built from joins.iceServers(code) with iceTransportPolicy 'relay' is attached, then replays them. Wait up to 90 s for the history. Assert TURN URLs with username+credential on both sides, every signaledCandidates entry of host to-service signal frames and of viewer.signals is typ relay with at least one per side, and findLeaks for the fixture text is []. Assertion messages print counts/types only, never URLs, usernames or credentials. The work agent never runs it with credentials (NFR-4)."
+        },
+        "items": [
+          {
+            "id": "forced-turn-checkpoint.ac1",
+            "title": "Given TURN_KEY_ID is unset, VITEST_INCLUDE_SLOW=1 npx vitest run on the file exits non-zero and the output contains 'forced-TURN checkpoint needs TURN_KEY_ID and TURN_KEY_API_TOKEN'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "forced-turn-checkpoint.ac2",
+            "title": "Without VITEST_INCLUDE_SLOW, npx vitest list tests/integration/services/share/ prints no forced-turn.slow.test.ts entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "forced-turn-checkpoint.ac3",
+            "title": "git grep -n 'skipIf\\|\\.skip(' tests/integration/services/share/forced-turn.slow.test.ts returns no match, and no expect message or thrown error in the file interpolates a username, credential or ICE URL",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "forced-turn-checkpoint.ac4",
+            "title": "Given relay-forced peers, the test fails unless every candidate signaled by the host and by the viewer is typ relay with at least one per side, and fails unless the fixture history arrives over the DataChannel",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rate-limit-integration",
+        "title": "Room-creation rate limit from the committed wrangler.jsonc on real workerd",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T23:55:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4482",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/integration/services/share/rate-limit.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/integration/services/share/rate-limit.test.ts"
+          ],
+          "expected_outputs": [
+            "rate-limit.test.ts: 1 test passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4482.md WI-7. Parse services/share/wrangler.jsonc with jsonc-parser's parse, take the ratelimits entry named ROOM_CREATE_LIMIT, assert simple equals {limit:10, period:60}, start startShareWorker with rateLimit {namespace: entry.namespace_id, limit, period}, then POST <base>/v1/rooms via mf.dispatchFetch ten times with tokenFor(OWNER.id) and distinct conversation ids, once more, and once with tokenFor(VIEWER_A.id). Consume every response body."
+        },
+        "items": [
+          {
+            "id": "rate-limit-integration.ac1",
+            "title": "The test reads ROOM_CREATE_LIMIT from services/share/wrangler.jsonc and fails if its simple block is not {limit:10, period:60}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rate-limit-integration.ac2",
+            "title": "Ten POST /v1/rooms requests from one GitHub id return 201, and the eleventh returns 429 with body {\"error\":\"rate_limited\"} and header Retry-After: 60",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rate-limit-integration.ac3",
+            "title": "A POST /v1/rooms from a second GitHub id after the 429 returns 201",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-verification",
+        "title": "Docs: Verification section in SHARED-SESSIONS.md and Networks and privacy in the user page",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T23:55:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4482",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/SHARED-SESSIONS.md",
+            "configuration/shared-sessions.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n '^## Verification' docs/SHARED-SESSIONS.md",
+            "grep -n '^## Networks and privacy' configuration/shared-sessions.mdx",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "both headings are found",
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4482.md WI-8, steps 1-3 for docs/SHARED-SESSIONS.md (one sentence in 'What the service can and cannot see', two command lines in 'Local development', a new '## Verification' before '## Deploy' with '### Signaling privacy', '### Room-creation rate limit' and '### Forced-relay checkpoint (operator)') and the '## Networks and privacy' section before '## Limits' in configuration/shared-sessions.mdx. The forced-relay subsection carries the exact command, the precondition failure, what PASS means (history arrived, every signaled candidate on both sides typ relay), that the operator posts the result on PAN-4482, and the D-10 werift first-TURN-URL note."
+        },
+        "items": [
+          {
+            "id": "docs-verification.ac1",
+            "title": "docs/SHARED-SESSIONS.md contains '## Verification' before '## Deploy', with subsections '### Signaling privacy', '### Room-creation rate limit' and '### Forced-relay checkpoint (operator)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-verification.ac2",
+            "title": "The forced-relay subsection contains the exact command 'TURN_KEY_ID=<key id> TURN_KEY_API_TOKEN=<api token> VITEST_INCLUDE_SLOW=1 npx vitest run tests/integration/services/share/forced-turn.slow.test.ts' and states that a pass requires every signaled candidate on both sides to be typ relay",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-verification.ac3",
+            "title": "The 'What the service can and cannot see' section contains tests/integration/services/share/signaling-privacy.test.ts, and 'Local development' contains the signaling-privacy and rate-limit test command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-verification.ac4",
+            "title": "configuration/shared-sessions.mdx contains '## Networks and privacy' before '## Limits', stating that Cloudflare TURN relays encrypted packets it cannot read and that an automated test checks no conversation text, prompt, draft or terminal output passes through the share service",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "acceptance-sweep",
+        "title": "Acceptance sweep table, AC-7 follow-up issue and operator checkpoint request",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T23:55:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-4482",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/SHARED-SESSIONS.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/services/share tests/integration/services/share tests/unit/lib/sharing tests/unit/cli/sharing tests/unit/dashboard/server/routes/shares.test.ts tests/unit/dashboard/server/routes/joins.test.ts src/dashboard/server/sharing/__tests__ src/dashboard/server/services/__tests__/share-host.test.ts src/dashboard/server/services/__tests__/share-join.test.ts packages/contracts/src/__tests__/sharing-wire.test.ts tests/helpers/share",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/chat/sharing/__tests__",
+            "grep -c '^| AC-\\|^| NFR-\\|^| Rate limit' docs/SHARED-SESSIONS.md",
+            "gh issue view 4482 --json comments --jq '.comments[].body' | grep -c forced-turn.slow.test.ts"
+          ],
+          "expected_outputs": [
+            "every listed test file passes",
+            "the frontend sharing tests pass",
+            "30 table rows (AC-1..AC-20, NFR-1..NFR-9, Rate limit)",
+            "at least 1 comment names the forced-relay test"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4482.md WI-9, steps 1-4. Run both suites (re-run a failing pre-existing file once alone; a repeat failure becomes FAIL plus a filed issue, no unrelated fixes). File the AC-7 issue with the exact title and body from the PRD (gh issue create --repo eltmon/overdeck --body-file). Add '## Acceptance sweep (PAN-4482)' after '## Verification' with the run date, commit and the 30-row table from the PRD using full repo-relative paths; the AC-7 row links the new issue; AC-15 and NFR-7 read 'Pending operator checkpoint'; AC-18 reads 'Waived' citing PAN-4473 D-9 and PAN-4474 D-19. Post one comment on PAN-4482 (gh issue comment 4482 --body-file) with the forced-relay command, what PASS looks like, and a request for the operator to run it and reply."
+        },
+        "items": [
+          {
+            "id": "acceptance-sweep.ac1",
+            "title": "Each of the two sweep commands exits 0 at the commit recorded in the sweep sentence, or each failing file appears in the table as FAIL with a linked issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acceptance-sweep.ac2",
+            "title": "docs/SHARED-SESSIONS.md contains '## Acceptance sweep (PAN-4482)' with exactly one row for each of AC-1..AC-20, NFR-1..NFR-9 and Rate limit, each naming a repo-relative test path or command as evidence",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acceptance-sweep.ac3",
+            "title": "gh issue list returns an open issue titled 'Shared Sessions: a viewer sees every participant with host and controller marked (PAN-658 FR-6, AC-7)', and the AC-7 row contains its link",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acceptance-sweep.ac4",
+            "title": "The AC-15 and NFR-7 rows contain 'Pending operator checkpoint', and gh issue view 4482 --json comments returns a comment that contains the forced-relay command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "share-worker-harness",
+        "to": "signaling-privacy-e2e",
+        "type": "blocks"
+      },
+      {
+        "from": "signaling-capture",
+        "to": "signaling-privacy-e2e",
+        "type": "blocks"
+      },
+      {
+        "from": "share-worker-harness",
+        "to": "forced-turn-checkpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "signaling-capture",
+        "to": "forced-turn-checkpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "loopback-viewer-ice-config",
+        "to": "forced-turn-checkpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "ice-candidate-classifier",
+        "to": "forced-turn-checkpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "share-worker-harness",
+        "to": "rate-limit-integration",
+        "type": "blocks"
+      },
+      {
+        "from": "signaling-privacy-e2e",
+        "to": "docs-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "forced-turn-checkpoint",
+        "to": "docs-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "rate-limit-integration",
+        "to": "docs-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "docs-verification",
+        "to": "acceptance-sweep",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-03-PAN-4482-shared-sessions-v0-slice-11-signaling-privacy-e2e-and-forced-turn-verification.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}

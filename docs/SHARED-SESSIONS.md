@@ -121,6 +121,8 @@ Facts verified against the Cloudflare docs on 2026-10-02:
 - **Sees:** room membership (GitHub id, login and avatar of the host and participants), the controller's admit, kick, revoke, contributor and handoff decisions, connect and disconnect times, SDP and ICE blobs, and the opaque scope descriptor (a conversation id). For a browser viewer it also sees the sealed session cookie, which holds that browser's device token encrypted with `WEB_SESSION_KEY`.
 - **Never sees:** conversation messages, terminal bytes or prompt drafts. Content flows only over DTLS DataChannels opened after admission. Cloudflare TURN may relay those encrypted packets but cannot read them.
 
+`tests/integration/services/share/signaling-privacy.test.ts` checks this on every CI run: it plants a unique string in every kind of content, proves each one arrives over a DataChannel, and fails if any appears in the host or viewer signaling traffic or if any frame carries a type or key outside the protocol table.
+
 ## Configuration
 
 | Name | Where | Meaning |
@@ -463,6 +465,8 @@ npx vitest run tests/unit/services/share/                     # reducer, decoder
 npx vitest run tests/integration/services/share/              # real workerd via Miniflare, account and TURN stubbed
 npm --prefix services/share run build:web                     # esbuild → public/viewer/viewer.js (the hosted viewer)
 npm --prefix services/share run build:dry                     # wrangler deploy --dry-run --outdir dist (runs build:web first; no credentials)
+npx vitest run tests/helpers/share/                           # capture, candidate and harness helpers
+npx vitest run tests/integration/services/share/signaling-privacy.test.ts tests/integration/services/share/rate-limit.test.ts
 ```
 
 A local `ACCOUNT` binding needs PAN-4293's `npm --prefix services/account run dev` running in another terminal; wrangler's local dev registry connects service bindings between local sessions.
@@ -470,6 +474,77 @@ A local `ACCOUNT` binding needs PAN-4293's `npm --prefix services/account run de
 Unit tests drive the reducer with an injected clock and `routes.handle()` with injected `Deps`, a fake `ROOMS` namespace and a fake `ACCOUNT`, so the 5-minute window and the 5-second TURN timeout never wait. The integration test bundles the Worker with `wrangler deploy --dry-run`, runs it in Miniflare beside an inline `AccountRpc` stub bound by named entrypoint, stubs `rtc.live.cloudflare.com` through `outboundService`, and drives a room through the lobby, admission, signaling, kick, revoke and deletion over real WebSockets.
 
 Agents may run `wrangler dev --local` and `wrangler deploy --dry-run`; nothing else. Deploying is operator-only.
+
+## Verification
+
+Three tests back the service's security claims (PAN-4482). The first two run in the default vitest run on CI; the third is an operator checkpoint. All three use `startShareWorker` (`tests/helpers/share/share-worker.ts`), which bundles the Worker with `wrangler deploy --dry-run` and runs it in Miniflare beside an account stub.
+
+### Signaling privacy
+
+`tests/integration/services/share/signaling-privacy.test.ts` runs one share end to end on real workerd and real werift: a `ShareManager` with a `PeerHub` on the host side, and two `JoinManager`s with werift `LoopbackViewer`s on the viewer side. A unique canary sits in each kind of content: the conversation history, a live append, the stream label, a viewer draft, a contributor submit, a host controller send, a viewer-controller send, and the terminal snapshot and output. A second viewer stays in the lobby the whole time.
+
+`SignalingCapture` (`tests/helpers/share/signaling-capture.ts`) records every frame and HTTP body both local servers exchange with the service. The test then asserts four things:
+
+1. **Positive control.** Every canary reached its destination over a DataChannel, and the queue delivered the three prompts in order.
+2. **No content in signaling.** No canary appears in any captured frame or HTTP body, plain, case-folded or base64-encoded.
+3. **Protocol shape.** Every frame's `type` and keys belong to the protocol table above for its socket and direction, `signal.data` holds only `sdp` and `candidate`, the `room` snapshot holds only its seven keys, and no binary frame crossed.
+4. **Live path.** The capture saw the SDP offer and answer, ICE candidates in both directions, `room` snapshots, `POST /v1/rooms` and `DELETE /v1/rooms/:code`. The lobby viewer received exactly one frame, `status lobby`, and its socket closed with 4004 when the share ended.
+
+The capture wraps the injected `openSocket`, `createRoom` and `deleteRoom` seams rather than logging TCP bytes. RFC 6455 masks every client-to-server frame with a random key, so a canary sent by a local server never appears in raw bytes, and a byte-level check would pass even if content leaked.
+
+### Room-creation rate limit
+
+`tests/integration/services/share/rate-limit.test.ts` reads the `ROOM_CREATE_LIMIT` entry from the committed `services/share/wrangler.jsonc` and binds it in Miniflare, so a change to the committed limit fails the test. One GitHub id gets `201` ten times, then `429` `rate_limited` with `Retry-After: 60`; another account still gets `201`.
+
+### Forced-relay checkpoint (operator)
+
+`tests/integration/services/share/forced-turn.slow.test.ts` proves the symmetric-NAT case of NFR-7: both peers connect relay-only through Cloudflare Realtime TURN. It forces `iceTransportPolicy: 'relay'` on the host (through `PeerHubDeps.createPeerConnection`) and on the viewer (through `LoopbackViewer`'s configuration, built from `JoinManager.iceServers`). Only the operator runs it:
+
+```bash
+TURN_KEY_ID=<key id> TURN_KEY_API_TOKEN=<api token> VITEST_INCLUDE_SLOW=1 \
+  npx vitest run tests/integration/services/share/forced-turn.slow.test.ts
+```
+
+It needs the same Realtime TURN key as the deployed Worker, and the local Worker makes one real credential request to Cloudflare per run. Without the two env vars it fails with `forced-TURN checkpoint needs TURN_KEY_ID and TURN_KEY_API_TOKEN`; it never skips, and no assertion prints an ICE URL, username or credential. A pass means the conversation history arrived over the DataChannel and every candidate both sides signaled was `typ relay`. Post the result (`PASS`, or the failing assertion) as a comment on PAN-4482.
+
+werift 0.25.1 uses only the first TURN URL in the list, and the test passes the Worker's list unchanged, as production does. If the run fails because the operator's network blocks that first transport, that is a real finding: file an issue to order the hub's TURN URLs (as PAN-4862 did for Anywhere) and re-run the checkpoint after it lands.
+
+## Acceptance sweep (PAN-4482)
+
+On 2026-11-03, at commit `80fbeb7a1f` on `feature/pan-4482`, the share backend test set (39 files, 579 tests) and the frontend sharing tests (7 files, 148 tests) passed. The commands are in PAN-4482's PRD, WI-9 step 1. Each row cites a file and, where one test carries the evidence, that test's name. The opt-in `*.slow.test.ts` files are not in the default run.
+
+| ID | Requirement | Evidence | Verdict |
+| --- | --- | --- | --- |
+| AC-1 | The dashboard and `pan share` both return a working share link | `tests/unit/dashboard/server/routes/shares.test.ts` :: "creates a share with a join link, and a repeat answers 200 with the same code (ac1)"; `tests/unit/cli/sharing/share.test.ts` :: "prints the link, the join code and both join commands for a new share"; `tests/integration/services/share/host-manager.test.ts` | Covered |
+| AC-2 | A browser link recipient signs in and is handed off to their local dashboard | `tests/unit/services/share/routes.test.ts` :: "an active room returns the localhost-detect invite page with a nonce…"; `tests/unit/dashboard/server/routes/joins.test.ts` :: "answers 412 not_signed_in without an account"; `tests/integration/services/share/miniflare.test.ts` :: "signs a browser in, opens the web-join socket with the session cookie and lands in the lobby" | Covered, with the rev-3 order: the invite page detects the local dashboard first and sign-in happens there (OD-1, D-R3-2) |
+| AC-3 | `pan join` signs in, lands in the lobby, and starts the local dashboard if needed | `tests/unit/cli/sharing/join.test.ts`; `tests/integration/cli/join-cold-start.slow.test.ts` :: "signs in, auto-starts the bundled dashboard and leaves the join in the lobby" | Covered (end to end only in the opt-in slow test) |
+| AC-4 | A joiner receives no content or presence until admitted | `tests/unit/services/share/room-state.test.ts` :: "a lobby viewer only ever receives status lobby, error not_admitted or a close"; `src/dashboard/server/sharing/__tests__/peer-hub.test.ts` :: "never connects a viewer the host did not admit, whatever the snapshot says (NFR-4)"; `tests/integration/services/share/signaling-privacy.test.ts` (lobby viewer) | Covered |
+| AC-5 | The controller sees pending joiners (avatar and handle) and admits each | `src/dashboard/frontend/src/components/chat/sharing/__tests__/SharingLobbyPanel.test.tsx` :: "ac1: renders the three sections with each @login and avatar" | Covered |
+| AC-6 | An admitted viewer sees the full history, then live updates | `src/dashboard/server/sharing/__tests__/peer-hub-loopback.test.ts` :: "streams the host hello, the history, then a live append"; `tests/integration/services/share/join-manager.test.ts` | Covered |
+| AC-7 | Presence shows every participant, host and controller marked | `src/dashboard/server/sharing/__tests__/peer-hub.test.ts` :: "sends the roster with the data owner first and no connected or blocked fields"; `src/dashboard/frontend/src/components/chat/sharing/__tests__/SharingLobbyPanel.test.tsx` | **Gap** for a plain viewer: the viewer header shows only the host, a count and the controller → [PAN-4971](https://github.com/eltmon/overdeck/issues/4971) |
+| AC-8 | Viewer drafts appear live for the controller, who can pick, edit and send one | `src/dashboard/server/sharing/__tests__/draft-board.test.ts` :: "relays the first of three quick updates at once and the last at 200 ms"; `src/dashboard/frontend/src/components/chat/sharing/__tests__/ShareDialog.test.tsx` :: "lists the drafts and posts a picked, edited draft with its author" | Covered |
+| AC-9 | Contributor grant and revoke; concurrent submits land in FIFO order, queued mid-turn | `src/dashboard/server/sharing/__tests__/submit-queue.test.ts` :: "delivers concurrent submits in FIFO order, one per agent turn"; `src/dashboard/server/sharing/__tests__/peer-hub.test.ts` :: "rejects queued items as grant_revoked when a snapshot removes the contributor grant (FR-7)" | Covered |
+| AC-10 | The viewer terminal shows the host session live, and viewer keys have no effect | `src/dashboard/server/sharing/__tests__/peer-hub.test.ts` :: "never reads from terminal and sends on it only after a watch"; `src/dashboard/frontend/src/components/chat/sharing/__tests__/SharedTerminalView.test.tsx` :: "creates a read-only terminal with no input handler and starts the watch" | Covered |
+| AC-11 | Kick sends a viewer back to the lobby; revoke blocks them until unrevoked | `tests/unit/services/share/room-state.test.ts` :: "kick removes and closes with 4010; the kicked viewer rejoins into the lobby" and "revoke blocks (rejoin closes 4003) until unrevoke, after which a rejoin lands in the lobby"; `tests/integration/services/share/miniflare.test.ts` | Covered |
+| AC-12 | Ending the share drops every participant; no fixed expiry | `tests/unit/services/share/room-state.test.ts` :: "both end the room with close-all 4004, cancel-alarm and delete-storage"; `src/dashboard/server/services/__tests__/share-host.test.ts` :: "end deletes the room with the host token, closes the socket and removes the record" | Covered |
+| AC-13 | Handoff to an admitted viewer works, and the data owner can reclaim | `src/dashboard/server/sharing/__tests__/peer-hub.test.ts` :: "the handoff chain: appoint B, B admits C over control, C gets a peer, the data owner reclaims, …" | Covered |
+| AC-14 | A host drop under 5 minutes restores viewers; over 5 minutes ends the room | `tests/unit/services/share/room-state.test.ts` :: "ends the room only once the full reconnect window has elapsed"; `tests/integration/services/share/host-repark.test.ts` :: "a host restart inside the window restores the admitted viewer without the lobby" | Covered |
+| AC-15 | A connection succeeds through symmetric NATs via TURN relay | `tests/integration/services/share/forced-turn.slow.test.ts` (operator checkpoint); `tests/unit/services/share/turn.test.ts`; `src/dashboard/server/sharing/__tests__/peer-hub.test.ts` :: "passes TURN credentials through to the peer connection" | **Pending operator checkpoint** until the operator posts PASS on PAN-4482 |
+| AC-16 | Channel traffic uses the versioned wire format with `streamId`; internal RPC types never cross | `packages/contracts/src/__tests__/sharing-wire.test.ts` :: "copies exactly the allow-listed keys and drops everything else"; `tests/integration/services/share/signaling-privacy.test.ts` (frame allow-lists) | Covered by allow-list construction; no import-boundary lint exists |
+| AC-17 | The signaling service never sees content | `tests/integration/services/share/signaling-privacy.test.ts` | Covered |
+| AC-18 | New tagged errors live in `src/lib/errors.ts` | — | Waived: PAN-4473 D-9 and PAN-4474 D-19 use string error codes because nothing runs in an Effect error channel |
+| AC-19 | One active share per scope | `tests/unit/lib/sharing/share-record.test.ts` :: "rejects a second short code for the same conversation, naming the conversation and the existing code (ac2)" | Covered (the file record replaces the table, parent rev 3) |
+| AC-20 | Documentation shipped | `docs/SHARED-SESSIONS.md`, `configuration/shared-sessions.mdx` (listed in `docs.json`), the `CLAUDE.md` topic row | Covered |
+| NFR-1 | Content never transits the share service; DataChannels only, TURN relay at most | `tests/integration/services/share/signaling-privacy.test.ts` | Covered |
+| NFR-2 | Data channels use the versioned contracts wire format; version skew degrades gracefully | `packages/contracts/src/__tests__/sharing-wire.test.ts`; `src/dashboard/frontend/src/components/chat/sharing/__tests__/webrtc-viewer.test.ts` :: "reports an unsupported scope kind and sends nothing" | Covered |
+| NFR-3 | Every content envelope carries a `streamId` | `src/dashboard/server/sharing/__tests__/peer-hub-loopback.test.ts` (asserts `streamId` on every envelope) | Covered |
+| NFR-4 | The host hub gates content on its own admitted set | `src/dashboard/server/sharing/__tests__/peer-hub.test.ts` :: "never connects a viewer the host did not admit, whatever the snapshot says (NFR-4)" | Covered |
+| NFR-5 | Viewers need no native dependency; the host uses pure-TypeScript werift | `find node_modules/werift -name '*.node' -o -name binding.gyp` prints nothing (pure TypeScript); viewers use the browser `RTCPeerConnection` | Covered; the dashboard runs only on Node 22, so the NFR's "`bun run` dev mode" wording is obsolete |
+| NFR-6 | The host dashboard stays localhost-only | `tests/unit/dashboard/server/routes/shares.test.ts` :: "401s an uncredentialed request from a non-loopback peer"; `tests/unit/dashboard/server/routes/joins.test.ts` :: "refuses a mutation without a credential or CSRF token" | Covered |
+| NFR-7 | Works through symmetric NATs via Cloudflare Realtime TURN | as AC-15 | **Pending operator checkpoint** |
+| NFR-8 | The share service is a Web-API-only Cloudflare Worker | `npm run typecheck:share`; `npm --prefix services/share run build:dry` | Covered |
+| NFR-9 | Room rules are a pure reducer with an injected clock | `tests/unit/services/share/room-state.test.ts` (injected `now`) | Covered |
+| Rate limit | 10 room creations per 60 s per GitHub id | `tests/integration/services/share/rate-limit.test.ts`; `tests/unit/services/share/routes.test.ts` :: "a refused rate limit is 429 rate_limited with Retry-After: 60, keyed by githubId" | Covered |
 
 ## Deploy
 

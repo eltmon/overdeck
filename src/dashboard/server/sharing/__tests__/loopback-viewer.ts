@@ -1,5 +1,6 @@
 /**
- * A werift stand-in for the slice 4 browser viewer (PRD PAN-4474 WI-7): it answers the host's offer,
+ * A werift stand-in for the slice 4 browser viewer (PRD PAN-4474 WI-7), optionally built with ICE
+ * servers and a relay-only transport policy (PAN-4482 WI-4): it answers the host's offer,
  * reassembles every channel's envelopes with `SharedChannelReader`, and replies to the host hello
  * with its own hello that echoes the host's scope (D-5). `send` writes one envelope on a channel with
  * that channel's next outbound `seq` (the hello is `control` seq 1; PAN-4476). Test helper, not a test.
@@ -18,8 +19,13 @@ import { RTCPeerConnection, type RTCDataChannel } from 'werift';
 type Candidate = NonNullable<SignalData['candidate']>;
 type Predicate = (channel: string, envelope: SharedEnvelope) => boolean;
 
+export interface LoopbackViewerConfig {
+  readonly iceServers?: Array<{ urls: string[]; username?: string; credential?: string }>;
+  readonly iceTransportPolicy?: 'all' | 'relay';
+}
+
 export class LoopbackViewer {
-  readonly pc = new RTCPeerConnection({ iceServers: [] });
+  readonly pc: RTCPeerConnection;
   /** Every signal this viewer sent, in order. */
   readonly signals: SignalData[] = [];
   readonly channels = new Map<string, RTCDataChannel>();
@@ -35,7 +41,11 @@ export class LoopbackViewer {
   private remoteSet = false;
   private localSent = false;
 
-  constructor() {
+  constructor(config: LoopbackViewerConfig = {}) {
+    this.pc = new RTCPeerConnection({
+      iceServers: config.iceServers ?? [],
+      ...(config.iceTransportPolicy ? { iceTransportPolicy: config.iceTransportPolicy } : {}),
+    });
     this.pc.onIceCandidate.subscribe((candidate) => {
       const json = candidate?.toJSON();
       if (!json?.candidate) return;
