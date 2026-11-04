@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5000",
   "created": "2026-11-04T11:38:38.802Z",
-  "updated": "2026-11-04T12:39:41.576Z",
+  "updated": "2026-11-04T12:40:18.494Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -88,6 +88,10 @@
     "no-project-crumb.ac4": {
       "status": "completed",
       "doneAt": "2026-11-04T12:39:41.576Z"
+    },
+    "linked-row-title.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T12:40:18.493Z"
     }
   }
 }
