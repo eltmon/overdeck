@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4932",
   "created": "2026-11-04T01:06:56.441Z",
-  "updated": "2026-11-04T01:59:33.565Z",
+  "updated": "2026-11-04T01:59:50.539Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -206,6 +206,10 @@
     "planning-continuation-wiring.ac2": {
       "status": "completed",
       "doneAt": "2026-11-04T01:59:33.565Z"
+    },
+    "conversation-wiring.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:59:50.539Z"
     }
   }
 }
