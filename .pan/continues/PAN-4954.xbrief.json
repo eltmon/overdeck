@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4954",
   "created": "2026-11-04T14:48:01.762Z",
-  "updated": "2026-11-04T14:57:06.876Z",
+  "updated": "2026-11-04T14:57:07.985Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -50,6 +50,11 @@
       "claimedBy": "agent-pan-4954",
       "claimedAt": "2026-11-04T14:56:16.411Z",
       "doneAt": "2026-11-04T14:57:06.876Z"
+    },
+    "summary": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4954",
+      "claimedAt": "2026-11-04T14:57:07.985Z"
     }
   }
 }
