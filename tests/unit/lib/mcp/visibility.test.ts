@@ -26,7 +26,7 @@ describe('MCP tool visibility (PAN-4927 W-MCP1)', () => {
     expect(tools.map((tool) => tool.name)).toEqual(['list_machines']);
   });
 
-  it('read:state, read:conversations and operate see every tool but the two approve tools', async () => {
+  it('read:state, read:conversations and operate see every tool but the approve tools', async () => {
     const client = await connectClient(fakeApi({}), ['read:state', 'read:conversations', 'operate']);
     const { tools } = await client.listTools();
     expect(tools.map((tool) => tool.name)).not.toContain('answer_question');
@@ -34,7 +34,7 @@ describe('MCP tool visibility (PAN-4927 W-MCP1)', () => {
     expect(tools).toHaveLength(8);
   });
 
-  it('adding approve lists all ten tools in ALL_TOOLS order', async () => {
+  it('adding approve lists every tool in ALL_TOOLS order', async () => {
     const client = await connectClient(fakeApi({}), ['read:state', 'read:conversations', 'operate', 'approve']);
     const { tools } = await client.listTools();
     expect(tools.map((tool) => tool.name)).toEqual(ALL_TOOLS.map((tool) => tool.name));
