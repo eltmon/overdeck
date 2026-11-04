@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4896",
   "created": "2026-11-04T05:35:39.263Z",
-  "updated": "2026-11-04T05:44:07.136Z",
+  "updated": "2026-11-04T05:44:17.981Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -14,6 +14,11 @@
       "claimedBy": "agent-pan-4896",
       "claimedAt": "2026-11-04T05:35:39.263Z",
       "doneAt": "2026-11-04T05:44:07.136Z"
+    },
+    "test-darwin-no-warning": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4896",
+      "claimedAt": "2026-11-04T05:44:17.981Z"
     }
   }
 }
