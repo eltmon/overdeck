@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5041",
   "created": "2026-11-04T17:22:54.161Z",
-  "updated": "2026-11-04T18:18:39.639Z",
+  "updated": "2026-11-04T18:19:05.888Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -164,6 +164,10 @@
     "wi7-android-plugin.ac4": {
       "status": "completed",
       "doneAt": "2026-11-04T18:18:39.638Z"
+    },
+    "wi8-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:19:05.886Z"
     }
   }
 }
