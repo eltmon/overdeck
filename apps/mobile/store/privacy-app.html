@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Overdeck app privacy policy</title>
+<meta name="description" content="What the Overdeck phone app collects, what it cannot see, and how to delete your data.">
+<style>
+  :root { color-scheme: light dark; --bg: #ffffff; --fg: #1d1d1f; --muted: #5f6368; --accent: #4f46e5; --rule: #e3e3e8; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #202020; --fg: #ececec; --muted: #a8a8ad; --accent: #818cf8; --rule: #3a3a3d; } }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  main { max-width: 42rem; margin: 0 auto; padding: 2.5rem 1rem 4rem; }
+  h1 { font-size: 1.75rem; line-height: 1.25; margin: 0 0 .25rem; }
+  h2 { font-size: 1.15rem; margin: 2rem 0 .5rem; padding-top: 1rem; border-top: 1px solid var(--rule); }
+  p, li { margin: .5rem 0; }
+  ul { padding-left: 1.25rem; }
+  a { color: var(--accent); }
+  .muted { color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+<h1>Overdeck app privacy policy</h1>
+<p class="muted">Effective 4 November 2026</p>
+
+<h2>What the app is</h2>
+<p>The Overdeck app for iPhone and Android connects your phone to the Overdeck dashboards that run on your own machines. It shows the agents and conversations on those machines and notifies you when an agent needs you. The overdeck.ai directory helps your phone find your machines; the conversation itself travels over an end-to-end encrypted channel between your phone and your machines.</p>
+
+<h2>What we collect</h2>
+<ul>
+  <li>Your GitHub account id and login, when you sign in with GitHub. We use them to identify your overdeck.ai account.</li>
+  <li>A label and the platform (iOS or Android) for each device you sign in on, so you can see and remove your devices.</li>
+  <li>A random install id that the app creates, so your machines can tell your phones apart.</li>
+  <li>The push token Apple or Google gives the app, so we can deliver notifications to your phone.</li>
+  <li>If you use the relay plan: the number of bytes relayed for your account, to meter the plan. We count bytes; we cannot read them.</li>
+</ul>
+
+<h2>What we cannot see</h2>
+<p>Conversation content and notification text are end-to-end encrypted between your phone and your machines. Apple, Google, Cloudflare and Overdeck see only ciphertext. The keys stay on your phone and your machines.</p>
+
+<h2>What we do not do</h2>
+<p>The app contains no analytics, crash-reporting or advertising code. We do not track you across apps or websites, and we do not sell or share your data.</p>
+
+<h2>Where it is processed</h2>
+<ul>
+  <li>Cloudflare Workers run the overdeck.ai account service and directory.</li>
+  <li>The Apple Push Notification service delivers notifications to iPhones.</li>
+  <li>Firebase Cloud Messaging (Google) delivers notifications to Android phones.</li>
+</ul>
+
+<h2>How long we keep it</h2>
+<p>We keep a device's records and push token until you sign out on that phone, remove the phone from a machine, or delete your account. Signing out on the phone removes its push token. We keep your account until you delete it.</p>
+
+<h2>How to delete it</h2>
+<p>Sign in at <a href="https://account.overdeck.ai/account">account.overdeck.ai</a> and choose <strong>Delete account</strong>. Deleting your account signs out every device, removes your machines from the directory and deletes all of your hosted data within 24 hours.</p>
+
+<h2>Contact</h2>
+<p>Questions or requests: open an issue at <a href="https://github.com/eltmon/overdeck/issues">github.com/eltmon/overdeck/issues</a>.</p>
+
+<h2>Changes</h2>
+<p>If this policy changes, we update this page and its effective date.</p>
+</main>
+</body>
+</html>
