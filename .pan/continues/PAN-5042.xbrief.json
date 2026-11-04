@@ -1,0 +1,193 @@
+{
+  "version": "1",
+  "issueId": "PAN-5042",
+  "created": "2026-11-04T17:47:47.339Z",
+  "updated": "2026-11-04T19:09:51.873Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "extract-pr-listing": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5042",
+      "claimedAt": "2026-11-04T17:47:47.339Z",
+      "doneAt": "2026-11-04T17:57:46.726Z"
+    },
+    "split-open-closed": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5042",
+      "claimedAt": "2026-11-04T17:58:17.624Z",
+      "doneAt": "2026-11-04T18:11:29.334Z"
+    },
+    "closed-listing-consistency": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5042",
+      "claimedAt": "2026-11-04T18:11:39.156Z",
+      "doneAt": "2026-11-04T18:21:36.896Z"
+    },
+    "log-failure-reason": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5042",
+      "claimedAt": "2026-11-04T18:22:26.854Z",
+      "doneAt": "2026-11-04T18:27:25.381Z"
+    },
+    "scheduler-open-listing": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5042",
+      "claimedAt": "2026-11-04T18:27:37.827Z",
+      "doneAt": "2026-11-04T18:31:31.804Z"
+    },
+    "open-only-readers": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5042",
+      "claimedAt": "2026-11-04T18:31:37.042Z",
+      "doneAt": "2026-11-04T18:35:33.811Z"
+    },
+    "merged-row-checks": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5042",
+      "claimedAt": "2026-11-04T18:35:37.965Z",
+      "doneAt": "2026-11-04T18:39:05.701Z"
+    },
+    "pr-sync-keeps-checks": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5042",
+      "claimedAt": "2026-11-04T18:39:18.515Z",
+      "doneAt": "2026-11-04T18:43:34.696Z"
+    },
+    "docs-pr-listing": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5042",
+      "claimedAt": "2026-11-04T18:43:40.530Z",
+      "doneAt": "2026-11-04T18:46:34.834Z"
+    },
+    "watch-unobserved-rows": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5042",
+      "claimedAt": "2026-11-04T18:46:47.262Z",
+      "doneAt": "2026-11-04T18:53:34.596Z"
+    },
+    "extract-pr-listing.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:58:41.770Z"
+    },
+    "extract-pr-listing.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:59:01.301Z"
+    },
+    "extract-pr-listing.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:59:21.683Z"
+    },
+    "split-open-closed.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:59:52.408Z"
+    },
+    "split-open-closed.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:00:08.904Z"
+    },
+    "split-open-closed.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:00:25.552Z"
+    },
+    "split-open-closed.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:00:41.445Z"
+    },
+    "split-open-closed.ac6": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:00:56.623Z"
+    },
+    "closed-listing-consistency.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:01:34.205Z"
+    },
+    "closed-listing-consistency.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:01:49.668Z"
+    },
+    "closed-listing-consistency.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:02:08.439Z"
+    },
+    "log-failure-reason.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:02:47.456Z"
+    },
+    "log-failure-reason.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:03:03.105Z"
+    },
+    "log-failure-reason.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:03:18.226Z"
+    },
+    "log-failure-reason.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:03:33.540Z"
+    },
+    "scheduler-open-listing.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:04:12.570Z"
+    },
+    "scheduler-open-listing.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:04:30.466Z"
+    },
+    "open-only-readers.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:05:16.251Z"
+    },
+    "open-only-readers.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:05:32.695Z"
+    },
+    "merged-row-checks.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:06:15.380Z"
+    },
+    "merged-row-checks.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:06:30.120Z"
+    },
+    "merged-row-checks.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:06:44.295Z"
+    },
+    "pr-sync-keeps-checks.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:07:22.394Z"
+    },
+    "pr-sync-keeps-checks.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:07:38.264Z"
+    },
+    "watch-unobserved-rows.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:08:16.262Z"
+    },
+    "watch-unobserved-rows.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:08:29.985Z"
+    },
+    "watch-unobserved-rows.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:08:44.375Z"
+    },
+    "docs-pr-listing.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:09:22.532Z"
+    },
+    "docs-pr-listing.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:09:36.802Z"
+    },
+    "docs-pr-listing.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T19:09:51.873Z"
+    }
+  }
+}

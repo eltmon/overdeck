@@ -183,6 +183,7 @@ src/components/mobile/__tests__/MobileConversations.test.tsx
 src/components/mobile/__tests__/MobileIssueSheet.test.tsx
 src/components/mobile/__tests__/MobileNeedsYou.test.tsx
 src/components/mobile/__tests__/MobilePipeline.test.tsx
+src/components/mobile/__tests__/conversationGroups.test.ts
 src/components/newConversation/__tests__/ConversationSkillsField.test.tsx
 src/components/newConversation/__tests__/IssuePickerField.test.tsx
 src/components/newConversation/__tests__/MachineField.test.tsx

@@ -1,0 +1,778 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-04T17:31:32Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5042: PR listing read flaps between ok and failed (catch logs nothing; 100-PR statusCheckRollup query takes ~10s against a 20s timeout)",
+    "updated": "2026-11-04T17:47:31.833Z"
+  },
+  "plan": {
+    "id": "pan-5042",
+    "title": "PR listing read flaps between ok and failed (catch logs nothing; 100-PR statusCheckRollup query takes ~10s against a 20s timeout)",
+    "status": "running",
+    "uid": "84501114-ff24-41c7-b1dd-14a7b31170bb",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-04T17:31:32Z",
+    "updated": "2026-11-04T17:47:31.833Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5042",
+        "label": "PAN-5042",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5042.md",
+        "label": "PRD draft (.pan/drafts/PAN-5042.md)",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "github",
+      "pr-cache",
+      "auto-merge",
+      "quota",
+      "observability"
+    ],
+    "narratives": {
+      "Problem": "readRepoPullRequests runs one `gh pr list --state all --limit 100` with statusCheckRollup and reviewRequests on every row. On 2026-11-04 GitHub's GraphQL gateway answered HTTP 504 after ~11 s (measured twice in planning), and the catch {} returns null without logging, so the auto-merge scheduler reports 'PR listing unavailable' for minutes at a time and nothing can be auto-merged, with no visible cause. Measured: open PRs with every field 0.75 s; closed PRs without the rollup 2.1 s; closed PRs with the rollup 10.3 s.",
+      "Proposal": "Move the GitHub PR listing into src/lib/overdeck/pr-listing.ts (derived-issue-state.ts is at 988 of 1000 lines). Split it into an open read (every field, 30 s TTL, 5 min when none open) and a closed read (no statusCheckRollup/reviewRequests/mergeable, 5 min TTL, 30 s after a failure, re-read when an open PR leaves the open listing). readRepoPullRequests composes them sequentially (open then closed), dedupes by number with the closed row winning, sorts by number descending, and fails if either fails. A new readOpenRepoPullRequests feeds the auto-merge scheduler, merge-path-owner, the UAT ready set and the approval refresher. Every failed read logs its reason ([pr-cache] <repo>: <open|closed> PR listing failed: <reason>) once per change, plus a recovery line. Merged rows without a rollup report checks 'green' (display only); PR sync keeps a link's last observed checks for such rows. Docs and the codebase concerns map record the split and the 504. A PR present in both listings keeps the row from the listing that settled later (reopen-safe). An open PR leaving the open listing bumps a per-repo closed generation and invalidates the closed cache; a combined read re-reads the closed listing once when its closed value predates that generation (in-flight-safe). PR watches never consume a snapshot built from a rollup-less row: such watched keys take the existing gh pr view read, or are dropped from that sweep's notify.",
+      "NonGoals": "- No change to the PrChecksState contract (no 'unknown' value)\n- No change to the 20 s exec timeouts\n- No change to the GitLab listing (listRepoMergeRequests)\n- No change to the 100-row cap of either listing\n- No change to the scheduler's null-vs-empty semantics: a failed open read is still 'PR listing unavailable', never 'no PRs'\n- No retry or backoff added inside the listing reads\n- No frontend change\n- No edit to scripts/file-size-allowlist.txt\n- A PR that opens and merges inside one 30 s open-listing window may appear in the combined listing up to 5 minutes late; accepted"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Split into an open read with every field and a closed read without statusCheckRollup, reviewRequests and mergeable, rather than limiting the closed set while keeping the rollup.",
+        "rationale": "Measured in planning: closed rows with the rollup alone take 10.3 s, at GitHub's GraphQL budget, while closed rows without it take 2.1 s. The issue lists the cheap closed field set as its preferred fix."
+      },
+      {
+        "summary": "No combined cache: two caches composed sequentially (open, then closed), with the open loader invalidating the closed cache when an open PR leaves the open set.",
+        "rationale": "A nested combined cache would let open data age to twice the TTL; parallel reads would let a just-merged PR vanish from the combined listing for one cycle, which makes issues flap between merged and working - the class of bug this issue fixes."
+      },
+      {
+        "summary": "Closed listing TTL 5 minutes on success, 30 seconds after a failure.",
+        "rationale": "Closed rows change only when an open PR closes, which the shrink check catches; a failure must be retried as fast as today."
+      },
+      {
+        "summary": "Merged rows without a fetched rollup report checks 'green'.",
+        "rationale": "Verified that no decision reads checks on a merged row (deriveState returns 'merged' first; ready/open/schedule/strike readers skip merged rows); without it every merged-not-closed issue shows 'Checks Running' after each dashboard restart. Every Overdeck merge path requires green checks."
+      },
+      {
+        "summary": "PR sync keeps a link's last observed checks when the listing row has no rollup.",
+        "rationale": "A merged snapshot is final and never refreshed, so it must keep the checks last seen while open rather than a guess."
+      },
+      {
+        "summary": "Open-only consumers (scheduler, merge-path-owner defaultPrOf, listReadyIssuesForProject, listOpenPullRequestsForProject) read the open listing only.",
+        "rationale": "The issue requires the open listing to keep feeding listScheduleCandidates; a closed-read failure must never stop scheduling or empty the UAT ready set."
+      },
+      {
+        "summary": "Keep both exec timeouts at 20 s.",
+        "rationale": "GitHub answers 504 at ~11 s, before our timeout; raising it changes nothing."
+      },
+      {
+        "summary": "Log format: console.warn '[pr-cache] <projectPath>: <open|closed> PR listing failed: <reason>' once per reason change, console.log '... recovered' on the first success after a failure.",
+        "rationale": "Mirrors the once-per-change shape auto-merge-skip-reasons.ts already uses; the issue asks for the reason once per state change."
+      },
+      {
+        "summary": "Extract the listing into src/lib/overdeck/pr-listing.ts with re-exports from derived-issue-state.ts.",
+        "rationale": "derived-issue-state.ts is at 988 of the 1000-line ceiling and allowlist raises are operator-only; re-exports keep every importer unchanged."
+      },
+      {
+        "summary": "Plan-critic findings (reopen, in-flight closed read, false watch checks-passed) accepted and resolved by a freshness rule for duplicate rows, a closed generation with one bounded re-read, and an unobserved-row rule for PR watches.",
+        "rationale": "Each finding named a real interleaving in the cache or watch code; see '## Critique response' in the PRD."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Ten small items across one subsystem (the GitHub PR listing and its consumers); every item is independently reviewable.",
+      "canonicalFilename": "2026-11-04-PAN-5042-pr-listing-read-flaps-between-ok-and-failed-catch-logs-nothing-100-pr-statuscheckrollup-query-takes-10s-against-a-20s-timeout.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "extract-pr-listing",
+        "title": "Move the GitHub PR listing into src/lib/overdeck/pr-listing.ts without behavior change",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T17:31:32Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-5042",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/pr-listing.ts",
+            "src/lib/overdeck/derived-issue-state.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/derived-issue-state-pr-listing.test.ts tests/unit/lib/overdeck/derived-issue-state-quota.test.ts tests/unit/lib/overdeck/derived-issue-state-batch.test.ts src/lib/overdeck/__tests__/open-pr-listing.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "the four listing test files pass with no test edits",
+            "typecheck completes without errors",
+            "lint:circular reports no cycle",
+            "lint-file-size exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Create src/lib/overdeck/pr-listing.ts and move, unchanged, from derived-issue-state.ts: PR_CACHE_TTL_MS, PR_LISTING_MAX_STALE_MS (with doc comments), GhPrRow, GH_PR_FIELDS, cachedRepoPullRequests, lastRepoPullRequests, listRepoPullRequests, invalidateRepoPullRequests, readRepoPullRequests, listRepoPullRequestsStaleOk, with the imports they need (createSettledTtlPromiseCache, runGh, prListingTtlMs, shouldListPullRequests). In derived-issue-state.ts import what it uses internally and add one `export { ... } from './pr-listing.js'` block re-exporting every moved public name. pr-listing.ts must not import derived-issue-state.ts. Remove imports that became unused."
+        },
+        "items": [
+          {
+            "id": "extract-pr-listing.ac1",
+            "title": "Given the move, when `wc -l src/lib/overdeck/derived-issue-state.ts` runs, then it prints a count of 1000 or less and `bash scripts/lint-file-size.sh` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-pr-listing.ac2",
+            "title": "Given the move, when `npx vitest run tests/unit/lib/overdeck/derived-issue-state-pr-listing.test.ts tests/unit/lib/overdeck/derived-issue-state-quota.test.ts tests/unit/lib/overdeck/derived-issue-state-batch.test.ts src/lib/overdeck/__tests__/open-pr-listing.test.ts` runs with those four files unedited, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-pr-listing.ac3",
+            "title": "Given src/lib/overdeck/pr-listing.ts, when `npm run lint:circular` runs, then it exits 0 and pr-listing.ts contains no import of derived-issue-state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "split-open-closed",
+        "title": "Split the PR listing into an open read with every field and a cheap closed read",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T17:31:32Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5042",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "closed-listing-consistency",
+            "log-failure-reason",
+            "scheduler-open-listing",
+            "open-only-readers",
+            "docs-pr-listing"
+          ],
+          "files_scope": [
+            "src/lib/overdeck/pr-listing.ts",
+            "src/lib/overdeck/derived-issue-state.ts",
+            "src/dashboard/server/services/derived-issue-state.ts",
+            "tests/unit/lib/overdeck/derived-issue-state-pr-listing.test.ts",
+            "tests/unit/lib/overdeck/derived-issue-state-quota.test.ts",
+            "src/lib/overdeck/__tests__/open-pr-listing.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/derived-issue-state-pr-listing.test.ts tests/unit/lib/overdeck/derived-issue-state-quota.test.ts tests/unit/lib/overdeck/derived-issue-state-batch.test.ts src/lib/overdeck/__tests__/open-pr-listing.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the pr-listing, quota, batch and open-pr-listing test files pass, including the new split and reopen cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4",
+            "FR-5",
+            "FR-7",
+            "FR-10",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2 (D1, D3-D7, D12, D13). In pr-listing.ts: add GH_CLOSED_PR_FIELDS = 'number,url,title,state,mergedAt,headRefName,headRefOid,baseRefName,isDraft,reviewDecision,updatedAt,closedAt,author'. Replace cachedRepoPullRequests with cachedOpenPullRequests (value SettledListing {rows, settledAt} | null, ttlFor = prListingTtlMs(listing?.rows ?? null, PR_CACHE_TTL_MS)) and cachedClosedPullRequests (value SettledListing | null, ttlFor = listing ? PR_CACHE_IDLE_TTL_MS : PR_CACHE_TTL_MS). Open loader: skip gate -> {rows: [], settledAt}; else runGh pr list --state open --limit 100 --json GH_PR_FIELDS (caller pr-cache, timeout 20_000) -> {rows, settledAt: Date.now()}; catch -> null. Closed loader: skip gate; runGh pr list --state closed --limit 100 --json GH_CLOSED_PR_FIELDS -> {rows, settledAt}; catch -> null. Export readOpenRepoPullRequests. readRepoPullRequests: await open; null -> null; await closed (sequential, never Promise.all); null -> null; rows = combineListings(open, closed) where a number present in both keeps the row from the listing that settled later (open wins only when open.settledAt > closed.settledAt), sorted by number descending; lastRepoPullRequests.set(projectPath, { rows, settledAt: open.settledAt }). invalidateRepoPullRequests invalidates both caches. Rewrite the PR_LISTING_MAX_STALE_MS doc comment (drop the '--state all ... ~11s' sentence; state the split and the measured 504). Re-export readOpenRepoPullRequests from derived-issue-state.ts and from src/dashboard/server/services/derived-issue-state.ts. In derived-issue-state.ts (same file, so open-pr-listing.test.ts never sees two runGh calls): listReadyIssuesForProject (line 856) defaults to `async (p) => (await readOpenRepoPullRequests(p)) ?? []`, and listOpenPullRequestsForProject (line 883) reads `(await readOpenRepoPullRequests(projectPath)) ?? []` on the GitHub branch. The shrink rule and closed generation are NOT in this item (closed-listing-consistency). Tests (fake timers): make the gh stub in derived-issue-state-pr-listing.test.ts answer by the --state argument, fix its header ('--limit 200'), add the PRD WI-2 cases including the reopen case; update derived-issue-state-quota.test.ts to assert the open and closed calls and that the closed args omit statusCheckRollup, reviewRequests and mergeable; open-pr-listing.test.ts asserts its single runGh call has '--state', 'open'."
+        },
+        "items": [
+          {
+            "id": "split-open-closed.ac1",
+            "title": "Given an empty cache, when readRepoPullRequests runs, then exactly one `gh pr list --state open` and one `gh pr list --state closed` call are issued, both metered as caller pr-cache, and the closed args contain none of statusCheckRollup, reviewRequests, mergeable",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "split-open-closed.ac2",
+            "title": "Given a first combined read where open answers [7 OPEN] and closed then answers [7 MERGED, 5 MERGED], when readRepoPullRequests runs, then it returns two rows, numbered 7 then 5, with 7 as the MERGED row; given a cached closed listing [7 CLOSED] and, 31 s later, an open listing [8 OPEN, 7 OPEN], when readRepoPullRequests runs, then 7 is returned as the OPEN row and no new closed read is issued",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "split-open-closed.ac4",
+            "title": "Given the closed read fails, when readRepoPullRequests and readOpenRepoPullRequests run, then the first returns null, the second returns the open rows, and the closed read is retried after 30 s rather than 5 minutes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "split-open-closed.ac5",
+            "title": "Given a successful combined listing older than the 30 s TTL, when listRepoPullRequestsStaleOk runs, then it returns that listing at once while exactly one refresh runs, and `npx vitest run tests/unit/lib/overdeck/derived-issue-state-pr-listing.test.ts` exits 0 with the PAN-3925 cases unchanged in their assertions",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "split-open-closed.ac6",
+            "title": "Given a GitHub project, when listOpenPullRequestsForProject runs, then runGh is called exactly once with args containing '--state' followed by 'open'; given readOpenRepoPullRequests answers null, listReadyIssuesForProject returns an empty array",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "closed-listing-consistency",
+        "title": "Closed listing re-reads after an open PR leaves the open listing, including a read already in flight",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T17:31:32Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5042",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/pr-listing.ts",
+            "tests/unit/lib/overdeck/derived-issue-state-pr-listing.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/derived-issue-state-pr-listing.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "derived-issue-state-pr-listing.test.ts passes including the shrink and in-flight cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9 (D2, D14). In pr-listing.ts add lastOpenNumbers: Map<string, ReadonlySet<number>> and closedGeneration: Map<string, number>; the closed cache value becomes ClosedListing = SettledListing & { generation: number }. Open loader after a successful parse: if a previous number set exists and any of its numbers is missing from the new set, increment closedGeneration for the repo and call cachedClosedPullRequests.invalidate(projectPath); store the new set; all before returning. Closed loader: read the generation BEFORE runGh and return it in the value. readRepoPullRequests after the open null-check: const seen = closedGeneration.get(projectPath) ?? 0; read closed; if closed && closed.generation < seen, invalidate the closed cache and read closed exactly once more (no loop). Tests with deferred, --state-keyed gh answers and fake timers: the shrink case and the in-flight case described in PRD WI-9."
+        },
+        "items": [
+          {
+            "id": "closed-listing-consistency.ac1",
+            "title": "Given a cached open listing [7, 8] and a cached closed listing [], when 31 s pass and the next readRepoPullRequests call's open refresh answers [8], then that same call issues a second closed read and returns PR 7 as the MERGED row the closed read answers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "closed-listing-consistency.ac2",
+            "title": "Given read A's closed read is still pending and read B's open refresh drops PR 7, when the pending closed load answers [] and B continues, then B issues exactly one more closed read and returns PR 7 as the MERGED row it answers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "closed-listing-consistency.ac3",
+            "title": "Given an unchanged open set 31 s later, when readRepoPullRequests runs, then it issues one open read and no closed read",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "log-failure-reason",
+        "title": "Log each PR listing failure reason once per change and log recovery",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T17:31:32Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5042",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/pr-listing.ts",
+            "tests/unit/lib/overdeck/pr-listing-failure.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/pr-listing-failure.test.ts tests/unit/lib/overdeck/derived-issue-state-pr-listing.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "pr-listing-failure.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3 (D10, FR-3). In pr-listing.ts export pure describePrListingFailure(error: unknown): string. Order: GitHubQuotaPausedError (instanceof, import from ../github-quota/pause-gate.js) -> 'quota pause: <message>'; GitHubRateLimitedError -> 'rate limited: <message>'; error.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER' -> 'output exceeded maxBuffer' (checked before killed, since Node sets killed for it too); error.killed === true -> 'timed out after 20s'; non-empty string stderr -> first non-empty stderr line trimmed; else first line of error.message or String(error) trimmed; cut to 200 chars. Keep lastFailureLogged Map keyed `${projectPath}\\0${listing}` (listing 'open' | 'closed'). In both loaders' catch: when the reason differs from the stored one, console.warn(`[pr-cache] ${projectPath}: ${listing} PR listing failed: ${reason}`) and store it. On success, when the key is stored, console.log(`[pr-cache] ${projectPath}: ${listing} PR listing recovered`) and delete it. Update the PAN-4264 loader comments to say the failure is logged. New test file tests/unit/lib/overdeck/pr-listing-failure.test.ts with fake timers, mocking run-gh.js and shouldListPullRequests -> true, and console.warn/console.log spies."
+        },
+        "items": [
+          {
+            "id": "log-failure-reason.ac1",
+            "title": "Given an error with stderr '\\nHTTP 504: 504 Gateway Timeout (https://api.github.com/graphql)\\n', when describePrListingFailure runs, then it returns 'HTTP 504: 504 Gateway Timeout (https://api.github.com/graphql)'; given { killed: true, signal: 'SIGTERM' } it returns 'timed out after 20s'; given a GitHubQuotaPausedError it returns a string starting 'quota pause:'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "log-failure-reason.ac2",
+            "title": "Given three consecutive open reads 31 s apart that fail with the same 504 stderr, when they run, then console.warn is called exactly once with '[pr-cache] <repo>: open PR listing failed: HTTP 504: 504 Gateway Timeout (https://api.github.com/graphql)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "log-failure-reason.ac3",
+            "title": "Given a logged open failure, when the next open read fails with a different stderr and the read after that succeeds, then console.warn is called once more and console.log is called once with '[pr-cache] <repo>: open PR listing recovered'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "log-failure-reason.ac4",
+            "title": "Given the closed read fails, when readRepoPullRequests runs, then console.warn emits a line containing 'closed PR listing failed:'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "scheduler-open-listing",
+        "title": "The auto-merge scheduler builds candidates from the open listing",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T17:31:32Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5042",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/auto-merge-scheduler.ts",
+            "src/dashboard/server/services/__tests__/auto-merge-scheduler.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/auto-merge-scheduler.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "auto-merge-scheduler.test.ts passes including the two new cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ],
+          "acJustification": "Two criteria cover the default reader for the found and failed cases; the rest of the scheduler is unchanged."
+        },
+        "narrative": {
+          "Action": "PRD WI-4. In listScheduleCandidates (auto-merge-scheduler.ts:156-161) import readOpenRepoPullRequests instead of readRepoPullRequests from './derived-issue-state.js' and default to it. Keep `if (!rows) return null;`. Update the module header's PAN-5036 paragraph and the listScheduleCandidates doc comment to name the open listing. Add tests: with the server adapter module mocked so readOpenRepoPullRequests returns one open green non-conflicting feature/pan-1 row and readRepoPullRequests throws, listScheduleCandidates returns candidates ['PAN-1']; with readOpenRepoPullRequests returning null, it returns null."
+        },
+        "items": [
+          {
+            "id": "scheduler-open-listing.ac1",
+            "title": "Given readOpenRepoPullRequests returns one open, green, non-conflicting feature/pan-1 row and readRepoPullRequests throws, when listScheduleCandidates runs with default deps, then it returns candidates ['PAN-1']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scheduler-open-listing.ac2",
+            "title": "Given readOpenRepoPullRequests returns null, when listScheduleCandidates runs, then it returns null so scheduleReadyAutoMerges records the 'PR listing unavailable' project skip",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "open-only-readers",
+        "title": "Merge-path owner's default PR lookup reads the open listing",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T17:31:32Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5042",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/merge-path-owner.ts",
+            "src/dashboard/server/services/__tests__/merge-path-owner.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/merge-path-owner.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "merge-path-owner.test.ts passes including the new default-prOf cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ],
+          "acJustification": "Two criteria cover the only behavior change (the default lookup) for found and failed reads."
+        },
+        "narrative": {
+          "Action": "PRD WI-5. merge-path-owner.ts defaultPrOf (line 82): `const rows = (await readOpenRepoPullRequests(projectPath)) ?? [];` imported from './derived-issue-state.js' (the server adapter, which re-exports it after split-open-closed). Keep the OPEN + headRefName === feature/<id lower> match. Update the prOf doc comment that names `listRepoPullRequests(projectPath)`. Tests in merge-path-owner.test.ts with the server adapter module mocked."
+        },
+        "items": [
+          {
+            "id": "open-only-readers.ac1",
+            "title": "Given readOpenRepoPullRequests returns an open feature/pan-9 row with url 'u' and headRefOid 'abc', when merge-path-owner's default prOf runs for PAN-9, then it returns { url: 'u', headSha: 'abc' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "open-only-readers.ac2",
+            "title": "Given readOpenRepoPullRequests returns null, when the default prOf runs for PAN-9, then it returns null and readRepoPullRequests is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "merged-row-checks",
+        "title": "Merged listing rows without a rollup report green checks",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T17:31:32Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5042",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/derived-issue-state.ts",
+            "tests/unit/lib/overdeck/derived-issue-state.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/derived-issue-state.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "derived-issue-state.test.ts passes including the four checksFromGhRow cases",
+            "typecheck completes without errors",
+            "lint-file-size exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6 (D8). Add exported checksFromGhRow(row: Pick<GhPrRow, 'statusCheckRollup' | 'mergedAt' | 'state'>): PrChecksState next to toChecksState in derived-issue-state.ts: statusCheckRollup !== undefined -> toChecksState(rollup); else mergedAt set or state 'MERGED' (case-insensitive) -> 'green'; else 'pending'. Doc comment says the closed listing never fetches the rollup and the value is display only. prFromGhRow uses `checks: checksFromGhRow(row)`. Tests in tests/unit/lib/overdeck/derived-issue-state.test.ts."
+        },
+        "items": [
+          {
+            "id": "merged-row-checks.ac1",
+            "title": "Given a row { number: 5, state: 'MERGED', mergedAt: '2026-11-04T00:00:00Z' } with no statusCheckRollup, when prFromGhRow runs, then it returns checks 'green' and merged true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merged-row-checks.ac2",
+            "title": "Given a merged row whose statusCheckRollup holds a FAILURE conclusion, when prFromGhRow runs, then it returns checks 'red'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merged-row-checks.ac3",
+            "title": "Given an OPEN row with no statusCheckRollup, and an OPEN row with statusCheckRollup [], when checksFromGhRow runs on each, then both return 'pending'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pr-sync-keeps-checks",
+        "title": "PR sync keeps a link's last observed checks for rows without a rollup",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T17:31:32Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5042",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/pull-request-sync-service.ts",
+            "src/dashboard/server/services/__tests__/pull-request-sync-service.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/pull-request-sync-service.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "pull-request-sync-service.test.ts passes including the two new cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ],
+          "acJustification": "Two criteria cover the two branches of the new rule (previous snapshot present / absent)."
+        },
+        "narrative": {
+          "Action": "PRD WI-7 (D9). snapshotFromGhRow(row, syncedAt, previous?: PullRequestSnapshot | null): checks = row.statusCheckRollup === undefined && previous ? previous.checks : checksFromGhRow(row) (import checksFromGhRow from '../../../lib/overdeck/derived-issue-state.js'). applySnapshot passes link.snapshot; the branch-detection insert and the ctx.snapshots.set call pass nothing. Update module header step 2 ('gh pr list --state all, cached 30 s') to describe the open listing plus the closed listing (PAN-5042)."
+        },
+        "items": [
+          {
+            "id": "pr-sync-keeps-checks.ac1",
+            "title": "Given a linked PR whose stored snapshot is { state: 'open', checks: 'red' } and a listing row { state: 'MERGED', mergedAt } with no statusCheckRollup, when a sweep runs, then the stored snapshot becomes { state: 'merged', checks: 'red' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pr-sync-keeps-checks.ac2",
+            "title": "Given a conversation branch matching a merged listing row with no statusCheckRollup and no existing link, when a sweep inserts the branch link, then its snapshot has checks 'green'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "watch-unobserved-rows",
+        "title": "PR watches re-read rows that came from the closed listing instead of using guessed checks",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T17:31:32Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5042",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/pull-request-sync-service.ts",
+            "src/dashboard/server/services/__tests__/pull-request-sync-service.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/pull-request-sync-service.test.ts src/dashboard/server/services/__tests__/pull-request-watch-notifier.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "pull-request-sync-service.test.ts passes including the two new watch cases; pull-request-watch-notifier.test.ts passes unchanged",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10 (D15). In pull-request-sync-service.ts add `readonly unobserved: Set<string>` to SweepContext (initialize it where the context is built). Wherever a listing row's snapshot goes into ctx.snapshots (the listing loop and applySnapshot), add the key to ctx.unobserved when row.statusCheckRollup === undefined. In runWatchPass replace `if (ctx.snapshots.has(id)) continue;` with `if (ctx.snapshots.has(id) && !ctx.unobserved.has(id)) continue;`; for an unobserved key, when the repo is in backoff or readPullRequest returns null, ctx.snapshots.delete(id) before continue; a successful view replaces the snapshot. Do not change pull-request-watch-notifier.ts."
+        },
+        "items": [
+          {
+            "id": "watch-unobserved-rows.ac1",
+            "title": "Given a watched PR with no conversation link that the listing returns as a MERGED row without statusCheckRollup, and readPullRequest answering a merged row with a red rollup, when a sweep runs, then readPullRequest is called once for that key and notify receives that key's snapshot with checks 'red'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "watch-unobserved-rows.ac2",
+            "title": "Given the same watched PR and readPullRequest answering null, when a sweep runs, then the snapshots map passed to notify has no entry for that key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "watch-unobserved-rows.ac3",
+            "title": "Given a watched PR listed as an OPEN row with a statusCheckRollup, when a sweep runs, then readPullRequest is not called for it and notify receives the listing snapshot",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-pr-listing",
+        "title": "Document the open/closed listing split, the failure log line and the GraphQL 504",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T17:31:32Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5042",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/PIPELINE-GATES.md",
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            ".overdeck/context/codebase/concerns.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'readOpenRepoPullRequests' docs/PIPELINE-GATES.md",
+            "grep -n 'PAN-5042' docs/DASHBOARD-ARCHITECTURE.md .overdeck/context/codebase/concerns.md",
+            "npm run lint:docs",
+            "npm run lint:last-verified"
+          ],
+          "expected_outputs": [
+            "grep finds readOpenRepoPullRequests in PIPELINE-GATES.md",
+            "grep finds PAN-5042 in both files",
+            "lint:docs and lint:last-verified exit 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-7",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. (1) docs/PIPELINE-GATES.md PAN-5036 paragraph (~line 851): the scheduler reads the open listing (readOpenRepoPullRequests); every failed listing read logs '[pr-cache] <repo>: <open|closed> PR listing failed: <reason>' once per change plus a 'recovered' line. (2) docs/PIPELINE-GATES.md quota bullet (~line 1628 'The PR-cache listing is capped at 100 rows'): describe the split (open with every field, 30 s / 5 min when none open; closed without statusCheckRollup, reviewRequests, mergeable, 5 min, re-read when an open PR leaves the open listing; each capped at 100) and why (GraphQL 504 at ~11 s, PAN-5042). (3) docs/DASHBOARD-ARCHITECTURE.md line 745: a batch costs the open plus the closed listing; replace the 'takes ~11s' claim with the measured open 0.75 s / closed 2.1 s. (4) docs/DASHBOARD-ARCHITECTURE.md ~line 421: the PR sync sweep reads the combined listing and a merged snapshot keeps the checks last seen while open. (5) .overdeck/context/codebase/concerns.md after the PAN-4291 '/rate_limit misreports' bullet: add '**statusCheckRollup on closed PRs times out GitHub GraphQL** (PAN-5042)' with the 504 at ~11 s, the 10.3 s closed+rollup timing, and the rule never to request statusCheckRollup or reviewRequests for closed PRs in a listing; leave the single trailing last-verified line unchanged."
+        },
+        "items": [
+          {
+            "id": "docs-pr-listing.ac1",
+            "title": "Given the docs change, when `grep -n readOpenRepoPullRequests docs/PIPELINE-GATES.md` runs, then it prints at least one line, and the PIPELINE-GATES quota section states that closed PRs are listed without statusCheckRollup",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-pr-listing.ac2",
+            "title": "Given the docs change, when `grep -n 'takes ~11s' docs/DASHBOARD-ARCHITECTURE.md` runs, then it prints nothing, and `grep -n PAN-5042 docs/DASHBOARD-ARCHITECTURE.md` prints at least one line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-pr-listing.ac3",
+            "title": "Given the concerns map change, when `grep -c 'last-verified' .overdeck/context/codebase/concerns.md` runs, then it prints 1, and the file contains a bullet naming PAN-5042 and the GraphQL 504",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "extract-pr-listing",
+        "to": "split-open-closed",
+        "type": "blocks"
+      },
+      {
+        "from": "split-open-closed",
+        "to": "closed-listing-consistency",
+        "type": "blocks"
+      },
+      {
+        "from": "closed-listing-consistency",
+        "to": "log-failure-reason",
+        "type": "blocks"
+      },
+      {
+        "from": "split-open-closed",
+        "to": "scheduler-open-listing",
+        "type": "blocks"
+      },
+      {
+        "from": "split-open-closed",
+        "to": "open-only-readers",
+        "type": "blocks"
+      },
+      {
+        "from": "split-open-closed",
+        "to": "merged-row-checks",
+        "type": "blocks"
+      },
+      {
+        "from": "merged-row-checks",
+        "to": "pr-sync-keeps-checks",
+        "type": "blocks"
+      },
+      {
+        "from": "pr-sync-keeps-checks",
+        "to": "watch-unobserved-rows",
+        "type": "blocks"
+      },
+      {
+        "from": "split-open-closed",
+        "to": "docs-pr-listing",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

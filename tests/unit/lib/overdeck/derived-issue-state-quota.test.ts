@@ -87,25 +87,36 @@ describe('readRepoPullRequests quota metering (PAN-4264)', () => {
 
     const rows = await readRepoPullRequests(`/repos/quota-${++repoSeq}`);
     expect(rows).toHaveLength(1);
-    expect(gh.calls).toHaveLength(1);
+    expect(gh.calls).toHaveLength(2);
     expect(gh.calls[0]!.slice(0, 2)).toEqual(['pr', 'list']);
+    expect(gh.calls[0]).toEqual(expect.arrayContaining(['--state', 'open']));
+    expect(gh.calls[1]).toEqual(expect.arrayContaining(['--state', 'closed']));
 
     await flushLedgerWrites();
-    expect(readLedgerWindow(Date.now())).toEqual([expect.objectContaining({
-      caller: 'pr-cache', pool: 'user', bucket: 'graphql', outcome: 'ok',
-    })]);
+    expect(readLedgerWindow(Date.now())).toEqual([
+      expect.objectContaining({ caller: 'pr-cache', pool: 'user', bucket: 'graphql', outcome: 'ok' }),
+      expect.objectContaining({ caller: 'pr-cache', pool: 'user', bucket: 'graphql', outcome: 'ok' }),
+    ]);
   });
 
-  it('lists 100 PRs and records the per-page price (PAN-4291)', async () => {
+  it('lists 100 PRs and records the per-page price for the open read, and the closed read omits the heavy fields (PAN-4291)', async () => {
     gh.stdout = JSON.stringify(Array.from({ length: 100 }, (_, i) => ({ number: i, state: 'OPEN' })));
 
     await readRepoPullRequests(`/repos/quota-${++repoSeq}`);
-    expect(gh.calls).toHaveLength(1);
+    expect(gh.calls).toHaveLength(2);
     expect(gh.calls[0]).toContain('100');
     expect(gh.calls[0]).not.toContain('200');
+    // The closed read never asks for the fields only an open PR's status needs.
+    const closedFields = gh.calls[1]![gh.calls[1]!.indexOf('--json') + 1]!;
+    expect(closedFields).not.toContain('statusCheckRollup');
+    expect(closedFields).not.toContain('reviewRequests');
+    expect(closedFields).not.toContain('mergeable');
 
     await flushLedgerWrites();
-    expect(readLedgerWindow(Date.now())).toEqual([expect.objectContaining({ caller: 'pr-cache', cost: 3 })]);
+    expect(readLedgerWindow(Date.now())).toEqual([
+      expect.objectContaining({ caller: 'pr-cache', cost: 3 }),
+      expect.objectContaining({ caller: 'pr-cache', cost: 1 }),
+    ]);
   });
 
   it('returns [] and execs gh zero times for a repo with no git remote (PAN-4291 AC1)', async () => {
@@ -146,34 +157,38 @@ describe('readRepoPullRequests quota metering (PAN-4264)', () => {
     gh.stdout = JSON.stringify([{ number: 1, state: 'OPEN', headRefName: 'feature/pan-1' }]);
     const rows = await readRepoPullRequests(path);
     expect(rows).toHaveLength(1);
-    expect(gh.calls).toHaveLength(1);
+    expect(gh.calls).toHaveLength(2);
   });
 
   it('caches a listing with no open PR for 5 minutes instead of the flat 30 s (PAN-4291 idle-ttl AC1)', async () => {
     gh.stdout = JSON.stringify([{ number: 1, state: 'MERGED' }]);
     const path = `/repos/quota-${++repoSeq}`;
 
+    // One open call and one closed call; both answer a listing with no OPEN
+    // row, so both cache at the 5-minute idle TTL.
     await readRepoPullRequests(path);
-    expect(gh.calls).toHaveLength(1);
+    expect(gh.calls).toHaveLength(2);
 
     await vi.advanceTimersByTimeAsync(60_000);
     await readRepoPullRequests(path);
-    expect(gh.calls).toHaveLength(1);
+    expect(gh.calls).toHaveLength(2);
 
     await vi.advanceTimersByTimeAsync(5 * 60_000);
     await readRepoPullRequests(path);
-    expect(gh.calls).toHaveLength(2);
+    expect(gh.calls).toHaveLength(4);
   });
 
-  it('keeps the flat 30 s TTL for a listing with an open PR (PAN-4291 idle-ttl AC2)', async () => {
+  it('keeps the flat 30 s TTL for the open read, and the idle TTL for the closed read, with an open PR (PAN-4291 idle-ttl AC2)', async () => {
     gh.stdout = JSON.stringify([{ number: 1, state: 'OPEN' }]);
     const path = `/repos/quota-${++repoSeq}`;
 
     await readRepoPullRequests(path);
-    expect(gh.calls).toHaveLength(1);
+    expect(gh.calls).toHaveLength(2);
 
+    // Past the open read's 30 s active TTL but well inside the closed read's
+    // 5-minute idle TTL: only the open read goes back to the forge.
     await vi.advanceTimersByTimeAsync(31_000);
     await readRepoPullRequests(path);
-    expect(gh.calls).toHaveLength(2);
+    expect(gh.calls).toHaveLength(3);
   });
 });

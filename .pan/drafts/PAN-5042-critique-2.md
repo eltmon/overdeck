@@ -1,0 +1,7 @@
+plan-digest: 34e32a8d81caf70485c1a170f6e71ab1a8da55e5a9a684314d17c395ac766db4
+
+## blocks-the-design: Closed snapshots erase observed review and mergeability
+
+The PRD's closed field set omits `reviewRequests` and `mergeable` (FR-2), but WI-7 preserves only `checks` from the previous snapshot (PRD lines 384–395). In `src/dashboard/server/services/pull-request-sync-service.ts`, `snapshotFromGhRow` currently computes `reviewState` from `reviewDecision` plus `reviewRequests` and computes `mergeable` from the row (lines 111–123). For a previously linked PR whose last observed snapshot was `review-requested` because `reviewRequests` was nonempty and `mergeable: false`, a merged closed row with `reviewDecision: null` becomes `reviewState: none, mergeable: null`. `applySnapshot` persists that result (lines 184–188), and `isDue` never refreshes a merged snapshot (lines 169–181), so both observations are permanently lost. D15 itself says the closed row has no observation of review requests or mergeability (PRD lines 196–198).
+
+Extend WI-7 to preserve the previous `reviewState` when the closed row has neither a review decision nor review-request data, and preserve the previous `mergeable` when the row omits it. Add a sweep test starting from an open linked snapshot with `reviewState: review-requested` and `mergeable: false`, then apply a merged closed row and assert both values remain in the final stored snapshot.

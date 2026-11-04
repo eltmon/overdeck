@@ -1,0 +1,133 @@
+{
+  "version": "1",
+  "issueId": "PAN-5045",
+  "created": "2026-11-04T18:04:56.381Z",
+  "updated": "2026-11-04T18:54:32.587Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "scope-row": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5045",
+      "claimedAt": "2026-11-04T18:04:56.381Z",
+      "doneAt": "2026-11-04T18:06:20.859Z"
+    },
+    "group-helper": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5045",
+      "claimedAt": "2026-11-04T18:06:44.381Z",
+      "doneAt": "2026-11-04T18:09:03.161Z"
+    },
+    "grouped-list": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5045",
+      "claimedAt": "2026-11-04T18:09:11.714Z",
+      "doneAt": "2026-11-04T18:23:14.383Z"
+    },
+    "project-create": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5045",
+      "claimedAt": "2026-11-04T18:23:21.585Z",
+      "doneAt": "2026-11-04T18:35:05.755Z"
+    },
+    "user-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5045",
+      "claimedAt": "2026-11-04T18:35:12.080Z",
+      "doneAt": "2026-11-04T18:35:53.911Z"
+    },
+    "phone-screenshot": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5045",
+      "claimedAt": "2026-11-04T18:36:03.014Z",
+      "doneAt": "2026-11-04T18:48:01.588Z"
+    },
+    "scope-row.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:49:36.427Z"
+    },
+    "scope-row.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:49:50.030Z"
+    },
+    "scope-row.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:50:03.644Z"
+    },
+    "group-helper.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:50:18.511Z"
+    },
+    "group-helper.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:50:33.432Z"
+    },
+    "group-helper.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:50:48.173Z"
+    },
+    "group-helper.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:51:03.702Z"
+    },
+    "group-helper.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:51:18.578Z"
+    },
+    "grouped-list.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:51:33.416Z"
+    },
+    "grouped-list.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:51:48.389Z"
+    },
+    "grouped-list.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:52:03.756Z"
+    },
+    "grouped-list.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:52:20.710Z"
+    },
+    "project-create.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:52:35.142Z"
+    },
+    "project-create.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:52:50.685Z"
+    },
+    "project-create.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:53:05.103Z"
+    },
+    "project-create.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:53:19.366Z"
+    },
+    "user-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:53:33.507Z"
+    },
+    "user-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:53:47.989Z"
+    },
+    "phone-screenshot.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:54:02.985Z"
+    },
+    "phone-screenshot.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:54:17.513Z"
+    },
+    "phone-screenshot.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:54:32.587Z"
+    }
+  }
+}

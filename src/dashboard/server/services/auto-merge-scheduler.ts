@@ -31,8 +31,10 @@
  * GitLab projects are skipped with a log line: their MRs are not listed here.
  *
  * PAN-5036: the pass never schedules nothing silently. The listing is read
- * with `readRepoPullRequests`, so a failed forge read (`null`) is told apart
- * from "no PRs": the project gets a "PR listing unavailable" skip reason. An
+ * with `readOpenRepoPullRequests` (PAN-5042: the open-only read, since a
+ * schedule candidate is always an open PR), so a failed forge read (`null`)
+ * is told apart from "no PRs": the project gets a "PR listing unavailable"
+ * skip reason. An
  * open gate-linked PR the listing rules out (checks not green, or conflicting)
  * is still walked through the free checks above, then skipped with a reason
  * naming its head instead of vanishing from `notScheduled`.
@@ -143,11 +145,12 @@ export function issueIdFromGateBranch(branch: string | undefined): string | null
 }
 
 /**
- * The project's schedule candidates from the cached `gh pr list` the UAT
- * reconciler reads on the same tick: open, non-draft PRs on a gate-linked
- * branch whose checks are green and that do not conflict. Approval is NOT read
- * here: the listing carries only the forge's `reviewDecision`, which is empty
- * without branch protection. The merge gate reads the verdict marker comments.
+ * The project's schedule candidates from the cached open-PR listing (PAN-5042)
+ * the UAT reconciler reads on the same tick: open, non-draft PRs on a
+ * gate-linked branch whose checks are green and that do not conflict.
+ * Approval is NOT read here: the listing carries only the forge's
+ * `reviewDecision`, which is empty without branch protection. The merge gate
+ * reads the verdict marker comments.
  *
  * PAN-5036: null when the listing could not be read, never an empty list; an
  * open gate-linked PR ruled out by the listing is returned in `dropped` with
@@ -157,8 +160,8 @@ export async function listScheduleCandidates(
   projectPath: string,
   deps: { listPullRequests?: (projectPath: string) => Promise<readonly GhPrRow[] | null> } = {},
 ): Promise<ScheduleCandidates | null> {
-  const { readRepoPullRequests, toChecksState } = await import('./derived-issue-state.js');
-  const rows = await (deps.listPullRequests ?? readRepoPullRequests)(projectPath);
+  const { readOpenRepoPullRequests, toChecksState } = await import('./derived-issue-state.js');
+  const rows = await (deps.listPullRequests ?? readOpenRepoPullRequests)(projectPath);
   if (!rows) return null;
   const candidates = new Set<string>();
   const dropped = new Map<string, DroppedScheduleCandidate>();

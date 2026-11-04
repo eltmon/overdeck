@@ -27,10 +27,13 @@ vi.mock('../../../../src/lib/projects.js', async (importOriginal) => {
 vi.mock('../../../../src/lib/pipeline-notifier.js', () => ({ notifyPipeline: vi.fn() }));
 
 import {
+  checksFromGhRow,
   deriveIssueState,
   getDerivedIssueState,
   loadIssueStateFacts,
+  prFromGhRow,
   specExistsFor,
+  type GhPrRow,
   type IssueStateFacts,
 } from '../../../../src/lib/overdeck/derived-issue-state.js';
 import { requestOperatorDecision } from '../../../../src/lib/cloister/operator-decision.js';
@@ -262,5 +265,28 @@ describe('an outside PR is the operator\'s move', () => {
       model: 'opus', state: 'blocked' as const, stateSince: NOW, terminalId: 'w1:p1',
     };
     expect(deriveIssueState(facts({ panes: [pane], prOutsidePipeline: outside })).attention).toBe('needs-you');
+  });
+});
+
+describe('checksFromGhRow (PAN-5042: the closed listing never fetches statusCheckRollup)', () => {
+  it('reports green for a merged row with no rollup', () => {
+    expect(checksFromGhRow({ state: 'MERGED', mergedAt: '2026-11-04T00:00:00Z' })).toBe('green');
+    expect(prFromGhRow({ number: 5, state: 'MERGED', mergedAt: '2026-11-04T00:00:00Z' })).toEqual(
+      expect.objectContaining({ checks: 'green', merged: true }),
+    );
+  });
+
+  it('still reports the real rollup state for a merged row that carries one', () => {
+    const row: GhPrRow = {
+      number: 6, state: 'MERGED', mergedAt: '2026-11-04T00:00:00Z',
+      statusCheckRollup: [{ status: 'COMPLETED', conclusion: 'FAILURE' }],
+    };
+    expect(checksFromGhRow(row)).toBe('red');
+    expect(prFromGhRow(row)).toEqual(expect.objectContaining({ checks: 'red' }));
+  });
+
+  it('reports pending for an open row with no rollup, and for one with an empty rollup', () => {
+    expect(checksFromGhRow({ state: 'OPEN', mergedAt: null })).toBe('pending');
+    expect(checksFromGhRow({ state: 'OPEN', mergedAt: null, statusCheckRollup: [] })).toBe('pending');
   });
 });

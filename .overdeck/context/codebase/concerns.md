@@ -363,6 +363,14 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   Read the GraphQL bucket with `rateLimit(dryRun: true)` (free). GitHub
   prices `gh pr list` per 100-row page: with `reviewRequests` +
   `statusCheckRollup` a full page costs 3 points, so `--limit 200` costs 6.
+- **`statusCheckRollup` on closed PRs times out GitHub GraphQL** (PAN-5042) —
+  a single `gh pr list --state all --limit 100 --json …,statusCheckRollup,…`
+  measured an HTTP 504 from GitHub's GraphQL gateway past ~11s on a busy repo
+  (closed PRs with the rollup measured 10.3s alone, vs. 0.75s for open PRs
+  with every field and 2.1s for closed PRs without the rollup). Never request
+  `statusCheckRollup` or `reviewRequests` for closed PRs in a listing — split
+  into an open read (every field) and a closed read (without them), as
+  `src/lib/overdeck/pr-listing.ts` does.
 
 - **Two terminal-permission detectors coexist** (PAN-4278) — agents are
   detected by `src/lib/agent-input-detection.ts` (the `1. Yes / 2. Yes, and … /
@@ -761,13 +769,11 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   `channel refused (<code>, <mode>)`; an unexpected handshake exception has the new accept code `internal`.
   Routine lines need `OVERDECK_ANYWHERE_DEBUG=1` (`src/lib/anywhere/debug-log.ts`). The phone evicts its
   peer connections to a machine after a handshake `timeout`/`protocol` failure instead of reusing a zombie.
-<!-- last-verified: 2026-11-04 -->
 - **A local Auto lane pick dropped its explanation** (PAN-5006 planning) — `laneMachineResolver`
   (`src/dashboard/server/routes/lanes.ts`) returned `null` for `target.self`, so `pan lane start --machine auto`
   printed no `Auto → …` line when Auto chose this machine, and `FleetTarget` never carried `answer.rejections`.
   PAN-5006 adds `LaneLaunchResult.placement` (reason plus passed-over machines); `machine` keeps meaning
   "null = runs here", because `handleLaneLaunch` follows a lane only when `machine` is set.
-<!-- last-verified: 2026-11-04 -->
 - **Session-tree presence was tmux-only on Herdr** (PAN-5011 planning) — `deriveSessionPresence`
   (`src/dashboard/server/services/session-presence.ts`) returns `ended` when the agent id is not in a set built from
   `tmux list-sessions`. On a Herdr host that set never holds an agent, so every work/planning/strike row from

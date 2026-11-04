@@ -107,11 +107,16 @@ include permission prompts, plan approvals, choice menus, rate-limit menus,
 session resume, held handoffs and turns that ended. For a conversation, tap
 **Open** to read it. For an agent, answer it on the desktop.
 
-The phone lists conversations and opens one full screen. The list includes
-conversations owned by linked machines; opening one reads it from the machine
-that runs it, the same as the desktop, at `/m?conversation=@<environment-id>/<name>`.
-The phone does not show terminals. It shows the pipeline but does not change
-it: there are no issue actions, filters or drag and drop.
+The phone groups conversations by project. Each project gets its own header,
+with No project last. Every group starts collapsed, and the phone remembers
+which groups you opened. Tap **+** next to a project's name to start a
+conversation in that project; it opens full screen and uses the machine's
+default model. Conversations owned by linked machines are listed too; opening
+one reads it from the machine that runs it, the same as the desktop, at
+`/m?conversation=@<environment-id>/<name>`. A machine running an older version
+of Overdeck shows its groups by project key, with no **+**, until you update
+it. The phone does not show terminals. It shows the pipeline but does not
+change it: there are no issue actions, filters or drag and drop.
 
 ## Notifications
 

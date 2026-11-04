@@ -88,7 +88,9 @@ describe('listOpenPullRequestsForProject — GitHub (PAN-4597)', () => {
     expect(open).toEqual([
       { issueId: 'PAN-10', pr: expect.objectContaining({ number: 10, headSha: 'a'.repeat(40) }) },
     ]);
+    // PAN-5042: this reads only the open listing, never the closed one.
     expect(mocks.runGh).toHaveBeenCalledTimes(1);
+    expect(mocks.runGh.mock.calls[0]![0]).toEqual(expect.arrayContaining(['--state', 'open']));
   });
 });
 

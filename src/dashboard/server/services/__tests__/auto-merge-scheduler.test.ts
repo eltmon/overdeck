@@ -28,6 +28,21 @@ vi.mock('../../../../lib/cloister/merge-blockers.js', () => ({ getMergeBlockersP
 // PAN-4852: the SageOx merge guard reads git and projects.yaml; these tests judge forge facts only.
 vi.mock('../../../../lib/sageox/merge-guard.js', () => ({ sageoxMergeGuardForIssue: vi.fn(async () => ({ ok: true })) }));
 
+// PAN-5042: listScheduleCandidates' default dep is this dynamic import; every
+// other test here injects `listPullRequests` and never touches it.
+const derivedIssueStateMocks = vi.hoisted(() => ({
+  readOpenRepoPullRequests: vi.fn(),
+  readRepoPullRequests: vi.fn(),
+}));
+vi.mock('../derived-issue-state.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../derived-issue-state.js')>();
+  return {
+    ...actual,
+    readOpenRepoPullRequests: derivedIssueStateMocks.readOpenRepoPullRequests,
+    readRepoPullRequests: derivedIssueStateMocks.readRepoPullRequests,
+  };
+});
+
 const {
   issueIdFromGateBranch,
   latestAutoMergeAllowsSchedule,
@@ -590,6 +605,21 @@ describe('listScheduleCandidates (#3983)', () => {
     expect(issueIdFromGateBranch('strike/min-1039')).toBeNull();
     expect(issueIdFromGateBranch('fix/pan-3983-merge-train-schedule')).toBeNull();
     expect(issueIdFromGateBranch(undefined)).toBeNull();
+  });
+
+  it('defaults to the open-only listing, never the combined one (PAN-5042)', async () => {
+    derivedIssueStateMocks.readOpenRepoPullRequests.mockResolvedValue([listed()]);
+    derivedIssueStateMocks.readRepoPullRequests.mockRejectedValue(new Error('must not be called'));
+
+    await expect(listScheduleCandidates('/repos/overdeck')).resolves.toEqual(only('PAN-42'));
+    expect(derivedIssueStateMocks.readOpenRepoPullRequests).toHaveBeenCalledWith('/repos/overdeck');
+    expect(derivedIssueStateMocks.readRepoPullRequests).not.toHaveBeenCalled();
+  });
+
+  it('returns null, never throws, when the default open listing read fails (PAN-5042)', async () => {
+    derivedIssueStateMocks.readOpenRepoPullRequests.mockResolvedValue(null);
+
+    await expect(listScheduleCandidates('/repos/overdeck')).resolves.toBeNull();
   });
 });
 

@@ -848,9 +848,15 @@ nothing while a review is already running. Every completed pass keeps each candi
 Pending auto-merges card as "Not scheduled: <reason>". A reason is logged only
 when it changes.
 PAN-5036: the scheduler never schedules nothing silently. When the project's
-PR listing read fails (`readRepoPullRequests` answers `null`), the project gets
-one skip entry, "PR listing unavailable", with `scope: 'project'` and the
-project key as `issueId`; it logs once when it appears and once when it clears.
+PR listing read fails (`readOpenRepoPullRequests` answers `null` — PAN-5042:
+the scheduler reads the open-only listing, since every candidate is an open
+PR), the project gets one skip entry, "PR listing unavailable", with
+`scope: 'project'` and the project key as `issueId`; it logs once when it
+appears and once when it clears. Every failed PR listing read (open or
+closed, any caller) logs `[pr-cache] <repo>: <open|closed> PR listing failed:
+<reason>` once per distinct reason per repo, plus a `[pr-cache] <repo>:
+<open|closed> PR listing recovered` line once a later read succeeds
+(`describePrListingFailure`, `src/lib/overdeck/pr-listing.ts`).
 An open `feature/<id>` PR that the cached listing rules out (checks not green, or
 conflicting) passes through the free checks (policy, Deft hold, latest row)
 and is then skipped with a reason naming the head it judged, for example
@@ -1625,7 +1631,7 @@ failures, and the closed-issue reaper treats the issue as not closed.
 - The closed-issue reaper's passive scans (workspace dirs, `agent-<issue>` state dirs, leaked `_devnet` networks) skip an issue whose residue the same deacon process reaped in the last 6 hours (`REAPED_RESIDUE_RECHECK_MS`). Reaping keeps the `agent-<issue>` directory, so without this every closed issue was re-checked against GitHub forever; 400+ of them spent the whole App REST quota. The running-agent loops still check every tick (PAN-5001).
 - A deacon-lite patrol tick, or a manual patrol request, that arrives while a patrol is still running joins it instead of starting an overlapping sweep (PAN-5001).
 - `readRepoPullRequests` skips the `gh pr list` call entirely — no exec, no ledger line — for a repo with no git remote or a project with no resolvable tracker.
-- The PR-cache listing is capped at 100 rows, not 200, and a listing with no OPEN PR is cached for `PR_CACHE_IDLE_TTL_MS` (5 minutes) instead of the flat 30 seconds, since nothing in it can change without a new PR opening.
+- The PR-cache listing is split into an open read and a closed read (PAN-5042), each capped at 100 rows: a single combined `gh pr list --state all --limit 100` with `statusCheckRollup` measured an HTTP 504 from GitHub's GraphQL gateway at ~11s on a busy repo. The open read (`readOpenRepoPullRequests`) asks every field and is cached for `PR_CACHE_TTL_MS` (30 seconds), or `PR_CACHE_IDLE_TTL_MS` (5 minutes) when it has no OPEN row, since nothing in it can change without a new PR opening. The closed read drops `statusCheckRollup`, `reviewRequests` and `mergeable` — fields only an open PR's status needs — and caches at the 5-minute idle TTL once it settles, or at the 30-second TTL on a failed read so a transient failure retries sooner; a PR number leaving the open set forces one extra closed re-read even inside that idle window, so a PR that just merged or closed is reflected promptly. `readRepoPullRequests` combines both by number, sequentially (closed after open, never in parallel).
 - `gh pr list`/`gh issue list` calls are priced by the GraphQL pages they actually walk (`priceGhListCall`), weighted by which `--json` fields GitHub joins in, instead of a flat 1 point.
 - A `gh` failure GitHub never saw (bad args, no git remote, `gh` missing) costs 0, not 1; only a failure whose stderr shows GitHub actually answered (an HTTP status or a `GraphQL:` error) still costs 1.
 
