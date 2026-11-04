@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-04T10:02:53.704471Z · model: claude-opus-5-5 · open: 869_
+_Last sequenced: 2026-11-04T10:03:42.207478Z · model: claude-opus-5-5 · open: 870_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -418,6 +418,7 @@ _Last sequenced: 2026-11-04T10:02:53.704471Z · model: claude-opus-5-5 · open: 
 | 416 | PAN-3016 | M | medium | ok |  |  | Operator ask: every view should be URL-addressable; cockpit tabs, stage panes and several drawers are still local state. |
 | 417 | PAN-3890 | S | medium | ok |  |  | opencode provider stream errors (rate limit) are invisible in the feed and never retried; first message dies silently |
 | 418 | PAN-3822 | L | medium | ok |  |  | PRD landed (12 items, FR-1..14): link PRs to conversations via branch detection + explicit override; unblocks PAN-3920 |
+| 419 | PAN-4950 | M | medium | ok |  |  | pan mcp connector login/pair/serve for self-hosted bots; deps W-CONN1/W-DIR1/W-MCP1 closed; directory redeploy (CP-5) gates release. |
 | 420 | PAN-4935 | M | medium | ok |  |  | Instruction blocks and no-MCP fallback; only W-PR1 (PAN-4943, in review) remains before it can start. |
 | 421 | PAN-1673 | S | medium | ok |  |  | Regression: pi + gpt-5.5 fails with 'No API key for provider: openai-codex' (worked previously) |
 | 422 | PAN-1669 | S | medium | ok |  |  | restart-with-model doesn't emit a live event |
@@ -1204,10 +1205,10 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-04T10:02:53.704471Z",
+  "generatedAt": "2026-11-04T10:03:42.207478Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 869,
+  "openCount": 870,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -12029,6 +12030,19 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "rationale": "New in-pipeline issue, placed in the open rank-224 slot next to the other in-pipeline work so no other rank moves. The bug misdirects agent-to-conversation messages and its error misleads (the conversation was running); the fix is a small target-resolver change with a named unit test.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4950",
+      "rank": 419,
+      "size": "M",
+      "importance": "medium",
+      "score": 45,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan mcp connector login/pair/serve for self-hosted bots; deps W-CONN1/W-DIR1/W-MCP1 closed; directory redeploy (CP-5) gates release.",
+      "rationale": "New in-pipeline child of epic PAN-4927 (W-CONN2), placed in the free rank-419 slot beside its in-pipeline sibling PAN-4935 so no other rank moves.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13284,6 +13298,13 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.4
+    },
+    {
+      "from": "PAN-4927",
+      "to": "PAN-4950",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
     }
   ]
 }
