@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4950",
   "created": "2026-11-04T10:02:21.153Z",
-  "updated": "2026-11-04T10:39:28.167Z",
+  "updated": "2026-11-04T10:39:35.280Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -62,6 +62,11 @@
       "claimedBy": "agent-pan-4950",
       "claimedAt": "2026-11-04T10:37:48.442Z",
       "doneAt": "2026-11-04T10:39:28.167Z"
+    },
+    "fleet-connector-local": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4950",
+      "claimedAt": "2026-11-04T10:39:35.279Z"
     }
   }
 }
