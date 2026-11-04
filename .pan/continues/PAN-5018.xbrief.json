@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5018",
   "created": "2026-11-04T13:12:52.932Z",
-  "updated": "2026-11-04T15:08:44.180Z",
+  "updated": "2026-11-04T15:08:58.934Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -116,6 +116,10 @@
     "accept-error-mode-and-internal.ac2": {
       "status": "completed",
       "doneAt": "2026-11-04T15:08:44.180Z"
+    },
+    "accept-error-mode-and-internal.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:08:58.934Z"
     }
   }
 }
