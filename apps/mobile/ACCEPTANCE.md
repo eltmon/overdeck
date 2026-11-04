@@ -464,17 +464,23 @@ Run on 2026-11-04.
 | 4 | Directory log has no content | `npx wrangler tail overdeck-connect --format json` ran during one more test push and a question. The 12 captured events carry only `frame`, `env`, `outcome` and `client`. There was no match for the test-push title or body, the question text, "Question ·", the conversation title, a concurrent "Finished · PAN-5041" title, `"title"`, `"body"`, `"token"` or the FCM token prefix `APA91b`. | pass |
 | 5a | Cold tap | With the app's UI closed, tapping the question notification started `MainActivity` with `ai.overdeck.app:/open#v=1&e=e91ffda1-…&p=%2Fm%3Fsubject%3D20261104-8903&t=2026-11-04T18%3A26%3A28.151Z`. The app opened `eltmon-z790` at the question's card ("Which color should the Android test pick?"). "Blue" and "Send" on the phone answered it, and the conversation replied "The Android test should pick Blue." After the page reload, `getLaunchUrl()` returned the same link again, and the guard skipped it. | [15](acceptance/15-android-cold-tap.png) — pass |
 | 5b | Warm tap (CP-3) | With the app in the foreground, a second question posted. Tapping it delivered the new link (`t=…18%3A27%3A50.700Z`) through `appUrlOpen`, and the app opened `/m?subject=20261104-8903` once. After that reload, `getLaunchUrl()` returned the older cold-launch link twice, and the guard skipped both, so there was no loop. | [17](acceptance/17-android-warm-tap.png) — pass |
+| 5c | Warm tap re-check | Run again from a cold-booted emulator, with a fresh conversation `20261104-4683`, the app on the machine list, and the shade cleared. AskUserQuestion at 18:48:14.343Z, push posted at 18:48:16.6Z, tap at 18:48:20.7Z. The link (`subject=20261104-4683`) opened that machine's `/m` screen once, with no loop. The screen again said "already answered": `GET /api/needs-you` had already dropped the question, which was still unanswered in the transcript. Filed as [#5048](https://github.com/eltmon/overdeck/issues/5048). | [18](acceptance/18-android-warm-tap-recheck.png) — routing pass; card blocked by #5048 |
 | 6 | Settings | Settings → Notifications showed `On`, with the shared pause and notification-type controls. | [16](acceptance/16-android-settings-notifications.png) — pass |
 
-The test conversation (`20261104-8903`) was stopped and archived after the run.
+The test conversations (`20261104-8903`, `20261104-9149`, `20261104-4683`) were stopped and archived
+after the run.
 
 ### Notes from the run
 
-- **Warm-tap card not shown.** The warm tap opened the right screen, but it showed "This question
-  was already answered." The question stayed unanswered in the conversation transcript, but the
-  machine's `GET /api/needs-you` and the conversation's pending-question field were already empty.
-  That is machine-side needs-you state, not the phone's routing. It was not investigated further
-  here.
+- **Warm-tap card not shown.** Both warm taps opened the right screen, but it showed "This question
+  was already answered." Each question stayed unanswered in its conversation transcript, but the
+  machine's `GET /api/needs-you` and the conversation's pending-question field were already empty
+  seconds after the push. That is machine-side needs-you state, not the phone's routing:
+  [#5048](https://github.com/eltmon/overdeck/issues/5048).
+- **Quick-boot restore loses pushes.** After `adb emu kill` saved a quick-boot snapshot, the restored
+  emulator showed Play services connected to `mtalk.google.com`, but a test push and a question
+  (`20261104-9149`) the machine reported as delivered never arrived. After a cold boot
+  (`-no-snapshot-load`), pushes arrived again within seconds. Cold-boot the emulator for push tests.
 - **Notification grouping.** Android 16 grouped two or more Overdeck notifications under one
   summary. Each child keeps its own tag and tap target.
 - **Debug-build logging.** In a debug build, Capacitor's bridge writes plugin return values to

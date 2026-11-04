@@ -279,6 +279,46 @@ describe('startPush on Android (PAN-4840)', () => {
     expect(sent).toEqual([{ type: 'push-register', platform: 'android', token: TOKEN }]);
   });
 
+  it('does not register when Android says denied', async () => {
+    const fake = fakePlugin('prompt', 'denied');
+    const { directory } = fakeDirectory('online');
+    const push = startPush({ directory, platform: 'android', plugin: fake.plugin, keys, overdeckPush: firebase(true), log: () => {} });
+    await settle();
+    expect(fake.plugin.requestPermissions).toHaveBeenCalledTimes(1);
+    expect(fake.plugin.register).not.toHaveBeenCalled();
+    expect(push.permission).toBe('denied');
+  });
+
+  it('sends one push-register per change into online and one per new token', async () => {
+    const fake = fakePlugin();
+    const { directory, sent } = fakeDirectory('connecting');
+    startPush({ directory, platform: 'android', plugin: fake.plugin, keys, overdeckPush: firebase(true), log: () => {} });
+    await settle();
+    fake.emit('registration', { value: TOKEN });
+    await settle();
+    expect(sent).toEqual([]);
+
+    const frame = { type: 'push-register', platform: 'android', token: TOKEN };
+    directory.set('online');
+    await settle();
+    expect(sent).toEqual([frame]);
+
+    // A machine-list update repeats the unchanged state.
+    directory.set('online');
+    await settle();
+    expect(sent).toHaveLength(1);
+
+    directory.set('connecting');
+    directory.set('online');
+    await settle();
+    expect(sent).toEqual([frame, frame]);
+
+    const next = 'f9e8d7c6'.repeat(8);
+    fake.emit('registration', { value: next });
+    await settle();
+    expect(sent).toEqual([frame, frame, { type: 'push-register', platform: 'android', token: next }]);
+  });
+
   it('treats a failing status call as unavailable', async () => {
     const fake = fakePlugin();
     const { directory } = fakeDirectory('online');
