@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4940",
   "created": "2026-11-04T04:28:29.563Z",
-  "updated": "2026-11-04T04:55:23.689Z",
+  "updated": "2026-11-04T05:13:13.630Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -16,9 +16,10 @@
       "doneAt": "2026-11-04T04:55:15.091Z"
     },
     "mem-add-route": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4940",
-      "claimedAt": "2026-11-04T04:55:23.689Z"
+      "claimedAt": "2026-11-04T04:55:23.689Z",
+      "doneAt": "2026-11-04T05:13:13.630Z"
     }
   }
 }
