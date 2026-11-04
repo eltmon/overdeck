@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4945",
   "created": "2026-11-04T01:22:40.341Z",
-  "updated": "2026-11-04T02:56:26.478Z",
+  "updated": "2026-11-04T02:56:43.314Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -234,6 +234,10 @@
     "routes-token-revoke.ac2": {
       "status": "completed",
       "doneAt": "2026-11-04T02:56:26.478Z"
+    },
+    "routes-token-revoke.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T02:56:43.314Z"
     }
   }
 }
