@@ -13,12 +13,14 @@
  * D-7: fixed windows from a key's first request (`public-mcp-rate-limit.ts`).
  * D-8: one activity entry per request while the switch is on, failures
  * included (status 500). It never reads a request body and never logs a token,
- * a code or a header value; the only identifier is the OAuth client id.
+ * a code or a header value; the only identifier is the OAuth client id, and a
+ * `client_id` query value that is not a minted client id is logged as null.
  */
 import { Effect, Exit } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { emitActivityEntry, type EmitActivityOptions } from '../../lib/activity-logger.js';
+import { CLIENT_ID_PREFIX } from '../../lib/mcp/oauth-flow.js';
 import { isPublicMcpEnabled, publicMcpSurface } from '../../lib/mcp/public-mcp.js';
 import { jsonResponse } from './http-helpers.js';
 import { createFixedWindowLimiter, type FixedWindowLimiter } from './public-mcp-rate-limit.js';
@@ -28,6 +30,8 @@ import { getHeaderFromMap, type HeaderMap } from './routes/origin-validation.js'
 const MCP_LIMIT = 60;
 const POLL_LIMIT = 60;
 const IP_LIMIT = 20;
+/** The shape `registerClient` mints; any other `client_id` from the public authorize URL is audited as null. */
+const CLIENT_ID_SHAPE = new RegExp(`^${CLIENT_ID_PREFIX}[0-9a-f]{32}$`);
 
 export interface PublicMcpFunnelDeps {
   limiter: FixedWindowLimiter;
@@ -57,9 +61,11 @@ export function makePublicMcpFunnelLayer(deps: PublicMcpFunnelDeps) {
           : surface === 'GET /oauth/mcp/authorize/status'
             ? [`poll:${ip}`, POLL_LIMIT]
             : [`ip:${ip}`, IP_LIMIT];
+        const queryClientId = surface === 'GET /oauth/mcp/authorize'
+          ? new URL(request.url, 'http://localhost').searchParams.get('client_id')
+          : null;
         const clientId = oauthClientId
-          ?? (surface === 'GET /oauth/mcp/authorize' ? new URL(request.url, 'http://localhost').searchParams.get('client_id') : null)
-          ?? null;
+          ?? (queryClientId !== null && CLIENT_ID_SHAPE.test(queryClientId) ? queryClientId : null);
         const audit = (status: number) => deps.audit({
           source: 'dashboard',
           level: status === 429 ? 'warn' : 'info',

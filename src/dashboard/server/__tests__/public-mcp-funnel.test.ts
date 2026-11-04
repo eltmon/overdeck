@@ -173,6 +173,15 @@ describe('public MCP Funnel middleware (PAN-4947)', () => {
     });
   });
 
+  it.each(['x'.repeat(5000), 'odc_short', `odc_${'A'.repeat(32)}`, 'evil\nline'])(
+    'audits a malformed authorize client_id as null (%#)',
+    async (clientId) => {
+      await send('GET', `/oauth/mcp/authorize?client_id=${encodeURIComponent(clientId)}&state=s`);
+      expect(audit).toHaveBeenCalledOnce();
+      expect(audit.mock.calls[0]?.[0].details).toBe('{"clientId":null}');
+    },
+  );
+
   it('audits a failing route once with status 500 and lets the failure through', async () => {
     const failing = HttpRouter.add('POST', '/oauth/mcp/revoke', Effect.die(new Error('boom')));
     const layer = makeApp(failing);

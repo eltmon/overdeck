@@ -896,7 +896,9 @@ unknown id and a wrong secret get the same `404`. The management routes
 (`/api/triggers`, `routes/triggers.ts`) stay behind the gate at the default
 `admin` scope.
 
-**A Funnel request reaches only `POST /hooks/*`.** Tailscale Funnel proxies
+**A Funnel request reaches only `POST /hooks/*`** (plus the nine public MCP
+surfaces while `mcp.public.enabled` is on; see "Public MCP (PAN-4947)" below).
+Tailscale Funnel proxies
 public traffic to `127.0.0.1`, so with the default `require_token_mint: false` a
 funneled request would look like the local operator. Every funneled request
 carries `Tailscale-Funnel-Request: ?1`: tailscaled deletes any client-sent copy
@@ -905,7 +907,8 @@ header cannot be forged through Funnel. `isTailscaleFunnelRequest` in
 `routes/dashboard-auth.ts` detects it, and:
 
 - the remote request gate answers **404** `{ "error": "not found" }` to a Funnel
-  request for any method or (normalized) path other than `POST /hooks/*`, before
+  request for any method or (normalized) path other than `POST /hooks/*` and,
+  while Public MCP is on, the nine public MCP surfaces (exact raw path), before
   any credential check, and `isTrustedLocalRequest` is never true for one;
 - the session mint (`rejectUnauthorizedDashboardSessionMintRequest`) never
   treats a Funnel request as a trusted peer;
@@ -930,8 +933,10 @@ stay 404. The switch is read from the operator's global `config.yaml` only
 - `public-mcp-funnel.ts`, a second global middleware, rate-limits each admitted
   request (60 per minute per OAuth token on `/mcp`, 60 per minute per
   `x-forwarded-for` address for the authorize status poll, 20 per minute per
-  address otherwise; **429** with `Retry-After`) and writes one activity entry
-  per request with the OAuth client id and never a token. It re-checks the
+  address otherwise; **429** with `Retry-After`) and writes one best-effort
+  activity entry per request (`emitActivityEntry` drops a failed write) with the
+  OAuth client id and never a token; an authorize `client_id` that is not
+  `odc_` plus 32 hex characters is logged as null. It re-checks the
   gate's admit condition itself, so the order of the two middlewares does not
   matter;
 - `GET`/`PUT /api/mcp/public` (`routes/mcp-public.ts`, internal token or root

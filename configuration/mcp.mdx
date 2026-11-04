@@ -359,7 +359,9 @@ tailscale funnel --https=8443 --set-path=/oauth off
 Give the bot the public URL `https://<machine>.<tailnet>.ts.net:8443/mcp`.
 
 **What is reachable.** While the switch is on, a Funnel request reaches only
-these nine surfaces, matched on the exact path; everything else gets 404:
+these nine surfaces, matched on the exact path, plus the trigger route
+`POST /hooks/*`, which Funnel reaches whether or not Public MCP is on (see
+Triggers). Every other path gets 404:
 
 - `POST /mcp`
 - `GET /.well-known/oauth-protected-resource`
@@ -380,20 +382,25 @@ first request:
 
 | Requests | Limit |
 | --- | --- |
-| `POST /mcp` with an OAuth sign-in | 60 per minute per sign-in |
+| `POST /mcp` with an OAuth sign-in | 60 per minute per access token |
 | `GET /oauth/mcp/authorize/status` (the sign-in page's status checks) | 60 per minute per address |
 | Every other public surface | 20 per minute per address |
 
 Over a limit, the answer is 429 `{ "error": "rate_limited" }` with a
-`Retry-After` header.
+`Retry-After` header. The `/mcp` limit counts per access token, so a refresh,
+which replaces the access token, starts a new count.
 
-**Audit.** Every public request writes one entry to the activity feed:
+**Audit.** Every public request writes one entry to the activity feed, on a
+best-effort basis: the write never delays or fails the request, so an entry can
+be missing if the activity store is unavailable at that moment. Each entry reads
 `Public MCP <METHOD> <path> <status>`, with the OAuth client id when there is
-one. No entry carries a token, a code or a request body. The sign-in page checks
-its status every 2 seconds, so a sign-in that waits for you writes one entry
-each time.
+one (a `client_id` that is not an Overdeck client id is recorded as none). No
+entry carries a token, a code or a request body. The sign-in page checks its
+status every 2 seconds, so a sign-in that waits for you writes one entry each
+time.
 
-**Turning it off** makes Funnel requests get 404 again. It does not end any
+**Turning it off** makes Funnel requests to these nine surfaces get 404 again;
+`POST /hooks/*` keeps working for triggers. It does not end any
 sign-in: approved apps keep working on the tailnet and this machine. End a
 sign-in under **Settings → Access Tokens → Sign-ins** or with
 `pan mcp oauth revoke <sign-in id>` (see Revoking below).
