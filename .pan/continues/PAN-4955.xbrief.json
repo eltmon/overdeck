@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4955",
   "created": "2026-11-04T14:23:26.498Z",
-  "updated": "2026-11-04T14:53:02.823Z",
+  "updated": "2026-11-04T14:53:15.501Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -48,6 +48,10 @@
     "manifest.ac1": {
       "status": "completed",
       "doneAt": "2026-11-04T14:53:02.823Z"
+    },
+    "manifest.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:53:15.501Z"
     }
   }
 }
