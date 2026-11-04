@@ -5,7 +5,7 @@ import { networkInterfaces, type NetworkInterfaceInfo } from 'node:os';
 import { Option } from 'effect';
 import { HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 
-import { scopeSatisfies, verifyAccessToken, type AccessTokenScope, type MachineAccess } from '../../../lib/access-tokens.js';
+import { CONNECTOR_SCOPE_CHOICES, scopeSatisfies, verifyAccessToken, type AccessTokenScope, type MachineAccess } from '../../../lib/access-tokens.js';
 import { effectiveScopes, LINK_ACTOR_HEADER, LINK_CEILING_HEADER, type LinkActor, parseLinkActor } from '../../../lib/anywhere/link-actor.js';
 import { getInternalToken, INTERNAL_TOKEN_HEADER } from '../../../lib/internal-token.js';
 import { readRemoteAccessConfig } from '../../../lib/remote-access/config.js';
@@ -149,15 +149,18 @@ export function hasDashboardInternalToken(request: HttpServerRequest.HttpServerR
  * stamp's ceiling. A `phone` credential (PAN-4835) likewise exists only
  * inside a link-mode channel bound to its `phoneKey`, carries its record's
  * scopes unnarrowed (a phone sends no actor stamp or ceiling header), and
- * never carries `admin` or `forward`.
+ * never carries `admin` or `forward`. A `connector` credential (PAN-4927 D-17)
+ * exists only inside a link-mode channel bound to its `connectorKey` and carries
+ * only the record's scopes that are in `CONNECTOR_SCOPE_CHOICES`.
  */
 export type DashboardCredential =
   | { kind: 'internal-token' }
   | { kind: 'root-session' }
   | { kind: 'device'; deviceId: string; scopes: AccessTokenScope[] }
-  | { kind: 'token'; tokenId: string; scopes: AccessTokenScope[]; agentId?: string; agentKind?: 'agent' | 'conversation'; role?: string }
+  | { kind: 'token'; tokenId: string; scopes: AccessTokenScope[]; agentId?: string; agentKind?: 'agent' | 'conversation'; role?: string; oauthClientId?: string }
   | { kind: 'machine'; tokenId: string; environmentId: string; scopes: AccessTokenScope[]; actor: LinkActor; access: MachineAccess }
-  | { kind: 'phone'; tokenId: string; clientId: string; phoneKey: string; scopes: AccessTokenScope[] };
+  | { kind: 'phone'; tokenId: string; clientId: string; phoneKey: string; scopes: AccessTokenScope[] }
+  | { kind: 'connector'; tokenId: string; clientId: string; connectorKey: string; scopes: AccessTokenScope[] };
 
 /** The scopes a credential grants: `['admin']` for root credentials, else the record's scopes. */
 export function credentialScopes(credential: DashboardCredential): readonly string[] {
@@ -178,6 +181,8 @@ export function dashboardDeviceTokenFromHeaders(headers: HeaderMap): string | un
  * `null` there (NFR-2). On a plain socket a `machine` or `phone` record never
  * resolves. (`verifyAccessToken` stamps `lastUsedAt` before this check, so a
  * refused machine or phone presentation still updates the timestamp; harmless.)
+ * A `connector` record resolves the same way as a phone, bound to its
+ * `connectorKey`, and never on a plain socket (PAN-4927 D-17).
  */
 export function resolveDashboardCredential(headers: HeaderMap, channel: ChannelMarker | null = null): DashboardCredential | null {
   if (channel !== null) {
@@ -188,6 +193,12 @@ export function resolveDashboardCredential(headers: HeaderMap, channel: ChannelM
     if (record.kind === 'phone') {
       if (record.phoneKey !== channel.remoteKeyHex || !record.clientId) return null;
       return { kind: 'phone', tokenId: record.id, clientId: record.clientId, phoneKey: record.phoneKey, scopes: record.scopes };
+    }
+    if (record.kind === 'connector') {
+      if (record.connectorKey !== channel.remoteKeyHex || !record.clientId) return null;
+      // PAN-4927 D-5: only the connector choices count, even on a hand-edited record.
+      const scopes = record.scopes.filter((scope) => CONNECTOR_SCOPE_CHOICES.includes(scope));
+      return { kind: 'connector', tokenId: record.id, clientId: record.clientId, connectorKey: record.connectorKey, scopes };
     }
     if (record.kind !== 'machine' || record.machineKey !== channel.remoteKeyHex || !record.environmentId || !record.access) return null;
     const { actor, ceiling } = parseLinkActor(
@@ -217,11 +228,15 @@ export function resolveDashboardCredential(headers: HeaderMap, channel: ChannelM
   if (record.kind === 'machine') return null;
   // PAN-4835 FR-3: a phone token authenticates only inside its link channel.
   if (record.kind === 'phone') return null;
+  // PAN-4927 D-17: a connector token authenticates only inside its link channel.
+  if (record.kind === 'connector') return null;
   if (record.kind === 'token') {
     // PAN-2351 D-9: a token authenticates only from the Bearer header.
     // PAN-4927 D-6: an agent token also names its agent; a plain token keeps the three keys.
+    // PAN-4945: an OAuth token also names its client.
     return cookieToken === undefined
-      ? { kind: 'token', tokenId: record.id, scopes: record.scopes, ...(record.agentId ? { agentId: record.agentId, agentKind: record.agentKind, role: record.role } : {}) }
+      ? { kind: 'token', tokenId: record.id, scopes: record.scopes, ...(record.agentId ? { agentId: record.agentId, agentKind: record.agentKind, role: record.role } : {}),
+          ...(record.oauthClientId ? { oauthClientId: record.oauthClientId } : {}) }
       : null;
   }
   // A record with no kind is a device (PAN-2351 FR-10).
@@ -273,8 +288,9 @@ export function rejectUnsafeDashboardMutationRequest(
   // Header-borne credentials cannot be sent by a cross-site form, so they skip
   // the Origin and CSRF checks (PAN-2351 FR-9). A token never arrives by cookie.
   // A phone's bearer rides a Noise-authenticated channel (PAN-4823 D-4), so it skips them too.
+  // A connector's bearer rides a Noise-authenticated channel too (PAN-4927 D-17).
   const credentialKind = resolveRequestCredential(request)?.kind;
-  if (credentialKind === 'internal-token' || credentialKind === 'token' || credentialKind === 'phone') return null;
+  if (credentialKind === 'internal-token' || credentialKind === 'token' || credentialKind === 'phone' || credentialKind === 'connector') return null;
 
   const origin = getHeaderFromMap(headers, 'origin');
   if (origin && !hasTrustedExactOrigin(headers)) {

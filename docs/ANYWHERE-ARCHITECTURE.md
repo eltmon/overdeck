@@ -317,6 +317,30 @@ active `machine` record or an active `phone` record
 (`findActiveChannelTokenByKey`), so a phone's handshake reaches HTTP the same
 way a linked machine's does.
 
+## Connector credentials (PAN-4927 W-CONN1)
+
+An Overdeck connector (the process a self-hosted bot runs) pairs once with one
+machine and then reaches it through a link-mode channel. Full detail — the
+`kind: 'connector'` record, its scopes, the routes and the cross-refusal —
+lives in `docs/DASHBOARD-AUTH.md` under "Connector credentials (PAN-4927
+W-CONN1)". The facts that belong here:
+
+- **Pairing string.** "Connect a bot" shows
+  `overdeck-connector:/pair#v=1&e=<environmentId>&k=<machineKeyHex>&c=<odp_code>`.
+  `packages/contracts/src/connector-pairing.ts` builds and parses it, next to
+  the phone link; the two formats never parse as each other.
+- **Intent store.** The code is an ordinary `odp_` pairing code. Its intent
+  (`{ name, scopes, expiresAt }`) is kept in memory by the code's pairingId
+  (`src/dashboard/server/connector-pairing.ts`), so the pairing channel's
+  marker is enough for the exchange to find it. A dashboard restart drops
+  intents and codes together.
+- **Handshake pin.** `isPinnedPeer` (`server.ts`) accepts a key held by an
+  active `machine`, `phone` or `connector` record
+  (`findActiveChannelTokenByKey`).
+- **One machine only.** Fleet routes and the linked-conversation proxy refuse
+  every channel caller, so a connector reaches only the machine it paired
+  with.
+
 ## Phone Live Activity (PAN-4839)
 
 The only phone data that leaves the secure channel in plain text is the two

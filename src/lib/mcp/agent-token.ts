@@ -25,6 +25,7 @@ import {
 } from '../access-tokens.js';
 import { getAgentDir, getAgentState } from '../agents/agent-state-read.js';
 import { normalizeAgentId } from '../agents/identity.js';
+import { removeAgentSecretsDir } from '../agents/state-dir-removal.js';
 import type { Role } from '../agents/role.js';
 
 export const AGENT_TOKEN_FILE = 'mcp-token';
@@ -129,7 +130,7 @@ export async function ensureAgentMcpToken(owner: AgentTokenOwner): Promise<{ tok
   throw new Error(`agent token for ${agentId} did not persist in the access-token registry`);
 }
 
-/** Revoke every active token of the owner and unlink its token file. Never throws; returns the count revoked. */
+/** Revoke every active token of the owner, unlink its token file and delete its `secrets/` directory (PAN-4941). Never throws; returns the count revoked. */
 export async function revokeAgentMcpTokens(agentId: string, opts: { agentKind?: 'agent' | 'conversation'; dir?: string } = {}): Promise<number> {
   const agentKind = opts.agentKind ?? 'agent';
   const id = ownerId(agentId, agentKind);
@@ -141,6 +142,7 @@ export async function revokeAgentMcpTokens(agentId: string, opts: { agentKind?: 
       await unlink(agentMcpTokenPath(dir)).catch((error: NodeJS.ErrnoException) => {
         if (error.code !== 'ENOENT') throw error;
       });
+      await removeAgentSecretsDir(dir);
     }
     return revoked.length;
   } catch (error) {

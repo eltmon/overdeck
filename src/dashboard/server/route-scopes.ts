@@ -138,6 +138,11 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   { method: 'POST', path: '/api/self/lanes', scope: 'operate' },
   { method: 'POST', path: '/api/self/lanes/wait', scope: 'read:state' },
   { method: 'POST', path: '/api/self/lanes/report', scope: 'tell' },
+  // PAN-4927 W-SEC1: secret requests; the handler also requires an agent token (D-10).
+  { method: 'POST', path: '/api/self/secret-requests', scope: 'tell' },
+  { method: 'GET', path: '/api/self/secret-requests/:id/wait', scope: 'read:state' },
+  { method: 'GET', path: '/api/agent-requests', scope: 'read:conversations' },
+  // POST /api/agent-requests/:id/secret and /decline have no row: root credentials only (D-4).
   // PAN-4650 WI-9: the owner's half of Pull here (a linked machine's operator only, checked by the routes).
   { method: 'POST', path: '/api/conversations/:name/release', scope: 'operate' },
   { method: 'GET', path: '/api/conversations/:name/release/transfer/:transferId', scope: 'operate' },
@@ -171,6 +176,8 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   { method: 'GET', path: '/api/activity', scope: 'read:state' },
   { method: 'PUT', path: '/api/phones/self/push-key', scope: 'tell' },
   { method: 'DELETE', path: '/api/phones/self', scope: 'tell' },
+  // PAN-4927 W-CONN1: a connector's logout (the handler also requires a connector credential).
+  { method: 'DELETE', path: '/api/connectors/self', scope: 'read:state' },
 ];
 
 /** `/ws/terminal` needs `operate`; every other WebSocket path keeps the `admin` default. */

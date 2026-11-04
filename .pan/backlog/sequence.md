@@ -1,12 +1,11 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-04T03:15:28.652812Z · model: claude-opus-5-5 · open: 883_
+_Last sequenced: 2026-11-04T04:41:21.849872Z · model: claude-opus-5-5 · open: 877_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-4702 | S | critical | ok |  |  | Merge gate orders reviews by skewed submitted_at, so a stale ancestor approval hides head approval; blocks 3 approved PRs. |
-| 3 | PAN-4970 | M | high | ok |  |  | Per-PR auto-merge and UAT batch reconciler race on same PRs: 30 generations invalidated in a day; Merge batch button silently 409s. |
 | 4 | PAN-4636 | S | critical | ok |  |  | Adopted outside PRs fail verification on the missing xBRIEF and the failure reaches nobody; stalls PAN-4630's PR silently. |
 | 5 | PAN-4553 | S | critical | ok |  |  | Duplicate of PAN-4929, now in review as PR #4963; close PAN-4553 when that PR merges. |
 | 6 | PAN-4733 | M | high | ok |  |  | Follow-up to closed PAN-4732: root-cause the title-bar spec, move 4 browser specs to a gating test-e2e lane, un-quarantine it. |
@@ -332,7 +331,7 @@ _Last sequenced: 2026-11-04T03:15:28.652812Z · model: claude-opus-5-5 · open: 
 | 328 | PAN-1480 | L | high | ok |  |  | TLDR: 93% bypass rate |
 | 329 | PAN-1479 | M | high | ok |  |  | RTK: Add telemetry to measure token savings from bash output compression |
 | 330 | PAN-2950 | L | high | ok |  |  | Refactor god files back under file-size ceilings after the UX overhaul |
-| 331 | PAN-4949 | M | medium | ok |  |  | Machine side of bot connectors: credential, pairing intents and exchange; W-TOK1 closed, so it is unblocked. Unblocks CONN2. |
+| 331 | PAN-4950 | M | medium | ok |  |  | pan mcp connector process bridging outside bots to /mcp; gates Hermes, OpenClaw and Grok Build plugins. |
 | 332 | PAN-2720 | M | high | ok |  |  | File-size ratchet counts lines, so it rewards line-packing on the god files it means to improve |
 | 333 | PAN-2650 | S | high | ok |  |  | Shed-stack half is moot (slot merges verify on host); remaining: pan swarm recover path for a stuck ready-to-merge slot. |
 | 334 | PAN-2358 | M | high | ok |  |  | PAN-2145 follow-up: restore PAN-1535 hardening in transformMessageForHarness (rewritten during conversations.ts decomposition) |
@@ -420,6 +419,7 @@ _Last sequenced: 2026-11-04T03:15:28.652812Z · model: claude-opus-5-5 · open: 
 | 417 | PAN-3890 | S | medium | ok |  |  | opencode provider stream errors (rate limit) are invisible in the feed and never retried; first message dies silently |
 | 418 | PAN-3822 | L | medium | ok |  |  | PRD landed (12 items, FR-1..14): link PRs to conversations via branch detection + explicit override; unblocks PAN-3920 |
 | 419 | PAN-4943 | S | medium | ok |  |  | Link and watch pull requests from an agent via MCP tools; W-SELF1 closed, now unblocked. |
+| 420 | PAN-4942 | S | medium | ok |  |  | link_machine tool: a conversation asks the operator to link a machine; request_secret closed, now unblocked. |
 | 421 | PAN-1673 | S | medium | ok |  |  | Regression: pi + gpt-5.5 fails with 'No API key for provider: openai-codex' (worked previously) |
 | 422 | PAN-1669 | S | medium | ok |  |  | restart-with-model doesn't emit a live event |
 | 423 | PAN-1668 | S | medium | ok |  |  | right-click 'restart with <model>' carries model only, never harness |
@@ -436,6 +436,7 @@ _Last sequenced: 2026-11-04T03:15:28.652812Z · model: claude-opus-5-5 · open: 
 | 434 | PAN-1461 | S | medium | ok |  |  | Conversation transcript: in-page search (Ctrl+F) only finds text in currently-rendered virtualized rows |
 | 435 | PAN-1449 | S | medium | ok |  |  | Memory extraction still failing; the live symptom PAN-4370 closed and PAN-4374 adds a working provider; layout half remains |
 | 436 | PAN-1446 | S | medium | ok |  |  | PAN-1231 follow-up: remove or implement Table + Timeline modes in FleetAgentsView (scope-creep stubs) |
+| 437 | PAN-4947 | L | medium | ok |  |  | Opt-in public /mcp via Tailscale Funnel, TLS ends on the user machine; OAuth server closed, now unblocked. |
 | 438 | PAN-1445 | S | medium | ok |  |  | PAN-1389 follow-up: remove or implement Files + Comments tabs in SessionFeedSidebar (scope-creep stubs) |
 | 439 | PAN-3616 | S | medium | ok |  |  | Planned deploy restarts show the alarm-toned Reconnecting banner; use the lifecycle signal for calm 'updating' copy. |
 | 440 | PAN-2982 | XS | medium | ok |  |  | Nothing runs a skill's own selftest when sync-sources/skills/** changes; a convoy passed a PR with its selftest red. |
@@ -871,22 +872,15 @@ _Last sequenced: 2026-11-04T03:15:28.652812Z · model: claude-opus-5-5 · open: 
 | 881 | PAN-4851 | S | low | needs-refinement |  |  | Open question: opt-in Overdeck reviewer for Deft-pipeline issues; operator says low priority, do not plan or start without them |
 | 882 | PAN-4887 | M | medium | ok |  |  | Phone app: let phone credentials reach linked machines (fleet Needs-you, linked-conv proxy, /ws/linked); PAN-4835 merged. |
 | 885 | PAN-4958 | S | low | ok |  |  | Docs for agent MCP and bot plugins; no hard deps but best written once Part A and B surfaces have landed. |
-| 889 | PAN-4944 | M | medium | ok |  |  | Approvals for every harness plus a fleet-wide pending list exposed as tools; needs only W-MCP1. |
-| 890 | PAN-4945 | L | medium | ok |  |  | OAuth 2.1 server for /mcp with access levels and expiry; gates dashboard OAuth UI, Funnel and Grok bot. |
 | 892 | PAN-4937 | M | medium | ok |  |  | Checklist, done, handoff and worker-report as MCP tools so agents stop shelling to pan over Bash. |
-| 895 | PAN-4941 | M | medium | ok |  |  | request_secret tool: agent asks operator for a secret without it entering the transcript; unblocks link_machine. |
 | 897 | PAN-4933 | S | medium | ok |  |  | Codex harness: write [mcp_servers.overdeck] so Codex agents get the Overdeck tools. |
-| 898 | PAN-4934 | S | medium | ok |  |  | ACP harnesses (acp, opencode) get the Overdeck MCP server injected. |
-| 899 | PAN-4942 | S | medium | ok |  | PAN-4941 | link_machine tool: a conversation asks the operator to link a machine; builds on request_secret. |
-| 900 | PAN-4946 | M | medium | ok |  | PAN-4945 | Dashboard OAuth approval card and sign-in list for /mcp clients. |
-| 901 | PAN-4950 | M | medium | ok |  | PAN-4949 | pan mcp connector process bridging outside bots to /mcp; gates Hermes, OpenClaw and Grok Build plugins. |
-| 902 | PAN-4951 | M | medium | ok |  | PAN-4949 | "Connect a bot" flow in Settings > Anywhere for pairing outside bots. |
-| 903 | PAN-4947 | L | medium | ok |  | PAN-4945 | Opt-in public /mcp via Tailscale Funnel, TLS ends on the user machine; no plaintext relay on overdeck.ai. |
+| 900 | PAN-4946 | M | medium | ok |  |  | Dashboard OAuth approval card and sign-in list for /mcp clients. |
+| 902 | PAN-4951 | M | medium | ok |  |  | "Connect a bot" flow in Settings > Anywhere for pairing outside bots. |
 | 904 | PAN-4953 | M | medium | ok |  | PAN-4950 | integrations/hermes/: Hermes plugin with its own revocable scoped token. |
 | 905 | PAN-4954 | M | medium | ok |  | PAN-4950 | integrations/openclaw/: OpenClaw plugin with its own revocable scoped token. |
 | 906 | PAN-4955 | S | medium | ok |  | PAN-4950 | integrations/grok-build/: Grok Build plugin with its own revocable scoped token. |
 | 907 | PAN-4956 | S | low | ok |  | PAN-4946, PAN-4947 | integrations/grok-bot/ and xAI API example; needs OAuth UI and public Funnel /mcp, not the connector. |
-| 908 | PAN-4935 | M | medium | ok |  | PAN-4937, PAN-4938, PAN-4940, PAN-4941, PAN-4942, PAN-4943, PAN-4944 | Instruction blocks and no-MCP fallback; lands last in Part A since it documents every tool to agents. |
+| 908 | PAN-4935 | M | medium | ok |  | PAN-4937, PAN-4938, PAN-4940, PAN-4942, PAN-4943 | Instruction blocks and no-MCP fallback; lands last in Part A since it documents every tool to agents. |
 | 909 | PAN-4957 | S | low | ok |  | PAN-4953, PAN-4954, PAN-4955, PAN-4956 | CI for the four integration packages; lands after all integrations exist. |
 
 ## Rationale detail
@@ -894,10 +888,6 @@ _Last sequenced: 2026-11-04T03:15:28.652812Z · model: claude-opus-5-5 · open: 
 ### PAN-4702 (rank 1)
 
 New substrate bug in the merge door: on 2026-11-01 it refused three approved, green PRs (#4699, #4692, #4686) because latestTrustedVerdicts in pr-facts.ts ranks a reviewer's verdicts by submitted_at, and GitHub returned future-skewed timestamps for stale approvals on ancestor commits. It blocks merging for in-pipeline PAN-4649, PAN-4681 and PAN-4641, so it takes the free rank 1 with no other node moving. It carries needs-handoff (TENET-10), so it runs as a supervised strike, never an autonomous Flywheel pickup.
-
-### PAN-4970 (rank 3)
-
-New in-pipeline substrate-improvement bug filed 2026-11-03: the per-PR auto-merge train and the UAT batch reconciler both act on the same ready Overdeck PRs, so every per-PR merge invalidates the current batch and the Merge train page offers a promote action that returns 409 without telling the operator. PRs still land through the per-PR path, so this is high rather than critical, but it makes merge ownership and deploy units unclear. It takes the free rank 3 because in-pipeline work is pinned at the top, and no other node moves. The fix direction and acceptance tests are concrete, so condition is ok.
 
 ### PAN-4636 (rank 4)
 
@@ -1211,6 +1201,10 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
 
 New this pass. The test role evaluates the workspace working tree rather than the reviewed commit, so a live work agent's in-progress uncommitted edits are counted against the issue — the gate's own artifact diagnosed it exactly, failing on a file the reviewed commit never touched. Combined with PAN-3104, which replays the stale artifact, it becomes a durable trap.
 
+### PAN-4213 (rank 82)
+
+Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066 merged, so these seven follow-ups now harden code that is on main. Items 2 and 5 are real merge-path correctness hazards: a success status can sit on a head that never landed, and git reset --keep can move an agent commit off its branch. Each item names its file, so the work is well defined and is now startable.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1218,10 +1212,10 @@ New this pass. The test role evaluates the workspace working tree rather than th
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-04T03:15:28.652812Z",
+  "generatedAt": "2026-11-04T04:41:21.849872Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 883,
+  "openCount": 877,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -4602,6 +4596,19 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "planning": "auto"
     },
     {
+      "issue": "PAN-4926",
+      "rank": 269,
+      "size": "XS",
+      "importance": "medium",
+      "score": 64,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan down SIGTERMs the smee pidfile PID without verifying it is smee; a reused PID kills an unrelated process. XS guard + test.",
+      "rationale": "New since prior run: a small safety fix with an exact recipe (reuse the isSmeeCommand cmdline guard), placed in the free rank 269 slot.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-2243",
       "rank": 270,
       "size": "S",
@@ -5276,6 +5283,20 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "planning": "auto"
     },
     {
+      "issue": "PAN-4927",
+      "rank": 324,
+      "size": "XL",
+      "importance": "medium",
+      "score": 58,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Epic: Overdeck MCP in every managed agent, OAuth /mcp, Hermes/OpenClaw/Grok plugins; W-SELF1 closed, 29 children filed.",
+      "rationale": "The PRD (.pan/drafts/pan-4927.md) is written and child issues were filed per work item, so the epic is ok and keeps rank 324. Roots W-TOK1, W-MCP1 and W-SELF1 have closed; W-SELF1 closing unblocks W-DEL1, W-MEM1 and W-PR1, lifted to the 396-419 band. W-INJ2 (PAN-4934), request_secret (PAN-4941) and the OAuth server (PAN-4945) closed 2026-11-04, unblocking W-LINK1, W-OAUTH2 and W-FUN1.",
+      "gate": "auto",
+      "planning": "auto",
+      "isEpic": true
+    },
+    {
       "issue": "PAN-1553",
       "rank": 326,
       "size": "M",
@@ -5334,6 +5355,19 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "why": "Refactor god files back under file-size ceilings after the UX overhaul",
       "gate": "auto",
       "planning": "interactive"
+    },
+    {
+      "issue": "PAN-4950",
+      "rank": 331,
+      "size": "M",
+      "importance": "medium",
+      "score": 44,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan mcp connector process bridging outside bots to /mcp; gates Hermes, OpenClaw and Grok Build plugins.",
+      "rationale": "Its only dependency PAN-4949 (W-CONN1) closed on 2026-11-04, so this now-unblocked connector bridge moves from the tail into slot 331, which PAN-4949 vacated next to the epic.",
+      "gate": "auto",
+      "planning": "auto"
     },
     {
       "issue": "PAN-2720",
@@ -6102,6 +6136,19 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "planning": "auto"
     },
     {
+      "issue": "PAN-4938",
+      "rank": 396,
+      "size": "M",
+      "importance": "medium",
+      "score": 50,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Delegation, lanes, issue start and conversation stop/interrupt as MCP tools; W-SELF1 closed, now unblocked.",
+      "rationale": "Its only dependency, W-SELF1 (PAN-4936), closed as completed, so this child is now workable and moves up from the tail into the slot band W-SELF1 held.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-3829",
       "rank": 397,
       "size": "L",
@@ -6135,6 +6182,19 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "condition": "ok",
       "dependsOn": [],
       "why": "work agents skip `pan done` (manual push instead)",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4940",
+      "rank": 400,
+      "size": "S",
+      "importance": "medium",
+      "score": 44,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Memory add and search as MCP tools scoped to the calling agent; W-SELF1 closed, now unblocked.",
+      "rationale": "Its only dependency, W-SELF1 (PAN-4936), closed as completed, so this child is now workable and moves up from the tail into the slot band W-SELF1 held.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6358,6 +6418,32 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "planning": "auto"
     },
     {
+      "issue": "PAN-4943",
+      "rank": 419,
+      "size": "S",
+      "importance": "medium",
+      "score": 43,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Link and watch pull requests from an agent via MCP tools; W-SELF1 closed, now unblocked.",
+      "rationale": "Its only dependency, W-SELF1 (PAN-4936), closed as completed, so this child is now workable and moves up from the tail into the slot band W-SELF1 held.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4942",
+      "rank": 420,
+      "size": "S",
+      "importance": "medium",
+      "score": 40,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "link_machine tool: a conversation asks the operator to link a machine; request_secret closed, now unblocked.",
+      "rationale": "Its only dependency, request_secret (PAN-4941), closed as completed, so this child is now workable and moves from the tail into a free slot in the epic's band.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-1673",
       "rank": 421,
       "size": "S",
@@ -6555,6 +6641,19 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "planning": "auto"
     },
     {
+      "issue": "PAN-4947",
+      "rank": 437,
+      "size": "L",
+      "importance": "medium",
+      "score": 38,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Opt-in public /mcp via Tailscale Funnel, TLS ends on the user machine; OAuth server closed, now unblocked.",
+      "rationale": "Its only dependency, the /mcp OAuth server (PAN-4945), closed as completed, so this child is now workable and moves from the tail into a free slot in the epic's band.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-1445",
       "rank": 438,
       "size": "S",
@@ -6699,6 +6798,19 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "condition": "ok",
       "dependsOn": [],
       "why": "CLI cannot address planning-*/specialist-* sessions",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4971",
+      "rank": 450,
+      "size": "S",
+      "importance": "medium",
+      "score": 48,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Viewer header shows only host + count; roster of all participants with host/controller marked. Frontend-only, payload exists.",
+      "rationale": "New issue filed by the PAN-4482 acceptance sweep; placed beside PAN-4482 since it closes the PAN-658 FR-6/AC-7 gap that sweep found.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -8534,6 +8646,19 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "dependsOn": [],
       "why": "Rescoped: Awareness rail should show conv-flywheel as the Flywheel with its last tick (derive-status.ts) and link to /flywheel.",
       "rationale": "Rank held at 601: the rescope comment names the concrete data source (deriveFlywheelStatus/findLastTick) and target route, so condition moves from needs-refinement to ok.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4960",
+      "rank": 603,
+      "size": "M",
+      "importance": "medium",
+      "score": 30,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Dashboard Settings → Anywhere Account card with PKCE sign-in; no code deps (the PAN-4959 page it linked to has closed).",
+      "rationale": "PAN-4959 closed since the prior run; the informs edge is dropped and rank holds.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11870,33 +11995,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "planning": "auto"
     },
     {
-      "issue": "PAN-4926",
-      "rank": 269,
-      "size": "XS",
-      "importance": "medium",
-      "score": 64,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan down SIGTERMs the smee pidfile PID without verifying it is smee; a reused PID kills an unrelated process. XS guard + test.",
-      "rationale": "New since prior run: a small safety fix with an exact recipe (reuse the isSmeeCommand cmdline guard), placed in the free rank 269 slot.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4927",
-      "rank": 324,
-      "size": "XL",
-      "importance": "medium",
-      "score": 58,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Epic: Overdeck MCP in every managed agent, OAuth /mcp, Hermes/OpenClaw/Grok plugins; W-SELF1 closed, 29 children filed.",
-      "rationale": "The PRD (.pan/drafts/pan-4927.md) is written and child issues were filed per work item, so the epic is ok and keeps rank 324. Roots W-TOK1, W-MCP1 and W-SELF1 have closed; W-SELF1 closing unblocks W-DEL1, W-MEM1 and W-PR1, lifted to the 396-419 band.",
-      "gate": "auto",
-      "planning": "auto",
-      "isEpic": true
-    },
-    {
       "issue": "PAN-4958",
       "rank": 885,
       "size": "S",
@@ -11906,45 +12004,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "dependsOn": [],
       "why": "Docs for agent MCP and bot plugins; no hard deps but best written once Part A and B surfaces have landed.",
       "rationale": "New child W-DOC of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4944",
-      "rank": 889,
-      "size": "M",
-      "importance": "medium",
-      "score": 48,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Approvals for every harness plus a fleet-wide pending list exposed as tools; needs only W-MCP1.",
-      "rationale": "New child W-APPR1 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4945",
-      "rank": 890,
-      "size": "L",
-      "importance": "medium",
-      "score": 47,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "OAuth 2.1 server for /mcp with access levels and expiry; gates dashboard OAuth UI, Funnel and Grok bot.",
-      "rationale": "New child W-OAUTH1 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4949",
-      "rank": 331,
-      "size": "M",
-      "importance": "medium",
-      "score": 46,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Machine side of bot connectors: credential, pairing intents and exchange; W-TOK1 closed, so it is unblocked. Unblocks CONN2.",
-      "rationale": "Its only dependency PAN-4930 (W-TOK1) closed on 2026-11-04, so this unblocked root of the bot-connector track moves from the tail into slot 331, which PAN-4930 vacated next to the epic.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11962,58 +12021,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "planning": "auto"
     },
     {
-      "issue": "PAN-4938",
-      "rank": 396,
-      "size": "M",
-      "importance": "medium",
-      "score": 50,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Delegation, lanes, issue start and conversation stop/interrupt as MCP tools; W-SELF1 closed, now unblocked.",
-      "rationale": "Its only dependency, W-SELF1 (PAN-4936), closed as completed, so this child is now workable and moves up from the tail into the slot band W-SELF1 held.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4940",
-      "rank": 400,
-      "size": "S",
-      "importance": "medium",
-      "score": 44,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Memory add and search as MCP tools scoped to the calling agent; W-SELF1 closed, now unblocked.",
-      "rationale": "Its only dependency, W-SELF1 (PAN-4936), closed as completed, so this child is now workable and moves up from the tail into the slot band W-SELF1 held.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4941",
-      "rank": 895,
-      "size": "M",
-      "importance": "medium",
-      "score": 45,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "request_secret tool: agent asks operator for a secret without it entering the transcript; unblocks link_machine.",
-      "rationale": "New child W-SEC1 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4943",
-      "rank": 419,
-      "size": "S",
-      "importance": "medium",
-      "score": 43,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Link and watch pull requests from an agent via MCP tools; W-SELF1 closed, now unblocked.",
-      "rationale": "Its only dependency, W-SELF1 (PAN-4936), closed as completed, so this child is now workable and moves up from the tail into the slot band W-SELF1 held.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4933",
       "rank": 897,
       "size": "S",
@@ -12027,60 +12034,15 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "planning": "auto"
     },
     {
-      "issue": "PAN-4934",
-      "rank": 898,
-      "size": "S",
-      "importance": "medium",
-      "score": 44,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "ACP harnesses (acp, opencode) get the Overdeck MCP server injected.",
-      "rationale": "New child W-INJ3 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4942",
-      "rank": 899,
-      "size": "S",
-      "importance": "medium",
-      "score": 40,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-4941"
-      ],
-      "why": "link_machine tool: a conversation asks the operator to link a machine; builds on request_secret.",
-      "rationale": "New child W-LINK1 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4946",
       "rank": 900,
       "size": "M",
       "importance": "medium",
       "score": 42,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4945"
-      ],
+      "dependsOn": [],
       "why": "Dashboard OAuth approval card and sign-in list for /mcp clients.",
       "rationale": "New child W-OAUTH2 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4950",
-      "rank": 901,
-      "size": "M",
-      "importance": "medium",
-      "score": 44,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-4949"
-      ],
-      "why": "pan mcp connector process bridging outside bots to /mcp; gates Hermes, OpenClaw and Grok Build plugins.",
-      "rationale": "PAN-4931 and PAN-4948 closed since the prior run; still waits on PAN-4949, so rank holds.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12091,26 +12053,9 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "importance": "medium",
       "score": 40,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-4949"
-      ],
+      "dependsOn": [],
       "why": "\"Connect a bot\" flow in Settings > Anywhere for pairing outside bots.",
       "rationale": "New child W-BOT1 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4947",
-      "rank": 903,
-      "size": "L",
-      "importance": "medium",
-      "score": 38,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-4945"
-      ],
-      "why": "Opt-in public /mcp via Tailscale Funnel, TLS ends on the user machine; no plaintext relay on overdeck.ai.",
-      "rationale": "New child W-FUN1 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic. Dependency PAN-4932 (W-INJ1) closed 2026-11-04; rank unchanged.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12186,13 +12131,11 @@ New this pass. The test role evaluates the workspace working tree rather than th
         "PAN-4937",
         "PAN-4938",
         "PAN-4940",
-        "PAN-4941",
         "PAN-4942",
-        "PAN-4943",
-        "PAN-4944"
+        "PAN-4943"
       ],
       "why": "Instruction blocks and no-MCP fallback; lands last in Part A since it documents every tool to agents.",
-      "rationale": "New child W-INJ4 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic. Dependency PAN-4939 (W-SCHED1) closed 2026-11-04; rank unchanged since other Part A tools remain open. Dependency PAN-4932 (W-INJ1) closed 2026-11-04; rank unchanged.",
+      "rationale": "New child W-INJ4 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic. Dependency PAN-4939 (W-SCHED1) closed 2026-11-04; rank unchanged since other Part A tools remain open. Dependency PAN-4932 (W-INJ1) closed 2026-11-04; rank unchanged. Dependency PAN-4941 (request_secret) closed 2026-11-04; rank unchanged since other Part A tools remain open.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12211,45 +12154,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       ],
       "why": "CI for the four integration packages; lands after all integrations exist.",
       "rationale": "New child W-CI1 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4960",
-      "rank": 603,
-      "size": "M",
-      "importance": "medium",
-      "score": 30,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Dashboard Settings → Anywhere Account card with PKCE sign-in; no code deps (the PAN-4959 page it linked to has closed).",
-      "rationale": "PAN-4959 closed since the prior run; the informs edge is dropped and rank holds.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4970",
-      "rank": 3,
-      "size": "M",
-      "importance": "high",
-      "score": 78,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Per-PR auto-merge and UAT batch reconciler race on same PRs: 30 generations invalidated in a day; Merge batch button silently 409s.",
-      "rationale": "New in-pipeline substrate-improvement bug filed 2026-11-03: the per-PR auto-merge train and the UAT batch reconciler both act on the same ready Overdeck PRs, so every per-PR merge invalidates the current batch and the Merge train page offers a promote action that returns 409 without telling the operator. PRs still land through the per-PR path, so this is high rather than critical, but it makes merge ownership and deploy units unclear. It takes the free rank 3 because in-pipeline work is pinned at the top, and no other node moves. The fix direction and acceptance tests are concrete, so condition is ok.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4971",
-      "rank": 450,
-      "size": "S",
-      "importance": "medium",
-      "score": 48,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Viewer header shows only host + count; roster of all participants with host/controller marked. Frontend-only, payload exists.",
-      "rationale": "New issue filed by the PAN-4482 acceptance sweep; placed beside PAN-4482 since it closes the PAN-658 FR-6/AC-7 gap that sweep found.",
       "gate": "auto",
       "planning": "auto"
     }
@@ -13426,27 +13330,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
     },
     {
       "from": "PAN-4927",
-      "to": "PAN-4944",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4927",
-      "to": "PAN-4945",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4927",
-      "to": "PAN-4949",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4927",
       "to": "PAN-4937",
       "type": "contains",
       "source": "github-ref",
@@ -13468,13 +13351,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
     },
     {
       "from": "PAN-4927",
-      "to": "PAN-4941",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4927",
       "to": "PAN-4943",
       "type": "contains",
       "source": "github-ref",
@@ -13489,29 +13365,8 @@ New this pass. The test role evaluates the workspace working tree rather than th
     },
     {
       "from": "PAN-4927",
-      "to": "PAN-4934",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4941",
-      "to": "PAN-4942",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4927",
       "to": "PAN-4942",
       "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4945",
-      "to": "PAN-4946",
-      "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
     },
@@ -13523,13 +13378,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "confidence": 1
     },
     {
-      "from": "PAN-4949",
-      "to": "PAN-4950",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-4927",
       "to": "PAN-4950",
       "type": "contains",
@@ -13537,23 +13385,9 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "confidence": 1
     },
     {
-      "from": "PAN-4949",
-      "to": "PAN-4951",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-4927",
       "to": "PAN-4951",
       "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4945",
-      "to": "PAN-4947",
-      "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
     },
@@ -13649,13 +13483,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "confidence": 1
     },
     {
-      "from": "PAN-4941",
-      "to": "PAN-4935",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-4942",
       "to": "PAN-4935",
       "type": "unblocks",
@@ -13664,13 +13491,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
     },
     {
       "from": "PAN-4943",
-      "to": "PAN-4935",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4944",
       "to": "PAN-4935",
       "type": "unblocks",
       "source": "github-ref",

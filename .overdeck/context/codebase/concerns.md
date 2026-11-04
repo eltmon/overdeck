@@ -675,6 +675,13 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   unless it calls `refreshAccessTokens()` first (as `pan mcp serve` does) or reads the file with
   `listAccessTokens()`. `verifyAccessToken` also writes `lastUsedAt`, and `mutate` serializes writes only
   within one process, so a CLI write and a dashboard `lastUsedAt` write can lose each other.
+- **MCP SDK clients require the advertised `resource` to share the origin they called** (PAN-4945
+  planning) — `@modelcontextprotocol/sdk` 1.30.1 `selectResourceURL` (`client/auth.js:344-357`) throws
+  unless `checkResourceAllowed` finds the protected-resource metadata's `resource` on the same origin as
+  the `/mcp` URL the client used. Any OAuth issuer for `/mcp` must be derived from the request's host
+  (checked against `getTrustedOrigins()`), never a fixed `127.0.0.1`. A stock SDK client also requests
+  every `scopes_supported` value at once (`auth.js:229`) and may send no `state` (`auth.js:732`).
+<!-- last-verified: 2026-11-04 (PAN-4905, PAN-4917, PAN-4925, PAN-4929, PAN-4930, PAN-4931, PAN-4482, PAN-4945) -->
 - **One merge path per feature (PAN-4970)** — the UAT reconciler drops features
   `mergePathOwner` (`src/dashboard/server/services/merge-path-owner.ts`) assigns to the
   per-PR train from its ready set before it ever assembles a batch; any new merge path
@@ -694,3 +701,10 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   (`worker.json` `startedAt`, or a stand-in's `createdAt`). PAN-4938 moves the stand-in wait helpers from
   `src/cli/commands/worker-remote.ts` to `src/lib/agents/worker/wait-any.ts`, because server code never imports `src/cli/`.
 <!-- last-verified: 2026-11-04 (PAN-4905, PAN-4917, PAN-4925, PAN-4929, PAN-4930, PAN-4931, PAN-4932, PAN-4938, PAN-4944, PAN-4970, PAN-4482) -->
+- **ACP agents spawn stdio MCP servers from `session/new` and `session/load`** (PAN-4934 planning probe) —
+  opencode 1.18.31 and kimi 2.0.2 both start a stdio `mcpServers` entry, pass its `env` array, keep the
+  inherited `PATH`/`HOME`, and call `initialize` then `tools/list`, on a new session and on a load. Both
+  advertise `mcpCapabilities: { http, sse }` too. The ACP host's `mcpServers` field
+  (`src/lib/acp/session-runtime.ts`) carries the `overdeck` server read from the host's `--mcp-config`
+  (PAN-4934); before that it was always `[]`.
+<!-- last-verified: 2026-11-04 (PAN-4905, PAN-4917, PAN-4925, PAN-4929, PAN-4930, PAN-4931, PAN-4932, PAN-4934) -->

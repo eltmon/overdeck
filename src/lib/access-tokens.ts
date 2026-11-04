@@ -29,10 +29,20 @@
  * `phoneKey`. A `phone` record missing `phoneKey` or `clientId` makes the file
  * corrupt, exactly like an incomplete `machine` record.
  *
+ * A `connector` record (PAN-4927 D-17) is bound to an Overdeck connector's link
+ * key (`connectorKey`, 64 hex) and its directory client id (`clientId`, a UUID
+ * v4). It carries only scopes from `CONNECTOR_SCOPE_CHOICES` and authenticates
+ * only inside a link-mode channel whose remote key equals `connectorKey`. A
+ * `connector` record missing either field makes the file corrupt.
+ *
  * An agent token (PAN-4927) is a `token` record that carries `agentId` (an
  * agent id or a conversation name), `agentKind` and `role`. Those fields are
  * valid only on `kind: 'token'` and only all together; on any other kind they
  * make the file corrupt. An agent token never carries `admin` or `forward`.
+ * An OAuth token (PAN-4945) is a `token` record with `oauthClientId`,
+ * `oauthFamilyId` and `expiresAt`, under the same all-or-none rule and never
+ * with the agent fields; it stops verifying at `expiresAt` and never carries
+ * `admin`, `forward`, `read:settings`, `read:costs` or `read:events`.
  * A CLI process has an empty snapshot, so `readActiveAccessTokenRecord`,
  * `revokeAccessTokensMatching` and `pruneEndedAccessTokens` read the file fresh.
  *
@@ -69,6 +79,8 @@ import {
   isMachineAccess,
   isRecord,
   MACHINE_ACCESS_LEVELS,
+  OAUTH_REFRESH_WINDOW_MS,
+  oauthFieldsValid,
   MACHINE_KEY_HEX,
   UUID_V4,
 } from './access-token-records.js';
@@ -98,6 +110,11 @@ export function MACHINE_TOKEN_SCOPES(access: MachineAccess): AccessTokenScope[] 
 
 /** The scopes a `phone` token carries (PAN-4823 NFR-4): a linked machine's operator scopes without `forward`. */
 export const PHONE_TOKEN_SCOPES: readonly AccessTokenScope[] = ['read:events', 'read:state', 'read:conversations', 'read:costs', 'read:settings', 'tell', 'operate', 'approve'];
+
+/** The scopes an operator may give a connector (PAN-4927 D-4, D-17): never admin, forward, read:settings, read:costs or read:events. */
+export const CONNECTOR_SCOPE_CHOICES: readonly AccessTokenScope[] = ['read:state', 'read:conversations', 'tell', 'operate', 'approve'];
+/** The scopes "Connect a bot" starts with (PAN-4927 D-4). */
+export const BOT_DEFAULT_SCOPES: readonly AccessTokenScope[] = ['read:state', 'read:conversations', 'tell'];
 
 /** A record as shown to callers: never carries the hash. */
 export type PublicAccessTokenRecord = Omit<AccessTokenRecord, 'tokenHash'>;
@@ -312,17 +329,25 @@ export interface CreateAccessTokenInput {
   access?: MachineAccess;
   /** Required for `kind: 'phone'`: the phone's link public key, 64 lowercase hex. */
   phoneKey?: string;
-  /** Required for `kind: 'phone'`: the phone app's directory client id, a UUID v4. */
+  /** Required for `kind: 'phone'` and `kind: 'connector'`: the directory client id, a UUID v4. */
   clientId?: string;
   /** Optional for `kind: 'phone'`: the phone's push public key, 64 lowercase hex. */
   pushKey?: string;
+  /** Required for `kind: 'connector'`: the connector's link public key, 64 lowercase hex. */
+  connectorKey?: string;
   /** `token` only (PAN-4927 D-6): the managed agent this token belongs to — an agent id or a conversation name. */
   agentId?: string;
   /** `token` only: what `agentId` names. */
   agentKind?: 'agent' | 'conversation';
   /** `token` only: the agent's role, or 'conversation'. */
   role?: string;
+  /** `token` only (PAN-4945), all three or none: the OAuth client, its sign-in (family) and the expiry (ISO 8601). */
+  oauthClientId?: string;
+  oauthFamilyId?: string;
+  expiresAt?: string;
 }
+
+const OAUTH_FORBIDDEN_SCOPES: readonly AccessTokenScope[] = ['admin', 'forward', 'read:settings', 'read:costs', 'read:events'];
 
 export async function createAccessToken(input: CreateAccessTokenInput): Promise<{ token: string; record: PublicAccessTokenRecord }> {
   const name = typeof input.name === 'string' ? input.name.trim() : '';
@@ -335,7 +360,7 @@ export async function createAccessToken(input: CreateAccessTokenInput): Promise<
   } catch (error) {
     throw new Error(`Invalid access-token scopes: ${(error as Error).message}`);
   }
-  let binding: Pick<AccessTokenRecord, 'machineKey' | 'environmentId' | 'access' | 'phoneKey' | 'clientId' | 'pushKey'> = {};
+  let binding: Pick<AccessTokenRecord, 'machineKey' | 'environmentId' | 'access' | 'phoneKey' | 'clientId' | 'pushKey' | 'connectorKey'> = {};
   if (input.kind === 'machine') {
     if (typeof input.machineKey !== 'string' || !MACHINE_KEY_HEX.test(input.machineKey)) {
       throw new Error('A machine token needs machineKey: 64 lowercase hex characters');
@@ -350,8 +375,9 @@ export async function createAccessToken(input: CreateAccessTokenInput): Promise<
       throw new Error('A machine token never carries admin (PAN-4645 FR-7)');
     }
     if (input.phoneKey !== undefined || input.clientId !== undefined || input.pushKey !== undefined) {
-      throw new Error('phoneKey, clientId and pushKey belong to kind: phone only');
+      throw new Error('phoneKey, clientId and pushKey belong to kind: phone only (clientId also to kind: connector)');
     }
+    if (input.connectorKey !== undefined) throw new Error('connectorKey belongs to kind: connector only');
     binding = { machineKey: input.machineKey, environmentId: input.environmentId, access: input.access };
   } else if (input.kind === 'phone') {
     if (typeof input.phoneKey !== 'string' || !MACHINE_KEY_HEX.test(input.phoneKey)) {
@@ -369,11 +395,28 @@ export async function createAccessToken(input: CreateAccessTokenInput): Promise<
     if (input.machineKey !== undefined || input.environmentId !== undefined || input.access !== undefined) {
       throw new Error('machineKey, environmentId and access belong to kind: machine only');
     }
+    if (input.connectorKey !== undefined) throw new Error('connectorKey belongs to kind: connector only');
     binding = { phoneKey: input.phoneKey, clientId: input.clientId, ...(input.pushKey !== undefined ? { pushKey: input.pushKey } : {}) };
+  } else if (input.kind === 'connector') {
+    if (typeof input.connectorKey !== 'string' || !MACHINE_KEY_HEX.test(input.connectorKey)) {
+      throw new Error('A connector token needs connectorKey: 64 lowercase hex characters');
+    }
+    if (typeof input.clientId !== 'string' || !UUID_V4.test(input.clientId)) {
+      throw new Error('A connector token needs clientId: a UUID v4');
+    }
+    if (!scopes.every((scope) => CONNECTOR_SCOPE_CHOICES.includes(scope))) {
+      throw new Error('A connector token carries only read:state, read:conversations, tell, operate and approve (PAN-4927 D-4)');
+    }
+    if (input.machineKey !== undefined || input.environmentId !== undefined || input.access !== undefined || input.phoneKey !== undefined || input.pushKey !== undefined) {
+      throw new Error('A connector token takes only connectorKey and clientId');
+    }
+    binding = { connectorKey: input.connectorKey, clientId: input.clientId };
+  } else if (input.connectorKey !== undefined) {
+    throw new Error('connectorKey belongs to kind: connector only');
   } else if (input.machineKey !== undefined || input.environmentId !== undefined || input.access !== undefined) {
     throw new Error('machineKey, environmentId and access belong to kind: machine only');
   } else if (input.phoneKey !== undefined || input.clientId !== undefined || input.pushKey !== undefined) {
-    throw new Error('phoneKey, clientId and pushKey belong to kind: phone only');
+    throw new Error('phoneKey, clientId and pushKey belong to kind: phone only (clientId also to kind: connector)');
   }
   let agent: Pick<AccessTokenRecord, 'agentId' | 'agentKind' | 'role'> = {};
   if (input.agentId !== undefined || input.agentKind !== undefined || input.role !== undefined) {
@@ -388,6 +431,14 @@ export async function createAccessToken(input: CreateAccessTokenInput): Promise<
     }
     agent = { agentId: input.agentId, agentKind: input.agentKind, role: input.role };
   }
+  const oauth = input.oauthClientId !== undefined || input.oauthFamilyId !== undefined || input.expiresAt !== undefined;
+  if (oauth) {
+    if (input.kind !== 'token' || agent.agentId !== undefined) throw new Error('oauthClientId, oauthFamilyId and expiresAt belong to kind: token only, never with agent fields');
+    if (!oauthFieldsValid(input)) throw new Error('An OAuth token needs oauthClientId, oauthFamilyId and expiresAt');
+    if (scopes.some((scope) => OAUTH_FORBIDDEN_SCOPES.includes(scope))) {
+      throw new Error('An OAuth token never carries admin, forward, read:settings, read:costs or read:events (PAN-4945)');
+    }
+  }
   const token = `${ACCESS_TOKEN_PREFIX}${randomBytes(32).toString('hex')}`;
   const record: AccessTokenRecord = {
     id: randomUUID(),
@@ -399,15 +450,22 @@ export async function createAccessToken(input: CreateAccessTokenInput): Promise<
     ...(input.kind ? { kind: input.kind } : {}),
     ...binding,
     ...agent,
+    ...(oauth ? { oauthClientId: input.oauthClientId, oauthFamilyId: input.oauthFamilyId, expiresAt: input.expiresAt } : {}),
   };
   await mutate((records) => ({ records: [...records, record], result: undefined }));
   return { token, record: toPublic(record) };
 }
 
-/** Active (not revoked) records of one kind, from the in-memory snapshot. */
+/** Not revoked and, for an OAuth token, not past `expiresAt`. */
+function isLive(record: AccessTokenRecord, now: number): boolean {
+  return !record.revokedAt && !(record.expiresAt !== undefined && Date.parse(record.expiresAt) <= now);
+}
+
+/** Active (not revoked, not expired) records of one kind, from the in-memory snapshot. */
 export function listActiveRecordsOfKind(kind: AccessTokenKind): PublicAccessTokenRecord[] {
+  const now = Date.now();
   return snapshot.records
-    .filter((record) => !record.revokedAt && (record.kind ?? 'device') === kind)
+    .filter((record) => isLive(record, now) && (record.kind ?? 'device') === kind)
     .map(toPublic);
 }
 
@@ -419,10 +477,11 @@ export function findActiveMachineTokenByKey(machineKey: string): PublicAccessTok
   return match ? toPublic(match) : null;
 }
 
-/** The active `machine` or `phone` record a link-mode initiator key is pinned by (PAN-4835 D-1); null when none. */
+/** The active `machine`, `phone` or `connector` record a link-mode initiator key is pinned by (PAN-4835 D-1, PAN-4927 D-17); null when none. */
 export function findActiveChannelTokenByKey(keyHex: string): PublicAccessTokenRecord | null {
   const match = snapshot.records.find((record) => !record.revokedAt
-    && ((record.kind === 'machine' && record.machineKey === keyHex) || (record.kind === 'phone' && record.phoneKey === keyHex)));
+    && ((record.kind === 'machine' && record.machineKey === keyHex) || (record.kind === 'phone' && record.phoneKey === keyHex)
+      || (record.kind === 'connector' && record.connectorKey === keyHex)));
   return match ? toPublic(match) : null;
 }
 
@@ -480,12 +539,19 @@ export async function revokeAccessTokensMatching(match: (record: PublicAccessTok
   return revoked.map(toPublic);
 }
 
-/** Remove records with `agentId` whose `revokedAt` is older than `olderThanMs` before `now`. Never removes a record without `agentId`. Returns the count removed. */
+/**
+ * Remove records that ended more than `olderThanMs` before `now`: agent tokens at `revokedAt`; OAuth tokens (PAN-4945)
+ * at `expiresAt`, or when revoked at `revokedAt` + the 90-day refresh window, so a refresh still sees a revocation (D-8.6).
+ * Never removes any other record. Returns the count removed. */
 export async function pruneEndedAccessTokens(olderThanMs: number, now = Date.now()): Promise<number> {
   return mutate((records) => {
-    const kept = records.filter(
-      (record) => !(record.agentId !== undefined && record.revokedAt !== undefined && now - Date.parse(record.revokedAt) > olderThanMs),
-    );
+    const kept = records.filter((record) => {
+      // NaN (a record that never ends) fails the comparison and is kept.
+      const revoked = record.revokedAt !== undefined ? Date.parse(record.revokedAt) : NaN;
+      const ended = record.oauthClientId === undefined ? (record.agentId !== undefined ? revoked : NaN)
+        : record.revokedAt !== undefined ? revoked + OAUTH_REFRESH_WINDOW_MS : Date.parse(record.expiresAt!);
+      return !(now - ended > olderThanMs);
+    });
     const removed = records.length - kept.length;
     return removed === 0 ? { records, result: 0, write: false } : { records: kept, result: removed };
   });
@@ -523,15 +589,16 @@ function recordLastUsed(record: AccessTokenRecord): void {
 
 /**
  * Check a presented token against the snapshot. Synchronous and constant-time
- * per record. A revoked token, an unknown token, or a corrupt registry fails.
+ * per record. A revoked or expired token, an unknown token, or a corrupt registry fails.
  */
 export function verifyAccessToken(presented: string | null | undefined): VerifyAccessTokenResult {
   if (!presented || !presented.startsWith(ACCESS_TOKEN_PREFIX) || snapshot.error) return { ok: false };
   const presentedHash = Buffer.from(hashToken(presented), 'hex');
+  const now = Date.now();
   let match: AccessTokenRecord | null = null;
   for (const record of snapshot.records) {
     const stored = Buffer.from(record.tokenHash, 'hex');
-    if (stored.length === presentedHash.length && timingSafeEqual(stored, presentedHash) && !record.revokedAt) {
+    if (stored.length === presentedHash.length && timingSafeEqual(stored, presentedHash) && isLive(record, now)) {
       match = record;
     }
   }

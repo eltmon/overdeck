@@ -60,6 +60,8 @@ import { workersRouteLayer } from './routes/workers.js'
 import { selfJobsRouteLayer } from './routes/self-jobs.js'
 import { selfLanesRouteLayer } from './routes/self-lanes.js'
 import { selfWorkersRouteLayer } from './routes/self-workers.js'
+import { selfRequestsRouteLayer } from './routes/self-requests.js'
+import { agentRequestsRouteLayer } from './routes/agent-requests.js'
 import { lanesRouteLayer } from './routes/lanes.js'
 import { workspacesRouteLayer } from './routes/workspaces.js'
 import { workspaceRegistryRouteLayer } from './routes/workspace-registry.js'
@@ -80,6 +82,7 @@ import { versionsSelfRouteLayer } from './routes/versions-self.js'
 import { machinesFleetRouteLayer } from './routes/machines-fleet.js'
 import { machinesPeerRouteLayer } from './routes/machines-peer.js'
 import { phonesRouteLayer } from './routes/phones.js'
+import { connectorsRouteLayer } from './routes/connectors.js'
 import { machinesWorkRouteLayer } from './routes/machines-work.js'
 import { machinesWorkLanesRouteLayer } from './routes/machines-work-lanes.js'
 import { fleetWorkRouteLayer } from './routes/fleet-work.js'
@@ -97,6 +100,8 @@ import { pushRouteLayer } from './routes/push.js'
 import { tailscaleRouteLayer } from './routes/tailscale.js'
 import { accessTokensRouteLayer } from './routes/access-tokens.js'
 import { mcpRouteLayer } from './routes/mcp.js'
+import { mcpOAuthRouteLayer } from './routes/mcp-oauth.js'
+import { mcpOAuthAdminRouteLayer } from './routes/mcp-oauth-admin.js'
 import { remoteRequestGateLayer } from './remote-request-gate.js'
 import { linkedConversationProxyLayer } from './linked-conversation-proxy.js';
 import { settingsRouteLayer } from './routes/settings.js'
@@ -186,8 +191,8 @@ const HttpServerLive = Layer.unwrap(
       setupAutoPresoWebSocket(nodeServer);
       // PAN-4645: secure machine channels on the dashboard port (the primary, or a
       // peer-mode dashboard that opted in; see hostsMachineLinks). An IK initiator is
-      // pinned when an active machine or phone token is bound to its key (PAN-4835); a
-      // pairing initiator must name a live `pan pair` credential.
+      // pinned when an active machine, phone or connector token is bound to its key
+      // (PAN-4835, PAN-4927); a pairing initiator must name a live `pan pair` credential.
       installChannelListener(nodeServer, {
         primary: hostsMachineLinks(),
         localKey: ensureMachineKey,
@@ -378,6 +383,8 @@ export const makeRoutesLayer = Layer.mergeAll(
   selfJobsRouteLayer,
   selfWorkersRouteLayer,
   selfLanesRouteLayer,
+  selfRequestsRouteLayer,
+  agentRequestsRouteLayer,
   lanesRouteLayer,
   workspacesRouteLayer,
   workspaceRegistryRouteLayer,
@@ -457,6 +464,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   machinesFleetRouteLayer,
   machinesPeerRouteLayer,
   phonesRouteLayer,
+  connectorsRouteLayer,
   machinesWorkRouteLayer,
   machinesWorkLanesRouteLayer,
   fleetWorkRouteLayer,
@@ -474,6 +482,8 @@ export const makeRoutesLayer = Layer.mergeAll(
   tailscaleRouteLayer,
   accessTokensRouteLayer,
   mcpRouteLayer,
+  mcpOAuthRouteLayer,
+  mcpOAuthAdminRouteLayer,
   staticRouteLayer,
 );
 

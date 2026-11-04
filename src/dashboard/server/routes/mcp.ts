@@ -9,7 +9,9 @@
  * an untrusted present Origin → 403, no internal token configured → 503, no
  * credential → 401, a credential that is not `kind: 'token'` (the internal
  * token, the root session, a paired device) → 403, a token with `admin` → 403.
- * MCP is always fenced (D-21): it never runs with a root credential.
+ * MCP is always fenced (D-21): it never runs with a root credential. The 401
+ * carries `WWW-Authenticate` naming the OAuth protected-resource metadata when
+ * the request's host is a trusted origin (PAN-4945).
  *
  * Each tool proxies a dashboard route over the loopback URL with the caller's
  * own Bearer token, so the route-scope table judges every tool call and a
@@ -27,6 +29,7 @@ import { createOverdeckMcpServer, hasAgentId } from '../../../lib/mcp/server.js'
 import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
 import { credentialScopes, dashboardDeviceTokenFromHeaders, resolveDashboardCredential } from './dashboard-auth.js';
+import { issuerFor } from './mcp-oauth.js';
 import { getHeaderFromMap, validateOriginHeaders, type HeaderMap } from './origin-validation.js';
 
 export interface McpRouteDeps {
@@ -90,7 +93,12 @@ export function makeMcpRouteLayer(deps: McpRouteDeps) {
         return jsonResponse({ error: 'dashboard session token not configured' }, { status: 503, headers: NO_STORE });
       }
       const credential = resolveDashboardCredential(headers);
-      if (!credential) return jsonResponse({ error: 'unauthorized' }, { status: 401, headers: NO_STORE });
+      if (!credential) {
+        // PAN-4945 (RFC 9728 §5.1): point an OAuth client at the protected-resource metadata.
+        const issuer = issuerFor(request);
+        const challenge: Record<string, string> = issuer ? { 'WWW-Authenticate': `Bearer resource_metadata="${issuer}/.well-known/oauth-protected-resource/mcp"` } : {};
+        return jsonResponse({ error: 'unauthorized' }, { status: 401, headers: { ...NO_STORE, ...challenge } });
+      }
       const token = dashboardDeviceTokenFromHeaders(headers);
       if (credential.kind !== 'token' || !token || credentialScopes(credential).includes('admin')) {
         return jsonResponse({ error: FENCED_ERROR }, { status: 403, headers: NO_STORE });

@@ -61,4 +61,68 @@ describe('MCP self tools (PAN-4927 W-SELF1)', () => {
     expect(resultText(missing)).toContain('jobId');
     expect(api.calls).toHaveLength(1);
   });
+
+  describe('request_secret and secret_wait (PAN-4941 W-SEC1)', () => {
+    const WAIT_R1 = 'GET /api/self/secret-requests/r1/wait?timeoutMs=50000';
+
+    it('hides both tools from a non-agent token', async () => {
+      const api = fakeApi({});
+      const human = await connectClient(api, ['read:state', 'tell']);
+      const names = (await human.listTools()).tools.map((tool) => tool.name);
+      expect(names).not.toContain('request_secret');
+      expect(names).not.toContain('secret_wait');
+      expect(resultText(await callTool(human, 'request_secret', { name: 'OPENAI_API_KEY', prompt: 'p' }))).toBe('Unknown tool request_secret');
+      expect(api.calls).toEqual([]);
+
+      const agent = await connectClient(api, ['read:state', 'tell'], true);
+      const agentNames = (await agent.listTools()).tools.map((tool) => tool.name);
+      expect(agentNames).toContain('request_secret');
+      expect(agentNames).toContain('secret_wait');
+    });
+
+    it('request_secret posts exactly { name, prompt }, and timeoutMs when given', async () => {
+      const pending = { requestId: 'r1', status: 'pending', expiresAt: '2026-11-04T00:10:00.000Z', next: { tool: 'secret_wait', arguments: { requestId: 'r1' } } };
+      const api = fakeApi({ 'POST /api/self/secret-requests': { status: 201, json: pending } });
+      const client = await connectClient(api, ['tell'], true);
+      expect(resultJson(await callTool(client, 'request_secret', { name: 'OPENAI_API_KEY', prompt: 'The eval key' }))).toEqual(pending);
+      await callTool(client, 'request_secret', { name: 'OPENAI_API_KEY', prompt: 'The eval key', timeoutMs: 120_000 });
+      expect(api.calls).toEqual([
+        { method: 'POST', path: '/api/self/secret-requests', body: { name: 'OPENAI_API_KEY', prompt: 'The eval key' } },
+        { method: 'POST', path: '/api/self/secret-requests', body: { name: 'OPENAI_API_KEY', prompt: 'The eval key', timeoutMs: 120_000 } },
+      ]);
+    });
+
+    it('request_secret rejects a missing name or prompt and a bad timeoutMs before any call', async () => {
+      const api = fakeApi({});
+      const client = await connectClient(api, ['tell'], true);
+      const missingName = await callTool(client, 'request_secret', { prompt: 'p' });
+      expect(missingName.isError).toBe(true);
+      expect(resultText(missingName)).toContain('name');
+      expect((await callTool(client, 'request_secret', { name: 'OPENAI_API_KEY' })).isError).toBe(true);
+      const badTimeout = await callTool(client, 'request_secret', { name: 'OPENAI_API_KEY', prompt: 'p', timeoutMs: 5 });
+      expect(badTimeout.isError).toBe(true);
+      expect(resultText(badTimeout)).toContain('timeoutMs');
+      expect(api.calls).toEqual([]);
+    });
+
+    it('secret_wait encodes the id, waits 50 s and passes the answer through', async () => {
+      const delivered = { requestId: 'r1', status: 'delivered', file: '/home/x/.overdeck/agents/agent-pan-1/secrets/OPENAI_API_KEY' };
+      const api = fakeApi({ [WAIT_R1]: { status: 200, json: delivered } });
+      const client = await connectClient(api, ['read:state'], true);
+      expect(resultJson(await callTool(client, 'secret_wait', { requestId: 'r1' }))).toEqual(delivered);
+      await callTool(client, 'secret_wait', { requestId: 'a/b' });
+      expect(api.calls).toEqual([
+        { method: 'GET', path: '/api/self/secret-requests/r1/wait?timeoutMs=50000' },
+        { method: 'GET', path: '/api/self/secret-requests/a%2Fb/wait?timeoutMs=50000' },
+      ]);
+    });
+
+    it('secret_wait maps a route 404 to a tool error starting HTTP 404', async () => {
+      const api = fakeApi({ [WAIT_R1]: { status: 404, json: { error: 'no such request; a dashboard restart forgets requests, so call request_secret again', code: 'unknown-request' } } });
+      const client = await connectClient(api, ['read:state'], true);
+      const result = await callTool(client, 'secret_wait', { requestId: 'r1' });
+      expect(result.isError).toBe(true);
+      expect(resultText(result).startsWith('HTTP 404')).toBe(true);
+    });
+  });
 });

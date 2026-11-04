@@ -3,7 +3,7 @@
  * 0600 `mcp-token` file, revoke by owner and by issue, and the D-5 check that a
  * mint persisted. Uses the real registry module under a temp OVERDECK_HOME.
  */
-import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -146,6 +146,28 @@ describe('agent MCP tokens (PAN-4930 W-4)', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     await expect(revokeAgentMcpTokens('agent-pan-1')).resolves.toBe(0);
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('[agent-token] revoke failed for agent-pan-1'));
+  });
+
+  it('PAN-4941: revokeAgentMcpTokens deletes the owner secrets directory for an agent and for a conversation with dir', async () => {
+    const agentDir = join(home, 'agents', 'agent-pan-1');
+    await mkdir(join(agentDir, 'secrets'), { recursive: true, mode: 0o700 });
+    await writeFile(join(agentDir, 'secrets', 'OPENAI_API_KEY'), 'v', { mode: 0o600 });
+    await revokeAgentMcpTokens('agent-pan-1');
+    await expect(stat(join(agentDir, 'secrets'))).rejects.toMatchObject({ code: 'ENOENT' });
+
+    const convDir = join(home, 'conversations', 'conv-abc');
+    await mkdir(join(convDir, 'secrets'), { recursive: true, mode: 0o700 });
+    await writeFile(join(convDir, 'secrets', 'OPENAI_API_KEY'), 'v', { mode: 0o600 });
+    await revokeAgentMcpTokens('abc', { agentKind: 'conversation', dir: convDir });
+    await expect(stat(join(convDir, 'secrets'))).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('PAN-4941: a missing secrets directory is not an error', async () => {
+    await ensureAgentMcpToken(workOwner());
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    await expect(revokeAgentMcpTokens('agent-pan-1')).resolves.toBe(1);
+    await expect(revokeAgentMcpTokens('abc', { agentKind: 'conversation', dir: join(home, 'conversations', 'conv-none') })).resolves.toBe(0);
+    expect(warn).not.toHaveBeenCalled();
   });
 
   it('normalizes a bare issue id, so a PAN-1 mint is revoked by agent-pan-1', async () => {
