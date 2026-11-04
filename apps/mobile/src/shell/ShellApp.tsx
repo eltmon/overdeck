@@ -47,9 +47,10 @@ const errorText = (e: unknown): string => (e instanceof Error ? e.message : Stri
 
 /**
  * The launch URL already handled in this WebView. Switching machines reloads the page (C-7), and
- * on Android `App.getLaunchUrl()` keeps answering the activity's original launch intent, so without
- * this a cold launch from a pair link would reopen the pair screen with a used code after each
- * reload. Session storage survives a reload and is empty in a new app process.
+ * on Android `App.getLaunchUrl()` keeps answering the activity's original launch intent, and on iOS
+ * it answers with the last URL that opened the app, even one delivered by `appUrlOpen` while it ran.
+ * Without this a pair link would reopen the pair screen with a used code after each reload. Session
+ * storage survives a reload and is empty in a new app process.
  */
 const LAUNCH_URL_KEY = 'overdeck.launchUrlHandled';
 
@@ -116,7 +117,12 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
         if (!cancelled) setBoot({ kind: 'failed', message: errorText(e) });
       }
     })();
-    const listener = App.addListener('appUrlOpen', ({ url }) => void handleUrl(url));
+    // Record a URL that arrives while running as handled too: iOS answers getLaunchUrl() with it
+    // after the next reload, which would reopen the pair screen with a used code.
+    const listener = App.addListener('appUrlOpen', ({ url }) => {
+      takeLaunchUrl(url);
+      void handleUrl(url);
+    });
     return () => {
       cancelled = true;
       void listener.then((handle) => handle.remove());

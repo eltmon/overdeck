@@ -173,6 +173,24 @@ describe('ShellApp machine view', () => {
     expect(await screen.findByText('Machines')).toBeTruthy();
     expect(screen.queryByPlaceholderText('ai.overdeck.app:/pair#…')).toBeNull();
   });
+
+  it('does not reopen a pair link that arrived while running after a reload (iOS reports it as the launch URL)', async () => {
+    localStorage.removeItem(CURRENT_MACHINE_KEY);
+    history.replaceState(null, '', '/');
+    const first = render(<ShellApp navigate={() => undefined} />);
+    await screen.findByText('Machines');
+    await act(async () => {
+      for (const listener of harness.urlListeners) listener({ url: PAIR_LINK });
+    });
+    expect(await screen.findByPlaceholderText('ai.overdeck.app:/pair#…')).toBeTruthy();
+    first.unmount();
+    // Pairing reloads the page; iOS then answers getLaunchUrl() with the link that opened the app.
+    harness.urlListeners.length = 0;
+    harness.launchUrl = PAIR_LINK;
+    render(<ShellApp navigate={() => undefined} />);
+    expect(await screen.findByText('Machines')).toBeTruthy();
+    expect(screen.queryByPlaceholderText('ai.overdeck.app:/pair#…')).toBeNull();
+  });
 });
 
 describe('ShellApp Live Activity (PAN-4839 WI-10)', () => {
