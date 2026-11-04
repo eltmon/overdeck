@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5046",
   "created": "2026-11-04T18:10:57.891Z",
-  "updated": "2026-11-04T18:51:45.593Z",
+  "updated": "2026-11-04T18:52:00.547Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -154,6 +154,10 @@
     "boot-wiring-order.ac2": {
       "status": "completed",
       "doneAt": "2026-11-04T18:51:45.593Z"
+    },
+    "phone-ice-restart-integration.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:52:00.547Z"
     }
   }
 }
