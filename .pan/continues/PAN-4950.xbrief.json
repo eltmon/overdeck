@@ -2,12 +2,18 @@
   "version": "1",
   "issueId": "PAN-4950",
   "created": "2026-11-04T10:02:21.153Z",
-  "updated": "2026-11-04T11:28:01.042Z",
+  "updated": "2026-11-04T11:42:36.794Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
   "resumePoint": null,
-  "sessionHistory": [],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-04T11:42Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-04T11:42:36.794Z"
+    }
+  ],
   "items": {
     "conn-home": {
       "status": "completed",
@@ -273,5 +279,14 @@
       "status": "completed",
       "doneAt": "2026-11-04T11:28:01.041Z"
     }
-  }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-04T11:42:36Z",
+      "markdownBody": "# CI Failure Feedback for PAN-4950\n\nPull request: https://github.com/eltmon/overdeck/pull/5014 (head `6135374a`)\n\nSource: check_run:test-shard (4/4)\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\n## Failing checks (1)\n\n### test-shard (4/4)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/126548099937/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/41822279750/job/126548099937  \n```\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/meta/no-real-overdeck-home.test.ts\u001b[2m > \u001b[22mreal OVERDECK_HOME test guard\u001b[2m > \u001b[22mhas no direct homedir .overdeck write patterns in tests\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/meta/no-real-overdeck-home.test.ts\u001b[2m > \u001b[22mreal OVERDECK_HOME test guard\u001b[2m > \u001b[22mhas no direct homedir .overdeck write patterns in tests\n\u001b[31m\u001b[1mAssertionError\u001b[22m: expected [ Array(1) ] to deeply equal []\u001b[39m\n\n\u001b[32m- Expected\u001b[39m\n\u001b[31m+ Received\u001b[39m\n\n\u001b[32m- []\u001b[39m\n\u001b[31m+ [\u001b[39m\n\u001b[31m+   \"/home/runner/work/overdeck/overdeck/tests/unit/lib/mcp/connector/home.test.ts\",\u001b[39m\n\u001b[31m+ ]\u001b[39m\n\n\u001b[36m \u001b[2m❯\u001b[22m tests/meta/no-real-overdeck-home.test.ts:\u001b[2m85:23\u001b[22m\u001b[39m\n    \u001b[90m 83|\u001b[39m     \u001b[35mconst\u001b[39m offenders\u001b[33m:\u001b[39m string[] \u001b[33m=\u001b[39m []\u001b[33m;\u001b[39m\n    \u001b[90m 84|\u001b[39m     \u001b[34mscanTests\u001b[39m(\u001b[34mjoin\u001b[39m(process\u001b[33m.\u001b[39m\u001b[34mcwd\u001b[39m()\u001b[33m,\u001b[39m \u001b[32m'tests'\u001b[39m)\u001b[33m,\u001b[39m offenders)\u001b[33m;\u001b[39m\n    \u001b[90m 85|\u001b[39m     \u001b[34mexpect\u001b[39m(offenders)\u001b[33m.\u001b[39m\u001b[34mtoEqual\u001b[39m([])\u001b[33m;\u001b[39m\n    \u001b[90m   |\u001b[39m                       \u001b[31m^\u001b[39m\n    \u001b[90m 86|\u001b[39m   })\u001b[33m;\u001b[39m\n    \u001b[90m 87|\u001b[39m })\u001b[33m;\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\u001b[22m\u001b[39m\n\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m1 failed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[1m\u001b[32m607 passed\u001b[39m\u001b[22m\u001b[90m (608)\u001b[39m\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    }
+  ]
 }
