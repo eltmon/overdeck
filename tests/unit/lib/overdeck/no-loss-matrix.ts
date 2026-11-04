@@ -541,6 +541,8 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/self/pull-request-watches',         kind: 'http', disposition: 'READ',        door: 'lib/overdeck/pull-request-watches store, agent tokens only (PAN-4943 W-PR1)' },
   { surface: 'DELETE /api/self/pull-request-watches/:id',  kind: 'http', disposition: 'WRITE',       door: 'lib/overdeck/pull-request-watches store, agent tokens only (PAN-4943 W-PR1)' },
   { surface: 'POST /api/self/pull-requests',                kind: 'http', disposition: 'WRITE',       door: 'linkPullRequestToConversation (lib/overdeck/conversation-pull-request-commands.js), agent tokens only (PAN-4943 W-PR1)' },
+  { surface: 'POST /api/self/memory/facts',                kind: 'http', disposition: 'WRITE',       door: 'services/self-jobs.start pan memory add in the caller cwd, agent tokens only (PAN-4927 W-MEM1)' },
+  { surface: 'POST /api/self/memory/search',               kind: 'http', disposition: 'READ',        door: 'services/self-jobs.start pan memory search --facts in the caller cwd, agent tokens only (PAN-4927 W-MEM1)' },
   { surface: '* /api/conversations/@<machine>/*',          kind: 'http', disposition: 'RELOCATE',    door: "linked-conversation-proxy -> owner's /api/conversations/* over the machine link (PAN-4650)" },
   { surface: 'POST /api/conversations/:name/release',      kind: 'http', disposition: 'WRITE',       door: 'conversation-release-service.releaseConversation (settle + pack + stop) (PAN-4650)' },
   { surface: 'GET /api/conversations/:name/release/transfer/:transferId', kind: 'http', disposition: 'READ', door: 'conversation-release-service.readTransferPack (PAN-4650)' },

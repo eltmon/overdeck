@@ -141,6 +141,34 @@ describe('DecisionsPanel', () => {
     expect(screen.getByText('Which approach for crew create?')).toBeTruthy();
   });
 
+  it('PAN-4946: renders mcp-sign-in-card for an mcpSignIn decision, with no Answer button', () => {
+    const mcpSignInDecision = {
+      id: 'appr-1',
+      source: 'agent' as const,
+      label: 'Claude Desktop',
+      kinds: ['mcpSignIn'],
+      since: '2026-11-04T00:00:00.000Z',
+      blocking: true,
+      mcpSignIn: {
+        id: 'appr-1',
+        clientId: 'odc_123',
+        clientName: 'Claude Desktop',
+        redirectHost: 'claude.ai',
+        requestedLevel: 'admin',
+        approvalCode: 'KQZT-MWRB',
+        createdAt: '2026-11-04T00:00:00.000Z',
+        expiresAt: '2026-11-04T00:10:00.000Z',
+      },
+    };
+    vi.spyOn(useDecisionsModule, 'useDecisions').mockReturnValue([mcpSignInDecision]);
+    renderWithQuery(<DecisionsPanel />);
+
+    expect(screen.getByTestId('mcp-sign-in-card')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Answer' })).toBeNull();
+    // An unrecognized requestedLevel ('admin') defaults the select to 'Read only'.
+    expect(screen.getByRole('combobox', { name: 'Access level' })).toHaveValue('read');
+  });
+
   it('Answer re-opens the dialog for that subject', async () => {
     vi.spyOn(useDecisionsModule, 'useDecisions').mockReturnValue([conversationDecision]);
     renderWithQuery(<DecisionsPanel />);

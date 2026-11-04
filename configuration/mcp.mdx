@@ -72,6 +72,8 @@ agent tokens.
 | `watch_pull_request` | Watches a GitHub pull request (`url`); get a message in this conversation when its checks fail or pass, its review changes, it gets merge conflicts, or it is merged or closed. | `tell` (agent tokens only) |
 | `list_pull_request_watches` | Lists your own pull request watches. | `read:state` (agent tokens only) |
 | `unwatch_pull_request` | Stops a watch by its `id` (from `watch_pull_request` or `list_pull_request_watches`). | `tell` (agent tokens only) |
+| `memory_add` | Records a curated memory fact by running `pan memory add` in the agent's checkout: `id`, `type` (`feedback`, `project`, `reference`, `user`), a one-line `description`, optional `title`, `body`, `tags` and `store` (`project` by default, `user` for type `user`, or `machine`). A project fact is written uncommitted, so the agent commits `.overdeck/memory/<id>.md`. | `tell` (agent tokens only) |
+| `memory_search` | Searches memory by running `pan memory search --facts`: up to 5 matching facts from the agent's checkout, the operator store and the machine store, each with its file path, then observations from the agent's project (`limit` 1-20, default 10). | `read:state` (agent tokens only) |
 | `delegate_task` | Starts a worker on your own issue to do `task`, here or on `machine`; you are its parent. Optional `harness`, `model`, `effort`, `readOnly`, `name`, `needs`. A caller without an issue gets `delegate_task needs an issue; use start_conversation`. | `operate` |
 | `task_wait` | Waits up to 50 s for one of your workers to report. Answers `done` with the report, `ended` when it stopped without one (with its last message), or `running` with `next`. Pass `afterSeq` for the report after the one you consumed. | `read:state` |
 | `task_status` | One of your workers: state, idle time, where it runs and its newest report's seq, time and status. Your workers only, including ones on linked machines. | `read:state` |
@@ -117,6 +119,17 @@ of asking in chat, so the value never enters its transcript.
   or the dashboard log. The agent reads the file straight into the program
   that needs it, for example `KEY="$(cat <file>)" some-command`, and never
   prints it.
+
+### Memory
+
+Both `memory_add` and `memory_search` run `pan memory` for the calling agent
+in its own checkout and answer `done` with the result, or `running` with
+`next`, like the other job tools. A non-zero exit code means `pan` refused
+(an existing id, secret-like text, a home-directory path); `stderr` says why.
+
+A project fact lands in the agent's own checkout, so `pan memory list --here`
+run there shows it at once, while the primary checkout shows it only after
+the agent's branch merges. See [Project memory](/configuration/memory).
 
 A tool the token's scopes hide answers `Unknown tool <name>`. A route can
 still refuse a listed tool, for example a linked machine's ceiling, with
@@ -241,8 +254,16 @@ names it.
 
 1. Your app opens a sign-in page in your browser. The page shows the app's
    name, where it will send you back, and an approval code such as `KQZT-MWRB`.
-2. You open the Overdeck dashboard on this machine, or run `pan mcp oauth pending`.
-3. You check that the dashboard shows the same code, and pick an access level.
+2. The dashboard's Needs you panel shows a card with the app's name, the
+   redirect host, and the same approval code — or run `pan mcp oauth pending`
+   from a terminal on this machine. Only this machine's own session can see
+   it: on its desktop layout that's the full card below; on its mobile
+   layout, which has no room for the card, it's "Approve on the desktop"
+   instead. A paired device never receives the pending sign-in at all — there
+   is nothing to approve from someone else's phone.
+3. You check that the card's code matches the page you opened, pick an access
+   level (the select starts at the level the app asked for), and click
+   Approve or Deny.
 4. The page sends you back to your app, and your app is signed in.
 
 The page itself can never approve anything, because anyone who can reach the
@@ -380,11 +401,16 @@ through the dashboard fails its next request at once. A token revoked by
 another process (for example `pan token revoke` while the dashboard is
 unreachable) fails within 5 seconds, when the dashboard rereads its token list.
 
-End an OAuth sign-in with `pan mcp oauth revoke <sign-in id>` (ids from
-`pan mcp oauth list`); its access and refresh tokens stop working at once.
-Revoking an OAuth access token under **Settings → Access Tokens** or with
-`pan token revoke` stops that access token at once and ends its sign-in at its
-next refresh.
+End an OAuth sign-in under **Settings → Access Tokens → Sign-ins** (also
+**Settings → Anywhere → Access tokens**), or with `pan mcp oauth revoke
+<sign-in id>` (ids from `pan mcp oauth list`); its access and refresh tokens
+stop working at once. Revoking an OAuth access token under **Settings →
+Access Tokens** or with `pan token revoke` stops that access token at once and
+ends its sign-in at its next refresh.
+
+Both token lists fold one access token per running agent under a collapsed
+**Show agent tokens (N)** toggle, so a fleet of agents doesn't bury your own
+tokens; click it to reveal and revoke an individual agent's token.
 
 ## Fleet reach
 

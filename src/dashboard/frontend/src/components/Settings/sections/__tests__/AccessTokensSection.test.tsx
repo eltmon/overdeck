@@ -56,8 +56,11 @@ function mockFetch(opts: {
   createError?: string;
   /** PAN-4645: what GET /api/anywhere/status answers (404 when omitted, as before). */
   anywhereStatus?: unknown;
+  /** PAN-4946: what GET /api/mcp-oauth/sign-ins answers (empty when omitted). */
+  signIns?: unknown[];
 } = {}) {
   const tokens = opts.tokens ?? [RECORD_A, RECORD_B];
+  const signIns = opts.signIns ?? [];
   global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = input.toString();
     if (url === '/api/access-tokens' && (!init || init.method === undefined)) {
@@ -87,6 +90,9 @@ function mockFetch(opts: {
     }
     if (url === '/api/anywhere/status' && opts.anywhereStatus !== undefined) {
       return new Response(JSON.stringify(opts.anywhereStatus), { status: 200 });
+    }
+    if (url === '/api/mcp-oauth/sign-ins' && (!init || init.method === undefined)) {
+      return new Response(JSON.stringify({ signIns }), { status: 200 });
     }
     return new Response('not found', { status: 404 });
   });
@@ -198,6 +204,28 @@ describe('AccessTokensSection', () => {
     expect(await screen.findByText('No access tokens yet.')).toBeInTheDocument();
   });
 
+  it('PAN-4946 ac4: renders a Sign-ins heading and the sign-in row returned by the route', async () => {
+    mockFetch({
+      signIns: [{
+        familyId: 'fam-1',
+        clientId: 'odc_1',
+        clientName: 'Claude Desktop',
+        level: 'operate',
+        scopes: ['read:state', 'operate'],
+        createdAt: '2026-10-01T00:00:00.000Z',
+        lastUsedAt: null,
+        accessExpiresAt: null,
+        refreshExpiresAt: '2026-12-01T00:00:00.000Z',
+        headless: false,
+      }],
+    });
+    renderSection();
+    await screen.findByText('ci-bot');
+
+    expect(screen.getByText('Sign-ins')).toBeInTheDocument();
+    expect(await screen.findByText('Claude Desktop')).toBeInTheDocument();
+  });
+
   it('places an access-tokens nav entry right after remote', () => {
     const ids = SETTINGS_NAV_ITEMS.map((item) => item.id);
     const remoteIndex = ids.indexOf('remote');
@@ -301,6 +329,65 @@ describe('AccessTokensSection — create-token dialog (PAN-4435 WI-5)', () => {
     const notice = await within(dialog).findByTestId('access-tokens-forbidden');
     expect(notice.textContent).toContain('scoped tokens may not create access tokens');
     expect(notice.textContent).toContain("Only this machine's own dashboard session");
+  });
+});
+
+describe('AccessTokensSection — agent token fold (PAN-4946)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const RECORD_AGENT_1 = {
+    id: 'tok-agent-1',
+    name: 'agent-pan-1',
+    scopes: ['read:state', 'operate'],
+    createdAt: '2026-10-01T00:00:00.000Z',
+    lastUsedAt: null,
+    agentId: 'agent-pan-1',
+  };
+
+  const RECORD_AGENT_2 = {
+    id: 'tok-agent-2',
+    name: 'agent-pan-2',
+    scopes: ['read:state'],
+    createdAt: '2026-09-01T00:00:00.000Z',
+    lastUsedAt: null,
+    revokedAt: '2026-09-02T00:00:00.000Z',
+    agentId: 'agent-pan-2',
+  };
+
+  it('ac1: renders the own token, hides agent tokens, and shows "Show agent tokens (2)" counting a revoked one', async () => {
+    mockFetch({ tokens: [RECORD_A, RECORD_AGENT_1, RECORD_AGENT_2] });
+    renderSection();
+
+    expect(await screen.findByText('ci-bot')).toBeInTheDocument();
+    expect(screen.queryByText('agent-pan-1')).not.toBeInTheDocument();
+    expect(screen.queryByText('agent-pan-2')).not.toBeInTheDocument();
+    const toggle = screen.getByTestId('show-agent-tokens');
+    expect(toggle).toHaveTextContent('Show agent tokens (2)');
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('ac2: clicking the toggle reveals both agent tokens and flips to "Hide agent tokens (2)"', async () => {
+    mockFetch({ tokens: [RECORD_A, RECORD_AGENT_1, RECORD_AGENT_2] });
+    renderSection();
+    await screen.findByText('ci-bot');
+
+    fireEvent.click(screen.getByTestId('show-agent-tokens'));
+
+    expect(screen.getByText('agent-pan-1')).toBeInTheDocument();
+    expect(screen.getByText('agent-pan-2')).toBeInTheDocument();
+    const toggle = screen.getByTestId('show-agent-tokens');
+    expect(toggle).toHaveTextContent('Hide agent tokens (2)');
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('ac3: renders no toggle when no record carries an agentId', async () => {
+    mockFetch();
+    renderSection();
+    await screen.findByText('ci-bot');
+
+    expect(screen.queryByTestId('show-agent-tokens')).not.toBeInTheDocument();
   });
 });
 
