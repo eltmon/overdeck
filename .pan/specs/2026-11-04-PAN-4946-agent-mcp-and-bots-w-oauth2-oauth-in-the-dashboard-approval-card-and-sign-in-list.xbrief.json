@@ -4,17 +4,17 @@
     "created": "2026-11-04T04:40:00Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4946: Agent MCP and bots (W-OAUTH2): OAuth in the dashboard: approval card and sign-in list",
-    "updated": "2026-11-04T04:33:47.366Z"
+    "updated": "2026-11-04T04:35:21.051Z"
   },
   "plan": {
     "id": "pan-4946",
     "title": "Agent MCP and bots (W-OAUTH2): OAuth in the dashboard: approval card and sign-in list",
-    "status": "proposed",
+    "status": "running",
     "uid": "acd6d43c-d4db-4839-acb2-4ac61eddbd4d",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-04T04:40:00Z",
-    "updated": "2026-11-04T04:33:47.366Z",
+    "updated": "2026-11-04T04:35:21.051Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4946",
@@ -576,5 +576,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
