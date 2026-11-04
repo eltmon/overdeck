@@ -214,3 +214,19 @@ answered:
   "ai.overdeck.app (unreviewed)".
 - Includes PAN-4840 (Android push decryption): no. PAN-4840 was still open, so this build has the
   FCM config but not the handler (D-6); a later build ships it.
+
+### TestFlight
+
+- Date: 2026-11-04. Built with `apps/mobile/scripts/build-ios-on-rig.sh --build 1 --rig eltmon@192.168.1.83`
+  from `feature/pan-4841`; the log ended `== DONE ==` after "Upload succeeded" and `** EXPORT SUCCEEDED **`.
+- Archive: CFBundleShortVersionString 1.0, CFBundleVersion 1. `App.app` contains
+  `PrivacyInfo.xcprivacy`, `NotificationService.appex` and `OverdeckWidgets.appex`.
+- Entitlements of a local App Store export of the same archive (`codesign -d --entitlements`):
+  aps-environment production for `App.app`; application identifiers `KUU2VM9GB9.ai.overdeck.app`,
+  `KUU2VM9GB9.ai.overdeck.app.NotificationService`, `KUU2VM9GB9.ai.overdeck.app.widgets`.
+- App Store Connect app "Overdeck Anywhere" ("Overdeck" was taken; the name under the icon stays
+  "Overdeck"), bundle id `ai.overdeck.app`, SKU `overdeck-ios`.
+- TestFlight status: build 1 processing state VALID; export compliance answered by the operator
+  as exempt (mass-market), so `usesNonExemptEncryption` is false; internal build state
+  READY_FOR_BETA_TESTING; in the internal group "Operator" (automatic distribution on), whose
+  tester (the operator) is INVITED.
