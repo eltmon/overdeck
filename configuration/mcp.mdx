@@ -605,6 +605,16 @@ plugins:
       allow_answers: false
 ```
 
+**Grok Build.** The Grok Build plugin lives in
+[`integrations/grok-build/`](https://github.com/eltmon/overdeck/tree/main/integrations/grok-build).
+Install it with `grok plugin install eltmon/overdeck#integrations/grok-build --trust`
+and `grok plugin enable overdeck`. Its MCP server script runs the paired
+connector when `~/.overdeck-connector/pairing.json` exists, and otherwise
+`pan mcp serve` with the token file from "This computer". Ask
+`/overdeck pending` to list prompts that wait for you; on a computer with
+Overdeck installed, type `/overdeck:overdeck pending`, because Overdeck's own
+`overdeck` skill has the same name.
+
 **Remove** in the Bots panel revokes a connector at once.
 
 ## Run the Overdeck connector
