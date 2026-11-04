@@ -679,3 +679,8 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
 
 - With PAN-5036 live, `notScheduled` reports "PR listing unavailable: the forge read failed" for panopticon-cli, botland and orca, flapping every few minutes. `readRepoPullRequests` (`src/lib/overdeck/derived-issue-state.ts`) runs `gh pr list --state all --limit 100` with `statusCheckRollup`, which took 9.9 s by hand, against a 20 s timeout, and its `catch` logs nothing. Filed PAN-5042 (log the reason; split open and closed listing) and started it.
 - Until it ships, an approved green PR that the train skips with that reason can go through the merge door (`POST /api/issues/<id>/merge`).
+
+## 2026-11-04 — PAN-4927 epic (Overdeck MCP for agents and bots) complete
+
+- All 29 work items (PAN-4930 to PAN-4958) merged, deployed in 4753858b36c and closed out; the epic is closed. The operator still owns publishing the integration packages to external registries (D-5).
+- Today's substrate fixes from this run: PAN-4993 (convergence false positive), PAN-5003 (merge door re-rebase), PAN-5011 (composer lock on idle Herdr agents), PAN-5015 (lost verdicts on GraphQL errors), PAN-5020 (last-verified line conflicts), PAN-5036 (scheduler skip reasons), PAN-5042 (PR listing flaps). Open: PAN-5007 (operator restart hold), PAN-5054 (ACCEPTANCE.md union merge), PAN-5046 (phone link churn).
