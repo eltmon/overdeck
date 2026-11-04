@@ -24,6 +24,7 @@ import type { NeedsYouNotification } from '../../../../src/lib/push/types.js';
 function notification(overrides: Partial<NeedsYouNotification> = {}): NeedsYouNotification {
   return {
     kind: 'question',
+    category: 'question',
     tag: 'auq:toolu_01',
     title: 'PAN-1 work asks a question',
     publicTitle: 'PAN-1 needs you',

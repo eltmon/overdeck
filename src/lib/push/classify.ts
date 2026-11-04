@@ -16,6 +16,8 @@ export interface PendingItem {
   subject: string;
   key: string;
   kind: 'question' | 'approval';
+  /** What a phone's notification-type switches act on (PAN-5019 D-2). */
+  category: 'question' | 'plan' | 'permission';
   askedAt: string | null;
   issueId: string | null;
   label: string;
@@ -111,14 +113,14 @@ export function pendingItemsFromEnrichment(payload: EnrichmentPayloadLike): { su
 
   const auq = payload.pendingAskUserQuestion;
   if (auq && nonEmpty(auq.toolUseId)) {
-    items.push({ ...base, key: `auq:${auq.toolUseId}`, kind: 'question', askedAt: nonEmpty(auq.askedAt), preview: questionPreview(auq) });
+    items.push({ ...base, key: `auq:${auq.toolUseId}`, kind: 'question', category: 'question', askedAt: nonEmpty(auq.askedAt), preview: questionPreview(auq) });
   }
   const plan = payload.pendingProposedPlan;
   if (plan && nonEmpty(plan.toolUseId)) {
-    items.push({ ...base, key: `plan:${plan.toolUseId}`, kind: 'approval', askedAt: nonEmpty(plan.askedAt), preview: planPreview(plan) });
+    items.push({ ...base, key: `plan:${plan.toolUseId}`, kind: 'approval', category: 'plan', askedAt: nonEmpty(plan.askedAt), preview: planPreview(plan) });
   }
   if (payload.pendingInputKinds?.includes('permissionRequest')) {
-    items.push({ ...base, key: 'perm:pending', kind: 'approval', askedAt: null, preview: null });
+    items.push({ ...base, key: 'perm:pending', kind: 'approval', category: 'permission', askedAt: null, preview: null });
   }
   return { subject, items };
 }
@@ -136,11 +138,11 @@ export function pendingItemsFromConversationRow(row: ConversationRowLike): { sub
 
   const auq = row.pendingAskUserQuestion;
   if (auq && nonEmpty(auq.toolUseId)) {
-    items.push({ ...base, key: `auq:${auq.toolUseId}`, kind: 'question', askedAt: nonEmpty(auq.askedAt), preview: questionPreview(auq) });
+    items.push({ ...base, key: `auq:${auq.toolUseId}`, kind: 'question', category: 'question', askedAt: nonEmpty(auq.askedAt), preview: questionPreview(auq) });
   }
   const plan = row.pendingProposedPlan;
   if (plan && nonEmpty(plan.toolUseId)) {
-    items.push({ ...base, key: `plan:${plan.toolUseId}`, kind: 'approval', askedAt: nonEmpty(plan.askedAt), preview: planPreview(plan) });
+    items.push({ ...base, key: `plan:${plan.toolUseId}`, kind: 'approval', category: 'plan', askedAt: nonEmpty(plan.askedAt), preview: planPreview(plan) });
   }
   const permission = row.pendingPermission;
   if (permission) {
@@ -148,6 +150,7 @@ export function pendingItemsFromConversationRow(row: ConversationRowLike): { sub
       ...base,
       key: `perm:${nonEmpty(permission.signature) ?? 'pending'}`,
       kind: 'approval',
+      category: 'permission',
       askedAt: nonEmpty(permission.since),
       preview: null,
     });
@@ -163,6 +166,7 @@ export function toNotification(item: PendingItem, opts: { includePreview: boolea
   const preview = opts.includePreview && item.preview ? truncate(item.preview, PREVIEW_MAX) : null;
   return {
     kind: item.kind,
+    category: item.category,
     tag: item.key,
     title: `${KIND_WORD[item.kind]} · ${item.label}`,
     publicTitle: publicTitle(item.kind, item.issueId),
@@ -187,6 +191,7 @@ export function edgeNotificationFromEvent(event: { type: string; timestamp: stri
     const issueId = nonEmpty(payload['issueId']);
     return {
       kind: 'failed',
+      category: 'stopped',
       tag: `dead:${agentId}:${event.timestamp}`,
       title: `${KIND_WORD.failed} · ${issueId ?? agentId}`,
       publicTitle: publicTitle('failed', issueId),
@@ -206,6 +211,7 @@ export function edgeNotificationFromEvent(event: { type: string; timestamp: stri
     const stamp = nonEmpty(entry['at']) ?? nonEmpty(record(entry['data'])?.['head']) ?? event.timestamp;
     return {
       kind: edge.kind,
+      category: edge.kind,
       tag: `journal:${issueId}:${entryType}:${stamp}`,
       title: `${KIND_WORD[edge.kind]} · ${issueId}`,
       publicTitle: publicTitle(edge.kind, issueId),
