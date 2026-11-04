@@ -6,7 +6,7 @@
  * the service reads `Date.now() + offset`, so adding to `offset` moves only
  * the service (codes, approvals); access-token expiry follows `Date`.
  */
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -246,5 +246,111 @@ describe('code exchange (D-7)', () => {
     const [a, b] = await Promise.all([service.exchangeCode(exchangeForm(clientId, code)), service.exchangeCode(exchangeForm(clientId, code))]);
     expect([a.ok, b.ok]).toEqual([false, false]);
     expect(registry.listActiveRecordsOfKind('token')).toEqual([]);
+  });
+});
+
+async function signIn(level = 'operate'): Promise<{ clientId: string; access: string; refresh: string }> {
+  const clientId = await register();
+  const result = await service.exchangeCode(exchangeForm(clientId, await approvedCode(clientId, level)));
+  if (!result.ok) throw new Error(`exchange failed: ${JSON.stringify(result.body)}`);
+  return { clientId, access: result.body.access_token, refresh: result.body.refresh_token };
+}
+
+function refreshForm(clientId: string, refreshToken: string): URLSearchParams {
+  return new URLSearchParams({ grant_type: 'refresh_token', refresh_token: refreshToken, client_id: clientId });
+}
+
+async function refreshed(clientId: string, refreshToken: string): Promise<{ access: string; refresh: string }> {
+  const result = await service.refresh(refreshForm(clientId, refreshToken));
+  if (!result.ok) throw new Error(`refresh failed: ${JSON.stringify(result.body)}`);
+  return { access: result.body.access_token, refresh: result.body.refresh_token };
+}
+
+describe('refresh rotation and revocation (D-8, D-9)', () => {
+  it('rotates both tokens and revokes the previous access token', async () => {
+    const first = await signIn();
+    const result = await service.refresh(refreshForm(first.clientId, first.refresh));
+    expect(result).toMatchObject({ ok: true, body: { token_type: 'Bearer', expires_in: 2_592_000, scope: 'operate' } });
+    const next = (result as { body: { access_token: string; refresh_token: string } }).body;
+    expect(next.refresh_token).not.toBe(first.refresh);
+    expect(registry.verifyAccessToken(first.access)).toEqual({ ok: false });
+    expect(registry.verifyAccessToken(next.access_token)).toMatchObject({ ok: true, record: { scopes: ['read:state', 'read:conversations', 'tell', 'operate'] } });
+    const family = (await store.readMcpOAuthData(Date.now())).families[0]!;
+    expect(family.priorRefreshHashes).toHaveLength(1);
+    expect(family.revokedAt).toBeUndefined();
+  });
+
+  it('ends the sign-in when a retired refresh token is presented again', async () => {
+    const first = await signIn();
+    const second = await refreshed(first.clientId, first.refresh);
+    await expect(service.refresh(refreshForm(first.clientId, first.refresh))).resolves.toMatchObject({ ok: false, status: 400, body: { error: 'invalid_grant' } });
+    expect(registry.verifyAccessToken(second.access)).toEqual({ ok: false });
+    await expect(service.refresh(refreshForm(first.clientId, second.refresh))).resolves.toMatchObject({ ok: false, body: { error: 'invalid_grant' } });
+    expect((await store.readMcpOAuthData(Date.now())).families[0]!.revokedAt).toBeDefined();
+  });
+
+  it('refuses another client_id without ending the sign-in', async () => {
+    const first = await signIn();
+    await expect(service.refresh(refreshForm(`odc_${'0'.repeat(32)}`, first.refresh))).resolves.toMatchObject({ ok: false, body: { error: 'invalid_grant' } });
+    await expect(service.refresh(refreshForm(first.clientId, first.refresh))).resolves.toMatchObject({ ok: true });
+  });
+
+  it('refuses a refresh at refreshExpiresAt + 1 ms', async () => {
+    const first = await signIn();
+    const family = (await store.readMcpOAuthData(Date.now())).families[0]!;
+    offset += Date.parse(family.refreshExpiresAt) - Date.now() + 1;
+    await expect(service.refresh(refreshForm(first.clientId, first.refresh))).resolves.toMatchObject({ ok: false, body: { error: 'invalid_grant' } });
+  });
+
+  it('ends the sign-in at the next refresh after its access token is revoked elsewhere', async () => {
+    const first = await signIn();
+    const family = (await store.readMcpOAuthData(Date.now())).families[0]!;
+    await registry.revokeAccessToken(family.accessTokenId);
+    await expect(service.refresh(refreshForm(first.clientId, first.refresh))).resolves.toMatchObject({ ok: false, body: { error: 'invalid_grant' } });
+    expect((await store.readMcpOAuthData(Date.now())).families[0]!.revokedAt).toBeDefined();
+  });
+
+  it('still refreshes when the current access record was pruned from the registry', async () => {
+    const first = await signIn();
+    const path = join(home, 'access-tokens.json');
+    const file = JSON.parse(await readFile(path, 'utf8')) as { v: 1; tokens: unknown[] };
+    await registry._settleAccessTokenWritesForTests();
+    await writeFile(path, JSON.stringify({ ...file, tokens: [] }), { mode: 0o600 });
+    await expect(service.refresh(refreshForm(first.clientId, first.refresh))).resolves.toMatchObject({ ok: true });
+  });
+
+  it('lets exactly one of two concurrent refreshes succeed and ends the sign-in', async () => {
+    const first = await signIn();
+    const results = await Promise.all([service.refresh(refreshForm(first.clientId, first.refresh)), service.refresh(refreshForm(first.clientId, first.refresh))]);
+    expect(results.filter((result) => result.ok)).toHaveLength(1);
+    expect((await store.readMcpOAuthData(Date.now())).families[0]!.revokedAt).toBeDefined();
+    expect(registry.listActiveRecordsOfKind('token')).toEqual([]);
+  });
+
+  it('revokeToken ends the sign-in of a Date-expired access token and of a refresh token, and ignores garbage', async () => {
+    await expect(service.revokeToken('garbage')).resolves.toBeUndefined();
+    await expect(service.revokeToken(`odr_${'0'.repeat(64)}`)).resolves.toBeUndefined();
+
+    const viaAccess = await signIn();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(Date.now() + 31 * 24 * 60 * 60_000);
+    expect(registry.verifyAccessToken(viaAccess.access)).toEqual({ ok: false });
+    await service.revokeToken(viaAccess.access);
+    vi.useRealTimers();
+    const viaRefresh = await signIn();
+    await service.revokeToken(viaRefresh.refresh);
+    const families = (await store.readMcpOAuthData(Date.now())).families;
+    expect(families).toHaveLength(2);
+    for (const family of families) expect(family.revokedAt).toBeDefined();
+    await expect(service.refresh(refreshForm(viaRefresh.clientId, viaRefresh.refresh))).resolves.toMatchObject({ ok: false });
+  });
+
+  it('revokeFamily ends an active sign-in once and then answers false', async () => {
+    const first = await signIn();
+    const family = (await store.readMcpOAuthData(Date.now())).families[0]!;
+    await expect(service.revokeFamily(family.familyId)).resolves.toBe(true);
+    expect(registry.verifyAccessToken(first.access)).toEqual({ ok: false });
+    await expect(service.revokeFamily(family.familyId)).resolves.toBe(false);
+    await expect(service.revokeFamily('0'.repeat(32))).resolves.toBe(false);
   });
 });

@@ -2,23 +2,33 @@
  * The OAuth 2.1 authorization server behind `/mcp` (PAN-4945 D-4..D-9).
  *
  * Every operation the OAuth routes call lives here: client registration,
- * the authorize request and its approval (D-6), and the code exchange (D-7).
+ * the authorize request and its approval (D-6), the code exchange (D-7),
+ * refresh rotation with reuse detection (D-8) and revocation (D-9).
  * The routes stay thin; this module imports nothing from `src/dashboard/`.
  *
  * Approvals and authorization codes live only in memory, so a dashboard
  * restart cancels every sign-in in progress; the client starts again. Clients
  * and sign-ins (families) live in `mcp-oauth.json` (`./oauth-store.js`), and
  * each family's access token is an ordinary `kind: 'token'` record carrying
- * `oauthClientId`, `oauthFamilyId` and `expiresAt`.
+ * `oauthClientId`, `oauthFamilyId` and `expiresAt`. Refresh and every
+ * family revocation run through one serialized queue, so two refreshes of the
+ * same sign-in never interleave.
  *
  * `createMcpOAuthService(deps)` takes the clock and the random source so tests
  * can move time; `mcpOAuthService` is the default instance. A store or
  * registry failure becomes a 500 `server_error` and one `console.error` line
  * that names the file, never a token.
  */
-import { createHash, randomBytes as cryptoRandomBytes } from 'node:crypto';
+import { createHash, randomBytes as cryptoRandomBytes, timingSafeEqual } from 'node:crypto';
 
-import { createAccessToken, revokeAccessToken, revokeAccessTokensMatching } from '../access-tokens.js';
+import {
+  ACCESS_TOKEN_PREFIX,
+  createAccessToken,
+  listAccessTokens,
+  readActiveAccessTokenRecord,
+  revokeAccessToken,
+  revokeAccessTokensMatching,
+} from '../access-tokens.js';
 import {
   ACCESS_TOKEN_TTL_MS,
   APPROVAL_TTL_MS,
@@ -37,7 +47,7 @@ import {
   validateRegistration,
   type OAuthLevel,
 } from './oauth-flow.js';
-import { mutateMcpOAuthData, readMcpOAuthData, type OAuthClientRecord } from './oauth-store.js';
+import { MAX_PRIOR_REFRESH_HASHES, mutateMcpOAuthData, readMcpOAuthData, type OAuthClientRecord, type OAuthFamilyRecord } from './oauth-store.js';
 
 export interface McpOAuthServiceDeps {
   now(): number;
@@ -74,6 +84,12 @@ export interface McpOAuthService {
   listApprovals(): PendingApprovalView[];
   decideApproval(id: string, decision: unknown, level: unknown): DecideResult;
   exchangeCode(form: URLSearchParams): Promise<TokenResult>;
+  /** D-8: rotate both tokens; a retired refresh token ends the sign-in. */
+  refresh(form: URLSearchParams): Promise<TokenResult>;
+  /** D-9: end the sign-in of an `odk_` or `odr_` token. Never throws. */
+  revokeToken(token: string): Promise<void>;
+  /** D-9: false when no active sign-in has that id. */
+  revokeFamily(familyId: string): Promise<boolean>;
 }
 
 const MAX_CLIENTS = 50;
@@ -121,6 +137,12 @@ function sha256Hex(value: string): string {
   return createHash('sha256').update(value).digest('hex');
 }
 
+/** Constant-time comparison of a stored hex digest with a presented digest. */
+function hashEquals(storedHex: string, presented: Buffer): boolean {
+  const stored = Buffer.from(storedHex, 'hex');
+  return stored.length === presented.length && timingSafeEqual(stored, presented);
+}
+
 function failure(status: 400 | 401 | 500, error: string, description?: string): { ok: false; status: 400 | 401 | 500; body: ErrorBody } {
   return { ok: false, status, body: oauthErrorBody(error, description) };
 }
@@ -134,21 +156,30 @@ export function createMcpOAuthService(deps: Partial<McpOAuthServiceDeps> = {}): 
   const randomBytes = deps.randomBytes ?? cryptoRandomBytes;
   const approvals = new Map<string, Approval>();
   const codes = new Map<string, AuthorizationCode>();
+  let queue: Promise<unknown> = Promise.resolve();
+
+  /** Run refresh and family revocations one at a time (D-8). */
+  function serialized<T>(work: () => Promise<T>): Promise<T> {
+    const run = queue.then(work);
+    queue = run.catch(() => undefined);
+    return run;
+  }
 
   function cleanup(at: number): void {
     for (const [id, approval] of approvals) if (at > approval.expiresAt + APPROVAL_GRACE_MS) approvals.delete(id);
     for (const [value, code] of codes) if (at > code.expiresAt + CODE_REUSE_WINDOW_MS) codes.delete(value);
   }
 
-  /** End a family: mark it revoked and revoke every access token it holds (D-9). */
+  /** End a family: mark it revoked and revoke every access token it holds (D-9). True when it was active. Call inside `serialized`. */
   async function endFamily(familyId: string): Promise<boolean> {
     const at = now();
     const ended = await mutateMcpOAuthData(at, (data) => {
       const index = data.families.findIndex((family) => family.familyId === familyId && family.revokedAt === undefined);
       if (index === -1) return { data, result: false, write: false };
       const families = data.families.slice();
-      families[index] = { ...families[index]!, revokedAt: iso(at) };
-      return { data: { ...data, families }, result: true };
+      const family = families[index]!;
+      families[index] = { ...family, revokedAt: iso(at) };
+      return { data: { ...data, families }, result: Date.parse(family.refreshExpiresAt) > at };
     });
     await revokeAccessTokensMatching((record) => record.oauthFamilyId === familyId);
     return ended;
@@ -377,7 +408,8 @@ export function createMcpOAuthService(deps: Partial<McpOAuthServiceDeps> = {}): 
     // D-7.2: a code presented twice ends the sign-in it produced. Checked before
     // expiry, because used codes are kept past expiry only to catch this.
     if (code.used) {
-      if (code.familyId !== undefined) await endFamily(code.familyId).catch(logFailure);
+      const familyId = code.familyId;
+      if (familyId !== undefined) await serialized(() => endFamily(familyId)).catch(logFailure);
       else code.reused = true;
       return failure(400, 'invalid_grant');
     }
@@ -400,13 +432,94 @@ export function createMcpOAuthService(deps: Partial<McpOAuthServiceDeps> = {}): 
     code.familyId = minted.familyId;
     if (code.reused) {
       // The code was presented again while this exchange was minting: treat it as a reuse.
-      await endFamily(minted.familyId!).catch(logFailure);
+      await serialized(() => endFamily(minted.familyId!)).catch(logFailure);
       return failure(400, 'invalid_grant');
     }
     return { ok: true, body: minted.body };
   }
 
-  return { registerClient, authorize, approvalStatus, listApprovals, decideApproval, exchangeCode };
+  /** The family whose current refresh hash is `hash`, else the one that retired it. */
+  function findByRefreshHash(families: readonly OAuthFamilyRecord[], hash: Buffer): { family: OAuthFamilyRecord; retired: boolean } | null {
+    const current = families.find((family) => hashEquals(family.refreshHash, hash));
+    if (current) return { family: current, retired: false };
+    const prior = families.find((family) => family.priorRefreshHashes.some((old) => hashEquals(old, hash)));
+    return prior ? { family: prior, retired: true } : null;
+  }
+
+  async function rotate(presented: string, clientId: string): Promise<TokenResult> {
+    const at = now();
+    const data = await readMcpOAuthData(at);
+    const found = findByRefreshHash(data.families, Buffer.from(sha256Hex(presented), 'hex'));
+    if (!found) return failure(400, 'invalid_grant');
+    const { family } = found;
+    // D-8.2: a retired refresh token shows theft, so the whole sign-in ends.
+    if (found.retired) {
+      await endFamily(family.familyId);
+      return failure(400, 'invalid_grant');
+    }
+    if (family.revokedAt !== undefined || Date.parse(family.refreshExpiresAt) <= at || clientId !== family.clientId) {
+      return failure(400, 'invalid_grant');
+    }
+    // D-8.6: rotation never revokes the current access token, so a revoked one
+    // was revoked from outside (Settings, `pan token revoke`). A pruned one was not.
+    const current = (await listAccessTokens()).find((record) => record.id === family.accessTokenId);
+    if (current?.revokedAt !== undefined) {
+      await endFamily(family.familyId);
+      return failure(400, 'invalid_grant');
+    }
+    const client = data.clients.find((c) => c.clientId === family.clientId);
+    if (!client) return failure(400, 'invalid_grant');
+    const access = await mintAccessToken(client, family.familyId, family.level, at);
+    const next = newRefreshToken();
+    try {
+      await mutateMcpOAuthData(at, (latest) => ({
+        data: {
+          clients: latest.clients.map((c) => (c.clientId === client.clientId ? { ...c, lastUsedAt: iso(at) } : c)),
+          families: latest.families.map((f) => (f.familyId !== family.familyId ? f : {
+            ...f,
+            refreshHash: next.hash,
+            priorRefreshHashes: [f.refreshHash, ...f.priorRefreshHashes].slice(0, MAX_PRIOR_REFRESH_HASHES),
+            accessTokenId: access.id,
+          })),
+        },
+        result: undefined,
+      }));
+    } catch (error) {
+      await revokeAccessToken(access.id).catch(logFailure);
+      throw error;
+    }
+    await revokeAccessTokensMatching((record) => record.oauthFamilyId === family.familyId && record.id !== access.id);
+    return { ok: true, body: { access_token: access.token, token_type: 'Bearer', expires_in: ACCESS_TOKEN_TTL_MS / 1000, refresh_token: next.token, scope: family.level } };
+  }
+
+  async function refresh(form: URLSearchParams): Promise<TokenResult> {
+    const presented = form.get('refresh_token');
+    const clientId = form.get('client_id');
+    if (!presented || !clientId) return failure(400, 'invalid_request', 'refresh_token and client_id are required');
+    return serialized(() => rotate(presented, clientId)).catch((error: unknown) => {
+      logFailure(error);
+      return failure(500, 'server_error');
+    });
+  }
+
+  async function revokeToken(token: string): Promise<void> {
+    await serialized(async () => {
+      let familyId: string | undefined;
+      if (token.startsWith(ACCESS_TOKEN_PREFIX)) {
+        // Ignores expiresAt, so an expired access token can still end its sign-in.
+        familyId = (await readActiveAccessTokenRecord(token))?.oauthFamilyId;
+      } else if (token.startsWith(REFRESH_TOKEN_PREFIX)) {
+        familyId = findByRefreshHash((await readMcpOAuthData(now())).families, Buffer.from(sha256Hex(token), 'hex'))?.family.familyId;
+      }
+      if (familyId !== undefined) await endFamily(familyId);
+    }).catch(logFailure);
+  }
+
+  function revokeFamily(familyId: string): Promise<boolean> {
+    return serialized(() => endFamily(familyId));
+  }
+
+  return { registerClient, authorize, approvalStatus, listApprovals, decideApproval, exchangeCode, refresh, revokeToken, revokeFamily };
 }
 
 export const mcpOAuthService: McpOAuthService = createMcpOAuthService();
