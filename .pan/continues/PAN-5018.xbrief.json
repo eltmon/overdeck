@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5018",
   "created": "2026-11-04T13:12:52.932Z",
-  "updated": "2026-11-04T13:18:06.582Z",
+  "updated": "2026-11-04T13:24:13.403Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -40,9 +40,10 @@
       "doneAt": "2026-11-04T13:18:03.637Z"
     },
     "rtc-transport-offer-logging": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5018",
-      "claimedAt": "2026-11-04T13:18:06.582Z"
+      "claimedAt": "2026-11-04T13:18:06.582Z",
+      "doneAt": "2026-11-04T13:24:13.403Z"
     }
   }
 }
