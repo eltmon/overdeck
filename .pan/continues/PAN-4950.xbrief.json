@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4950",
   "created": "2026-11-04T10:02:21.153Z",
-  "updated": "2026-11-04T11:12:45.622Z",
+  "updated": "2026-11-04T11:13:33.231Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -120,6 +120,10 @@
     "conn-directory.ac1": {
       "status": "completed",
       "doneAt": "2026-11-04T11:12:45.622Z"
+    },
+    "conn-directory.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T11:13:33.231Z"
     }
   }
 }
