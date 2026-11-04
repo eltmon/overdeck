@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4998",
   "created": "2026-11-04T10:12:10.948Z",
-  "updated": "2026-11-04T10:29:38.936Z",
+  "updated": "2026-11-04T10:32:57.361Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,9 +34,10 @@
       "doneAt": "2026-11-04T10:29:34.059Z"
     },
     "w5-doctor-size": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4998",
-      "claimedAt": "2026-11-04T10:29:38.936Z"
+      "claimedAt": "2026-11-04T10:29:38.936Z",
+      "doneAt": "2026-11-04T10:32:57.360Z"
     }
   }
 }
