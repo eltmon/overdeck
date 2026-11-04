@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4957",
   "created": "2026-11-04T16:52:59.952Z",
-  "updated": "2026-11-04T17:14:04.015Z",
+  "updated": "2026-11-04T17:14:17.477Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -58,6 +58,10 @@
     "ci-job-hermes.ac2": {
       "status": "completed",
       "doneAt": "2026-11-04T17:14:04.015Z"
+    },
+    "ci-job-hermes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T17:14:17.477Z"
     }
   }
 }
