@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4998",
   "created": "2026-11-04T10:12:10.948Z",
-  "updated": "2026-11-04T10:46:57.424Z",
+  "updated": "2026-11-04T10:47:36.720Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -70,6 +70,10 @@
     "w3-tmp-sweep.ac3": {
       "status": "completed",
       "doneAt": "2026-11-04T10:46:57.423Z"
+    },
+    "w4-sweep-schedule.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:47:36.720Z"
     }
   }
 }
