@@ -1,0 +1,67 @@
+{
+  "version": "1",
+  "issueId": "PAN-4663",
+  "created": "2026-11-01T11:01:24.996Z",
+  "updated": "2026-11-01T11:16:59.663Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "init-perms-network-mode": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4663",
+      "claimedAt": "2026-11-01T11:01:24.996Z",
+      "doneAt": "2026-11-01T11:03:20.257Z"
+    },
+    "network-guard-test": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4663",
+      "claimedAt": "2026-11-01T11:03:44.362Z",
+      "doneAt": "2026-11-01T11:11:17.903Z"
+    },
+    "network-rule-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4663",
+      "claimedAt": "2026-11-01T11:11:21.892Z",
+      "doneAt": "2026-11-01T11:13:25.894Z"
+    },
+    "init-perms-network-mode.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T11:15:17.728Z"
+    },
+    "init-perms-network-mode.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T11:15:31.020Z"
+    },
+    "init-perms-network-mode.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T11:15:44.348Z"
+    },
+    "network-guard-test.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T11:15:59.019Z"
+    },
+    "network-guard-test.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T11:16:09.928Z"
+    },
+    "network-guard-test.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T11:16:20.963Z"
+    },
+    "network-rule-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T11:16:35.521Z"
+    },
+    "network-rule-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T11:16:47.961Z"
+    },
+    "network-rule-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T11:16:59.663Z"
+    }
+  }
+}

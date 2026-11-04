@@ -75,6 +75,7 @@ import { findProjectByPath, resolveProjectFromIssueSync } from '../projects.js';
 import { inferProjectForge } from '../project-repos.js';
 import { cachedApprovalAtHead } from '../cloister/approval-at-head.js';
 import { readOpenOperatorDecision } from '../cloister/operator-decision.js';
+import { isDeftPipelineIssue } from '../deft/issue-pipeline.js';
 import { runGh } from '../github-quota/run-gh.js';
 import { prListingTtlMs, shouldListPullRequests } from './pr-cache-policy.js';
 import { deriveWorkStart, readWorkStartFacts, type WorkStartFacts } from './work-start-state.js';
@@ -149,6 +150,8 @@ export interface IssueStateFacts {
   readonly workStart?: DerivedWorkStart;
   /** An open PR on the pipeline branch that no pipeline workspace picked up (PAN-4605). */
   readonly prOutsidePipeline?: DerivedPrOutsidePipeline;
+  /** PAN-4820: the issue runs on Deft's pipeline, so no Overdeck approval is expected (AD-4). */
+  readonly deftPipeline?: boolean;
 }
 
 // ─── the pure function ───────────────────────────────────────────────────────
@@ -169,7 +172,7 @@ function deriveState(facts: IssueStateFacts): IssueState {
     // the gate's cached answer for this head, never the forge's
     // `reviewDecision` (empty without branch protection, and stale on a push).
     if (
-      facts.prApprovedAtHead === true && pr.reviewState !== 'changes-requested'
+      (facts.prApprovedAtHead === true || facts.deftPipeline === true) && pr.reviewState !== 'changes-requested'
       && pr.checks === 'green' && pr.mergeable === true
     ) {
       return 'ready';
@@ -267,6 +270,8 @@ export interface IssueStateLoaderDeps {
   readonly readWorkStart?: (issueId: string, projectPath: string) => WorkStartFacts | null;
   /** The outside-PR read behind `prOutsidePipeline` (PAN-4605); `readPrOutsidePipeline` by default. */
   readonly readPrOutsidePipeline?: typeof readPrOutsidePipeline;
+  /** PAN-4820: `isDeftPipelineIssue` by default. */
+  readonly isDeftPipeline?: (issueId: string) => Promise<boolean>;
 }
 
 /** The tracker's answer for one issue. */
@@ -446,7 +451,7 @@ async function readPrWithGh(_issueId: string, projectPath: string, branch: strin
 
 // ─── GitLab ──────────────────────────────────────────────────────────────────
 
-interface GlabMrRow {
+export interface GlabMrRow {
   iid?: number;
   web_url?: string;
   state?: string;
@@ -493,7 +498,7 @@ export function mrFromGlabRow(row: GlabMrRow): LoadedPr | null {
   };
 }
 
-async function listRepoMergeRequests(projectPath: string): Promise<readonly GlabMrRow[]> {
+export async function listRepoMergeRequests(projectPath: string): Promise<readonly GlabMrRow[]> {
   return cachedRepoMergeRequests(projectPath, async () => {
     try {
       const { stdout } = await execFileAsync('glab', [
@@ -815,6 +820,7 @@ export async function loadIssueStateFacts(
     ...(project ? { operatorDecisionOpen: operatorDecisionOpenFor(issueId, project.projectPath) } : {}),
     ...(workStart ? { workStart } : {}),
     ...(prOutsidePipeline ? { prOutsidePipeline } : {}),
+    ...((await (deps.isDeftPipeline ?? isDeftPipelineIssue)(issueId)) ? { deftPipeline: true } : {}),
   };
   return facts;
 }
@@ -974,6 +980,7 @@ export async function loadIssueStatesForProject(
       operatorDecisionOpen: operatorDecisionOpenFor(issueId, projectPath),
       ...(workStart ? { workStart } : {}),
       ...(prOutsidePipeline ? { prOutsidePipeline } : {}),
+      ...((await (deps.isDeftPipeline ?? isDeftPipelineIssue)(issueId)) ? { deftPipeline: true } : {}),
     };
     out.set(issueId, deriveIssueState(facts));
   }

@@ -18,7 +18,8 @@ import { homedir } from 'os';
 import { parse } from 'yaml';
 import { Effect, Stream } from 'effect';
 import { getIsolatedPlaywrightMcpConfig } from '../claude-mcp.js';
-import { buildClaudeUserSettings } from '../claude-permissions.js';
+import { BYPASS_PERMISSION_MODE, buildClaudeUserSettings } from '../claude-permissions.js';
+import { listFlyMachines } from '../anywhere/fly/machine-store.js';
 import { FlyApiClient, createFlyApiClient, FlyApiError } from './fly-api.js';
 import type { RemoteProvider, VmInfo, VmStatus, ExecResult } from './interface.js';
 import { RemoteError } from './interface.js';
@@ -36,7 +37,7 @@ export interface FlyProviderConfig {
   vmSize?: string;
   /** Memory in MB (default: 1024) */
   vmMemory?: number;
-  /** Docker image for workspace machines */
+  /** Docker image for workspace machines (default: registry.fly.io/<app>:latest) */
   image?: string;
   /** API token (falls back to FLY_API_TOKEN env var) */
   apiToken?: string;
@@ -46,6 +47,17 @@ export interface FlyProviderConfig {
 
 const DURABLE_VOLUME_SIZE_GB = 10;
 const DURABLE_MAX_RETRIES = 3;
+
+/** Fly app that owns workspace machines when `[remote.fly] app` is unset. */
+export const DEFAULT_FLY_APP = 'pan-workspaces';
+
+/**
+ * Default workspace image for a Fly app. The Fly registry is app-scoped, so an
+ * image can only live at registry.fly.io/<app>; the default follows the app (PAN-4682).
+ */
+export function defaultFlyImage(app: string): string {
+  return `registry.fly.io/${app}:latest`;
+}
 
 function mapFlyStateToVmStatus(state: string): VmStatus {
   switch (state) {
@@ -88,13 +100,14 @@ export class FlyProvider implements RemoteProvider {
   private api: FlyApiClient | null = null;
 
   constructor(config: FlyProviderConfig = {}) {
+    const app = config.app ?? DEFAULT_FLY_APP;
     this.config = {
-      app: config.app ?? 'pan-workspaces',
+      app,
       org: config.org ?? 'personal',
       region: config.region ?? 'iad',
       vmSize: config.vmSize ?? 'shared-cpu-2x',
       vmMemory: config.vmMemory ?? 1024,
-      image: config.image ?? 'registry.fly.io/pan-workspace:latest',
+      image: config.image ?? defaultFlyImage(app),
       apiToken: config.apiToken ?? process.env.FLY_API_TOKEN ?? '',
       resiliencyTier: config.resiliencyTier ?? 'ephemeral',
     };
@@ -134,8 +147,10 @@ export class FlyProvider implements RemoteProvider {
   }
 
   /**
-   * Resolve vmName to {appName, machineId} by scanning workspace metadata.
-   * Falls back to listing machines in the app.
+   * Resolve vmName to {appName, machineId} by scanning workspace metadata,
+   * then the Fly machine records (a linked work agent's vmName is its Fly
+   * machine's name, in the app it was provisioned in — PAN-4734). Falls back
+   * to listing machines in the app.
    *
    * Internal helper: returns a Promise because all of its callers compose it
    * inside other Effect-wrapped operations.
@@ -156,6 +171,10 @@ export class FlyProvider implements RemoteProvider {
         }
       }
     }
+
+    // An unreadable store is no answer here; the API listing still is.
+    const record = (await listFlyMachines().catch(() => [])).find((r) => r.machineName === vmName);
+    if (record) return { appName: record.appName, machineId: record.machineId };
 
     // Fallback: search by machine name via API
     const machines = await this.getApi().listMachines(this.config.app);
@@ -569,7 +588,13 @@ export class FlyProvider implements RemoteProvider {
     await this.sshImpl(vmName, 'mkdir -p ~/.claude');
 
     // Set onboarding complete + pre-trust /workspace so the agent doesn't
-    // hang at the "do you trust this folder?" dialog on first launch.
+    // hang at the "do you trust this folder?" dialog on first launch, and
+    // pre-acknowledge the Bypass Permissions disclaimer (default "No, exit"),
+    // as preTrustDirectory() does for local workspaces (PAN-4295 smoke test).
+    // Also dismiss the one-shot "Make auto mode your default permission mode?"
+    // nudge: settings.json below always sets a non-auto defaultMode, so an
+    // eligible account sees it on every fresh VM and it swallows the first
+    // message (PAN-4738). Key verified in Claude Code 2.1.293 and 2.1.316.
     const onboardingScript = `
 import json, os
 path = os.path.expanduser("~/.claude.json")
@@ -579,6 +604,8 @@ if os.path.exists(path):
         data = json.load(f)
 data["hasCompletedOnboarding"] = True
 data["lastOnboardingVersion"] = "2.0.50"
+data["${BYPASS_PERMISSION_MODE}ModeAccepted"] = True
+data["hasSeenAutoDefaultNudge"] = True
 projects = data.setdefault("projects", {})
 ws = projects.setdefault("/workspace", {})
 ws["hasTrustDialogAccepted"] = True

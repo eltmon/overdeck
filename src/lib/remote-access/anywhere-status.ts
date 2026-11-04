@@ -8,6 +8,7 @@
  * list. Each carries an `action` the UI maps to a button; a message never
  * tells the operator to run a `pan` command.
  */
+import type { TailscaleNextStep } from '../tailscale/state.js';
 import { readVaultConfig } from '../vault/config.js';
 import { openVaultContext } from '../vault/open.js';
 
@@ -16,24 +17,76 @@ export type AnywhereVaultState = 'off' | 'locked' | 'rotation-pending' | 'ready'
 export type AnywhereAction =
   | { kind: 'pair-dialog' }
   | { kind: 'settings-section'; section: 'session-vault' }
+  | { kind: 'tailscale-setup' }
   | { kind: 'none'; docsUrl?: string };
 
 export interface AnywhereProblem {
-  code: 'identity-unreadable' | 'no-reachable-address' | 'vault-locked' | 'vault-rotation-pending';
+  code: 'identity-unreadable' | 'no-reachable-address' | 'vault-locked' | 'vault-rotation-pending' | 'tailscale-serve-unprotected';
   message: string;
   action: AnywhereAction;
 }
 
-export type AnywhereViewerKind = 'root-session' | 'device' | 'token' | 'internal-token';
+/**
+ * PAN-4645: `machine` is a linked machine reading the status over its secure
+ * channel. PAN-4835: `phone` is the phone app reading it the same way.
+ * PAN-4927 D-17: `connector` is an Overdeck connector reading it the same way.
+ */
+export type AnywhereViewerKind = 'root-session' | 'device' | 'token' | 'internal-token' | 'machine' | 'phone' | 'connector';
 
 export interface AnywhereStatus {
   machine: { environmentId: string; label: string } | null;
   addresses: Array<{ origin: string; loopback: boolean }>;
   devices: { active: number };
   vault: { state: AnywhereVaultState; backend: string | null };
+  /** PAN-4645 D-4645-12: the enforced `require_token_mint`, the YAML value, and why it is on by itself. */
+  tokenMint: { effective: boolean; configured: boolean; autoReasons: string[] };
   problems: AnywhereProblem[];
+  /** Tailscale on this machine (PAN-1254 FR-9); `not-installed` when no CLI resolves. */
+  tailscale: { nextStep: TailscaleNextStep | 'not-installed'; serveUrl: string | null; magicDnsName: string | null };
   /** Who is asking (PAN-4455 D-3); null when no credential resolves (a loopback peer with no session). */
   viewer: { kind: AnywhereViewerKind | null };
+  /** The overdeck.ai directory (PAN-2356); null when this machine is signed out or runs no directory client. */
+  directory: AnywhereDirectoryStatus | null;
+  /** The relay add-on (PAN-2356 FR-21); null when the plan has no relay or there is no directory. */
+  relay: AnywhereRelayStatus | null;
+}
+
+export interface AnywhereDirectoryStatus {
+  state: 'off' | 'connecting' | 'online' | 'refused';
+  plan: 'free' | 'tester' | null;
+  url: string | null;
+  refusal: string | null;
+}
+
+export interface AnywhereRelayStatus {
+  /** A relay channel is open now. */
+  using: boolean;
+  bytesUsed: number;
+  capBytes: number;
+  stopped: boolean;
+}
+
+type Source<T> = () => T | null;
+
+let directorySource: Source<AnywhereDirectoryStatus> = () => null;
+let relaySource: Source<AnywhereRelayStatus> = () => null;
+
+/** The dashboard registers the directory client here, so this module never imports the server. */
+export function setDirectoryStatusSource(source: Source<AnywhereDirectoryStatus> | null): void {
+  directorySource = source ?? (() => null);
+}
+
+/** The dashboard registers the relay client here. */
+export function setRelayStatusSource(source: Source<AnywhereRelayStatus> | null): void {
+  relaySource = source ?? (() => null);
+}
+
+export function readDirectoryStatus(): AnywhereDirectoryStatus | null {
+  return directorySource();
+}
+
+export function readRelayStatus(): AnywhereRelayStatus | null {
+  return relaySource();
 }
 
 const REMOTE_ACCESS_DOCS = 'https://overdeck.ai/configuration/remote-access';
@@ -87,8 +140,21 @@ export function computeAnywhereProblems(input: {
   identityError: string | null;
   addresses: AnywhereStatus['addresses'];
   vault: AnywhereStatus['vault'];
+  /** Tailscale Serve proxies this dashboard (PAN-1254). */
+  tailscaleServeOn?: boolean;
+  /** `dashboard.require_token_mint`. */
+  requireTokenMint?: boolean;
 }): AnywhereProblem[] {
   const problems: AnywhereProblem[] = [];
+  // Serve makes every tailnet visitor a loopback peer, and a loopback peer may
+  // mint the root session unless a token is required (PAN-1254 D-2).
+  if (input.tailscaleServeOn === true && input.requireTokenMint !== true) {
+    problems.push({
+      code: 'tailscale-serve-unprotected',
+      message: 'Tailscale Serve sends tailnet visitors to this dashboard, but a token is not required to sign in. Anyone on your tailnet could open it.',
+      action: { kind: 'tailscale-setup' },
+    });
+  }
   if (input.identityError !== null) {
     problems.push({
       code: 'identity-unreadable',

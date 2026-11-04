@@ -1,17 +1,26 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { BackendPane, DerivedIssueState } from '@overdeck/contracts';
 
-import { deriveFlywheelStatus, freshnessFor, type DeriveFlywheelStatusDeps } from '../../../../src/lib/flywheel/derive-status.js';
+import { deriveFlywheelStatus, freshnessFor, selectOpenStrikePr, type DeriveFlywheelStatusDeps } from '../../../../src/lib/flywheel/derive-status.js';
 import type { LegacyConversation } from '../../../../src/lib/overdeck/conversations.js';
 import { listPanesWithBackend, loadIssueStatesForProject, readIssueFromTracker } from '../../../../src/lib/overdeck/derived-issue-state.js';
 
-// The deriver's defaults import this module lazily; the two names below are
+// The deriver's defaults import this module lazily; the names below are
 // everything it takes from it, so replacing the module wholesale is safe and
-// keeps the default `loadStates` / `readTrackerIssues` paths offline.
+// keeps the default `loadStates` / `readTrackerIssues` / `readStrikePr`
+// paths offline (PAN-4752: the strike PR overlay's default reaches
+// `forgeForProject`/`listRepoPullRequests`/`listRepoMergeRequests`/
+// `prFromGhRow`/`mrFromGlabRow`, so any test that falls through to it needs
+// these mocked too).
 vi.mock('../../../../src/lib/overdeck/derived-issue-state.js', () => ({
   listPanesWithBackend: vi.fn(async () => []),
   loadIssueStatesForProject: vi.fn(async () => new Map()),
   readIssueFromTracker: vi.fn(async () => null),
+  forgeForProject: vi.fn(() => 'github'),
+  listRepoPullRequests: vi.fn(async () => []),
+  listRepoMergeRequests: vi.fn(async () => []),
+  prFromGhRow: vi.fn(() => null),
+  mrFromGlabRow: vi.fn(() => null),
 }));
 
 const NOW = Date.parse('2026-09-23T10:00:00.000Z');
@@ -453,6 +462,162 @@ describe('deriveFlywheelStatus (PAN-3964 FR-1)', () => {
       deps: baseDeps({ getConversation: () => conversation({ createdAt: '2026-09-23T08:00:00.000Z' }) }),
     });
     expect(status.conversation?.createdAt).toBe('2026-09-23T08:00:00.000Z');
+  });
+
+  describe('strike workspaces (PAN-4752)', () => {
+    it('folds a strike-only workspace onto its base id', async () => {
+      const readTrackerIssues = vi.fn(async () => ({}));
+      const loadStates = vi.fn(async () => new Map());
+      const status = await deriveFlywheelStatus({
+        deps: baseDeps({
+          listWorkspaces: () => [{ issueId: 'PAN-4669-STRIKE', workspacePath: '/ws/feature-pan-4669-strike' }],
+          readTrackerIssues,
+          loadStates,
+        }),
+      });
+      expect(status.inFlight.map((row) => row.issueId)).toEqual(['PAN-4669']);
+      expect(status.inFlight[0]?.strike).toBe(true);
+      expect(status.inFlight.some((row) => /-STRIKE$/i.test(row.issueId))).toBe(false);
+      expect(readTrackerIssues).toHaveBeenCalledWith(['PAN-4669']);
+      expect(loadStates).toHaveBeenCalledWith('/repos/overdeck', ['PAN-4669'], { issues: {}, panes: [] });
+    });
+
+    it('folds a strike workspace listed before its base workspace into one row, journal from the base', async () => {
+      const lastJournal = vi.fn(() => null);
+      const status = await deriveFlywheelStatus({
+        deps: baseDeps({
+          listWorkspaces: () => [
+            { issueId: 'PAN-7-STRIKE', workspacePath: '/ws/feature-pan-7-strike' },
+            { issueId: 'PAN-7', workspacePath: '/ws/feature-pan-7' },
+          ],
+          lastJournal,
+        }),
+      });
+      expect(status.inFlight.map((row) => row.issueId)).toEqual(['PAN-7']);
+      expect(status.inFlight[0]?.strike).toBe(true);
+      expect(lastJournal).toHaveBeenCalledWith('/ws/feature-pan-7');
+      expect(lastJournal).not.toHaveBeenCalledWith('/ws/feature-pan-7-strike');
+    });
+
+    it('folds a tick-only strike id onto its base, with inTick true', async () => {
+      const status = await deriveFlywheelStatus({
+        deps: baseDeps({
+          readTranscript: async () => [marker(4, '2026-09-23T09:59:30.000Z', 'pick=PAN-8-STRIKE phase=watch in-flight=PAN-8-STRIKE needs-you=none')],
+          listWorkspaces: () => [],
+        }),
+      });
+      expect(status.inFlight).toEqual([
+        expect.objectContaining({ issueId: 'PAN-8', strike: true, inTick: true, lastJournal: null }),
+      ]);
+    });
+
+    it('counts a live strike pane toward the folded row', async () => {
+      const status = await deriveFlywheelStatus({
+        deps: baseDeps({
+          listWorkspaces: () => [{ issueId: 'PAN-4669-STRIKE', workspacePath: '/ws/feature-pan-4669-strike' }],
+          listPanes: () => [
+            { id: 'PAN-4669-work', issue: 'PAN-4669', role: 'work', harness: 'claude-code', model: 'claude-opus-5-5', state: 'working' },
+          ],
+        }),
+      });
+      expect(status.inFlight[0]?.liveAgents).toBe(1);
+      expect(status.agents[0]?.issueId).toBe('PAN-4669');
+    });
+
+    it('does not set strike on a plain workspace row', async () => {
+      const status = await deriveFlywheelStatus({
+        deps: baseDeps({ listWorkspaces: () => [{ issueId: 'PAN-1', workspacePath: '/ws/feature-pan-1' }] }),
+      });
+      expect('strike' in status.inFlight[0]!).toBe(false);
+    });
+
+    describe('strike PR overlay (PAN-4752 W3)', () => {
+      function strikePr(number: number, reviewState: 'review-requested' | 'changes-requested' = 'review-requested') {
+        return { url: `https://github.com/eltmon/overdeck/pull/${number}`, number, reviewState, checks: 'pending' as const, mergeable: null };
+      }
+
+      it('carries the open strike PR and derives in-review, dropping work-not-started attention (test 6)', async () => {
+        const readStrikePr = vi.fn(async () => strikePr(4698));
+        const status = await deriveFlywheelStatus({
+          deps: baseDeps({
+            listWorkspaces: () => [{ issueId: 'PAN-4669-STRIKE', workspacePath: '/ws/feature-pan-4669-strike' }],
+            loadStates: async () => new Map([['PAN-4669', { issueId: 'PAN-4669', state: 'backlog', attention: 'work-not-started' } as DerivedIssueState]]),
+            readStrikePr,
+          }),
+        });
+        expect(status.inFlight[0]?.pr?.number).toBe(4698);
+        expect(status.inFlight[0]?.state).toBe('in-review');
+        expect(status.inFlight[0]).not.toHaveProperty('attention');
+        expect(readStrikePr).toHaveBeenCalledWith('/repos/overdeck', 'PAN-4669');
+      });
+
+      it('derives changes-requested from a strike PR in that review state (test 7)', async () => {
+        const status = await deriveFlywheelStatus({
+          deps: baseDeps({
+            listWorkspaces: () => [{ issueId: 'PAN-4669-STRIKE', workspacePath: '/ws/feature-pan-4669-strike' }],
+            readStrikePr: async () => strikePr(4698, 'changes-requested'),
+          }),
+        });
+        expect(status.inFlight[0]?.state).toBe('changes-requested');
+      });
+
+      it('keeps the tracker-derived state and drops no PR when no strike PR is open (test 8)', async () => {
+        const status = await deriveFlywheelStatus({
+          deps: baseDeps({
+            listWorkspaces: () => [{ issueId: 'PAN-4669-STRIKE', workspacePath: '/ws/feature-pan-4669-strike' }],
+            loadStates: async () => new Map([['PAN-4669', { issueId: 'PAN-4669', state: 'working' } as DerivedIssueState]]),
+            readStrikePr: async () => null,
+          }),
+        });
+        expect(status.inFlight.map((row) => row.issueId)).toEqual(['PAN-4669']);
+        expect(status.inFlight[0]?.state).toBe('working');
+        expect(status.inFlight[0]).not.toHaveProperty('pr');
+      });
+
+      it('drops a closed strike row from in-flight even with an open strike PR (test 9)', async () => {
+        const status = await deriveFlywheelStatus({
+          deps: baseDeps({
+            listWorkspaces: () => [{ issueId: 'PAN-4669-STRIKE', workspacePath: '/ws/feature-pan-4669-strike' }],
+            loadStates: async () => new Map([['PAN-4669', { issueId: 'PAN-4669', state: 'closed' } as DerivedIssueState]]),
+            readStrikePr: async () => strikePr(4698),
+          }),
+        });
+        expect(status.inFlight).toEqual([]);
+      });
+
+      it('prefers a feature-branch PR and never reads the strike PR for it (test 10)', async () => {
+        const readStrikePr = vi.fn(async () => strikePr(4698));
+        const featurePr = { url: 'https://github.com/eltmon/overdeck/pull/7', number: 7, reviewState: 'review-requested' as const, checks: 'pending' as const, mergeable: null };
+        const status = await deriveFlywheelStatus({
+          deps: baseDeps({
+            listWorkspaces: () => [{ issueId: 'PAN-4669-STRIKE', workspacePath: '/ws/feature-pan-4669-strike' }],
+            loadStates: async () => new Map([['PAN-4669', { issueId: 'PAN-4669', state: 'in-review', pr: featurePr } as DerivedIssueState]]),
+            readStrikePr,
+          }),
+        });
+        expect(status.inFlight[0]?.pr?.number).toBe(7);
+        expect(readStrikePr).not.toHaveBeenCalled();
+      });
+
+      it('never calls readStrikePr for a non-strike row', async () => {
+        const readStrikePr = vi.fn(async () => strikePr(4698));
+        await deriveFlywheelStatus({
+          deps: baseDeps({ listWorkspaces: () => [{ issueId: 'PAN-1', workspacePath: '/ws/feature-pan-1' }], readStrikePr }),
+        });
+        expect(readStrikePr).not.toHaveBeenCalled();
+      });
+
+      it('selectOpenStrikePr drops merged PRs and keeps the highest open number (test 11)', () => {
+        const merged10 = { url: '', number: 10, reviewState: 'none' as const, checks: 'pending' as const, mergeable: null, merged: true };
+        const open11 = { url: '', number: 11, reviewState: 'none' as const, checks: 'pending' as const, mergeable: null, merged: false };
+        const open12 = { url: '', number: 12, reviewState: 'none' as const, checks: 'pending' as const, mergeable: null, merged: false };
+        expect(selectOpenStrikePr([merged10])).toBeNull();
+        expect(selectOpenStrikePr([merged10, open12])?.number).toBe(12);
+        expect(selectOpenStrikePr([null, open12])?.number).toBe(12);
+        expect(selectOpenStrikePr([open11, open12])?.number).toBe(12);
+        expect(selectOpenStrikePr([open12])).not.toHaveProperty('merged');
+      });
+    });
   });
 
   it('never writes: every dependency it calls is a read', async () => {

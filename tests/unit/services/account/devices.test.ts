@@ -92,6 +92,12 @@ describe('device records (PAN-4293 account-device-credentials)', () => {
     expect(isValidPlatform('linux-x64')).toBe(true);
     expect(isValidPlatform('freebsd-x64')).toBe(false);
     expect(isValidPlatform('linux-x86')).toBe(false);
+    expect(isValidPlatform('ios-arm64')).toBe(true);
+    expect(isValidPlatform('android-arm64')).toBe(true);
+    expect(isValidPlatform('ios-x64')).toBe(false);
+    expect(isValidPlatform('android-x64')).toBe(false);
+    expect(isValidPlatform('ios-arm')).toBe(false);
+    expect(isValidPlatform('iphone-arm64')).toBe(false);
     expect(isValidEnvironmentId(ENV_A)).toBe(true);
     expect(isValidEnvironmentId(ENV_B.toUpperCase())).toBe(false);
     expect(isValidEnvironmentId('11111111-2222-1333-8444-555555555555')).toBe(false);
@@ -103,6 +109,8 @@ describe('device records (PAN-4293 account-device-credentials)', () => {
     expect(defaultLabel('linux-x64')).toBe('Linux device');
     expect(defaultLabel('darwin-arm64')).toBe('macOS device');
     expect(defaultLabel('win32-x64')).toBe('Windows device');
+    expect(defaultLabel('ios-arm64')).toBe('iPhone');
+    expect(defaultLabel('android-arm64')).toBe('Android phone');
     expect(normalizeLabel('  my laptop ')).toBe('my laptop');
     expect(normalizeLabel('')).toBeNull();
     expect(normalizeLabel('   ')).toBeNull();
@@ -148,6 +156,7 @@ describe('verifyDeviceToken (FR-5, FR-6)', () => {
       ok: true,
       userId: 'u-tester',
       githubId: 100,
+      githubLogin: 'user100',
       deviceId: tester.deviceId,
       entitlement: { plan: 'tester', storageBytesCap: 2147483648, maxDevices: null },
     });
@@ -155,6 +164,35 @@ describe('verifyDeviceToken (FR-5, FR-6)', () => {
     await seedUser(rc, 'u-owner', TEST_OWNER_GITHUB_ID);
     const owner = await mintDevice(rc, 'u-owner', 'linux-x64', ENV_A);
     expect(await verifyDeviceToken(rc, owner.token)).toMatchObject({ ok: true, entitlement: { storageBytesCap: 5368709120 } });
+  });
+
+  it('a free grant verifies as the free plan with maxDevices 3; tester and owner stay unlimited (PAN-2356)', async () => {
+    const { rc, db } = setup();
+    await seedUser(rc, 'u-free', 300);
+    await addGrant(rc, 300, 'free-user', {}, 'admin-add');
+    await db.prepare("UPDATE grants SET entitlement = 'free' WHERE github_id = ?").bind(300).run();
+    const free = await mintDevice(rc, 'u-free', 'linux-x64', ENV_A);
+    expect(await verifyDeviceToken(rc, free.token)).toMatchObject({ ok: true, entitlement: { plan: 'free', maxDevices: 3 } });
+
+    await seedUser(rc, 'u-tester', 100);
+    await addGrant(rc, 100, 'tester', {}, 'admin-add');
+    const tester = await mintDevice(rc, 'u-tester', 'linux-x64', ENV_A);
+    expect(await verifyDeviceToken(rc, tester.token)).toMatchObject({ ok: true, entitlement: { plan: 'tester', maxDevices: null } });
+
+    await seedUser(rc, 'u-owner', TEST_OWNER_GITHUB_ID);
+    const owner = await mintDevice(rc, 'u-owner', 'linux-x64', ENV_A);
+    expect(await verifyDeviceToken(rc, owner.token)).toMatchObject({ ok: true, entitlement: { plan: 'tester', maxDevices: null } });
+  });
+
+  it('reflects a changed github_login on the next verify (AC2)', async () => {
+    const { rc, db } = setup();
+    await seedUser(rc, 'u-tester', 100);
+    await addGrant(rc, 100, 'tester', {}, 'admin-add');
+    const tester = await mintDevice(rc, 'u-tester', 'linux-x64', ENV_A);
+    expect(await verifyDeviceToken(rc, tester.token)).toMatchObject({ ok: true, githubLogin: 'user100' });
+
+    await db.prepare('UPDATE users SET github_login = ? WHERE user_id = ?').bind('renamed-user', 'u-tester').run();
+    expect(await verifyDeviceToken(rc, tester.token)).toMatchObject({ ok: true, githubLogin: 'renamed-user' });
   });
 
   it('writes last_used_at on first verify, leaves it 4 minutes later and rewrites it 6 minutes later (D-18)', async () => {

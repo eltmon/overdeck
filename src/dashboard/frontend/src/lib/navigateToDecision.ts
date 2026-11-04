@@ -30,7 +30,9 @@ export interface DecisionSubjectTarget {
 /** The path a subject resolves to, or null when there is nowhere to send the operator. */
 export function decisionSubjectPath(target: DecisionSubjectTarget): string | null {
   if (target.source === 'conversation') {
-    const path = `/conv/${encodeURIComponent(target.id)}`;
+    // PAN-4651: a linked machine's conversation keeps its `/conv/@<env>/<name>` form.
+    const linked = /^@([^/]+)\/([^/]+)$/.exec(target.id);
+    const path = linked ? `/conv/@${encodeURIComponent(linked[1]!)}/${encodeURIComponent(linked[2]!)}` : `/conv/${encodeURIComponent(target.id)}`;
     return target.view === 'terminal' ? `${path}?view=terminal` : path;
   }
   return target.issueId ? `/issues/${encodeURIComponent(target.issueId)}` : null;

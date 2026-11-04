@@ -7,25 +7,31 @@
  * file (see the REMOTE gate in cloister/prompts/work.md).
  *
  * `reapCompletedRemoteAgents()` is the host-side half of that contract:
- * for every remote agent that has created the sentinel (or exited after
- * pushing its branch), it
+ * for every remote agent that has created the sentinel, it
  *
  *   1. verifies the feature branch exists on origin,
  *   2. materializes the standard local worktree for the branch,
  *   3. copies the remote .pan/continue.json back (best effort),
  *   4. writes a minimal local agent state.json (downstream flows resolve
  *      the workspace through it),
- *   5. creates the review artifact set + review status (same entry the
- *      `pan done` flow uses), writes the `completed` marker that the
- *      cloister's checkCompletionMarkers() patrol consumes,
- *   6. stops the fly machine and marks the remote agent state stopped.
+ *   5. creates the review artifact set (same entry the `pan done` flow
+ *      uses) and writes the `completed` marker other readers use as "work
+ *      agent finished",
+ *   6. destroys the fly machine, marks the remote agent state stopped, and
+ *      requests review through the guarded review route.
  *
- * Invoked via `pan admin remote reap` (and suitable for a deacon patrol).
+ * A linked work agent (PAN-4734) runs as a conversation on a Fly machine
+ * linked to home. Its session is the conversation's tmux session, its repo is
+ * its VM worktree (`workdir`), and step 6 destroys the machine, removes its
+ * link and forgets its record instead of deleting a legacy VM and its
+ * workspace metadata.
+ *
+ * Invoked every deacon-lite tick and by `pan admin remote reap`.
  */
 
 import { existsSync, mkdirSync, readdirSync, unlinkSync, writeFileSync } from 'fs';
 import { homedir } from 'os';
-import { basename, join } from 'path';
+import { basename, dirname, join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { Effect } from 'effect';
@@ -34,15 +40,18 @@ import { createFlyProviderFromConfig } from './index.js';
 import {
   loadRemoteAgentState,
   saveRemoteAgentState,
-  isRemoteAgentRunning,
   listActiveRemoteAgentStates,
   getRemoteAgentOutput,
   sendToRemoteAgent,
+  remoteTmuxTarget,
 } from './remote-agents.js';
 import { resolveProjectFromIssueSync, extractTeamPrefix, findProjectByTeam } from '../projects.js';
 import { createWorkspace } from '../workspace-manager.js';
 import { workspaceNeedsSetup } from '../workspace-manager/setup-marker.js';
 import { PAN_DIRNAME, PAN_CONTINUE_FILENAME } from '../pan-dir/index.js';
+import { buildRemoteTmuxCommand, ensureRemoteTmuxContext, runSsh, type RemoteTmuxTarget } from './remote-tmux.js';
+import type { FlyProvider } from './fly-provider.js';
+import type { VmStatus } from './interface.js';
 
 const execAsync = promisify(exec);
 const AGENTS_DIR = join(homedir(), '.overdeck', 'agents');
@@ -50,13 +59,37 @@ const AGENTS_DIR = join(homedir(), '.overdeck', 'agents');
 export interface RemoteReapResult {
   agentId: string;
   issueId: string;
-  status: 'handed-off' | 'still-running' | 'stale' | 'error';
+  status: 'handed-off' | 'still-running' | 'indeterminate' | 'stale' | 'error';
   details: string[];
 }
 
-/** List agent IDs that have a remote-state.json in running/starting state. */
-function listActiveRemoteAgents(): string[] {
-  return listActiveRemoteAgentStates().map((state) => state.id);
+/** Running remote agents. `starting` ones are mid-spawn: no tmux session yet, so a probe would read them as crashed. */
+function listReapableRemoteAgents(): string[] {
+  return listActiveRemoteAgentStates().filter((state) => state.status === 'running').map((state) => state.id);
+}
+
+type Probe = 'yes' | 'no' | 'unknown';
+
+/** has-session through the remote tmux server; only a clean exec with a known token is evidence. */
+async function probeRemoteSession(fly: FlyProvider, vmName: string, target: RemoteTmuxTarget): Promise<Probe> {
+  try {
+    await ensureRemoteTmuxContext(fly, vmName);
+    const r = await runSsh(fly, vmName,
+      `${buildRemoteTmuxCommand(['has-session', '-t', target.session], target.socket)} 2>/dev/null && echo exists || echo not-found`);
+    if (r.exitCode !== 0) return 'unknown';
+    const out = r.stdout.trim();
+    return out === 'exists' ? 'yes' : out === 'not-found' ? 'no' : 'unknown';
+  } catch { return 'unknown'; }
+}
+
+/** The REMOTE_DONE sentinel; `|| echo absent` keeps the exit code 0 so a failed exec stays distinguishable. */
+async function probeDoneSentinel(fly: FlyProvider, vmName: string): Promise<Probe> {
+  try {
+    const r = await runSsh(fly, vmName, '[ -f /workspace/.pan/REMOTE_DONE ] && echo present || echo absent');
+    if (r.exitCode !== 0) return 'unknown';
+    const out = r.stdout.trim();
+    return out === 'present' ? 'yes' : out === 'absent' ? 'no' : 'unknown';
+  } catch { return 'unknown'; }
 }
 
 async function branchExistsOnOrigin(projectRoot: string, branch: string): Promise<boolean> {
@@ -108,7 +141,7 @@ async function captureRemoteForensics(agentId: string, vmName: string, details: 
       let copied = 0;
       for (const remotePath of files) {
         try {
-          await fly.copyFromVm(vmName, remotePath, join(destDir, basename(remotePath)));
+          await Effect.runPromise(fly.copyFromVm(vmName, remotePath, join(destDir, basename(remotePath))));
           copied++;
         } catch {
           details.push(`Failed to copy ${remotePath}`);
@@ -131,13 +164,13 @@ async function captureRemoteForensics(agentId: string, vmName: string, details: 
  * image. Unpushed work on a stopped machine is one restart away from gone
  * (lost live on PAN-1762: ~2h of agent work).
  */
-async function salvageRemoteWork(vmName: string, branch: string, details: string[]): Promise<void> {
+async function salvageRemoteWork(vmName: string, branch: string, details: string[], workdir = '/workspace'): Promise<void> {
   const config = loadConfigSync();
   const fly = createFlyProviderFromConfig(config.remote);
   try {
     const result = await Effect.runPromise(fly.ssh(
       vmName,
-      `cd /workspace && git add -A && (git diff --cached --quiet || git commit -m "wip(remote): salvage checkpoint before machine stop") && git push origin ${branch} 2>&1 | tail -2`
+      `cd ${workdir} && git add -A && (git diff --cached --quiet || git commit -m "wip(remote): salvage checkpoint before machine stop") && git push origin ${branch} 2>&1 | tail -2`
     ));
     if (result.exitCode === 0) {
       details.push(`Salvaged workspace state to origin/${branch}`);
@@ -176,13 +209,27 @@ async function healStaleRemoteAuth(agentId: string, vmName: string, details: str
 }
 
 /**
+ * Destroy a linked work agent's Fly machine, remove its link and forget its
+ * record (PAN-4734 FR-12). A missing record is a machine already gone; a
+ * failed destroy keeps the record, and the sweep retries once the agent's
+ * state is no longer active.
+ */
+async function retireLinkedFlyMachine(flyMachineId: string | undefined): Promise<string> {
+  const { listFlyMachines } = await import('../anywhere/fly/machine-store.js');
+  const record = (await listFlyMachines()).find((r) => r.machineId === flyMachineId);
+  if (!record) return `Fly machine ${flyMachineId ?? '(unknown)'} is already gone`;
+  const { destroyAndForgetFlyMachine } = await import('./fly-machine-loops.js');
+  return (await destroyAndForgetFlyMachine(record, 'work agent handed to review')).line;
+}
+
+/**
  * Reap completed remote agents into the review pipeline.
  * Pass issueId to target one agent; otherwise scans all active remote agents.
  */
 export async function reapCompletedRemoteAgents(opts: { issueId?: string; dryRun?: boolean } = {}): Promise<RemoteReapResult[]> {
   const agentIds = opts.issueId
     ? [`agent-${opts.issueId.toLowerCase()}`]
-    : listActiveRemoteAgents();
+    : listReapableRemoteAgents();
 
   const results: RemoteReapResult[] = [];
 
@@ -197,31 +244,43 @@ export async function reapCompletedRemoteAgents(opts: { issueId?: string; dryRun
     const vmName = remoteState.vmName;
 
     try {
-      // 1. Completion detection: the /workspace/.pan/REMOTE_DONE sentinel
-      // file (created by the agent per the REMOTE prompt contract), or the
-      // session having exited. Do NOT grep session output for the marker —
-      // the prompt's own instruction text contains the literal string, so a
-      // mid-work agent's pane matches it (false positive observed live on
-      // the first migrated issue).
-      let sessionAlive = false;
-      let sentinelSeen = false;
-      try {
+      // 1. Completion detection from positive evidence only: the machine
+      // state Fly reports, the tmux session and the /workspace/.pan/REMOTE_DONE
+      // sentinel file (created by the agent per the REMOTE prompt contract).
+      // A failed or garbled exec is indeterminate, never "dead" or "absent".
+      // Do NOT grep session output for the marker — the prompt's own
+      // instruction text contains the literal string, so a mid-work agent's
+      // pane matches it (false positive observed live on the first migrated
+      // issue).
+      const config = loadConfigSync();
+      const fly = createFlyProviderFromConfig(config.remote);
+      const vmStatus: VmStatus = await Effect.runPromise(fly.getStatus(vmName)).catch(() => 'unknown' as const);
+      const machineStopped = vmStatus === 'stopped';
+      let session: Probe = 'no';
+      let sentinel: Probe = 'no';
+      if (machineStopped) {
+        details.push(`Fly reports ${vmName} stopped — treating as crash, not completion`);
+      } else if (vmStatus !== 'running') {
+        details.push(`Fly reports machine state '${vmStatus}' for ${vmName} — indeterminate, no action taken`);
+        results.push({ agentId, issueId, status: 'indeterminate', details });
+        continue;
+      } else {
         // A single has-session over the Machines exec API false-negatives on
         // transient exec failures/429s — one flake here stopped a healthy
-        // mid-work machine live (PAN-1762). Any success across retries means
-        // alive; only consistent failure proceeds to the crash path.
-        for (let attempt = 0; attempt < 3 && !sessionAlive; attempt++) {
-          if (attempt > 0) await new Promise((r) => setTimeout(r, 5000));
-          sessionAlive = await isRemoteAgentRunning(agentId, vmName);
+        // mid-work machine live (PAN-1762). Retry only while the probe has
+        // no answer; a clean "not-found" is evidence and is not retried.
+        const target = remoteTmuxTarget(agentId);
+        session = await probeRemoteSession(fly, vmName, target);
+        for (let attempt = 1; attempt < 3 && session === 'unknown'; attempt++) {
+          await new Promise((r) => setTimeout(r, 5000));
+          session = await probeRemoteSession(fly, vmName, target);
         }
-        const config = loadConfigSync();
-        const fly = createFlyProviderFromConfig(config.remote);
-        const check = await Effect.runPromise(
-          fly.ssh(vmName, '[ -f /workspace/.pan/REMOTE_DONE ] && echo present')
-        );
-        sentinelSeen = check.stdout.trim() === 'present';
-      } catch (err: any) {
-        details.push(`VM unreachable (${err.message}) — falling back to branch check`);
+        sentinel = await probeDoneSentinel(fly, vmName);
+        if (sentinel === 'unknown' || (sentinel === 'no' && session === 'unknown')) {
+          details.push(`Indeterminate probe (tmux session: ${session}, REMOTE_DONE sentinel: ${sentinel}) — no action taken`);
+          results.push({ agentId, issueId, status: 'indeterminate', details });
+          continue;
+        }
       }
 
       const teamPrefix = extractTeamPrefix(issueId);
@@ -235,7 +294,7 @@ export async function reapCompletedRemoteAgents(opts: { issueId?: string; dryRun
       const branch = `feature/${issueId.toLowerCase()}`;
       const pushed = await branchExistsOnOrigin(projectRoot, branch);
 
-      if (sessionAlive && !sentinelSeen) {
+      if (session === 'yes' && sentinel === 'no') {
         await healStaleRemoteAuth(agentId, vmName, details);
         results.push({ agentId, issueId, status: 'still-running', details });
         continue;
@@ -247,13 +306,15 @@ export async function reapCompletedRemoteAgents(opts: { issueId?: string; dryRun
       // straight into review (observed live on the first migrated issue).
       // Park as error with forensics; the machine stays (stopped) for
       // inspection and manual recovery via `pan admin remote reap --issue`.
-      if (!sentinelSeen || !pushed) {
-        const reason = !sentinelSeen
-          ? 'session ended without the REMOTE_DONE sentinel — treating as crash, not completion'
-          : `sentinel present but ${branch} is not on origin`;
-        details.push(reason);
+      if (sentinel !== 'yes' || !pushed) {
+        if (!machineStopped) {
+          details.push(sentinel !== 'yes'
+            ? 'session ended without the REMOTE_DONE sentinel — treating as crash, not completion'
+            : `sentinel present but ${branch} is not on origin`);
+        }
         const { paneCaptured } = await captureRemoteForensics(agentId, vmName, details);
-        if (!sessionAlive && paneCaptured) {
+        // No exec can succeed on a stopped machine, so the guard only applies to a running one.
+        if (!machineStopped && session !== 'yes' && paneCaptured) {
           // Contradiction: has-session said dead, but capture-pane just read
           // the live pane through the same tmux server. The session is
           // reachable — the alive check flaked. Do NOT stop the machine.
@@ -263,10 +324,8 @@ export async function reapCompletedRemoteAgents(opts: { issueId?: string; dryRun
         }
         // Salvage before stopping: rootfs does not survive a stop→start
         // cycle, so this is the last chance to preserve unpushed work.
-        await salvageRemoteWork(vmName, branch, details);
+        await salvageRemoteWork(vmName, branch, details, remoteState.workdir);
         try {
-          const config = loadConfigSync();
-          const fly = createFlyProviderFromConfig(config.remote);
           await Effect.runPromise(fly.stopVm(vmName));
           details.push(`Stopped machine ${vmName} (rootfs resets on next start — salvage above is the durable copy)`);
         } catch (err: any) {
@@ -312,15 +371,15 @@ export async function reapCompletedRemoteAgents(opts: { issueId?: string; dryRun
       }
 
       // 3. Copy continue.json back from the VM (best effort — session record).
+      // A linked agent keeps it in its worktree's .overdeck/ (PAN-4734 FR-12).
+      const [remoteContinue, localContinue] = remoteState.workdir
+        ? [`${remoteState.workdir}/.overdeck/${PAN_CONTINUE_FILENAME}`, join(workspacePath, '.overdeck', PAN_CONTINUE_FILENAME)]
+        : [`/workspace/${PAN_DIRNAME}/${PAN_CONTINUE_FILENAME}`, join(workspacePath, PAN_DIRNAME, PAN_CONTINUE_FILENAME)];
       try {
         const config = loadConfigSync();
         const fly = createFlyProviderFromConfig(config.remote);
-        mkdirSync(join(workspacePath, PAN_DIRNAME), { recursive: true });
-        await fly.copyFromVm(
-          vmName,
-          `/workspace/${PAN_DIRNAME}/${PAN_CONTINUE_FILENAME}`,
-          join(workspacePath, PAN_DIRNAME, PAN_CONTINUE_FILENAME),
-        );
+        mkdirSync(dirname(localContinue), { recursive: true });
+        await Effect.runPromise(fly.copyFromVm(vmName, remoteContinue, localContinue));
         details.push('Copied continue.json back from VM');
       } catch {
         details.push('No continue.json retrieved from VM (skipped)');
@@ -348,7 +407,8 @@ export async function reapCompletedRemoteAgents(opts: { issueId?: string; dryRun
         });
       }
 
-      // 5. Review artifacts + completed marker — same entries pan done uses.
+      // 5. Review artifacts (same entry pan done uses) + the completed marker
+      // other readers use as "work agent finished".
       const { createReviewArtifactsForIssue } = await import('../review-artifacts.js');
       const artifactResult = await createReviewArtifactsForIssue(issueId, workspacePath);
       const primaryArtifact = artifactResult.mergeSet?.repos.find((repo) => !!repo.artifactUrl);
@@ -366,7 +426,7 @@ export async function reapCompletedRemoteAgents(opts: { issueId?: string; dryRun
         trackerUpdated: false,
         comment: `Remote agent completed on ${vmName} (reaped)`,
       }));
-      details.push('Wrote completion marker for cloister pickup');
+      details.push('Wrote completion marker');
 
       // 5.5. Preserve the transcript and final pane before the machine goes.
       await captureRemoteForensics(agentId, vmName, details);
@@ -377,21 +437,38 @@ export async function reapCompletedRemoteAgents(opts: { issueId?: string; dryRun
       // at the (now-idle) VM. Destroying the machine also closes the
       // run-forever cost leak.
       try {
-        const config = loadConfigSync();
-        const fly = createFlyProviderFromConfig(config.remote);
-        if (sessionAlive) {
+        if (session === 'yes') {
           const { killRemoteAgent } = await import('./remote-agents.js');
           await killRemoteAgent(agentId, vmName).catch(() => undefined);
         }
-        await Effect.runPromise(fly.deleteVm(vmName));
-        details.push(`Destroyed machine ${vmName}`);
+        if (remoteState.linked === true) {
+          details.push(await retireLinkedFlyMachine(remoteState.flyMachineId));
+        } else {
+          await Effect.runPromise(fly.deleteVm(vmName));
+          details.push(`Destroyed machine ${vmName}`);
+        }
       } catch (err: any) {
         details.push(`Warning: could not destroy machine: ${err.message}`);
       }
-      const { deleteWorkspaceMetadata } = await import('./workspace-metadata.js');
-      deleteWorkspaceMetadata(issueId);
-      details.push('Removed remote workspace metadata (pipeline is local from here)');
+      // A linked agent has no legacy workspace metadata (pan start --remote refuses one).
+      if (remoteState.linked !== true) {
+        const { deleteWorkspaceMetadata } = await import('./workspace-metadata.js');
+        deleteWorkspaceMetadata(issueId);
+        details.push('Removed remote workspace metadata (pipeline is local from here)');
+      }
       saveRemoteAgentState({ ...remoteState, status: 'stopped', lastActivity: new Date().toISOString() });
+
+      // Post-Cut, review starts from POST /api/review/:id/request (what pan done
+      // calls). Must run after deleteWorkspaceMetadata: while the metadata exists
+      // the route still sees a remote workspace and answers 409.
+      const { requestReviewThroughRoute } = await import('../cloister/review-request-route.js');
+      const review = await requestReviewThroughRoute(issueId, {
+        message: `Remote agent finished on ${vmName}; reaped into the local worktree`,
+        source: 'remote-reap',
+      });
+      details.push(review.requested
+        ? 'Requested review through the dashboard review route'
+        : `Review not requested (${review.reason}): run pan review request ${issueId}`);
 
       results.push({ agentId, issueId, status: 'handed-off', details });
     } catch (err: any) {

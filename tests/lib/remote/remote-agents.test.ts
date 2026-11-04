@@ -22,6 +22,22 @@ const { execFileMock } = vi.hoisted(() => ({
   ),
 }));
 
+const { flySshCommands } = vi.hoisted(() => ({ flySshCommands: [] as string[] }));
+
+vi.mock('../../../src/lib/remote/fly-provider.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/lib/remote/fly-provider.js')>();
+  const { Effect: E } = await import('effect');
+  return {
+    ...actual,
+    createFlyProvider: () => ({
+      ssh: (_vm: string, command: string) => {
+        flySshCommands.push(command);
+        return E.succeed({ stdout: '', stderr: '', exitCode: 0 });
+      },
+    }),
+  };
+});
+
 vi.mock('child_process', async (importOriginal) => {
   const actual = await importOriginal<typeof import('child_process')>();
   return { ...actual, execFile: execFileMock };
@@ -35,7 +51,14 @@ import {
   refreshHostHeartbeatForEphemeralVms,
   checkRemoteSpendCap,
   checkRemoteDurabilityPreflight,
+  getRemoteAgentOutput,
+  sendToRemoteAgent,
+  killRemoteAgent,
+  saveRemoteAgentState,
+  loadRemoteAgentState,
+  type RemoteAgentState,
 } from '../../../src/lib/remote/remote-agents.js';
+import { getManagedTmuxSocketName } from '../../../src/lib/tmux.js';
 
 describe('generatePushDaemonScript', () => {
   it('includes the issue branch and wip(remote) prefix', () => {
@@ -53,6 +76,39 @@ describe('generatePushDaemonScript', () => {
 });
 
 describe('installPushDaemon', () => {
+  function recordingProvider(sshCommands: string[], scriptBytes: number) {
+    return {
+      ssh: vi.fn((_vm: string, command: string) => {
+        sshCommands.push(command);
+        const stdout = command.includes('wc -c') && command.includes('push-daemon-pan-1.js') ? `${scriptBytes}\n` : '';
+        return Effect.succeed({ stdout, stderr: '', exitCode: 0 });
+      }),
+    } as unknown as import('../../../src/lib/remote/fly-provider.js').FlyProvider;
+  }
+
+  it('runs in a linked agent\'s VM worktree (PAN-4734 FR-9)', async () => {
+    const workdir = '/workspace/overdeck/workspaces/feature-pan-1';
+    const script = generatePushDaemonScript({ issueId: 'PAN-1', branch: 'feature/pan-1', logFile: '/workspace/.pan/push-daemon-pan-1.log', workdir });
+    expect(script).toContain(`const cwd = "${workdir}";`);
+    const sshCommands: string[] = [];
+
+    await installPushDaemon(recordingProvider(sshCommands, Buffer.byteLength(script)), 'vm-1', 'PAN-1', workdir);
+
+    const heartbeatTmux = sshCommands.find((cmd) => cmd.includes('new-session') && cmd.includes('push-daemon-pan-1'));
+    expect(heartbeatTmux).toContain(`'-c' '${workdir}'`);
+  });
+
+  it('runs in /workspace when no workdir is given', async () => {
+    const script = generatePushDaemonScript({ issueId: 'PAN-1', branch: 'feature/pan-1', logFile: '/workspace/.pan/push-daemon-pan-1.log' });
+    expect(script).toContain('const cwd = "/workspace";');
+    const sshCommands: string[] = [];
+
+    await installPushDaemon(recordingProvider(sshCommands, Buffer.byteLength(script)), 'vm-1', 'PAN-1');
+
+    const heartbeatTmux = sshCommands.find((cmd) => cmd.includes('new-session') && cmd.includes('push-daemon-pan-1'));
+    expect(heartbeatTmux).toContain(`'-c' '/workspace'`);
+  });
+
   it('writes the daemon script and starts a detached tmux heartbeat session', async () => {
     const sshCommands: string[] = [];
     const logFile = '/workspace/.pan/push-daemon-pan-1845.log';
@@ -265,6 +321,45 @@ describe('checkRemoteSpendCap', () => {
     expect(result.allowed).toBe(false);
     expect(result.current).toBe(1);
   });
+
+  it('counts Fly machines against the same cap (PAN-4652 FR-12)', () => {
+    const active = [
+      { id: 'agent-pan-1', issueId: 'PAN-1', vmName: 'vm-1', model: 'claude-sonnet-4-6', status: 'running', startedAt: '2026-01-01T00:00:00Z', location: 'remote' as const },
+    ];
+    const result = checkRemoteSpendCap(
+      { remote: { max_concurrent_agents: 2 } },
+      { listActiveRemoteAgentStates: () => active, countFlyMachines: () => 1 },
+    );
+    expect(result).toMatchObject({ allowed: false, current: 2, cap: 2 });
+    expect(result.message).toContain('Fly machines');
+  });
+
+  it('ignores an unreadable Fly machine store when no cap applies, and fails closed when one does', () => {
+    const corrupt = () => { throw new Error('Fly machine store /x/fly-machines.json has an unexpected shape'); };
+    expect(checkRemoteSpendCap({ remote: {} }, { listActiveRemoteAgentStates: () => [], countFlyMachines: corrupt }))
+      .toMatchObject({ allowed: true, cap: 0 });
+    expect(() => checkRemoteSpendCap({ remote: { max_concurrent_agents: 2 } }, { listActiveRemoteAgentStates: () => [], countFlyMachines: corrupt }))
+      .toThrow('unexpected shape');
+  });
+
+  it('does not count a linked work agent on top of its Fly machine (PAN-4734 FR-10)', () => {
+    const active = [
+      { id: 'agent-pan-1', issueId: 'PAN-1', vmName: 'overdeck-machine-1a2b3c4d', model: 'claude-opus-5-5', status: 'running', startedAt: '2026-01-01T00:00:00Z', location: 'remote' as const, startedBy: 'operator', linked: true as const },
+    ];
+    const result = checkRemoteSpendCap(
+      { remote: { max_concurrent_agents: 2 } },
+      { listActiveRemoteAgentStates: () => active, countFlyMachines: () => 1 },
+    );
+    expect(result).toMatchObject({ allowed: true, current: 1, cap: 2 });
+  });
+
+  it('allows any count of agents and Fly machines when the cap is zero', () => {
+    const result = checkRemoteSpendCap(
+      { remote: { max_concurrent_agents: 0 } },
+      { listActiveRemoteAgentStates: () => [], countFlyMachines: () => 5 },
+    );
+    expect(result).toMatchObject({ allowed: true, current: 5, cap: 0 });
+  });
 });
 
 describe('checkRemoteDurabilityPreflight', () => {
@@ -356,6 +451,30 @@ describe('refreshHostHeartbeatForEphemeralVms', () => {
     expect(sshCommands[0]).toContain('2026-01-01T00:00:00.000Z');
   });
 
+  it('skips a linked work agent, whose Fly machine record owns the heartbeat (PAN-4734 FR-10)', async () => {
+    const createFlyProvider = vi.fn();
+    const actions = await refreshHostHeartbeatForEphemeralVms({
+      listActiveRemoteAgentStates: () => [
+        {
+          id: 'agent-pan-1',
+          issueId: 'PAN-1',
+          vmName: 'overdeck-machine-1a2b3c4d',
+          model: 'claude-opus-5-5',
+          status: 'running',
+          startedAt: '2026-01-01T00:00:00Z',
+          location: 'remote',
+          startedBy: 'operator',
+          tier: 'ephemeral',
+          linked: true,
+        },
+      ],
+      createFlyProvider: createFlyProvider as any,
+      now: () => new Date('2026-01-01T00:00:00Z'),
+    });
+    expect(actions).toEqual([]);
+    expect(createFlyProvider).not.toHaveBeenCalled();
+  });
+
   it('returns a failure message when SSH fails', async () => {
     const ssh = vi.fn(() => Effect.fail(new Error('fly API down')));
     const actions = await refreshHostHeartbeatForEphemeralVms({
@@ -376,5 +495,122 @@ describe('refreshHostHeartbeatForEphemeralVms', () => {
     });
     expect(actions[0]).toContain('failed');
     expect(actions[0]).toContain('fly API down');
+  });
+
+  it('reports a failure when the heartbeat exec exits non-zero', async () => {
+    const ssh = vi.fn(() => Effect.succeed({ stdout: '', stderr: 'machine not started', exitCode: 1 }));
+    const actions = await refreshHostHeartbeatForEphemeralVms({
+      listActiveRemoteAgentStates: () => [
+        {
+          id: 'agent-pan-1845',
+          issueId: 'PAN-1845',
+          vmName: 'vm-eph',
+          model: 'claude-sonnet-4-6',
+          status: 'running',
+          startedAt: '2026-01-01T00:00:00Z',
+          location: 'remote',
+          tier: 'ephemeral',
+        },
+      ],
+      createFlyProvider: () => ({ ssh }) as any,
+      now: () => new Date('2026-01-01T00:00:00Z'),
+    });
+    expect(actions).toEqual(['Host heartbeat failed for PAN-1845 on vm-eph (exit 1): machine not started']);
+    expect(actions[0]).not.toContain('refreshed');
+  });
+});
+
+describe('remote tmux target (PAN-4734)', () => {
+  const VM = 'overdeck-machine-1a2b3c4d';
+  const CONFIG = `'-f' '/workspace/.pan/tmux/overdeck.tmux.conf'`;
+
+  function seedState(id: string, extra: Partial<RemoteAgentState> = {}): void {
+    saveRemoteAgentState({
+      id,
+      issueId: 'PAN-4734',
+      vmName: VM,
+      model: 'claude-opus-5-5',
+      status: 'running',
+      startedAt: '2026-11-02T00:00:00.000Z',
+      location: 'remote',
+      startedBy: 'operator',
+      ...extra,
+    });
+  }
+
+  const tmuxCommands = (): string[] => flySshCommands.filter((command) => command.startsWith(`'tmux'`));
+
+  beforeEach(() => {
+    flySshCommands.length = 0;
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  describe('linked work agent', () => {
+    const AGENT = 'agent-pan-4734-linked';
+
+    beforeEach(() => {
+      seedState(AGENT, {
+        linked: true,
+        environmentId: 'env-1',
+        tmuxSession: 'conv-20261102-1234',
+        tmuxSocket: 'overdeck',
+      });
+    });
+
+    it('captures output from the conversation session on the VM socket', async () => {
+      await getRemoteAgentOutput(AGENT, VM);
+      expect(tmuxCommands()).toEqual([
+        `'tmux' '-L' 'overdeck' ${CONFIG} 'capture-pane' '-t' 'conv-20261102-1234' '-p' '-S' '-100'`,
+      ]);
+    });
+
+    it('pastes into the conversation session and keeps the agent id for the buffer', async () => {
+      vi.useFakeTimers();
+      const pending = sendToRemoteAgent(AGENT, VM, 'hello');
+      await vi.advanceTimersByTimeAsync(300);
+      expect(await pending).toEqual({ ok: true });
+      expect(tmuxCommands()).toEqual([
+        `'tmux' '-L' 'overdeck' ${CONFIG} 'load-buffer' '-b' '${AGENT}' '/workspace/.pan/prompts/${AGENT}-message.txt'`,
+        `'tmux' '-L' 'overdeck' ${CONFIG} 'paste-buffer' '-b' '${AGENT}' '-t' 'conv-20261102-1234' '-d'`,
+        `'tmux' '-L' 'overdeck' ${CONFIG} 'send-keys' '-t' 'conv-20261102-1234' 'C-m'`,
+      ]);
+    });
+
+    it('kills the conversation session and records stopped on the agent id', async () => {
+      await killRemoteAgent(AGENT, VM);
+      expect(tmuxCommands()).toEqual([
+        `'tmux' '-L' 'overdeck' ${CONFIG} 'kill-session' '-t' 'conv-20261102-1234' 2>/dev/null || true`,
+      ]);
+      expect(loadRemoteAgentState(AGENT)?.status).toBe('stopped');
+    });
+  });
+
+  describe('legacy remote agent', () => {
+    const AGENT = 'agent-pan-4734-legacy';
+
+    beforeEach(() => {
+      seedState(AGENT);
+    });
+
+    it('produces the unchanged output, send and kill commands', async () => {
+      vi.useFakeTimers();
+      const socket = getManagedTmuxSocketName();
+      await getRemoteAgentOutput(AGENT, VM);
+      const pending = sendToRemoteAgent(AGENT, VM, 'hello');
+      await vi.advanceTimersByTimeAsync(300);
+      await pending;
+      await killRemoteAgent(AGENT, VM);
+      expect(tmuxCommands()).toEqual([
+        `'tmux' '-L' '${socket}' ${CONFIG} 'capture-pane' '-t' '${AGENT}' '-p' '-S' '-100'`,
+        `'tmux' '-L' '${socket}' ${CONFIG} 'load-buffer' '-b' '${AGENT}' '/workspace/.pan/prompts/${AGENT}-message.txt'`,
+        `'tmux' '-L' '${socket}' ${CONFIG} 'paste-buffer' '-b' '${AGENT}' '-t' '${AGENT}' '-d'`,
+        `'tmux' '-L' '${socket}' ${CONFIG} 'send-keys' '-t' '${AGENT}' 'C-m'`,
+        `'tmux' '-L' '${socket}' ${CONFIG} 'kill-session' '-t' '${AGENT}' 2>/dev/null || true`,
+      ]);
+      expect(loadRemoteAgentState(AGENT)?.status).toBe('stopped');
+    });
   });
 });

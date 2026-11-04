@@ -5,6 +5,8 @@
  *   pan pair [--label <name>] [--url <base>] [--json]
  *   pan devices list [--json]
  *   pan devices revoke <id>
+ *   pan machines link|list|unlink   (PAN-4645, `machines.ts`, registered from here)
+ *   pan connect [--url <base>] [--label <name>] [--json]   (PAN-4656, `connect.ts`, registered from here)
  *
  * Asks the running dashboard (with the internal token) for a one-time pairing
  * credential and prints `<base>/#pair=<credential>`. The credential is always
@@ -15,14 +17,19 @@
  * connections can be open then). See configuration/remote-access.mdx.
  *
  * `src/cli/index.ts` imports this module at startup to register the verbs, so
- * it imports only Commander types, chalk and the import-free
- * `lib/remote-access/loopback.ts` statically. Config and token modules load
- * inside each handler.
+ * it imports only Commander types, chalk, the import-free
+ * `lib/remote-access/loopback.ts` and `../lazy-action.ts` statically. Config
+ * and token modules load inside each handler; `connect.ts` loads through
+ * `lazyAction` only when `pan connect` runs.
  */
 import chalk from 'chalk';
 import type { Command } from 'commander';
 
 import { isLoopbackOrigin as isLoopbackBase } from '../../lib/remote-access/loopback.js';
+import { lazyAction } from '../lazy-action.js';
+import { callDashboard, errorText, isDashboardUnreachable } from './dashboard-call.js';
+import { registerMachinesCommands } from './machines.js';
+import { LOOPBACK_WARNING, NOT_RUNNING, requestPairingLink, TOKEN_REJECTED } from './pairing-link.js';
 
 /** True when the base URL only resolves on this machine (PAN-4445 D-7: one check, shared with the server). */
 export { isLoopbackBase };
@@ -30,35 +37,10 @@ export { isLoopbackBase };
 export interface PairOptions { label?: string; url?: string; json?: boolean }
 
 const DOCS_PAGE = 'configuration/remote-access.mdx';
-const NOT_RUNNING = 'Overdeck dashboard is not running; start it with `pan up`.';
-const NEEDS_PAN_UP = 'The dashboard rejected this machine\'s internal token. `pan pair` needs a dashboard started by `pan up` (a `pan serve` server does not share it).';
-const LOOPBACK_WARNING = 'This URL only works on this machine. Pass --url with an address another device can reach, and add that origin to OVERDECK_TRUSTED_ORIGINS.';
+// Shared with `pan connect` (PAN-4656) from a leaf module, so connect.ts never imports this file.
+export { LOOPBACK_WARNING, pairingUrl, requestPairingLink, type PairingLinkResult } from './pairing-link.js';
 
-/** `<base>/#pair=<credential>`: the credential rides in the fragment only. */
-export function pairingUrl(base: string, credential: string): string {
-  return `${base.replace(/\/+$/, '')}/#pair=${credential}`;
-}
-
-class DashboardUnreachableError extends Error {}
-
-/** Call the running dashboard with the internal token. Throws DashboardUnreachableError when nothing answers. */
-export async function callDashboard(path: string, init: { method: string; body?: unknown }): Promise<Response> {
-  const { getDashboardApiUrl } = await import('../../lib/config.js');
-  const { ensureInternalToken, INTERNAL_TOKEN_HEADER } = await import('../../lib/internal-token.js');
-  try {
-    return await fetch(`${getDashboardApiUrl()}${path}`, {
-      method: init.method,
-      headers: { 'Content-Type': 'application/json', [INTERNAL_TOKEN_HEADER]: ensureInternalToken() },
-      body: init.body === undefined ? undefined : JSON.stringify(init.body),
-    });
-  } catch (error) {
-    throw new DashboardUnreachableError((error as Error).message);
-  }
-}
-
-export function isDashboardUnreachable(error: unknown): boolean {
-  return error instanceof DashboardUnreachableError;
-}
+export { callDashboard, isDashboardUnreachable } from './dashboard-call.js';
 
 async function fail(message: string): Promise<never> {
   console.error(chalk.red(message));
@@ -66,29 +48,10 @@ async function fail(message: string): Promise<never> {
   return exitCli(1);
 }
 
-async function errorText(response: Response): Promise<string> {
-  const body = await response.json().catch(() => null) as { error?: unknown } | null;
-  return typeof body?.error === 'string' ? body.error : `HTTP ${response.status}`;
-}
-
 export async function runPair(options: PairOptions): Promise<void> {
-  let response: Response;
-  try {
-    response = await callDashboard('/api/pairing/credentials', {
-      method: 'POST',
-      body: options.label ? { label: options.label } : {},
-    });
-  } catch (error) {
-    if (isDashboardUnreachable(error)) return fail(NOT_RUNNING);
-    throw error;
-  }
-  if (response.status === 401) return fail(NEEDS_PAN_UP);
-  if (!response.ok) return fail(`pan pair failed: ${await errorText(response)}`);
-
-  const { credential, expiresAt } = await response.json() as { credential: string; expiresAt: string };
-  const { getDashboardApiUrl } = await import('../../lib/config.js');
-  const base = options.url ?? getDashboardApiUrl();
-  const url = pairingUrl(base, credential);
+  const link = await requestPairingLink({ label: options.label, base: options.url });
+  if (!link.ok) return fail(link.message);
+  const { url, credential, expiresAt, base } = link;
   const loopback = isLoopbackBase(base);
 
   if (options.json) {
@@ -113,7 +76,7 @@ export async function runDevicesList(options: { json?: boolean }): Promise<void>
     if (isDashboardUnreachable(error)) return fail(NOT_RUNNING);
     throw error;
   }
-  if (response.status === 401) return fail(NEEDS_PAN_UP);
+  if (response.status === 401) return fail(TOKEN_REJECTED);
   if (!response.ok) return fail(`pan devices list failed: ${await errorText(response)}`);
   const { devices } = await response.json() as { devices: DeviceRow[] };
 
@@ -147,7 +110,7 @@ export async function runDevicesRevoke(id: string): Promise<void> {
     return;
   }
   if (response.status === 404) return fail(`No paired device with id ${id}.`);
-  if (response.status === 401) return fail(NEEDS_PAN_UP);
+  if (response.status === 401) return fail(TOKEN_REJECTED);
   if (!response.ok) return fail(`pan devices revoke failed: ${await errorText(response)}`);
   const { device } = await response.json() as { device: DeviceRow };
   console.log(`Revoked device "${device.name}" (${device.id}); its live connections were closed.`);
@@ -174,4 +137,16 @@ export function registerPairCommands(program: Command): void {
     .command('revoke <id>')
     .description('Revoke a paired device and close its live connections')
     .action((id: string) => runDevicesRevoke(id));
+
+  // PAN-4645: `pan machines` registers here so `src/cli/index.ts` does not grow.
+  registerMachinesCommands(program);
+
+  // PAN-4656: likewise `pan connect`.
+  program
+    .command('connect')
+    .description('Install this machine\'s server as a lasting service and print one link that links it from another machine (see cli/machines.mdx)')
+    .option('--url <base>', 'Address another machine reaches this one at (default: picked automatically)')
+    .option('--label <name>', 'Name recorded for the pairing in the activity log')
+    .option('--json', 'Print the result as JSON')
+    .action(lazyAction(() => import('./connect.js'), 'connectCommand'));
 }

@@ -1,5 +1,6 @@
 import { Effect, Layer, Stream } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
+import { rmSync } from 'node:fs';
 import { mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -8,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { INTERNAL_TOKEN_HEADER, _resetInternalTokenCacheForTests } from '../../../../../src/lib/internal-token.js';
 import { specialistsLegacyRouteLayer } from '../../../../../src/dashboard/server/routes/specialists/legacy-routes.js';
 import { EventStoreService } from '../../../../../src/dashboard/server/services/domain-services.js';
+import { getOverdeckHome } from '../../../../../src/lib/paths.js';
 
 const mocks = vi.hoisted(() => ({
   resolveProject: vi.fn(),
@@ -66,6 +68,7 @@ beforeEach(async () => {
   projectPath = await mkdtemp(join(tmpdir(), 'pan-2724-inspect-'));
   await mkdir(join(projectPath, 'workspaces', 'feature-pan-2724'), { recursive: true });
   process.env.OVERDECK_INTERNAL_TOKEN = 'test-token';
+  rmSync(join(getOverdeckHome(), 'internal-token'), { force: true });
   _resetInternalTokenCacheForTests();
   mocks.resolveProject.mockReturnValue({ projectPath, projectKey: 'overdeck' });
   mocks.readWorkspacePlan.mockReturnValue({ plan: { items: [{ id: 'issue-view-model' }] } });

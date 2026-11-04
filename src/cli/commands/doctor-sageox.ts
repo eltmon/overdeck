@@ -1,11 +1,13 @@
 /**
- * SageOx doctor check (PAN-2444 FR-4). Silent unless the `sageox` pack is
- * registered. Then it reports whether the `ox` on PATH answers the fork's host
- * contract probe and whether its build commit matches the pack's trusted
- * commit. `pan install` never installs `ox`; the fix text says how to build it.
+ * SageOx doctor check (PAN-2444 FR-4, PAN-4852 WI-8). Silent unless the
+ * `sageox` pack is registered. Then it reports whether Overdeck built `ox` for
+ * the pack's trusted commit and whether that built binary answers the fork's
+ * host contract probe. The build is identified by its directory and build
+ * marker, not by the probe's commit, which an archive build leaves empty
+ * (AD-7). There is no fallback to an `ox` on PATH (AD-7a).
  */
+import { resolveOxBinary, type OxBinary } from '../../lib/sageox/binary.js';
 import { probeOxHostContract, OX_HOST_CONTRACT, type OxProbeResult } from '../../lib/sageox/probe.js';
-import { getPack } from '../../lib/skill-packs/sources.js';
 
 // Structurally identical to doctor.ts's CheckResult; re-declared (like
 // doctor-tier-fitness.ts) because importing it would create a module cycle.
@@ -17,20 +19,20 @@ interface CheckResult {
 }
 
 export interface SageoxDoctorDeps {
-  packCommit: () => Promise<string | null>;
-  probe: () => Promise<OxProbeResult>;
+  resolveBinary: () => Promise<OxBinary>;
+  probe: (bin: string) => Promise<OxProbeResult>;
 }
 
 const NAME = 'SageOx (ox)';
-const FIX = 'build ox from the eltmon/ox commit trusted by the sageox pack: go build -o ~/.local/bin/ox ./cmd/ox';
+const FIX = 'pan skills pack sync sageox';
 
 const defaultDeps: SageoxDoctorDeps = {
-  packCommit: async () => (await getPack('sageox'))?.commit ?? null,
-  probe: () => probeOxHostContract(),
+  resolveBinary: () => resolveOxBinary(),
+  probe: (bin) => probeOxHostContract({ bin }),
 };
 
 const PROBE_FAILURES: Record<Exclude<OxProbeResult, { ok: true }>['reason'], string> = {
-  missing: 'ox not found on PATH',
+  missing: 'built ox not executable',
   'no-contract': 'upstream ox, no host contract',
   'bad-output': 'ox host-contract printed unreadable output',
   timeout: 'ox host-contract timed out',
@@ -39,22 +41,16 @@ const PROBE_FAILURES: Record<Exclude<OxProbeResult, { ok: true }>['reason'], str
 const short = (commit: string): string => commit.slice(0, 7);
 
 export async function checkSageox(deps: SageoxDoctorDeps = defaultDeps): Promise<CheckResult[]> {
-  const packCommit = await deps.packCommit();
-  if (packCommit === null) return [];
-  const probe = await deps.probe();
+  const binary = await deps.resolveBinary();
+  if (!binary.ok) {
+    if (binary.reason === 'not-registered') return [];
+    return [{ name: NAME, status: 'warn', message: `ox not built for pack ${short(binary.commit)}`, fix: FIX }];
+  }
+  const probe = await deps.probe(binary.bin);
   if (!probe.ok) return [{ name: NAME, status: 'warn', message: PROBE_FAILURES[probe.reason], fix: FIX }];
-
-  const contract = `host contract ${OX_HOST_CONTRACT}, ox ${probe.version || 'version unknown'}`;
-  if (!probe.commit) {
-    return [{ name: NAME, status: 'warn', message: `${contract}; build commit unknown, cannot compare with pack ${short(packCommit)}`, fix: FIX }];
-  }
-  if (probe.commit.startsWith(packCommit) || packCommit.startsWith(probe.commit)) {
-    return [{ name: NAME, status: 'ok', message: `${contract}; commit matches pack` }];
-  }
   return [{
     name: NAME,
-    status: 'warn',
-    message: `${contract}; commit ${short(probe.commit)} differs from pack ${short(packCommit)}`,
-    fix: FIX,
+    status: 'ok',
+    message: `built ox at ${binary.bin}; host contract ${OX_HOST_CONTRACT}, ox ${probe.version || 'version unknown'}; pack ${short(binary.commit)}`,
   }];
 }

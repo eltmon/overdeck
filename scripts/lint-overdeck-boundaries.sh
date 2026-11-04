@@ -45,6 +45,8 @@ EXCLUDES=(
   ':!**/*.test.ts'
   ':!*.md'
   ':!scripts/create-overdeck-db.ts'
+  # PAN-4650: the two-machine smoke seeds the throwaway databases of its own .tmp homes (a test harness).
+  ':!scripts/anywhere/two-machine-smoke.mjs'
   ':!scripts/drizzle-node-sqlite-smoke.ts'
   ':!scripts/lint-overdeck-boundaries.sh'
   ':!scripts/recover-costs-deep.mjs'

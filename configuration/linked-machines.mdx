@@ -1,0 +1,681 @@
+---
+title: Linked machines
+description: Link two machines' dashboards over an encrypted channel, learn routes, and watch each other's health
+---
+
+# Linked machines
+
+Each machine runs its own Overdeck and owns its own conversations, agents and
+credentials. A **machine link** lets one machine's dashboard reach another machine's
+dashboard: the two servers talk to each other over an end-to-end encrypted channel, so
+this machine can show and control what runs on the other one. Your browser still talks
+only to the machine it opened. Released in v0.73.0.
+
+A link is one direction. **Link both ways** (the default) creates the mirror link in the
+same step, so either dashboard can show both machines.
+
+## Link a machine
+
+On the machine you want to reach, create a pairing link, exactly as for a device:
+
+```bash
+pan pair
+```
+
+or **Settings → Anywhere → Pair a device**. The link looks like
+`https://desk.tailnet.ts.net/#pair=odp_…` and works once, for ten minutes.
+
+On the machine that should reach it, paste the link:
+
+```bash
+pan machines link https://desk.tailnet.ts.net/#pair=odp_…
+```
+
+or **Settings → Anywhere → Machines → Link a machine** (also the command palette's
+**Link a machine**). The dialog takes the pairing
+link, the access level and the **Link both ways** checkbox. Linking takes a few seconds:
+the two machines prove their keys to each other through the pairing code, exchange
+tokens, and the new link shows up as **Online** on both sides.
+
+Both servers on one host (for a test) need `--allow-loopback`, because a `localhost`
+pairing link only works on the machine that printed it.
+
+An agent can ask you for a link. Its `link_machine` tool shows a **Machine link
+requested** card in the Decisions panel, and the card's **Link a machine…** button
+opens this dialog. After the link succeeds, the agent learns the new machine's label,
+never the pairing link. See [Machine links](/configuration/mcp#machine-links).
+
+## SSH machines
+
+A machine that this one reaches only over SSH (a VPS, a lab box behind a bastion) can be
+linked without running anything there by hand. Use **Settings → Anywhere → Machines →
+Add an SSH machine** (also the command palette's **Add an SSH machine**), or:
+
+```bash
+pan machines add-ssh me@vps.example.com
+```
+
+The dashboard server does all of it with its own OpenSSH client, keys and `~/.ssh/config`,
+so it works from any browser that can open this dashboard:
+
+1. It opens an SSH session to the host.
+2. It checks that the host has the same `pan` version as this machine.
+3. It adopts the Overdeck dashboard already running there, or starts one with `pan up`.
+4. It forwards a loopback port on this machine to the host's dashboard port.
+5. It pairs over that forwarded port and saves a machine link whose route has kind `ssh`.
+
+**Test** in the dialog (or `pan machines test-ssh <host>`) runs only step 2. The host field
+suggests the concrete `Host` aliases of this machine's `~/.ssh/config`.
+
+To set a server up from the server itself instead (a lasting service that survives
+logout and reboot), use [Link a fresh server](#link-a-fresh-server).
+
+### Requirements
+
+- OpenSSH (`ssh`) on this machine, on the dashboard's `PATH`.
+- A key or SSH agent the dashboard process can use **without a prompt**. Every call uses
+  `BatchMode=yes`. If your keys live in an agent, start the dashboard (`pan up`) from a
+  shell that has `SSH_AUTH_SOCK` set.
+- The host key already in `~/.ssh/known_hosts`. Overdeck never accepts a new or changed key
+  for you: run `ssh <host>` once in a terminal on this machine and check the key.
+- The same `pan` version on the host. A different version fails with `version-mismatch`,
+  which names both versions and the command to run there,
+  `npm install -g @overdeck/core@<this version>`. Nothing is installed for you. When `pan` is
+  not on the host's login `PATH`, give its absolute path under **Advanced** (`--pan-path`).
+
+### Started by Overdeck, or already running
+
+The row of an SSH machine shows `SSH <host> · forward <state> · <launch>`:
+
+- **Started by Overdeck** (`managed`): this machine ran `pan up` on the host. Removing the
+  machine stops that server, unless you tick **Leave the server running**
+  (`pan machines unlink <machine> --keep-server`).
+- **Already running** (`external`): the host's server was running before. Removing the
+  machine never stops it.
+
+Removal stops the dashboard and the supervisor that `pan up` runs next to it (the
+supervisor would otherwise restart the dashboard). Other sidecars that `pan up` started on
+the host (CLIProxy) keep running. If the host's supervisor cannot be stopped (on a Mac, the
+launchd agent that `pan connect` installs), the server is left running. A server is also
+left running when another machine holds an active link to it (`in-use`), or when it was
+restarted since this machine started it.
+
+### The forward
+
+This dashboard keeps the SSH port forward running while it runs: it starts it at boot,
+restarts it with back-off (1 s doubling to 60 s) when it exits, and moves it to another
+local port when its port is taken. When SSH refuses the login or the host key, the forward
+stops retrying and the row shows **forward attention** with the reason. Fix the key or the
+host key, then press **Reconnect**, which restarts the forward and starts or adopts the
+host's server again.
+
+## Link a fresh server
+
+To link a server you reach over SSH, one command on the server does everything: it
+installs Overdeck as a service that survives logout and reboot, starts it, and prints the
+link.
+
+```bash
+# on the server, over SSH
+npx @overdeck/core connect
+```
+
+Then run the `pan machines link '…'` line it prints on your laptop. See
+[`pan connect`](/cli/machines#connect) for lingering, macOS, firewalls and removal.
+
+## Fly machines
+
+A Fly machine is a [Fly.io](https://fly.io) VM that runs Overdeck (`pan serve`) and is
+linked one way from this machine over `wss://<app>.fly.dev`. Everything between the two
+travels inside the same end-to-end encrypted channel as any other link; Fly's proxy sees
+only ciphertext. Use it to run a conversation on a fresh machine without tying up this one:
+
+```bash
+pan machines add-fly --project overdeck --message "Fix the flaky retry test"
+pan machines add-fly --project overdeck --harness codex --model gpt-6.1-sol --message "Fix the flaky retry test"
+```
+
+Settings → Anywhere → Machines has the same door as a dialog: **Add a Fly machine**, next to
+**Add an SSH machine** (also the command palette's **Add a Fly machine**). It takes an
+optional project and, under Advanced, an optional
+region; it has no message, harness or model field, because it only links the machine — start
+a conversation on it from the new-conversation dialog's **Fly (new VM)** choice (see
+[Start work on another machine](#start-work-on-another-machine)) or with `--message` above.
+
+This one command, which takes a few minutes:
+
+1. Starts a Fly VM from the `pan-workspace` image and makes its `pan` version equal this
+   machine's.
+2. Copies your Claude, Codex (when this machine has a Codex sign-in) and GitHub
+   credentials to it (no SSH key ever reaches the VM).
+3. Starts Overdeck there and links to it. Its chip reads `fly-<machineId>`. The Fly machine
+   advertises no private addresses, so this machine reaches it only over
+   `wss://<app>.fly.dev`.
+4. With `--project`, clones that project onto the VM (GitHub projects only).
+5. With `--message`, starts a Claude Code or Codex conversation (`--harness`) there and
+   prints its URL.
+
+The conversation then streams in this dashboard like any linked conversation: use
+[Remote control](#remote-control) to steer it, or [Pull here](#pull-here) to bring it home.
+
+### Setup
+
+Fly machines use the `[remote]` and `[remote.fly]` settings, which `pan start --remote`
+also uses to start [work agents on Fly](#work-agents-on-fly):
+
+- `enabled = true` under `[remote]` in `~/.overdeck/config.toml`:
+
+  ```toml
+  [remote]
+  enabled = true
+  ```
+
+  `remote.enabled` lives only in config.toml. The global `~/.overdeck/config.yaml`
+  also has a `remote:` section, but it holds only `resiliency_tier` and
+  `max_concurrent_agents` — an `enabled` key there does nothing, and
+  `pan admin config set remote.enabled <value>` refuses rather than write it. In
+  the dashboard, Settings → Anywhere → Machines → **Add a Fly machine** shows a
+  "Remote is off" notice with a **Turn on remote** button that writes the
+  `[remote] enabled = true` line for you.
+- A Fly token: `fly auth login`, or `FLY_API_TOKEN` (or the variable that
+  `[remote.fly] api_token_env` names). `fly auth login`'s stored login works, but Overdeck
+  only refreshes it through `flyctl` after a rejected request (PAN-4748), so a host where
+  nobody runs `fly` interactively should export a long-lived token instead:
+  `fly tokens create deploy -a <app>` into `FLY_API_TOKEN`.
+- Once per Fly app, give it public IPs, because `https://<app>.fly.dev` needs them and the
+  Machines API cannot allocate them:
+
+```bash
+fly ips allocate-v4 --shared -a <app>   # default app: pan-workspaces
+fly ips allocate-v6 -a <app>
+```
+
+A Fly machine gets at least 2 GB of memory (`[remote.fly] vm_memory`, raised to 2048 when
+lower).
+
+### Lifetime and cost
+
+A Fly machine is destroyed, never stopped, because a Fly VM loses its disk when it stops.
+That happens when:
+
+- you unlink it (`pan machines unlink fly-<machineId>`). With `--keep-server` it is not destroyed at once, but nothing heartbeats it any more, so it stops itself within about 5 minutes;
+- no linked conversation on it has been active for `[remote.fly] machine_idle_minutes`
+  (default 30; 0 turns the idle check off);
+- this machine stops sending its heartbeat for 5 minutes (the VM stops itself, and this
+  machine destroys it once it sees it stopped).
+
+Its conversations go with it. [Pull here](#pull-here) first to keep one.
+
+Fly machines count toward `remote.max_concurrent_agents`, the same cap as remote work
+agents; `add-fly` refuses with `cap-reached` when it is full (0 or unset means no cap).
+
+### Work agents on Fly
+
+`pan start <id> --remote`, or `pan start <id> --machine fly`, starts the issue's work agent
+on a new Fly machine:
+
+```bash
+pan start PAN-123 --remote
+pan start PAN-123 --machine fly
+```
+
+- The command pushes the feature branch, then asks the running dashboard to start a Fly
+  machine with the project, add the issue's worktree there and start the work agent as a
+  conversation in it. It waits 5–15 minutes and prints the conversation's URL. It needs
+  `pan up`.
+- The transcript streams in this dashboard while the agent works, with the `fly-<machineId>`
+  chip. The issue's row in the project tree lists the conversation and opens it.
+- `pan tell <id>`, `pan kill <id>` and the dashboard's output view reach the agent's session
+  on the Fly machine.
+- When the agent finishes and touches its done marker, the reap hands the branch to review
+  here, then destroys the Fly machine. While the agent works, the idle sweep leaves the
+  machine alone.
+- [Pull here](#pull-here) is not for work agents: pulling the conversation home stops the
+  agent from continuing, and the reap will not hand it to review.
+- Claude Code with an Anthropic model only; Codex is not supported as a Fly work agent. The
+  durable tier (`--tier durable`, or `remote.resiliency_tier = "durable"`) is refused.
+- An issue that still has a remote workspace from before this change is refused; destroy
+  it with `pan workspace destroy <id>` first.
+
+### Codex
+
+`--harness codex` starts a Codex conversation on the Fly machine instead of a Claude Code
+one:
+
+- It needs `--model` with an OpenAI model id. There is no default model.
+- This machine needs the Codex CLI and a Codex sign-in (`codex login`). `add-fly` checks
+  both, and the model, before it starts a VM.
+- The VM's Codex CLI is pinned to this machine's version.
+- Codex on the VM calls OpenAI directly with your sign-in. It does not use CLIProxy.
+- OpenAI replaces your refresh token each time Codex refreshes its sign-in, so two copies
+  of one sign-in cannot both stay valid. Every 60 seconds this machine compares its
+  sign-in with each Fly machine's, and the newest refresh wins: a newer refresh on the VM
+  is copied here, otherwise this machine's sign-in is copied to the VM.
+- If both machines refresh inside the same minute, one of them can be signed out. Run
+  `codex login` here; the next sync copies the new sign-in to the VM.
+
+Every Fly machine gets Codex when this machine has it, whatever `--harness` you pass, so
+a Fly machine started for Claude Code can also run a Codex conversation later.
+`add-fly` prints `codex: yes` for such a machine.
+
+### Limits
+
+- Claude Code and Codex. Other harnesses cannot run on a Fly machine.
+- Codex runs with its usual `workspace-write` sandbox on a Fly machine; shell commands
+  work there (checked live, PAN-4296).
+- Docker: the VM runs Docker with the `vfs` storage driver, because the VM's disk cannot
+  host the default overlay driver. Containers run, but images take more disk and start
+  more slowly than on your own machine. `add-fly --json` reports `record.docker` as `true`
+  or `false` for each machine.
+
+### Gauntlet lanes
+
+A linked Fly machine runs gauntlet lanes like any linked machine: name it with
+`pan lane start --machine fly-<machineId>`, or let `--machine auto --needs docker` choose
+it. It runs Claude Code and Codex lanes only. A run with long waits between reports can sit idle
+longer than `machine_idle_minutes`, so raise it for that run. See
+[Lanes on other machines](/reference/lanes#lanes-on-other-machines).
+
+## Access levels
+
+| Level | What this machine may do on the other | Flag |
+| --- | --- | --- |
+| **Operator-level** (default) | Read and control the other machine's conversations, agents and terminals as the operator. | none |
+| **Agent-fenced** | Only what an agent on this machine is allowed to do, within that agent's own scopes; requests are stamped with the agent and are never operator-level. | `--agent-fenced` |
+
+Neither level can pair devices, mint tokens or change the other machine's settings. The
+other machine refuses those routes to any linked machine.
+
+## What is encrypted
+
+Everything, on every route. The channel is a Noise protocol session (X25519,
+ChaCha20-Poly1305) between the two machine keys; the pairing code only introduces the
+keys. Every request, the event stream and every terminal that crosses a link runs inside
+the channel. A machine's key lives in `~/.overdeck/machine-key.json`, mode 0600, and its
+fingerprint (five groups of four hex characters) is shown next to each link so you can
+compare it with the other machine's **This machine** line.
+
+## Routes
+
+A link keeps a list of ways to reach the other machine, best first: a LAN address, a
+Tailscale address, an SSH forward, then public or relayed ones. Where they come from:
+
+- The **pairing** address is the one in the pairing link.
+- **Advertised** addresses are learned from the other machine itself: its LAN and
+  Tailscale addresses, and its Tailscale Serve name when it has one. When a better one
+  answers, the link moves to it within a minute. Addresses the other machine stops
+  advertising are dropped.
+- An **`ssh`** route is the forwarded loopback port (`tcp://127.0.0.1:<port>`) that this
+  dashboard keeps open for an [SSH machine](#ssh-machines). When the host also advertises a
+  LAN or Tailscale address that answers from here, the link moves to it, and the forward
+  stays as the fallback.
+- **Add route** (in the expanded route list) adds an address you know works. For a
+  machine you reach over SSH, use **Add an SSH machine** instead of forwarding a port by
+  hand.
+
+Expand a link's **Routes** to see each address, its kind, where it came from and whether
+it answered last time.
+
+**Through the overdeck.ai directory.** When both machines are signed in to the same
+overdeck.ai account, you can also link them without a pairing link: click **Link** in
+**Settings → Anywhere → Directory** (or run `pan machines join`), then approve on the other
+machine after checking that both screens show the same six-digit code. The directory also adds
+`direct` routes (`rtc://<environment id>`, a peer-to-peer WebRTC path) and, on the relay plan,
+`relay` routes (`rtc+turn://<environment id>`, through a TURN relay). The relay tries the TURN
+server over TLS on port 443 first, so a network that blocks UDP can still reach it. These routes are tried only when
+no LAN, Tailscale, SSH or public route answers, appear with the source `directory`, and are
+never saved with the link. See
+[Find your machines through overdeck.ai](/configuration/remote-access#find-your-machines-through-overdeck-ai).
+
+## States
+
+| State | Meaning |
+| --- | --- |
+| **Online** | Heartbeats arrive every 15 s over the channel. |
+| **Connecting** | A heartbeat is late (17.5 s); every route is being tried while the old channel stays open. |
+| **Offline** | No heartbeat for 20 s and no route answered. Retries back off from 1 s to 45 s; the link comes back within a minute of the other machine returning. |
+| **Unsupported** | The other machine runs an Overdeck without machine links, or another link protocol. The state names the exact version, where to install it, and the `npm install -g @overdeck/core@<version>` command. It is not retried until **Reconnect** or a restart. |
+| **Revoked** | The other machine removed this machine's access. Link again with a new pairing link. |
+
+**On a Mac**, a route stuck in **Offline** can say "macOS is blocking local network access for Overdeck."
+instead of the raw connection error. The dashboard only shows this when two signals agree:
+every LAN route to the peer failed with the same `EHOSTUNREACH` errno, and a probe of this
+process's own network access confirms macOS denied it. A powered-off peer, which also fails
+fast with `EHOSTUNREACH`, keeps the raw error instead — turning on Local Network access
+would not help there.
+
+When a link drops, the row says why. **froze** means the other dashboard's event loop
+stalled (it reports its own stalls in the next heartbeat, so a frozen machine is told
+apart from a dead network); **network** means nothing arrived.
+
+Each row in **Settings → Anywhere → Machines** shows the machine's name and state, then
+two lines: the route in use and the access level, then the machine's Overdeck version,
+last heartbeat, load and tags.
+
+## Sharing conversations
+
+Once two machines are linked, each lists the other's conversations next to its own.
+Sharing is on by default. A linked machine sees the metadata of every local, unarchived
+conversation on this machine: its name, title, harness, model, status, whether it is
+working, its last activity, project, git origin, working directory and issue. It never
+receives transcript content until you open a conversation, and then only that
+conversation's newest page.
+
+Turn **Share my conversations** off in **Settings → Anywhere → Machines** to stop
+sharing. Linked machines drop this machine's conversations on their next sync, within
+about 15 seconds.
+
+To hide one machine's conversations without unlinking it, open the ⋮ menu on one of its
+rows and choose **Hide this machine**. The list footer then reads
+"<machine> conversations hidden · Show"; **Show** brings them back.
+
+A conversation appears once, however many machines list it: this machine's own row wins
+over a linked row, and a linked row wins over its Session Vault saved copy (the row then
+offers the saved copy itself).
+
+## Title-bar states
+
+The conversation title bar shows which machine runs the conversation. These are surface
+tones, never status colors.
+
+| State | Title bar | Banner and actions |
+| --- | --- | --- |
+| Local | the usual card surface | none |
+| Remote (owner online) | the remote surface, chip "on <machine>" | **Preview** and **Pull here** in the title bar |
+| Owner offline, saved copy | remote surface, muted title, hollow dot "offline" | "<machine> is offline (last seen …)" with **Read saved copy** and **Continue here** |
+| Owner offline, no saved copy | remote surface, muted title, hollow dot "offline" | the same text with **Reconnect** |
+| Released (this machine's copy after a pull) | remote surface, muted title, hollow dot "released" | "Continued on <machine> · this copy is read-only" with **Open there** |
+
+In the three non-live states the composer is read-only and the conversation cannot be
+renamed.
+
+Machine chips, in the title bar and on conversation rows, drop the `.local` suffix macOS
+adds to hostnames (`studio-mbp.local` shows as "on studio-mbp"); hover a chip for the full name.
+
+## Remote control
+
+Open a linked conversation from the list, or at `/conv/@<environment-id>/<name>`, or on
+the phone at `/m?conversation=@<environment-id>/<name>`. Its
+transcript streams live through this machine's server, and you can send, answer
+questions and approvals, stop, abort, switch model, compact and open its terminal, as if
+it were local. Images load from the owner. The owner's own access rules decide what is
+allowed: an **agent-fenced** link can read but not change the other machine's
+conversations, and an agent on a linked machine is always refused changes
+(`agent-fenced`).
+
+From the CLI, `pan tell @<machine>/<conv> "<message>"` delivers to a conversation on a
+linked machine (see [`pan tell`](/cli/agent-commands)).
+
+## Pull here
+
+**Pull here** (or `pan conv pull @<machine>/<conv>`) makes this machine the owner. A
+conversation runs on one machine at a time. The pull has four steps:
+
+1. **Release.** The owner settles the conversation, with its uncommitted and unpushed
+   code changes, and stops its harness. If a turn is running you choose **Wait for this
+   turn** (up to 30 minutes) or **Stop it now**.
+2. **Transfer.** The settled conversation crosses the encrypted channel.
+3. **Adopt.** This machine continues it in its own checkout and resumes the harness. It
+   keeps the title it had on the owner.
+4. **Finish.** The old copy shows "Continued on <this machine>" and is read-only.
+
+If adoption fails, the owner takes the conversation back and resumes it; nothing is
+lost. When the owner is offline, the banner's **Continue here** continues this machine's
+Session Vault saved copy instead (it fails when there is none).
+
+Pushing back is a Pull here from the other machine; the old read-only copy there is
+archived (its transcript is kept). If the machine you released to never ran the
+conversation, take it back with `pan conv reclaim <conv>`: it refuses while that machine
+still runs it, and when that machine cannot be asked unless you pass `--force`.
+
+Pull here works for Claude Code and Codex conversations.
+
+## Open preview
+
+**Preview** in a remote conversation's title bar forwards a TCP port from the owner to
+`127.0.0.1` on this machine and opens it in a new tab, for a dev server's preview. It
+lists the ports Overdeck assigned to the conversation's workspace and the project's
+service ports; you can type any other port. The CLI is
+[`pan machines forward`](/cli/machines#forward).
+
+A forward reaches only `127.0.0.1` on the owner. Ports below 1024 or above 65535, and
+Overdeck's own ports (the dashboard and its API, the supervisor, 80, 443 and Traefik's
+dashboard port) are refused with `port-refused`. A forward closes when you stop it, when
+the link goes away, or after 30 minutes with no open connection. It needs an
+operator-level link.
+
+## Open in editor
+
+On a linked conversation, **Open in editor** opens the owner's checkout in your local
+editor over remote SSH: `code --remote ssh-remote+<authority> <cwd>`. For a machine added
+as an SSH machine, the host is the destination you added it with (for example
+`ssh-remote+root@build-box`), never the local port forward; otherwise it's the link's
+Tailscale (`tailnet`) host name. A link with neither cannot do this (`no-ssh-host`). A
+destination with a port, an IPv6 address or an uppercase letter is passed in Remote-SSH's
+encoded form (hex of `{"hostName","user","port"}`), so the command line shows a long hex
+string. VS Code, VS Code Insiders and VSCodium are supported. Cursor and Windsurf are
+shown disabled: their remote-SSH launch could not be verified.
+
+## Fleet versions and Update all
+
+**Settings → Anywhere → Fleet versions** (or `pan machines versions`) shows one row per
+machine, this machine first: the Overdeck version and the version of each harness CLI
+installed there (Claude Code, Codex CLI, Kimi Code CLI, OpenCode, Muse Code, Prime Agent,
+OhMyPi). A linked machine that is not online shows its last known Overdeck version. A
+linked machine on an Overdeck from before fleet updates shows the version to install and
+its command.
+
+**Update all** (or `pan machines update`) asks every online machine to update itself:
+
+1. **Wait for running turns.** Each machine waits until no agent or conversation is in the
+   middle of a turn there, checking every 5 s. It never starts on its own while a turn
+   works. After 30 minutes the row says it is still waiting. **Update now** on that row
+   (or `pan machines update --now`) starts it at once; **Cancel** (or
+   `pan machines update --cancel`) stops a waiting update.
+2. **Update each harness CLI** with its own command. A CLI installed with npm is updated
+   with npm into the same prefix. A failure in one CLI does not stop the next; the row
+   shows the command's output.
+3. **Update Overdeck last** on a machine where it was installed with
+   `npm install -g @overdeck/core` or set up with `pan connect` (the update goes into
+   `~/.overdeck/runtime` with `npm install --prefix`, no `sudo`), then restart that
+   machine's dashboard. A repository checkout (`pan reload` deployments) or the desktop
+   app keeps its Overdeck and still updates the CLIs.
+
+Each version shows `before → after` once it changed. Update all always installs the
+latest version; it never lets anyone pick a version.
+
+| CLI | Update command | Notes |
+| --- | --- | --- |
+| Claude Code | `claude update` | npm installs: `npm install -g --prefix <prefix> @anthropic-ai/claude-code@latest` |
+| Codex CLI | `codex update` | npm installs: `npm install -g --prefix <prefix> @openai/codex@latest` |
+| Kimi Code CLI | `kimi upgrade --yes` | |
+| OpenCode | `opencode upgrade` | npm installs: `npm install -g --prefix <prefix> opencode-ai@latest` |
+| Muse Code | none | Listed with its version; Overdeck does not update it. |
+| Prime Agent | none | Overdeck pins it to 0.8, so it is not updated to latest. |
+| OhMyPi | none | Listed with its version; Overdeck does not update it. |
+
+Homebrew installs, Windows, and an npm prefix Overdeck cannot write show the command to
+run yourself instead of running it. Offline, connecting, unsupported and revoked machines
+are skipped, and so is a machine reached over an agent-fenced link: Update all needs an
+operator-level link.
+
+## Start work on another machine
+
+The new-conversation dialog has a **Machine** field: **This machine** (the default),
+**Auto**, each online linked machine by label, and **Fly (new VM)**. **Fly (new VM)** is
+enabled once the dialog has a project (it needs one to clone) and needs an admin
+credential; choosing it starts a new Fly machine, clones the project, runs the conversation
+there and takes a few minutes — the dialog shows "Starting a Fly machine." while it works.
+The machine is destroyed, like any Fly machine, once no conversation on it has been active
+for `[remote.fly] machine_idle_minutes` (see [Lifetime and cost](#lifetime-and-cost)). The
+CLI takes the same per-machine choice for a conversation, but `--machine fly` refuses on
+`pan start`, `pan worker run` and `pan lane start` (see [Fly machines](#fly-machines) and
+[`pan machines add-fly`](/cli/machines#add-fly)):
+
+```bash
+pan start PAN-123 --machine desk
+pan worker run --issue PAN-123 --prompt "Run the suite" --machine desk
+pan lane start --run hotel --key 663 --role builder --brief b.md --machine auto
+```
+
+A conversation or agent started on another machine runs there and is listed on both
+machines. The other machine must have a project for the same repository (the same
+`github_repo` or `gitlab_repo`); if it does not, the error names the command that adds it
+(see [Projects across machines](#projects-across-machines)).
+
+The other machine chooses the working directory: its own copy of the project, or its
+default working directory (`~/Projects`, else home) when no project is chosen. With any
+machine but **This machine** chosen, the dialog's **Working directory** field is empty
+and reads, for example, "Set by desk: its copy of Overdeck". A directory you typed
+applies only to this machine and is kept if you switch back.
+
+Work started this way is **link-started**: the other machine records which machine asked
+for it. An agent on your machine may then message and stop that work, and only that work.
+It can never open terminals or port forwards there, create conversations or workers outside
+the work doors, add projects, pair devices, mint tokens or change settings.
+
+## Delegation
+
+`pan worker run --machine <label|auto>` starts a worker on another machine and gives you a
+local **stand-in** id (`agent-<issue>-worker-<n>`). `pan worker wait` on that id mirrors the
+remote worker's reports exactly like a local worker's.
+
+- **Offline:** while the other machine is asleep or unreachable, the follower backs off
+  (1 s, doubling up to 5 minutes) and keeps waiting; the wait does not fail. It resumes
+  after a dashboard restart.
+- **Parent stop:** when the agent or conversation that started the worker ends, this
+  machine stops the remote worker.
+- **Unpushed commits:** the other machine starts from its view of `origin`. If your branch
+  has commits that are not pushed, the CLI refuses and says so; re-run with `--push-first`
+  to push them, or `--ignore-unpushed` to start anyway.
+
+## Auto placement
+
+**Auto** (`--machine auto`) picks a machine for you and prints why, for example
+`Auto → desk (CPU pressure 3%, 41 GB free, 2 agents)`.
+
+1. Candidates are this machine and every online, visible linked machine.
+2. A machine is skipped when it is offline, has no project for the repository, lacks a
+   needed tag, has a saturated CPU, or is **reserved**. A reserved machine is still picked
+   when it is the only machine with a needed tag.
+3. The rest are ranked by lowest CPU pressure, then most free memory, then fewest working
+   agents, then this machine.
+
+Each machine reports its load every 15 seconds and its **capability tags**: `linux`,
+`macos` or `windows`, plus `docker`, `gpu` and `ios-sim` when they are detected. Add your own
+tags, or reserve a machine, in its `config.yaml`:
+
+```yaml
+anywhere:
+  machine:
+    tags: [payments, big-disk]
+    placement: on-request   # Auto skips this machine unless only it has a needed tag
+```
+
+`--needs docker,gpu` (and the dialog's **Needs** field when **Auto** is chosen) limits Auto to
+machines with every listed tag. The Machines list (`pan machines list`, Settings → Anywhere →
+Machines) shows each machine's load and tags.
+
+For a **conversation**, when nothing fits, `remote.auto_fly = true` lets Auto create a Fly
+machine instead of answering "no machine fits" — only when the project is on GitHub and
+`needs` stays within what a Fly machine can have (`linux`, `docker`). It is off by default,
+and it never applies to a worker, an issue start or a lane:
+
+```toml
+# ~/.overdeck/config.toml
+[remote]
+auto_fly = true
+```
+
+### Gauntlet lanes
+
+`pan lane start --machine auto [--needs <tags>]` places a gauntlet lane the same way, so a
+loop's heavy critics can run on an idle laptop or Fly machine instead of the orchestrator's
+machine. The orchestrator keeps the run's rules and lists, waits on, stops and reaps the
+lane from its own machine. See [Lanes on other machines](/reference/lanes#lanes-on-other-machines).
+
+## Projects across machines
+
+With **Combine matching repositories across machines** on (Settings → Anywhere → Machines,
+default on), the sidebar shows one project per repository: a project that other machines
+also have shows "· N machines", conversations from those machines appear under it, and
+repositories that only other machines have are listed under **On other machines**.
+
+**Add this project to <machine>** clones the repository on the target machine through the
+normal project creation, registers it, and copies the git-ignored files you select: `.env`,
+`.envrc` and `.dev.vars` are selected by default, files larger than 1 MiB, directories and
+symlinks are never copied, and an existing file on the target is kept. Files cross only an
+operator-level link, for the operator. From the CLI:
+
+```bash
+pan machines add-project desk overdeck            # desk's overdeck, cloned here
+pan machines add-project laptop overdeck --to desk   # this machine's overdeck, cloned on desk
+```
+
+## Fleet Needs-You and search
+
+**Needs you** lists questions and permission prompts waiting on every online linked
+machine, labelled "on <machine>". A conversation on another machine opens through the link;
+an agent there is answered on that machine. The command palette's search adds an
+"On <machine>" group for every online linked machine. `pan machines who PAN-123` lists which
+machines run agents or conversations for an issue. Offline machines add nothing and never
+cause an error.
+
+## Fleet usage
+
+The Costs page's **Machines** tab shows today, week and month spend for each machine and an
+**All machines** total. An offline machine shows its last known numbers with "cached <time>".
+A provider request recorded on two machines (for example a conversation pulled from one to the
+other) is counted once in All machines.
+
+## Compare settings
+
+**Compare settings** on a machine's row (Settings → Anywhere → Machines) lists the
+`config.yaml` keys whose values differ between this machine and that one. Secrets show only
+"set" or "not set". Each value this machine sets comes with a copyable
+`pan admin config set <key> <value>` line to run on the other machine; nothing is changed for
+you. With a Tailscale route, **Open <machine>'s dashboard** goes to that machine's own
+Settings.
+
+## Unlink
+
+**Unlink** on a link (or `pan machines unlink <label>`) removes it here and tells the
+other machine to drop its access token for this machine. If the other machine is
+unreachable, it sees the link as **Revoked** when it next connects. The **Inbound** list
+shows machines that hold access to this one; **Remove** revokes one and closes its open
+connections.
+
+## Troubleshooting
+
+- **Unsupported**: update Overdeck on the machine the state names, then **Reconnect**.
+- **Revoked**: the other side unlinked. Create a new pairing link there and link again.
+- **Update all skipped a machine**: the toast and `pan machines update` name the reason.
+  An offline or unsupported machine is never updated; bring it online (or install the
+  named Overdeck version) and run Update all again. "agent-fenced" means this machine's
+  link to it is agent-fenced; link again at operator level to update it from here.
+- **A CLI update failed**: the row shows `Failed: <CLI>`, and the Update cell's tooltip
+  (or `pan machines versions --json`) holds the command's output. Fix the cause on that
+  machine (often permissions on the npm prefix) and run Update all again; the other CLIs
+  were still updated.
+- **Offline with "ECONNREFUSED"**: the other dashboard is not running, or no advertised
+  address reaches it from here. Add a route you know works.
+- **Offline with "closed the connection before proving the pinned machine key"**: every
+  route answered but none proved the expected key. Either the other machine's key changed
+  (its `machine-key.json` was replaced) or a proxy answered for a dead peer. Unlink and
+  link again if the key really changed.
+- **`add-fly` fails with `unreachable`**: the Fly app has no public IPs. Run
+  `fly ips allocate-v4 --shared -a <app>` and `fly ips allocate-v6 -a <app>` once, then
+  try again. The failed VM was already destroyed.
+- **`add-fly` fails with `version-mismatch`**: the VM could not install this machine's
+  Overdeck version from npm. The message names both versions; a development build that is
+  not published on npm cannot be installed there. With `--harness codex` the message can
+  also name `@openai/codex`: the VM could not install this machine's Codex CLI version.
+  Update the Codex CLI here to a published version, then try again.
+- **`add-fly --harness codex` fails with `credentials-failed`**: this machine has no
+  Codex CLI or no valid Codex sign-in. Run `codex login` here, then try again.
+- **`Fly token rejected (403)`**: check `pan doctor`'s `Fly token` row for the origin and
+  status, then `fly auth login` to refresh the stored login, or set `FLY_API_TOKEN` (or
+  the variable `[remote.fly] api_token_env` names) to a long-lived token from
+  `fly tokens create deploy -a <app>` (PAN-4748).
+- The link exists but `require_token_mint` turned itself on: that is expected. Any remote
+  access turns it on; see [Remote access](/configuration/remote-access#local-reverse-proxies-require_token_mint).

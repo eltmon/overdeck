@@ -24,6 +24,8 @@ import {
   runSsh,
   shellQuote,
 } from './remote-tmux.js';
+import type { RemoteTmuxTarget } from './remote-tmux.js';
+import { countFlyMachines } from '../anywhere/fly/machine-store.js';
 import { generateLauncherScript } from '../launcher-generator.js';
 import { getClaudePermissionFlags, getClaudePermissionFlagsString } from '../claude-permissions.js';
 import {
@@ -34,11 +36,12 @@ import { isOperatorStartedBy } from '../agents/provenance.js';
 import { determineModel } from '../agents/provider-env.js';
 import { resolveEffort } from '../agents/resolve-effort.js';
 
-export { sendToRemoteAgentKeyed } from './remote-keyed-delivery.js';
+import { deliverRemoteKeyed } from './remote-keyed-delivery.js';
+import type { RemoteKeyedDeliveryOutcome, RemoteKeyedExec } from './remote-keyed-delivery.js';
 export type { RemoteKeyedDeliveryOutcome, RemoteKeyedExec } from './remote-keyed-delivery.js';
 
 const AGENTS_DIR = join(homedir(), '.overdeck', 'agents');
-const REMOTE_HOST_HEARTBEAT_PATH = `${REMOTE_PAN_DIR}/host-heartbeat`;
+export const REMOTE_HOST_HEARTBEAT_PATH = `${REMOTE_PAN_DIR}/host-heartbeat`;
 
 const PUSH_DAEMON_INTERVAL_SECONDS = 300;
 const EPHEMERAL_WATCHDOG_INTERVAL_SECONDS = 60;
@@ -49,6 +52,8 @@ export interface PushDaemonOptions {
   branch: string;
   intervalSeconds?: number;
   logFile?: string;
+  /** The repository the daemon commits and pushes (PAN-4734: a linked agent's VM worktree). */
+  workdir?: string;
 }
 
 /**
@@ -61,6 +66,7 @@ export function generatePushDaemonScript(options: PushDaemonOptions): string {
   const logFile = options.logFile ?? `${REMOTE_PAN_DIR}/push-daemon.log`;
   const issueIdLiteral = JSON.stringify(options.issueId);
   const branchLiteral = JSON.stringify(options.branch);
+  const workdirLiteral = JSON.stringify(options.workdir ?? '/workspace');
 
   return [
     "const { execFile } = require('child_process');",
@@ -74,7 +80,7 @@ export function generatePushDaemonScript(options: PushDaemonOptions): string {
     '}',
     '',
     'function runOnce() {',
-    "  const cwd = '/workspace';",
+    `  const cwd = ${workdirLiteral};`,
     '  try {',
     `    if (!fs.existsSync(path.join(cwd, '.git'))) {`,
     "      log('Not a git repository; skipping heartbeat');",
@@ -137,13 +143,14 @@ export async function installPushDaemon(
   provider: FlyProvider,
   vmName: string,
   issueId: string,
+  workdir = '/workspace',
 ): Promise<void> {
   const branch = `feature/${issueId.toLowerCase()}`;
   const baseName = `push-daemon-${issueId.toLowerCase()}`;
   const scriptPath = `${REMOTE_PAN_DIR}/${baseName}.js`;
   const logFile = `${REMOTE_PAN_DIR}/${baseName}.log`;
 
-  const script = generatePushDaemonScript({ issueId, branch, logFile });
+  const script = generatePushDaemonScript({ issueId, branch, logFile, workdir });
   await writeRemoteFile(provider, vmName, scriptPath, script);
 
   const envVars = [
@@ -160,7 +167,7 @@ export async function installPushDaemon(
     '-s',
     baseName,
     '-c',
-    '/workspace',
+    workdir,
     daemonCmd,
   ]);
   const result = await runSsh(provider, vmName, tmuxCmd);
@@ -293,6 +300,18 @@ export interface RemoteAgentState {
   location: 'remote';
   startedBy: string;
   tier?: 'ephemeral' | 'durable';
+  /** PAN-4734: a work agent running as a conversation on a linked Fly machine. */
+  linked?: true;
+  environmentId?: string;
+  linkId?: string;
+  flyMachineId?: string;
+  conversationName?: string;
+  /** The tmux session and socket on the VM (`conv-<name>`, `overdeck`); absent ⇒ `id` and home's socket. */
+  tmuxSession?: string;
+  tmuxSocket?: string;
+  projectKey?: string;
+  /** The VM worktree the agent works in; absent ⇒ `/workspace`. */
+  workdir?: string;
 }
 
 /**
@@ -347,7 +366,7 @@ export interface RefreshHostHeartbeatDeps {
 
 /**
  * Refresh the host-heartbeat freshness file on every active ephemeral-tier VM.
- * The deacon patrol calls this each cycle; the VM-side ephemeral watchdog uses
+ * The hygiene scheduler calls this every 60 s (PAN-4295); the VM-side ephemeral watchdog uses
  * the file's mtime to decide when to self-stop the machine.
  */
 export async function refreshHostHeartbeatForEphemeralVms(
@@ -355,10 +374,11 @@ export async function refreshHostHeartbeatForEphemeralVms(
 ): Promise<string[]> {
   const activeStates = (deps.listActiveRemoteAgentStates ?? listActiveRemoteAgentStates)();
   const ephemeralStates = activeStates.filter(
-    (state) => state.tier !== 'durable',
     // Missing tier defaults to ephemeral: older states pre-date tier tracking,
     // and writing a heartbeat is harmless for durable VMs while essential for
-    // ephemeral ones that may still have a watchdog installed.
+    // ephemeral ones that may still have a watchdog installed. A linked work
+    // agent's Fly machine record owns its heartbeat (PAN-4734 FR-10).
+    (state) => state.tier !== 'durable' && state.linked !== true,
   );
   if (ephemeralStates.length === 0) return [];
 
@@ -369,11 +389,18 @@ export async function refreshHostHeartbeatForEphemeralVms(
 
   for (const state of ephemeralStates) {
     try {
-      await runSsh(
+      const result = await runSsh(
         fly,
         state.vmName,
         `mkdir -p ${shellQuote(REMOTE_PAN_DIR)} && echo ${shellQuote(heartbeatContent)} > ${shellQuote(REMOTE_HOST_HEARTBEAT_PATH)}`,
       );
+      if (result.exitCode !== 0) {
+        const output = result.stderr.trim() || result.stdout.trim() || 'no output';
+        actions.push(
+          `Host heartbeat failed for ${state.issueId.toUpperCase()} on ${state.vmName} (exit ${result.exitCode}): ${output}`,
+        );
+        continue;
+      }
       actions.push(`Host heartbeat refreshed for ${state.issueId.toUpperCase()} on ${state.vmName}`);
     } catch (err: any) {
       actions.push(
@@ -394,6 +421,8 @@ export interface RemoteSpendCapResult {
 
 export interface CheckRemoteSpendCapDeps {
   listActiveRemoteAgentStates?: typeof listActiveRemoteAgentStates;
+  /** Fly machines count toward the same cap (PAN-4652 FR-12). */
+  countFlyMachines?: () => number;
 }
 
 /**
@@ -405,23 +434,32 @@ export function checkRemoteSpendCap(
   config: { remote?: { max_concurrent_agents?: number } },
   deps: CheckRemoteSpendCapDeps = {},
 ): RemoteSpendCapResult {
-  const activeStates = (deps.listActiveRemoteAgentStates ?? listActiveRemoteAgentStates)();
   const cap = config.remote?.max_concurrent_agents ?? 0;
+  let flyMachines = 0;
+  try {
+    flyMachines = (deps.countFlyMachines ?? countFlyMachines)();
+  } catch (error) {
+    if (cap > 0) throw error; // fail closed only when a cap applies
+  }
+  // A linked work agent runs on a Fly machine that is already counted (PAN-4734 FR-10).
+  const legacyAgents = (deps.listActiveRemoteAgentStates ?? listActiveRemoteAgentStates)()
+    .filter((state) => state.linked !== true).length;
+  const current = legacyAgents + flyMachines;
 
   if (!cap || cap <= 0) {
-    return { allowed: true, current: activeStates.length, cap: 0 };
+    return { allowed: true, current, cap: 0 };
   }
 
-  if (activeStates.length >= cap) {
+  if (current >= cap) {
     return {
       allowed: false,
-      current: activeStates.length,
+      current,
       cap,
-      message: `Remote agent cap reached: ${activeStates.length}/${cap} active remote agents. Stop an existing remote agent or raise remote.max_concurrent_agents.`,
+      message: `Remote agent cap reached: ${current}/${cap} active remote agents and Fly machines. Stop an existing remote agent, remove a Fly machine, or raise remote.max_concurrent_agents.`,
     };
   }
 
-  return { allowed: true, current: activeStates.length, cap };
+  return { allowed: true, current, cap };
 }
 
 export interface RemoteDurabilityPreflightResult {
@@ -468,19 +506,26 @@ export async function checkRemoteDurabilityPreflight(
   return { ok: true, missing: [] };
 }
 
+/** PAN-4734: the VM tmux session and socket that hold this agent (legacy: the agent id, home's socket). */
+export function remoteTmuxTarget(agentId: string): RemoteTmuxTarget {
+  const state = loadRemoteAgentState(agentId);
+  return { session: state?.tmuxSession ?? agentId, socket: state?.tmuxSocket };
+}
+
 /**
  * Check if remote agent session exists
  */
 async function remoteSessionExists(
   provider: FlyProvider,
   vmName: string,
-  sessionName: string
+  sessionName: string,
+  socket?: string,
 ): Promise<boolean> {
   await ensureRemoteTmuxContext(provider, vmName);
   const result = await runSsh(
     provider,
     vmName,
-    `${buildRemoteTmuxCommand(['has-session', '-t', sessionName])} 2>/dev/null && echo exists || echo not-found`,
+    `${buildRemoteTmuxCommand(['has-session', '-t', sessionName], socket)} 2>/dev/null && echo exists || echo not-found`,
   );
   return result.stdout.trim() === 'exists';
 }
@@ -615,6 +660,11 @@ async function spawnRemoteAgentWithoutConsentClaim(
 
   saveRemoteAgentState(state);
 
+  // The VM runs everything as root, and Claude Code refuses the bypass
+  // permission mode as root unless IS_SANDBOX=1 says it is in a sandbox
+  // (PAN-4295 smoke test). A Fly machine is that sandbox.
+  const sandboxExport = 'export IS_SANDBOX=1';
+
   // Write prompt to file on remote VM if provided
   let claudeCmd: string;
 
@@ -634,7 +684,7 @@ async function spawnRemoteAgentWithoutConsentClaim(
       promptFile,
       baseCommand: 'claude',
       permissionFlags: getClaudePermissionFlags(),
-      extraEnvExports: [`export OVERDECK_AGENT_STARTED_BY=${shellQuote(startedBy)}`],
+      extraEnvExports: [sandboxExport, `export OVERDECK_AGENT_STARTED_BY=${shellQuote(startedBy)}`],
       extraArgs: `--effort ${workEffort.effort}`,
       model,
     });
@@ -646,7 +696,7 @@ async function spawnRemoteAgentWithoutConsentClaim(
 
     claudeCmd = `bash ${launcherScript}`;
   } else {
-    claudeCmd = `OVERDECK_AGENT_STARTED_BY=${shellQuote(startedBy)} claude ${getClaudePermissionFlagsString()} --model ${model} --effort ${workEffort.effort}`;
+    claudeCmd = `IS_SANDBOX=1 OVERDECK_AGENT_STARTED_BY=${shellQuote(startedBy)} claude ${getClaudePermissionFlagsString()} --model ${model} --effort ${workEffort.effort}`;
   }
 
   console.log(`[claude-invoke] purpose=remote-agent | model=${model} | effort=${workEffort.effort} | source=remote-agents.ts | vm=${vmName} | agent=${agentId} | command="${claudeCmd}"`);
@@ -693,10 +743,11 @@ export async function getRemoteAgentOutput(
   const fly = createFlyProvider();
   await ensureRemoteTmuxContext(fly, vmName);
 
+  const target = remoteTmuxTarget(agentId);
   const result = await runSsh(
     fly,
     vmName,
-    buildRemoteTmuxCommand(['capture-pane', '-t', agentId, '-p', '-S', `-${lines}`]),
+    buildRemoteTmuxCommand(['capture-pane', '-t', target.session, '-p', '-S', `-${lines}`], target.socket),
   );
   return result.stdout;
 }
@@ -713,6 +764,7 @@ export async function sendToRemoteAgent(
   const fly = (deps.createFlyProvider ?? createFlyProvider)();
   await ensureRemoteTmuxContext(fly, vmName);
 
+  const target = remoteTmuxTarget(agentId);
   const promptFile = `${REMOTE_PAN_DIR}/prompts/${agentId}-message.txt`;
   const messageBase64 = Buffer.from(message).toString('base64');
   // Every delivery step runs over SSH and can fail at the remote tmux layer
@@ -723,8 +775,8 @@ export async function sendToRemoteAgent(
       label: 'prompt-file write',
       command: `mkdir -p ${shellQuote(`${REMOTE_PAN_DIR}/prompts`)} && echo ${shellQuote(messageBase64)} | base64 -d > ${shellQuote(promptFile)}`,
     },
-    { label: 'load-buffer', command: buildRemoteTmuxCommand(['load-buffer', '-b', agentId, promptFile]) },
-    { label: 'paste-buffer', command: buildRemoteTmuxCommand(['paste-buffer', '-b', agentId, '-t', agentId, '-d']) },
+    { label: 'load-buffer', command: buildRemoteTmuxCommand(['load-buffer', '-b', agentId, promptFile], target.socket) },
+    { label: 'paste-buffer', command: buildRemoteTmuxCommand(['paste-buffer', '-b', agentId, '-t', target.session, '-d'], target.socket) },
   ];
   for (const step of steps) {
     const result = await runSsh(fly, vmName, step.command);
@@ -734,7 +786,7 @@ export async function sendToRemoteAgent(
     }
   }
   await new Promise(resolve => setTimeout(resolve, 300));
-  const sendResult = await runSsh(fly, vmName, buildRemoteTmuxCommand(['send-keys', '-t', agentId, 'C-m']));
+  const sendResult = await runSsh(fly, vmName, buildRemoteTmuxCommand(['send-keys', '-t', target.session, 'C-m'], target.socket));
   if (sendResult.exitCode !== 0) {
     const detail = sendResult.stderr.trim() || sendResult.stdout.trim() || 'no output';
     return { ok: false, failure: `remote send-keys failed for ${agentId} on ${vmName} (exit ${sendResult.exitCode}): ${detail}` };
@@ -743,6 +795,17 @@ export async function sendToRemoteAgent(
   // message undelivered.
   await runSsh(fly, vmName, `rm -f ${shellQuote(promptFile)}`);
   return { ok: true };
+}
+
+/** Keyed remote delivery (PAN-2997) into the agent's VM tmux session (PAN-4734). */
+export async function sendToRemoteAgentKeyed(
+  agentId: string,
+  vmName: string,
+  message: string,
+  dedupKey: string,
+  exec?: RemoteKeyedExec,
+): Promise<RemoteKeyedDeliveryOutcome> {
+  return deliverRemoteKeyed(agentId, remoteTmuxTarget(agentId), vmName, message, dedupKey, exec);
 }
 
 
@@ -754,7 +817,8 @@ export async function isRemoteAgentRunning(
   vmName: string
 ): Promise<boolean> {
   const fly = createFlyProvider();
-  return remoteSessionExists(fly, vmName, agentId);
+  const target = remoteTmuxTarget(agentId);
+  return remoteSessionExists(fly, vmName, target.session, target.socket);
 }
 
 /**
@@ -766,10 +830,11 @@ export async function killRemoteAgent(
 ): Promise<void> {
   const fly = createFlyProvider();
   await ensureRemoteTmuxContext(fly, vmName);
+  const target = remoteTmuxTarget(agentId);
   await runSsh(
     fly,
     vmName,
-    `${buildRemoteTmuxCommand(['kill-session', '-t', agentId])} 2>/dev/null || true`,
+    `${buildRemoteTmuxCommand(['kill-session', '-t', target.session], target.socket)} 2>/dev/null || true`,
   );
 
   // Update state
@@ -814,7 +879,8 @@ export async function pollRemoteAgentStatus(
   const fly = createFlyProvider();
 
   // Check if session exists
-  const isRunning = await remoteSessionExists(fly, vmName, agentId);
+  const target = remoteTmuxTarget(agentId);
+  const isRunning = await remoteSessionExists(fly, vmName, target.session, target.socket);
 
   if (!isRunning) {
     return { isRunning: false, lastOutput: '', toolUses: [] };

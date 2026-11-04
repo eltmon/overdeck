@@ -13,7 +13,8 @@ import { enrichAction } from './enrich.js';
 import { embedAction } from './embed.js';
 import { jsonlAction } from './jsonl.js';
 import { moveAction } from './move.js';
-import { autoArchiveOnMergeAction, linkPrAction, prsAction, unlinkPrAction } from './pull-requests.js';
+import { autoSettleOnMergeAction, autoSettleOverrideAction, linkPrAction, prsAction, unlinkPrAction } from './pull-requests.js';
+import { autoSettleIdleDaysAction } from './auto-settle.js';
 import {
   scheduleAddAction,
   scheduleListAction,
@@ -22,6 +23,8 @@ import {
   type ScheduleAddOptions,
 } from './schedule.js';
 import { healAction } from './heal.js';
+import { pendingAction } from './pending.js';
+import { pullAction, reclaimAction } from './pull.js';
 
 function collectRepeatable(value: string, previous: string[] = []): string[] {
   return [...previous, value];
@@ -108,6 +111,27 @@ export function registerConversationsCommands(program: Command): void {
     .option('--json', 'Output status/path as JSON; read the status field')
     .action((id: string, opts: { json?: boolean }) => jsonlAction(id, opts));
 
+  // ── pending (PAN-4641) ──────────────────────────────────────────────────────
+  conversations
+    .command('pending <conv>')
+    .description('List messages queued to send when the conversation\'s usage limit resets')
+    .option('--json', 'Print JSON')
+    .action((conv: string, opts: { json?: boolean }) => pendingAction(conv, opts));
+
+  // ── pull / reclaim (PAN-4650) ───────────────────────────────────────────────
+  conversations
+    .command('pull <conv>')
+    .description('Make this machine own a conversation that runs on a linked machine (@<machine>/<conv>)')
+    .option('--stop-turn', 'Stop a running turn instead of waiting for it')
+    .option('--json', 'Print the final job state as JSON')
+    .action((conv: string, opts: { stopTurn?: boolean; json?: boolean }) => pullAction(conv, opts));
+
+  conversations
+    .command('reclaim <conv>')
+    .description('Take back a conversation this machine released when the other machine does not run it')
+    .option('--force', 'Reclaim even when the other machine cannot be asked')
+    .action((conv: string, opts: { force?: boolean }) => reclaimAction(conv, opts));
+
   // ── move ────────────────────────────────────────────────────────────────────
   conversations
     .command('move <query> <projectKey>')
@@ -130,9 +154,17 @@ export function registerConversationsCommands(program: Command): void {
     .option('--json', 'Output { links, effective } as JSON')
     .action((query: string, opts: { json?: boolean }) => prsAction(query, opts));
   conversations
-    .command('auto-archive-on-merge [value]')
-    .description('Show or set (on|off) archiving operator conversations once all their linked PRs are merged or closed (default off)')
-    .action((value?: string) => autoArchiveOnMergeAction(value));
+    .command('auto-settle-on-merge [value]')
+    .description('Show or set (on|off) settling conversations once all their linked PRs are merged or closed (default on)')
+    .action((value?: string) => autoSettleOnMergeAction(value));
+  conversations
+    .command('auto-settle <query> [value]')
+    .description("Show or set (on|off|inherit) one conversation's auto-settle-on-merge override")
+    .action((query: string, value?: string) => autoSettleOverrideAction(query, value));
+  conversations
+    .command('auto-settle-idle-days [days]')
+    .description('Show or set how many days without activity before an operator conversation is settled (0 = off, default 3)')
+    .action((days?: string) => autoSettleIdleDaysAction(days));
 
   // ── schedules (PAN-4640) ────────────────────────────────────────────────────
   const schedule = conversations

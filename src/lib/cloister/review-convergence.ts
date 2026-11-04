@@ -101,34 +101,39 @@ export function countBlockingFindingsForRun(runDir: string): number | null {
 
 /**
  * Evaluate whether a review cycle series is converging.
- * Returns 'not-converging' when:
- *   - counts.length >= 3 AND the series shows a reversal (count[n-1] > count[n-2]), OR
- *   - the last two transitions are both non-decreases (going backwards)
+ *
+ * Only the current episode is judged: the rounds after the last 0-blocker
+ * round. A 0-blocker round is an approved, converged loop, so blockers found
+ * after it come from new code (a conflict repair, a main merge), not from a
+ * reviewer flip-flopping on the same code. Judging the whole series read
+ * `0 → 0 → 2 → 2` as a reversal and withheld the verdict from the work agent
+ * (PAN-4993).
+ *
+ * Within the episode, returns 'not-converging' when:
+ *   - the episode has >= 3 rounds AND shows a reversal (count[n-1] > count[n-2]), OR
+ *   - the last two transitions are both non-decreases (a stall)
  * Otherwise returns 'converging'.
  */
 export function evaluateReviewConvergence(counts: number[]): 'converging' | 'not-converging' {
-  if (counts.length < REVIEW_CONVERGENCE_MIN_CYCLES) {
+  // An empty episode (the latest round has zero blockers) has nothing left to
+  // converge on, so a flat run of zeros (aborted or clean rounds) is never a stall.
+  const episode = counts.slice(counts.lastIndexOf(0) + 1);
+  if (episode.length < REVIEW_CONVERGENCE_MIN_CYCLES) {
     return 'converging';
   }
 
-  const n = counts.length;
-
-  // No blockers left in the latest round: there is nothing to converge on, so
-  // a flat run of zeros (aborted or clean rounds) is never a stall.
-  if (counts[n - 1] === 0) {
-    return 'converging';
-  }
+  const n = episode.length;
 
   // Check for reversal: the latest value > previous value (an increase after decreases)
-  const hasReversal = counts[n - 1] > counts[n - 2];
+  const hasReversal = episode[n - 1] > episode[n - 2];
   if (hasReversal) {
     return 'not-converging';
   }
 
   // Check for two consecutive non-decreases (stall):
-  // counts[n-3] <= counts[n-2] AND counts[n-2] <= counts[n-1]
-  const isFirstNonDecreasing = counts[n - 2] >= counts[n - 3];
-  const isSecondNonDecreasing = counts[n - 1] >= counts[n - 2];
+  // episode[n-3] <= episode[n-2] AND episode[n-2] <= episode[n-1]
+  const isFirstNonDecreasing = episode[n - 2] >= episode[n - 3];
+  const isSecondNonDecreasing = episode[n - 1] >= episode[n - 2];
   if (isFirstNonDecreasing && isSecondNonDecreasing) {
     return 'not-converging';
   }

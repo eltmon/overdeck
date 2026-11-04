@@ -34,5 +34,7 @@ describe('getFriendlyModelName', () => {
   it('keeps GPT-6.1 Terra and GPT-5.6 Terra distinct (PAN-4633)', () => {
     expect(getFriendlyModelName('gpt-6.1-terra')).toBe('GPT-6.1 Terra');
     expect(getFriendlyModelName('gpt-5.6-terra')).toBe('GPT-5.6 Terra');
+    expect(getFriendlyModelName('gpt-6-rosalind')).toBe('GPT-6 Rosalind');
+    expect(getFriendlyModelName('gpt-6-astra-law')).toBe('GPT-6 Astra for Law');
   });
 });

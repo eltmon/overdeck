@@ -3,13 +3,20 @@
  *
  * Wraps the Fly Machines API (flaps) for machine lifecycle management.
  * Base URL: https://api.machines.dev/v1
- * Auth: FLY_API_TOKEN environment variable
+ *
+ * Auth comes from a `FlyTokenSource` (PAN-4748): an explicit token
+ * (`remote.fly.api_token_env` or `FLY_API_TOKEN`) is sent as-is and never
+ * refreshed; flyctl's stored login (`~/.fly/config.yml`) is re-read per
+ * request and, after a 401/403, refreshed once through `flyctl auth token`.
  */
 
-import { existsSync, readFileSync } from 'fs';
-import { homedir } from 'os';
-import { join } from 'path';
 import { Effect } from 'effect';
+import {
+  flyctlTokenSource,
+  readStoredFlyTokenSync,
+  staticFlyTokenSource,
+  type FlyTokenSource,
+} from './fly-token.js';
 
 export interface FlyMachineConfig {
   image: string;
@@ -21,6 +28,8 @@ export interface FlyMachineConfig {
   restart?: { policy: 'no' | 'always' | 'on-failure'; max_retries?: number };
   metadata?: Record<string, string>;
   mounts?: FlyMount[];
+  /** Fly proxy services (PAN-4652): e.g. 443 tls+http → internal 3011. */
+  services?: Array<{ protocol: 'tcp'; internal_port: number; ports: Array<{ port: number; handlers: string[] }> }>;
 }
 
 export interface FlyMount {
@@ -85,13 +94,31 @@ export class FlyApiError extends Error {
   }
 }
 
+/** A 401 or 403 from the Machines API: the token was rejected (PAN-4748). */
+export function isFlyAuthError(error: unknown): error is FlyApiError {
+  return error instanceof FlyApiError && (error.statusCode === 401 || error.statusCode === 403);
+}
+
+/** The fix every surface prints for a rejected token. */
+export const FLY_TOKEN_FIX =
+  'run `fly auth login`, or set FLY_API_TOKEN (or the variable remote.fly.api_token_env names) to a long-lived token from `fly tokens create deploy -a <app>`';
+
+export function flyTokenRejectedMessage(error: FlyApiError): string {
+  return `Fly token rejected (${error.statusCode}): ${FLY_TOKEN_FIX}`;
+}
+
 const BASE_URL = 'https://api.machines.dev/v1';
 
 export class FlyApiClient {
-  private readonly token: string;
+  private readonly tokens: FlyTokenSource;
 
-  constructor(token: string) {
-    this.token = token;
+  constructor(token: string | FlyTokenSource) {
+    this.tokens = typeof token === 'string' ? staticFlyTokenSource(token) : token;
+  }
+
+  /** Where this client's token comes from (`pan doctor` reports it). */
+  get tokenOrigin(): FlyTokenSource['origin'] {
+    return this.tokens.origin;
   }
 
   private async request<T>(
@@ -100,16 +127,22 @@ export class FlyApiClient {
     body?: unknown
   ): Promise<T> {
     const url = `${BASE_URL}${path}`;
-    const headers: Record<string, string> = {
-      Authorization: `Bearer ${this.token}`,
-      'Content-Type': 'application/json',
-    };
+    const send = (token: string) =>
+      fetch(url, {
+        method,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: body !== undefined ? JSON.stringify(body) : undefined,
+      });
 
-    const response = await fetch(url, {
-      method,
-      headers,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
-    });
+    const token = await this.tokens.current();
+    let response = await send(token);
+    if ((response.status === 401 || response.status === 403) && this.tokens.refresh) {
+      const fresh = await this.tokens.refresh(token);
+      if (fresh !== null && fresh !== token) response = await send(fresh);
+    }
 
     const text = await response.text();
 
@@ -146,6 +179,7 @@ export class FlyApiClient {
       config: {
         image: config.image,
         env: config.env,
+        services: config.services,
         guest: config.size
           ? { cpu_kind: 'shared', cpus, memory_mb: config.memory ?? 1024 }
           : undefined,
@@ -321,31 +355,19 @@ export class FlyApiClient {
   }
 }
 
-/**
- * Read the flyctl CLI's stored access token from ~/.fly/config.yml.
- * Lets every pan surface (CLI, dashboard server) work after `fly auth login`
- * without separately exporting FLY_API_TOKEN.
- */
-function readFlyctlConfigToken(): string | undefined {
-  try {
-    const configPath = join(homedir(), '.fly', 'config.yml');
-    if (!existsSync(configPath)) return undefined;
-    const match = readFileSync(configPath, 'utf-8').match(/^access_token:\s*(\S+)/m);
-    return match?.[1];
-  } catch {
-    return undefined;
-  }
-}
-
 /** Create a FlyApiClient from an explicit token, env, or flyctl's stored auth */
 export function createFlyApiClient(token?: string): FlyApiClient {
-  const tok = token ?? process.env.FLY_API_TOKEN ?? readFlyctlConfigToken();
-  if (!tok) {
-    throw new Error(
-      'Fly API token not found. Run `fly auth login`, or set FLY_API_TOKEN.'
-    );
+  const explicit = token ?? process.env.FLY_API_TOKEN;
+  if (explicit) {
+    return new FlyApiClient(staticFlyTokenSource(explicit));
   }
-  return new FlyApiClient(tok);
+  const stored = readStoredFlyTokenSync();
+  if (stored) {
+    return new FlyApiClient(flyctlTokenSource(stored));
+  }
+  throw new Error(
+    'Fly API token not found. Run `fly auth login`, or set FLY_API_TOKEN.'
+  );
 }
 
 // ─── Effect API ───────────────────────────────────────────────────────────────

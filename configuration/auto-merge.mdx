@@ -144,14 +144,21 @@ Changes are saved through `POST /api/projects/:key/auto-merge-default` and store
 in `~/.overdeck/projects.yaml`.
 
 <Note>
-**Auto-merge vs. UAT batch trains.** This toggle controls *per-issue* scheduled
-auto-merge — Overdeck merging one eligible PR at a time without a human click.
-The separate `merge_train_enabled` setting enables [UAT batch
+**Auto-merge vs. UAT batch trains (PAN-4970).** This toggle controls *per-issue*
+scheduled auto-merge — Overdeck merging one eligible PR at a time without a
+human click. The separate `merge_train_enabled` setting enables [UAT batch
 trains](/features/merge-batches), where ready features are assembled into one
-tested batch you promote together. Auto-merge ships individual PRs on a
-cooldown; batch trains assemble and promote a tested bundle. Auto-merge also
-needs the merge train on: with `merge_train_enabled` off, nothing is scheduled
-and nothing is merged.
+tested batch you promote together. Each ready feature has exactly one of
+these two merge paths — a feature auto-merge will merge never also joins a
+batch. While auto-merge is on, a ready feature is batched only when
+auto-merge will not merge it: it is held for UAT (its label, else the project
+default, else the global setting), its Deft policy requires a human merge,
+its auto-merge was cancelled by the operator, or its last auto-merge failed
+at the PR head it still has. A GitLab project, a project spanning several
+repos, and any host with `OVERDECK_DISABLE_AUTO_MERGE=1` set batch every
+ready feature — auto-merge never schedules there. Auto-merge also needs the
+merge train on: with `merge_train_enabled` off, nothing is scheduled and
+nothing is merged.
 Leave `require_uat_before_merge` at its default (`true`, auto-merge OFF) when you
 want a human to UAT each batch before promoting it.
 </Note>

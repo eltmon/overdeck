@@ -1,0 +1,630 @@
+---
+title: "MCP server"
+description: Drive this machine's Overdeck from another tool over the Model Context Protocol, with a scoped, revocable token
+---
+
+# MCP server
+
+Overdeck serves a Model Context Protocol (MCP) server, so another tool (Claude
+Desktop, another agent harness, a chat bot) can list conversations, read one,
+send a message, start a conversation or a worker, and answer prompts that wait
+on you. It reaches this machine and the machines it is linked to (see Fleet reach).
+
+This is separate from the Channels bridge (`overdeck-bridge`), which delivers
+messages into one running agent. The MCP server is a control surface for
+outside tools.
+
+Every tool calls an existing dashboard route with the token the client
+presents, so a tool can do only what that token's scopes allow on that route.
+There is no second path to any operation.
+
+## Tools
+
+| Tool | What it does | Scope the token needs |
+| --- | --- | --- |
+| `list_machines` | Lists this machine and its linked machines with their state, load and capability tags. | `read:state` |
+| `list_conversations` | Lists recent conversations with status, harness, model and pending input. `limit` 1–200, default 50. | `read:conversations` |
+| `search_conversations` | Searches conversations by title and content. `query`, `limit` 1–50, default 20. | `read:conversations` |
+| `read_conversation` | Reads one conversation's messages. Pass a page cursor as `before` for older messages. | `read:conversations` |
+| `send_message` | Sends a message to a running conversation. | `tell` (`operate` includes it) |
+| `start_conversation` | Starts a conversation with a first message. Optional `projectKey`, `model`, `harness`, `effort`, `issueId`, `machine` (a label, environment id or `auto`), `needs`. | `operate` |
+| `start_worker` | Starts a registered worker on an issue that has a workspace on the chosen machine. `issueId`, `prompt`, optional `model`, `harness`, `effort`, `readOnly`, `name`, `machine`, `needs`. | `operate` |
+| `start_issue` | Starts a planned issue's work agent on this machine through the same gates as the dashboard's Start button, or on `machine` through that machine's work door. `issueId`, optional `model`, `harness`, `effort`, `machine`, `needs`. An unplanned issue answers an error that says to run `pan start <id>`, which plans first. | `operate` |
+| `stop_conversation` | Stops a conversation. `conversation` (`@<machine>/<name>` for one on a linked machine). | `operate` |
+| `interrupt_conversation` | Interrupts the current turn of a Pi conversation. Other harnesses answer an error; use `stop_conversation` to end them. | `operate` |
+| `schedule_message` | Queues a message for a Claude Code conversation that Overdeck sends after its usage limit resets, or at once if it is not limited. At most 20 queued; `/pan` commands are refused. | `tell` |
+| `schedule_recurring` | Creates a recurring schedule: `prompt`, a 5-field `cron` (runs at least 15 minutes apart), optional `timeZone` (default: the Overdeck machine's zone) and `enabled`. Not for agent conversations. | `tell` |
+| `list_scheduled` | Lists a conversation's pending one-shot messages (`once`) and its schedules (`recurring`). | `read:conversations` |
+| `update_scheduled` | `kind: once` replaces a pending message's text; `kind: recurring` changes `prompt`, `cron`, `timeZone` or `enabled` (pause or resume). | `tell` |
+| `delete_scheduled` | `kind: once` cancels an unsent message; `kind: recurring` deletes a schedule. | `tell` |
+| `link_pull_request` | Links a pull or merge request (`ref`: a URL, `#42`, or `owner/repo#42`) to a conversation (`conversation`, `@<machine>/<name>` for one on a linked machine). An Overdeck agent may omit `conversation` to link to its own conversation. | `tell` |
+| `list_pending_input` | Lists what waits on input on this machine and every online linked machine, conversations and agents, grouped by machine. | `read:conversations` |
+| `answer_question` | Answers a pending question of a Claude Code conversation (`conversation`) or of an agent on this machine (`agentId`, optional `toolUseId`). | `tell` and `approve` |
+| `answer_permission` | Answers a Claude Code permission prompt with `allow-once`, `allow-always` or `deny`. | `approve` |
+| `answer_pane_choice` | Chooses an option (`selectedIndex` 0-8) in a numbered menu shown in a Claude Code conversation, with its `signature`. | `approve` |
+| `answer_codex_approval` | Answers a Codex conversation's approval prompt with the 1-based `optionNumber`, and `toolUseId` when the app-server transport needs it. | `approve` |
+| `answer_pi_ask` | Answers a Pi conversation's ask prompt: `toolUseId` and exactly one `answers` entry. | `approve` |
+| `answer_plan` | Approves or rejects a conversation's proposed plan: `action` (`approve-auto`, `approve-manual`, `reject-ultraplan`, `reject-feedback`) and optional `feedback`. | `approve` |
+| `answer_agent_plan` | Approves or rejects a plan an agent on this machine is waiting on: `agentId`, `action`, optional `feedback`. | `approve` |
+| `answer_agent_permission` | Allows or denies a tool-permission request from an agent on this machine: `agentId`, `requestId`, `behavior` (`allow`/`deny`). | `approve` |
+
+No tool pairs devices, creates or revokes tokens, reads or writes settings, or
+touches the session vault.
+
+`tools/list` shows only the tools whose scope the token holds, so a
+`read:state` token sees only `list_machines`. Calling a tool the token cannot
+see answers `Unknown tool <name>`. Tools for managed agents are listed only to
+agent tokens.
+
+### Agent-only tools
+
+| Tool | What it does | Scope the token needs |
+| --- | --- | --- |
+| `wait_job` | Waits up to 50 s for a job another tool started. Answers `done` with the exit code and output, or `running` with `next`, the call to make again. Never poll or sleep; jobs are forgotten when the dashboard restarts. | `read:state` (agent tokens only) |
+| `task_claim` | Claims a checklist item of the agent's issue (`pan task claim`). | `tell` (agent tokens only) |
+| `task_done` | Marks a checklist item done once its `Item:` commit is pushed (`pan task done`). | `tell` (agent tokens only) |
+| `task_block` | Marks a checklist item blocked, optionally on issues or PRs (`on`), and wakes the agent when they merge (`pan task block`). | `tell` (agent tokens only) |
+| `done` | Signals the issue's work is complete: push, PR, tracker In Review, review started (`pan done`). | `operate` (agent tokens only) |
+| `handoff` | Hands the conversation off to a new one with a `focus` and optional `title` (`pan handoff self`). Not for work agents, which have no conversation. | `tell` (agent tokens only) |
+| `worker_report` | Records a worker's report with `status` `done`, `blocked` or `failed` (`pan worker report`). Workers only. | `tell` (agent tokens only) |
+| `request_secret` | Asks the operator for a secret, such as an API key, by an environment-variable-style `name` and a short `prompt`; answers a `requestId` and `next`, the `secret_wait` call to make. | `tell` (agent tokens only) |
+| `secret_wait` | Waits up to 50 s for the operator's answer. Answers `pending` with `next`, `delivered` with `file` (the path of the secret, never the value), `declined` or `expired`. | `read:state` (agent tokens only) |
+| `watch_pull_request` | Watches a GitHub pull request (`url`); get a message in this conversation when its checks fail or pass, its review changes, it gets merge conflicts, or it is merged or closed. | `tell` (agent tokens only) |
+| `list_pull_request_watches` | Lists your own pull request watches. | `read:state` (agent tokens only) |
+| `unwatch_pull_request` | Stops a watch by its `id` (from `watch_pull_request` or `list_pull_request_watches`). | `tell` (agent tokens only) |
+| `link_machine` | Asks the operator to link a machine the agent was told about, by a `hint` such as "my desk Mac"; answers a `requestId` and `next`, the `link_machine_wait` call to make. | `tell` (agent tokens only) |
+| `link_machine_wait` | Waits up to 50 s. Answers `pending` with `next`, `linked` with `machine` (`environmentId` and `label`), `declined` or `expired`. | `read:state` (agent tokens only) |
+| `memory_add` | Records a curated memory fact by running `pan memory add` in the agent's checkout: `id`, `type` (`feedback`, `project`, `reference`, `user`), a one-line `description`, optional `title`, `body`, `tags` and `store` (`project` by default, `user` for type `user`, or `machine`). A project fact is written uncommitted, so the agent commits `.overdeck/memory/<id>.md`. | `tell` (agent tokens only) |
+| `memory_search` | Searches memory by running `pan memory search --facts`: up to 5 matching facts from the agent's checkout, the operator store and the machine store, each with its file path, then observations from the agent's project (`limit` 1-20, default 10). | `read:state` (agent tokens only) |
+| `delegate_task` | Starts a worker on your own issue to do `task`, here or on `machine`; you are its parent. Optional `harness`, `model`, `effort`, `readOnly`, `name`, `needs`. A caller without an issue gets `delegate_task needs an issue; use start_conversation`. | `operate` |
+| `task_wait` | Waits up to 50 s for one of your workers to report. Answers `done` with the report, `ended` when it stopped without one (with its last message), or `running` with `next`. Pass `afterSeq` for the report after the one you consumed. | `read:state` |
+| `task_status` | One of your workers: state, idle time, where it runs and its newest report's seq, time and status. Your workers only, including ones on linked machines. | `read:state` |
+| `list_workers` | Every worker you started, on this machine or linked ones, with the same fields as `task_status`. | `read:state` |
+| `task_cancel` | Stops one of your workers, on this machine or another. Its reports so far stay readable. | `operate` |
+| `lane_start` | Launches a gauntlet lane (`role`, `brief`, with `key` or `for`, and optional `run`, `project`, `model`, `harness`, `effort`, `title`, `branch`, `from`, `at`, `machine`, `needs`, `reuse`, `replace`). Conversations only: the lane's parent is the calling conversation. | `operate` |
+| `lane_status` | Reads one lane by name. | `read:state` |
+| `lane_stop` | Stops one lane, here or on the machine it runs on. | `operate` |
+| `lane_wait` | Waits up to 50 s for the next report of any lane you launched, or of `run`. Answers `done` with the report and a cursor, or `running`; pass the cursor as `after` for the next report. Stopped lanes that never reported come back as `warnings`. | `read:state` |
+| `lane_report` | Files this lane's report (`report`, optional `status`, `verdict`, `defects`). Lane conversations only. | `tell` |
+
+A worker or lane wait returns within 50 s; call its `next` again instead of polling.
+
+Each workflow tool runs the `pan` command for the calling agent, on that
+agent's issue, and waits up to 50 s. It answers `done` with the exit code and
+output, or `running` with `next`, a `wait_job` call to make again. A non-zero
+exit code means `pan` refused; stderr says why. Review, test and ship agents
+lack `operate`, so `done` is hidden from them.
+
+Agent-only tools call routes under `/api/self/`, which refuse any token that
+is not an agent token.
+
+### Secrets
+
+An agent that needs an API key or a password calls `request_secret` instead
+of asking in chat, so the value never enters its transcript.
+
+- The request appears as a **Secret requested** card in the Decisions panel.
+  Only this machine's own dashboard, opened in a browser on this machine, can
+  answer it. A phone, a paired device or another machine's browser shows
+  "Answer this on <machine>'s own dashboard".
+- The operator types the value into the masked input and chooses **Send**, or
+  chooses **Decline**.
+- The value lands in a file: `~/.overdeck/agents/<agentId>/secrets/<NAME>` for
+  an agent, or `~/.overdeck/conversations/<tmux session>/secrets/<NAME>` for a
+  conversation. The file has mode 0600 in a directory with mode 0700.
+- The `secrets/` directory is deleted when the agent stops, is killed, exits
+  or is closed out.
+- A request expires after 10 minutes by default (`timeoutMs` allows 1 to 60
+  minutes). A dashboard restart forgets every pending request, and the agent
+  must call `request_secret` again.
+- The value never appears in a tool result, the transcript, the activity feed
+  or the dashboard log. The agent reads the file straight into the program
+  that needs it, for example `KEY="$(cat <file>)" some-command`, and never
+  prints it.
+
+### Machine links
+
+An agent told to work on a machine that is not linked yet calls
+`link_machine` with the operator's words for it, such as "my desk Mac". It
+never asks for a pairing link in chat, so no pairing code enters its
+transcript.
+
+- The request appears as a **Machine link requested** card in the Decisions
+  panel. Only this machine's own dashboard, opened in a browser on this
+  machine, can answer it. A phone, a paired device or another machine's
+  browser shows "Answer this on <machine>'s own dashboard".
+- **Link a machine…** opens the usual Link a machine dialog. After the link
+  succeeds, the agent's `link_machine_wait` answers `linked` with the new
+  machine's `environmentId` and `label`. The agent passes that label as
+  `machine` to `delegate_task`, `start_worker` or `start_conversation`.
+- **Dismiss** declines the request, and the wait answers `declined`.
+- The agent never sees the pairing link. The label it gets comes from the
+  link itself.
+- Only the card's dialog answers a request. A link made any other way (`pan
+  machines link`, the Machines panel, the SSH or Fly dialogs, or the command
+  palette) does not; dismiss the card instead.
+- A request expires after 24 hours. A dashboard restart forgets every pending
+  request, and the agent must call `link_machine` again.
+- An agent may hold 20 pending requests, secret and machine-link requests
+  together. Asking again with the same hint (ignoring case and outer spaces)
+  answers the pending request.
+
+### Memory
+
+Both `memory_add` and `memory_search` run `pan memory` for the calling agent
+in its own checkout and answer `done` with the result, or `running` with
+`next`, like the other job tools. A non-zero exit code means `pan` refused
+(an existing id, secret-like text, a home-directory path); `stderr` says why.
+
+A project fact lands in the agent's own checkout, so `pan memory list --here`
+run there shows it at once, while the primary checkout shows it only after
+the agent's branch merges. See [Project memory](/configuration/memory).
+
+A tool the token's scopes hide answers `Unknown tool <name>`. A route can
+still refuse a listed tool, for example a linked machine's ceiling, with
+`HTTP 403: insufficient_scope (missingScope: approve)`.
+
+### Pull requests
+
+`watch_pull_request` gets an agent a message when a GitHub pull request it
+cares about changes, without needing a conversation of its own. Overdeck
+checks watched pull requests about once a minute, through the existing PR
+sync sweep on this machine's primary dashboard — never a separate poller.
+GitHub pull requests only; GitLab merge requests are refused.
+
+A watch delivers one message per change, naming every event the change
+produced: the checks failed or passed, the review state changed, merge
+conflicts appeared, or the pull request was merged or closed. The message
+reads `[Overdeck] <repository>#<number>: <phrase>; <phrase>. <url>`, for
+example `[Overdeck] eltmon/overdeck#4943: checks failed (was pending).
+https://github.com/eltmon/overdeck/pull/4943`; a message that ends the watch
+adds a trailing sentence saying so. A merged or closed pull request ends the
+watch, as does the eleventh consecutive message that only reports a
+review-state change (`watch_pull_request` again to keep watching after
+that). Each agent may hold 20 watches, and 50 may exist across every agent
+on this machine; past either limit, `watch_pull_request` answers an error
+instead of a new watch. A watch works whether or not its pull request is
+linked to any conversation, and a stopped agent's watches are removed when
+its token is revoked.
+
+## Over HTTP
+
+Open **Settings → Anywhere** on this machine and choose **Copy MCP URL**. The
+dialog:
+
+1. Asks for a name, the address the client will use, and whether to allow
+   answering questions and approving permissions.
+2. Creates an MCP access token and copies the URL, `<address>/mcp`, to the
+   clipboard.
+3. Shows the URL, the `Authorization: Bearer odk_…` header and a ready client
+   config, each with a Copy button. The token is shown once.
+
+The address list holds the machine's trusted addresses that other devices can
+reach, with the first `https://` one selected. When there is none, the dialog
+offers this browser's address, which works only on this machine. Add a
+reachable address (for example a Tailscale address) under Settings → Anywhere
+first.
+
+The token is never part of the URL. Proxy and access logs record URLs, so the
+token travels only in the `Authorization` header. Every common MCP client
+accepts a header. With Claude Code:
+
+```bash
+claude mcp add --transport http overdeck https://desk.tailnet.ts.net/mcp \
+  --header "Authorization: Bearer odk_…"
+```
+
+Or in an `mcp.json`-style config:
+
+```json
+{
+  "mcpServers": {
+    "overdeck": {
+      "type": "http",
+      "url": "https://desk.tailnet.ts.net/mcp",
+      "headers": { "Authorization": "Bearer odk_…" }
+    }
+  }
+}
+```
+
+The endpoint is stateless. Each `POST /mcp` gets its own server and one JSON
+answer; there is no session and no event stream. `GET /mcp` and `DELETE /mcp`
+answer 405. Only a browser on this machine can create the token; a paired
+device's browser sees "Only a browser on this machine can create MCP tokens."
+
+`/mcp` is served by the production dashboard (`pan up`) and its reachable
+addresses. The Vite dev server (`pan dev`) does not proxy it.
+
+## Over stdio
+
+`pan mcp serve` serves the same tools over stdin and stdout. It reads the token
+from the `OVERDECK_MCP_TOKEN` environment variable, or, when that is unset,
+from the file named by `OVERDECK_MCP_TOKEN_FILE`; a command-line flag would
+show in `ps`. Create a token first:
+
+```bash
+pan token create mcp --scopes read:state,read:conversations,operate
+OVERDECK_MCP_TOKEN=odk_… pan mcp serve
+```
+
+Or from a file, which must be mode 0600:
+
+```bash
+chmod 600 ~/.overdeck/mcp-token
+OVERDECK_MCP_TOKEN_FILE=~/.overdeck/mcp-token pan mcp serve
+```
+
+The command checks the token before it serves. It exits 1 when neither is set,
+when the token is unknown, revoked, a paired-device credential, or carries
+`admin`, or when the file is unreadable, empty, or readable by group or
+others. Its stdout carries only JSON-RPC; every message goes to stderr.
+
+A Claude Desktop config:
+
+```json
+{
+  "mcpServers": {
+    "overdeck": {
+      "command": "pan",
+      "args": ["mcp", "serve"],
+      "env": { "OVERDECK_MCP_TOKEN": "odk_…" }
+    }
+  }
+}
+```
+
+The dashboard must be running: each tool calls it.
+
+## Sign in with OAuth
+
+A hosted MCP client (a Claude Desktop connector, a chat bot) cannot be handed a
+token file. It signs in through the MCP authorization flow instead: point it at
+`<dashboard URL>/mcp` and it finds the sign-in server by itself. The discovery
+document is at `<dashboard URL>/.well-known/oauth-protected-resource/mcp`, and
+an unauthenticated `POST /mcp` answers 401 with a `WWW-Authenticate` header that
+names it.
+
+1. Your app opens a sign-in page in your browser. The page shows the app's
+   name, where it will send you back, and an approval code such as `KQZT-MWRB`.
+2. The dashboard's Needs you panel shows a card with the app's name, the
+   redirect host, and the same approval code — or run `pan mcp oauth pending`
+   from a terminal on this machine. Only this machine's own session can see
+   it: on its desktop layout that's the full card below; on its mobile
+   layout, which has no room for the card, it's "Approve on the desktop"
+   instead. A paired device never receives the pending sign-in at all — there
+   is nothing to approve from someone else's phone.
+3. You check that the card's code matches the page you opened, pick an access
+   level (the select starts at the level the app asked for), and click
+   Approve or Deny.
+4. The page sends you back to your app, and your app is signed in.
+
+The page itself can never approve anything, because anyone who can reach the
+port can open it. Approve only a sign-in whose code matches the page you opened.
+
+| Level | Label | Scopes |
+| --- | --- | --- |
+| `read` | Read only | `read:state`, `read:conversations` |
+| `message` | Can message | `read:state`, `read:conversations`, `tell` |
+| `operate` | Can operate | `read:state`, `read:conversations`, `tell`, `operate` |
+| `approve` | Can approve | `read:state`, `read:conversations`, `tell`, `operate`, `approve` |
+
+An OAuth sign-in never gets `admin`, `forward`, `read:settings`, `read:costs` or
+`read:events`. The level the app asks for is only a suggestion: a stock MCP
+client asks for every level, so Overdeck offers the lowest one it named, and you
+choose the real level when you approve.
+
+Each sign-in gets an access token that lasts 30 days and a refresh token that
+lasts 90 days. Each refresh replaces both. A refresh token is single use: if an
+old one is presented again, Overdeck treats it as stolen and ends the sign-in.
+After 90 days the app must sign in again. A sign-in waiting for approval expires
+after 10 minutes, and every waiting sign-in is lost when the dashboard restarts;
+start it again from the app.
+
+Manage sign-ins from the terminal:
+
+```bash
+pan mcp oauth pending                            # sign-ins waiting for you
+pan mcp oauth approve KQZT-MWRB --level operate  # approve the one showing that code
+pan mcp oauth deny KQZT-MWRB                     # refuse it
+pan mcp oauth list                               # active sign-ins
+pan mcp oauth revoke <sign-in id>                # end one
+pan mcp oauth issue --name xAI --level message   # tokens for a client that cannot open a browser
+```
+
+`issue` creates a sign-in at once and prints its access and refresh tokens. They
+are shown once; store them in the client. Use it for an API caller such as the
+xAI API, which takes a token but cannot show you a browser page. The approval
+code is case-insensitive and the dash is optional.
+
+The sign-in endpoints answer on this machine, the LAN, the tailnet (Tailscale
+Serve) and the dashboard's other trusted addresses. The discovery documents are
+built from the address the client used, so a request for an address Overdeck
+does not trust gets 400. A Tailscale Funnel request gets 404 unless Public MCP is
+on (below).
+
+## Public MCP for hosted bots
+
+A hosted bot, such as Grok Bot or the xAI API, runs on servers you do not
+control. It cannot join your tailnet or run the Overdeck connector, so it needs
+a public HTTPS address for `/mcp`. Public MCP publishes exactly `/mcp` and the
+sign-in endpoints on the internet through Tailscale Funnel. TLS ends on this
+machine, and only OAuth sign-ins you approve can use it.
+
+Public MCP is **off** by default. Turn it on in Settings → Anywhere → "Public MCP
+for hosted bots", or with `PUT /api/mcp/public` and the body `{ "enabled": true }`
+(root credentials only). The switch is `mcp.public.enabled` in
+`~/.overdeck/config.yaml`. A project `.pan.yaml` or `.overdeck.yaml` cannot turn
+it on. The dashboard reads the value once and keeps it, so a hand edit of
+`config.yaml` takes effect after a dashboard restart or the next switch change.
+
+**Prerequisites** are the same as for triggers (see Triggers → Publish with
+Tailscale Funnel): HTTPS certificates on the tailnet, the `funnel` node
+attribute for this machine, `sudo tailscale set --operator=$USER`, and this
+machine's `.ts.net` address saved as a trusted address. Without that trusted
+address the dashboard cannot build the public URL, and the sign-in documents
+answer 400.
+
+**Publish the paths** (replace `3011` if your dashboard API port is different;
+the Settings panel prints the commands with your port). Overdeck never runs
+`tailscale` for you:
+
+```bash
+tailscale funnel --bg --https=8443 --set-path=/mcp http://127.0.0.1:3011/mcp
+tailscale funnel --bg --https=8443 --set-path=/.well-known http://127.0.0.1:3011/.well-known
+tailscale funnel --bg --https=8443 --set-path=/oauth http://127.0.0.1:3011/oauth
+```
+
+**Remove them:**
+
+```bash
+tailscale funnel --https=8443 --set-path=/mcp off
+tailscale funnel --https=8443 --set-path=/.well-known off
+tailscale funnel --https=8443 --set-path=/oauth off
+```
+
+Give the bot the public URL `https://<machine>.<tailnet>.ts.net:8443/mcp`.
+
+**What is reachable.** While the switch is on, a Funnel request reaches only
+these nine surfaces, matched on the exact path, plus the trigger route
+`POST /hooks/*`, which Funnel reaches whether or not Public MCP is on (see
+Triggers). Every other path gets 404:
+
+- `POST /mcp`
+- `GET /.well-known/oauth-protected-resource`
+- `GET /.well-known/oauth-protected-resource/mcp`
+- `GET /.well-known/oauth-authorization-server`
+- `POST /oauth/mcp/register`
+- `GET /oauth/mcp/authorize`
+- `GET /oauth/mcp/authorize/status`
+- `POST /oauth/mcp/token`
+- `POST /oauth/mcp/revoke`
+
+**Only OAuth sign-ins work.** Over Funnel, a `pan token create` token, a Copy
+MCP URL token or an agent token gets 403 `public MCP accepts only OAuth
+sign-ins`. Those tokens still work on this machine, the LAN and the tailnet.
+
+**Limits.** Each limit counts requests in a 60-second window that starts at the
+first request:
+
+| Requests | Limit |
+| --- | --- |
+| `POST /mcp` with an OAuth sign-in | 60 per minute per access token |
+| `GET /oauth/mcp/authorize/status` (the sign-in page's status checks) | 60 per minute per address |
+| Every other public surface | 20 per minute per address |
+
+Over a limit, the answer is 429 `{ "error": "rate_limited" }` with a
+`Retry-After` header. The `/mcp` limit counts per access token, so a refresh,
+which replaces the access token, starts a new count.
+
+**Audit.** Every public request writes one entry to the activity feed, on a
+best-effort basis: the write never delays or fails the request, so an entry can
+be missing if the activity store is unavailable at that moment. Each entry reads
+`Public MCP <METHOD> <path> <status>`, with the OAuth client id when there is
+one (a `client_id` that is not an Overdeck client id is recorded as none). No
+entry carries a token, a code or a request body. The sign-in page checks its
+status every 2 seconds, so a sign-in that waits for you writes one entry each
+time.
+
+**Turning it off** makes Funnel requests to these nine surfaces get 404 again;
+`POST /hooks/*` keeps working for triggers. It does not end any
+sign-in: approved apps keep working on the tailnet and this machine. End a
+sign-in under **Settings → Access Tokens → Sign-ins** or with
+`pan mcp oauth revoke <sign-in id>` (see Revoking below).
+
+## Agents get these tools
+
+Every Claude Code, Codex, Kimi Code ACP (`acp`) and OpenCode (`opencode`) agent
+that Overdeck launches on this machine starts with the `overdeck` server: work
+agents, role runs (plan, review, test, ship, worker and the others), planning
+sessions and conversations. You do not create a token for them.
+
+Each agent holds its own agent token. It sits in `mcp-token` (mode 0600), next
+to `overdeck-mcp.json`, in `~/.overdeck/agents/<id>/` for an agent or
+`~/.overdeck/conversations/conv-<name>/` for a conversation. `overdeck-mcp.json`
+runs `pan mcp serve` and names only the token file, so neither it nor the
+launcher script holds the token. The launcher passes
+`--mcp-config=<file>` and, when the role has no tool allow-list,
+`--allowedTools=mcp__overdeck`, so a tool call does not stop at a permission
+prompt. Roles with a `tools:` list (review, test) get `mcp__overdeck` in that
+list instead.
+
+An ACP agent gets the same `overdeck-mcp.json`. The launcher passes
+`--mcp-config <file>` to the ACP host, which sends the server to the agent in
+`session/new` and `session/load`. The ACP host approves the agent's permission
+requests itself, so no allow-list is needed.
+
+A Codex agent gets the server differently: Codex has no CLI flag for an
+MCP allow-list, so instead of a launcher flag it gets an
+`[mcp_servers.overdeck]` table written directly into
+`~/.overdeck/agents/<id>/codex-home-v2/config.toml` (or
+`~/.overdeck/agents/conv-<name>/codex-home-v2/config.toml` for a
+conversation), alongside any MCP servers the role itself declares. The table
+names only the token file in its `env`, never the token. It also carries
+`default_tools_approval_mode = "approve"`, because Overdeck's MCP tools carry
+no `readOnlyHint` annotations — without that key, Codex refuses every
+model-initiated call with "MCP tool call requires approval, but approval
+policy is never" under `approval_policy = "never"`.
+
+The token's scopes follow the agent's role:
+
+| Agent | Scopes |
+| --- | --- |
+| work, worker, plan, strike, sequencer, knowledge, flywheel | `read:events`, `read:state`, `read:conversations`, `tell`, `operate` |
+| review, test, ship | `read:events`, `read:state`, `read:conversations`, `tell` |
+| an operator conversation | the work scopes plus `approve` |
+| a lane conversation (`pan lane start`) | the `worker` scopes |
+| the Flywheel conversation | the `flywheel` scopes |
+
+A resumed, recovered or relaunched agent keeps the same server and reuses its
+live token. Stopping the agent revokes the token.
+
+To turn injection off, set this in `config.yaml`:
+
+```yaml
+mcp:
+  agents: false
+```
+
+These launches get no server: Docker workspaces (`OVERDECK_DOCKER_WORKSPACE=1`
+or `PAN_DOCKER=1`), bare conversations, Fly machines, and harnesses other than
+Claude Code, Codex, `acp` and `opencode`. When the token cannot be
+minted or the config cannot be written, the agent starts without the server and
+the log shows one `[agent-injection] overdeck MCP skipped for <id>: <reason>`
+warning. The agent can still reach Overdeck through `pan`.
+
+## Scopes and the approve scope
+
+An MCP token is an ordinary access token. Copy MCP URL gives it `read:state`,
+`read:conversations` and `operate` by default. `operate` covers `tell`, the
+start tools and the stop and interrupt tools.
+
+The box **Allow answering questions and approving permissions** adds
+`approve`. It is off by default, and only `approve` or `admin` satisfies it.
+`approve` lets the token answer blocking prompts with any of the eight answer
+tools: `answer_question`, `answer_permission`, `answer_pane_choice`,
+`answer_codex_approval`, `answer_pi_ask`, `answer_plan`, `answer_agent_plan`
+and `answer_agent_permission`. See [Remote access](/configuration/remote-access)
+for the full scope table.
+
+<Warning>
+`approve` does not stop text from reaching a conversation that waits on a
+question. A token with `tell` can still send any message with `send_message`.
+What `approve` gates is the keystroke-driven answers and the two answer tools.
+</Warning>
+
+MCP never accepts an `admin` token, the machine's internal token or the
+dashboard's own session. Both transports refuse them.
+
+## Revoking
+
+Revoke an MCP token under **Settings → Anywhere → Access tokens**, under
+**Settings → Access Tokens**, or with `pan token revoke <id>`. A token revoked
+through the dashboard fails its next request at once. A token revoked by
+another process (for example `pan token revoke` while the dashboard is
+unreachable) fails within 5 seconds, when the dashboard rereads its token list.
+
+End an OAuth sign-in under **Settings → Access Tokens → Sign-ins** (also
+**Settings → Anywhere → Access tokens**), or with `pan mcp oauth revoke
+<sign-in id>` (ids from `pan mcp oauth list`); its access and refresh tokens
+stop working at once. Revoking an OAuth access token under **Settings →
+Access Tokens** or with `pan token revoke` stops that access token at once and
+ends its sign-in at its next refresh.
+
+Both token lists fold one access token per running agent under a collapsed
+**Show agent tokens (N)** toggle, so a fleet of agents doesn't bury your own
+tokens; click it to reveal and revoke an individual agent's token.
+
+## Connect a bot
+
+Give an outside MCP client — Hermes, OpenClaw, Grok Build, Grok Bot, or a script
+calling the xAI API — scoped, revocable access to this machine. Open **Connect a
+bot** from **Settings → Anywhere → Bots**, or from the command palette.
+
+The dialog picks a reach by platform:
+
+| Platform | Reaches |
+| --- | --- |
+| Hermes, OpenClaw | Overdeck connector (default), Tailscale |
+| Grok Build | This computer (default), Overdeck connector, Tailscale |
+| Grok Bot, xAI API | Public MCP |
+
+Access defaults to `read:state`, `read:conversations` and `tell`; `read:state`
+is always on. `operate` and `approve` are off by default. A bot never gets
+`admin`, `forward`, `read:settings` or `read:costs`, regardless of what is
+ticked.
+
+Each reach produces a different setup:
+
+- **Overdeck connector** — a pairing string that works once, within 10
+  minutes, plus the commands that pair and run the connector:
+  `npx -y @overdeck/core@<version> mcp connector login`, `... pair <string>`
+  and `... serve`.
+- **Tailscale, This computer** — an access token, shown once. The config
+  snippet never carries it: it goes only into the one-time "Token setup"
+  field, kept out of the config through `OVERDECK_MCP_TOKEN` or
+  `OVERDECK_MCP_TOKEN_FILE`.
+- **Public MCP** — the public URL plus, for the xAI API, the
+  `pan mcp oauth issue` command that mints its token.
+
+The Hermes connector config, for example:
+
+```yaml
+# ~/.hermes/config.yaml — connector route (default)
+mcp_servers:
+  overdeck:
+    url: "http://127.0.0.1:7466/mcp"
+    headers:
+      Authorization: "Bearer ${OVERDECK_CONNECTOR_LOCAL_TOKEN}"
+plugins:
+  enabled: [overdeck]
+  entries:
+    overdeck:
+      mcp_allowlist: ["overdeck"]
+      summary: true
+      allow_answers: false
+```
+
+**Remove** in the Bots panel revokes a connector at once.
+
+<Info>
+The `pan mcp connector` commands and the public `/mcp` route ship separately
+(PAN-4950, PAN-4947); until then, the connector and public reaches show their
+setup text but nothing serves it yet.
+</Info>
+
+## Fleet reach
+
+One MCP URL reaches every machine this one is linked to (see
+[Linked machines](/configuration/linked-machines)).
+
+- `list_machines` lists this machine and each linked machine with its state, load and tags.
+- `list_conversations` and `search_conversations` include linked machines' conversations.
+  A conversation on another machine is named `@<label|environment-id>/<name>`; pass that
+  name to `read_conversation`, `send_message`, the `answer_*` tools, and `schedule_message`,
+  `schedule_recurring`, `list_scheduled`, `update_scheduled` and `delete_scheduled`.
+- `start_conversation` and `start_worker` take `machine`: omit it for this machine, give a
+  linked machine's label or environment id, or `auto` to place the work by load. With
+  `auto`, `needs` (a list of capability tags such as `docker`) limits the choice.
+
+**The token's scopes are the fence on every machine.** A call that reaches another machine
+is forwarded as the operator with a ceiling equal to the token's own scopes, so the other
+machine applies exactly what you granted: a token without `approve` gets 403 on a linked
+conversation's permission prompt, and one without `tell` cannot message it. Settings are
+never reachable: `PUT /api/settings` answers 403 because an MCP token never carries `admin`,
+and linked machines never forward it. A linked machine cannot use this one to reach a third
+machine (no chained hops), so the URL reaches only the machines linked to this dashboard.
+
+**An agent's token acts as that agent on a linked machine.** A managed agent's token is
+forwarded as `{ agentId }`, with its scopes as the ceiling, so the agent can read a linked
+conversation but not change it, and `delegate_task` or `start_issue` with `machine` start the
+work through that machine's work door as the agent, which may later stop what it started. A
+conversation's token acts as the operator, limited to its scopes, as the conversation's own
+`pan` does.
+
+Agent answers (`answer_agent_plan`, `answer_agent_permission`, `answer_question` with
+`agentId`) reach agents on this machine only; `list_pending_input` marks a linked machine's
+agents `remote: true`.
+
+The linked machine must run a version with the schedule scopes (PAN-4939); an older one
+answers `403 insufficient_scope` for recurring schedules.

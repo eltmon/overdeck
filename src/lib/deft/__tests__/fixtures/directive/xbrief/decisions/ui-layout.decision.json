@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "deft.decision.v1",
+  "id": "dec-ui-layout",
+  "decision": "Render scopes above tasks",
+  "governingRule": {
+    "description": "Show scopes where the plan shows"
+  },
+  "alternativesConsidered": [
+    {
+      "option": "Separate tab",
+      "whyNot": "Buried"
+    }
+  ],
+  "whyWinner": "The plan tab is where operators look",
+  "confidence": "high",
+  "activeScopeRefs": [
+    "scope-ui"
+  ],
+  "timestamp": "2026-11-02T14:00:00Z",
+  "revisitTrigger": "Operator feedback"
+}

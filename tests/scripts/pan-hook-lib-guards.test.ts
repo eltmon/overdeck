@@ -337,3 +337,40 @@ pan_release_singleflight_lock "$RATE_LOCK_DIR"`,
     expect((await holder.result).code).toBe(0)
   })
 })
+
+describe('PAN_INTERNAL_TOKEN resolution (PAN-4628)', () => {
+  let tempRoot: string
+
+  beforeEach(() => {
+    tempRoot = mkdtempSync(join(tmpdir(), 'pan-hook-token-'))
+  })
+
+  afterEach(() => {
+    rmSync(tempRoot, { recursive: true, force: true })
+  })
+
+  it('prefers the token file over a stale env token', async () => {
+    const overdeckHome = join(tempRoot, 'overdeck-home')
+    mkdirSync(overdeckHome)
+    writeFileSync(join(overdeckHome, 'internal-token'), 'file-token\n', 'utf-8')
+
+    const output = await runBash(
+      'source "$LIB_PATH"; printf "%s" "$PAN_INTERNAL_TOKEN"',
+      { ...process.env, LIB_PATH, OVERDECK_HOME: overdeckHome, OVERDECK_INTERNAL_TOKEN: 'stale-token' },
+    )
+
+    expect(output).toBe('file-token')
+  })
+
+  it('falls back to the env token when no file exists', async () => {
+    const overdeckHome = join(tempRoot, 'overdeck-home')
+    mkdirSync(overdeckHome)
+
+    const output = await runBash(
+      'source "$LIB_PATH"; printf "%s" "$PAN_INTERNAL_TOKEN"',
+      { ...process.env, LIB_PATH, OVERDECK_HOME: overdeckHome, OVERDECK_INTERNAL_TOKEN: 'env-token' },
+    )
+
+    expect(output).toBe('env-token')
+  })
+})

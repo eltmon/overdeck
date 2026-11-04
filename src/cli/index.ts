@@ -42,8 +42,12 @@ import type { RoleEffort } from '../lib/config-yaml.js';
 import type { RuntimeName } from '../lib/runtimes/types.js';
 import { defineUpCommand, registerReloadAndRestartCommands } from './commands/dashboard-lifecycle-commands.js';
 import { registerSkillsCommands } from './commands/skills.js';
+import { registerTellCommand } from './commands/tell-register.js';
 import { registerPairCommands } from './commands/pair.js';
+import { registerTailscaleCommands } from './commands/tailscale.js';
 import { registerTokenCommands } from './commands/token.js';
+import { registerMcpCommands } from './commands/mcp.js';
+import { registerTriggersCommands } from './commands/triggers.js';
 import { CommandGroupLoader, resolveGroupDemand } from './command-group-loader.js';
 import { COMMAND_GROUPS } from './command-groups.js';
 import { exitCli, runCliWithTelemetry } from './telemetry.js';
@@ -224,7 +228,10 @@ backup
 
 registerSkillsCommands(program);
 registerPairCommands(program);
+registerTailscaleCommands(program);
 registerTokenCommands(program);
+registerMcpCommands(program);
+registerTriggersCommands(program);
 
 // pan issues — list and triage work
 program
@@ -341,12 +348,7 @@ planCmd
   .option('--no-prd', 'Bypass the PRD-first gate for a genuinely trivial issue (loud; prefer writing the PRD)')
   .action(lazyAction(() => import('./commands/plan-done.js'), 'planDoneCommand'));
 
-program
-  .command('tell <id> <message>')
-  .description('Send message to running agent')
-  .option('--force', 'Deliver even to a critic or verifier lane that already filed its verdict')
-  .option('--steer', 'Interrupt the running turn and send now (Claude Code send-now; Ctrl+X Ctrl+S)')
-  .action(lazyAction(() => import('./commands/tell.js'), 'tellCommand'));
+registerTellCommand(program);
 program
   .command('ask <id> [question]')
   .description('Ask the operator a blocking decision; it appears in the dashboard Needs-you')
@@ -473,25 +475,7 @@ program
 
 await groups.register('close');
 
-program
-  .command('start <id>')
-  .description('Create workspace and spawn agent for an issue')
-  .option('--model <model>', 'Work model for this session (defaults to Cloister config)')
-  .option('--harness <harness>', 'Coding-agent harness: claude-code | pi | codex | acp | kimi-code | opencode | muse | prime-agent (defaults to role/provider settings)')
-  .option('--effort <level>', 'Claude Code effort: low | medium | high | xhigh | max (defaults to roles.work.effort)')
-  .option('--tier <tier>', 'Remote workspace resiliency tier: ephemeral | durable (defaults to remote.resiliency_tier)')
-  .option('--dry-run', 'Show what would be created')
-  .option('--remote', 'Use remote workspace (Fly.io)')
-  .option('--local', 'Use local workspace (explicit override)')
-  .option('--plan <mode>', "Planning depth when no plan exists yet: interactive | auto | skip (default: config planning.default_mode, shipped default auto)")
-  .option('--plan-model <model>', 'Planning model override when this start auto-plans (defaults to roles.plan.model); the work model stays --model')
-  .option('--auto', '[deprecated: use --plan skip] Skip planning agent by synthesizing a minimal xBRIEF from the issue title/body')
-  .option('--force', 'Clear paused, troubled, and pending-operator-decision gates and start anyway')
-  .option('--fresh', 'Drop the saved Claude session (non-destructive) and start a new one — replaces a live session too, so it recovers an inert agent without a separate pan kill')
-  .option('--host', 'Bypass workspace docker stack-health gate and spawn on the host')
-  .option('--yes', 'Confirm --host in non-interactive contexts')
-  .option('--skip-freshness', 'Bypass the plan-freshness preflight and spawn even if the plan names files deleted since it was written')
-  .action(lazyAction(() => import('./commands/start.js'), 'issueCommand'));
+await groups.register('start');
 
 program
   .command('strike <ids...>')
@@ -505,6 +489,8 @@ await groups.register('knowledge');
 await groups.register('swarm'); await groups.register('task');
 await groups.register('workspace');
 await groups.register('vault');
+await groups.register('account');
+await groups.register('sharing');
 await groups.register('test');
 await groups.register('tts');
 
@@ -567,9 +553,7 @@ defineUpCommand(program)
     const { Effect } = await import('effect');
     const noResume = isNoResumeCliOptionEnabled(options);
     const bootGates = resolveBootGates(options);
-    const { spawn, execSync, exec } = await import('child_process');
-    const { promisify } = await import('util');
-    const execAsync = promisify(exec);
+    const { spawn, execSync } = await import('child_process');
     const { join, dirname } = await import('path');
     const { fileURLToPath } = await import('url');
     const { readFileSync, existsSync } = await import('fs');
@@ -720,26 +704,17 @@ defineUpCommand(program)
     if (traefikEnabled && !options.skipTraefik) {
       const traefikDir = join(process.env.HOME || '', '.overdeck', 'traefik');
       if (existsSync(traefikDir)) {
-        try {
-          // PAN-4299: external network + ports on the configured bind address; a changed file needs `up -d` to recreate.
-          const migrated = (await import('../lib/traefik.js')).migrateTraefikCompose(join(traefikDir, 'docker-compose.yml'));
-          console.log(chalk.dim('Starting Traefik...'));
-          const { stdout } = await execAsync(
-            'docker ps --filter "name=overdeck-traefik" --format "{{.Names}}" 2>/dev/null',
-          );
-          if (stdout.trim().includes('overdeck-traefik') && !migrated) {
-            console.log(chalk.dim('Traefik already running'));
-          } else {
-            execSync('docker compose up -d', {
-              cwd: traefikDir,
-              stdio: 'pipe',
-            });
-          }
-          console.log(chalk.green('✓ Traefik started'));
-          console.log(chalk.dim(`  Dashboard: https://traefik.${traefikDomain}:8080\n`));
-        } catch (error) {
+        console.log(chalk.dim('Starting Traefik...'));
+        // PAN-4299: external network + ports on the configured bind address; a changed file needs `up -d` to recreate.
+        const { startTraefikContainer } = await import('./commands/traefik-start.js');
+        const result = await startTraefikContainer(traefikDir, { skipWhenRunning: true });
+        if (result === 'failed') {
           console.log(chalk.yellow('⚠ Failed to start Traefik (continuing anyway)'));
           console.log(chalk.dim('  Run with --skip-traefik to suppress this message\n'));
+        } else {
+          if (result === 'already-running') console.log(chalk.dim('Traefik already running'));
+          console.log(chalk.green('✓ Traefik started'));
+          console.log(chalk.dim(`  Dashboard: https://traefik.${traefikDomain}:8080\n`));
         }
       }
     }
@@ -1220,60 +1195,8 @@ program
   .command('serve')
   .description('Start the dashboard server and open it in the default browser (npx launcher)')
   .option('--port <port>', 'Port to listen on', '3011')
-  .action(async (options: { port: string }) => {
-    const { spawn } = await import('child_process');
-    const { randomBytes } = await import('crypto');
-    const { join, dirname } = await import('path');
-    const { fileURLToPath } = await import('url');
-    const { existsSync } = await import('fs');
-
-    // Node 22+ is guaranteed here: ensureCompatibleNode() at CLI startup
-    // relaunches under a compatible Node (or exits) before any command runs.
-    const nodeVersion = process.versions.node;
-
-    const __dirname = dirname(fileURLToPath(import.meta.url));
-    const bundledServer = join(__dirname, '..', 'dashboard', 'server.js');
-    const bundledFrontendIndex = join(__dirname, '..', 'dashboard', 'public', 'index.html');
-    const port = parseInt(options.port, 10) || 3011;
-    const url = `http://localhost:${port}`;
-    const internalToken = process.env.OVERDECK_INTERNAL_TOKEN || randomBytes(32).toString('hex');
-    const browserUrl = `${url}#overdeck_token=${encodeURIComponent(internalToken)}`;
-
-    if (!existsSync(bundledServer) || !existsSync(bundledFrontendIndex)) {
-      console.error(chalk.red('Error: Dashboard bundle not found.'));
-      console.error(chalk.dim('This package may not be fully built. Try: npm run build'));
-      return exitCli(1);
-    }
-
-    console.log(chalk.bold('Overdeck Dashboard'));
-    console.log(chalk.dim(`Starting server on port ${port} (Node ${nodeVersion})...`));
-
-    const server = spawn(process.execPath, [bundledServer], {
-      stdio: 'inherit',
-      env: { ...process.env, PORT: String(port), OVERDECK_INTERNAL_TOKEN: internalToken },
-    });
-
-    server.on('error', async (err) => {
-      console.error(chalk.red('Failed to start dashboard:'), err.message);
-      return exitCli(1);
-    });
-
-    // Open browser after server has had a moment to start
-    setTimeout(async () => {
-      console.log(`  ${chalk.cyan(url)}`);
-      const [{ openBrowser }, { Effect }, { layer: nodeServicesLayer }] = await Promise.all([
-        import('../lib/browser.js'),
-        import('effect'),
-        import('@effect/platform-node/NodeServices'),
-      ]);
-      await Effect.runPromise(
-        openBrowser(browserUrl).pipe(Effect.provide(nodeServicesLayer)),
-      ).catch(() => {
-        // If openBrowser fails, show URL for manual opening
-        console.log(chalk.dim(`  Open your browser to: ${browserUrl}`));
-      });
-    }, 1_500);
-  });
+  .option('--no-open', 'Do not open a browser')
+  .action(lazyAction(() => import('./commands/serve.js'), 'serveCommand'));
 
 await groups.finish();
 

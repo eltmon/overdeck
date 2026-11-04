@@ -1,0 +1,71 @@
+{
+  "version": "1",
+  "issueId": "PAN-4738",
+  "created": "2026-11-02T05:12:04.950Z",
+  "updated": "2026-11-02T05:58:27.659Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-02T05:58:27.658Z"
+    }
+  ],
+  "items": {
+    "fly-preanswer-auto-default-nudge": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4738",
+      "claimedAt": "2026-11-02T05:12:04.950Z",
+      "doneAt": "2026-11-02T05:16:27.030Z"
+    },
+    "readiness-refuses-auto-default-nudge": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4738",
+      "claimedAt": "2026-11-02T05:16:32.438Z",
+      "doneAt": "2026-11-02T05:20:02.673Z"
+    },
+    "docs-fly-and-readiness": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4738",
+      "claimedAt": "2026-11-02T05:20:09.364Z",
+      "doneAt": "2026-11-02T05:21:38.576Z"
+    },
+    "fly-preanswer-auto-default-nudge.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:32:28.862Z"
+    },
+    "fly-preanswer-auto-default-nudge.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:32:47.548Z"
+    },
+    "readiness-refuses-auto-default-nudge.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:33:06.552Z"
+    },
+    "readiness-refuses-auto-default-nudge.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:33:25.513Z"
+    },
+    "readiness-refuses-auto-default-nudge.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:33:44.893Z"
+    },
+    "docs-fly-and-readiness.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:34:04.773Z"
+    },
+    "docs-fly-and-readiness.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:34:24.004Z"
+    },
+    "docs-fly-and-readiness.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T05:34:43.139Z"
+    }
+  },
+  "feedback": [],
+  "agentModel": "claude-opus-5-5"
+}

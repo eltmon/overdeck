@@ -27,8 +27,7 @@ import { retainAllAgentOutputInterest } from '../services/agent-output-service.j
 import { jsonResponse } from '../http-helpers.js';
 import { endStreamOnDeviceRevocation } from '../device-connections.js';
 import { scopeSatisfies } from '../../../lib/access-tokens.js';
-import { credentialScopes, resolveDashboardCredential } from './dashboard-auth.js';
-import type { HeaderMap } from './origin-validation.js';
+import { credentialScopes, resolveRequestCredential } from './dashboard-auth.js';
 import { httpHandler } from './http-handler.js';
 
 const PUBLIC_CATALOG = [
@@ -115,7 +114,7 @@ function authorized(request: HttpServerRequest.HttpServerRequest): boolean {
   const expected = process.env['OVERDECK_EVENTS_TOKEN'];
   if (!expected) return true;
   // PAN-2351: a dashboard credential with read:events works alongside the env token.
-  const credential = resolveDashboardCredential(request.headers as HeaderMap);
+  const credential = resolveRequestCredential(request);
   if (credential && scopeSatisfies(credentialScopes(credential), 'read:events')) return true;
   const header = getHeader(request, 'authorization');
   if (!header) return false;
@@ -256,7 +255,7 @@ const getEventStreamRoute = HttpRouter.add(
           evaluate: () => nodeStream,
           onError: (err) => err,
         }),
-        resolveDashboardCredential(request.headers as HeaderMap),
+        resolveRequestCredential(request),
       );
 
       return HttpServerResponse.stream(effectStream, {

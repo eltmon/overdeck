@@ -1,0 +1,211 @@
+---
+title: "Push notifications"
+description: "Get a phone notification when an agent or conversation needs you, sent by your own machine with end-to-end encrypted Web Push and an optional ntfy topic"
+---
+
+# Push notifications
+
+When an agent or conversation stops to wait for you, Overdeck can tell your
+phone. Your own machine sends the notification. For Web Push and ntfy, no
+relay and no overdeck.ai service is involved; notifications for the Overdeck app
+pass through connect.overdeck.ai as ciphertext that only the phone can open.
+
+## What you get
+
+A notification for four kinds of item:
+
+| Kind | When it fires |
+| --- | --- |
+| **Question** | An agent or conversation asks an AskUserQuestion, or a `pan ask` decision is waiting for you. |
+| **Approval needed** | A plan waits for approval, or a permission prompt waits in an agent or conversation. |
+| **Finished** | A work agent ran `pan done` (verification started), or an issue merged. |
+| **Failed** | An agent stopped responding, a merge failed, a stalled review escalated, or a conflict repair escalated. |
+
+Each item notifies once, when it first appears. When you answer it and a new
+question arrives later, that new question notifies again. A dashboard restart
+does not replay questions that were already waiting.
+
+The default notification says what kind of item it is and where it is, for
+example `Question · Refactor the billing module` with the body `Tap to answer.`
+It never contains the question text unless you turn on `includePreview`.
+
+At most 6 notifications go out per minute. If more items arrive, Overdeck
+counts them and sends one summary, such as `3 more items need you`, when the
+minute ends.
+
+## How it works
+
+Overdeck uses standard **Web Push**, the same system web apps use on Android,
+iPhone and desktop browsers.
+
+1. **VAPID keys.** The first time a device subscribes, your machine creates its
+   own VAPID key pair (RFC 8292) at `~/.overdeck/push/vapid.json`, file mode
+   0600. Each push request is signed with it, so the browser's push service
+   knows the request came from your machine. The key is never rotated or
+   overwritten: every subscription is bound to it.
+2. **Subscribing.** When you tap **Turn on notifications**, your browser creates
+   a subscription: an address at its vendor's push service (Google for
+   Chrome and Android, Apple for Safari and iPhone, Mozilla for Firefox) plus
+   an encryption key that only your device holds. The dashboard stores it in
+   `~/.overdeck/push/subscriptions.json` (mode 0600, at most 20 devices).
+3. **Encryption.** Every notification is encrypted to your device's key with
+   RFC 8291 (`aes128gcm`) before it leaves your machine. The push service only
+   forwards ciphertext. **The push service and overdeck.ai cannot read the
+   payload**; only your phone can decrypt it.
+4. **Delivery.** Your machine sends the encrypted message straight to the push
+   service, which wakes your phone. Tapping the notification opens the
+   dashboard at the item (`/m?subject=<id>`), or at `/m` for finished and failed
+   items.
+
+Overdeck only sends to the Google, Apple, Mozilla and Microsoft push services.
+A subscription to any other address is refused.
+
+## Set up your phone
+
+1. **Reach the dashboard over HTTPS.** Browsers allow push only on a secure
+   page. `http://localhost` counts, but a phone needs HTTPS. Until the
+   **Set up Tailscale** action ships, run this on the machine:
+
+   ```bash
+   tailscale serve --bg 3011
+   ```
+
+   Then open the `https://<machine>.<tailnet>.ts.net` address on the phone. See
+   [Remote access](/configuration/remote-access) for how other devices reach the
+   dashboard.
+2. **Pair the phone.** Run `pan pair` and open the link on the phone, or use
+   **Pair a device** in Settings → Anywhere. See [`pan pair`](/cli/pair).
+3. **On iPhone, install the app first.** Safari offers push only to a Home
+   Screen web app (iOS 16.4 or later). Tap **Share → Add to Home Screen**, then
+   open Overdeck from the new icon.
+4. **Turn it on.** Open Settings → Anywhere → **Phone notifications** and tap
+   **Turn on notifications**, then allow notifications when the browser asks.
+   Once the phone shell at `/m` ships, the same control is in its header.
+5. **Send a test.** Tap **Send test**. The phone should show
+   `Overdeck test notification` within a few seconds.
+
+## Configuration
+
+Push is on by default; subscribing a device is the opt-in. Every key is
+optional. This is the full block with its defaults (the `ntfy` part is an
+example; it is off unless you set it):
+
+```yaml
+push:
+  enabled: true            # default true; subscribing a phone is the opt-in
+  events: [question, approval, finished, failed]   # default: all four
+  includePreview: false    # default false
+  webpush:
+    subject: https://overdeck.ai   # default; must be an https: or mailto: URL
+  ntfy:                    # optional; active only when url AND topic are set
+    url: https://ntfy.example.net
+    topic: deck-k3J9xQ2mV7pL4sTa
+    token: tk_...          # optional bearer token for publishing
+    clickBaseUrl: https://desk.tailnet.ts.net   # optional; tapping opens this dashboard
+```
+
+| Key | Default | Effect |
+| --- | --- | --- |
+| `enabled` | `true` | `false` stops every push and the conversation scan. |
+| `events` | all four | Which kinds notify. Unknown entries are ignored. |
+| `includePreview` | `false` | Adds the first question text (or the plan's first line), cut to 140 characters, to Web Push notifications. Never sent to ntfy. |
+| `webpush.subject` | `https://overdeck.ai` | The VAPID contact URL. Apple rejects values that are not `https:` or `mailto:`. |
+| `ntfy.*` | off | See below. |
+
+The dashboard reads the block on every send, so changes apply without a
+restart. A bad value never stops the dashboard from starting: invalid entries
+are ignored, and a bad ntfy setting shows its reason in the Phone notifications
+panel.
+
+## The Overdeck app
+
+Each phone paired with the Overdeck app receives every needs-you notification,
+sealed with `crypto_box_seal` to that phone's own push key. Your machine sends
+the sealed notification to connect.overdeck.ai, which forwards the ciphertext to
+Apple or Google; neither overdeck.ai nor Apple or Google can read it. A
+notification holds at most 2,256 bytes, so a long body is shortened and ends
+with `…`. The machine must be signed in to overdeck.ai and connected to it.
+Settings → Anywhere → Phone notifications shows the count, such as
+`Overdeck app: 2 phones`, and removing a phone from the device list stops its
+notifications within 5 seconds. To pair a phone, see [Phone](/configuration/phone).
+
+On iPhone, the app decrypts each notification on the phone and shows its real
+title and text. If it cannot (for example before the first unlock after a
+restart), the notification reads **Overdeck · Something needs you**. Turn
+notifications on or off in the app's Settings.
+
+### Live Activity (iPhone)
+
+On iOS 16.2 and later, the Overdeck app shows a Live Activity on the lock
+screen and in the Dynamic Island, such as `3 need you · 2 running`. The first
+number counts the items that need you; the second counts the running agents.
+With several paired machines, the card shows their sum.
+
+iOS draws the card from a push without running the app, so its content cannot be
+end-to-end encrypted. Apple and overdeck.ai see these two numbers and nothing
+else: no titles, no conversation text, no machine names.
+
+- The card is on by default. Turn it off in the app's Settings → Live Activity.
+  If iOS Settings does not allow Live Activities for Overdeck, the app tells you
+  to turn them on there.
+- Your machine sends the counts whenever it is connected to overdeck.ai, even
+  when notifications are off.
+- The card dims when it has had no update for 10 minutes.
+- iOS ends a Live Activity after at most 8 hours. The card comes back the next
+  time you open the app.
+
+## Optional: ntfy
+
+[ntfy](https://ntfy.sh) is a simple publish-subscribe notification service.
+Overdeck can publish to an ntfy topic as well as, or instead of, Web Push.
+
+An ntfy server sees what you publish in plain text, so Overdeck sends it
+**titles only**: the kind plus the issue id, or the words `a conversation`.
+Conversation titles, question text and previews never reach ntfy.
+
+- **Treat the topic name as a secret.** Anyone who knows it can subscribe to
+  it. Use an unguessable topic, such as `deck-` followed by 16 or more random
+  characters.
+- **Use a publish token** (`token`) so nobody else can post to your topic.
+- **Prefer a self-hosted server**, so the titles never leave your network.
+- Set `clickBaseUrl` to the HTTPS address of your dashboard if tapping the
+  ntfy notification should open it.
+
+## Privacy
+
+- **Lock screen.** A notification shows on the phone's lock screen. By default
+  it shows only the kind and the conversation title or issue id, never the
+  question text.
+- **`includePreview`.** Turning it on puts the first 140 characters of the
+  question (or the plan's first line) on the lock screen. It still travels
+  encrypted; only the phone can read it.
+- **Revoking a device stops its push.** Each subscription remembers the paired
+  device that created it. When you revoke that device (`pan devices revoke`, or
+  **Revoke** in Settings → Anywhere), its subscription is deleted before the
+  next send.
+- **Removing a subscription.** **Remove** in the Phone notifications panel
+  deletes it. On the device itself, it also unsubscribes the browser.
+
+## Troubleshooting
+
+**There is no Turn on notifications button.** The panel explains why in its
+place:
+
+- *Open this dashboard over HTTPS* — the page is not a secure context. Use the
+  Tailscale Serve address, or `http://localhost` on the machine itself.
+- *On iPhone, add Overdeck to your Home Screen* — Safari tabs cannot receive
+  push. Install the app and open it from the Home Screen icon.
+- *Notifications are blocked for this site* — allow notifications for the
+  dashboard's address in the browser's site settings.
+
+**The test sends, but nothing arrives.** Check the phone's notification
+settings for the browser or the installed app, and turn off Focus or Do Not
+Disturb. On Android, check that battery saving does not restrict the browser.
+
+**A device disappeared from the list.** When a push service answers `404` or
+`410`, the subscription has expired or the browser removed it, so Overdeck
+deletes it. Tap **Turn on notifications** on that device again.
+
+**Notifications stopped after many failures.** The panel shows a failure count
+for each device. Other `4xx` answers count as failures; a successful send
+clears the count.

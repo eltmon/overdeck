@@ -35,6 +35,26 @@ describe('FlywheelStatusPane (PAN-3964 FR-9)', () => {
     expect(screen.getByTestId('flywheel-needs-you')).toHaveTextContent('decide the PAN-3920 scope');
   });
 
+  it('the needs-you banner is a button that calls onNeedsYouClick (PAN-4751)', () => {
+    const onNeedsYouClick = vi.fn();
+    const status = flywheelStatus({
+      lastTick: { tick: 4, pick: null, phase: 'park', inFlight: [], needsYou: 'decide the PAN-3920 scope', at: '2026-09-23T09:59:50.000Z' },
+    });
+    render(<FlywheelStatusPane status={status} unreachable={false} nowMs={NOW} onNeedsYouClick={onNeedsYouClick} />);
+    const banner = screen.getByTestId('flywheel-needs-you');
+    expect(banner.tagName).toBe('BUTTON');
+    fireEvent.click(banner);
+    expect(onNeedsYouClick).toHaveBeenCalledTimes(1);
+  });
+
+  it('the needs-you banner click does not throw without onNeedsYouClick', () => {
+    const status = flywheelStatus({
+      lastTick: { tick: 4, pick: null, phase: 'park', inFlight: [], needsYou: 'decide the PAN-3920 scope', at: '2026-09-23T09:59:50.000Z' },
+    });
+    render(<FlywheelStatusPane status={status} unreachable={false} nowMs={NOW} />);
+    expect(() => fireEvent.click(screen.getByTestId('flywheel-needs-you'))).not.toThrow();
+  });
+
   it('renders in-flight rows with state, attention, PR, and last journal; issue ids navigate', () => {
     const onNavigateIssue = vi.fn();
     render(<FlywheelStatusPane status={flywheelStatus()} unreachable={false} nowMs={NOW} onNavigateIssue={onNavigateIssue} />);
@@ -72,6 +92,16 @@ describe('FlywheelStatusPane (PAN-3964 FR-9)', () => {
       render(<FlywheelStatusPane status={rowStatus({})} unreachable={false} nowMs={NOW} />);
       expect(screen.queryByTestId('flywheel-title-PAN-1')).toBeNull();
       expect(screen.queryByTestId('flywheel-tracker-unknown-PAN-1')).toBeNull();
+    });
+
+    it('marks a row that folds a strike workspace onto its base issue (PAN-4752)', () => {
+      render(<FlywheelStatusPane status={rowStatus({ strike: true })} unreachable={false} nowMs={NOW} />);
+      expect(screen.getByTestId('flywheel-strike-PAN-1')).toHaveTextContent('strike');
+    });
+
+    it('renders no strike marker for a plain row (PAN-4752)', () => {
+      render(<FlywheelStatusPane status={rowStatus({})} unreachable={false} nowMs={NOW} />);
+      expect(screen.queryByTestId('flywheel-strike-PAN-1')).toBeNull();
     });
   });
 

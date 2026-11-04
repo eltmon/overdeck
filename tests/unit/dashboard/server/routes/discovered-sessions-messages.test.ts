@@ -1,3 +1,4 @@
+import { rmSync } from 'node:fs';
 import { cp, mkdtemp, rm, utimes } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -8,6 +9,7 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { INTERNAL_TOKEN_HEADER, _resetInternalTokenCacheForTests } from '../../../../../src/lib/internal-token.js';
+import { getOverdeckHome } from '../../../../../src/lib/paths.js';
 import { discoveredSessionsRouteLayer } from '../../../../../src/dashboard/server/routes/discovered-sessions.js';
 import { EventStoreService } from '../../../../../src/dashboard/server/services/domain-services.js';
 import type { DiscoveredSession } from '../../../../../src/lib/overdeck/discovered-sessions.js';
@@ -113,6 +115,9 @@ beforeEach(async () => {
   const oldTimestamp = new Date('2026-07-03T01:00:00.000Z');
   await utimes(transcriptPath, oldTimestamp, oldTimestamp);
   process.env.OVERDECK_INTERNAL_TOKEN = 'test-token';
+  // The token file wins over env (PAN-4628); delete any file a sibling
+  // test in this worker's shared OVERDECK_HOME left behind.
+  rmSync(join(getOverdeckHome(), 'internal-token'), { force: true });
   _resetInternalTokenCacheForTests();
   vi.mocked(runDashboardDbJob).mockReset();
   vi.mocked(parseConversationMessages).mockClear();

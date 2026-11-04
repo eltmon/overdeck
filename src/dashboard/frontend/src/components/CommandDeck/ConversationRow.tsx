@@ -2,7 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { getRuntimeBehavior, normalizeHarnessName } from '@overdeck/contracts';
 import { useDashboardStore } from '../../lib/store';
-import { Circle, Archive, Copy, Check, X, Pencil, Sparkles, Star, Loader2, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranch, GitBranchPlus, GitFork, AlertCircle, Info, Scissors, TriangleAlert, FileText, FileX, ExternalLink, Share2, MoreVertical, FolderInput, MonitorSmartphone } from 'lucide-react';
+import { Circle, Archive, Copy, Check, X, Pencil, Sparkles, Star, Loader2, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranch, GitBranchPlus, GitFork, AlertCircle, Info, Scissors, TriangleAlert, FileText, FileX, ExternalLink, Share2, MoreVertical, FolderInput, MonitorSmartphone, CheckSquare, Square, CalendarClock } from 'lucide-react';
 import { toolNameToPhase, getPhaseLabel, isSpinnerPhase } from '../../lib/workingPhase';
 import { useConfirm } from '../DialogProvider';
 import { continueTargetOf, openContinueOnDevice } from '../chat/continueOnDevice/continueOnDeviceStore';
@@ -17,7 +17,11 @@ import type { RegisteredProject } from './UnknownProjectState';
 import { resolveEffectiveProjectKey } from './projectsData';
 import { fallbackBadgeTone } from './fallbackBadge';
 import { MenuItemButton, MenuOverlay, MenuSeparator, MenuSurface } from '../shared/ContextMenu';
+import { isOfflineLinked, LinkedMachineChip, LinkedOfflineMeta, LinkedRowMenuItems } from './LinkedConversationRow';
 import { PullRequestMenuItems } from './PullRequestMenuItems';
+import { ScheduleMenuItem } from '../chat/ConversationScheduleDialog';
+import { TriageMenuItems } from './TriageMenuItems';
+import { formatLocalWhen, formatSnoozeWake, isSnoozed } from './conversation-triage';
 import { PullRequestBadge } from '../primitives/PullRequestBadge';
 import styles from './styles/command-deck.module.css';
 
@@ -96,6 +100,11 @@ interface ConversationRowProps {
   conv: Conversation;
   isSelected: boolean;
   onSelect: (name: string) => void;
+  /** PAN-4639 D14: when present, the row's click goes here instead of onSelect
+   *  (multi-select handling by the list); nested rows and other callers keep onSelect. */
+  onRowClick?: (event: React.MouseEvent, name: string) => void;
+  /** PAN-4639 D14: part of the current multi-selection (top-level rows only). */
+  isMultiSelected?: boolean;
   mutations: ConversationMutations;
   variant?: 'flat' | 'nested';
   /** Registered projects for the Move submenu (PAN-1577). Fetched once by the
@@ -165,6 +174,8 @@ export function ConversationRow({
   conv,
   isSelected,
   onSelect,
+  onRowClick,
+  isMultiSelected = false,
   mutations,
   variant = 'flat',
   registeredProjects = [],
@@ -258,6 +269,15 @@ export function ConversationRow({
     ? `waiting on agent — no activity since ${formatStalledTime(conv.stalledSince)}`
     : null;
 
+  // PAN-4639 WI-7: settling never calls stop or archive — the session keeps running.
+  const toggleSettle = useCallback(() => {
+    const settled = Boolean(conv.settledAt);
+    mutations.triage({
+      updates: [{ name: conv.name, settled: !settled }],
+      label: settled ? `Moved "${conv.title ?? conv.name}" to Inbox` : `Settled "${conv.title ?? conv.name}"`,
+    });
+  }, [conv.settledAt, conv.name, conv.title, mutations]);
+
   const beginRename = useCallback(() => {
     committingRef.current = false;
     const initial = conv.title ?? conv.name;
@@ -319,9 +339,10 @@ export function ConversationRow({
     if (ok) mutations.archive(conv.name);
   }, [conv.isFavorited, conv.title, conv.name, confirm, mutations]);
 
-  const itemClass = isNested
+  const offlineLinked = isOfflineLinked(conv); // PAN-4650: muted title, hollow dot, offline metadata
+  const itemClass = (offlineLinked ? `${styles.linkedRowOffline} ` : '') + (isNested
     ? `${styles.projectConvItem} ${isSelected ? styles.projectConvItemSelected : ''} ${leavingKind ? styles.conversationRowLeaving : ''}`
-    : `${styles.conversationItem} ${isSelected ? styles.conversationItemSelected : ''} ${leavingKind ? styles.conversationRowLeaving : ''}`;
+    : `${styles.conversationItem} ${isSelected || isMultiSelected ? styles.conversationItemSelected : ''} ${leavingKind ? styles.conversationRowLeaving : ''}`);
 
   // Fork / spawn status badges — shared by both row variants.
   const ownerLabel = conv.vaultOwnerLabel ?? 'another machine';
@@ -353,12 +374,27 @@ export function ConversationRow({
       <MonitorSmartphone size={10} />
       <span className={styles.conversationBranchChipText}>{`from ${ownerLabel}`}</span>
     </span>
-  ) : continuityBadge;
+  ) : conv.origin === 'linked' ? <LinkedMachineChip conv={conv} /> : continuityBadge;
   const pullRequestBadge = conv.pullRequest ? (
     <PullRequestBadge
       link={conv.pullRequest}
       extraCount={Math.max(0, (conv.pullRequestCount ?? 1) - 1)}
     />
+  ) : null;
+  const scheduleCount = conv.scheduleCount ?? 0;
+  const scheduleBadgeLabel = conv.nextScheduledRunAt
+    ? `${scheduleCount} active schedule${scheduleCount === 1 ? '' : 's'} · next run ${new Date(conv.nextScheduledRunAt).toLocaleString()}`
+    : '';
+  const scheduleBadge = conv.nextScheduledRunAt ? (
+    <span
+      className={styles.conversationBranchChip}
+      title={scheduleBadgeLabel}
+      aria-label={scheduleBadgeLabel}
+      data-testid="schedule-badge"
+    >
+      <CalendarClock size={10} />
+      <span className={styles.conversationBranchChipText}>{formatLocalWhen(conv.nextScheduledRunAt, now)}</span>
+    </span>
   ) : null;
 
   const forkBadges = (
@@ -434,7 +470,11 @@ export function ConversationRow({
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('application/json', JSON.stringify({ name: conv.name, projectKey: conv.projectKey ?? null, cwd: conv.cwd }));
       }}
-      onClick={() => { if (leavingKind) return; onSelect(conv.name); }}
+      onClick={(e) => {
+        if (leavingKind) return;
+        if (onRowClick) onRowClick(e, conv.name);
+        else onSelect(conv.name);
+      }}
       onContextMenu={(e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -449,6 +489,7 @@ export function ConversationRow({
       }}
       title={conv.name}
       aria-busy={leavingKind ? true : undefined}
+      aria-selected={isMultiSelected || undefined}
     >
       {/* Stop button */}
       {conv.sessionAlive && (
@@ -474,6 +515,23 @@ export function ConversationRow({
             <X size={iconSize} />
           </span>
         )
+      )}
+
+      {/* Settle checkbox (PAN-4639 WI-7): top-level rows only. The session is not stopped. */}
+      {!isNested && (
+        <span
+          role="checkbox"
+          aria-checked={Boolean(conv.settledAt)}
+          tabIndex={0}
+          className={styles.conversationSettleBox}
+          aria-label={conv.settledAt ? `Unsettle ${conv.title ?? conv.name}` : `Settle ${conv.title ?? conv.name}`}
+          onClick={(e) => { e.stopPropagation(); toggleSettle(); }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); toggleSettle(); }
+          }}
+        >
+          {conv.settledAt ? <CheckSquare size={iconSize} /> : <Square size={iconSize} />}
+        </span>
       )}
 
       {/* Status indicator */}
@@ -528,7 +586,7 @@ export function ConversationRow({
           size={dotSize}
           className={styles.conversationDot}
           style={{
-            fill: conv.sessionAlive ? 'var(--success)' : 'var(--muted-foreground)',
+            fill: offlineLinked ? 'transparent' : conv.sessionAlive ? 'var(--success)' : 'var(--muted-foreground)',
             color: conv.sessionAlive ? 'var(--success)' : 'var(--muted-foreground)',
           }}
         />
@@ -576,6 +634,7 @@ export function ConversationRow({
           )}
           {ownerBadge}
           {pullRequestBadge}
+          {scheduleBadge}
           {forkBadges}
         </>
       ) : (
@@ -598,6 +657,7 @@ export function ConversationRow({
                 )}
                 {ownerBadge}
                 {pullRequestBadge}
+                {scheduleBadge}
                 {conv.lastAttachedAt && (
                   <>
                     {conv.branch && <span className={styles.conversationMetaSep} aria-hidden>·</span>}
@@ -623,13 +683,20 @@ export function ConversationRow({
                 )}
                 <span className={styles.conversationMetaSep} aria-hidden>·</span>
                 <span title={`Harness: ${shortHarness(conv.harness ?? 'claude-code')}`}>{shortHarness(conv.harness ?? 'claude-code')}</span>
-                {conv.model && (
+                {offlineLinked && <LinkedOfflineMeta conv={conv} />}
+                {conv.model && !offlineLinked && (
                   <>
                     <span className={styles.conversationMetaSep} aria-hidden>·</span>
                     <span title={`Model: ${conv.model}`}>{shortModel(conv.model)}</span>
                   </>
                 )}
                 {forkBadges}
+                {isSnoozed(conv, now.getTime()) && conv.snoozedUntil && (
+                  <>
+                    <span className={styles.conversationMetaSep} aria-hidden>·</span>
+                    <span className={styles.conversationSnoozeLabel}>{formatSnoozeWake(conv.snoozedUntil, now)}</span>
+                  </>
+                )}
               </>
             )}
           </span>
@@ -696,6 +763,7 @@ export function ConversationRow({
           className="fixed z-[1000] min-w-[220px]"
           style={{ position: 'fixed', top: menuPos.top, left: menuPos.left, right: 'auto' }}
         >
+          {conv.origin === 'linked' ? <LinkedRowMenuItems conv={conv} onCopyLink={handleCopyLink} onClose={() => setMenuOpen(false)} /> : <>
           <MenuItemButton
             onClick={() => { beginRename(); setMenuOpen(false); }}
           >
@@ -753,7 +821,9 @@ export function ConversationRow({
               )}
             </span>
           )}
+          {!isNested && <TriageMenuItems conversation={conv} mutations={mutations} onClose={() => setMenuOpen(false)} />}
           <PullRequestMenuItems conversation={conv} mutations={mutations} onClose={() => setMenuOpen(false)} />
+          <ScheduleMenuItem conversation={conv} onClose={() => setMenuOpen(false)} />
           {conv.claudeSessionId && !conv.forkStatus && (
             <MenuItemButton
               onClick={() => { mutations.openForkModal(conv, { mode: 'handoff' }); setMenuOpen(false); }}
@@ -809,6 +879,7 @@ export function ConversationRow({
             {archivePending ? <Loader2 size={14} className={styles.conversationWorkingSpinner} /> : <Archive size={14} />}
             {archivePending ? 'Archiving…' : 'Archive'}
           </MenuItemButton>
+          </>}
         </MenuSurface>
       </>,
       document.body,

@@ -11,6 +11,10 @@ function excerpt(text: string, limit: number): string {
   return text.length > limit ? `${text.slice(0, limit)}…` : text;
 }
 
+function basename(path: string): string {
+  return path.split('/').pop() || path;
+}
+
 function CitationChip({ conversationName, citation }: { conversationName: string; citation: PendingCitation }) {
   const [expanded, setExpanded] = useState(false);
   const [comment, setComment] = useState(citation.comment);
@@ -29,6 +33,9 @@ function CitationChip({ conversationName, citation }: { conversationName: string
         <Quote size={14} />
         {expanded ? (
           <div className="flex flex-1 flex-col gap-1.5">
+            {citation.source.kind === 'file' && (
+              <div className="text-muted-foreground">{citation.source.path}</div>
+            )}
             <blockquote className="border-border border-l-2 bg-muted/30 pl-2 text-muted-foreground">
               {citation.quotedText}
             </blockquote>
@@ -44,6 +51,9 @@ function CitationChip({ conversationName, citation }: { conversationName: string
           </div>
         ) : (
           <span className={styles.composerImageName}>
+            {citation.source.kind === 'file' && (
+              <span className={styles.composerImageStatus}>{basename(citation.source.path)} · </span>
+            )}
             {excerpt(citation.quotedText, QUOTE_EXCERPT_LIMIT)}
             {citation.comment && (
               <span className={styles.composerImageStatus}> · {excerpt(citation.comment, COMMENT_EXCERPT_LIMIT)}</span>

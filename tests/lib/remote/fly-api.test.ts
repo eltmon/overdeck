@@ -1,9 +1,17 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync } from 'fs';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { Effect } from 'effect';
-import { FlyApiClient, FlyApiError, createFlyApiClient } from '../../../src/lib/remote/fly-api.js';
+import {
+  FlyApiClient,
+  FlyApiError,
+  createFlyApiClient,
+  isFlyAuthError,
+  flyTokenRejectedMessage,
+  FLY_TOKEN_FIX,
+} from '../../../src/lib/remote/fly-api.js';
+import type { FlyTokenSource } from '../../../src/lib/remote/fly-token.js';
 
 // Mock global fetch
 const fetchMock = vi.fn();
@@ -76,6 +84,25 @@ describe('FlyApiClient', () => {
       const body = JSON.parse(options.body as string);
       expect(body.config.restart).toEqual({ policy: 'no' });
       expect(body.config).not.toHaveProperty('mounts');
+      expect(body.config).not.toHaveProperty('services');
+      expect(body.config).not.toHaveProperty('env');
+    });
+
+    it('sends services and env verbatim in the config body', async () => {
+      mockOk({ id: 'm1', name: 'ws-123', state: 'started', region: 'iad' });
+      const services = [
+        { protocol: 'tcp' as const, internal_port: 3011, ports: [{ port: 443, handlers: ['tls', 'http'] }] },
+      ];
+      const env = { OVERDECK_PUBLIC_LINK_ONLY: '1', OVERDECK_MACHINE_NAME: 'fly-m1' };
+      await client.createMachine('my-app', 'ws-123', {
+        image: 'registry.fly.io/pan-workspace:latest',
+        services,
+        env,
+      });
+      const [, options] = fetchMock.mock.calls[0];
+      const body = JSON.parse(options.body as string);
+      expect(body.config.services).toEqual(services);
+      expect(body.config.env).toEqual(env);
     });
   });
 
@@ -294,6 +321,77 @@ describe('FlyApiClient', () => {
       });
     });
   });
+
+  describe('token refresh on 401/403 (PAN-4748)', () => {
+    function fakeFlyctlSource(refreshed: string | null): FlyTokenSource {
+      return {
+        origin: 'flyctl',
+        current: async () => 'old',
+        refresh: async () => refreshed,
+      };
+    }
+
+    it('retries once with the refreshed token after a 403 from a flyctl source', async () => {
+      const flyctlClient = new FlyApiClient(fakeFlyctlSource('new'));
+      mockError(403, 'forbidden');
+      mockOk([]);
+
+      const result = await flyctlClient.listMachines('my-app');
+
+      expect(result).toEqual([]);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(fetchMock).toHaveBeenNthCalledWith(
+        1,
+        expect.any(String),
+        expect.objectContaining({ headers: expect.objectContaining({ Authorization: 'Bearer old' }) })
+      );
+      expect(fetchMock).toHaveBeenNthCalledWith(
+        2,
+        expect.any(String),
+        expect.objectContaining({ headers: expect.objectContaining({ Authorization: 'Bearer new' }) })
+      );
+    });
+
+    it('retries a 401 the same way', async () => {
+      const flyctlClient = new FlyApiClient(fakeFlyctlSource('new'));
+      mockError(401, 'unauthorized');
+      mockOk([]);
+
+      const result = await flyctlClient.listMachines('my-app');
+
+      expect(result).toEqual([]);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('throws the 403 without retrying when refresh returns null', async () => {
+      const flyctlClient = new FlyApiClient(fakeFlyctlSource(null));
+      mockError(403, 'forbidden');
+
+      await expect(flyctlClient.listMachines('my-app')).rejects.toMatchObject({ statusCode: 403 });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not refresh an explicit-token client', async () => {
+      mockError(403, 'forbidden');
+
+      await expect(client.listMachines('my-app')).rejects.toMatchObject({ statusCode: 403 });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+  });
+});
+
+describe('isFlyAuthError / flyTokenRejectedMessage', () => {
+  it('isFlyAuthError is true for 401/403 FlyApiError and false for 404 and plain Error', () => {
+    expect(isFlyAuthError(new FlyApiError('x', 401, ''))).toBe(true);
+    expect(isFlyAuthError(new FlyApiError('x', 403, ''))).toBe(true);
+    expect(isFlyAuthError(new FlyApiError('x', 404, ''))).toBe(false);
+    expect(isFlyAuthError(new Error('x'))).toBe(false);
+  });
+
+  it('flyTokenRejectedMessage names the status and the fix', () => {
+    const message = flyTokenRejectedMessage(new FlyApiError('x', 403, ''));
+    expect(message).toBe(`Fly token rejected (403): ${FLY_TOKEN_FIX}`);
+  });
 });
 
 describe('createFlyApiClient', () => {
@@ -327,6 +425,21 @@ describe('createFlyApiClient', () => {
     process.env.HOME = mkdtempSync(join(tmpdir(), 'fly-api-test-'));
     try {
       expect(() => createFlyApiClient()).toThrow('Fly API token not found');
+    } finally {
+      process.env.HOME = originalHome;
+    }
+  });
+
+  it('reports origin flyctl when only ~/.fly/config.yml has a token', () => {
+    delete process.env.FLY_API_TOKEN;
+    const originalHome = process.env.HOME;
+    const home = mkdtempSync(join(tmpdir(), 'fly-api-test-'));
+    mkdirSync(join(home, '.fly'), { recursive: true });
+    writeFileSync(join(home, '.fly', 'config.yml'), 'access_token: fm2_test\n');
+    process.env.HOME = home;
+    try {
+      const client = createFlyApiClient();
+      expect(client.tokenOrigin).toBe('flyctl');
     } finally {
       process.env.HOME = originalHome;
     }

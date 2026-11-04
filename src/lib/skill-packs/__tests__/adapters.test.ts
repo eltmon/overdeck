@@ -2,7 +2,7 @@
  * PAN-4334 WI-1: pack adapters read skill lists and capabilities from real
  * fixture trees in temp dirs.
  */
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -16,6 +16,7 @@ import {
 } from '../adapters.js';
 import { SAGEOX_DISCLOSURE } from '../../sageox/disclosure.js';
 import { DEFT_SKILL_MAP } from '../deft.js';
+import { GSTACK_BROWSER_NEEDED, GSTACK_DISCLOSURE, GSTACK_OPT_IN_SKILLS, GSTACK_SKILL_MAP } from '../gstack.js';
 
 const roots: string[] = [];
 
@@ -128,6 +129,35 @@ describe('claude-plugin adapter', () => {
   });
 });
 
+describe('plugin root', () => {
+  it('reads a claude-plugin pack from pluginRoot and returns repo-relative dirs', async () => {
+    const root = fixture({
+      'harness/p/claude-code/.claude-plugin/plugin.json': JSON.stringify({ name: 'p', license: 'MIT' }),
+      'harness/p/claude-code/skills/alpha/SKILL.md': skillMd('alpha', 'Alpha.'),
+      'harness/p/claude-code/skills/alpha/scripts/run.sh': 'echo hi\n',
+      'harness/p/claude-code/skills/beta/SKILL.md': skillMd('beta', 'Beta.'),
+      'harness/p/claude-code/agents/x.md': '# Agent\n',
+      'skills/decoy/SKILL.md': skillMd('decoy', 'Decoy at repo root.'),
+    });
+    const manifest = await readPackManifest(root, 'claude-plugin', { pluginRoot: 'harness/p/claude-code' });
+    expect(manifest.skills.map((skill) => [skill.name, skill.dir])).toEqual([
+      ['alpha', 'harness/p/claude-code/skills/alpha'],
+      ['beta', 'harness/p/claude-code/skills/beta'],
+    ]);
+    expect(manifest.capabilities.agents).toBe(true);
+    expect(manifest.capabilities.executables).toEqual(['harness/p/claude-code/skills/alpha/scripts/run.sh']);
+    expect(manifest.license).toBe('MIT');
+    expect(manifest.pluginName).toBe('p');
+  });
+
+  it('rejects a plugin root that escapes the repo', async () => {
+    const root = fixture({ 'skills/x/SKILL.md': skillMd('x', 'X.') });
+    for (const pluginRoot of ['../x', '/abs', '..', '']) {
+      await expect(readPackManifest(root, 'plain', { pluginRoot })).rejects.toThrow(/invalid pack plugin root/);
+    }
+  });
+});
+
 describe('plain adapter', () => {
   it('finds nested and flat skills', async () => {
     const root = fixture({
@@ -212,7 +242,88 @@ describe('deft-readonly adapter', () => {
   });
 });
 
+describe('gstack-runtime adapter', () => {
+  function gstackFixture(): string {
+    const root = fixture({
+      'bin/gstack-x': '#!/usr/bin/env bash\n',
+      'bin/notes.txt': 'not executable',
+      'scripts/pack-render.sh': '#!/usr/bin/env bash\n',
+      'test/t.sh': '#!/usr/bin/env bash\n',
+      'node_modules/dep/run.sh': '#!/usr/bin/env bash\n',
+      '.git/hooks/pre-commit.sh': '#!/usr/bin/env bash\n',
+      'review/SKILL.md': skillMd('review', 'Pre-landing review.'),
+      'review/bin/helper.sh': '#!/usr/bin/env bash\n',
+      'codex/SKILL.md': skillMd('codex', 'Second opinion from Codex.'),
+      'qa/SKILL.md': skillMd('qa', 'QA with the browser.'),
+      'ship/SKILL.md': skillMd('ship', 'Ship a release.'),
+      'pair-agent/SKILL.md': skillMd('pair-agent', 'Pair over a tunnel.'),
+      'newskill/SKILL.md': skillMd('newskill', 'Added upstream later.'),
+    });
+    chmodSync(join(root, 'bin/gstack-x'), 0o755);
+    symlinkSync('review', join(root, 'connect-chrome'));
+    return root;
+  }
+
+  it('mounts default and opt-in skills from the map and lists every other skill dir as not mounted', async () => {
+    const manifest = await readPackManifest(gstackFixture(), 'gstack-runtime');
+    expect(manifest.skills).toEqual([
+      { name: 'codex', dir: 'codex', description: 'Second opinion from Codex.', optIn: true },
+      { name: 'review', dir: 'review', description: 'Pre-landing review.', optIn: false },
+    ]);
+    expect(manifest.excluded).toEqual([
+      { name: 'connect-chrome', reason: GSTACK_SKILL_MAP['connect-chrome']!.reason },
+      { name: 'newskill', reason: 'unreviewed' },
+      { name: 'pair-agent', reason: GSTACK_SKILL_MAP['pair-agent']!.reason },
+      { name: 'qa', reason: GSTACK_BROWSER_NEEDED },
+      { name: 'ship', reason: GSTACK_BROWSER_NEEDED },
+    ]);
+  });
+
+  it('mounts browser skills only with browser: true, browser-opt-in ones as opt-in (PAN-4730)', async () => {
+    const without = await readPackManifest(gstackFixture(), 'gstack-runtime', { browser: false });
+    expect(without.skills.map((s) => s.name)).toEqual(['codex', 'review']);
+    expect(without.capabilities.projectMutatingSkills).toEqual(['codex']);
+
+    const manifest = await readPackManifest(gstackFixture(), 'gstack-runtime', { browser: true });
+    expect(manifest.skills).toEqual([
+      { name: 'codex', dir: 'codex', description: 'Second opinion from Codex.', optIn: true },
+      { name: 'qa', dir: 'qa', description: 'QA with the browser.', optIn: false },
+      { name: 'review', dir: 'review', description: 'Pre-landing review.', optIn: false },
+      { name: 'ship', dir: 'ship', description: 'Ship a release.', optIn: true },
+    ]);
+    expect(manifest.excluded).toEqual([
+      { name: 'connect-chrome', reason: GSTACK_SKILL_MAP['connect-chrome']!.reason },
+      { name: 'newskill', reason: 'unreviewed' },
+      { name: 'pair-agent', reason: GSTACK_SKILL_MAP['pair-agent']!.reason },
+    ]);
+    expect(manifest.capabilities.projectMutatingSkills).toEqual(['codex', 'ship']);
+  });
+
+  it('lists every runtime executable outside .git, test and node_modules, and requires bun', async () => {
+    const { capabilities } = await readPackManifest(gstackFixture(), 'gstack-runtime');
+    expect(capabilities.executables).toEqual(['bin/gstack-x', 'review/bin/helper.sh', 'scripts/pack-render.sh']);
+    expect(capabilities).toMatchObject({ hooks: true, runtime: true, requiresCli: ['bun'], projectMutatingSkills: ['codex'] });
+  });
+
+  it('does not label runtime executables as not applied', async () => {
+    const { capabilities } = await readPackManifest(gstackFixture(), 'gstack-runtime');
+    const labels = notAppliedLabels(capabilities);
+    expect(labels.some((label) => label.startsWith('executables'))).toBe(false);
+    expect(labels).toContain('requires CLI (bun)');
+  });
+});
+
 describe('KNOWN_PACKS', () => {
+  it('registers gstack as the eltmon fork with the runtime adapter', () => {
+    expect(KNOWN_PACKS['gstack']).toEqual({
+      id: 'gstack',
+      url: 'https://github.com/eltmon/gstack',
+      adapter: 'gstack-runtime',
+      optIn: GSTACK_OPT_IN_SKILLS,
+      disclosure: GSTACK_DISCLOSURE,
+    });
+  });
+
   it('points deft at the eltmon/directive fork with the deft-readonly adapter', () => {
     expect(KNOWN_PACKS['deft']).toEqual({
       id: 'deft',
@@ -235,6 +346,7 @@ describe('KNOWN_PACKS', () => {
       url: 'https://github.com/eltmon/ox',
       adapter: 'plain',
       skillsRoot: 'extensions/skills',
+      ref: '0e6c7e2df8fd89638a2d40db08cc45d4cff05fdc',
       optIn: [
         'ox-cli-init',
         'ox-cli-attest',
@@ -247,6 +359,27 @@ describe('KNOWN_PACKS', () => {
         'ox-cli-cart-drop',
       ],
       disclosure: SAGEOX_DISCLOSURE,
+    });
+    expect(KNOWN_PACKS['sageox']?.ref).toMatch(/^[0-9a-f]{40}$/);
+  });
+
+  it('points pstack at the eltmon/plugins fork, pinned, with the Claude Code build as plugin root', () => {
+    expect(KNOWN_PACKS['pstack']).toEqual({
+      id: 'pstack',
+      url: 'https://github.com/eltmon/plugins',
+      ref: 'ae5650febf4320793844c12c4adaa937f417f8da',
+      adapter: 'claude-plugin',
+      pluginRoot: 'harness/pstack/claude-code',
+      mountExtras: ['docs', 'README.md'],
+      optIn: [
+        'automate-me',
+        'create-formal-verification-skill',
+        'create-verification-skill',
+        'maintain-verification-skill',
+        'make-bot-ui',
+        'reflect',
+        'setup-pstack',
+      ],
     });
   });
 });

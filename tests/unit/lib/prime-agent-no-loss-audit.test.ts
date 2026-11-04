@@ -66,7 +66,7 @@ const PRIME_AGENT_LITERAL_FILES = [
   'src/lib/overdeck/conversation-archive.ts',
   'src/lib/overdeck/conversation-runtime.ts',
   'src/lib/planning/spawn-planning-session.ts',
-  'src/dashboard/server/routes/agents/spawn.ts',
+  'src/dashboard/server/routes/agents/spawn-issue.ts',
   'src/dashboard/server/routes/agents/spawn-helpers.ts',
   'src/dashboard/server/routes/agents/lifecycle-restart.ts',
   'src/dashboard/server/routes/context.ts',

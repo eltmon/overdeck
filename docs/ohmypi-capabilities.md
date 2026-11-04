@@ -71,9 +71,9 @@ model IDs, the canonical auth mode, and key model capabilities where known.
 | Improvement | Description | Impact |
 |-------------|-------------|--------|
 | **Kimi/GLM via ohmypi harness** | Route kimi-k2 and GLM-4 models through ohmypi rather than CLIProxy, eliminating the 200k-window illusion (PAN-1865). omp has native DashScope / Z.AI auth. | Eliminates deadlocks on long Kimi sessions; removes CLIProxy overhead |
-| **Multi-provider model picker** | Surface omp's 35+ provider matrix in the dashboard harness picker, so users can select `groq/llama-3.3-70b` or `bedrock/claude-3.7-sonnet` without leaving the UI. | Opens 35+ providers to GUI selection without CLI hacks |
+| **Multi-provider model picker** | Surface omp's 35+ provider matrix in the dashboard harness picker, so users can select `groq/openai/gpt-oss-120b` or `bedrock/claude-3.7-sonnet` without leaving the UI. | Opens 35+ providers to GUI selection without CLI hacks |
 | **Provider credential passthrough** | Extend `getOhmypiLauncherFields` to inject additional provider env vars (`GROQ_API_KEY`, `CEREBRAS_API_KEY`, `FIREWORKS_API_KEY`, etc.) at spawn time — already done for KIMI/MINIMAX/DashScope. | Removes manual env-var setup for new providers |
-| **Default model per provider** | When a user selects a provider without specifying a model, resolve a sensible default (e.g., `groq/llama-3.3-70b-versatile`) from a config table rather than erroring. | Reduces friction for first-time provider selection |
+| **Default model per provider** | When a user selects a provider without specifying a model, resolve a sensible default (e.g., `groq/openai/gpt-oss-120b`) from a config table rather than erroring. | Reduces friction for first-time provider selection |
 
 ### 2.2 Role Defaults
 

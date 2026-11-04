@@ -14,6 +14,11 @@
  *   1  usage or request error
  *
  * Messaging a lane is `pan tell conv-<name>` (D12); there is no lane verb for it.
+ * A lane on another machine (PAN-4638) is `pan tell @<label>/<name>`.
+ *
+ * `--machine <label|environment-id|auto>` runs the lane on a linked machine:
+ * the dashboard resolves the machine and calls its lane door. `list`, `show`,
+ * `wait`, `stop` and `reap` work on remote lanes through home's stand-ins.
  */
 import { readFile } from 'node:fs/promises';
 
@@ -26,7 +31,9 @@ import { criticChain, formatCriticChain, type PairingRow } from '../../lib/lanes
 import type { LaneReportInput } from '../../lib/lanes/report.js';
 import type { LaneView } from '../../lib/lanes/views.js';
 import type { LaneSetFilter, LaneSetOptions, LaneSetOutcome } from '../../lib/lanes/wait.js';
+import { senderFromEnv } from '../../lib/terminal-backends/prompt-guard.js';
 import { WORKER_EXIT } from './worker.js';
+import { parseNeedsFlag } from './worker-remote.js';
 
 const START_POLL_MS = 2_000;
 const START_WAIT_MS = 180_000;
@@ -34,7 +41,8 @@ export const MISSING_LANE_PARENT_MESSAGE = 'pan lane start must run inside a con
 
 /** A lane conversation as the CLI needs it. */
 export interface LaneRef {
-  id: number;
+  /** Null for a lane on another machine (PAN-4638). */
+  id: number | null;
   name: string;
   run: string | null;
   key: string | null;
@@ -69,7 +77,24 @@ async function resolveLaneLocally(ref: string): Promise<LaneRef | null> {
   const row = /^\d+$/.test(trimmed)
     ? getConversationById(Number(trimmed))
     : getConversationByName(trimmed.startsWith('conv-') ? trimmed.slice('conv-'.length) : trimmed);
-  return row ? { id: row.id, name: row.name, run: row.gauntletRun, key: row.laneKey, spawnError: row.spawnError } : null;
+  if (row) return { id: row.id, name: row.name, run: row.gauntletRun, key: row.laneKey, spawnError: row.spawnError };
+  // PAN-4638: a lane on another machine has only a stand-in here.
+  const { readRemoteLane } = await import('../../lib/lanes/remote-lanes.js');
+  const name = trimmed.startsWith('conv-') ? trimmed.slice('conv-'.length) : trimmed;
+  const remote = await readRemoteLane(name).catch(() => null);
+  return remote
+    ? { id: null, name, run: remote.facts.run, key: remote.facts.key, spawnError: remote.mirror?.spawnError ?? null }
+    : null;
+}
+
+/** `conv <id> (<name>)` for a local lane, `<name>` for a lane on another machine. */
+function laneLabel(lane: { id: number | null; name: string }): string {
+  return lane.id === null ? lane.name : `conv ${lane.id} (${lane.name})`;
+}
+
+/** `conv <id>` for a local lane, `<name>` for a lane on another machine. */
+function laneShortLabel(lane: { id: number | null; name: string }): string {
+  return lane.id === null ? lane.name : `conv ${lane.id}`;
 }
 
 export function defaultLaneCliDeps(): LaneCliDeps {
@@ -98,8 +123,11 @@ interface ApiAnswer {
 async function api(deps: LaneCliDeps, method: 'GET' | 'POST', path: string, body?: unknown): Promise<ApiAnswer> {
   const response = await deps.fetch(`${deps.apiUrl()}${path}`, {
     method,
-    // POSTs need a trusted Origin (routes/origin-validation.ts), as plan-finalize sends.
-    headers: method === 'POST' ? { 'Content-Type': 'application/json', Origin: deps.apiUrl() } : {},
+    // POSTs need a trusted Origin (routes/origin-validation.ts), as plan-finalize sends. The sender
+    // header lets a lane on another machine be started or stopped as this agent (PAN-4638 D-4638-12).
+    headers: method === 'POST'
+      ? { 'Content-Type': 'application/json', Origin: deps.apiUrl(), 'x-overdeck-sender': senderFromEnv(deps.env).id }
+      : {},
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     signal: AbortSignal.timeout(120_000),
   });
@@ -148,6 +176,9 @@ export interface LaneStartOptions {
   replace?: boolean;
   /** PAN-4311: launch even while the host is CPU-saturated. */
   force?: boolean;
+  /** PAN-4638 FR-1: a linked machine's label or environment id, or `auto`. */
+  machine?: string;
+  needs?: string;
   wait?: boolean;
   json?: boolean;
 }
@@ -202,6 +233,8 @@ export async function laneStartCommand(options: LaneStartOptions, deps: LaneCliD
     ...(options.reuse ? { reuse: true } : {}),
     ...(options.replace ? { replace: true } : {}),
     ...(options.force ? { force: true } : {}),
+    ...(options.machine ? { machine: options.machine } : {}),
+    ...(options.needs ? { needs: parseNeedsFlag(options.needs) } : {}),
   };
   let answer: ApiAnswer;
   try {
@@ -214,8 +247,15 @@ export async function laneStartCommand(options: LaneStartOptions, deps: LaneCliD
     deps.stderr(errorOf(answer));
     return WORKER_EXIT.usage;
   }
-  const result = answer.body as { conversation: { id: number; name: string; gauntletRun: string; laneKey: string; laneRole: string }; cwd: string; iteration: number; warnings?: string[] };
+  const result = answer.body as {
+    conversation: { id: number | null; name: string; gauntletRun: string; laneKey: string; laneRole: string };
+    cwd: string;
+    iteration: number;
+    warnings?: string[];
+    machine?: { environmentId: string; label: string; reason: string | null } | null;
+  };
   for (const warning of result.warnings ?? []) deps.stderr(`warning: ${warning}`);
+  if (result.machine?.reason) deps.stderr(result.machine.reason);
   const { conversation } = result;
 
   if (options.wait !== false) {
@@ -225,12 +265,12 @@ export async function laneStartCommand(options: LaneStartOptions, deps: LaneCliD
       const activity = view?.body?.activity;
       if (activity === 'failed-to-start') {
         const row = await deps.resolveLane(conversation.name);
-        deps.stderr(`Lane conv ${conversation.id} (${conversation.name}) failed to start: ${row?.spawnError ?? 'no spawn error recorded'}`);
+        deps.stderr(`Lane ${laneLabel(conversation)} failed to start: ${row?.spawnError ?? 'no spawn error recorded'}`);
         return WORKER_EXIT.usage;
       }
       if (activity !== undefined && activity !== 'starting') break;
       if (deps.now() >= deadline) {
-        deps.stderr(`Lane conv ${conversation.id} (${conversation.name}) is still starting after ${START_WAIT_MS / 1000} s.`);
+        deps.stderr(`Lane ${laneLabel(conversation)} is still starting after ${START_WAIT_MS / 1000} s.`);
         break;
       }
       await deps.sleep(START_POLL_MS);
@@ -238,7 +278,11 @@ export async function laneStartCommand(options: LaneStartOptions, deps: LaneCliD
   }
 
   if (options.json) deps.stdout(JSON.stringify(result, null, 2));
-  else deps.stdout(`Lane ${conversation.gauntletRun}/${conversation.laneKey} ${conversation.laneRole} i${result.iteration}: conv ${conversation.id} (${conversation.name}) in ${result.cwd}`);
+  else if (result.machine) {
+    deps.stdout(`Lane ${conversation.gauntletRun}/${conversation.laneKey} ${conversation.laneRole} i${result.iteration}: ${conversation.name} on ${result.machine.label} in ${result.cwd}`);
+  } else {
+    deps.stdout(`Lane ${conversation.gauntletRun}/${conversation.laneKey} ${conversation.laneRole} i${result.iteration}: conv ${conversation.id} (${conversation.name}) in ${result.cwd}`);
+  }
   return WORKER_EXIT.done;
 }
 
@@ -250,11 +294,12 @@ function verdictCell(verdict: { verdict?: string; value?: string; defects: numbe
 
 function laneTable(lanes: LaneView[]): string[] {
   const rows = [
-    ['ID', 'RUN/KEY', 'ROLE', 'ITER', 'ACTIVITY', 'REPORT', 'FOR', 'VERDICT', 'BRANCH@SHA', 'AHEAD', 'DIRTY', 'MODEL', 'COST'],
+    ['ID', 'RUN/KEY', 'ROLE', 'MACHINE', 'ITER', 'ACTIVITY', 'REPORT', 'FOR', 'VERDICT', 'BRANCH@SHA', 'AHEAD', 'DIRTY', 'MODEL', 'COST'],
     ...lanes.map((lane) => [
-      String(lane.id),
+      lane.id === null ? lane.name : String(lane.id),
       `${lane.run}/${lane.key}`,
       lane.role,
+      lane.machine ? `${lane.machine.label}${lane.machine.reachable ? '' : ' (offline)'}` : '-',
       String(lane.iteration),
       lane.archived ? 'archived' : lane.activity,
       lane.report ? `#${lane.report.seq} ${lane.report.status}` : '-',
@@ -444,7 +489,7 @@ function pairingRowsOf(lanes: readonly LaneView[]): PairingRow[] {
       role: lane.role,
       iteration: lane.iteration,
       createdAt: lane.createdAt,
-      criticOfId: lane.criticOf?.id ?? null,
+      criticOfName: lane.criticOf?.name ?? null,
       activity: lane.archived ? 'stopped' : lane.activity,
       report: lane.report ? { status: lane.report.status, ...(verdict ? { verdict } : {}) } : null,
     };
@@ -495,7 +540,7 @@ export async function laneShowCommand(
       const judge = lane.role === 'critic' || lane.role === 'verifier';
       const verdict = judge && lane.verdict ? lane.verdict.value : '-';
       const file = judge && lane.verdict?.file ? lane.verdict.file : '-';
-      deps.stdout(`#${lane.id} ${lane.role} i${lane.iteration} ${lane.archived ? 'archived' : lane.activity} ${verdict} ${file}`);
+      deps.stdout(`${lane.id === null ? lane.name : `#${lane.id}`} ${lane.role} i${lane.iteration} ${lane.archived ? 'archived' : lane.activity} ${verdict} ${file}`);
     }
     return WORKER_EXIT.done;
   } catch (error) {
@@ -517,7 +562,7 @@ export async function laneStopCommand(ref: string, deps: LaneCliDeps): Promise<n
   const lane = await requireLane(ref, deps);
   if (!lane) return WORKER_EXIT.usage;
   try {
-    const answer = await api(deps, 'POST', `/api/conversations/${encodeURIComponent(lane.name)}/stop`, {});
+    const answer = await api(deps, 'POST', `/api/lanes/${encodeURIComponent(lane.name)}/stop`, {});
     if (answer.status !== 200) {
       deps.stderr(errorOf(answer));
       return WORKER_EXIT.usage;
@@ -526,7 +571,7 @@ export async function laneStopCommand(ref: string, deps: LaneCliDeps): Promise<n
     deps.stderr(`Could not reach the dashboard: ${error instanceof Error ? error.message : String(error)}`);
     return WORKER_EXIT.usage;
   }
-  deps.stdout(`Stopped lane ${lane.run}/${lane.key} (conv ${lane.id})`);
+  deps.stdout(`Stopped lane ${lane.run}/${lane.key} (${laneShortLabel(lane)})`);
   return WORKER_EXIT.done;
 }
 
@@ -547,11 +592,11 @@ export async function laneReapCommand(ref: string, options: { park?: boolean; ke
   }
   const result = answer.body as { archived?: boolean; parkedPatch?: string | null; warnings?: string[] };
   const conversation = keep ? 'conversation kept' : result.archived ? 'conversation archived' : 'conversation not archived';
-  deps.stdout(`Reaped lane ${lane.run}/${lane.key} (conv ${lane.id}): directory removed, ${conversation}`);
+  deps.stdout(`Reaped lane ${lane.run}/${lane.key} (${laneShortLabel(lane)}): directory removed, ${conversation}`);
   if (result.parkedPatch) deps.stdout(`Parked uncommitted work in ${result.parkedPatch}`);
   const warnings = result.warnings ?? [];
   if (!keep && !result.archived && !warnings.some((warning) => warning.includes('archiving failed'))) {
-    warnings.push(`reaped, but archiving failed; archive conv ${lane.id} from the Command Deck`);
+    warnings.push(`reaped, but archiving failed; archive ${laneShortLabel(lane)} from the Command Deck`);
   }
   for (const warning of warnings) deps.stderr(`warning: ${warning}`);
   return WORKER_EXIT.done;
@@ -583,6 +628,8 @@ export function registerLaneCommands(program: Command, deps: () => LaneCliDeps =
     .option('--reuse', 'Continue in the directory of the latest earlier lane with the same run, key and role')
     .option('--replace', 'Stop the live lane with the same run, key and role first')
     .option('--force', 'Launch even while the host is CPU-saturated')
+    .option('--machine <label|auto>', 'Where to run: a linked machine\'s label or environment id, or auto')
+    .option('--needs <tags>', 'With --machine auto: comma-separated capability tags the machine must have')
     .option('--no-wait', 'Return without waiting for the lane to start')
     .option('--json', 'Print the launch result as JSON')
     .action(async (options: LaneStartOptions) => exitCli(await laneStartCommand(options, deps())));
@@ -629,7 +676,7 @@ export function registerLaneCommands(program: Command, deps: () => LaneCliDeps =
 
   lane
     .command('stop <lane>')
-    .description('Stop a lane through the conversation stop door')
+    .description('Stop a lane through the conversation stop door (on its own machine for a remote lane)')
     .action(async (ref: string) => exitCli(await laneStopCommand(ref, deps())));
 
   lane

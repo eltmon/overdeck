@@ -1,0 +1,229 @@
+{
+  "version": "1",
+  "issueId": "PAN-4888",
+  "created": "2026-11-03T08:25:32.067Z",
+  "updated": "2026-11-03T09:29:24.234Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "lock-target-record": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4888",
+      "claimedAt": "2026-11-03T08:25:32.067Z",
+      "doneAt": "2026-11-03T08:27:12.860Z"
+    },
+    "supersede-protocol": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4888",
+      "claimedAt": "2026-11-03T08:27:28.252Z",
+      "doneAt": "2026-11-03T08:29:35.957Z"
+    },
+    "gate-yield-hook": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4888",
+      "claimedAt": "2026-11-03T08:29:42.654Z",
+      "doneAt": "2026-11-03T08:31:19.414Z"
+    },
+    "gate-withdraw-route": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4888",
+      "claimedAt": "2026-11-03T08:31:27.660Z",
+      "doneAt": "2026-11-03T08:33:27.467Z"
+    },
+    "build-pinned-target": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4888",
+      "claimedAt": "2026-11-03T08:33:29.196Z",
+      "doneAt": "2026-11-03T08:34:32.020Z"
+    },
+    "reload-newcomer": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4888",
+      "claimedAt": "2026-11-03T08:34:37.291Z",
+      "doneAt": "2026-11-03T08:39:24.348Z"
+    },
+    "reload-holder-yield": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4888",
+      "claimedAt": "2026-11-03T08:39:29.532Z",
+      "doneAt": "2026-11-03T08:42:07.028Z"
+    },
+    "cli-build-sha-lines": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4888",
+      "claimedAt": "2026-11-03T08:42:18.750Z",
+      "doneAt": "2026-11-03T08:43:05.857Z"
+    },
+    "banner-build-sha": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4888",
+      "claimedAt": "2026-11-03T08:43:11.453Z",
+      "doneAt": "2026-11-03T08:45:06.905Z"
+    },
+    "docs-supersede": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4888",
+      "claimedAt": "2026-11-03T08:45:12.607Z",
+      "doneAt": "2026-11-03T08:46:06.836Z"
+    },
+    "banner-build-sha.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T09:12:34.524Z"
+    },
+    "banner-build-sha.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T09:14:13.493Z"
+    },
+    "build-pinned-target.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T09:14:35.705Z"
+    },
+    "build-pinned-target.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T09:14:54.669Z"
+    },
+    "build-pinned-target.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T09:15:20.987Z"
+    },
+    "build-pinned-target.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T09:15:48.215Z"
+    },
+    "cli-build-sha-lines.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T09:16:16.540Z"
+    },
+    "cli-build-sha-lines.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T09:16:44.188Z"
+    },
+    "docs-supersede.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T09:17:09.976Z"
+    },
+    "docs-supersede.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T09:17:32.770Z"
+    },
+    "docs-supersede.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T09:17:54.001Z"
+    },
+    "docs-supersede.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T09:18:17.773Z"
+    },
+    "gate-withdraw-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T09:18:40.041Z"
+    },
+    "gate-withdraw-route.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T09:19:02.281Z"
+    },
+    "gate-withdraw-route.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T09:19:23.006Z"
+    },
+    "gate-withdraw-route.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T09:19:41.545Z"
+    },
+    "gate-yield-hook.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T09:20:01.074Z"
+    },
+    "gate-yield-hook.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T09:20:28.689Z"
+    },
+    "gate-yield-hook.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T09:20:57.260Z"
+    },
+    "gate-yield-hook.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T09:21:24.740Z"
+    },
+    "gate-yield-hook.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T09:21:53.313Z"
+    },
+    "lock-target-record.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T09:22:16.544Z"
+    },
+    "lock-target-record.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T09:22:42.734Z"
+    },
+    "lock-target-record.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T09:23:04.764Z"
+    },
+    "reload-holder-yield.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T09:23:28.456Z"
+    },
+    "reload-holder-yield.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T09:23:56.376Z"
+    },
+    "reload-holder-yield.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T09:24:25.820Z"
+    },
+    "reload-holder-yield.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T09:24:47.922Z"
+    },
+    "reload-holder-yield.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T09:25:07.198Z"
+    },
+    "reload-newcomer.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T09:25:48.219Z"
+    },
+    "reload-newcomer.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T09:26:17.636Z"
+    },
+    "reload-newcomer.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T09:26:43.058Z"
+    },
+    "reload-newcomer.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T09:27:06.669Z"
+    },
+    "reload-newcomer.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T09:27:27.174Z"
+    },
+    "supersede-protocol.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T09:27:47.835Z"
+    },
+    "supersede-protocol.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T09:28:08.157Z"
+    },
+    "supersede-protocol.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T09:28:32.241Z"
+    },
+    "supersede-protocol.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T09:28:59.010Z"
+    },
+    "supersede-protocol.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T09:29:24.234Z"
+    }
+  }
+}

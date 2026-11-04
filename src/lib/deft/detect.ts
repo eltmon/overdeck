@@ -75,14 +75,12 @@ function firstLine(text: string): string {
   return text.split(/\r?\n/, 1)[0] ?? '';
 }
 
-async function readCoreVersion(root: string): Promise<string | null> {
-  const text = await readTextOrNull(join(root, '.deft', 'core', 'VERSION'));
+function coreVersionFrom(text: string | null): string | null {
   const line = text === null ? '' : firstLine(text).trim();
   return line || null;
 }
 
-async function readPinnedEngine(root: string): Promise<string | null> {
-  const text = await readTextOrNull(join(root, 'package.json'));
+function pinnedEngineFrom(text: string | null): string | null {
   if (text === null) return null;
   try {
     const pkg: unknown = JSON.parse(text);
@@ -99,11 +97,53 @@ async function readPinnedEngine(root: string): Promise<string | null> {
   return null;
 }
 
-async function readManagedSection(root: string): Promise<string | null> {
-  const text = await readTextOrNull(join(root, 'AGENTS.md'));
+function managedSectionFrom(text: string | null): string | null {
   const match = text?.match(MANAGED_SECTION);
   if (!match) return null;
   return match[1] ?? 'unversioned';
+}
+
+const CORE_VERSION_PATH = '.deft/core/VERSION';
+
+async function readCoreVersion(root: string): Promise<string | null> {
+  return coreVersionFrom(await readTextOrNull(join(root, CORE_VERSION_PATH)));
+}
+
+async function readPinnedEngine(root: string): Promise<string | null> {
+  return pinnedEngineFrom(await readTextOrNull(join(root, 'package.json')));
+}
+
+async function readManagedSection(root: string): Promise<string | null> {
+  return managedSectionFrom(await readTextOrNull(join(root, 'AGENTS.md')));
+}
+
+/** A file's text at a git ref, or null when it is absent or git fails. */
+async function readTextAtRef(root: string, ref: string, path: string): Promise<string | null> {
+  try {
+    const { stdout } = await execFileAsync('git', ['-C', root, 'show', `${ref}:${path}`], {
+      timeout: GIT_TIMEOUT_MS,
+      maxBuffer: 16 * 1024 * 1024,
+      env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
+    });
+    return stdout;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * PAN-4820: whether the project's committed tree at `ref` holds a Directive
+ * deposit, by the same three markers as {@link detectDirectiveProject}. A
+ * worktree's own files cannot decide this: a temporary install leaves the
+ * markers on disk, hidden from git.
+ */
+export async function isDirectiveProjectAtRef(root: string, ref: string): Promise<boolean> {
+  const [core, pkg, agents] = await Promise.all([
+    readTextAtRef(root, ref, CORE_VERSION_PATH),
+    readTextAtRef(root, ref, 'package.json'),
+    readTextAtRef(root, ref, 'AGENTS.md'),
+  ]);
+  return coreVersionFrom(core) !== null || pinnedEngineFrom(pkg) !== null || managedSectionFrom(agents) !== null;
 }
 
 async function readAgentHookFiles(root: string): Promise<string[]> {

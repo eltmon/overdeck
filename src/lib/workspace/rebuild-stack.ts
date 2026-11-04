@@ -24,8 +24,10 @@ import { promisify } from 'node:util';
 import { Effect } from 'effect';
 
 import { recordDockerContainerLifecycleSnapshot } from '../docker-stats.js';
+import { reserveDiskFloor } from '../disk-floor.js';
 import { getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
 import { isIssueClosed } from '../cloister/issue-closed.js';
+import { estimateWorkspaceDiskCost, invalidateWorkspaceDiskCostMemo } from './disk-cost.js';
 import { ensureDevcontainer } from './ensure-devcontainer.js';
 import {
   collectDockerContainerLifecycleSnapshot,
@@ -128,6 +130,8 @@ export interface RebuildWorkspaceStackResult {
   workspacePath?: string;
   composeFile?: string;
   composeProjectName?: string;
+  /** PAN-4961: refused because the disk cannot take a new stack. */
+  diskLow?: boolean;
 }
 
 /**
@@ -266,10 +270,29 @@ export const rebuildWorkspaceStack = (
 
     progress('Ensuring shared docker network...');
     yield* ensureExternalNetwork();
+
+    // PAN-4961: admit the stack phase against every in-flight setup. The
+    // teardown above stays first because it frees the old volume.
+    const cost = yield* Effect.promise(() => estimateWorkspaceDiskCost(projectConfig));
+    const admission = yield* Effect.promise(() => reserveDiskFloor({
+      path: workspacePath,
+      bytes: cost.stackBytes,
+      label: `stack:${normalizedIssueId}`,
+    }));
+    if (!admission.ok) {
+      progress(admission.error);
+      return { success: false, diskLow: true, error: admission.error, workspacePath } satisfies RebuildWorkspaceStackResult;
+    }
+
     progress('Starting workspace stack...');
     yield* dockerCompose(
       ['-f', composeFile, '-p', composeProjectName, 'up', '-d', '--build'],
       dirname(composeFile),
+    ).pipe(
+      Effect.ensuring(Effect.promise(async () => {
+        await admission.reservation.release();
+        invalidateWorkspaceDiskCostMemo(projectConfig.path);
+      })),
     );
     const containers = yield* collectDockerContainerLifecycleSnapshot();
     recordDockerContainerLifecycleSnapshot(containers);

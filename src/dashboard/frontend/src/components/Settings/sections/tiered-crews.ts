@@ -282,9 +282,10 @@ export function tierFitnessWarnings(
     }])),
     ...(rawConfig.supervisor ? { supervisor: resolve(rawConfig.supervisor) } : {}),
   };
-  // PAN-3842 F-4: MODELS_BY_PROVIDER has no groq/cerebras/mistral groups, so
-  // models the server knows — mistral-large-latest, llama-3.3-70b-versatile —
-  // were reported "not in the model catalog" by Settings alone. Union in the
+  // PAN-3842 F-4: MODELS_BY_PROVIDER's groq/cerebras/mistral groups list only
+  // the current ids, so models the server knows — mistral-large-latest, the
+  // retired llama-3.3-70b-versatile — appear only in the class table and would
+  // be reported "not in the model catalog" by Settings alone. Union in the
   // shared class table, whose completeness against the real catalog is
   // enforced by the FR-1 test, so both surfaces agree on what exists.
   const knownModelIds = new Set([

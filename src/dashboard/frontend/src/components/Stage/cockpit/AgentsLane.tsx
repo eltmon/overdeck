@@ -11,6 +11,7 @@ import type { ProjectFeature } from '../../CommandDeck/ProjectTree/ProjectNode'
 import type { SessionNode } from '@overdeck/contracts'
 import { AgentStepRow } from '../../issue-view/AgentStepRow'
 import { VerificationGates } from '../../issue-view/VerificationGates'
+import { DeftSubagentRows } from '../../deft/DeftSubagentRows'
 import styles from './agentsLane.module.css'
 
 /**
@@ -392,6 +393,7 @@ export function AgentsLane({
             onAction={() => {}}
           />
         ))}
+        <DeftSubagentRows issueId={issueId} />
       </div>
 
       <StackDrawer issueId={issueId} feature={feature} branch={branch} onExpandSpine={onExpandSpine} />

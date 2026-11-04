@@ -7,6 +7,8 @@ const wsTransportMock = vi.hoisted(() => ({
   getAvailableEditors: vi.fn(),
   shellOpenInEditor: vi.fn(),
   readWorkspaceFile: vi.fn(),
+  getAvailableBrowsers: vi.fn(),
+  shellOpenInBrowser: vi.fn(),
 }));
 
 const toastMock = vi.hoisted(() => ({
@@ -30,6 +32,7 @@ vi.mock('@pierre/diffs', () => ({
 
 import { MarkdownFileLink, fileLinkIconForPath } from '../MarkdownFileLink';
 import { StageDeckProvider, type StageDeckContextValue } from '../../Stage/StageDeckContext';
+import { CitationTargetContext } from '../../../lib/composerCitations';
 
 const meta = {
   filePath: '/home/eltmon/project/src/App.tsx',
@@ -45,6 +48,23 @@ const markdownMeta = {
   targetPath: '/home/eltmon/project/docs/README.md',
   displayPath: 'project/docs/README.md',
   basename: 'README.md',
+};
+
+// PAN-4762 — a browser-renderable, non-markdown chip.
+const htmlMeta = {
+  filePath: '/home/eltmon/project/mockups/board.html',
+  targetPath: '/home/eltmon/project/mockups/board.html:4',
+  displayPath: 'project/mockups/board.html:4',
+  basename: 'board.html',
+  line: 4,
+};
+
+// PAN-4762 — a markdown chip whose extension is not browser-renderable.
+const mdxMeta = {
+  filePath: '/home/eltmon/project/docs/page.mdx',
+  targetPath: '/home/eltmon/project/docs/page.mdx',
+  displayPath: 'project/docs/page.mdx',
+  basename: 'page.mdx',
 };
 
 // PAN-3260 — the reported case: a repo-root markdown chip inside a
@@ -70,8 +90,14 @@ const positionedMarkdownMeta = {
   column: 5,
 };
 
-function renderWithDeck(ui: React.ReactElement, deck: StageDeckContextValue | null) {
-  return render(<StageDeckProvider value={deck}>{ui}</StageDeckProvider>);
+function renderWithDeck(
+  ui: React.ReactElement,
+  deck:
+    | (Omit<StageDeckContextValue, 'openOrFocusAgentPane'> & Partial<Pick<StageDeckContextValue, 'openOrFocusAgentPane'>>)
+    | null,
+) {
+  const value = deck ? { openOrFocusAgentPane: vi.fn(), ...deck } : null;
+  return render(<StageDeckProvider value={value}>{ui}</StageDeckProvider>);
 }
 
 describe('MarkdownFileLink', () => {
@@ -94,11 +120,17 @@ describe('MarkdownFileLink', () => {
       truncated: false,
       totalLines: 80,
     });
+    wsTransportMock.getAvailableBrowsers.mockReset();
+    wsTransportMock.getAvailableBrowsers.mockResolvedValue({ browsers: ['default-browser', 'chrome', 'firefox'] });
+    wsTransportMock.shellOpenInBrowser.mockReset();
+    wsTransportMock.shellOpenInBrowser.mockResolvedValue(undefined);
     wsTransportMock.request.mockReset();
     wsTransportMock.request.mockImplementation((connect: (client: Record<string, unknown>) => unknown) => connect({
       [WS_METHODS.getAvailableEditors]: wsTransportMock.getAvailableEditors,
       [WS_METHODS.shellOpenInEditor]: wsTransportMock.shellOpenInEditor,
       [WS_METHODS.readWorkspaceFile]: wsTransportMock.readWorkspaceFile,
+      [WS_METHODS.getAvailableBrowsers]: wsTransportMock.getAvailableBrowsers,
+      [WS_METHODS.shellOpenInBrowser]: wsTransportMock.shellOpenInBrowser,
     }));
   });
 
@@ -323,7 +355,7 @@ describe('MarkdownFileLink', () => {
 
       fireEvent.click(screen.getByRole('link'));
 
-      expect(openOrFocusEditorPane).toHaveBeenCalledWith(markdownMeta.filePath, markdownMeta.basename);
+      expect(openOrFocusEditorPane).toHaveBeenCalledWith(markdownMeta.filePath, markdownMeta.basename, null);
       expect(wsTransportMock.shellOpenInEditor).not.toHaveBeenCalled();
     });
 
@@ -333,7 +365,7 @@ describe('MarkdownFileLink', () => {
 
       fireEvent.click(screen.getByRole('link'));
 
-      expect(openOrFocusEditorPane).toHaveBeenCalledWith(flywheelBriefMeta.filePath, flywheelBriefMeta.basename);
+      expect(openOrFocusEditorPane).toHaveBeenCalledWith(flywheelBriefMeta.filePath, flywheelBriefMeta.basename, null);
       expect(wsTransportMock.shellOpenInEditor).not.toHaveBeenCalled();
     });
 
@@ -343,8 +375,8 @@ describe('MarkdownFileLink', () => {
 
       fireEvent.click(screen.getByRole('link'));
 
-      expect(openOrFocusEditorPane).toHaveBeenCalledWith(positionedMarkdownMeta.filePath, positionedMarkdownMeta.basename);
-      expect(openOrFocusEditorPane).not.toHaveBeenCalledWith(positionedMarkdownMeta.targetPath, expect.anything());
+      expect(openOrFocusEditorPane).toHaveBeenCalledWith(positionedMarkdownMeta.filePath, positionedMarkdownMeta.basename, null);
+      expect(openOrFocusEditorPane).not.toHaveBeenCalledWith(positionedMarkdownMeta.targetPath, expect.anything(), null);
       expect(wsTransportMock.shellOpenInEditor).not.toHaveBeenCalled();
     });
 
@@ -400,7 +432,7 @@ describe('MarkdownFileLink', () => {
     // the outer beforeEach; MarkdownFileLink caches that fetch module-wide
     // (same pattern as the Quickview highlighter cache), so every test in
     // this block sees the same two external editors.
-    it('lists the internal editor, then each available external editor, then the copy actions, in that order', async () => {
+    it('lists the internal editor, then each available external editor, then browser items, then the copy actions, in that order', async () => {
       renderWithDeck(<MarkdownFileLink {...markdownMeta} />, { deckKey: 'overdeck', openOrFocusEditorPane: vi.fn() });
 
       fireEvent.contextMenu(screen.getByRole('link'));
@@ -410,6 +442,9 @@ describe('MarkdownFileLink', () => {
           'Open in internal editor',
           'Open in Cursor',
           'Open in VS Code',
+          'Open in browser',
+          'Open in Google Chrome',
+          'Open in Firefox',
           'Open containing folder',
           'Copy relative path',
           'Copy full path',
@@ -464,7 +499,7 @@ describe('MarkdownFileLink', () => {
       const internalItem = await screen.findByRole('menuitem', { name: 'Open in internal editor' });
       fireEvent.click(internalItem);
 
-      expect(openOrFocusEditorPane).toHaveBeenCalledWith(markdownMeta.filePath, markdownMeta.basename);
+      expect(openOrFocusEditorPane).toHaveBeenCalledWith(markdownMeta.filePath, markdownMeta.basename, null);
       expect(localStorage.getItem('overdeck:markdown-open-target')).toBe('internal');
       expect(wsTransportMock.shellOpenInEditor).not.toHaveBeenCalled();
     });
@@ -477,7 +512,36 @@ describe('MarkdownFileLink', () => {
       const internalItem = await screen.findByRole('menuitem', { name: 'Open in internal editor' });
       fireEvent.click(internalItem);
 
-      expect(openOrFocusEditorPane).toHaveBeenCalledWith(positionedMarkdownMeta.filePath, positionedMarkdownMeta.basename);
+      expect(openOrFocusEditorPane).toHaveBeenCalledWith(positionedMarkdownMeta.filePath, positionedMarkdownMeta.basename, null);
+    });
+
+    it('shows no browser items for an .mdx chip', async () => {
+      renderWithDeck(<MarkdownFileLink {...mdxMeta} />, { deckKey: 'overdeck', openOrFocusEditorPane: vi.fn() });
+
+      fireEvent.contextMenu(screen.getByRole('link'));
+
+      await waitFor(() => {
+        const labels = screen.getAllByRole('menuitem').map((item) => item.textContent);
+        expect(labels.some((label) => label?.startsWith('Open in browser'))).toBe(false);
+        expect(labels.some((label) => label?.startsWith('Open in Google Chrome'))).toBe(false);
+        expect(labels.some((label) => label?.startsWith('Open in Firefox'))).toBe(false);
+      });
+    });
+
+    it('clicking Open in Google Chrome calls shellOpenInBrowser and leaves the markdown open target unchanged', async () => {
+      renderWithDeck(<MarkdownFileLink {...markdownMeta} />, { deckKey: 'overdeck', openOrFocusEditorPane: vi.fn() });
+
+      fireEvent.contextMenu(screen.getByRole('link'));
+      const chromeItem = await screen.findByRole('menuitem', { name: 'Open in Google Chrome' });
+      fireEvent.click(chromeItem);
+
+      await waitFor(() => {
+        expect(wsTransportMock.shellOpenInBrowser).toHaveBeenCalledWith({
+          path: markdownMeta.filePath,
+          browser: 'chrome',
+        });
+      });
+      expect(localStorage.getItem('overdeck:markdown-open-target')).toBeNull();
     });
 
     it('renders the original items plus the reveal action for a non-markdown chip', () => {
@@ -491,6 +555,112 @@ describe('MarkdownFileLink', () => {
         'Copy relative path',
         'Copy full path',
       ]);
+    });
+  });
+
+  describe('browser items in the generic right-click menu (PAN-4762)', () => {
+    it('lists browser items between Open in editor and Open containing folder for a browser-renderable chip', async () => {
+      render(<MarkdownFileLink {...htmlMeta} />);
+
+      fireEvent.contextMenu(screen.getByRole('link'));
+
+      await waitFor(() => {
+        expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual([
+          'Open in editor',
+          'Open in browser',
+          'Open in Google Chrome',
+          'Open in Firefox',
+          'Open containing folder',
+          'Copy relative path',
+          'Copy full path',
+        ]);
+      });
+
+      fireEvent.keyDown(document, { key: 'Escape' });
+    });
+
+    it('clicking Open in Firefox calls shellOpenInBrowser and shows a success toast', async () => {
+      render(<MarkdownFileLink {...htmlMeta} />);
+
+      fireEvent.contextMenu(screen.getByRole('link'));
+      const firefoxItem = await screen.findByRole('menuitem', { name: 'Open in Firefox' });
+      fireEvent.click(firefoxItem);
+
+      await waitFor(() => {
+        expect(wsTransportMock.shellOpenInBrowser).toHaveBeenCalledWith({
+          path: htmlMeta.filePath,
+          browser: 'firefox',
+        });
+        expect(toastMock.success).toHaveBeenCalledWith('Opened in Firefox');
+      });
+    });
+
+    it('shows a failure toast when shellOpenInBrowser rejects', async () => {
+      wsTransportMock.shellOpenInBrowser.mockRejectedValue(new Error('boom'));
+      render(<MarkdownFileLink {...htmlMeta} />);
+
+      fireEvent.contextMenu(screen.getByRole('link'));
+      const browserItem = await screen.findByRole('menuitem', { name: 'Open in browser' });
+      fireEvent.click(browserItem);
+
+      await waitFor(() => {
+        expect(toastMock.error).toHaveBeenCalledWith('Failed to open in browser: boom');
+      });
+    });
+
+    it('does not request available browsers for a non-browser-renderable chip', async () => {
+      render(<MarkdownFileLink {...meta} />);
+
+      fireEvent.contextMenu(screen.getByRole('link'));
+
+      expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual([
+        'Open in editor',
+        'Open containing folder',
+        'Copy relative path',
+        'Copy full path',
+      ]);
+      expect(wsTransportMock.getAvailableBrowsers).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('CitationTargetContext (PAN-4658)', () => {
+    it('passes the provided conversation name as the third argument on click', () => {
+      const openOrFocusEditorPane = vi.fn();
+      renderWithDeck(
+        <CitationTargetContext.Provider value="conv-a">
+          <MarkdownFileLink {...markdownMeta} />
+        </CitationTargetContext.Provider>,
+        { deckKey: 'overdeck', openOrFocusEditorPane },
+      );
+
+      fireEvent.click(screen.getByRole('link'));
+
+      expect(openOrFocusEditorPane).toHaveBeenCalledWith(markdownMeta.filePath, markdownMeta.basename, 'conv-a');
+    });
+
+    it('passes the provided conversation name from the right-click "Open in internal editor" item', async () => {
+      const openOrFocusEditorPane = vi.fn();
+      renderWithDeck(
+        <CitationTargetContext.Provider value="conv-a">
+          <MarkdownFileLink {...markdownMeta} />
+        </CitationTargetContext.Provider>,
+        { deckKey: 'overdeck', openOrFocusEditorPane },
+      );
+
+      fireEvent.contextMenu(screen.getByRole('link'));
+      const internalItem = await screen.findByRole('menuitem', { name: 'Open in internal editor' });
+      fireEvent.click(internalItem);
+
+      expect(openOrFocusEditorPane).toHaveBeenCalledWith(markdownMeta.filePath, markdownMeta.basename, 'conv-a');
+    });
+
+    it('passes null as the third argument without a provider', () => {
+      const openOrFocusEditorPane = vi.fn();
+      renderWithDeck(<MarkdownFileLink {...markdownMeta} />, { deckKey: 'overdeck', openOrFocusEditorPane });
+
+      fireEvent.click(screen.getByRole('link'));
+
+      expect(openOrFocusEditorPane).toHaveBeenCalledWith(markdownMeta.filePath, markdownMeta.basename, null);
     });
   });
 });

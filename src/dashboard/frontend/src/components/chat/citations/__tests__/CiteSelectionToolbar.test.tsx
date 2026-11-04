@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, beforeEach } from 'vitest';
+import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { CiteSelectionLayer, CiteSelectionToolbar, type CiteSnapshot } from '../CiteSelectionToolbar.js';
+import { fileSelectionResolver } from '../resolveSelectionCitation.js';
 import { getConversationCitations, resetCitationStore } from '../../../../lib/composerCitations.js';
 
 function fakeRect(): DOMRect {
@@ -9,7 +10,7 @@ function fakeRect(): DOMRect {
 }
 
 function snapshot(overrides: Partial<CiteSnapshot> = {}): CiteSnapshot {
-  return { messageId: 'asst-1', role: 'assistant', quotedText: 'Quoted text', rect: fakeRect(), ...overrides };
+  return { source: { kind: 'message', messageId: 'asst-1', role: 'assistant' }, quotedText: 'Quoted text', rect: fakeRect(), ...overrides };
 }
 
 /** Mirrors the open/closed state `CiteSelectionLayer` owns, so the presentational
@@ -158,5 +159,97 @@ describe('CiteSelectionLayer (review fix: the open box must outlive the live sel
     expect(getConversationCitations('conv-a')).toEqual([]);
 
     root.remove();
+  });
+
+  it('uses the default message resolver: selecting a [data-cite-message-id] row stores a message-kind citation', () => {
+    const { root, citable } = buildTimeline();
+    const rootRef = { current: root };
+
+    render(<CiteSelectionLayer conversationName="conv-a" rootRef={rootRef} />);
+
+    act(() => selectTextIn(citable));
+    fireEvent.click(screen.getByRole('button', { name: 'Cite' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    const citations = getConversationCitations('conv-a');
+    expect(citations).toHaveLength(1);
+    expect(citations[0]!.source).toEqual({ kind: 'message', messageId: 'asst-1', role: 'assistant' });
+
+    root.remove();
+  });
+});
+
+describe('CiteSelectionLayer with a file resolver', () => {
+  function buildPlainRoot(): { root: HTMLDivElement; paragraph: HTMLParagraphElement; outside: HTMLDivElement } {
+    const root = document.createElement('div');
+    root.innerHTML = '<p>Plain preview text</p>';
+    document.body.appendChild(root);
+    const outside = document.createElement('div');
+    outside.textContent = 'Outside the root';
+    document.body.appendChild(outside);
+    return { root, paragraph: root.querySelector('p')!, outside };
+  }
+
+  function selectTextIn(element: Element): void {
+    const range = document.createRange();
+    range.selectNodeContents(element);
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+    document.dispatchEvent(new Event('selectionchange'));
+  }
+
+  it('Cite then Save stores a file citation and calls onSaved once with it', () => {
+    const { root, paragraph, outside } = buildPlainRoot();
+    const rootRef = { current: root };
+    const onSaved = vi.fn();
+
+    render(
+      <CiteSelectionLayer
+        conversationName="conv-a"
+        rootRef={rootRef}
+        resolve={fileSelectionResolver('/repo/docs/a.md')}
+        onSaved={onSaved}
+      />,
+    );
+
+    act(() => selectTextIn(paragraph));
+    fireEvent.click(screen.getByRole('button', { name: 'Cite' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    const citations = getConversationCitations('conv-a');
+    expect(citations).toHaveLength(1);
+    expect(citations[0]!.source).toEqual({ kind: 'file', path: '/repo/docs/a.md' });
+    expect(onSaved).toHaveBeenCalledTimes(1);
+    expect(onSaved).toHaveBeenCalledWith(citations[0]);
+
+    root.remove();
+    outside.remove();
+  });
+
+  it('renders no Cite button when the selection focus lies outside the root', () => {
+    const { root, paragraph, outside } = buildPlainRoot();
+    const rootRef = { current: root };
+
+    render(
+      <CiteSelectionLayer
+        conversationName="conv-a"
+        rootRef={rootRef}
+        resolve={fileSelectionResolver('/repo/docs/a.md')}
+      />,
+    );
+
+    const range = document.createRange();
+    range.setStart(paragraph.firstChild!, 0);
+    range.setEnd(outside.firstChild!, 5);
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+    act(() => document.dispatchEvent(new Event('selectionchange')));
+
+    expect(screen.queryByRole('button', { name: 'Cite' })).not.toBeInTheDocument();
+
+    root.remove();
+    outside.remove();
   });
 });

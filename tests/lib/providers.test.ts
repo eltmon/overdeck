@@ -16,9 +16,9 @@ describe('providers', () => {
       GEMINI_API_KEY: 'AIza-test',
       ANTHROPIC_DEFAULT_OPUS_MODEL: 'gemini-3.1-pro-preview',
       ANTHROPIC_DEFAULT_SONNET_MODEL: 'gemini-3-flash-preview',
-      ANTHROPIC_DEFAULT_HAIKU_MODEL: 'gemini-3.1-flash-lite-preview',
-      ANTHROPIC_SMALL_FAST_MODEL: 'gemini-3.1-flash-lite-preview',
-      CLAUDE_CODE_SUBAGENT_MODEL: 'gemini-3.1-flash-lite-preview',
+      ANTHROPIC_DEFAULT_HAIKU_MODEL: 'gemini-3.1-flash-lite',
+      ANTHROPIC_SMALL_FAST_MODEL: 'gemini-3.1-flash-lite',
+      CLAUDE_CODE_SUBAGENT_MODEL: 'gemini-3.1-flash-lite',
     });
   });
 
@@ -74,6 +74,17 @@ describe('providers', () => {
         expect(() => resolveKimiCodeModelAlias(legacy)).toThrow(/has no native kimi-code CLI equivalent/);
       }
     });
+
+    it('registers K3.1 Pro and K3.1 Pro Highspeed as kimi provider models with same-named native aliases', () => {
+      expect(resolveKimiCodeModelAlias('k3.1-pro')).toBe('kimi-code/k3.1-pro');
+      expect(resolveKimiCodeModelAlias('k3.1-pro-highspeed')).toBe('kimi-code/k3.1-pro-highspeed');
+      expect(resolveKimiCodeModelAlias('kimi-code/k3.1-pro')).toBe('kimi-code/k3.1-pro');
+      expect(resolveKimiCodeModelAlias('kimi-code/k3.1-pro-highspeed')).toBe('kimi-code/k3.1-pro-highspeed');
+      for (const id of ['k3.1-pro', 'k3.1-pro-highspeed', 'kimi-code/k3.1-pro', 'kimi-code/k3.1-pro-highspeed']) {
+        expect(getProviderForModel(id).name).toBe('kimi');
+      }
+      expect(() => resolveKimiCodeModelAlias('kimi-k2.6')).toThrow(/kimi-code\/k3\.1-pro/);
+    });
   });
 
   it('resolves the zai provider for glm-5.2', () => {
@@ -111,11 +122,11 @@ describe('providers', () => {
       ANTHROPIC_AUTH_TOKEN: 'sk-zai-test',
       ZAI_API_KEY: 'sk-zai-test',
       API_TIMEOUT_MS: '300000',
-      ANTHROPIC_DEFAULT_OPUS_MODEL: 'glm-5.2',
-      ANTHROPIC_DEFAULT_SONNET_MODEL: 'glm-4.7',
-      ANTHROPIC_DEFAULT_HAIKU_MODEL: 'glm-4.7-flash',
-      ANTHROPIC_SMALL_FAST_MODEL: 'glm-4.7-flash',
-      CLAUDE_CODE_SUBAGENT_MODEL: 'glm-4.7-flash',
+      ANTHROPIC_DEFAULT_OPUS_MODEL: 'glm-5.3',
+      ANTHROPIC_DEFAULT_SONNET_MODEL: 'glm-5.3',
+      ANTHROPIC_DEFAULT_HAIKU_MODEL: 'glm-5.3-flash',
+      ANTHROPIC_SMALL_FAST_MODEL: 'glm-5.3-flash',
+      CLAUDE_CODE_SUBAGENT_MODEL: 'glm-5.3-flash',
     });
   });
 
@@ -126,11 +137,11 @@ describe('providers', () => {
       ANTHROPIC_AUTH_TOKEN: 'sk-mimo-test',
       MIMO_API_KEY: 'sk-mimo-test',
       API_TIMEOUT_MS: '300000',
-      ANTHROPIC_DEFAULT_OPUS_MODEL: 'mimo-v2.5-pro',
-      ANTHROPIC_DEFAULT_SONNET_MODEL: 'mimo-v2.5-pro',
-      ANTHROPIC_DEFAULT_HAIKU_MODEL: 'mimo-v2.5',
-      ANTHROPIC_SMALL_FAST_MODEL: 'mimo-v2.5',
-      CLAUDE_CODE_SUBAGENT_MODEL: 'mimo-v2.5',
+      ANTHROPIC_DEFAULT_OPUS_MODEL: 'mimo-v2.6-pro',
+      ANTHROPIC_DEFAULT_SONNET_MODEL: 'mimo-v2.6-pro',
+      ANTHROPIC_DEFAULT_HAIKU_MODEL: 'mimo-v2.6-flash',
+      ANTHROPIC_SMALL_FAST_MODEL: 'mimo-v2.6-flash',
+      CLAUDE_CODE_SUBAGENT_MODEL: 'mimo-v2.6-flash',
     });
   });
 
@@ -157,11 +168,11 @@ describe('providers', () => {
       ANTHROPIC_BASE_URL: 'http://127.0.0.1:12436/dashscope',
       ANTHROPIC_AUTH_TOKEN: 'sk-test',
       DASHSCOPE_API_KEY: 'sk-test',
-      ANTHROPIC_DEFAULT_OPUS_MODEL: 'qwen3-max',
-      ANTHROPIC_DEFAULT_SONNET_MODEL: 'qwen3-coder-plus',
-      ANTHROPIC_DEFAULT_HAIKU_MODEL: 'qwen3-plus',
-      ANTHROPIC_SMALL_FAST_MODEL: 'qwen3-plus',
-      CLAUDE_CODE_SUBAGENT_MODEL: 'qwen3-plus',
+      ANTHROPIC_DEFAULT_OPUS_MODEL: 'qwen3.8-max',
+      ANTHROPIC_DEFAULT_SONNET_MODEL: 'qwen3.7-plus',
+      ANTHROPIC_DEFAULT_HAIKU_MODEL: 'qwen3.8-flash',
+      ANTHROPIC_SMALL_FAST_MODEL: 'qwen3.8-flash',
+      CLAUDE_CODE_SUBAGENT_MODEL: 'qwen3.8-flash',
     });
   });
 

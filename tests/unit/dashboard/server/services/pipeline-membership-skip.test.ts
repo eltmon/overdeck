@@ -12,7 +12,11 @@ import {
   readPipelineMembershipSnapshotsForProjects,
   refreshMembershipSnapshotsForProjects,
 } from '../../../../../src/dashboard/server/services/pipeline-membership.js';
-import { readSkippedProjects, resetSkippedProjectsForTests } from '../../../../../src/lib/github-quota/skipped-projects.js';
+import {
+  readSkippedProjects,
+  resetSkippedProjectsForTests,
+  settleSkippedProjectsForTests,
+} from '../../../../../src/lib/github-quota/skipped-projects.js';
 import type { ProjectConfig } from '../../../../../src/lib/projects.js';
 
 const unresolvable: ProjectConfig = { name: 'papers-please', path: '/projects/papers-please' };
@@ -34,7 +38,10 @@ describe('membership refresh skips projects with no tracker (PAN-4264)', () => {
     resetSkippedProjectsForTests();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    // The refresh writes skipped-projects.json without awaiting it; a write still in flight
+    // under OVERDECK_HOME makes the rmSync below fail with ENOTEMPTY.
+    await settleSkippedProjectsForTests();
     vi.restoreAllMocks();
     if (originalHome === undefined) delete process.env.OVERDECK_HOME;
     else process.env.OVERDECK_HOME = originalHome;

@@ -21,6 +21,11 @@
  * predates the gate, and a dashboard that is not answering has no live operator
  * work to interrupt.
  *
+ * A waiting `pan reload` may step aside for a newer one (PAN-4888). It does so
+ * only through the withdraw call, which the server refuses once an approval
+ * covers the request, so an approval is never discarded: a request the server
+ * keeps is claimed and restarted as approved.
+ *
  * The wire contract (paths, JSON shapes, 5s poll interval) is pinned by the
  * PAN-3729 spec and shared with the dashboard-side gate service. Do not change
  * shapes here without changing them there.
@@ -92,13 +97,21 @@ export interface RestartGateWaitOptions extends RestartGateHttpOptions {
   readonly log?: (message: string) => void;
   readonly pollIntervalMs?: number;
   readonly unhealthyFallbackMs?: number;
+  /**
+   * PAN-4888: asked at the top of every loop iteration while this request is
+   * outside an epoch. A non-null string asks this requester to step aside; it
+   * does so only after the gate agrees to withdraw the request.
+   */
+  readonly shouldYield?: () => Promise<string | null>;
 }
 
 export type RestartGateOutcome =
   /** Perform the restart: this requester holds the claim, or the gate is absent. */
   | { readonly proceed: true; readonly reason: 'claimed' | 'ungated'; readonly detail: string }
   /** Skip the restart: another requester's approved restart already covered this one. */
-  | { readonly proceed: false; readonly reason: 'satisfied'; readonly detail: string };
+  | { readonly proceed: false; readonly reason: 'satisfied'; readonly detail: string }
+  /** Skip the restart: a newer `pan reload` replaced this one and the gate withdrew its request (PAN-4888). */
+  | { readonly proceed: false; readonly reason: 'superseded'; readonly detail: string };
 
 /**
  * One gate HTTP call. `absent` means the endpoint 404s (a server build without
@@ -191,9 +204,12 @@ export function restartGateWaitLines(request: RestartGateRequest, pendingCount: 
     : others > 1
       ? ` ${others} other restart requests are waiting too, and a single approval releases all of them.`
       : '';
+  const build = request.builtSha
+    ? ` Approving it puts origin/main build ${request.builtSha.slice(0, 12)} live.`
+    : '';
   return [
     'Waiting for operator approval before restarting the dashboard.',
-    `A dashboard restart asked for by a deploy or a CLI command now waits for you, so it cannot interrupt live work. This request is "${request.reason}".${company}`,
+    `A dashboard restart asked for by a deploy or a CLI command now waits for you, so it cannot interrupt live work. This request is "${request.reason}".${company}${build}`,
     'To let it run, either click "Restart now" in the banner at the top of any dashboard view, or run `pan restart --now` in a terminal. Nothing else is needed, and there is no timeout — this command waits until you do one of them.',
   ];
 }
@@ -223,8 +239,26 @@ export async function waitForRestartApproval(
   let announced = false;
   let lastHeartbeatAt = Date.now();
   const waitStartedAt = Date.now();
+  let registered = false;
+  let inEpoch = false;
 
   while (true) {
+    if (options.shouldYield && !inEpoch) {
+      const detail = await options.shouldYield();
+      if (detail) {
+        const withdrawal = registered
+          ? await withdrawRestartGateRequest(request.requesterId, options)
+          : 'withdrawn'; // never registered: nothing on the gate to lose
+        if (withdrawal === 'kept') {
+          inEpoch = true; // an approval landed since the last poll: claim it below
+        } else {
+          // 'withdrawn', or a gate without the route / not answering (D6)
+          log(`Stepping aside — ${detail}.`);
+          return { proceed: false, reason: 'superseded', detail };
+        }
+      }
+    }
+
     const poll = await gatePost<RestartGatePollResponse>(
       '/api/restart-gate/requests',
       request,
@@ -253,6 +287,8 @@ export async function waitForRestartApproval(
     }
 
     unhealthySince = null;
+    registered = true;
+    inEpoch = poll.payload.status === 'approved' || poll.payload.status === 'claimed';
 
     if (poll.payload.status === 'satisfied') {
       return {
@@ -344,6 +380,27 @@ export async function claimRestartGate(
     GATE_BYPASS_TIMEOUT_MS,
   );
   return result.kind === 'ok' ? result.payload.granted === true : null;
+}
+
+export type RestartGateWithdrawResult = 'withdrawn' | 'kept' | 'absent' | 'unavailable';
+
+/**
+ * PAN-4888: remove this request from the gate only while it is outside an
+ * epoch. `kept` means an approval already covers it and it must restart.
+ */
+export async function withdrawRestartGateRequest(
+  requesterId: string,
+  options: RestartGateHttpOptions = {},
+): Promise<RestartGateWithdrawResult> {
+  const result = await gatePost<{ withdrawn?: boolean }>(
+    '/api/restart-gate/withdraw',
+    { requesterId },
+    options,
+    GATE_CALL_TIMEOUT_MS,
+  );
+  if (result.kind === 'absent') return 'absent';
+  if (result.kind === 'unavailable') return 'unavailable';
+  return result.payload.withdrawn === true ? 'withdrawn' : 'kept';
 }
 
 /** Read the gate for display. Returns null when the gate is absent or unreachable. */

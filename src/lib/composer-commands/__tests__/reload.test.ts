@@ -84,6 +84,19 @@ describe('composer reload', () => {
     expect(emit).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'reload-123:completed', status: 'completed' }));
   });
 
+  it('reports superseded as a completed info activity', async () => {
+    const path = join(home, 'build.log');
+    await writeFile(path, 'Stepping aside');
+    await reportComposerReloadProgress('superseded', 'reload-123', path);
+    expect(emit).toHaveBeenLastCalledWith(expect.objectContaining({
+      id: 'reload-123:superseded',
+      status: 'completed',
+      level: 'info',
+      message: 'A newer reload replaced this one. It builds a newer origin/main and asks for approval itself; this build was discarded.',
+      output: 'Stepping aside',
+    }));
+  });
+
   it('leaves terminal reloads unchanged', async () => {
     vi.stubEnv('OVERDECK_COMPOSER_RELOAD_ACTIVITY', '');
     await reportComposerReloadProgress('building');

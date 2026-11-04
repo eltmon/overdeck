@@ -1,0 +1,135 @@
+---
+title: pan account
+description: Optional overdeck.ai sign-in for this machine (directory and hosted features)
+---
+
+# `pan account`
+
+Sign this machine in to your overdeck.ai account with GitHub's device flow. Sign-in is
+optional: `pan share` needs it, and `pan join` runs this sign-in itself when the machine is not
+signed in (see [`pan share and pan join`](/cli/share)).
+It is the prerequisite for the directory ([PAN-2356](https://github.com/eltmon/overdeck/issues/2356))
+and Shared Sessions — see [`anywhere`](/anywhere).
+
+## login
+
+```bash
+pan account login [--base-url <url>]
+```
+
+Runs the device flow:
+
+```
+To sign in, open: <verificationUri>
+and enter the code: <userCode>
+Or open: <verificationUriComplete>
+Waiting for approval…
+```
+
+`verification_uri` always comes from the account service's response; `pan account` never
+hardcodes the sign-in host.
+
+| Flag | Effect |
+| --- | --- |
+| `--base-url <url>` | Account service URL. |
+
+The base URL resolves in order: `--base-url`, then the `OVERDECK_ACCOUNT_URL` environment
+variable, then the default `https://account.overdeck.ai`. An invalid URL (wrong scheme, a
+path, a query, or a fragment) exits 1 before any network call with
+`Invalid account service URL: <url>`.
+
+An unsupported platform exits 1 before any network call:
+
+```
+This platform (<platform>-<arch>) cannot sign in to overdeck.ai; supported: linux, darwin, win32 on x64 or arm64.
+```
+
+Signing in again on a machine that already has a token prints:
+
+```
+Already signed in as <login>; signing in again replaces this machine's token.
+```
+
+and still runs the flow — the service rotates this machine's token in place. On success:
+
+```
+Signed in to <baseUrl> as <githubLogin> (device <label>, <deviceId>).
+```
+
+If your GitHub account is not on the invite list, or you cancel the GitHub step:
+
+```
+This GitHub account is not on the overdeck.ai invite list, or sign-in was cancelled. Ask the operator to allow it, then run: pan account login
+```
+
+Other failures: `The sign-in code expired. Run: pan account login`; `Cannot reach <baseUrl>: <reason>` after the service is unreachable for several consecutive polls; or, if a token arrived but reading the account afterward failed, the token is still saved and it prints `Signed in (device <label>, <deviceId>), but could not read the account: <reason>. Run: pan account status`.
+
+## status
+
+```bash
+pan account status [--json]
+```
+
+With no stored token:
+
+```
+Not signed in. Run: pan account login
+```
+
+(exit 0 — sign-in is optional). Otherwise this calls `GET /v1/me` against the stored base
+URL and prints:
+
+```
+Signed in as <githubLogin> (GitHub id <githubId>)
+Account service: <baseUrl>
+This device:     <label> (<deviceId>)
+Access:          active
+```
+
+or, when the account's grant has expired, `Access:          expired on <date>; ask the
+operator to renew the invite.`
+
+| Flag | Effect |
+| --- | --- |
+| `--json` | Print `{ signedIn, baseUrl, githubLogin, githubId, deviceId, label, access, reachable }`. Never includes the token. |
+
+If this machine's token was revoked or the account was deleted: `This machine's sign-in is
+no longer valid (<error>). Run: pan account login`, exit 1 — the token file is kept so you
+can see this message again rather than silently sign you out. If the account service is
+unreachable: `Signed in as <login> (account service unreachable: <reason>)`, exit 1, using
+the login cached in the token file.
+
+## logout
+
+```bash
+pan account logout
+```
+
+Revokes this machine's device on the account service (`DELETE /v1/devices/<deviceId>`) and
+deletes the local token file either way — a 204, 401 or 404 all mean the device is gone or
+already invalid:
+
+```
+Signed out. This machine's device token was revoked.
+```
+
+If the service cannot be reached, the token file is still deleted locally, and this prints
+to stderr and exits 1:
+
+```
+Signed out locally, but could not revoke the device on <baseUrl>: <reason>. Revoke it from another signed-in machine or ask the operator.
+```
+
+With no stored token: `Not signed in.`, exit 0, no network call. `logout` never touches
+anything under `${OVERDECK_HOME}` besides `account.json` — not the Session Vault key, not
+`environment-id.json`.
+
+## The token file
+
+`${OVERDECK_HOME}/account.json`, mode `0600`, written atomically. Holds `baseUrl`,
+`accessToken`, `deviceId`, `label`, `githubLogin`, `githubId` and `signedInAt`. A corrupt or
+unreadable file is never rewritten silently: reading it fails with a message naming the
+path and `Delete it to sign out locally.`
+
+It never holds the Session Vault key, a vault passphrase, or any conversation content —
+see [`pan vault`](/cli/vault) for those.

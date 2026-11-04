@@ -1,0 +1,196 @@
+{
+  "version": "1",
+  "issueId": "PAN-4970",
+  "created": "2026-11-04T00:20:58.327Z",
+  "updated": "2026-11-04T02:00:03.132Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "owner-rule": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4970",
+      "claimedAt": "2026-11-04T00:20:58.327Z",
+      "doneAt": "2026-11-04T00:36:31.348Z"
+    },
+    "reconciler-partition": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4970",
+      "claimedAt": "2026-11-04T00:36:39.630Z",
+      "doneAt": "2026-11-04T00:43:34.056Z"
+    },
+    "reconciler-wiring": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4970",
+      "claimedAt": "2026-11-04T00:44:26.599Z",
+      "doneAt": "2026-11-04T01:00:47.056Z"
+    },
+    "queue-owner-flag": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4970",
+      "claimedAt": "2026-11-04T01:00:57.763Z",
+      "doneAt": "2026-11-04T01:06:41.152Z"
+    },
+    "promote-fast-refusal": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4970",
+      "claimedAt": "2026-11-04T01:06:50.005Z",
+      "doneAt": "2026-11-04T01:14:33.089Z"
+    },
+    "fe-extract": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4970",
+      "claimedAt": "2026-11-04T01:14:38.079Z",
+      "doneAt": "2026-11-04T01:23:41.076Z"
+    },
+    "fe-promote-failure": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4970",
+      "claimedAt": "2026-11-04T01:23:49.664Z",
+      "doneAt": "2026-11-04T01:32:15.951Z"
+    },
+    "fe-per-pr-copy": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4970",
+      "claimedAt": "2026-11-04T01:32:25.173Z",
+      "doneAt": "2026-11-04T01:39:03.476Z"
+    },
+    "docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4970",
+      "claimedAt": "2026-11-04T01:39:09.438Z",
+      "doneAt": "2026-11-04T01:41:51.261Z"
+    },
+    "owner-rule.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:46:53.704Z"
+    },
+    "owner-rule.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:47:28.801Z"
+    },
+    "owner-rule.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:47:46.895Z"
+    },
+    "owner-rule.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:48:05.122Z"
+    },
+    "owner-rule.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:48:23.647Z"
+    },
+    "reconciler-partition.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:48:41.250Z"
+    },
+    "reconciler-partition.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:48:58.298Z"
+    },
+    "reconciler-partition.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:49:15.440Z"
+    },
+    "reconciler-partition.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:49:32.073Z"
+    },
+    "reconciler-partition.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:49:48.429Z"
+    },
+    "reconciler-partition.ac6": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:50:06.143Z"
+    },
+    "promote-fast-refusal.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:50:23.748Z"
+    },
+    "promote-fast-refusal.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:50:41.517Z"
+    },
+    "promote-fast-refusal.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:50:59.703Z"
+    },
+    "reconciler-wiring.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:51:21.105Z"
+    },
+    "reconciler-wiring.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:51:37.118Z"
+    },
+    "queue-owner-flag.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:51:52.183Z"
+    },
+    "queue-owner-flag.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:52:07.839Z"
+    },
+    "fe-extract.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:52:24.521Z"
+    },
+    "fe-extract.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:52:41.501Z"
+    },
+    "fe-extract.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:52:58.556Z"
+    },
+    "fe-promote-failure.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:53:14.529Z"
+    },
+    "fe-promote-failure.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:53:31.098Z"
+    },
+    "fe-promote-failure.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:53:47.395Z"
+    },
+    "fe-promote-failure.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:54:04.678Z"
+    },
+    "fe-per-pr-copy.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:54:19.985Z"
+    },
+    "fe-per-pr-copy.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:54:35.914Z"
+    },
+    "fe-per-pr-copy.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:54:51.798Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:55:08.021Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:55:24.844Z"
+    },
+    "docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:55:42.303Z"
+    },
+    "docs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:55:59.471Z"
+    }
+  },
+  "feedback": []
+}

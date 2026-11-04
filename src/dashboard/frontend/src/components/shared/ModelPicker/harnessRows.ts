@@ -66,12 +66,15 @@ export function expandHarnessRows<T extends RowBase>(models: T[]): T[] {
 /**
  * Effort-level override for the composer's EffortPicker. The native `kimi`
  * binary's /effort offers low/high/max only — surface exactly that for
- * kimi-code/* ids instead of Claude Code's full five. Everything else returns
+ * kimi-code/* ids instead of Claude Code's full five. K2.7 Code Highspeed has
+ * no adjustable effort, so it gets an empty list. Everything else returns
  * undefined ("no model-specific restriction" → the picker shows all levels,
  * which is correct for the claude-code route).
  */
 export function pickerEffortLevels(modelId: string): readonly string[] | undefined {
-  if (modelId.startsWith('kimi-code/kimi-for-coding')) return [];
+  if (modelId === 'kimi-code/kimi-for-coding-highspeed') return [];
+  if (modelId === 'kimi-code/kimi-for-coding') return KIMI_NATIVE_EFFORT_LEVELS;
+  // Covers K3 (kimi-code/k3, k3-256k) and K3.1 (kimi-code/k3.1-pro*): all native low/high/max.
   if (modelId.startsWith('kimi-code/k3')) return KIMI_NATIVE_EFFORT_LEVELS;
   return undefined;
 }

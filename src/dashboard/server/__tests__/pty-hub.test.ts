@@ -1,6 +1,17 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { WebSocket } from 'ws';
-import { addClientToHub, broadcastToHub, removeClientFromHub, setClientReady, type PtyHub } from '../pty-hub.js';
+import {
+  addClientToHub,
+  addHubListener,
+  broadcastToHub,
+  notifyHubExit,
+  notifyHubSize,
+  removeClientFromHub,
+  removeHubListener,
+  setClientReady,
+  type PtyHub,
+  type PtyHubListener,
+} from '../pty-hub.js';
 
 // Minimal mock WebSocket — only the properties our code uses.
 function makeMockWs(readyState: number = WebSocket.OPEN): WebSocket {
@@ -161,5 +172,171 @@ describe('removeClientFromHub', () => {
     // ws2 wasn't there, hub still has ws1
     expect(hub.clients.size).toBe(1);
     expect(tornDown).toBe(false);
+  });
+});
+
+// ── hub listeners (PAN-4477) ───────────────────────────────────────────────────
+
+function makeKillablePty() {
+  return { kill: vi.fn() } as unknown as import('@lydell/node-pty').IPty;
+}
+
+function makeListenerHub(...clients: WebSocket[]): PtyHub {
+  return {
+    pty: makeKillablePty(),
+    clients: new Set(clients),
+    cols: 120,
+    rows: 30,
+    pendingInput: [],
+    inputClient: null,
+    clientStates: new Map(),
+  };
+}
+
+function makeListener(): PtyHubListener & {
+  onData: ReturnType<typeof vi.fn>;
+  onSize: ReturnType<typeof vi.fn>;
+  onExit: ReturnType<typeof vi.fn>;
+} {
+  return { onData: vi.fn(), onSize: vi.fn(), onExit: vi.fn() };
+}
+
+describe('hub listener output', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('gives a listener the same coalesced string as an open ready client', () => {
+    const ws = makeMockWs(WebSocket.OPEN);
+    const hub = makeListenerHub(ws);
+    addClientToHub(hub, ws, true);
+    const listener = makeListener();
+    addHubListener(hub, listener);
+
+    broadcastToHub(hub, 'abc');
+    broadcastToHub(hub, 'def');
+    vi.advanceTimersByTime(4);
+
+    expect(ws.send).toHaveBeenCalledWith('abcdef');
+    expect(listener.onData).toHaveBeenCalledTimes(1);
+    expect(listener.onData).toHaveBeenCalledWith('abcdef');
+  });
+
+  it('drops a listener that throws and still feeds the others', () => {
+    const hub = makeListenerHub();
+    const thrower = makeListener();
+    thrower.onData.mockImplementation(() => { throw new Error('boom'); });
+    const healthy = makeListener();
+    addHubListener(hub, thrower);
+    addHubListener(hub, healthy);
+
+    broadcastToHub(hub, 'first');
+    vi.advanceTimersByTime(4);
+    broadcastToHub(hub, 'second');
+    vi.advanceTimersByTime(4);
+
+    expect(thrower.onData).toHaveBeenCalledTimes(1);
+    expect(healthy.onData).toHaveBeenNthCalledWith(1, 'first');
+    expect(healthy.onData).toHaveBeenNthCalledWith(2, 'second');
+
+    notifyHubExit(hub);
+    expect(thrower.onExit).not.toHaveBeenCalled();
+    expect(healthy.onExit).toHaveBeenCalledTimes(1);
+  });
+
+  it('notifyHubSize passes the hub cols and rows', () => {
+    const hub = makeListenerHub();
+    const listener = makeListener();
+    addHubListener(hub, listener);
+    hub.cols = 90;
+    hub.rows = 25;
+
+    notifyHubSize(hub);
+
+    expect(listener.onSize).toHaveBeenCalledWith(90, 25);
+  });
+
+  it('notifyHubExit calls onExit once and later flushes reach no listener', () => {
+    const hub = makeListenerHub();
+    const listener = makeListener();
+    addHubListener(hub, listener);
+
+    notifyHubExit(hub);
+    notifyHubExit(hub);
+    broadcastToHub(hub, 'after-exit');
+    vi.advanceTimersByTime(4);
+
+    expect(listener.onExit).toHaveBeenCalledTimes(1);
+    expect(listener.onData).not.toHaveBeenCalled();
+  });
+});
+
+describe('hub teardown with listeners', () => {
+  let hubs: Map<string, PtyHub>;
+
+  beforeEach(() => {
+    hubs = new Map();
+  });
+
+  it('keeps the hub when the last client leaves while a listener remains', () => {
+    const ws = makeMockWs();
+    const hub = makeListenerHub(ws);
+    hub.inputClient = ws;
+    hubs.set('sess', hub);
+    addHubListener(hub, makeListener());
+
+    const tornDown = removeClientFromHub(hubs, 'sess', ws);
+
+    expect(tornDown).toBe(false);
+    expect(hubs.get('sess')).toBe(hub);
+    expect(hub.pty?.kill).not.toHaveBeenCalled();
+    expect(hub.inputClient).toBeNull();
+  });
+
+  it('tears the hub down when the last listener leaves and no client remains', () => {
+    const hub = makeListenerHub();
+    hubs.set('sess', hub);
+    const listener = makeListener();
+    addHubListener(hub, listener);
+
+    const tornDown = removeHubListener(hubs, 'sess', hub, listener);
+
+    expect(tornDown).toBe(true);
+    expect(hubs.has('sess')).toBe(false);
+    expect(hub.pty?.kill).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the hub when a listener leaves while a client remains', () => {
+    const ws = makeMockWs();
+    const hub = makeListenerHub(ws);
+    hubs.set('sess', hub);
+    const listener = makeListener();
+    addHubListener(hub, listener);
+
+    const tornDown = removeHubListener(hubs, 'sess', hub, listener);
+
+    expect(tornDown).toBe(false);
+    expect(hubs.get('sess')).toBe(hub);
+    expect(hub.pty?.kill).not.toHaveBeenCalled();
+  });
+
+  it('removing a listener from a stale hub kills only that hub and keeps its successor registered', () => {
+    const oldHub = makeListenerHub();
+    const newHub = makeListenerHub();
+    hubs.set('sess', oldHub);
+    const listener = makeListener();
+    addHubListener(oldHub, listener);
+    hubs.set('sess', newHub);
+
+    const tornDown = removeHubListener(hubs, 'sess', oldHub, listener);
+
+    expect(tornDown).toBe(true);
+    expect(oldHub.pty?.kill).toHaveBeenCalledTimes(1);
+    expect(newHub.pty?.kill).not.toHaveBeenCalled();
+    expect(hubs.get('sess')).toBe(newHub);
   });
 });

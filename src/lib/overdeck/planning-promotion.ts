@@ -1,4 +1,4 @@
-import { execFile, spawn } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
@@ -29,6 +29,7 @@ import { applyCritiqueGateForPromotion } from '../planning/plan-critique-io.js';
 import { resolveAutoSpawnOnFinalize } from '../planning/spawn-planning-session.js';
 import { extractTeamPrefix, findProjectByPath, findProjectByTeam, resolveProjectFromIssueSync } from '../projects.js';
 import { commitPlanArtifacts, planArtifactCommitMessage } from './plan-artifact-commit.js';
+import { pushFeatureBranch } from './feature-branch-push.js';
 import { loadRemoteAgentState } from '../remote/remote-agents.js';
 import { resolveGitHubIssue } from '../tracker-utils.js';
 import { sessionExists } from '../tmux.js';
@@ -126,7 +127,7 @@ export interface CompletePlanningAutoSpawnResult {
   workAgentRequestedAt?: string;
 }
 
-type CompletePlanningPhase = 'prdGate' | 'prdPromote' | 'critiqueGate' | 'beadsMaterialize' | 'specWrite' | 'autoSpawn' | 'terminal';
+type CompletePlanningPhase = 'prdGate' | 'prdPromote' | 'critiqueGate' | 'beadsMaterialize' | 'specWrite' | 'branchPush' | 'autoSpawn' | 'terminal';
 type CompletePlanningPhaseStatus = 'start' | 'success' | 'failure' | 'skipped';
 
 const completePlanningGuard = createInFlightGuard();
@@ -258,10 +259,10 @@ export async function commitCompletePlanningWorkspaceGit(
   taskWarning: string | null,
   execImpl: typeof execFileAsync = execFileAsync,
   specPath?: string,
-): Promise<{ pushed: boolean; taskWarning: string | null }> {
+): Promise<{ taskWarning: string | null }> {
   if (isPreWorktreeMetadataOnlyDir(gitRoot)) {
     console.log('[complete-planning] workspace ' + gitRoot + ' is a pre-worktree metadata dir; skipping workspace git init/commit');
-    return { pushed: true, taskWarning };
+    return { taskWarning };
   }
 
   const isGitRepo = existsSync(join(gitRoot, '.git'));
@@ -291,17 +292,7 @@ export async function commitCompletePlanningWorkspaceGit(
       console.warn(`[complete-planning] Could not commit the ${issueId} spec in ${finalized.specRepo}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
-
-  try {
-    const { stdout: remotes } = await execImpl('git', ['remote'], { cwd: gitRoot, encoding: 'utf-8' });
-    if (remotes.trim()) {
-      const pushChild = spawn('git', ['push'], { cwd: gitRoot, detached: true, stdio: 'ignore' });
-      pushChild.unref();
-    }
-    return { pushed: true, taskWarning };
-  } catch {
-    return { pushed: false, taskWarning };
-  }
+  return { taskWarning };
 }
 
 async function realpathOrSelf(path: string): Promise<string> {
@@ -357,6 +348,7 @@ function getInternalDashboardOrigin(): string {
 
 function classifyAutoSpawnSkip(status: number, body: Record<string, unknown>): NonNullable<CompletePlanningAutoSpawnResult['workAgentSkipReason']> {
   const error = typeof body['error'] === 'string' ? body['error'] : '';
+  if (body['diskLow'] === true) return 'guardrails'; // PAN-4961: retryable once space returns
   if (status === 401 || status === 403) return 'unauthorized';
   if (body['stackHealth'] || /workspace docker stack/i.test(error)) return 'stack-unhealthy';
   if (body['paused'] === true) return 'paused';
@@ -539,7 +531,7 @@ export async function completePlanningAutoSpawn(options: {
       workAgentError: error,
       workAgentSkipReason: skipReason,
       workAgentHttpStatus: response.status,
-      ...((skipReason === 'guardrails' && body['guardrails']) || skipReason === 'stack-unhealthy' ? { workAgentDeferred: true } : {}),
+      ...((skipReason === 'guardrails' && (body['guardrails'] || body['diskLow'] === true)) || skipReason === 'stack-unhealthy' ? { workAgentDeferred: true } : {}),
     };
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
@@ -758,8 +750,8 @@ export async function completePlanningForIssue(options: {
       }
     }
 
-    // Git operations: write planning marker, commit, push (complex nested async — kept as async block)
-    const { pushed: gitPushed, taskWarning, specPath } = await (async (): Promise<{ pushed: boolean; taskWarning: string | null; specPath: string }> => {
+    // Git operations: write planning marker, commit (complex nested async — kept as async block)
+    const { taskWarning, specPath } = await (async (): Promise<{ taskWarning: string | null; specPath: string }> => {
       if (!projectPath) {
         throw new Error(`Cannot complete planning for ${id}: project path could not be resolved`);
       }
@@ -893,6 +885,12 @@ export async function completePlanningForIssue(options: {
     if (effectiveAutoSpawn && workspacePath) {
       await commitWorkspacePlanArtifacts(workspacePath, id);
     }
+    // PAN-4683: the branch tracks origin/main, so push it with an explicit refspec.
+    const push = workspacePath && existsSync(join(workspacePath, '.git'))
+      ? await pushFeatureBranch({ cwd: workspacePath, branch: `feature/${issueLower}` })
+      : { pushed: false, reason: 'no workspace git checkout' };
+    emitCompletePlanningPhase(id, 'branchPush', push.pushed ? 'success' : 'failure', push.reason ?? `pushed feature/${issueLower}`);
+    const gitPushed = push.pushed;
 
     const autoSpawnResult = await completePlanningAutoSpawnAndKill({
       issueId: id,

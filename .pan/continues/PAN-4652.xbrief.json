@@ -1,0 +1,368 @@
+{
+  "version": "1",
+  "issueId": "PAN-4652",
+  "created": "2026-11-01T18:40:05.145Z",
+  "updated": "2026-11-01T20:59:47.900Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-01T20:47Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-01T20:47:47.462Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-01T20:59Z] ci-monitor → FAILED — seq 2",
+      "timestamp": "2026-11-01T20:59:07.577Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-01T20:59Z] review-agent → CHANGES-REQUESTED — seq 3",
+      "timestamp": "2026-11-01T20:59:47.900Z"
+    }
+  ],
+  "items": {
+    "wi1-image-pan-docker": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4652",
+      "claimedAt": "2026-11-01T18:40:05.145Z",
+      "doneAt": "2026-11-01T18:41:40.190Z"
+    },
+    "wi2-serve-no-open": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4652",
+      "claimedAt": "2026-11-01T18:41:45.588Z",
+      "doneAt": "2026-11-01T18:47:06.241Z"
+    },
+    "wi3-fly-machine-services": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4652",
+      "claimedAt": "2026-11-01T18:47:10.711Z",
+      "doneAt": "2026-11-01T18:48:23.933Z"
+    },
+    "wi4-fly-instance-route-param": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4652",
+      "claimedAt": "2026-11-01T18:48:04.678Z",
+      "doneAt": "2026-11-01T18:51:26.140Z"
+    },
+    "wi5-public-link-only-gate": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4652",
+      "claimedAt": "2026-11-01T18:51:30.325Z",
+      "doneAt": "2026-11-01T18:52:55.401Z"
+    },
+    "wi6-fly-machine-store": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4652",
+      "claimedAt": "2026-11-01T18:53:00.504Z",
+      "doneAt": "2026-11-01T18:54:28.069Z"
+    },
+    "wi7-provision-vm": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4652",
+      "claimedAt": "2026-11-01T18:54:33.622Z",
+      "doneAt": "2026-11-01T19:00:20.137Z"
+    },
+    "wi10-cap-counts-fly-machines": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4652",
+      "claimedAt": "2026-11-01T19:00:26.907Z",
+      "doneAt": "2026-11-01T19:02:22.720Z"
+    },
+    "wi8-add-fly-machine-service": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4652",
+      "claimedAt": "2026-11-01T19:02:27.915Z",
+      "doneAt": "2026-11-01T19:09:49.500Z"
+    },
+    "wi9-project-and-conversation": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4652",
+      "claimedAt": "2026-11-01T19:09:59.437Z",
+      "doneAt": "2026-11-01T19:14:00.578Z"
+    },
+    "wi11-heartbeat-and-sweep": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4652",
+      "claimedAt": "2026-11-01T19:15:46.122Z",
+      "doneAt": "2026-11-01T19:20:25.386Z"
+    },
+    "wi12-credential-refresh-fly": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4652",
+      "claimedAt": "2026-11-01T19:20:30.678Z",
+      "doneAt": "2026-11-01T19:22:20.233Z"
+    },
+    "wi13-route-and-cli": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4652",
+      "claimedAt": "2026-11-01T19:22:24.515Z",
+      "doneAt": "2026-11-01T19:26:11.412Z"
+    },
+    "wi16-dev-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4652",
+      "claimedAt": "2026-11-01T19:26:25.673Z",
+      "doneAt": "2026-11-01T19:27:36.343Z"
+    },
+    "wi15-user-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4652",
+      "claimedAt": "2026-11-01T19:28:40.604Z",
+      "doneAt": "2026-11-01T19:29:40.062Z"
+    },
+    "wi14-live-checkpoint": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4652",
+      "claimedAt": "2026-11-01T19:51:10.366Z",
+      "doneAt": "2026-11-01T20:28:09.435Z"
+    },
+    "wi1-image-pan-docker.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:31:03.636Z"
+    },
+    "wi1-image-pan-docker.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:31:17.760Z"
+    },
+    "wi1-image-pan-docker.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:31:30.383Z"
+    },
+    "wi2-serve-no-open.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:31:42.672Z"
+    },
+    "wi2-serve-no-open.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:31:55.319Z"
+    },
+    "wi2-serve-no-open.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:32:09.107Z"
+    },
+    "wi3-fly-machine-services.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:32:23.020Z"
+    },
+    "wi3-fly-machine-services.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:32:37.510Z"
+    },
+    "wi4-fly-instance-route-param.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:32:51.664Z"
+    },
+    "wi4-fly-instance-route-param.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:33:05.187Z"
+    },
+    "wi4-fly-instance-route-param.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:33:18.793Z"
+    },
+    "wi5-public-link-only-gate.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:33:30.849Z"
+    },
+    "wi5-public-link-only-gate.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:33:44.525Z"
+    },
+    "wi5-public-link-only-gate.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:33:57.472Z"
+    },
+    "wi5-public-link-only-gate.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:34:11.719Z"
+    },
+    "wi6-fly-machine-store.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:34:25.184Z"
+    },
+    "wi6-fly-machine-store.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:34:38.116Z"
+    },
+    "wi6-fly-machine-store.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:34:51.272Z"
+    },
+    "wi6-fly-machine-store.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:35:04.255Z"
+    },
+    "wi7-provision-vm.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:35:18.717Z"
+    },
+    "wi7-provision-vm.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:35:32.218Z"
+    },
+    "wi7-provision-vm.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:35:46.628Z"
+    },
+    "wi7-provision-vm.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:36:00.238Z"
+    },
+    "wi7-provision-vm.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:36:12.671Z"
+    },
+    "wi8-add-fly-machine-service.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:36:26.679Z"
+    },
+    "wi8-add-fly-machine-service.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:36:39.367Z"
+    },
+    "wi8-add-fly-machine-service.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:36:52.623Z"
+    },
+    "wi8-add-fly-machine-service.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:37:05.231Z"
+    },
+    "wi9-project-and-conversation.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:37:19.207Z"
+    },
+    "wi9-project-and-conversation.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:37:31.634Z"
+    },
+    "wi9-project-and-conversation.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:37:44.617Z"
+    },
+    "wi9-project-and-conversation.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:37:57.948Z"
+    },
+    "wi10-cap-counts-fly-machines.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:38:11.226Z"
+    },
+    "wi10-cap-counts-fly-machines.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:38:25.362Z"
+    },
+    "wi10-cap-counts-fly-machines.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:38:38.628Z"
+    },
+    "wi11-heartbeat-and-sweep.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:38:53.203Z"
+    },
+    "wi11-heartbeat-and-sweep.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:39:06.856Z"
+    },
+    "wi11-heartbeat-and-sweep.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:39:21.796Z"
+    },
+    "wi11-heartbeat-and-sweep.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:39:35.569Z"
+    },
+    "wi11-heartbeat-and-sweep.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:39:49.635Z"
+    },
+    "wi12-credential-refresh-fly.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:40:03.689Z"
+    },
+    "wi12-credential-refresh-fly.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:40:19.827Z"
+    },
+    "wi12-credential-refresh-fly.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:40:34.528Z"
+    },
+    "wi13-route-and-cli.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:40:49.360Z"
+    },
+    "wi13-route-and-cli.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:41:03.201Z"
+    },
+    "wi13-route-and-cli.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:41:17.237Z"
+    },
+    "wi13-route-and-cli.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:41:31.890Z"
+    },
+    "wi14-live-checkpoint.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:41:45.672Z"
+    },
+    "wi14-live-checkpoint.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:41:59.122Z"
+    },
+    "wi14-live-checkpoint.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:42:15.330Z"
+    },
+    "wi14-live-checkpoint.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:42:29.642Z"
+    },
+    "wi15-user-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:42:44.105Z"
+    },
+    "wi15-user-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:42:58.100Z"
+    },
+    "wi16-dev-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:43:12.514Z"
+    },
+    "wi16-dev-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T20:43:26.005Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-01T20:47:47Z",
+      "markdownBody": "# CI Failure Feedback for PAN-4652\n\nPull request: https://github.com/eltmon/overdeck/pull/4742 (head `629d95b1`)\n\nSource: check_run:lint-group (core)\n\n## Failing checks (1)\n\n### lint-group (core)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/124972994695/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/41348370388/job/124972994695  \n```\n/runtimes/storage/\n\n$ npm run lint:harness-branches\n\n> @overdeck/core@0.72.0 lint:harness-branches\n> bash scripts/lint-harness-branches.sh\n\n✖ src/dashboard/server/services/fly-machine-service.ts: NEW file with 1 harness-name branches\nReplace the branch with a HarnessCapabilities field — see configuration/harnesses.mdx \"Harness capabilities\".\n##[error]Process completed with exit code 1.\nPost job cleanup.\n[command]/usr/bin/git version\ngit version 2.56.0\nTemporarily overriding HOME='/home/runner/work/_temp/ac19619c-a646-43e9-9d01-99d30c4248cd' before making global git config changes\nAdding repository directory to the temporary git global config as a safe directory\n[command]/usr/bin/git config --global --add safe.directory /home/runner/work/overdeck/overdeck\n[command]/usr/bin/git config --local --name-only --get-regexp core\\.sshCommand\n[command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'core\\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\"\n[command]/usr/bin/git config --local --name-only --get-regexp http\\.https\\:\\/\\/github\\.com\\/\\.extraheader\nhttp.https://github.com/.extraheader\n[command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader\n[command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'http\\.https\\:\\/\\/github\\.com\\/\\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\"\n[command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\\.gitdir:\n[command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url\nCleaning up orphan processes\n##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-node@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    },
+    {
+      "seq": 2,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-01T20:59:07Z",
+      "markdownBody": "# CI Failure Feedback for PAN-4652\n\nPull request: https://github.com/eltmon/overdeck/pull/4742 (head `3ac2dc71`)\n\nSource: check_run:test-shard (4/4)\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\n## Failing checks (1)\n\n### test-shard (4/4)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/124974916324/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/41348993308/job/124974916324  \n```\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/e2e/styleguide-conformance.spec.ts\u001b[2m > \u001b[22mstyleguide rendered surface conformance\u001b[2m > \u001b[22mrenders shared primitives on Pipeline, Board, Command Deck, and Agents routes\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/e2e/styleguide-conformance.spec.ts\u001b[2m > \u001b[22mstyleguide rendered surface conformance\u001b[2m > \u001b[22mrenders shared primitives on Pipeline, Board, Command Deck, and Agents routes\n\u001b[31m\u001b[1mError\u001b[22m: Test timed out in 45000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\u001b[39m\n\u001b[36m \u001b[2m❯\u001b[22m tests/e2e/styleguide-conformance.spec.ts:\u001b[2m417:3\u001b[22m\u001b[39m\n    \u001b[90m415|\u001b[39m\n    \u001b[90m416|\u001b[39m \u001b[34mdescribe\u001b[39m(\u001b[32m'styleguide rendered surface conformance'\u001b[39m\u001b[33m,\u001b[39m () \u001b[33m=>\u001b[39m {\n    \u001b[90m417|\u001b[39m   it('renders shared primitives on Pipeline, Board, Command Deck, and …\n    \u001b[90m   |\u001b[39m   \u001b[31m^\u001b[39m\n    \u001b[90m418|\u001b[39m     \u001b[35mconst\u001b[39m pipeline \u001b[33m=\u001b[39m \u001b[35mawait\u001b[39m \u001b[34mopenRoute\u001b[39m(\u001b[32m'/pipeline'\u001b[39m)\u001b[33m;\u001b[39m\n    \u001b[90m419|\u001b[39m     await expect.poll(() => pipeline.page.locator('[data-component=\"to…\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\u001b[22m\u001b[39m\n\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m1 failed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[1m\u001b[32m531 passed\u001b[39m\u001b[22m\u001b[90m (532)\u001b[39m\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    },
+    {
+      "seq": 3,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-11-01T20:59:47Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-4652\n\n# Review — PAN-4652\n## Verdict: CHANGES REQUESTED — CI `lint-group (core)` is red on 629d95b1 (`lint:harness-branches`: new harness-name branch in fly-machine-service.ts); fixed forward in d47240dcb8b, which needs its own review on the final HEAD\n\n## Context\n- Run ID: agent-pan-4652-review-629d95b1\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-4652/.pan/review/agent-pan-4652-review-629d95b1/context.json\n- Branch / workspace: feature/pan-4652 · /home/eltmon/Projects/overdeck/workspaces/feature-pan-4652 · PR #4742\n- HEAD reviewed: 629d95b12e76b0d79d9ef426ef854ec92b067516\n- Base / prior cycle SHA: merge-base fac760e21d6 (main now 813042e6214); no prior review cycle\n- Branch moved during review: the work agent pushed d47240dcb8b (harness-capability fix) and 3ac2dc716ab (continue-file note), and at report time had uncommitted edits in 9 files (CodeRabbit follow-ups). This verdict is for 629d95b1. See Scope Note.\n\n## Blocking Findings\n\n### [correctness] Mandatory CI lint gate fails on a new harness-name branch — `src/dashboard/server/services/fly-machine-service.ts:138`\n- Severity: ! (a mandatory CI quality gate is red on the reviewed HEAD)\n- Classification / requirement scope: implementation defect; in_pr_scope\n- Trigger and changed-code connection: `refuseEarly()` in the new file checks `input.harness !== 'claude-code'`. `npm run lint:harness-branches` refuses harness-name branches in new files.\n- Expected / observed / impact: CI run 41348370388 (headSha 629d95b1) job `lint-group (core)` failed with `✖ src/dashboard/server/services/fly-machine-service.ts: NEW file with 1 harness-name branches`. The core group stops at the first failure, so the later core steps never ran on CI for this HEAD. The PR cannot merge with this check red.\n- Evidence: job log `gh api repos/eltmon/overdeck/actions/jobs/124972994695/logs`. Limitation: none for the failure itself.\n- Fix: already applied in d47240dcb8b. It adds `HarnessCapabilities.runsOnFlyMachine` (true only for claude-code) and refuses `harness-unsupported` when the normalized harness lacks it or is unknown. I read that diff and it is correct. CI `lint-group (core)` passed on 3ac2dc716ab. That commit still needs review as part of the final HEAD.\n\n## Non-blocking Findings\n\n1. **~ `add-fly --message` loses its first message on a fresh VM (#4738).** Classification: PR-scoped exposure of a pre-existing gap. `startFlyConversation` (`fly-machine-service.ts:212-227`) sends the message and gets a 201 with a conversation name, so FR-10's text is met. But the live run (docs/fly-provider.md, \"Live verification (PAN-4652)\", Run 1) showed Claude Code's \"Make auto mode your default permission mode?\" dialog swallowing the pasted first message. Every Fly VM starts with fresh Claude state, so this probably happens every time. The CLI reports success and prints `Open: …`, but Claude never got the task. The root cause is pre-existing `FlyProvider.configureClaudeCode` (`src/lib/remote/fly-provider.ts:568-590`), which pre-answers onboarding, trust and the bypass disclaimer but not this dialog. Because changes are requested anyway, I recommend fixing it this cycle, or making the operator accept it explicitly (Scope Note).\n\n2. **~ A failed destroy during provisioning can orphan a running, untracked VM.** `provisionFlyMachine` (`src/lib/anywhere/fly/provision.ts`, the `catch` around `prepareMachine`) logs a failed `destroyFlyVm` and rethrows. No record exists yet, and the watchdog is installed only at step 9. So a failure in steps 4–8 plus a failed destroy leaves a `sleep infinity` VM that is billed, with no record, heartbeat, watchdog or sweep. `addFlyMachine`'s `rollback` also deletes the record when its destroy fails. There the watchdog is already running, so the VM stops itself within about 5 min, but it stays in the app. The live run's O4 hit a destroy 403 (rotated token), so a failed destroy is realistic. Fix: write the provisional record before `createMachine` returns control (or keep it when destroy fails) so the sweep's \"provisioning never linked it\" rule retries. Or install the watchdog right after `started`. The work agent's uncommitted edits touch `provision.ts`; check this on re-review.\n\n3. **~ Spec defect: `--keep-server` on a Fly machine does not keep it running.** FR-13 says \"With `--keep-server` (`keepServer=1`) the machine is left running and only the record is deleted.\" FR-14 heartbeats only machines that have a record, and the watchdog `kill 1`s the VM 300 s after the last heartbeat. So the CLI line \"Left the Fly machine … running (--keep-server)\" (`src/cli/commands/machines.ts`) holds for about 5 minutes. After that the VM stops, and per D-9 its state is gone. Spec correction: either say in the CLI and docs that the VM stops itself within 5 min, or say what keeps it alive (for example, keep heartbeating, or drop `--keep-server` for Fly).\n\n4. **~ The idle sweep can destroy a quiet but live conversation's VM (#4739).** `sweepFlyMachines` (`src/lib/remote/fly-machine-loops.ts`, `reasonToRemove`) counts a row as active when `status === 'active'` or `lastActivityAt` is inside the window. The live run showed the VM's lifecycle patrol marking the live conversation `ended` on every tick (#4739). That leaves only `lastActivityAt`, which is the last transcript record (`src/lib/overdeck/conversation-list.ts:284-292`). A conversation that is working keeps writing records and stays alive. A live session left waiting for the operator is destroyed after about 60 min (30 min to go stale, then 30 min idle), and its unpulled transcript and code go with it. The user docs already say idle VMs are destroyed and their conversations are lost unless pulled, so this stays advisory. Tracked in #4739.\n\n5. **? A zero-byte `fly-machines.json` blocks remote agent spawns too.** `countFlyMachines` (`src/lib/anywhere/fly/machine-store.ts`) throws on any unparseable file, so the cap fails closed by design. `checkRemoteSpendCap` is also on the `pan start --remote` path. A file zeroed by a crash mid-write (the store writes temp-then-rename, so this mainly applies to external truncation) would block remote work agents until someone removes it. Consider treating an empty file as absent. CodeRabbit raised a related point at `remote-agents.ts:419`, and the uncommitted edits appear to address it.\n\n6. **? Cross-process link-store writes.** `sweepFlyMachines` calls `removeLink` from the deacon child while the dashboard owns its own in-process write queue for `machine-links.json`. The PRD's Hazards section accepts this. The race window is a 60 s tick against rare link writes.\n\n7. **? Rule 0b covers HTTP only.** WebSocket upgrades bypass the HTTP gate. I checked every upgrade handler: `/ws/terminal`, `/ws/voice`, `/ws/autopreso`, `/ws/rpc` (`ws-rpc-auth.ts`), `/ws/linked/*` (`ws-linked.ts`) and the knowledge viewer all require a dashboard credential, and `ws-forward.ts` requires a channel. So a public peer of `<app>.fly.dev` gets 401/403 instead of 404, and gets no access. `/ws/link` stays open by design (D-3). There is no vulnerability here; FR-5 is literally scoped to HTTP.\n\n8. **? NFR-5 wording.** `_settleFlyMachineWritesForTests` and `_resetFlyMachineStoreForTests` (`machine-store.ts`) use \"Test-only:\" comments instead of the PRD's exact `/** Test seam: no production caller; … */` form. No dead-export scan in the lint chain flags them.\n\nCodeRabbit left 5 Minor inline comments (`machines-fly.ts:63`, `fly-machine-service.ts:160`, `machine-store.ts:137`, `provision.ts:280`, `remote-agents.ts:419`). The work agent's uncommitted edits touch exactly those files. They are advisory per project memory.\n\n## Coverage\n\n**Changed-file ledger (47 files at 629d95b1):**\n\n| File | Status |\n|---|---|\n| src/lib/anywhere/fly/provision.ts | reviewed (findings 2) |\n| src/lib/anywhere/fly/machine-store.ts | reviewed (findings 5, 8) |\n| src/lib/anywhere/fly/project.ts | reviewed: inputs validated by regex before reaching the shell; detached clone polled for 20 min |\n| src/dashboard/server/services/fly-machine-service.ts | reviewed (blocker; findings 1, 2) |\n| src/dashboard/server/routes/machines-fly.ts | reviewed: channel caller refused (403), admin scope by default, 50,000-char body cap, error-status map |\n| src/dashboard/server/routes/machines.ts | reviewed: unlink hook; a failed destroy returns 502 and keeps the record and link so the unlink can be retried |\n| src/dashboard/server/server.ts | reviewed: route layer registered |\n| src/dashboard/server/remote-request-gate.ts | reviewed: rule 0b placed after Funnel; loopback without a forwarding header passes; channel judged as before (finding 7) |\n| src/lib/anywhere/channel/open.ts | reviewed: `fly-instance` moved to the `fly-force-instance-id` header; other URLs unchanged |\n| src/lib/anywhere/routes.ts | reviewed: canonical wss URL keeps the pin; no import cycle (open.ts does not import routes.ts) |\n| src/lib/config.ts | reviewed: `machine_idle_minutes` |\n| src/lib/remote/fly-api.ts | reviewed: `services` passed through |\n| src/lib/remote/remote-agents.ts | reviewed: cap counts Fly records; heartbeat path exported; small net growth |\n| src/lib/remote/remote-credential-refresh.ts | reviewed: Fly names joined into the target set; a corrupt store does not stop the agent refresh; provider now built `'ephemeral'` for all targets, which matches how remote agents use it |\n| src/lib/remote/fly-machine-loops.ts | reviewed (findings 4, 6); NFR-1 early return before any client is built |\n| src/lib/cloister/hygiene-scheduler.ts | reviewed: two routines outside the freeze |\n| src/lib/overdeck/linked-conversations.ts | reviewed: `readOnly` option for the deacon reader |\n| src/cli/commands/machines-fly.ts | reviewed: node:http with no client timeout; internal token |\n| src/cli/commands/machines.ts, src/cli/commands/serve.ts, src/cli/index.ts | reviewed (finding 3 for the unlink message) |\n| packages/contracts/src/composer-commands.generated.ts | reviewed: add-fly, unlink and serve entries; the HEAD copy matches the CLI source for the entry the local lint flagged (local drift came from stale dist) |\n| docker/pan-workspace/Dockerfile | reviewed: `@overdeck/core@${OVERDECK_VERSION}`, docker.io and iptables; CMD unchanged |\n| tests/unit/lib/overdeck/no-loss-matrix.ts | reviewed: row added |\n| 12 test files (provision, project, machine-store, fly-machine-service, machines-fly route, machines-unlink, fly-machine-loops, credential refresh, serve, channel, gate, routes, fly-api, remote-agents, hygiene-scheduler) | reviewed for AC coverage and fake timers (NFR-2 met: every delay test uses `vi.useFakeTimers`) |\n| configuration/linked-machines.mdx, cli/machines.mdx, docs/ANYWHERE-ARCHITECTURE.md, docs/fly-provider.md | reviewed for AC-15/16 and live-run accuracy |\n| .pan/drafts/PAN-4652.md, .pan/continues/*.json, .pan/specs xbrief, .overdeck/context/codebase/architecture.md | not applicable (planning artifacts); the PRD was read as the requirement source |\n\n**Dimensions:**\n- Correctness: blocker; findings 1–6.\n- Security: the route refuses channel callers and needs admin scope. The pairing code travels only over the Fly exec API (D-1). Shell inputs are validated or `shellQuote`d. Region and image go only into the API JSON. Rule 0b and every WS upgrade checked (finding 7). No SSH key reaches the VM (NFR-6: only `syncAllCredentials`). Bytes inside the Noise channel (NFR-7, proven in the live run). No vulnerability found.\n- Performance: with zero records the loops build no Fly client and make no API call (NFR-1). `countFlyMachines` does one small `readFileSync`, bounded; there is no `execSync` (NFR-3). The deacon opens SQLite read-only once a minute, and only when records exist. No material impact.\n- Requirements/UX: see the AC matrix. The headline `--message` journey has a known gap (finding 1). `--keep-server` UX is misleading (finding 3).\n\n**AC matrix** (the manifest's `acceptanceCriteria` was empty, so I mapped against the PRD's AC-1..16):\n\n| AC | Status | Evidence |\n|---|---|---|\n| AC-1 image has pan + dockerd | met (live) | Live run used an image with the packed `@overdeck/core` 0.72.0; Run 2 `dockerd --storage-driver=vfs` and hello-world exit 0. CI build of the image happens on merge. |\n| AC-2 `--no-open` | met | tests/unit/cli/serve.test.ts:122 (passed locally) |\n| AC-3 services/env verbatim | met | tests/lib/remote/fly-api.test.ts (passed locally) |\n| AC-4 fly-instance header | met | channel.test.ts:603, :616 (passed locally) |\n| AC-5 public-link-only 404 | met | remote-request-gate.test.ts:272-295 (passed locally) |\n| AC-6 store 0600 round trip | met | machine-store.test.ts:52 (passed locally) |\n| AC-7 serve env + fly-<id> label | met | provision.test.ts:130 (passed locally); live Run 2 label `fly-7817612a669d98` |\n| AC-8 link failure rolls back | met | fly-machine-service.test.ts:107 (CI shards on the new HEAD; not run locally, see Verification) |\n| AC-9 conversation POST body/actor | met | fly-machine-service.test.ts:149 (same caveat) |\n| AC-10 cap counts Fly | met | tests/lib/remote/remote-agents.test.ts (passed locally) |\n| AC-11 sweep stopped/500/idle 29 vs 30 | met | fly-machine-loops.test.ts:91-161 (passed locally) |\n| AC-12 Fly-only credential sync | met | remote-credential-refresh.test.ts:205 (passed locally) |\n| AC-13 channel 403 + no-loss row | met | machines-fly.test.ts:59 (same caveat as AC-8); matrix row present |\n| AC-14 live verification | met | docs/fly-provider.md \"Live verification (PAN-4652)\" records O1–O4, with defects #4738–#4741 filed |\n| AC-15 user docs | met | linked-machines.mdx:118 `## Fly machines`, add-fly, `machine_idle_minutes`, `fly ips allocate`; cli/machines.mdx:105 `## add-fly` |\n| AC-16 dev docs | met | ANYWHERE-ARCHITECTURE.md:554 `## Fly machines (PAN-4652)` naming `fly-instance` and `OVERDECK_PUBLIC_LINK_ONLY`; fly-provider.md:159 `@overdeck/core` |\n\nNon-goals respected: no `--machine fly`, no dialog entry or UI button, no work-agent path change beyond the FR-12 cap count, no tailnet join, no CMD change, no SSH key copy. I did not check the PR body for `Refs #1775` versus `Closes`; the merge step should check it.\n\n## Verification\n- CI for 629d95b1 (run 41348370388): `lint-group (core)` **failed** (blocker). That run was later cancelled when the new push superseded it. Test shards for 629d95b1 never finished: **unverified**.\n- CI for 3ac2dc716ab (run 41348993308, not the reviewed HEAD): lint, lint-group core/effect/state/skills, build, test-e2e, smoke and test shards 1–3 pass; shard 4/4 was pending at report time.\n- Local focused tests (supplementary; worktree dirty): `npx vitest run` on 12 files (src/lib/anywhere/fly/__tests__/, fly-machine-loops, credential refresh, serve, channel, gate, routes, fly-api, remote-agents, hygiene-scheduler): **160/160 passed**. I left out fly-machine-service.test.ts and machines-fly.test.ts because uncommitted edits touch that service; those are unverified on 629d95b1.\n- `npm run lint:effect-diagnostics` (run once, dirty worktree): \"Effect diagnostics guard passed (227 known findings; none new)\". CI `lint-group (effect)` also passed on 3ac2dc716ab.\n- Other local core lints (dirty worktree; I cite only their ✓ lines): workspace-doors, park-exits, agent-dir-removal, prompts, file-size, source-introspection, no-coderabbit-merge-gate, ratchet-audit, quarantine-audit, effect-facades all printed ✓. The local `harness-branches` ✓ reflected the uncommitted fix and is not evidence about 629d95b1. Local `slash-commands` reported drift on an entry this PR does not touch; the committed generated file matches the CLI source, so the drift comes from a stale local dist. Unverified on CI for 629d95b1; it passed in CI core lint on 3ac2dc716ab.\n- I ran no full test suite and no live Fly calls.\n\n## Scope Note\n- **The branch moved during review.** The CI blocker on 629d95b1 is fixed in d47240dcb8b. At report time the work agent had uncommitted edits in 9 files (provision.ts, machine-store.ts, fly-machine-service.ts, remote-agents.ts, machines-fly.ts and tests), apparently for CodeRabbit's comments. A review only judges committed HEAD: commit and push those edits, then run one review on the final HEAD. Re-reviewing every intermediate push wastes cycles.\n- **Operator decision (#4738):** should `pan machines add-fly --message` ship while its first message is lost on every fresh VM? If not, fix `configureClaudeCode` to pre-answer the auto-mode dialog in this PR. The issue says to check the key name against the image's Claude Code version and not to guess it.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-4652/.pan/review/agent-pan-4652-review-629d95b1/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-4652 -m \"Fixed review issues\"`"
+    }
+  ]
+}

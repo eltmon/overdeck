@@ -18,9 +18,13 @@ const mockCreateConversation = vi.fn();
 const mockGetConversationByClaudeSessionId = vi.fn();
 const mockGetConversationByName = vi.fn();
 const mockSetClearedToConvId = vi.fn();
+// PAN-4739: the sessions the latest census mock returned, so the
+// conversation-liveness door can agree with the census by default.
+let lastCensusSessions = new Set<string>();
 
 async function buildRuntimeCensusMock() {
   const sessions = await Effect.runPromise(mockListSessionNames());
+  lastCensusSessions = new Set(sessions);
   const panesBySession = new Map<string, Array<{ paneDeadStatus: number | null }>>();
   for (const session of sessions) {
     const values = await mockListPaneValues(session);
@@ -31,9 +35,17 @@ async function buildRuntimeCensusMock() {
   return {
     sampledAt: Date.now(),
     available: true,
+    stale: false,
+    error: null,
+    panes: [],
     sessionNames: new Set(sessions),
     panesBySession,
   };
+}
+
+/** The conversation-liveness door agreeing with the census (PAN-4739). */
+async function doorAgreesWithCensus(name: string): Promise<boolean> {
+  return lastCensusSessions.has(name) && (await mockIsHarnessProcessAlive(name));
 }
 
 vi.mock('../../../../lib/overdeck/conversations.js', () => ({
@@ -121,6 +133,8 @@ describe('ConversationLifecycleService — pollConversations', () => {
     mockHostBackend.mockResolvedValue('tmux');
     // A tmux host normally has no Herdr to ask.
     mockListHerdrAgents.mockRejectedValue(new Error('no herdr socket'));
+    // PAN-4739: the door agrees with the census unless a case says otherwise.
+    mockConversationHarnessAlive.mockImplementation(doorAgreesWithCensus);
   });
 
   it('marks active conversations as ended when session is not in tmux list', async () => {
@@ -606,6 +620,95 @@ describe('ConversationLifecycleService — pollConversations', () => {
     expect(mockMarkConversationEnded).toHaveBeenCalledWith('true-corpse');
   });
 
+  describe('mark-time confirmation through conversation-liveness (PAN-4739)', () => {
+    const pan4739Warnings = (warn: { mock: { calls: unknown[][] } }) =>
+      warn.mock.calls.filter(([message]) => String(message).includes('WARNING (PAN-4739)'));
+
+    it('keeps a conversation active when the census omits its session but conversation-liveness reports the harness alive (PAN-4739)', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      mockListConversations.mockReturnValue([
+        { name: 'flap-a', tmuxSession: 'conv-flap-a', status: 'active', cwd: '/tmp/work', claudeSessionId: null },
+      ]);
+      mockListSessionNames.mockReturnValue(Effect.succeed([]));
+      mockConversationHarnessAlive.mockResolvedValue(true);
+
+      const { pollConversations } = await import('../conversation-lifecycle.js');
+      await pollConversations();
+
+      expect(mockMarkConversationEnded).not.toHaveBeenCalled();
+      expect(mockCloseCompanionTerminalForOwner).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0]?.[0])).toMatch(/WARNING \(PAN-4739\).*conv-flap-a.*gone.*harness alive/);
+      warn.mockRestore();
+    });
+
+    it('warns once per disagreement episode across ticks (PAN-4739)', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      mockListConversations.mockReturnValue([
+        { name: 'flap-b', tmuxSession: 'conv-flap-b', status: 'active', cwd: '/tmp/work', claudeSessionId: null },
+      ]);
+      mockListSessionNames.mockReturnValue(Effect.succeed([]));
+      mockConversationHarnessAlive.mockResolvedValue(true);
+
+      const { pollConversations } = await import('../conversation-lifecycle.js');
+      await pollConversations();
+      await pollConversations();
+
+      expect(mockMarkConversationEnded).not.toHaveBeenCalled();
+      expect(pan4739Warnings(warn)).toHaveLength(1);
+      warn.mockRestore();
+    });
+
+    it('keeps a keep-alive corpse verdict active when the door reports the harness alive (PAN-4739)', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      mockListConversations.mockReturnValue([
+        { name: 'flap-c', tmuxSession: 'conv-flap-c', status: 'active', cwd: '/tmp/work', claudeSessionId: null },
+      ]);
+      mockListSessionNames.mockReturnValue(Effect.succeed(['conv-flap-c']));
+      mockIsHarnessProcessAlive.mockResolvedValue(false);
+      mockConversationHarnessAlive.mockResolvedValue(true);
+
+      const { pollConversations } = await import('../conversation-lifecycle.js');
+      await pollConversations();
+
+      expect(mockMarkConversationEnded).not.toHaveBeenCalled();
+      const warnings = pan4739Warnings(warn);
+      expect(warnings).toHaveLength(1);
+      expect(String(warnings[0]?.[0])).toContain('conv-flap-c without a harness process');
+      warn.mockRestore();
+    });
+
+    it('still ends the row when the census and conversation-liveness agree the harness is dead (PAN-4739)', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      mockListConversations.mockReturnValue([
+        { name: 'flap-d', tmuxSession: 'conv-flap-d', status: 'active', cwd: '/tmp/work', claudeSessionId: null },
+      ]);
+      mockListSessionNames.mockReturnValue(Effect.succeed([]));
+      mockConversationHarnessAlive.mockResolvedValue(false);
+
+      const { pollConversations } = await import('../conversation-lifecycle.js');
+      await pollConversations();
+
+      expect(mockMarkConversationEnded).toHaveBeenCalledWith('flap-d');
+      expect(pan4739Warnings(warn)).toHaveLength(0);
+      warn.mockRestore();
+    });
+
+    it('does not ask conversation-liveness on a tick with nothing to end (PAN-4739, NFR-1)', async () => {
+      mockListConversations.mockReturnValue([
+        { name: 'flap-e', tmuxSession: 'conv-flap-e', status: 'active', cwd: '/tmp/work', claudeSessionId: null },
+      ]);
+      mockListSessionNames.mockReturnValue(Effect.succeed(['conv-flap-e']));
+      mockIsHarnessProcessAlive.mockResolvedValue(true);
+
+      const { pollConversations } = await import('../conversation-lifecycle.js');
+      await pollConversations();
+
+      expect(mockMarkConversationEnded).not.toHaveBeenCalled();
+      expect(mockConversationHarnessAlive).not.toHaveBeenCalled();
+    });
+  });
+
   it('does not throw when listConversations errors', async () => {
     mockListConversations.mockImplementation(() => { throw new Error('DB error'); });
 
@@ -895,7 +998,14 @@ describe('ConversationLifecycleService — pollConversations on a Herdr host (PA
     mockHostBackend.mockResolvedValue('herdr');
     mockIsRespawnPending.mockReturnValue(false);
     mockIsHarnessProcessAlive.mockResolvedValue(true);
-    mockConversationHarnessAlive.mockResolvedValue(true);
+    // On a Herdr host the door answers from Herdr's inventory (PAN-4739: the
+    // patrol now asks it before ending a row, so it must not read alive for an
+    // agent Herdr no longer holds).
+    mockConversationHarnessAlive.mockImplementation(async (name: string) => {
+      const agents = await Promise.resolve(mockListHerdrAgents()).catch(() => []);
+      return (agents as Array<{ agentId: string; state: string }>)
+        .some((agent) => agent.agentId === name && agent.state !== 'exited');
+    });
     mockGetRuntimeCensus.mockImplementation(noTmuxServer);
     mockRefreshRuntimeCensus.mockImplementation(noTmuxServer);
   });
@@ -1069,6 +1179,7 @@ describe('ConversationLifecycleService — rollback to tmux (PAN-3921)', () => {
     mockListPaneValues.mockResolvedValue([]);
     mockGetRuntimeCensus.mockImplementation(buildRuntimeCensusMock);
     mockRefreshRuntimeCensus.mockImplementation(buildRuntimeCensusMock);
+    mockConversationHarnessAlive.mockImplementation(doorAgreesWithCensus);
   });
 
   it('keeps a conversation still running in a Herdr pane after the host flips to tmux', async () => {

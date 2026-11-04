@@ -1,0 +1,657 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-02T03:32:26Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4683: pan start --remote re-plans an already-planned issue (looks for the spec only on the primary checkout)",
+    "updated": "2026-11-02T03:42:08.264Z"
+  },
+  "plan": {
+    "id": "pan-4683",
+    "title": "pan start --remote re-plans an already-planned issue (looks for the spec only on the primary checkout)",
+    "status": "running",
+    "uid": "597a7147-6b29-482a-92ac-d62f5a46296f",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-02T03:32:26Z",
+    "updated": "2026-11-02T03:42:08.264Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4683",
+        "label": "PAN-4683",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4683.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "remote",
+      "fly",
+      "planning",
+      "pan-start",
+      "complete-planning",
+      "bug"
+    ],
+    "narratives": {
+      "Problem": "pan start <id> --remote decides whether a plan exists with findSpecByIssue(projectRoot, id), which reads only the primary checkout. A planned issue's spec is committed on feature/<id>, so the lookup misses and --remote launches a second planning session (seen live on PAN-4677). Two related gaps: complete-planning's detached bare `git push` always fails because workspace branches track origin/main (branch.<b>.merge=refs/heads/main), so the Fly VM's `git fetch origin feature/<id>` finds no spec; and the post-planning auto-start (and the deferred hand-off retry) POSTs /api/agents with no location, so the work agent that `pan start --remote` promises starts locally.",
+      "Proposal": "(1) New findIssuePlan helper (src/lib/xbrief/issue-plan-lookup.ts) checks local workspace -> refs/heads/feature/<id> -> refs/remotes/origin/feature/<id> -> primary checkout, with no network I/O; start.ts uses it and checks the local workspace even under --remote. (2) New pushFeatureBranch helper pushes with an explicit refspec `git push origin HEAD:refs/heads/feature/<id>` (no -u, no --no-verify, no --force); complete-planning calls it after its last plan commit and reports the real gitPushed; createRemoteWorkspace calls it before creating the VM and aborts on failure. (3) The auto-start consent record carries workspaceLocation (mirroring workModel, PAN-3022); a consent-bearing POST /api/agents with consent location 'remote' and no remote metadata spawns `pan start <id> --remote` and skips local-only steps. (4) Docs: docs/fly-provider.md, features/workspaces.mdx, docs/XBRIEF.md. Full detail in .pan/drafts/PAN-4683.md.",
+      "NonGoals": "- Running git fetch during plan lookup (a stale origin view still falls through to planning).\n- Polyrepo plan homes on branch refs, and pushing a nested pan_records.repo spec repo.\n- Running planning itself on Fly, or changing `pan plan --remote`.\n- A new workspaceLocation field in the POST /api/agents body, or any dashboard UI for choosing a location.\n- Pushing uncommitted workspace changes to the VM.\n- Setting or changing the feature branch upstream (`git push -u`), or changing how worktrees are created/tracked.\n- Bypassing git hooks (--no-verify) or force-pushing on any push.\n- Raising any scripts/file-size-allowlist.txt cap."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Plan lookup order: local workspace, local feature branch ref, origin feature branch ref, primary checkout; first hit wins.",
+        "rationale": "The spec is committed on feature/<id>; the workspace is the freshest copy, branch refs cover a removed workspace, and the primary checkout keeps today's behavior as the last resort."
+      },
+      {
+        "summary": "No git fetch during plan lookup.",
+        "rationale": "Adding network I/O to every pan start is not worth it; a stale origin view falls through to re-planning, which is today's behavior."
+      },
+      {
+        "summary": "Fix both push points: complete-planning (non-fatal) and createRemoteWorkspace (fatal, before VM creation).",
+        "rationale": "The remote-creator push covers 'planned days ago, pan start --remote today'; the complete-planning fix makes the existing 'pushed to git' response honest and matches the code's original intent."
+      },
+      {
+        "summary": "Push with `git push origin HEAD:refs/heads/feature/<id>`: no -u, no --no-verify, no --force, 120 s timeout.",
+        "rationale": "-u would retarget @{u}, which git-state/continue-state/lanes read as origin/main; hooks are guards and must not be bypassed; never rewrite remote history."
+      },
+      {
+        "summary": "The work-agent location travels on the auto-start consent record, not a new /api/agents body field.",
+        "rationale": "Mirrors the existing workModel pattern (PAN-3022) and covers the deferred hand-off retry with no caller change."
+      },
+      {
+        "summary": "The /api/agents route starts a remote work agent by spawning `pan start <id> --remote` through its existing detached spawnPanCommand path.",
+        "rationale": "Reuses handleRemoteWorkspace end to end (VM create, clone, checkout, spawn) and keeps multi-minute VM creation out of the HTTP request."
+      },
+      {
+        "summary": "Consent says remote but remote is disabled: the route returns HTTP 422 with an actionable message.",
+        "rationale": "Fail loudly instead of silently starting locally, which is the bug being fixed."
+      },
+      {
+        "summary": "Keep the dirty-tree refusal for remote spawns when the local workspace exists.",
+        "rationale": "Uncommitted changes would not reach the VM, so refusing is the correct outcome."
+      }
+    ],
+    "metadata": {
+      "prd": ".pan/drafts/PAN-4683.md",
+      "canonicalFilename": "2026-11-02-PAN-4683-pan-start-remote-re-plans-an-already-planned-issue-looks-for-the-spec-only-on-the-primary-checkout.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "issue-plan-lookup",
+        "title": "Add findIssuePlan helper that finds a spec in the workspace, on feature branch refs, or on the primary checkout",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T03:32:26Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4683",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/xbrief/issue-plan-lookup.ts",
+            "src/lib/xbrief/__tests__/issue-plan-lookup.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/xbrief/__tests__/issue-plan-lookup.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "issue-plan-lookup.test.ts passes including the branch-only and origin-only cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/xbrief/issue-plan-lookup.ts exporting `async function findIssuePlan(input: { issueId: string; projectRoot: string; localWorkspace: string | null }): Promise<string | null>` per PRD WI-1. Do NOT add it to io.ts (start-running-noop.test.ts mocks io.js with only findPlanSync). Order: (1) localWorkspace exists -> findPlanSync(localWorkspace) if non-null; (2) for ref in refs/heads/feature/<id-lower>, refs/remotes/origin/feature/<id-lower>: promisified execFile `git -c core.quotePath=false ls-tree --name-only --full-name <ref> -- .pan/specs/` in projectRoot, any git error = no match, keep lines under .pan/specs/ whose basename parseXBriefFilename()s to the same issue id (case-insensitive), return `${ref}:${firstSorted}`; (3) return (await Effect.runPromise(findSpecByIssue(projectRoot, issueId)))?.path ?? null using findSpecByIssue from ../pan-dir/specs.js. No git fetch. Tests use real git fixtures in mkdtemp dirs and buildPanSpecFilename() for names: branch-only, origin-only (bare origin + clone, local branch deleted), workspace file, other-issue spec -> null, nothing -> null."
+        },
+        "items": [
+          {
+            "id": "issue-plan-lookup.ac1",
+            "title": "Given a repo whose spec for PAN-9001 is committed only on local feature/pan-9001, when findIssuePlan runs with localWorkspace null, then it returns a string starting with `refs/heads/feature/pan-9001:.pan/specs/`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issue-plan-lookup.ac2",
+            "title": "Given the spec exists only on refs/remotes/origin/feature/pan-9002, when findIssuePlan runs, then it returns a string starting with `refs/remotes/origin/feature/pan-9002:`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issue-plan-lookup.ac3",
+            "title": "Given a local workspace directory containing .pan/specs/<spec for the issue>, when findIssuePlan runs, then it returns that file's path without running git",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issue-plan-lookup.ac4",
+            "title": "Given the branch holds only a spec for a different issue and nothing else matches, when findIssuePlan runs, then it returns null and does not throw for a missing ref",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "start-uses-plan-lookup",
+        "title": "Make pan start use findIssuePlan so --remote finds a planned issue's spec",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T03:32:26Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4683",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/start.ts",
+            "src/cli/commands/__tests__/start-remote-planned.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/start-remote-planned.test.ts src/cli/commands/__tests__/start-running-noop.test.ts src/cli/commands/__tests__/start-fresh-session.test.ts src/cli/commands/__tests__/start-harness.test.ts src/cli/commands/__tests__/start-status.test.ts src/cli/commands/__tests__/start-freshness.test.ts src/cli/commands/__tests__/start-workspace-branch-repair.test.ts",
+            "npm run typecheck",
+            "wc -l src/cli/commands/start.ts"
+          ],
+          "expected_outputs": [
+            "start-remote-planned.test.ts and the existing start-*.test.ts files pass",
+            "typecheck completes without errors",
+            "start.ts has at most 1283 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/cli/commands/start.ts replace the three-line ternary after `const projectRoot = findProjectRoot(id);` (search `PAN-2407: route unplanned issues`) with one line: `const existingPlan = await findIssuePlan({ issueId: id, projectRoot, localWorkspace: isRemote ? findLocalWorkspace(id) : workspacePath });`. Replace import line `import { findSpecByIssue } from '../../lib/pan-dir/specs.js';` with `import { findIssuePlan } from '../../lib/xbrief/issue-plan-lookup.js';` (findSpecByIssue has no other use; keep findPlanSync and Effect imports). start.ts is AT its file-size cap (1283): net line change must be <= 0; never edit scripts/file-size-allowlist.txt. Add src/cli/commands/__tests__/start-remote-planned.test.ts using the vi.mock harness from start-running-noop.test.ts plus a mock of ../../../lib/xbrief/issue-plan-lookup.js and a vi.stubGlobal fetch spy; stub loadConfigSync remote.enabled=false if the remote path needs to return early. Run every existing start-*.test.ts and fix their mocks if the new import breaks them."
+        },
+        "items": [
+          {
+            "id": "start-uses-plan-lookup.ac1",
+            "title": "Given findIssuePlan resolves a `refs/heads/feature/pan-4677:...` string, when issueCommand('PAN-4677', { remote: true }) runs, then fetch is never called with a URL containing `/start-planning`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "start-uses-plan-lookup.ac2",
+            "title": "Given findIssuePlan resolves null and planning mode auto, when issueCommand('PAN-4677', { remote: true }) runs, then fetch is called once with a URL ending `/api/issues/PAN-4677/start-planning`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "start-uses-plan-lookup.ac3",
+            "title": "Given --remote and an existing local workspace directory, when issueCommand runs, then findIssuePlan receives localWorkspace equal to that directory",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "start-uses-plan-lookup.ac4",
+            "title": "`wc -l src/cli/commands/start.ts` prints at most 1283 and `grep -n findSpecByIssue src/cli/commands/start.ts` prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "feature-branch-push",
+        "title": "Add pushFeatureBranch helper that pushes feature/<id> with an explicit refspec",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T03:32:26Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4683",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/feature-branch-push.ts",
+            "src/lib/overdeck/__tests__/feature-branch-push.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/feature-branch-push.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "feature-branch-push.test.ts passes including the real git fixture case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "NFR-1",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/overdeck/feature-branch-push.ts exporting `pushFeatureBranch(input: { cwd: string; branch: string; execImpl?: typeof execFileAsync }): Promise<{ pushed: boolean; reason?: string }>` per PRD WI-3. Steps: `git symbolic-ref --short HEAD` (error -> pushed:false 'HEAD is detached'); HEAD branch !== input.branch -> pushed:false 'HEAD is on <x>, expected <branch>'; `git remote` lacks an `origin` line -> pushed:false 'no origin remote'; `git push origin HEAD:refs/heads/<branch>` with timeout 120000 -> pushed:true; error -> pushed:false with the first stderr line. NEVER -u, --no-verify or --force; never throws. Async execFile only (dashboard-reachable). Tests: real fixture (bare origin.git, clone, `git worktree add -b feature/pan-9003 ../ws origin/main`, commit) proves the push lands and branch.feature/pan-9003.merge stays refs/heads/main; execImpl spy asserts exact args; wrong-branch and rejected-push cases."
+        },
+        "items": [
+          {
+            "id": "feature-branch-push.ac1",
+            "title": "Given a worktree branch feature/pan-9003 tracking origin/main with a new commit, when pushFeatureBranch runs, then it returns { pushed: true } and `git ls-remote origin refs/heads/feature/pan-9003` prints the worktree HEAD sha",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "feature-branch-push.ac2",
+            "title": "After that push, `git config --get branch.feature/pan-9003.merge` still prints refs/heads/main (upstream preserved)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "feature-branch-push.ac3",
+            "title": "Given an execImpl spy, when pushFeatureBranch pushes feature/pan-9003, then the recorded push args are exactly ['push', 'origin', 'HEAD:refs/heads/feature/pan-9003']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "feature-branch-push.ac4",
+            "title": "Given HEAD on another branch, pushFeatureBranch returns { pushed: false } and issues no push; given a rejected push, it returns { pushed: false, reason } without throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "complete-planning-push",
+        "title": "Replace complete-planning's detached bare git push with an awaited pushFeatureBranch call",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T03:32:26Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4683",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/planning-promotion.ts",
+            "src/dashboard/server/routes/__tests__/complete-planning.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/complete-planning.test.ts",
+            "npm run typecheck",
+            "wc -l src/lib/overdeck/planning-promotion.ts"
+          ],
+          "expected_outputs": [
+            "complete-planning.test.ts passes",
+            "typecheck completes without errors",
+            "planning-promotion.ts has at most 995 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-4 in src/lib/overdeck/planning-promotion.ts: (1) delete the remotes/spawn('git', ['push']) try/catch from commitCompletePlanningWorkspaceGit; it now returns Promise<{ taskWarning: string | null }> (pre-worktree early return becomes `return { taskWarning };`); change line 1 to `import { execFile } from 'node:child_process';` (spawn has no other use). (2) Add 'branchPush' to the CompletePlanningPhase union. (3) In completePlanningForIssue, after the `if (effectiveAutoSpawn && workspacePath) { await commitWorkspacePlanArtifacts(...) }` block and before completePlanningAutoSpawnAndKill, call pushFeatureBranch({ cwd: workspacePath, branch: `feature/${issueLower}` }) when workspacePath has a .git entry (else { pushed: false, reason: 'no workspace git checkout' }), emit the branchPush phase success/failure, and set gitPushed from push.pushed for the response. Push failure never fails finalize. Never call pushPlanArtifacts from a workspace (it targets main). File must stay <= 995 lines. Update the commitCompletePlanningWorkspaceGit tests in complete-planning.test.ts: expect { taskWarning: null } and assert no recorded call has args[0] === 'push'. The 995-line limit is a self-imposed buffer (the file-size gate itself allows up to 1000); the change nets negative, so it should hold."
+        },
+        "items": [
+          {
+            "id": "complete-planning-push.ac1",
+            "title": "commitCompletePlanningWorkspaceGit returns { taskWarning } and the updated complete-planning.test.ts asserts it records no git call whose first arg is 'push'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "complete-planning-push.ac2",
+            "title": "`grep -n \"spawn('git', \\['push'\\]\" src/lib/overdeck/planning-promotion.ts` prints nothing and completePlanningForIssue calls pushFeatureBranch with branch `feature/<issue-lower>` after commitWorkspacePlanArtifacts and before completePlanningAutoSpawnAndKill",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "complete-planning-push.ac3",
+            "title": "When the push returns { pushed: false }, complete-planning emits a branchPush phase with status failure and responds with gitPushed false instead of returning an error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "complete-planning-push.ac4",
+            "title": "`wc -l src/lib/overdeck/planning-promotion.ts` prints at most 995",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "remote-workspace-push",
+        "title": "Push the local feature branch before createRemoteWorkspace provisions a VM",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T03:32:26Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4683",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/remote-workspace.ts",
+            "src/lib/__tests__/remote-workspace-push.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/remote-workspace-push.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "remote-workspace-push.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-5 in src/lib/remote-workspace.ts createRemoteWorkspace(): hoist `const localWorkspacePath = join(projectRoot, 'workspaces', `feature-${normalizedId}`)` to just after the dry-run block; before `// Step 1: Create VM`, when `existsSync(join(localWorkspacePath, '.git'))`, set the spinner text to `Pushing ${branchName}...`, await pushFeatureBranch({ cwd: localWorkspacePath, branch: branchName }) and, if !pushed, throw `Could not push ${branchName} before creating the remote workspace: ${reason}. Push it with: git -C ${localWorkspacePath} push origin HEAD:refs/heads/${branchName}`. Step 6 reuses the hoisted const. New test src/lib/__tests__/remote-workspace-push.test.ts mocks ../config.js, ../remote/index.js (createVm spy rejecting 'stop'), ../projects.js, ../overdeck/feature-branch-push.js and node:child_process exec; never reaches real Fly or the clone poll loop."
+        },
+        "items": [
+          {
+            "id": "remote-workspace-push.ac1",
+            "title": "Given a local workspace with .git and pushFeatureBranch resolving { pushed: false, reason: 'rejected' }, createRemoteWorkspace('PAN-9004') rejects with a message containing `Could not push feature/pan-9004` and createVm is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remote-workspace-push.ac2",
+            "title": "Given pushFeatureBranch resolving { pushed: true }, the push spy's invocationCallOrder is lower than createVm's",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remote-workspace-push.ac3",
+            "title": "Given no .git in workspaces/feature-pan-9004, createRemoteWorkspace does not call pushFeatureBranch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "consent-workspace-location",
+        "title": "Persist workspaceLocation on the auto-start consent record and add a reader",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T03:32:26Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4683",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "route-remote-location"
+          ],
+          "files_scope": [
+            "src/lib/planning/auto-spawn-consent.ts",
+            "src/lib/planning/spawn-planning-session.ts",
+            "src/lib/planning/__tests__/auto-spawn-consent.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/planning/__tests__/auto-spawn-consent.test.ts src/lib/planning/__tests__/resolve-auto-spawn-on-finalize.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "auto-spawn-consent.test.ts and resolve-auto-spawn-on-finalize.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-6 in src/lib/planning/auto-spawn-consent.ts: add `workspaceLocation?: 'local' | 'remote'` to AutoSpawnConsentRecord; parseConsentRecord keeps it only when exactly 'local' or 'remote'; writeAutoSpawnOnFinalizeFlag options become `{ workModel?: string | null; workspaceLocation?: 'local' | 'remote' | null }` with workModel's semantics (null clears, undefined preserves the prior record's value, a value sets it), reading the prior record at most once; export `readAutoSpawnConsentWorkspaceLocation(issueId)` returning undefined when no record or status 'spent'. In src/lib/planning/spawn-planning-session.ts change the planning-spawn write to `writeAutoSpawnOnFinalizeFlag(issue.identifier, autoSpawnOnFinalize === true, { workModel: workModel ?? null, workspaceLocation })` (workspaceLocation is already destructured from opts). Extend auto-spawn-consent.test.ts with set/preserve/clear/spent/invalid cases."
+        },
+        "items": [
+          {
+            "id": "consent-workspace-location.ac1",
+            "title": "Given writeAutoSpawnOnFinalizeFlag(id, true, { workspaceLocation: 'remote' }), readAutoSpawnConsentWorkspaceLocation(id) returns 'remote'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "consent-workspace-location.ac2",
+            "title": "A later writeAutoSpawnOnFinalizeFlag(id, true) with no options preserves 'remote', and { workspaceLocation: null } makes the reader return undefined",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "consent-workspace-location.ac3",
+            "title": "After completeAutoSpawnConsentClaim marks the record spent, or when the stored value is \"moon\", the reader returns undefined",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "consent-workspace-location.ac4",
+            "title": "spawn-planning-session.ts passes the planning request's workspaceLocation in the writeAutoSpawnOnFinalizeFlag options at planning spawn",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "route-remote-location",
+        "title": "Make consent-bearing POST /api/agents spawn `pan start --remote` when the consent location is remote",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T03:32:26Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "api",
+          "issueLabel": "pan-4683",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/agents/shared.ts",
+            "src/dashboard/server/routes/agents/spawn-issue.ts",
+            "src/dashboard/server/routes/__tests__/agents-start-args.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/agents-start-args.test.ts src/dashboard/server/routes/__tests__/spawn-container-claim.test.ts",
+            "npm run typecheck",
+            "wc -l src/dashboard/server/routes/agents/spawn-issue.ts"
+          ],
+          "expected_outputs": [
+            "agents-start-args.test.ts and spawn-container-claim.test.ts pass",
+            "typecheck completes without errors",
+            "spawn-issue.ts has at most 1000 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ],
+          "parallelSafeReason": "Touches only src/dashboard/server/routes/agents/{shared,spawn-issue}.ts and agents-start-args.test.ts; no other item edits these files, and its only input (readAutoSpawnConsentWorkspaceLocation) arrives via the blocks edge from consent-workspace-location."
+        },
+        "narrative": {
+          "Action": "Per PRD WI-7. shared.ts: buildPanStartArgs input gains `location?: 'local' | 'remote'`; emit `'--remote'` when location === 'remote', else `'--local'` (default unchanged). spawn-issue.ts (stay <= 1000 lines): after `const isRemote = workspaceMetadata?.location === 'remote';` compute `remoteRequested = !isRemote && autoSpawnConsentRequired && (await readAutoSpawnConsentWorkspaceLocation(issueId).catch(() => undefined)) === 'remote'` (via Effect.promise, as readAutoSpawnConsentWorkModel is read); if remoteRequested and loadConfigSync().remote?.enabled !== true return 422 `Remote workspaces are not enabled for <ID>: run pan admin remote setup, or start it locally with pan start <ID> --local`. Gate: skip the workspaceNeedsSetup -> `pan workspace create --local` block, the stack-health gate (`if (!isRemote && !remoteRequested)`), and handleContainerOrchestration when remoteRequested; run the dirty-tree check only when `!remoteRequested || existsSync(workspacePath)`; pass `location: remoteRequested ? 'remote' : 'local'` to buildPanStartArgs in the direct spawn and use phase text 'starting remote work agent via pan start --remote'. The deferred hand-off retry is covered because it also sends autoSpawnConsentRequired: true; do not change work-agent-start.ts or deferred-handoff.ts. Add buildPanStartArgs cases to agents-start-args.test.ts. When remoteRequested is true and the local workspace directory does not exist, pass projectPath (not workspacePath) as the spawnPanCommand cwd, because a missing cwd fails the spawn with ENOENT."
+        },
+        "items": [
+          {
+            "id": "route-remote-location.ac1",
+            "title": "buildPanStartArgs({ issueId: 'PAN-4683', location: 'remote' }) returns ['start', 'PAN-4683', '--remote'] and every existing case without location still emits '--local'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "route-remote-location.ac2",
+            "title": "Given a consent-bearing request with consent location 'remote' and no remote metadata, when the route spawns, then buildPanStartArgs receives location 'remote' and no stackHealthGate start phase is emitted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "route-remote-location.ac3",
+            "title": "When remoteRequested is true and remote.enabled is not true, the route returns HTTP 422 with an error naming `pan admin remote setup`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "route-remote-location.ac4",
+            "title": "Given a request without autoSpawnConsentRequired, or with consent location 'local' or unset, when the route spawns, then the spawn args still contain '--local' and the stack-health gate still runs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-remote-start",
+        "title": "Document push-before-provision and pan start --remote on planned issues",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T03:32:26Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4683",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/fly-provider.md",
+            "features/workspaces.mdx",
+            "docs/XBRIEF.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'pan start MIN-123 --remote' features/workspaces.mdx",
+            "grep -n 'Push the local' docs/fly-provider.md",
+            "grep -n 'explicit refspec' docs/XBRIEF.md"
+          ],
+          "expected_outputs": [
+            "each grep prints at least one matching line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-8. docs/fly-provider.md step 3 ('Create a remote workspace for an issue'): add, before 'Create a Fly Machine', the bullet 'Push the local `feature/<id>` branch to origin when a local workspace exists, so the planned spec reaches the machine; creation stops with an error and creates no machine if that push is rejected', plus one sentence after the list that uncommitted local changes are not pushed. features/workspaces.mdx 'Creating Remote Workspaces': add an example `pan start MIN-123 --remote` and a paragraph: on an already-planned issue it skips planning (plan found in the local workspace, on feature/<id>, or on the last-fetched origin/feature/<id>); on an unplanned issue the work agent that starts after planning finalizes runs on Fly; if remote workspaces are disabled that hand-off fails with a message pointing at `pan admin remote setup`. docs/XBRIEF.md lifecycle step 3 ('Planning completes'): add 'Complete-planning then pushes `feature/<id>` to origin with an explicit refspec (the branch tracks `origin/main`, so the upstream is left unchanged); a failed push is reported as `gitPushed: false`, not an error.'"
+        },
+        "items": [
+          {
+            "id": "docs-remote-start.ac1",
+            "title": "features/workspaces.mdx shows `pan start MIN-123 --remote` and states that a planned issue skips planning and that the post-planning work agent runs on Fly",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-remote-start.ac2",
+            "title": "docs/fly-provider.md step 3 contains a bullet saying the local feature/<id> branch is pushed before machine creation and that creation stops with no machine if the push is rejected",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-remote-start.ac3",
+            "title": "docs/XBRIEF.md lifecycle step 3 states complete-planning pushes feature/<id> with an explicit refspec and reports a failed push as gitPushed: false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "issue-plan-lookup",
+        "to": "start-uses-plan-lookup",
+        "type": "blocks"
+      },
+      {
+        "from": "feature-branch-push",
+        "to": "complete-planning-push",
+        "type": "blocks"
+      },
+      {
+        "from": "feature-branch-push",
+        "to": "remote-workspace-push",
+        "type": "blocks"
+      },
+      {
+        "from": "consent-workspace-location",
+        "to": "route-remote-location",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

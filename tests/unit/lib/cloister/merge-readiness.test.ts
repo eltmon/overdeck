@@ -1,4 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+// AD-19 (PAN-4852): every otherwise-ready PR also runs the SageOx merge guard,
+// which fails closed without a real project; this suite tests readiness only.
+vi.mock('../../../../src/lib/sageox/merge-guard.js', () => ({ sageoxMergeGuardForIssue: vi.fn(async () => ({ ok: true })) }));
 
 import { evaluateMergeReadiness, type PrFacts } from '../../../../src/lib/cloister/pr-facts.js';
 import { getMergeReadyIssues } from '../../../../src/lib/cloister/merge-ready-set.js';

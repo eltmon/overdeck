@@ -50,6 +50,7 @@ pan-help
 pan-hygiene
 pan-install
 pan-issues
+pan-join
 pan-kill
 pan-knowledge
 pan-lane
@@ -76,6 +77,7 @@ pan-resources
 pan-restart
 pan-review
 pan-rollout
+pan-share
 pan-show
 pan-skill-creator
 pan-start

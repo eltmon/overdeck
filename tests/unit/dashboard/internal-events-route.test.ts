@@ -1,3 +1,5 @@
+import { rmSync } from 'node:fs';
+import { join } from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import {
@@ -9,9 +11,14 @@ import {
   validateInternalEventsHeaders,
 } from '../../../src/dashboard/server/routes/internal-events.js';
 import { _resetInternalTokenCacheForTests, INTERNAL_TOKEN_HEADER } from '../../../src/lib/internal-token.js';
+import { getOverdeckHome } from '../../../src/lib/paths.js';
 
 describe('internal events route helpers', () => {
   beforeEach(() => {
+    // The token file wins over env (PAN-4628); delete any file a sibling
+    // test in this worker's shared OVERDECK_HOME left behind so this test's
+    // env token is the one actually resolved.
+    rmSync(join(getOverdeckHome(), 'internal-token'), { force: true });
     process.env.OVERDECK_INTERNAL_TOKEN = 'test-token';
     _resetInternalTokenCacheForTests();
   });

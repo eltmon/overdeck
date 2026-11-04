@@ -2,8 +2,15 @@
 // viewer servers over its WebSockets, plus the room HTTP API shapes.
 //
 // Type-only and import-free (D-R3-8): the share Worker imports this file by relative path, so it must
-// never pull a runtime dependency into the Worker bundle. The content wire format (SharedEnvelope and
-// friends) is not here: the share service never carries content. Slice 3 (PAN-4474) adds it.
+// never pull a runtime dependency into the Worker bundle. The content wire format (PAN-4474, slice 3)
+// is at the end of this file; the share service never carries it. Its runtime helpers are in
+// `sharing-wire.ts`, which the Worker never imports.
+// PAN-4473 (slice 2) adds the host dashboard API types at the end of this file: the shapes the
+// browser exchanges with its local dashboard server to create, list and manage shares.
+// PAN-4475 (slice 4) adds the viewer dashboard API types at the end: the shapes the viewer browser
+// exchanges with its own dashboard server.
+// PAN-4476 (slice 5) adds drafts, contributor submits and the queue indicator.
+// PAN-4478 (slice 7) adds set-controller to ShareCommand, the controller commands and their acks, and the identity payload.
 
 export type ShareProtocolVersion = 1;
 export type ShareScope = { readonly kind: 'conversation'; readonly conversationId: string };
@@ -82,3 +89,248 @@ export type ShareCloseCode =
   | 4010 /* kicked */
   | 4011 /* revoked */
   | 4013 /* room-full or lobby-full */;
+
+// ── Host dashboard API (PAN-4473, slice 2): the browser ⇄ local dashboard server. ──
+// The host token never appears in these types (NFR-1).
+
+/**
+ * The host socket's state in this dashboard process. 'reconnecting': the socket dropped and the
+ * manager retries on a backoff (PAN-4479). 'disconnected': a stale record that was not re-parked,
+ * or a socket replaced by another host (close 4008).
+ */
+export type ShareConnection = 'connecting' | 'connected' | 'reconnecting' | 'disconnected';
+
+/** The host frames the data owner's browser may request. Slice 7 adds set-controller (handoff; the data owner's id = reclaim). */
+export type ShareCommand = Extract<
+  HostFrame,
+  { readonly type: 'admit' | 'kick' | 'revoke' | 'unrevoke' | 'set-contributor' | 'set-controller' }
+>;
+
+/** The share commands a viewer-controller may send on `control` (slice 7). Un-revoke stays with the data owner (D-7). */
+export type SharedControllerCommand = Exclude<ShareCommand, { readonly type: 'unrevoke' }>;
+
+/** Why the host refused a controller command or a controller send (slice 7). */
+export type SharedCommandRefusal =
+  | 'not_controller' | 'unknown_participant' | 'invalid_target' | 'invalid_command' | 'not_connected'
+  | 'invalid_prompt' | 'too_long' | 'queue_full';
+
+export interface CreateShareRequest { readonly conversationName: string }
+
+export interface ShareLastError { readonly code: ShareErrorCode | 'replaced'; readonly githubId?: number; readonly at: string }
+
+export interface ShareView {
+  readonly shortCode: string;
+  readonly joinUrl: string;
+  readonly scope: ShareScope;
+  readonly createdAt: string;            // ISO
+  readonly connection: ShareConnection;
+  readonly snapshot: RoomSnapshot | null; // null for a stale record
+  readonly lastError: ShareLastError | null;
+  /** Slice 5: the viewers' current drafts, oldest started first. Optional so older fixtures compile (D-13). */
+  readonly drafts?: readonly ShareDraftView[];
+  /** Slice 5: the share's prompt queue. Optional so older fixtures compile (D-13). */
+  readonly queue?: ShareQueueView;
+  /** Slice 7: the host's effective controller (D-2). Optional so older fixtures compile. */
+  readonly controllerGithubId?: number;
+}
+
+/** One viewer's current draft, as the host browser sees it. */
+export interface ShareDraftView {
+  readonly githubId: number;
+  readonly login: string;
+  readonly avatarUrl: string;
+  readonly text: string;
+  readonly startedAt: string; // ISO
+  readonly updatedAt: string; // ISO
+}
+
+/** One prompt waiting in (or being delivered from) the host's queue. */
+export interface ShareQueueItemView {
+  readonly id: string;
+  readonly login: string;
+  readonly avatarUrl: string;
+  readonly source: 'contributor' | 'controller';
+  readonly text: string;
+  readonly enqueuedAt: string; // ISO
+}
+
+export interface ShareQueueView {
+  readonly agentWorking: boolean;
+  readonly delivering: boolean;
+  readonly items: readonly ShareQueueItemView[];
+}
+
+/** POST /api/shares/:code/prompts: a controller send; `draftGithubId` names the picked draft. */
+export interface SendSharePromptRequest { readonly text: string; readonly draftGithubId?: number }
+
+export interface ListSharesResponse { readonly shares: readonly ShareView[] }
+
+// ── Content wire format (PAN-4474, slice 3): host server ⇄ viewer over WebRTC data channels. ──
+// The share service never carries these. Runtime helpers live in ./sharing-wire.ts.
+
+/** The five data channel labels. Every peer connection carries all five, ordered and reliable. */
+export type SharedChannel = 'control' | 'conversation' | 'drafts' | 'terminal' | 'presence';
+
+/** One data-channel message. `v` is 1 in this version; a later host may send more. */
+export interface SharedEnvelope<P = unknown> {
+  readonly v: number;
+  readonly ch: SharedChannel;
+  /** The member session; v0: always the shared conversation's name. */
+  readonly streamId: string;
+  /** Per peer connection, per channel, per stream: 1, 2, 3, … Fragments do not consume one. */
+  readonly seq: number;
+  /** Host epoch ms. */
+  readonly t: number;
+  readonly payload: P;
+}
+
+/** One piece of an encoded envelope longer than SHARE_MAX_MESSAGE_CHARS, sent in order on the same channel. */
+export interface SharedChunk {
+  readonly v: number;
+  readonly chunk: { readonly id: number; readonly index: number; readonly count: number };
+  readonly data: string;
+}
+
+/** The first envelope each side sends on `control`. The viewer copies `scope` from the host's hello. */
+export interface SharedHello {
+  readonly v: number;
+  readonly scopeKinds: readonly ShareScope['kind'][];
+  readonly scope: ShareScope;
+}
+
+export type SharedHelloError = 'invalid_hello' | 'version_unsupported' | 'scope_kind_unsupported';
+
+/** Why a shared prompt was not (or will not be) delivered. */
+export type SharedSubmitReason =
+  | 'not_contributor' | 'invalid_prompt' | 'too_long' | 'queue_full'
+  | 'grant_revoked' | 'delivery_refused' | 'delivery_unknown';
+
+/**
+ * `control` payloads. Slice 5 adds submit (viewer → host), submit-ack and draft-sent (host → viewer);
+ * slice 6 adds the viewer's terminal watch. Slice 7 adds identity and command-ack (host → viewer),
+ * command and controller-send (viewer → host).
+ */
+export type ControlPayload =
+  | { readonly kind: 'hello'; readonly hello: SharedHello }
+  | { readonly kind: 'error'; readonly code: SharedHelloError }
+  | { readonly kind: 'submit'; readonly clientId: string; readonly text: string }
+  | {
+      readonly kind: 'submit-ack';
+      readonly clientId: string;
+      readonly status: 'queued' | 'sent' | 'rejected';
+      readonly position?: number;           // 1-based, with 'queued'
+      readonly reason?: SharedSubmitReason; // with 'rejected'
+    }
+  | { readonly kind: 'draft-sent' }
+  /** Viewer → host: start (`true`) or stop (`false`) the read-only terminal stream (slice 6). */
+  | { readonly kind: 'terminal-watch'; readonly watch: boolean }
+  | { readonly kind: 'identity'; readonly githubId: number }
+  | { readonly kind: 'command'; readonly clientId: string; readonly command: SharedControllerCommand }
+  | { readonly kind: 'controller-send'; readonly clientId: string; readonly text: string; readonly draftGithubId?: number }
+  | {
+      readonly kind: 'command-ack';
+      readonly clientId: string;
+      readonly status: 'accepted' | 'rejected';
+      readonly position?: number;              // 1-based, with an accepted controller-send
+      readonly reason?: SharedCommandRefusal;  // with 'rejected'
+    };
+
+export type TerminalUnavailableReason = 'terminal_not_found' | 'terminal_ended';
+
+/**
+ * `terminal` payloads (slice 6), host → viewer only. A watch starts with `snapshot`; `data` is raw
+ * terminal output (escape sequences included). The host reads nothing on this channel.
+ */
+export type TerminalPayload =
+  | { readonly kind: 'snapshot'; readonly cols: number; readonly rows: number; readonly data: string }
+  | { readonly kind: 'output'; readonly data: string }
+  | { readonly kind: 'size'; readonly cols: number; readonly rows: number }
+  | { readonly kind: 'unavailable'; readonly reason: TerminalUnavailableReason };
+
+/** The allow-listed subset of the internal ChatMessage that may cross to a viewer. */
+export interface SharedMessage {
+  readonly id: string;
+  readonly role: 'user' | 'assistant' | 'system';
+  readonly text: string;
+  readonly turnId?: string;
+  /** Which human sent a user message (slice 5 sets it; never mapped from ChatMessage). */
+  readonly author?: { readonly login: string; readonly avatarUrl: string };
+  readonly createdAt: string;
+  readonly completedAt?: string;
+  readonly streaming?: boolean;
+  readonly sequence?: number;
+}
+
+/** `conversation` payloads. `history` replaces the stream's whole list. */
+export type ConversationPayload =
+  | { readonly kind: 'history'; readonly messages: readonly SharedMessage[] }
+  | { readonly kind: 'append'; readonly message: SharedMessage }
+  | { readonly kind: 'update'; readonly message: SharedMessage }
+  | { readonly kind: 'unavailable'; readonly reason: 'transcript_not_found' | 'history_too_large' };
+
+export interface SharedStream {
+  readonly streamId: string;
+  readonly label: string;
+  readonly kind: 'conversation';
+  /** Slice 5: the stream's agent is mid-turn. Absent from older hosts. */
+  readonly agentWorking?: boolean;
+  /** Slice 5: shared prompts waiting in the host's queue. Absent from older hosts. */
+  readonly queued?: number;
+}
+
+export interface PresenceParticipant {
+  readonly githubId: number;
+  readonly login: string;
+  readonly avatarUrl: string;
+  readonly state: 'lobby' | 'admitted';
+  readonly contributor: boolean;
+  readonly isHost: boolean;
+}
+
+/** `presence` payload: the roster (data owner first), the controller and the stream roster. */
+export interface PresencePayload {
+  readonly controllerGithubId: number;
+  readonly participants: readonly PresenceParticipant[];
+  readonly streams: readonly SharedStream[];
+}
+
+/** Host → viewer on `drafts`: another participant's whole draft; an empty `text` deletes it. */
+export interface DraftPayload {
+  readonly authorGithubId: number;
+  readonly authorLogin: string;
+  readonly text: string;
+  readonly updatedAt: number;
+}
+
+/** Viewer → host on `drafts`: the author's whole draft. The host ignores every other key. */
+export interface DraftUpdate { readonly text: string }
+
+// ── Viewer dashboard API (PAN-4475, slice 4): the viewer browser ⇄ its own dashboard server. ──
+// The device token never appears in these types.
+
+/** A join's state on the viewer server. Live: connecting, lobby, admitted, host-disconnected, reconnecting. */
+export type JoinState =
+  | 'connecting' | 'lobby' | 'admitted' | 'host-disconnected'
+  | 'reconnecting'  // a seated join lost its socket; the viewer server retries on a backoff (PAN-4479)
+  | 'away'          // closed by the viewer server's grace timer; POST /api/joins reopens it
+  | 'disconnected'  // a join that was never seated failed to connect; POST /api/joins reopens it
+  | 'left' | 'kicked' | 'revoked' | 'ended' | 'is-host' | 'full' | 'replaced' | 'rejected';
+
+export interface JoinView {
+  readonly shortCode: string;
+  readonly joinUrl: string;              // <share_url>/s/<shortCode>
+  readonly state: JoinState;
+  readonly contributor: boolean;
+  readonly login: string | null;         // the signed-in GitHub login from account.json
+  readonly closeCode: number | null;     // the last join-socket close code, if any
+  readonly error: string | null;         // e.g. 'unreachable', 'http_503'; never a token
+}
+
+export interface CreateJoinRequest { readonly code: string }
+export interface JoinIceServersResponse { readonly iceServers: readonly IceServer[] }
+
+/** Server-sent events on GET /api/joins/:code/events. The SSE `event:` name is `type`. */
+export type JoinEvent =
+  | { readonly type: 'state'; readonly view: JoinView }
+  | { readonly type: 'signal'; readonly data: SignalData }
+  | { readonly type: 'replaced' };

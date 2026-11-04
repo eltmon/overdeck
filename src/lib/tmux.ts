@@ -33,7 +33,7 @@ import { buildChildEnv } from './child-env.js';
 import { MessageDeliveryFailed, TmuxError } from './errors.js';
 
 export { MessageDeliveryFailed } from './errors.js';
-import { getUiTheme, TERMINAL_BG } from './ui-theme.js';
+import { resolveTerminalBackground } from './color-themes/terminal-background.js';
 import { paneTreeHasHarnessProcess } from './tmux-process-tree.js';
 import { paneHasBlockingChoiceMenu } from './pane-choice-menu.js';
 import { deliveryVerifyLine, type PaneViewport } from './pane-composer.js';
@@ -756,17 +756,17 @@ export async function capturePaneViewport(sessionName: string): Promise<PaneView
 
 export function listPaneValuesSync(target: string, format: string): string[] {
   try {
-    const output = tmuxExecSync(['list-panes', '-t', exactPaneTarget(target), '-F', format], { encoding: 'utf8' }) as string;
+    const output = tmuxExecSync(['-u', 'list-panes', '-t', exactPaneTarget(target), '-F', format], { encoding: 'utf8' }) as string;
     return output.split('\n').map((line) => line.trim()).filter(Boolean);
   } catch {
     return [];
   }
 }
 
-/** List one `#{format}` value per pane of a target; empty on any tmux failure. */
+/** List one `#{format}` value per pane of a target (UTF-8 client, PAN-4739); empty on any tmux failure. */
 export async function listPaneValues(target: string, format: string): Promise<string[]> {
   try {
-    const { stdout } = await tmuxExecAsync(['list-panes', '-t', exactPaneTarget(target), '-F', format], { encoding: 'utf-8' });
+    const { stdout } = await tmuxExecAsync(['-u', 'list-panes', '-t', exactPaneTarget(target), '-F', format], { encoding: 'utf-8' });
     return String(stdout).split('\n').map((line: string) => line.trim()).filter(Boolean);
   } catch {
     return [];
@@ -882,7 +882,7 @@ export const listAllPaneRecords = (): Effect.Effect<readonly TmuxPaneRecord[], T
   Effect.tryPromise({
     try: async () => {
       const { stdout } = await tmuxExecAsync([
-        'list-panes',
+        '-u', 'list-panes', // PAN-4739: -u keeps -F tabs when the server has no UTF-8 locale (Fly)
         '-a',
         '-F',
         '#{session_name}\t#{pane_pid}\t#{pane_dead}\t#{pane_dead_status}',
@@ -948,11 +948,11 @@ export const createSession = (
       // agents get no answer and fall back to dark regardless of the
       // dashboard theme (conv 2547).
       try {
-        const theme = await getUiTheme();
+        const background = await resolveTerminalBackground();
         // window-style is a window option: the trailing ':' targets the
         // session's (only) window — a bare '=name' fails with "no such window".
         await tmuxExecAsync(
-          ['set-option', '-t', `${exactSession(name)}:`, 'window-style', `bg=${TERMINAL_BG[theme]}`],
+          ['set-option', '-t', `${exactSession(name)}:`, 'window-style', `bg=${background}`],
           { encoding: 'utf-8' },
         );
       } catch {

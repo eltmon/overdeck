@@ -21,7 +21,7 @@ export interface WorkspaceInfo {
 
 export interface VerificationRunnerOptions {
   syncTargetBranch?: boolean;
-  /** Strike workspaces intentionally have no vBRIEF checklist. */
+  /** Skip the plan checklist gate: strike workspaces, and adopted PR workspaces with no xBRIEF (PAN-4786). */
   skipPlanChecklist?: boolean;
   /** PAN-2487: receives human-readable gate progress lines (ship-log mirror). */
   onGateLog?: (line: string) => void;

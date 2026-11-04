@@ -1,0 +1,225 @@
+{
+  "version": "1",
+  "issueId": "PAN-4743",
+  "created": "2026-11-02T12:52:57.022Z",
+  "updated": "2026-11-02T15:03:30.297Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "fly-target-door": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4743",
+      "claimedAt": "2026-11-02T12:52:57.022Z",
+      "doneAt": "2026-11-02T13:05:09.654Z"
+    },
+    "resolver-fly-branch": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4743",
+      "claimedAt": "2026-11-02T13:05:22.698Z",
+      "doneAt": "2026-11-02T13:22:24.971Z"
+    },
+    "auto-fly-config": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4743",
+      "claimedAt": "2026-11-02T13:22:30.704Z",
+      "doneAt": "2026-11-02T13:25:02.290Z"
+    },
+    "auto-fly-fallback": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4743",
+      "claimedAt": "2026-11-02T13:25:07.453Z",
+      "doneAt": "2026-11-02T13:30:48.545Z"
+    },
+    "fleet-conversation-fly": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4743",
+      "claimedAt": "2026-11-02T13:30:55.168Z",
+      "doneAt": "2026-11-02T13:37:38.492Z"
+    },
+    "cli-fly-refusal": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4743",
+      "claimedAt": "2026-11-02T13:37:44.477Z",
+      "doneAt": "2026-11-02T13:41:16.744Z"
+    },
+    "machine-field-fly": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4743",
+      "claimedAt": "2026-11-02T13:41:23.631Z",
+      "doneAt": "2026-11-02T13:44:54.273Z"
+    },
+    "dialog-fly-progress": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4743",
+      "claimedAt": "2026-11-02T13:45:00.546Z",
+      "doneAt": "2026-11-02T13:48:41.372Z"
+    },
+    "add-fly-dialog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4743",
+      "claimedAt": "2026-11-02T13:48:48.128Z",
+      "doneAt": "2026-11-02T13:55:15.154Z"
+    },
+    "add-fly-button": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4743",
+      "claimedAt": "2026-11-02T13:55:21.303Z",
+      "doneAt": "2026-11-02T13:58:21.266Z"
+    },
+    "docs-fly-new-vm": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4743",
+      "claimedAt": "2026-11-02T13:58:28.329Z",
+      "doneAt": "2026-11-02T14:03:49.966Z"
+    },
+    "live-uat-fly": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4743",
+      "claimedAt": "2026-11-02T14:03:57.634Z",
+      "doneAt": "2026-11-02T14:41:52.625Z"
+    },
+    "fly-target-door.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T14:52:01.741Z"
+    },
+    "fly-target-door.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T14:52:15.932Z"
+    },
+    "fly-target-door.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T14:52:29.592Z"
+    },
+    "fly-target-door.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T14:52:42.827Z"
+    },
+    "fly-target-door.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-02T14:52:57.383Z"
+    },
+    "resolver-fly-branch.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T14:53:11.357Z"
+    },
+    "resolver-fly-branch.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T14:53:26.197Z"
+    },
+    "resolver-fly-branch.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T14:53:40.866Z"
+    },
+    "auto-fly-config.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T14:53:53.882Z"
+    },
+    "auto-fly-config.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T14:54:07.484Z"
+    },
+    "auto-fly-fallback.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T14:54:22.481Z"
+    },
+    "auto-fly-fallback.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T14:54:36.982Z"
+    },
+    "auto-fly-fallback.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T14:54:50.987Z"
+    },
+    "fleet-conversation-fly.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T14:55:04.897Z"
+    },
+    "fleet-conversation-fly.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T14:55:20.537Z"
+    },
+    "fleet-conversation-fly.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T14:55:36.594Z"
+    },
+    "fleet-conversation-fly.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T14:55:53.099Z"
+    },
+    "cli-fly-refusal.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T14:56:09.532Z"
+    },
+    "cli-fly-refusal.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T14:56:24.736Z"
+    },
+    "machine-field-fly.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T14:56:40.605Z"
+    },
+    "machine-field-fly.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T14:56:55.162Z"
+    },
+    "machine-field-fly.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T14:57:09.413Z"
+    },
+    "dialog-fly-progress.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T14:57:22.682Z"
+    },
+    "dialog-fly-progress.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T14:57:35.945Z"
+    },
+    "add-fly-dialog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T14:57:49.028Z"
+    },
+    "add-fly-dialog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T14:58:02.891Z"
+    },
+    "add-fly-dialog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T14:58:17.462Z"
+    },
+    "add-fly-button.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T14:58:32.904Z"
+    },
+    "add-fly-button.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T14:58:48.674Z"
+    },
+    "docs-fly-new-vm.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T14:59:04.727Z"
+    },
+    "docs-fly-new-vm.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T14:59:20.708Z"
+    },
+    "docs-fly-new-vm.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T14:59:38.638Z"
+    },
+    "docs-fly-new-vm.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T14:59:53.942Z"
+    },
+    "live-uat-fly.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T15:00:09.950Z"
+    },
+    "live-uat-fly.ac2": {
+      "status": "cancelled"
+    }
+  },
+  "feedback": []
+}

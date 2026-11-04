@@ -272,14 +272,14 @@ describe('mergeTargetRefusal (#4066 review)', () => {
 });
 
 describe('mergeHeadPin and manualMergeHeadMoved (#4066 review)', () => {
-  it('pins a manual merge to the head it lands, an automatic one as before, and never a strike', () => {
+  it('pins a manual merge (feature or strike) to the head it lands, and an automatic one as before', () => {
     expect(mergeHeadPin({ kind: 'normal' }, 'abc1234')).toEqual({ matchHeadCommit: 'abc1234' });
     expect(mergeHeadPin({ kind: 'normal' }, null)).toEqual({});
     expect(mergeHeadPin({ kind: 'normal', expectedHeadSha: 'abc1234' }, 'def5678')).toEqual({ matchHeadCommit: 'def5678' });
     expect(mergeHeadPin({ kind: 'normal', expectedHeadSha: 'abc1234' })).toEqual({ matchHeadCommit: 'abc1234' });
     expect(mergeHeadPin({
       kind: 'strike', markerHead: 'abc1234', workspacePath: '/w', branchName: 'strike/pan-1', recoveryTarget: 'agent-pan-1',
-    }, 'abc1234')).toEqual({});
+    }, 'abc1234')).toEqual({ matchHeadCommit: 'abc1234' });
   });
 
   it('refuses a manual merge only when the head it would land is not the gated head', () => {

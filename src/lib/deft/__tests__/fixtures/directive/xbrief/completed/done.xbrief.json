@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "0.8",
+  "plan": {
+    "id": "scope-done",
+    "title": "Done scope",
+    "status": "completed",
+    "items": [
+      {
+        "id": "c1",
+        "title": "Ship it",
+        "status": "completed"
+      }
+    ],
+    "metadata": {
+      "handoffState": "delivered",
+      "deliveryDisposition": "merged",
+      "productPullRequest": 9
+    }
+  }
+}

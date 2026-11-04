@@ -64,8 +64,11 @@
 | Flywheel page and loop skill | [docs/FLYWHEEL.md](docs/FLYWHEEL.md) |
 | Gauntlet lanes (`pan lane`) | [reference/lanes.mdx](reference/lanes.mdx) |
 | Shared Sessions share service (Cloudflare Worker, Durable Objects, TURN) | [docs/SHARED-SESSIONS.md](docs/SHARED-SESSIONS.md) |
+| Overdeck Anywhere: machine links, secure channel, routes | [docs/ANYWHERE-ARCHITECTURE.md](docs/ANYWHERE-ARCHITECTURE.md) |
+| Anywhere release checklist (AC-1 to AC-15) | [docs/ANYWHERE-RELEASE-CHECKLIST.md](docs/ANYWHERE-RELEASE-CHECKLIST.md) |
 | The no-loss map: every deleted verb/route/view and its new home | [docs/THE-CUT.md](docs/THE-CUT.md) |
 | overdeck.ai account service (Cloudflare Worker, D1, invite-only admin) | [docs/ACCOUNT-SERVICE.md](docs/ACCOUNT-SERVICE.md) |
+| overdeck.ai directory, relay and webhook inbox (Cloudflare Worker, Durable Objects) | [docs/CONNECT-SERVICE.md](docs/CONNECT-SERVICE.md) |
 
 ## Small But Sharp
 

@@ -102,6 +102,34 @@ the focused file with `--detectAsyncLeaks` to verify that no work remains after
 the test finishes. Do not disable unhandled-error reporting or reduce the
 repository's two-worker CI concurrency to hide a leak.
 
+### Shared worker home and the internal token
+
+`tests/setup/overdeck-home.ts` sets `OVERDECK_HOME` to
+`<run root>/worker-<VITEST_POOL_ID>`. Every test file that runs in the same
+Vitest pool slot shares that one directory, and files persist there between
+test files.
+
+Mocking the `OVERDECK_HOME` or `CONFIG_DIR` constants exported from
+`paths.js` does not move the token file: `src/lib/internal-token.ts` resolves
+it through `getOverdeckHome()`, which reads the `OVERDECK_HOME` env var at
+call time, not the mocked constant.
+
+The token file `<OVERDECK_HOME>/internal-token` wins over
+`OVERDECK_INTERNAL_TOKEN` (PAN-4628) — the env var is read only when no file
+exists. A test that authenticates with an env token must therefore delete the
+file before it resets the token cache, and again after the test, or a
+sibling test in the same worker can leave a token file that 401s it:
+
+```typescript
+rmSync(join(getOverdeckHome(), 'internal-token'), { force: true });
+_resetInternalTokenCacheForTests();
+```
+
+The setup file also deletes the worker-home token file once, before each test
+file starts (PAN-4881). That only protects against leaks *between* files in
+the same pool slot — the per-test cleanup above still covers leaks *within*
+one file.
+
 ### Real-process fixtures
 
 A fixture that spawns a real child process to stand in for a target state
@@ -119,6 +147,25 @@ run the fixture to completion before the test calls `vi.useFakeTimers()`: once
 fake timers are installed, both `setTimeout` and the deadline's own
 `Date.now()` calls can freeze, so the ordering — real fixture first, fake
 clock after — is what keeps the poll live.
+
+### Signals and fixture PIDs
+
+Code under test that calls `process.kill` with a PID it read from a fixture
+(a mocked pidfile, a state row) sends that signal to the real host process
+holding that PID. The test must spy `process.kill` (`vi.spyOn(process,
+'kill')`) and assert the calls through the spy.
+
+`tests/setup/no-worker-signals.ts` (refusal logic in
+`tests/setup/worker-signal-guard.ts`) refuses a non-zero signal to the
+worker, the Vitest main process, PID `0`, and PID `-1`, and fails the test
+with a `[test-guard] refused process.kill(…)` error even when the code
+under test catches it. It does not protect other workers.
+
+To diagnose "Worker exited unexpectedly" with every test green: download the
+failed and a passing shard log, strip ANSI codes, extract the sorted
+`✓  root  <file>` lines from each, and `comm -3` them. The file present only
+in the passing log is the one whose worker died. PAN-4925 found
+`tests/unit/lib/smee-process.test.ts` this way.
 
 ## Dashboard UI Testing
 
@@ -148,6 +195,10 @@ All interactive dashboard elements should have `data-testid` attributes for reli
 - Prefer `data-testid` over `getByRole` or `getByText` for action buttons
 - Use `getByRole` for standard semantic elements (nav, headings)
 - Use `getByText` only for content verification, not for clicking
+- `getByRole(role, { name })` in Playwright is a case-insensitive **substring** match. Pass `exact: true` for short names that can appear inside other labels: `{ name: 'Yes' }` also matches a button whose text ends in "yesterday" (PAN-4757).
+- E2E fixture timestamps that the UI renders as relative time (`5m ago`, `yesterday`) are computed from `Date.now()`, never hard-coded dates; a fixed date changes the rendered text as the calendar moves.
+- Browser specs under `tests/e2e/*.spec.ts` run inside the default unit shards. Each `openRoute()`/`page.goto` in a fresh browser context is a full load of the unbundled Vite dev app, about 5–7 s on a loaded CI runner, so give each route its own `it` and keep an `it` to at most three page loads within its 45 s budget (PAN-4767). Moving these specs to a serial lane is PAN-4733.
+- The isolated-dashboard fixture (`src/dashboard/frontend/tests/fixtures/isolated-dashboard.ts`) binds an OS-assigned free port, never 3011, and accepts health only from its own child's PID, so specs can run under any Playwright worker count. If its child server still loses the port (`EADDRINUSE`), the fixture retries once on a fresh port with the same home. Passing `port` to `startIsolatedDashboard` (a restart on the same port) turns that retry off (PAN-4805).
 
 **Playwright patterns:**
 

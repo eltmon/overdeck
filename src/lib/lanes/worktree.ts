@@ -54,6 +54,16 @@ export async function addBranchWorktree(projectPath: string, path: string, branc
   }
 }
 
+/** Whether `ref` names a commit in the repository at `projectPath` (PAN-4638 FR-9). */
+export async function commitExists(projectPath: string, ref: string): Promise<boolean> {
+  try {
+    await git(['rev-parse', '--verify', '--quiet', `${ref}^{commit}`], projectPath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Adds a worktree whose HEAD is detached at `ref`. */
 export async function addDetachedWorktree(projectPath: string, path: string, ref: string): Promise<void> {
   await git(['worktree', 'add', '--detach', path, ref], projectPath);

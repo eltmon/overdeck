@@ -1,0 +1,327 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-01T07:16:41Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4680: Flaky run-gh ledger test turned main red: queueLedgerEntry appends race, so ledger order is completion order",
+    "updated": "2026-11-01T07:24:11.755Z"
+  },
+  "plan": {
+    "id": "pan-4680",
+    "title": "Flaky run-gh ledger test turned main red: queueLedgerEntry appends race, so ledger order is completion order",
+    "status": "running",
+    "uid": "7faf64d9-05b0-4adb-8b26-6973d7d1490a",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-01T07:16:41Z",
+    "updated": "2026-11-01T07:24:11.755Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4680",
+        "label": "PAN-4680",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4680.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "github-quota",
+      "ledger",
+      "flaky-test",
+      "ci"
+    ],
+    "narratives": {
+      "Problem": "queueLedgerEntry in src/lib/github-quota/ledger.ts starts each append immediately and only tracks the promise in a Set. Two appends queued back to back race through `await mkdir` and `await appendFile`, so the ledger file holds lines in completion order. tests/unit/lib/github-quota/run-gh.test.ts asserts call order and turned main red on 2026-11-01 (run 41283191295).",
+      "Proposal": "Split the append into a synchronous prepare step (stamp ts/pid, resolve dir and hour file at call time) and an async write step (mkdir, appendFile, hourly prune). Route every append, queued and direct, through one module-level promise chain whose links each swallow failures. flushLedgerWrites awaits the chain tail. Add a new test file that gates the first mkdir with a hand-released deferred to prove call-order, call-time placement, and failure isolation. Document the in-process ordering guarantee in the module header and docs/PIPELINE-GATES.md. Full detail: .pan/drafts/PAN-4680.md.",
+      "NonGoals": "- No cross-process ordering or file locking between the dashboard, deacon, CLI and agent shim\n- No change to the ledger line format, file naming, prune policy or read window\n- No change to readLedgerWindow (stays sync and bounded)\n- No change to run-gh.ts, rest-meter.ts, sampler.ts or pause-gate.ts\n- No change to the call-order assertion in tests/unit/lib/github-quota/run-gh.test.ts\n- No fake timers and no real setTimeout delays in the new tests\n- No new exported helpers from ledger.ts (prepare/write/enqueue/chain stay private)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Direct appendLedgerEntry calls join the same append chain as queueLedgerEntry and await their own link.",
+        "rationale": "The issue's goal is ledger order equals call order; that holds for the whole file only if both entry points share one chain. The cost is a few milliseconds of waiting behind in-flight queued appends, and pause-gate still reads its own refusal back because appendLedgerEntry resolves after its own line lands."
+      },
+      {
+        "summary": "The 50-consecutive-run AC is proven with a bash loop, run once by the work agent.",
+        "rationale": "Vitest 4.1 has no --repeat CLI flag (checked with npx vitest --help), and every local Vitest run enters the shared CPU admission queue."
+      },
+      {
+        "summary": "New tests go in a new file tests/unit/lib/github-quota/ledger-queue.test.ts.",
+        "rationale": "They mock node:fs/promises, and vi.mock is file-wide; a separate file keeps the existing ledger.test.ts prune/append tests on the real fs."
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-01-PAN-4680-flaky-run-gh-ledger-test-turned-main-red-queueledgerentry-appends-race-so-ledger-order-is-completion-order.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "serialize-appends",
+        "title": "Serialize ledger appends through one promise chain with call-time stamping",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T07:16:41Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4680",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/github-quota/ledger.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/github-quota/ tests/unit/cli/telemetry-exit.test.ts",
+            "for i in $(seq 1 50); do npx vitest run tests/unit/lib/github-quota/run-gh.test.ts >/dev/null 2>&1 || { echo \"FAIL on run $i\"; exit 1; }; done; echo \"50/50 passed\""
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "all github-quota tests and telemetry-exit.test.ts pass",
+            "the loop prints 50/50 passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/github-quota/ledger.ts replace lines 108-153 (from `let lastAppendHour` through `flushLedgerWrites`) with the After block in PRD WI-1: private `prepareLedgerAppend` (sync; stamps ts/pid, resolves getGitHubQuotaDir() and ledgerFilePath(); returns null instead of throwing), private `writeLedgerAppend` (mkdir, appendFile, hourly prune; swallows errors), private `appendChain` promise and `enqueueLedgerAppend` (prepare now, `appendChain.then(() => writeLedgerAppend(prepared)).catch(() => undefined)`, store as new tail, return the link). `appendLedgerEntry` awaits `enqueueLedgerAppend(input)`; `queueLedgerEntry` does `void enqueueLedgerAppend(input)`; `flushLedgerWrites` awaits `appendChain`. Delete `pendingAppends`. The chain callback must call writeLedgerAppend, never appendLedgerEntry (that would deadlock). Add to the module header after the O_APPEND sentence: 'Within one process, appends are serialized in call order: each write starts after the previous one settles, and the entry is stamped and its file resolved at call time.' Do not touch any caller."
+        },
+        "items": [
+          {
+            "id": "serialize-appends.ac1",
+            "title": "Given ledger.ts after the change, when `npm run typecheck` runs, then it exits 0 and `grep -n pendingAppends src/lib/github-quota/ledger.ts` prints nothing, while queueLedgerEntry, appendLedgerEntry and flushLedgerWrites keep their exported signatures",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "serialize-appends.ac2",
+            "title": "When `npx vitest run tests/unit/lib/github-quota/ tests/unit/cli/telemetry-exit.test.ts` runs, then every existing test passes, including the pause-gate test that reads its own rate_limited line back without a flush",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "serialize-appends.ac3",
+            "title": "When the 50-iteration bash loop over tests/unit/lib/github-quota/run-gh.test.ts runs, then it prints `50/50 passed`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "serialize-appends.ac4",
+            "title": "`grep -n \"serialized in call order\" src/lib/github-quota/ledger.ts` returns a line in the module header comment",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "queue-order-test",
+        "title": "Add ordering tests for the append chain in ledger-queue.test.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T07:16:41Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4680",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/lib/github-quota/ledger-queue.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/github-quota/ledger-queue.test.ts",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "ledger-queue.test.ts passes the three ordering tests named in PRD WI-2",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-5",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Create tests/unit/lib/github-quota/ledger-queue.test.ts per PRD WI-2. Mock node:fs/promises with vi.hoisted mkdir/appendFile spies that pass through to the real functions; re-install the pass-through implementations in beforeEach (mockReset + mockImplementation from vi.importActual). Gate the first mkdir with mockImplementationOnce that waits on a hand-released deferred and then calls the REAL mkdir from vi.importActual (never resolve it with undefined: the github-quota dir must still be created, or the first appendFile fails with ENOENT); yield with `await new Promise((r) => setImmediate(r))`; never use setTimeout or fake timers. Tests: (1) 'appends queued entries in call order even when the first mkdir is slow' — three queued entries, mkdir called exactly once and appendFile zero times before release, window costs [1,2,3] after flush; (2) 'orders a direct append after the queued appends started before it' — queue 1, start un-awaited appendLedgerEntry 2, queue 3, release, await direct, first two window costs are [1,2], after flush [1,2,3]; (3) 'stamps and places a queued entry at call time, not at write time' — vi.spyOn(Date, 'now') returns queuedAt (real now minus 60s) while two ts-less entries are queued under home A with the chain gated; then the spy returns queuedAt + 30s and OVERDECK_HOME switches to home B; release, flush, restore the spy; both entries are in A with ts equal to new Date(queuedAt).toISOString(), and B has no github-quota dir. Implementation checkpoint: run test 1 against the pre-change ledger.ts and confirm the mkdir call-count assertion fails there; do not commit that revert."
+        },
+        "items": [
+          {
+            "id": "queue-order-test.ac1",
+            "title": "Given the first mkdir is gated, when three entries are queued, then mkdir has been called exactly once before release and readLedgerWindow returns costs [1, 2, 3] after flushLedgerWrites",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "queue-order-test.ac2",
+            "title": "Given a direct appendLedgerEntry started between two queued appends, when it resolves, then the ledger's first two lines are the earlier queued entry and the direct entry, and after flush all three appear in call order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "queue-order-test.ac3",
+            "title": "Given two entries queued under OVERDECK_HOME A while the chain is blocked and Date.now() returns queuedAt, when Date.now() advances and OVERDECK_HOME switches to B before the writes run, then both entries persist under A with ts equal to queuedAt and no github-quota directory is created under B",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "queue-order-test.ac4",
+            "title": "Against the pre-change ledger.ts, test 1's mkdir call-count assertion fails (recorded in the commit message or PR body as checkpoint evidence)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "queue-rejection-test",
+        "title": "Add failure-isolation tests for the append chain",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T07:16:41Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4680",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/lib/github-quota/ledger-queue.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/github-quota/ledger-queue.test.ts"
+          ],
+          "expected_outputs": [
+            "ledger-queue.test.ts passes the two failure-isolation tests named in PRD WI-3"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Add two tests to tests/unit/lib/github-quota/ledger-queue.test.ts per PRD WI-3: (1) 'a rejected append does not stop later appends' — appendFile.mockImplementationOnce rejects with Error('EIO'); queue costs 1,2,3; `await expect(flushLedgerWrites()).resolves.toBeUndefined()`; window costs equal [2,3]. (2) 'a rejected direct append resolves for its caller' — same rejection; `await expect(appendLedgerEntry(cost 1)).resolves.toBeUndefined()`; then await appendLedgerEntry(cost 2); window costs equal [2]."
+        },
+        "items": [
+          {
+            "id": "queue-rejection-test.ac1",
+            "title": "Given the first appendFile rejects, when three entries are queued and flushLedgerWrites is awaited, then the flush resolves and the ledger holds only entries 2 and 3 in that order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "queue-rejection-test.ac2",
+            "title": "Given the first appendFile rejects, when appendLedgerEntry is awaited for that entry, then it resolves to undefined and a following appendLedgerEntry persists its line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-ledger-order",
+        "title": "Document the in-process ledger ordering guarantee in PIPELINE-GATES.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T07:16:41Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4680",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/PIPELINE-GATES.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n \"appends land in call order\" docs/PIPELINE-GATES.md"
+          ],
+          "expected_outputs": [
+            "grep prints the new sentence inside the 'The ledger.' paragraph"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In docs/PIPELINE-GATES.md, in the paragraph starting '**The ledger.** Every metered call and every' (around line 1420), after the sentence that lists the entry shape ending 'agent? }`.', insert: 'Within one process, appends land in call order: each write starts after the previous one settles, and an entry's `ts` and file are fixed when the call is metered. Lines from different processes interleave in arrival order.' Change nothing else."
+        },
+        "items": [
+          {
+            "id": "docs-ledger-order.ac1",
+            "title": "`grep -n \"appends land in call order\" docs/PIPELINE-GATES.md` returns the new sentence inside the 'The ledger.' paragraph, which also states that ts and file are fixed when the call is metered",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-ledger-order.ac2",
+            "title": "The same 'The ledger.' paragraph contains a sentence saying lines from different processes interleave in arrival order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "serialize-appends",
+        "to": "queue-order-test",
+        "type": "blocks"
+      },
+      {
+        "from": "serialize-appends",
+        "to": "queue-rejection-test",
+        "type": "blocks"
+      },
+      {
+        "from": "queue-order-test",
+        "to": "queue-rejection-test",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

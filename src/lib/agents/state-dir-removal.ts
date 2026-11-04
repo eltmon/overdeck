@@ -315,3 +315,63 @@ export async function removeAgentStateDir(
 
   return cleanDirectory(candidate, canonicalRoot, true);
 }
+
+const CODEX_CACHE_NAME_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
+
+/**
+ * PAN-4727: remove one plugin's copy from every agent's Codex plugin cache,
+ * `<agent>/codex-home*\/plugins/cache/<marketplace>/<plugin>`. Only that cache
+ * directory goes; nothing else in the agent dir (no session, no transcript) is
+ * touched. Symbolic links are never followed or removed, and a path whose
+ * canonical form leaves the agents root is refused. Returns the removed paths.
+ */
+export async function removeCodexPluginCaches(
+  marketplace: string,
+  plugin: string,
+  agentsRootPath: string = AGENTS_DIR,
+): Promise<string[]> {
+  for (const name of [marketplace, plugin]) {
+    if (!CODEX_CACHE_NAME_PATTERN.test(name)) {
+      throw new Error(`removeCodexPluginCaches: invalid name: ${JSON.stringify(name)}`);
+    }
+  }
+  const agentsRoot = resolve(agentsRootPath);
+  let canonicalRoot: string;
+  try {
+    canonicalRoot = await realpath(agentsRoot);
+  } catch (error) {
+    if (hasErrorCode(error, 'ENOENT')) return [];
+    throw error;
+  }
+
+  const removed: string[] = [];
+  for (const agent of await readdir(agentsRoot, { withFileTypes: true })) {
+    if (!agent.isDirectory()) continue;
+    const agentDir = join(agentsRoot, agent.name);
+    for (const home of await readdir(agentDir, { withFileTypes: true })) {
+      if (!home.isDirectory() || !home.name.startsWith('codex-home')) continue;
+      const cache = join(agentDir, home.name, 'plugins', 'cache', marketplace, plugin);
+      let cacheStat;
+      try {
+        cacheStat = await lstat(cache);
+      } catch (error) {
+        if (hasErrorCode(error, 'ENOENT') || hasErrorCode(error, 'ENOTDIR')) continue;
+        throw error;
+      }
+      if (cacheStat.isSymbolicLink() || !cacheStat.isDirectory()) continue;
+      assertContained(canonicalRoot, await realpath(cache));
+      await rm(cache, { recursive: true, force: true });
+      removed.push(cache);
+    }
+  }
+  return removed;
+}
+
+/**
+ * PAN-4941 — delete an agent's or conversation's delivered secrets: only the
+ * `secrets/` child of `ownerDir` (`<agent dir>` or `<conversation dir>`), never
+ * the owner directory or its transcripts. A missing directory is not an error.
+ */
+export async function removeAgentSecretsDir(ownerDir: string): Promise<void> {
+  await rm(join(ownerDir, 'secrets'), { recursive: true, force: true });
+}

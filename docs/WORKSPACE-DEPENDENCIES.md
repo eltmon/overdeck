@@ -62,7 +62,9 @@ Determines which command runs during workspace creation and before verification 
 - `npm` → `npm install`
 - `pnpm` → `pnpm install`
 
-If omitted, Overdeck auto-detects from lock files (`bun.lock` → bun, `package-lock.json` → npm, `pnpm-lock.yaml` → pnpm).
+If omitted, Overdeck uses bun when the workspace root has a bun.lock, and npm otherwise.
+
+When the workspace root has no package.json (every polyrepo workspace, or a non-Node project), Overdeck runs no root install and logs "No root package.json; skipped root install".
 
 ### `workspace_packages`
 
@@ -157,7 +159,7 @@ override to match.
 When `pan workspace create` runs (or when the planning dialog creates a workspace):
 
 1. **Create git worktree** — `git fetch origin && git worktree add`
-2. **Install dependencies** — `bun install` in the worktree root
+2. **Install dependencies** — the project's package manager in the worktree root, only when the root has a package.json; then, for polyrepo repos that set repos[].package_manager, an install inside each such repo.
 3. **Build workspace packages** — e.g., `cd packages/contracts && npm run build`
 4. **Install skills & templates** — Overdeck skills, CLAUDE.md, project templates
 5. **Start Docker containers** (if `--docker` flag) — runs init service which installs deps independently

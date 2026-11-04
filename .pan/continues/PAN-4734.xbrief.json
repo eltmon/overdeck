@@ -1,0 +1,299 @@
+{
+  "version": "1",
+  "issueId": "PAN-4734",
+  "created": "2026-11-02T14:23:44.928Z",
+  "updated": "2026-11-02T17:10:28.463Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "wi1-remote-state-tmux-target": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4734",
+      "claimedAt": "2026-11-02T14:23:44.928Z",
+      "doneAt": "2026-11-02T14:30:43.975Z"
+    },
+    "wi2-loops-skip-linked": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4734",
+      "claimedAt": "2026-11-02T14:30:51.180Z",
+      "doneAt": "2026-11-02T14:31:38.969Z"
+    },
+    "wi3-push-daemon-workdir": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4734",
+      "claimedAt": "2026-11-02T14:31:42.713Z",
+      "doneAt": "2026-11-02T14:32:30.687Z"
+    },
+    "wi4-sweep-defers-to-reap": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4734",
+      "claimedAt": "2026-11-02T14:32:33.776Z",
+      "doneAt": "2026-11-02T14:34:14.740Z"
+    },
+    "wi5-remote-prompt-workspace-path": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4734",
+      "claimedAt": "2026-11-02T14:34:23.489Z",
+      "doneAt": "2026-11-02T14:35:26.030Z"
+    },
+    "wi6-fly-conversation-cwd-and-workspace": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4734",
+      "claimedAt": "2026-11-02T14:35:29.799Z",
+      "doneAt": "2026-11-02T14:37:07.509Z"
+    },
+    "wi7-fly-work-agent-service": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4734",
+      "claimedAt": "2026-11-02T14:43:06.781Z",
+      "doneAt": "2026-11-02T14:43:30.053Z"
+    },
+    "wi10-reap-linked-agents": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4734",
+      "claimedAt": "2026-11-02T14:43:33.596Z",
+      "doneAt": "2026-11-02T14:45:47.164Z"
+    },
+    "wi8-work-door-route": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4734",
+      "claimedAt": "2026-11-02T14:45:52.010Z",
+      "doneAt": "2026-11-02T14:48:24.183Z"
+    },
+    "wi9-cli-start-remote": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4734",
+      "claimedAt": "2026-11-02T14:48:29.295Z",
+      "doneAt": "2026-11-02T14:52:25.651Z"
+    },
+    "wi11-discovery-linked-conversations": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4734",
+      "claimedAt": "2026-11-02T14:52:29.817Z",
+      "doneAt": "2026-11-02T14:54:34.852Z"
+    },
+    "wi12-tree-row-linked-conversation": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4734",
+      "claimedAt": "2026-11-02T14:54:39.729Z"
+    },
+    "wi12-tree-row-opens-linked": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4734",
+      "claimedAt": "2026-11-02T14:54:45.605Z",
+      "doneAt": "2026-11-02T14:56:48.216Z"
+    },
+    "wi13-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4734",
+      "claimedAt": "2026-11-02T14:56:52.591Z",
+      "doneAt": "2026-11-02T14:58:01.319Z"
+    },
+    "wi14-live-checkpoint": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4734",
+      "claimedAt": "2026-11-02T15:10:17.725Z",
+      "doneAt": "2026-11-02T16:36:37.612Z"
+    },
+    "wi1-remote-state-tmux-target.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:49:35.863Z"
+    },
+    "wi1-remote-state-tmux-target.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:49:55.923Z"
+    },
+    "wi1-remote-state-tmux-target.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:50:14.276Z"
+    },
+    "wi1-remote-state-tmux-target.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:50:33.280Z"
+    },
+    "wi2-loops-skip-linked.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:50:51.334Z"
+    },
+    "wi2-loops-skip-linked.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:51:10.762Z"
+    },
+    "wi2-loops-skip-linked.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:51:29.760Z"
+    },
+    "wi3-push-daemon-workdir.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:51:45.907Z"
+    },
+    "wi3-push-daemon-workdir.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:52:03.201Z"
+    },
+    "wi4-sweep-defers-to-reap.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:52:20.963Z"
+    },
+    "wi4-sweep-defers-to-reap.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:52:37.178Z"
+    },
+    "wi4-sweep-defers-to-reap.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:52:53.578Z"
+    },
+    "wi5-remote-prompt-workspace-path.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:53:13.516Z"
+    },
+    "wi5-remote-prompt-workspace-path.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:53:31.226Z"
+    },
+    "wi6-fly-conversation-cwd-and-workspace.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:53:50.182Z"
+    },
+    "wi6-fly-conversation-cwd-and-workspace.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:54:08.062Z"
+    },
+    "wi6-fly-conversation-cwd-and-workspace.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:54:28.007Z"
+    },
+    "wi6-fly-conversation-cwd-and-workspace.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:54:45.658Z"
+    },
+    "wi7-fly-work-agent-service.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:55:00.749Z"
+    },
+    "wi7-fly-work-agent-service.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:55:16.316Z"
+    },
+    "wi7-fly-work-agent-service.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:55:33.770Z"
+    },
+    "wi7-fly-work-agent-service.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:55:53.274Z"
+    },
+    "wi7-fly-work-agent-service.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:56:14.584Z"
+    },
+    "wi8-work-door-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:56:32.451Z"
+    },
+    "wi8-work-door-route.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:56:49.564Z"
+    },
+    "wi8-work-door-route.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:57:06.703Z"
+    },
+    "wi8-work-door-route.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:57:25.006Z"
+    },
+    "wi9-cli-start-remote.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:57:43.398Z"
+    },
+    "wi9-cli-start-remote.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:58:00.255Z"
+    },
+    "wi9-cli-start-remote.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:58:17.182Z"
+    },
+    "wi9-cli-start-remote.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:58:34.261Z"
+    },
+    "wi9-cli-start-remote.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:58:51.967Z"
+    },
+    "wi10-reap-linked-agents.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:59:08.537Z"
+    },
+    "wi10-reap-linked-agents.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:59:25.867Z"
+    },
+    "wi10-reap-linked-agents.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:59:43.233Z"
+    },
+    "wi11-discovery-linked-conversations.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T16:59:59.153Z"
+    },
+    "wi11-discovery-linked-conversations.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:00:16.174Z"
+    },
+    "wi11-discovery-linked-conversations.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:00:34.411Z"
+    },
+    "wi12-tree-row-opens-linked.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:00:52.023Z"
+    },
+    "wi12-tree-row-opens-linked.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:01:09.149Z"
+    },
+    "wi12-tree-row-opens-linked.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:01:27.776Z"
+    },
+    "wi13-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:01:44.962Z"
+    },
+    "wi13-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:02:02.114Z"
+    },
+    "wi13-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:02:18.303Z"
+    },
+    "wi14-live-checkpoint.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:02:34.286Z"
+    },
+    "wi14-live-checkpoint.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:02:50.702Z"
+    },
+    "wi14-live-checkpoint.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:03:06.355Z"
+    },
+    "wi14-live-checkpoint.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:03:22.064Z"
+    },
+    "wi14-live-checkpoint.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:03:39.732Z"
+    }
+  },
+  "feedback": []
+}

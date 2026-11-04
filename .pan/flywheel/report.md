@@ -1,40 +1,25 @@
-# Flywheel report — 2026-10-26 (conv 3341)
+# Flywheel report — 2026-11-01 (conv-flywheel, ticks 1–65)
 
-## Shipped
+Stopped for an operator machine reboot at 15:25 UTC. Every pipeline agent was paused first (`pan pause`, reason "Operator machine reboot"). The full list of live conversations and paused agents, with the unpause command, is in `~/reboot-2026-11-01-active-sessions.md`.
 
-- PAN-4534: CI failure feedback names the failing test. It had merged on
-  2026-10-24; closed out this run, with every Definition-of-Done row passing.
-- PAN-4633: adds GPT-6.1 Terra (gpt-6.1-terra) to the catalog, pricing,
-  Codex floor and CLIProxy route. PR #4635 merged at 20:18 UTC, went live in
-  0.72.0, and is closed out.
-- PAN-4630: dashboard terminals no longer loop on "Connection lost", because
-  Herdr streams now spawn with ~/.local/bin on PATH. PR #4631 merged through
-  the merge door, main CI was green at 4775d716, `pan reload` deployed
-  7a659f67, and the issue is closed out.
+## Shipped (merged, deployed, closed)
 
-## In flight
+PAN-4299, PAN-4640, PAN-4402, PAN-4647, PAN-4642, PAN-4643, PAN-4626, PAN-4330, PAN-2354, PAN-4672, PAN-2355, PAN-4628, PAN-4697, PAN-1254, PAN-4641, PAN-4680, PAN-4681, PAN-4649, PAN-4639, PAN-4648, PAN-4644, PAN-4663, PAN-4670, PAN-4295, PAN-4645 (Anywhere foundation), PAN-4714, PAN-4654.
 
-Nothing.
+Merged, waiting for deploy and close-out: PAN-4656, PAN-4717 (run `pan reload` after the reboot; main `7601a44a8f8` is green).
+
+## In flight (paused for the reboot)
+
+- Anywhere: PAN-4650 (approved mockup build), PAN-2356, PAN-4404 (PR #4720, approved, needs a merge-main). Gated on PAN-4650: PAN-4651, PAN-4652, then PAN-4296, PAN-4638.
+- PAN-4723 (flaky create-workspace-row test).
+- Strike PRs waiting for the operator's merge: #4698 (PAN-4669 reaper), #4701 (PAN-4690 review dispatch), #4707 (PAN-4702 merge-gate timestamps), #4678 (PAN-4673 model names), #4679 (PAN-4674 crew removal).
 
 ## Waiting on the operator
 
-- PAN-4636: an outside PR that the pipeline adopts can never pass
-  verification. Adoption never skips the plan-checklist check, which only
-  strikes skip, so it fails `incomplete-plan-items`, and the failure reaches
-  no agent. It is labeled `needs-handoff` (review machinery, TENET-10) and
-  needs a supervised `pan handoff`. Until it is fixed, recover each instance
-  with `pan start <id> --plan auto`; that worked for PAN-4630.
-- PAN-4626: stop and archive pending state on conversation rows. It is
-  planned (`pan plan --auto`) and ranked first, and it waits for the
-  `released` label.
-- PAN-4616: verify that GitHub's mergeable state honors `merge=union`. A
-  leftover planning workspace from the 2026-10-24 mis-start remains; it is
-  not released.
+- Merge the five strike PRs above.
+- Approve machinery fixes: PAN-4666 (status hides live agents), PAN-4671 (late CodeRabbit findings; recurred 3x), PAN-4675 (post-merge cleanup cannot resume), PAN-4710 (deferred hand-off retries give up).
+- Pick an option for PAN-4708 (docs.json conflicts).
 
 ## Substrate fixes this run
 
-- Filed PAN-4636, with file:line root cause and recovery recipe in
-  `.pan/flywheel/state.md`.
-- Observed once, not filed: the merge door counts the non-blocking flake-lane
-  CI job as pending (`pr-facts.ts` line 242). It can delay an approved merge
-  by up to 30 minutes.
+Filed with root cause: PAN-4663, 4666, 4669, 4670, 4671, 4672, 4675, 4680, 4681, 4690, 4697, 4702, 4708, 4710, 4717, 4723. Landed: PAN-4663 (Docker subnets), PAN-4670 (simple-mode CSRF), PAN-4680 (ledger flake), PAN-4697 (test-list conflict cascade). Learnings are in `.pan/flywheel/state.md`.

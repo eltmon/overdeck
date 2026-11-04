@@ -1,0 +1,680 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-01T16:15:52Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4728: pstack as a skill pack: mount Cursor's Claude Code build from the eltmon/plugins fork (subfolder plugin root)",
+    "updated": "2026-11-01T17:45:09.933Z"
+  },
+  "plan": {
+    "id": "pan-4728",
+    "title": "pstack as a skill pack: mount Cursor's Claude Code build from the eltmon/plugins fork (subfolder plugin root)",
+    "status": "running",
+    "uid": "71fc7f02-a054-4f0a-98de-68d8adae7720",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 4,
+    "created": "2026-11-01T16:15:52Z",
+    "updated": "2026-11-01T17:45:09.933Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4728",
+        "label": "PAN-4728",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "skill-packs",
+      "skills",
+      "pstack",
+      "cli",
+      "docs"
+    ],
+    "narratives": {
+      "Problem": "The operator wants poteto's pstack skills (principle-*, unslop, tdd, architect, poteto-mode) as an Overdeck skill pack with global/project/issue/conversation toggles. pstack's Claude Code build lives in a subfolder (harness/pstack/claude-code) of the eltmon/plugins fork, but the claude-plugin adapter only reads a plugin at the repo root, the mount copies only skill dirs (so 23 skills' link to ../../docs/harness/claude-code.md dangles), and `pan skills pack add` requires an explicit url and --ref.",
+      "Proposal": "Add KnownPack.pluginRoot: readPackManifest reads the plugin under that subfolder and returns repo-relative skill dirs so treeHash and the mount work unchanged; extractCommit archives only that subtree. Add KnownPack.mountExtras so the mount copies the plugin's docs/ and README.md next to skills/. Add KNOWN_PACKS.pstack pointing at https://github.com/eltmon/plugins pinned to ae5650febf4320793844c12c4adaa937f417f8da with 7 opt-in skills, and let `pan skills pack add <id> [url]` default the url and ref from KNOWN_PACKS. Verify live on this host with the workspace CLI at project level, then document in features/skills.mdx and changelog.mdx. Full detail: .pan/drafts/PAN-4728.md.",
+      "NonGoals": "- No --plugin-root CLI flag or registry field; pluginRoot comes from KNOWN_PACKS only\n- No mounting of agents/, hooks, MCP servers or commands, and Overdeck never runs pack scripts\n- No changes to the eltmon/plugins fork and no issues, PRs, comments or fetches against cursor/* or poteto/*\n- No mount of the Cursor source tree (pstack/) and no Codex-specific build\n- No dashboard changes (the add-command hint stays the mattpocock literal)\n- No change to skillsRoot semantics or to the sageox, mattpocock or deft pack behavior\n- No gstack runtime work (PAN-4727)\n- Nothing left turned on after live verification; pstack stays registered and off"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Add KnownPack.pluginRoot and keep skillsRoot separate rather than generalising skillsRoot",
+        "rationale": "pluginRoot relocates the manifest, capability probes and license; folding sageox into it would move its probes to extensions/ and could change its Not-applied output, which the acceptance forbids."
+      },
+      {
+        "summary": "Pin KNOWN_PACKS.pstack.ref to the fork commit ae5650febf4320793844c12c4adaa937f417f8da",
+        "rationale": "The issue names it as the fork point and requires an operator-approved pinned commit; fork main equals it today, and a SHA ref disables update nagging until the operator re-pins."
+      },
+      {
+        "summary": "Opt-in: setup-pstack, automate-me, reflect, create-verification-skill, create-formal-verification-skill, maintain-verification-skill, make-bot-ui",
+        "rationale": "Each writes outside the task's diff (user-global ~/.claude/rules, new or edited skill files, PRs, or a Tailscale-exposed webhook UI). poteto-mode stays default because the operator named it and it is user-invoked only; its PR playbooks are documented."
+      },
+      {
+        "summary": "Mount docs/ and README.md from the plugin root as mount extras",
+        "rationale": "23 skills link ../../docs/harness/claude-code.md, the doc that maps Cursor names to Claude Code, and it tells the agent to read local copies instead of fetching cursor/plugins URLs, which the operator forbids."
+      },
+      {
+        "summary": "Make the url and --ref of `pan skills pack add` optional, defaulting from KNOWN_PACKS",
+        "rationale": "The acceptance runs `pan skills pack add pstack` with no other arguments; only pstack gets a default ref, so other packs still require --ref."
+      },
+      {
+        "summary": "Live verification uses the workspace CLI against the real host config at project panopticon-cli, reverted to inherit",
+        "rationale": "The deployed pan lacks this code; PAN-4424 set the precedent of registering on the host (registration enables nothing) and verifying a level inside a short window."
+      }
+    ],
+    "metadata": {
+      "prd": ".pan/drafts/PAN-4728.md",
+      "canonicalFilename": "2026-11-01-PAN-4728-pstack-as-a-skill-pack-mount-cursor-s-claude-code-build-from-the-eltmon-plugins-fork-subfolder-plugin-root.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "manifest-plugin-root",
+        "title": "Read a pack manifest from a plugin root subfolder",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T16:15:52Z",
+        "metadata": {
+          "issueLabel": "pan-4728",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "backend",
+          "requiresInspection": true,
+          "foundationFor": [
+            "known-pack-pstack",
+            "sources-plugin-root",
+            "launch-pstack-mount"
+          ],
+          "files_scope": [
+            "src/lib/skill-packs/adapters.ts",
+            "src/lib/skill-packs/__tests__/adapters.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/skill-packs/__tests__/adapters.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "adapters.test.ts passes including 'reads a claude-plugin pack from pluginRoot and returns repo-relative dirs'",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. In src/lib/skill-packs/adapters.ts add KnownPack.pluginRoot and readPackManifest opts.pluginRoot: validate with toRepoRelative (throw `invalid pack plugin root: \"<v>\"`), read plugin.json, skill scan, hooks/mcp/commands/agents probes and LICENSE under join(root, pluginRoot), and return every PackSkill.dir and executable prefixed with pluginRoot (repo-relative). With pluginRoot unset the output is unchanged. Add the two plugin-root tests in adapters.test.ts."
+        },
+        "items": [
+          {
+            "id": "manifest-plugin-root.ac1",
+            "title": "Given a repo whose plugin sits at harness/p/claude-code plus a decoy skills/decoy at the repo root, when readPackManifest runs with pluginRoot 'harness/p/claude-code', then it returns only alpha and beta with dir 'harness/p/claude-code/skills/<name>' and no decoy",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "manifest-plugin-root.ac2",
+            "title": "Given that fixture, readPackManifest returns capabilities.agents true, executables ['harness/p/claude-code/skills/alpha/scripts/run.sh'], license 'MIT' and pluginName 'p' read from the plugin root",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "manifest-plugin-root.ac3",
+            "title": "readPackManifest rejects pluginRoot values '../x', '/abs', '..' and '' with an error containing 'invalid pack plugin root'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "manifest-plugin-root.ac4",
+            "title": "With pluginRoot unset every pre-existing adapters.test.ts case passes unchanged (the diff touches no existing expectation)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "known-pack-pstack",
+        "title": "Add the KNOWN_PACKS.pstack entry with ref and mountExtras fields",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T16:15:52Z",
+        "metadata": {
+          "issueLabel": "pan-4728",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/skill-packs/adapters.ts",
+            "src/lib/skill-packs/__tests__/adapters.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/skill-packs/__tests__/adapters.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "adapters.test.ts passes including the pstack KNOWN_PACKS case",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-4",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Add KnownPack.ref and KnownPack.mountExtras fields and the KNOWN_PACKS.pstack entry exactly as in PRD FR-4: url https://github.com/eltmon/plugins, ref ae5650febf4320793844c12c4adaa937f417f8da, adapter claude-plugin, pluginRoot harness/pstack/claude-code, mountExtras ['docs','README.md'], optIn [automate-me, create-formal-verification-skill, create-verification-skill, maintain-verification-skill, make-bot-ui, reflect, setup-pstack]. Add one toEqual test; leave the deft/mattpocock/sageox tests untouched."
+        },
+        "items": [
+          {
+            "id": "known-pack-pstack.ac1",
+            "title": "adapters.test.ts asserts KNOWN_PACKS.pstack toEqual the FR-4 object (fork url, 40-hex ref ae5650febf4320793844c12c4adaa937f417f8da, pluginRoot, mountExtras, 7 alphabetical opt-in names) and passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "known-pack-pstack.ac2",
+            "title": "The deft, mattpocock and sageox KNOWN_PACKS assertions in adapters.test.ts are byte-identical to main and the file passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "known-pack-pstack.ac3",
+            "title": "No URL under github.com/cursor or github.com/poteto appears in KNOWN_PACKS (grep of adapters.ts returns no match)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sources-plugin-root",
+        "title": "Fetch, extract and preview a known pack from its plugin root",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T16:15:52Z",
+        "metadata": {
+          "issueLabel": "pan-4728",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/skill-packs/sources.ts",
+            "src/lib/skill-packs/__tests__/sources.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/skill-packs/__tests__/sources.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "sources.test.ts passes including the four 'plugin root packs' cases",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-5",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. In src/lib/skill-packs/sources.ts: extractCommit(id, commit, pluginRoot?) archives only `-- <pluginRoot>`, reuses a cached extraction only when join(dir, pluginRoot) is a directory (else rm and re-extract), and validates the operand; addPack, both updatePack extractions and syncPack pass KNOWN_PACKS[id]?.pluginRoot; manifestAt passes pluginRoot to readPackManifest; PackPreview gains optional pluginRoot set by addPack/updatePack. Add the four 'plugin root packs' tests in sources.test.ts using a local upstream repo registered as id 'pstack'."
+        },
+        "items": [
+          {
+            "id": "sources-plugin-root.ac1",
+            "title": "Given a local upstream repo with skills under harness/pstack/claude-code and an unrelated other/skills/x, when addPack runs for id 'pstack', then the preview lists only the plugin-root skills, marks setup-pstack optIn, and sets preview.pluginRoot to 'harness/pstack/claude-code'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sources-plugin-root.ac2",
+            "title": "After addPack the extraction dir packExtractDir('pstack', commit) contains harness/pstack/claude-code and does not contain other/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sources-plugin-root.ac3",
+            "title": "Given a cached extraction dir for the commit that lacks the plugin root, extractCommit('pstack', commit, 'harness/pstack/claude-code') re-extracts and returns a dir holding the plugin root",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sources-plugin-root.ac4",
+            "title": "Given one pstack skill changed in a new upstream commit, updatePack returns diff.changed listing exactly that skill name",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mount-extras",
+        "title": "Copy known-pack reference files next to skills in the mount",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T16:15:52Z",
+        "metadata": {
+          "issueLabel": "pan-4728",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "backend",
+          "requiresInspection": true,
+          "foundationFor": [
+            "launch-pstack-mount"
+          ],
+          "files_scope": [
+            "src/lib/skill-packs/mount.ts",
+            "src/lib/skill-packs/__tests__/mount.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/skill-packs/__tests__/mount.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "mount.test.ts passes including 'copies extras from the plugin root next to skills'",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-7",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. In src/lib/skill-packs/mount.ts add MountPack.pluginRoot and MountPack.extras; populateMount copies each existing extra from join(root, pluginRoot, extra) to plugins/<pack>/<extra> with copyWithoutSymlinks and skips a missing one; mountHash adds one entry per extra so extra-free packs keep their hash (MOUNT_FORMAT_VERSION stays 2); assertMountPack rejects escaping paths and extras equal to or under skills, .claude-plugin, .codex-plugin. Add three buildMount tests."
+        },
+        "items": [
+          {
+            "id": "mount-extras.ac1",
+            "title": "Given a MountPack with pluginRoot 'harness/p/claude-code' and extras ['docs','README.md','missing'], buildMount creates plugins/p/docs/harness/claude-code.md and plugins/p/README.md, skips 'missing' without error, and still creates plugins/p/skills/a/SKILL.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mount-extras.ac2",
+            "title": "mountHash returns the same value for a selection with no extras field and with extras [], and a different value when extras is ['docs']; MOUNT_FORMAT_VERSION remains 2",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mount-extras.ac3",
+            "title": "buildMount rejects extras '../x', 'skills' and '.claude-plugin/plugin.json' with an error and writes no mount",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "launch-pstack-mount",
+        "title": "Mount pstack skills and docs at launch from catalog and KNOWN_PACKS",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T16:15:52Z",
+        "metadata": {
+          "issueLabel": "pan-4728",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/skill-overrides/catalog.ts",
+            "src/lib/skill-overrides/launch.ts",
+            "src/lib/skill-overrides/__tests__/launch.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/skill-overrides/__tests__/launch.test.ts src/lib/skill-overrides/__tests__/store.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "launch.test.ts and store.test.ts pass including the PAN-4728 pstack case",
+            "typecheck and lint complete without errors (no new circular import)"
+          ],
+          "traces": [
+            "FR-6",
+            "FR-8",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. catalog.ts listPackCatalog passes pluginRoot: known?.pluginRoot to readPackManifest. launch.ts resolveLaunchPackSelection loads KNOWN_PACKS via a dynamic import of ../skill-packs/adapters.js and adds pluginRoot and extras (from mountExtras) to each MountPack only when defined. Add the 'mounts pstack skills with the Claude Code adapter doc (PAN-4728)' launch test."
+        },
+        "items": [
+          {
+            "id": "launch-pstack-mount.ac1",
+            "title": "Given pstack is on at project level and its extraction holds harness/pstack/claude-code/skills/tdd and docs/harness/claude-code.md, when applyClaudePacks runs, then it returns [] and the link exposes pstack/skills/tdd/SKILL.md and pstack/docs/harness/claude-code.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launch-pstack-mount.ac2",
+            "title": "listPackCatalog passes the known pack's pluginRoot to readPackManifest (catalog.ts call includes pluginRoot: known?.pluginRoot)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launch-pstack-mount.ac3",
+            "title": "Every pre-existing launch.test.ts and store.test.ts case passes unchanged, so mattpocock and deft mounts carry no pluginRoot or extras fields",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-pack-add-defaults",
+        "title": "Default url and ref from KNOWN_PACKS in pan skills pack add and print the Root row",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T16:15:52Z",
+        "metadata": {
+          "issueLabel": "pan-4728",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/cli/commands/skills.ts",
+            "src/cli/commands/__tests__/skills.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/skills.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "skills.test.ts passes including the four new 'pan skills pack' add cases",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-9",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. In src/cli/commands/skills.ts change `pack add <id> <url>` to `add <id> [url]` with --ref optional; resolve url from KNOWN_PACKS[id].url and ref from KNOWN_PACKS[id].ref, exiting 1 with the exact FR-9 messages when either is missing; update the header usage line; printPackPreview inserts a 'Root' row after 'Source' only when preview.pluginRoot is set. Add the four new skills.test.ts cases."
+        },
+        "items": [
+          {
+            "id": "cli-pack-add-defaults.ac1",
+            "title": "Given `pan skills pack add pstack --yes` with no url or --ref, addPack is called with url 'https://github.com/eltmon/plugins' and ref 'ae5650febf4320793844c12c4adaa937f417f8da'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-pack-add-defaults.ac2",
+            "title": "Given `pan skills pack add mattpocock` with no --ref, the command exits 1 printing 'pack mattpocock has no default ref; pass --ref <tag-or-branch>' and does not call addPack",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-pack-add-defaults.ac3",
+            "title": "Given `pan skills pack add foo` with no url, the command exits 1 printing 'pack foo has no default url'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-pack-add-defaults.ac4",
+            "title": "A preview with pluginRoot 'harness/pstack/claude-code' renders the line '  Root         harness/pstack/claude-code'; the existing mattpocock preview renders no Root row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "live-checkpoint",
+        "title": "Register pstack on this host and verify the project-level mount and invocation",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T16:15:52Z",
+        "metadata": {
+          "issueLabel": "pan-4728",
+          "inspectionDepth": "fast",
+          "readiness": "sequential",
+          "difficulty": "medium",
+          "kind": "test",
+          "requiresInspection": false,
+          "files_scope": [
+            ".pan/drafts/PAN-4728-live-checkpoint.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "test -f .pan/drafts/PAN-4728-live-checkpoint.md",
+            "grep -c 'harness/pstack/claude-code' .pan/drafts/PAN-4728-live-checkpoint.md"
+          ],
+          "expected_outputs": [
+            "checkpoint doc exists with Build, Add, Project level, Invocation, Cleanup sections",
+            "grep count is at least 1"
+          ],
+          "traces": [
+            "FR-12",
+            "NFR-2",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7, run exactly as written there with the workspace CLI (node <ws>/dist/cli/index.js after npm run build:contracts && npm run build:cli). Add pstack with --yes, turn it on for project panopticon-cli, run launch-settings into a scratch link under <ws>/.tmp/pan-4728-live/, count mounted skills, check the adapter doc, invoke /pstack:principle-laziness-protocol via claude -p --plugin-dir <link> --model haiku (fallback: claude plugin validate), then set the project toggle back to inherit, confirm the link is absent, and run pack gc. Record everything verbatim in .pan/drafts/PAN-4728-live-checkpoint.md. Leave pstack registered and off."
+        },
+        "items": [
+          {
+            "id": "live-checkpoint.ac1",
+            "title": "The checkpoint doc records `pan skills pack add pstack --yes` output showing 58 skills at ae5650f, a 'Root  harness/pstack/claude-code' row and 'Not applied  agents, executables (6), project-mutating skills (7)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-checkpoint.ac2",
+            "title": "With pstack on for project panopticon-cli, the recorded launch-settings link contains 51 skill dirs and pstack/docs/harness/claude-code.md, and contains no setup-pstack dir",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-checkpoint.ac3",
+            "title": "The recorded claude -p reply to /pstack:principle-laziness-protocol describes the skill's principle (or, under the documented fallback, claude plugin validate passes on the mounted plugin)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-checkpoint.ac4",
+            "title": "The cleanup section shows the project toggle back at inherit, the rerun link absent, and pan skills list --project panopticon-cli reporting pstack off while it stays registered at ae5650f",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-pstack",
+        "title": "Document the pstack pack and add the changelog entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T16:15:52Z",
+        "metadata": {
+          "issueLabel": "pan-4728",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "docs",
+          "requiresInspection": false,
+          "files_scope": [
+            "features/skills.mdx",
+            "changelog.mdx",
+            ".overdeck/context/codebase/architecture.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n '### pstack' features/skills.mdx",
+            "grep -n 'pan skills pack add pstack' features/skills.mdx changelog.mdx",
+            "grep -n 'pluginRoot' .overdeck/context/codebase/architecture.md"
+          ],
+          "expected_outputs": [
+            "features/skills.mdx has a '### pstack' heading",
+            "both files contain 'pan skills pack add pstack'",
+            "architecture.md mentions pluginRoot"
+          ],
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. features/skills.mdx: add the known-pack default sentence under '### Adding a pack' and a '### pstack' section after the Matt Pocock fork section with the source and pin, add command and preview, enable/undo commands at three levels, the 7 opt-in skills with reasons, the docs/README mount extras, model-routing behavior under Claude Code (opus/xhigh mapping, setup-pstack writes ~/.claude/rules/pstack-models.md), agents not applied (pstack:poteto-agent falls back to general-purpose), poteto-mode PR/watch-pr playbooks, and Codex receiving the Claude build. changelog.mdx: pstack bullet in an Upcoming <Update> block (v0.73.0 unless a newer tag exists). .overdeck/context/codebase/architecture.md: mention pluginRoot, default ref and mountExtras in the skill-packs sentence and refresh last-verified."
+        },
+        "items": [
+          {
+            "id": "docs-pstack.ac1",
+            "title": "features/skills.mdx renders a '### pstack' section containing 'pan skills pack add pstack', 'harness/pstack/claude-code', all 7 opt-in skill names, 'docs/harness/claude-code.md' and 'pstack:poteto-agent'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-pstack.ac2",
+            "title": "The pstack section contains the statement that setup-pstack writes ~/.claude/rules/pstack-models.md, which every Claude Code session on the machine loads, and that claude-opus-5-5-xhigh maps to model opus with effort xhigh",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-pstack.ac3",
+            "title": "changelog.mdx contains the pstack bullet linking #4728 inside an <Update> block tagged Upcoming",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-pstack.ac4",
+            "title": ".overdeck/context/codebase/architecture.md contains pluginRoot and mountExtras in the skill-packs sentence and exactly one last-verified line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "manifest-plugin-root",
+        "to": "known-pack-pstack",
+        "type": "blocks"
+      },
+      {
+        "from": "manifest-plugin-root",
+        "to": "sources-plugin-root",
+        "type": "blocks"
+      },
+      {
+        "from": "known-pack-pstack",
+        "to": "sources-plugin-root",
+        "type": "blocks"
+      },
+      {
+        "from": "manifest-plugin-root",
+        "to": "launch-pstack-mount",
+        "type": "blocks"
+      },
+      {
+        "from": "known-pack-pstack",
+        "to": "launch-pstack-mount",
+        "type": "blocks"
+      },
+      {
+        "from": "mount-extras",
+        "to": "launch-pstack-mount",
+        "type": "blocks"
+      },
+      {
+        "from": "known-pack-pstack",
+        "to": "cli-pack-add-defaults",
+        "type": "blocks"
+      },
+      {
+        "from": "sources-plugin-root",
+        "to": "cli-pack-add-defaults",
+        "type": "blocks"
+      },
+      {
+        "from": "sources-plugin-root",
+        "to": "live-checkpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "launch-pstack-mount",
+        "to": "live-checkpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-pack-add-defaults",
+        "to": "live-checkpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "live-checkpoint",
+        "to": "docs-pstack",
+        "type": "informs"
+      }
+    ]
+  },
+  "status": "active"
+}

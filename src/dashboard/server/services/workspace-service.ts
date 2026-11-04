@@ -13,7 +13,13 @@ import { Effect, Layer, Context } from 'effect';
 import { workspaceNeedsSetup } from '../../../lib/workspace-manager/setup-marker.js';
 
 const execAsync = promisify(exec);
-import { resolveProjectFromIssueSync } from '../../../lib/projects.js';
+import { reserveDiskFloor } from '../../../lib/disk-floor.js';
+import { getProjectSync, resolveProjectFromIssueSync } from '../../../lib/projects.js';
+import {
+  estimateWorkspaceDiskCost,
+  invalidateWorkspaceDiskCostMemo,
+  SEED_STACK_DISK_COST_BYTES,
+} from '../../../lib/workspace/disk-cost.js';
 import { WorkspaceNotFound, WorkspaceCreateError } from './typed-errors.js';
 
 // ─── Domain types ─────────────────────────────────────────────────────────────
@@ -285,7 +291,7 @@ export const WorkspaceServiceLive = Layer.effect(
       containerize: (issueId) =>
         Effect.tryPromise({
           try: async () => {
-            const { workspacePath } = getWorkspacePath(issueId);
+            const { projectPath, workspacePath } = getWorkspacePath(issueId);
             const issueLower = issueId.toLowerCase();
 
             if (!existsSync(workspacePath)) {
@@ -325,10 +331,27 @@ export const WorkspaceServiceLive = Layer.effect(
             // Start containers
             const finalComposePath = composePaths.find((p) => existsSync(p));
             if (finalComposePath) {
-              await execAsync(
-                `docker compose -f "${finalComposePath}" up -d --build`,
-                { cwd: dirname(finalComposePath), timeout: 300000 },
-              );
+              // PAN-4961: admit the stack phase against every in-flight setup.
+              const resolved = resolveProjectFromIssueSync(issueId);
+              const projectConfig = (resolved ? getProjectSync(resolved.projectKey) : null) ?? { path: projectPath };
+              const cost = await estimateWorkspaceDiskCost(projectConfig);
+              const admission = await reserveDiskFloor({
+                path: workspacePath,
+                bytes: cost.stackBytes || SEED_STACK_DISK_COST_BYTES,
+                label: `containerize:${issueLower}`,
+              });
+              if (!admission.ok) {
+                throw new WorkspaceCreateError({ id: issueId, message: admission.error });
+              }
+              try {
+                await execAsync(
+                  `docker compose -f "${finalComposePath}" up -d --build`,
+                  { cwd: dirname(finalComposePath), timeout: 300000 },
+                );
+              } finally {
+                await admission.reservation.release();
+                invalidateWorkspaceDiskCostMemo(projectConfig.path);
+              }
             }
           },
           catch: (err) => {

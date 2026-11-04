@@ -14,6 +14,7 @@ import { useDashboardStore, hasDetectedToolPermission, selectAgentsWithPendingAs
 import { useAskUserQuestionUiStore } from '../../lib/askUserQuestionUiStore';
 import { refreshDashboardState } from '../../lib/refresh-dashboard-state';
 import { fetchWithTimeout } from '../../lib/apiFetch';
+import { buildPendingAnswerRequest, parseCodexOptionNumber, postPendingAnswer, type PendingAnswerTarget } from '../../lib/pendingInputAnswer';
 import type { Issue } from '../../types';
 import {
   fetchConfirmations,
@@ -357,67 +358,13 @@ export function usePendingInputDialogs() {
   }, [agentsWithAskUserQuestion, agentsWithProposedPlan, convAskUserQuestionRows, issueTitleById]);
 
   const askUserQuestionAnswerMutation = useMutation({
-    mutationFn: async ({ kind, id, answers, questions, harness, toolUseId }: {
-      kind: 'agent' | 'conv';
-      id: string;
+    mutationFn: async (target: PendingAnswerTarget & {
       /** Friendly display label (issue/conversation title) for the toast. */
       label?: string;
-      answers: string[];
-      questions: AskUserQuestionSubject['pendingAskUserQuestion'] extends infer T
-        ? T extends { questions: infer Q } ? Q : never : never;
-      /** PAN-3766 — conversation harness; pi asks are answered by keystrokes. */
-      harness?: string | null;
-      toolUseId?: string;
     }) => {
-      if (kind === 'agent') {
-        // fetchWithTimeout everywhere in these mutations: a plain fetch that
-        // never resolves (e.g. server restart mid-request) leaves isPending
-        // stuck true and every dialog button disabled until a page refresh.
-        const res = await fetchWithTimeout(`/api/agents/${encodeURIComponent(id)}/answer-question`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ answers, toolUseId }),
-        });
-        if (!res.ok) {
-          let message = `Failed to deliver answer (${res.status})`;
-          try { const body = await res.json() as { error?: string }; if (body?.error) message = body.error; } catch { /* ignore */ }
-          throw new Error(message);
-        }
-        return res.json();
-      }
-      // PAN-3766 — a pi ask modal holds the session's input; a queued message
-      // is swallowed. Drive the modal with keystrokes instead.
-      if (harness === 'ohmypi' || harness === 'pi') {
-        const res = await fetchWithTimeout(`/api/conversations/${encodeURIComponent(id)}/pi-ask-answer`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ toolUseId, answers }),
-        });
-        if (!res.ok) {
-          let message = `Failed to deliver answer (${res.status})`;
-          try { const body = await res.json() as { error?: string }; if (body?.error) message = body.error; } catch { /* ignore */ }
-          throw new Error(message);
-        }
-        return res.json();
-      }
-      const lines: string[] = [];
-      const qArr = (questions ?? []) as ReadonlyArray<{ question: string }>;
-      for (let i = 0; i < answers.length && i < qArr.length; i++) {
-        const q = qArr[i]?.question ?? `Question ${i + 1}`;
-        lines.push(`Q: ${q}\nA: ${answers[i]}`);
-      }
-      const composed = `Operator answered the pending question${answers.length > 1 ? 's' : ''}:\n\n${lines.join('\n\n')}`;
-      const res = await fetchWithTimeout(`/api/conversations/${encodeURIComponent(id)}/message`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: composed }),
-      });
-      if (!res.ok) {
-        let message = `Failed to deliver answer (${res.status})`;
-        try { const body = await res.json() as { error?: string }; if (body?.error) message = body.error; } catch { /* ignore */ }
-        throw new Error(message);
-      }
-      return res.json();
+      const request = buildPendingAnswerRequest(target);
+      if ('error' in request) throw new Error(request.error);
+      return postPendingAnswer(request, 'Failed to deliver answer');
     },
     onMutate: (variables) => {
       const toolUseId = currentAskUserQuestionSubject?.pendingAskUserQuestion?.toolUseId;
@@ -438,23 +385,10 @@ export function usePendingInputDialogs() {
   });
 
   const codexApprovalMutation = useMutation({
-    mutationFn: async ({ id, optionNumber, toolUseId }: {
-      id: string;
-      optionNumber: number;
-      label?: string;
-      toolUseId?: string;
-    }) => {
-      const res = await fetchWithTimeout(`/api/conversations/${encodeURIComponent(id)}/codex-approval`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ optionNumber, toolUseId }),
-      });
-      if (!res.ok) {
-        let message = `Failed to send approval (${res.status})`;
-        try { const body = await res.json() as { error?: string }; if (body?.error) message = body.error; } catch { /* ignore */ }
-        throw new Error(message);
-      }
-      return res.json();
+    mutationFn: async (target: PendingAnswerTarget & { label?: string }) => {
+      const request = buildPendingAnswerRequest(target);
+      if ('error' in request) throw new Error(request.error);
+      return postPendingAnswer(request, 'Failed to send approval');
     },
     onMutate: ({ toolUseId }) => {
       if (toolUseId) markAskUserQuestionAnswered(toolUseId);
@@ -474,15 +408,14 @@ export function usePendingInputDialogs() {
     const subject = currentAskUserQuestionSubject;
     const toolUseId = subject.pendingAskUserQuestion?.toolUseId;
     if (toolUseId?.startsWith('codex-approval:')) {
-      const match = /^\s*(\d+)/.exec(answers[0] ?? '');
-      const optionNumber = match ? Number(match[1]) : NaN;
-      if (!Number.isInteger(optionNumber)) {
+      if (parseCodexOptionNumber(answers[0] ?? '') === null) {
         toast.error('Could not determine which option was selected');
         return;
       }
       codexApprovalMutation.mutate({
+        kind: 'conv',
         id: subject.id,
-        optionNumber,
+        answers,
         label: subject.title?.trim() || subject.id,
         toolUseId,
       });
@@ -493,7 +426,7 @@ export function usePendingInputDialogs() {
       id: subject.id,
       label: subject.title?.trim() || subject.id,
       answers,
-      questions: subject.pendingAskUserQuestion?.questions as never,
+      questions: subject.pendingAskUserQuestion?.questions,
       harness: (subject as { harness?: string | null }).harness ?? null,
       toolUseId: subject.pendingAskUserQuestion?.toolUseId,
     });

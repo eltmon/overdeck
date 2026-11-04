@@ -6,6 +6,10 @@ export type RestartLockHolder = {
   pid: number;
   ts: number;
   caller: string;
+  /** origin/main commit a `pan reload` holder builds (PAN-4888). */
+  targetSha?: string;
+  /** True when the holder steps aside for a newer `pan reload` (PAN-4888). */
+  supersedable?: boolean;
 };
 
 export type RestartLockHandle = {
@@ -36,7 +40,13 @@ async function readHolderFromPath(path: string): Promise<RestartLockHolder | nul
     ) {
       return null;
     }
-    return { pid: parsed.pid, ts: parsed.ts, caller: parsed.caller };
+    return {
+      pid: parsed.pid,
+      ts: parsed.ts,
+      caller: parsed.caller,
+      ...(typeof parsed.targetSha === 'string' && parsed.targetSha ? { targetSha: parsed.targetSha } : {}),
+      ...(parsed.supersedable === true ? { supersedable: true } : {}),
+    };
   } catch (error) {
     if (isErrnoException(error) && error.code === 'ENOENT') return null;
     return null;
@@ -157,13 +167,25 @@ export async function readRestartLockHolder(): Promise<RestartLockHolder | null>
   }
 }
 
-/** Acquire the restart lock for `caller`; resolves to a lock handle, or null while another live holder has it. */
-export async function acquireRestartLock(caller: string): Promise<RestartLockHandle | null> {
+/**
+ * Acquire the restart lock for `caller`; resolves to a lock handle, or null while another live holder has it.
+ * `extra` records the reload target and whether the holder yields to a newer `pan reload` (PAN-4888).
+ */
+export async function acquireRestartLock(
+  caller: string,
+  extra: { targetSha?: string; supersedable?: boolean } = {},
+): Promise<RestartLockHandle | null> {
   const path = restartLockPath();
   await mkdir(dirname(path), { recursive: true });
 
   for (let attempt = 0; attempt < 3; attempt += 1) {
-    const holder = { pid: process.pid, ts: Date.now(), caller };
+    const holder: RestartLockHolder = {
+      pid: process.pid,
+      ts: Date.now(),
+      caller,
+      ...(extra.targetSha ? { targetSha: extra.targetSha } : {}),
+      ...(extra.supersedable === true ? { supersedable: true } : {}),
+    };
     try {
       await writeLockFile(path, holder);
       return createOwnedLockHandle(path, holder);

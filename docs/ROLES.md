@@ -130,6 +130,23 @@ Overdeck renders this declaration for each harness:
 - **Claude Code** gets a generated `--mcp-config` JSON file and an `mcp__<name>` entry in `--allowedTools` (PAN-2090).
 - **Codex** gets `[mcp_servers.<name>]` entries in the agent's `codex-home/config.toml`. Overdeck rewrites the entries on spawn, resume, and recovery so relaunching a role preserves its tools (PAN-2698).
 - **ohmypi** cannot provision role MCP servers. Overdeck logs a spawn-time warning that names every unavailable server.
+- **ACP harnesses** (`acp`, `opencode`) get only the `overdeck` server (PAN-4934); role-declared servers are not provisioned for them.
+
+### Agent token scopes (PAN-4927)
+
+Each managed agent and conversation gets its own access token for the Overdeck
+MCP server. Its scopes come from `AGENT_TOKEN_SCOPES` in
+`src/lib/mcp/agent-token.ts`, keyed by role:
+
+| Role | Scopes |
+| --- | --- |
+| `work`, `worker`, `plan`, `strike`, `sequencer`, `knowledge`, `flywheel` | `read:events`, `read:state`, `read:conversations`, `tell`, `operate` |
+| `review`, `test`, `ship` | `read:events`, `read:state`, `read:conversations`, `tell` |
+| `conversation` | `read:events`, `read:state`, `read:conversations`, `tell`, `operate`, `approve` |
+
+An agent token never holds `admin`, `forward`, `read:settings` or `read:costs`.
+Only conversations get `approve`. See "Agent tokens (PAN-4927)" in
+`docs/DASHBOARD-AUTH.md` for minting, revocation and the sweep.
 
 ### 2. Overdeck pipeline agent — `agents/pan-*-agent.md`
 

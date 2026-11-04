@@ -21,6 +21,8 @@ export interface SkippedProjectRecord {
 
 const skipped = new Map<string, SkippedProjectRecord>();
 const loggedAtMtime = new Map<string, number>();
+/** Writes of the skipped list still in flight; the refresh never awaits them. */
+const inFlight = new Set<Promise<void>>();
 
 function skippedProjectsFile(): string {
   return join(getGitHubQuotaDir(), 'skipped-projects.json');
@@ -65,7 +67,11 @@ export function recordMembershipTrackerSkip(project: { name?: string; path: stri
       loggedAtMtime.delete(project.path);
       changed = true;
     }
-    if (changed) void persist([...skipped.values()]).catch(() => undefined);
+    if (changed) {
+      const write = persist([...skipped.values()]).catch(() => undefined);
+      inFlight.add(write);
+      void write.finally(() => inFlight.delete(write));
+    }
   } catch {
     // NFR-2: bookkeeping never fails the refresh.
   }
@@ -87,4 +93,9 @@ export function readSkippedProjects(): SkippedProjectRecord[] {
 export function resetSkippedProjectsForTests(): void {
   skipped.clear();
   loggedAtMtime.clear();
+}
+
+/** Wait for skipped-list writes still in flight, so a test can remove its OVERDECK_HOME (tests only). */
+export async function settleSkippedProjectsForTests(): Promise<void> {
+  await Promise.all([...inFlight]);
 }

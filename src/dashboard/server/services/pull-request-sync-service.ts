@@ -27,6 +27,14 @@
  *      cap, another repository, or a conversation outside every GitHub
  *      project) gets one `gh pr view`. Three failed reads in a row skip that
  *      repository for 15 minutes.
+ *   6. Auto-settle (PAN-4653): a conversation whose linked PR went from open to
+ *      merged/closed this sweep, and whose live links are all merged/closed, is
+ *      settled with reason `merge` when its override (else
+ *      `conversations.auto_settle_on_merge`, default on) allows it. Never
+ *      archives; agent conversations are skipped.
+ *   7. Watches (PAN-4943): every watched PR's snapshot comes from this pass's
+ *      listing or fallback rows, else one `gh pr view` under the same backoff;
+ *      the notifier compares it with the watch's own baseline.
  *
  * Boot +30 s, then every 60 s. Timers are unref()'d; a sweep never overlaps the
  * previous one. GitHub only; GitLab projects and MR links are skipped.
@@ -38,12 +46,10 @@ import { paneAgentKey, type PullRequestKey, type PullRequestLink, type PullReque
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
 import { getBackendPanes, isBackendInventoryDegraded } from './backend-inventory.js';
 import { resolveConversationBranch } from '../../../lib/overdeck/conversation-branch.js';
-import {
-  archiveConversation,
-  getConversationByName,
-  isAgentConversationName,
-} from '../../../lib/overdeck/conversations.js';
-import { isConversationsAutoArchiveOnMerge } from '../../../lib/overdeck/control-settings.js';
+import { isAgentConversationName } from '../../../lib/overdeck/conversations.js';
+import { isConversationsAutoSettleOnMerge } from '../../../lib/overdeck/control-settings.js';
+import { invalidateConversationListEnrichmentCache } from '../../../lib/overdeck/conversation-list.js';
+import { autoSettlesOnMerge, listConversationTriage, settleConversation } from '../../../lib/overdeck/conversation-triage-store.js';
 import {
   emitConversationPullRequestsChanged,
   listConversationPullRequests,
@@ -62,9 +68,9 @@ import {
 } from '../../../lib/overdeck/derived-issue-state.js';
 import { getRepoTargetBranch } from '../../../lib/project-repos.js';
 import { findProjectByPath, type ProjectConfig } from '../../../lib/projects.js';
-import { tmuxExecAsync } from '../../../lib/tmux.js';
 import { activeGitHubPause } from '../../../lib/github-quota/pause-gate.js';
 import { runGh } from '../../../lib/github-quota/run-gh.js';
+import { listWatchedPullRequestKeys, notifyPullRequestWatches } from './pull-request-watch-notifier.js';
 
 export const PR_SYNC_BOOT_DELAY_MS = 30_000;
 export const PR_SYNC_INTERVAL_MS = 60_000;
@@ -138,9 +144,11 @@ interface SweepContext {
   /** PR keys already handled this sweep (refreshed, or not due). */
   readonly handled: Set<string>;
   /** Conversations with a link that went from open to merged/closed this sweep. */
-  readonly settled: Set<string>;
+  readonly prFinished: Set<string>;
   /** PR key → conversations whose own link to it was open when the sweep began. */
   readonly openBefore: ReadonlyMap<string, ReadonlySet<string>>;
+  /** PAN-4943: PR key → snapshot read this pass, reused by the watch pass so a covered key costs no extra read. */
+  readonly snapshots: Map<string, PullRequestSnapshot>;
 }
 
 function openLinksByKey(links: ReadonlyMap<string, readonly PullRequestLink[]>): Map<string, Set<string>> {
@@ -176,50 +184,48 @@ function isDue(link: PullRequestLink, now: number): boolean {
 function applySnapshot(link: PullRequestLink, row: GhPrRow, ctx: SweepContext): number {
   lastReadAt.set(keyString(link), ctx.now);
   const snapshot = snapshotFromGhRow(row, ctx.syncedAt);
+  ctx.snapshots.set(keyString(link), snapshot);
   const changed = setPullRequestLinkSnapshot(link, snapshot);
   // Only an observed open → merged/closed transition counts (a first read of an
-  // already-settled PR does not), so auto-archive can't fire on a fresh link.
+  // already-finished PR does not), so auto-settle can't fire on a fresh link.
   // Judged per conversation: links sharing a PR can hold different snapshots.
   const openBefore = ctx.openBefore.get(keyString(link));
   for (const name of changed) {
     ctx.changedNames.add(name);
-    if (snapshot.state !== 'open' && openBefore?.has(name)) ctx.settled.add(name);
+    if (snapshot.state !== 'open' && openBefore?.has(name)) ctx.prFinished.add(name);
   }
   return changed.length;
 }
 
 /**
- * `conversations.auto_archive_on_merge` (default off): archive an operator
- * conversation whose PR just settled when every live link is now merged or
- * closed and no terminal session is alive. Acting only on the transition makes
- * it happen at most once, so an operator who unarchives is left alone. Agent
- * conversations belong to the pipeline and are never archived here; nothing is
- * ever stopped.
+ * PAN-4653: settle (never archive) an operator conversation whose PR just
+ * finished, once every live link is merged or closed. Effective setting =
+ * the conversation's override, else `conversations.auto_settle_on_merge`
+ * (default on). Acting only on the transition makes it fire once, so an
+ * operator who unsettles is left alone. Agent conversations, already
+ * settled ones and ones snoozed into the future are skipped. Settling
+ * touches no session, so liveness is not read.
  */
-async function autoArchiveSettledConversations(
-  ctx: SweepContext,
-  listLiveSessions: () => Promise<readonly string[] | null>,
-): Promise<string[]> {
-  const candidates = [...ctx.settled].filter((name) => !isAgentConversationName(name));
-  if (candidates.length === 0 || !isConversationsAutoArchiveOnMerge()) return [];
-  const liveNames = await listLiveSessions();
-  if (liveNames === null) {
-    // Liveness unknown: archiving now could archive a live conversation.
-    console.warn(`${LOG_PREFIX} terminal sessions could not be listed; skipping auto-archive this sweep`);
-    return [];
-  }
-  const live = new Set(liveNames);
-  const archived: string[] = [];
+function autoSettleMergedConversations(ctx: SweepContext): string[] {
+  const candidates = [...ctx.prFinished].filter((name) => !isAgentConversationName(name));
+  if (candidates.length === 0) return [];
+  const globalEnabled = isConversationsAutoSettleOnMerge();
+  const triage = listConversationTriage(candidates);
+  const settled: string[] = [];
   for (const name of candidates) {
-    const conversation = getConversationByName(name);
-    if (!conversation || conversation.archivedAt || live.has(conversation.tmuxSession)) continue;
+    const state = triage.get(name);
+    if (!state || state.settledAt !== null) continue;
+    if (!autoSettlesOnMerge(state.autoSettleOverride, globalEnabled)) continue;
+    if (state.snoozedUntil !== null && Date.parse(state.snoozedUntil) > ctx.now) continue;
     const links = listConversationPullRequests(name).filter((link) => link.dismissedAt === null);
     if (links.length === 0 || links.some((link) => link.snapshot?.state !== 'merged' && link.snapshot?.state !== 'closed')) continue;
-    archiveConversation(name);
-    archived.push(name);
+    if (settleConversation(name, 'merge', ctx.now)) settled.push(name);
   }
-  if (archived.length > 0) console.log(`${LOG_PREFIX} auto-archived ${archived.length} conversation(s) whose PRs settled`);
-  return archived;
+  if (settled.length > 0) {
+    invalidateConversationListEnrichmentCache();
+    console.log(`${LOG_PREFIX} auto-settled ${settled.length} conversation(s) whose PRs finished`);
+  }
+  return settled;
 }
 
 async function syncProject(
@@ -264,6 +270,7 @@ async function syncProject(
     if (!key) continue;
     const entry = { key, row };
     byKey.set(keyString(key), entry);
+    ctx.snapshots.set(keyString(key), snapshotFromGhRow(row, ctx.syncedAt));
     if (row.headRefName) {
       const list = byHead.get(row.headRefName) ?? [];
       list.push(entry);
@@ -370,6 +377,54 @@ async function readGithubPullRequest(key: PullRequestKey): Promise<GhPrRow | nul
   }
 }
 
+/** PAN-4943 WI-5: the watch store's keys and notifier, injected so tests can fake both. */
+export interface WatchPassDeps {
+  listKeys: () => Promise<ReadonlyArray<PullRequestKey & { url: string }>>;
+  notify: (snapshots: ReadonlyMap<string, PullRequestSnapshot>) => Promise<unknown>;
+}
+
+const defaultWatchPassDeps: WatchPassDeps = {
+  listKeys: listWatchedPullRequestKeys,
+  notify: (snapshots) => notifyPullRequestWatches(snapshots),
+};
+
+/** PAN-4943 C-5: an uncovered watched key gets one `gh pr view`, under the same backoff as `refreshUnlistedLinks`. */
+async function runWatchPass(
+  ctx: SweepContext,
+  readPullRequest: (key: PullRequestKey) => Promise<GhPrRow | null>,
+  watches: WatchPassDeps,
+): Promise<void> {
+  const keys = await watches.listKeys();
+  if (keys.length === 0) return;
+  for (const key of keys) {
+    const id = keyString(key);
+    if (ctx.snapshots.has(id)) continue;
+    const repo = `${key.host}/${key.repository}`;
+    if (repoInBackoff(repo, ctx.now)) continue;
+    const row = await readPullRequest(key);
+    if (!row) {
+      if (!userGraphqlPaused()) recordRepoFailure(repo, ctx.now);
+      continue;
+    }
+    repoFailures.delete(repo);
+    lastReadAt.set(id, ctx.now);
+    ctx.snapshots.set(id, snapshotFromGhRow(row, ctx.syncedAt));
+  }
+  await watches.notify(ctx.snapshots);
+}
+
+/** WI-6 uses this for a new watch's creation baseline. One read; writes no link. */
+export async function readPullRequestSnapshotNow(
+  key: PullRequestKey,
+  readPullRequest: (key: PullRequestKey) => Promise<GhPrRow | null> = readGithubPullRequest,
+  now: number = Date.now(),
+): Promise<PullRequestSnapshot | null> {
+  const row = await readPullRequest(key);
+  if (!row) return null;
+  lastReadAt.set(keyString(key), now);
+  return snapshotFromGhRow(row, new Date(now).toISOString());
+}
+
 /**
  * Forced refresh right after an explicit link, outside the sweep schedule, so
  * the badge fills in within seconds, including PRs outside the 100-row listing.
@@ -388,22 +443,6 @@ export async function refreshPullRequestLinkNow(
   return setPullRequestLinkSnapshot(link, snapshotFromGhRow(row, new Date(now).toISOString()));
 }
 
-/**
- * Live tmux session names, or null when they could not be read (unlike
- * `listSessionNames`, which reports a failure as "none alive"). A tmux with no
- * server running has no live sessions. Conversations are tmux-hosted on every
- * host for now; PAN-3921 moves this to the backend-agnostic inventory.
- */
-async function listLiveConversationSessions(): Promise<readonly string[] | null> {
-  try {
-    const { stdout } = await tmuxExecAsync(['list-sessions', '-F', '#{session_name}'], { encoding: 'utf-8' });
-    return String(stdout).split('\n').map((line) => line.trim()).filter(Boolean);
-  } catch (error) {
-    const stderr = String((error as { stderr?: unknown }).stderr ?? '');
-    return /no server running|error connecting to .*No such file or directory/i.test(stderr) ? [] : null;
-  }
-}
-
 /** Agent ids of live panes, or null when the inventory cannot be trusted this sweep. */
 async function listLivePaneAgentIds(): Promise<ReadonlySet<string> | null> {
   try {
@@ -417,23 +456,23 @@ async function listLivePaneAgentIds(): Promise<ReadonlySet<string> | null> {
 
 /**
  * One full sweep. Exported for tests; `readPullRequest` is the `gh pr view`
- * fallback, `listLiveSessions` the terminal sessions auto-archive checks, and
- * `listLivePanes` the backend-agnostic pane inventory primary-checkout
+ * fallback and `listLivePanes` the backend-agnostic pane inventory primary-checkout
  * branch matching reads for liveness (PAN-4457).
  */
 export async function runPullRequestSyncOnce(
   now: number = Date.now(),
   readPullRequest: (key: PullRequestKey) => Promise<GhPrRow | null> = readGithubPullRequest,
-  listLiveSessions: () => Promise<readonly string[] | null> = listLiveConversationSessions,
   listLivePanes: () => Promise<ReadonlySet<string> | null> = listLivePaneAgentIds,
+  watches: WatchPassDeps = defaultWatchPassDeps,
 ): Promise<PullRequestSyncResult> {
   // PAN-4264: skip the whole sweep during a user GraphQL pause (non-essential poller).
   if (userGraphqlPaused()) return { inserted: 0, updated: 0 };
   const livePanes = await listLivePanes();
   const conversations = listConversationsForPullRequestSync();
   const ctx: SweepContext = {
-    now, syncedAt: new Date(now).toISOString(), changedNames: new Set(), handled: new Set(), settled: new Set(),
+    now, syncedAt: new Date(now).toISOString(), changedNames: new Set(), handled: new Set(), prFinished: new Set(),
     openBefore: openLinksByKey(listPullRequestLinksForConversations(conversations.map((conversation) => conversation.name))),
+    snapshots: new Map(),
   };
   const groups = new Map<string, { project: ProjectConfig; conversations: PullRequestSyncConversation[] }>();
   for (const conversation of conversations) {
@@ -461,19 +500,24 @@ export async function runPullRequestSyncOnce(
     console.warn(`${LOG_PREFIX} fallback refresh failed:`, error);
   }
   try {
-    await autoArchiveSettledConversations(ctx, listLiveSessions);
+    autoSettleMergedConversations(ctx);
   } catch (error) {
-    console.warn(`${LOG_PREFIX} auto-archive failed:`, error);
+    console.warn(`${LOG_PREFIX} auto-settle failed:`, error);
+  }
+  try {
+    await runWatchPass(ctx, readPullRequest, watches);
+  } catch (error) {
+    console.warn(`${LOG_PREFIX} watch pass failed:`, error);
   }
   for (const name of ctx.changedNames) emitConversationPullRequestsChanged(name);
   return { inserted, updated };
 }
 
-async function runGuarded(trigger: string): Promise<void> {
+async function runGuarded(trigger: string, watches: WatchPassDeps): Promise<void> {
   if (running || stopped) return;
   running = true;
   try {
-    const result = await runPullRequestSyncOnce();
+    const result = await runPullRequestSyncOnce(undefined, undefined, undefined, watches);
     if (result.inserted > 0 || result.updated > 0) {
       console.log(`${LOG_PREFIX} ${trigger} sweep: ${result.inserted} linked, ${result.updated} refreshed`);
     }
@@ -484,14 +528,14 @@ async function runGuarded(trigger: string): Promise<void> {
   }
 }
 
-export function startPullRequestSyncService(): void {
+export function startPullRequestSyncService(watches: WatchPassDeps = defaultWatchPassDeps): void {
   if (bootTimer !== null || intervalTimer !== null) return;
   stopped = false;
   bootTimer = setTimeout(() => {
     bootTimer = null;
-    void runGuarded('boot');
+    void runGuarded('boot', watches);
     intervalTimer = setInterval(() => {
-      void runGuarded('interval');
+      void runGuarded('interval', watches);
     }, PR_SYNC_INTERVAL_MS);
     if (typeof intervalTimer.unref === 'function') intervalTimer.unref();
   }, PR_SYNC_BOOT_DELAY_MS);

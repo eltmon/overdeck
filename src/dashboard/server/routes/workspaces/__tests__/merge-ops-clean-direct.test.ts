@@ -172,6 +172,7 @@ vi.mock('../merge-strike.js', async (importOriginal) => {
   manualMergeHeadMoved: actual.manualMergeHeadMoved,
   mergeHeadPin: actual.mergeHeadPin,
   automaticMergeStartRefusal: actual.automaticMergeStartRefusal,
+  busyMergeRefusal: actual.busyMergeRefusal,
   activeStrikeMerge: vi.fn(() => false),
   advanceMergeQueue: vi.fn(async () => {}),
   ensureAgentReadyForMerge: mocks.ensureAgentReadyForMerge,
@@ -283,6 +284,15 @@ describe('triggerMerge clean PR direct merge', () => {
       url: PR_URL,
       matchHeadCommit: HEAD_SHA,
     }));
+  });
+
+  // PAN-4801: the auto-merge executor's merge (`{ kind: 'normal', expectedHeadSha }`)
+  // reaches the post-merge lifecycle once; the lifecycle rolls the merge train.
+  it('runs the post-merge lifecycle once after an automatic merge', async () => {
+    await triggerMerge('PAN-3110', { kind: 'normal', expectedHeadSha: HEAD_SHA });
+
+    expect(mocks.postMergeLifecycle).toHaveBeenCalledOnce();
+    expect(mocks.postMergeLifecycle).toHaveBeenCalledWith('PAN-3110', '/project', 'feature/pan-3110');
   });
 
   // #4066 review: the live PR head moved after the approval. The direct path

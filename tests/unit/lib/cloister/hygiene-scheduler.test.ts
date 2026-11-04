@@ -12,6 +12,11 @@ const mocks = vi.hoisted(() => ({
   sweepOrphanedSwarmSlots: vi.fn(async () => [] as string[]),
   patrolDiskPressure: vi.fn(async () => [] as string[]),
   patrolMemoryPressure: vi.fn(async () => [] as string[]),
+  refreshHostHeartbeatForEphemeralVms: vi.fn(async () => [] as string[]),
+  refreshClaudeCredentialsForActiveRemoteAgents: vi.fn(async () => [] as string[]),
+  heartbeatFlyMachines: vi.fn(async () => [] as string[]),
+  sweepFlyMachines: vi.fn(async () => [] as string[]),
+  syncFlyCodexAuth: vi.fn(async () => [] as string[]),
   loadCloisterConfigSync: vi.fn(() => ({ retention: { transcript_days: 30 } })),
 }));
 
@@ -47,6 +52,17 @@ vi.mock('../../../../src/lib/cloister/disk-pressure-patrol.js', () => ({
 }));
 vi.mock('../../../../src/lib/cloister/memory-pressure-patrol.js', () => ({
   patrolMemoryPressure: mocks.patrolMemoryPressure,
+}));
+vi.mock('../../../../src/lib/remote/remote-agents.js', () => ({
+  refreshHostHeartbeatForEphemeralVms: mocks.refreshHostHeartbeatForEphemeralVms,
+}));
+vi.mock('../../../../src/lib/remote/remote-credential-refresh.js', () => ({
+  refreshClaudeCredentialsForActiveRemoteAgents: mocks.refreshClaudeCredentialsForActiveRemoteAgents,
+}));
+vi.mock('../../../../src/lib/remote/fly-machine-loops.js', () => ({
+  heartbeatFlyMachines: mocks.heartbeatFlyMachines,
+  sweepFlyMachines: mocks.sweepFlyMachines,
+  syncFlyCodexAuth: mocks.syncFlyCodexAuth,
 }));
 vi.mock('../../../../src/lib/cloister/config.js', () => ({
   loadCloisterConfigSync: mocks.loadCloisterConfigSync,
@@ -90,6 +106,11 @@ describe('hygiene-scheduler', () => {
     expect(mocks.sweepOrphanedSwarmSlots).toHaveBeenCalledTimes(1);
     expect(mocks.patrolDiskPressure).toHaveBeenCalledTimes(1);
     expect(mocks.patrolMemoryPressure).toHaveBeenCalledTimes(1);
+    expect(mocks.refreshHostHeartbeatForEphemeralVms).toHaveBeenCalledTimes(1);
+    expect(mocks.refreshClaudeCredentialsForActiveRemoteAgents).toHaveBeenCalledTimes(1);
+    expect(mocks.heartbeatFlyMachines).toHaveBeenCalledTimes(1);
+    expect(mocks.sweepFlyMachines).toHaveBeenCalledTimes(1);
+    expect(mocks.syncFlyCodexAuth).toHaveBeenCalledTimes(1);
   });
 
   it('fires the 60s-cadence routines on their own interval', async () => {
@@ -107,6 +128,20 @@ describe('hygiene-scheduler', () => {
     // orphan-slot GC that swarmJanitorPass ran on every cycle.
     expect(mocks.reconcileMergedIssueDocker).toHaveBeenCalledTimes(1);
     expect(mocks.sweepOrphanedSwarmSlots).toHaveBeenCalledTimes(1);
+    // PAN-4295: the remote heartbeat and credential refresh, each with no argument
+    // reaching its deps parameter.
+    expect(mocks.refreshHostHeartbeatForEphemeralVms).toHaveBeenCalledTimes(1);
+    expect(mocks.refreshHostHeartbeatForEphemeralVms).toHaveBeenCalledWith();
+    expect(mocks.refreshClaudeCredentialsForActiveRemoteAgents).toHaveBeenCalledTimes(1);
+    expect(mocks.refreshClaudeCredentialsForActiveRemoteAgents).toHaveBeenCalledWith();
+    // PAN-4652: the Fly machine heartbeat and sweep, also every 60 s.
+    expect(mocks.heartbeatFlyMachines).toHaveBeenCalledTimes(1);
+    expect(mocks.heartbeatFlyMachines).toHaveBeenCalledWith();
+    expect(mocks.sweepFlyMachines).toHaveBeenCalledTimes(1);
+    expect(mocks.sweepFlyMachines).toHaveBeenCalledWith();
+    // PAN-4296: the Codex sign-in sync, every 60 s with no argument.
+    expect(mocks.syncFlyCodexAuth).toHaveBeenCalledTimes(1);
+    expect(mocks.syncFlyCodexAuth).toHaveBeenCalledWith();
     // ~10-minute-cadence routines must not have fired yet.
     expect(mocks.reapOrphanedDashboardServers).not.toHaveBeenCalled();
     expect(mocks.reapLeftoverPlaywrightBrowsers).not.toHaveBeenCalled();
@@ -163,6 +198,24 @@ describe('hygiene-scheduler', () => {
     for (const mock of Object.values(mocks)) {
       if ('mock' in mock) expect(mock).not.toHaveBeenCalled();
     }
+  });
+
+  it('skips a Codex sign-in sync tick while the previous pass is still running (PAN-4296)', async () => {
+    let finish!: () => void;
+    mocks.syncFlyCodexAuth.mockImplementationOnce(() => new Promise<string[]>((resolve) => { finish = () => resolve([]); }));
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    startHygieneScheduler();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(mocks.syncFlyCodexAuth).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(mocks.syncFlyCodexAuth).toHaveBeenCalledTimes(1);
+    expect(log).toHaveBeenCalledWith('[hygiene-scheduler] syncFlyCodexAuth: skipped: the previous pass is still running');
+
+    finish();
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(mocks.syncFlyCodexAuth).toHaveBeenCalledTimes(2);
+    log.mockRestore();
   });
 
   it('starting twice does not double-schedule', async () => {

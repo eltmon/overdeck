@@ -1,20 +1,34 @@
-import { memo, useState, useCallback, useMemo, useEffect } from 'react';
+import { memo, useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ForkModal } from './ForkModal';
 import { ConversationRow } from './ConversationRow';
+import { HiddenMachinesFooter } from './LinkedConversationRow';
 import { buildConversationTree, groupSummary, isConversationActive, type ConversationTreeNode } from './conversation-tree';
+import { partitionConversationSections, SECTION_ORDER, snoozePresets, type ConversationSectionId } from './conversation-triage';
 import { useConversationMutations, type ConversationMutations } from './useConversationMutations';
 import { useDashboardStore } from '../../lib/store';
+import { useNow } from '../../hooks/useNow';
 import type { ContextUsage } from '../chat/chat-types';
 import styles from './styles/command-deck.module.css';
 import { fetchWithTimeout } from '../../lib/apiFetch';
 import { fetchRegisteredProjects } from './UnknownProjectState';
-import type { PullRequestLink } from '@overdeck/contracts';
+import { MenuItemButton, MenuOverlay, MenuSurface } from '../shared/ContextMenu';
+import type { LinkedConversationFields, PullRequestLink } from '@overdeck/contracts';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export interface Conversation {
+/** PAN-4650 D-4650-3: the fields a linked row (owned by another machine) carries. */
+type LinkedRowFields = Partial<Omit<LinkedConversationFields, 'origin'>> & {
+  gitOrigin?: string | null;
+  pullable?: boolean;
+  /** When the saved copy of a linked row was last settled. */
+  savedCopyAt?: string | null;
+  /** Where the owner pulled this conversation from (finds a released copy's continuation). */
+  pulledFrom?: { environmentId: string; nativeSessionId: string } | null;
+};
+
+export interface Conversation extends LinkedRowFields {
   id: number;
   name: string;
   tmuxSession: string;
@@ -82,6 +96,16 @@ export interface Conversation {
   pullRequest?: PullRequestLink | null;
   /** PAN-3822: number of live (non-dismissed) pull-request links. */
   pullRequestCount?: number;
+  /** PAN-4657: the earliest nextRunAt among this conversation's enabled schedules, null if none. */
+  nextScheduledRunAt?: string | null;
+  /** PAN-4657: number of enabled schedules on this conversation. */
+  scheduleCount?: number;
+  /** PAN-4639: operator triage state. Null/absent = not settled / not snoozed. */
+  settledAt?: string | null;
+  settleReason?: 'manual' | 'merge' | 'idle' | null;
+  snoozedUntil?: string | null;
+  /** PAN-4653: per-conversation auto-settle-on-merge override. Absent = inherit. */
+  autoSettleOverride?: 'on' | 'off' | 'inherit';
   /** PAN-1520 — unified pending-input surfaces (same shape as AgentSnapshot). */
   pendingInputCount?: number;
   pendingInputKinds?: ReadonlyArray<string>;
@@ -120,8 +144,8 @@ export interface Conversation {
   workspaceId?: string | null;
   /** PAN-1577: explicit project assignment override. Null = fall back to deriving the project from cwd. */
   projectKey?: string | null;
-  /** PAN-4436: 'vault' = a read-only Session Vault browse copy owned by another machine. */
-  origin?: 'local' | 'vault';
+  /** PAN-4436: 'vault' = a read-only Session Vault browse copy owned by another machine; PAN-4650: 'linked' = a live row another machine owns. */
+  origin?: 'local' | 'vault' | 'linked';
   /** PAN-4436: the owning machine's label for a browse copy. */
   vaultOwnerLabel?: string | null;
   /** PAN-4447: this row's native file moved to another machine, or saved a local P-6 fork of a record another machine now owns. Null for a vault browse row or when neither applies. */
@@ -192,7 +216,7 @@ export async function updateConversationTitle(name: string, title: string): Prom
 export function getSortKey(conv: Conversation, sort: SortOption): string | number {
   switch (sort) {
     case 'lastActivity':
-      return conv.lastAttachedAt ?? conv.createdAt;
+      return conv.lastActivityAt ?? conv.lastAttachedAt ?? conv.createdAt;
     case 'lastAccessed':
       return conv.lastAttachedAt ?? '';
     case 'created':
@@ -252,6 +276,42 @@ function writeCollapsedGroups(names: ReadonlySet<string>): void {
   }
 }
 
+// ─── Sections (PAN-4639 D6, D9, D10) ───────────────────────────────────────────
+
+const SECTION_LABELS: Record<ConversationSectionId, string> = {
+  needsYou: 'Needs you',
+  inbox: 'Inbox',
+  snoozed: 'Snoozed',
+  settled: 'Settled',
+};
+
+/** D10: only Snoozed and Settled have a collapse toggle. */
+const COLLAPSIBLE_SECTIONS: ReadonlySet<ConversationSectionId> = new Set(['snoozed', 'settled']);
+
+/** D10: the names the viewer expanded, against the collapsed-by-default state of Snoozed/Settled. */
+const SECTIONS_EXPANDED_STORAGE_KEY = 'commandDeck.sections.expanded';
+
+function readExpandedSections(): Set<ConversationSectionId> {
+  try {
+    const parsed: unknown = JSON.parse(localStorage.getItem(SECTIONS_EXPANDED_STORAGE_KEY) ?? '[]');
+    return new Set(
+      Array.isArray(parsed)
+        ? parsed.filter((id): id is ConversationSectionId => id === 'snoozed' || id === 'settled')
+        : [],
+    );
+  } catch {
+    return new Set();
+  }
+}
+
+function writeExpandedSections(ids: ReadonlySet<ConversationSectionId>): void {
+  try {
+    localStorage.setItem(SECTIONS_EXPANDED_STORAGE_KEY, JSON.stringify([...ids]));
+  } catch {
+    // Storage unavailable (private window, blocked site data): collapse still works for this view.
+  }
+}
+
 // ─── List item (PAN-4560) ─────────────────────────────────────────────────────
 //
 // One top-level entry: the row, its group toggle and its nested rows.
@@ -267,9 +327,15 @@ type RegisteredProject = React.ComponentProps<typeof ConversationRow>['registere
 
 interface ConversationListItemProps {
   node: ConversationTreeNode<Conversation>;
+  /** PAN-4639: which section this top-level row renders in (D6). */
+  section: ConversationSectionId;
   collapsed: boolean;
   selectedConversation: string | null;
   onSelectConversation: (name: string) => void;
+  /** PAN-4639 D14: multi-select click handling for the top-level row. */
+  onRowClick: (event: React.MouseEvent, name: string) => void;
+  /** PAN-4639 D14: whether the top-level row is part of the current multi-selection. */
+  isMultiSelected: boolean;
   onToggleGroup: (node: ConversationTreeNode<Conversation>) => void;
   mutations: ConversationMutations;
   registeredProjects: RegisteredProject;
@@ -289,9 +355,12 @@ function groupSummaryText(node: ConversationTreeNode<Conversation>): string {
 
 function ConversationListItemImpl({
   node,
+  section,
   collapsed,
   selectedConversation,
   onSelectConversation,
+  onRowClick,
+  isMultiSelected,
   onToggleGroup,
   mutations,
   registeredProjects,
@@ -303,11 +372,14 @@ function ConversationListItemImpl({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -4 }}
       transition={{ duration: 0.15, ease: 'easeOut' }}
+      data-section={section}
     >
       <ConversationRow
         conv={node.conv}
         isSelected={selectedConversation === node.conv.name}
         onSelect={onSelectConversation}
+        onRowClick={onRowClick}
+        isMultiSelected={isMultiSelected}
         mutations={mutations}
         registeredProjects={registeredProjects}
         orphanOf={node.orphanOf}
@@ -345,7 +417,9 @@ function ConversationListItemImpl({
 
 function itemPropsEqual(a: ConversationListItemProps, b: ConversationListItemProps): boolean {
   if (a.node.conv !== b.node.conv || a.node.orphanOf !== b.node.orphanOf) return false;
+  if (a.section !== b.section) return false;
   if (a.collapsed !== b.collapsed) return false;
+  if (a.isMultiSelected !== b.isMultiSelected) return false;
   if ((a.selectedConversation === a.node.conv.name) !== (b.selectedConversation === b.node.conv.name)) return false;
   if (a.node.descendants.length !== b.node.descendants.length) return false;
   for (let i = 0; i < a.node.descendants.length; i += 1) {
@@ -357,6 +431,7 @@ function itemPropsEqual(a: ConversationListItemProps, b: ConversationListItemPro
   }
   return (
     Object.is(a.onSelectConversation, b.onSelectConversation)
+    && Object.is(a.onRowClick, b.onRowClick)
     && Object.is(a.onToggleGroup, b.onToggleGroup)
     && Object.is(a.mutations, b.mutations)
     && Object.is(a.registeredProjects, b.registeredProjects)
@@ -412,8 +487,12 @@ export function ConversationList({ selectedConversation, onSelectConversation, e
     try { localStorage.setItem(TAB_STORAGE_KEY, t); } catch { /* ignore */ }
   }, []);
 
-  // ── Sorted + grouped list ────────────────────────────────────────────────────
-  const displayConversations = useMemo(() => {
+  // PAN-4639 D5: snooze wake is decided client-side on every render; no
+  // timer, no server job, no write.
+  const now = useNow(30_000);
+
+  // ── Sorted, grouped, sectioned list ──────────────────────────────────────────
+  const sections = useMemo(() => {
     let filtered = conversations;
 
     if (excludeIds && excludeIds.size > 0) {
@@ -438,8 +517,9 @@ export function ConversationList({ selectedConversation, onSelectConversation, e
       sort,
     );
 
-    return buildConversationTree([...active, ...inactive]);
-  }, [conversations, sort, tab, excludeIds, includeIds]);
+    const tree = buildConversationTree([...active, ...inactive]);
+    return partitionConversationSections(tree, now.getTime());
+  }, [conversations, sort, tab, excludeIds, includeIds, now]);
 
   // PAN-4223 D18: per-viewer group collapse. Persisted: names the viewer
   // collapsed. Session-only: names the viewer expanded against the default.
@@ -468,6 +548,101 @@ export function ConversationList({ selectedConversation, onSelectConversation, e
     });
   }, [isGroupCollapsed]);
 
+  // PAN-4639 D10: Snoozed and Settled are collapsed by default; expansion is
+  // persisted per viewer.
+  const [expandedSections, setExpandedSections] = useState<Set<ConversationSectionId>>(readExpandedSections);
+  const toggleSection = useCallback((id: ConversationSectionId) => {
+    setExpandedSections((previous) => {
+      const next = new Set(previous);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      writeExpandedSections(next);
+      return next;
+    });
+  }, []);
+
+  // PAN-4639 WI-9 (D11): Cmd/Ctrl+Z undoes the last triage change while the
+  // list has focus, unless the user is typing (rename input, etc.).
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    const isEditable = !!target.closest('input, textarea, select, [contenteditable="true"]');
+    if (e.key === 'Escape') {
+      setSelected((previous) => (previous.size > 0 ? new Set() : previous));
+      anchorRef.current = null;
+      return;
+    }
+    if (!(e.metaKey || e.ctrlKey) || e.shiftKey || e.key.toLowerCase() !== 'z') return;
+    if (isEditable) return;
+    if (mutations.undoLastTriage()) e.preventDefault();
+  }, [mutations]);
+
+  // PAN-4639 WI-10 (D14): Cmd/Ctrl-click toggles one row and sets the anchor;
+  // Shift-click ranges from the anchor over the visible top-level rows in
+  // render order (collapsed sections excluded); a plain click clears the
+  // selection and opens the row. `anchor` lives in a ref, not state, because
+  // it never renders — keeping it out of state keeps handleRowClick's
+  // identity stable across unrelated polls (NFR-4).
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const anchorRef = useRef<string | null>(null);
+  const visibleTopLevelNamesRef = useRef<string[]>([]);
+  const [bulkSnoozeOpen, setBulkSnoozeOpen] = useState(false);
+
+  const handleRowClick = useCallback((e: React.MouseEvent, name: string) => {
+    const names = visibleTopLevelNamesRef.current;
+    if (e.shiftKey && anchorRef.current !== null) {
+      const anchorIndex = names.indexOf(anchorRef.current);
+      const clickedIndex = names.indexOf(name);
+      if (anchorIndex !== -1 && clickedIndex !== -1) {
+        const [start, end] = anchorIndex <= clickedIndex ? [anchorIndex, clickedIndex] : [clickedIndex, anchorIndex];
+        const range = names.slice(start, end + 1);
+        setSelected((previous) => new Set([...previous, ...range]));
+        return;
+      }
+    }
+    if (e.metaKey || e.ctrlKey || e.shiftKey) {
+      setSelected((previous) => {
+        const next = new Set(previous);
+        if (next.has(name)) next.delete(name);
+        else next.add(name);
+        return next;
+      });
+      anchorRef.current = name;
+      return;
+    }
+    setSelected(new Set());
+    anchorRef.current = null;
+    onSelectConversation(name);
+  }, [onSelectConversation]);
+
+  const clearSelection = useCallback(() => {
+    setSelected(new Set());
+    anchorRef.current = null;
+  }, []);
+
+  const bulkLabel = useCallback((verb: string, count: number) => `${verb} ${count} conversation${count === 1 ? '' : 's'}`, []);
+
+  const bulkSettle = useCallback(() => {
+    const names = [...selected];
+    if (names.length === 0) return;
+    mutations.triage({ updates: names.map((name) => ({ name, settled: true })), label: bulkLabel('Settled', names.length) });
+    clearSelection();
+  }, [selected, mutations, bulkLabel, clearSelection]);
+
+  const bulkUnsettle = useCallback(() => {
+    const names = [...selected];
+    if (names.length === 0) return;
+    mutations.triage({ updates: names.map((name) => ({ name, settled: false })), label: `Moved ${names.length} conversation${names.length === 1 ? '' : 's'} to Inbox` });
+    clearSelection();
+  }, [selected, mutations, clearSelection]);
+
+  const bulkSnooze = useCallback((until: Date) => {
+    const names = [...selected];
+    if (names.length === 0) return;
+    mutations.triage({ updates: names.map((name) => ({ name, snoozedUntil: until.toISOString() })), label: bulkLabel('Snoozed', names.length) });
+    setBulkSnoozeOpen(false);
+    clearSelection();
+  }, [selected, mutations, bulkLabel, clearSelection]);
+
   if (isLoading) {
     return (
       <div className={styles.skeletonList}>
@@ -479,8 +654,25 @@ export function ConversationList({ selectedConversation, onSelectConversation, e
 
   const favCount = conversations.filter((c) => c.isFavorited).length;
 
+  const sectionsById = new Map(sections.map((section) => [section.id, section]));
+  const needsYouCount = sectionsById.get('needsYou')?.nodes.length ?? 0;
+  const inboxCount = sectionsById.get('inbox')?.nodes.length ?? 0;
+  const snoozedCount = sectionsById.get('snoozed')?.nodes.length ?? 0;
+  const settledCount = sectionsById.get('settled')?.nodes.length ?? 0;
+  const totalCount = needsYouCount + inboxCount + snoozedCount + settledCount;
+  // D10: Needs you and Inbox both quiet, but something is parked — say so instead
+  // of the generic "No conversations yet" message, which would be misleading.
+  const showInboxClear = needsYouCount === 0 && inboxCount === 0 && (snoozedCount > 0 || settledCount > 0);
+
+  // D14: the visible top-level rows in render order, collapsed sections
+  // excluded — Shift-click ranges over exactly this list.
+  visibleTopLevelNamesRef.current = SECTION_ORDER.flatMap((id) => {
+    if (COLLAPSIBLE_SECTIONS.has(id) && !expandedSections.has(id)) return [];
+    return (sectionsById.get(id)?.nodes ?? []).map((node) => node.conv.name);
+  });
+
   return (
-    <div className={styles.conversationListWrapper}>
+    <div className={styles.conversationListWrapper} onKeyDown={handleKeyDown}>
       {/* Controls bar: All/Favorites tabs + sort */}
       <div className={styles.conversationControls}>
         <div className={styles.convTabBar}>
@@ -511,8 +703,44 @@ export function ConversationList({ selectedConversation, onSelectConversation, e
         </select>
       </div>
 
+      {/* Bulk bar (PAN-4639 D15) */}
+      {selected.size > 0 && (
+        <div role="toolbar" aria-label="Selected conversations" className={styles.convBulkBar}>
+          <span>{selected.size} selected</span>
+          <button type="button" onClick={bulkSettle}>Settle</button>
+          <button type="button" onClick={bulkUnsettle}>Unsettle</button>
+          <span style={{ position: 'relative', display: 'inline-block' }}>
+            <button
+              type="button"
+              aria-haspopup="menu"
+              aria-expanded={bulkSnoozeOpen}
+              onClick={() => setBulkSnoozeOpen((open) => !open)}
+            >
+              Snooze
+            </button>
+            {bulkSnoozeOpen && (
+              <>
+                <MenuOverlay onClick={() => setBulkSnoozeOpen(false)} />
+                <MenuSurface
+                  aria-label="Snooze selected conversations"
+                  onClose={() => setBulkSnoozeOpen(false)}
+                  className="absolute left-0 top-full z-[1001] mt-1 min-w-[160px]"
+                >
+                  {snoozePresets(new Date()).map((preset) => (
+                    <MenuItemButton key={preset.id} onClick={() => bulkSnooze(preset.until)}>
+                      {preset.label}
+                    </MenuItemButton>
+                  ))}
+                </MenuSurface>
+              </>
+            )}
+          </span>
+          <button type="button" onClick={clearSelection}>Clear</button>
+        </div>
+      )}
+
       {/* List */}
-      {displayConversations.length === 0 ? (
+      {totalCount === 0 ? (
         <div className={styles.conversationEmpty}>
           {tab === 'favorites'
             ? 'No favorites yet — hover a conversation and click ★ to star it.'
@@ -521,21 +749,74 @@ export function ConversationList({ selectedConversation, onSelectConversation, e
       ) : (
         <div className={styles.conversationList}>
           <AnimatePresence initial={false}>
-            {displayConversations.map((node) => (
-              <ConversationListItem
-                key={node.conv.id}
-                node={node}
-                collapsed={node.descendants.length > 0 && isGroupCollapsed(node)}
-                selectedConversation={selectedConversation}
-                onSelectConversation={onSelectConversation}
-                onToggleGroup={toggleGroup}
-                mutations={mutations}
-                registeredProjects={registeredProjects}
-              />
-            ))}
+            {SECTION_ORDER.flatMap((id) => {
+              const nodes = sectionsById.get(id)?.nodes ?? [];
+              const rendered: React.ReactNode[] = [];
+
+              if (id === 'needsYou' && nodes.length > 0) {
+                rendered.push(
+                  <div
+                    key="section-header-needsYou"
+                    className={`${styles.convSectionHeader} text-state-needs-you`}
+                    role="heading"
+                    aria-level={3}
+                    data-section="needsYou"
+                  >
+                    {SECTION_LABELS.needsYou}
+                    <span className={styles.convSectionCount}> · {nodes.length}</span>
+                  </div>,
+                );
+              }
+
+              if (id === 'inbox' && showInboxClear) {
+                rendered.push(
+                  <div key="section-inbox-clear" className={styles.conversationEmpty} data-section="inbox">
+                    Inbox clear
+                  </div>,
+                );
+              }
+
+              if (COLLAPSIBLE_SECTIONS.has(id) && nodes.length > 0) {
+                const expanded = expandedSections.has(id);
+                rendered.push(
+                  <button
+                    key={`section-header-${id}`}
+                    type="button"
+                    className={styles.convSectionHeader}
+                    aria-expanded={expanded}
+                    data-section={id}
+                    onClick={() => toggleSection(id)}
+                  >
+                    {`${expanded ? '▾' : '▸'} ${SECTION_LABELS[id]}`}
+                    <span className={styles.convSectionCount}> · {nodes.length}</span>
+                  </button>,
+                );
+                if (!expanded) return rendered;
+              }
+
+              for (const node of nodes) {
+                rendered.push(
+                  <ConversationListItem
+                    key={node.conv.id}
+                    node={node}
+                    section={id}
+                    collapsed={node.descendants.length > 0 && isGroupCollapsed(node)}
+                    selectedConversation={selectedConversation}
+                    onSelectConversation={onSelectConversation}
+                    onRowClick={handleRowClick}
+                    isMultiSelected={selected.has(node.conv.name)}
+                    onToggleGroup={toggleGroup}
+                    mutations={mutations}
+                    registeredProjects={registeredProjects}
+                  />,
+                );
+              }
+              return rendered;
+            })}
           </AnimatePresence>
         </div>
       )}
+      <HiddenMachinesFooter />
 
       {mutations.forkTarget && (
         <ForkModal

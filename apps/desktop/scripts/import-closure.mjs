@@ -29,6 +29,10 @@ export const scanImportClosure = (
       ...source.matchAll(/import\s*["']([^"'\n]+)["']/g),
       ...source.matchAll(/import\(\s*["']([^"'\n]+)["']\s*\)/g),
       ...source.matchAll(/require\(\s*["']([^"'\n]+)["']\s*\)/g),
+      // tsdown inlines `createRequire(import.meta.url)` call sites as
+      // `createRequire(import.meta.url)("pkg")`; the Noise channel stack loads
+      // its native-backed packages that way (PAN-4645 D-4645-2).
+      ...source.matchAll(/createRequire\([^)]*\)\(\s*["']([^"'\n]+)["']\s*\)/g),
     ].map((match) => match[1]);
 
     for (const specifier of specifiers) {

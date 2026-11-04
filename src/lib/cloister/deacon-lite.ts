@@ -7,8 +7,10 @@
  * the pipeline journal: `recoverStalledReviews`, `recoverUndispatchedReviews`
  * (PAN-4221, in undispatched-review-recovery.ts), `recoverSilentReviewers`
  * (PAN-4433, in silent-reviewer-recovery.ts) and `retryDeferredHandoffs`
- * (PAN-4155, in deferred-handoff.ts). See docs/PIPELINE-GATES.md and the PAN-3917
- * PRD ("The patrol loop", FR-11, D1/D4/D5/D6/D7).
+ * (PAN-4155, in deferred-handoff.ts). The last, `reapFinishedRemoteAgents`
+ * (PAN-4295, in remote-reap-routine.ts), hands finished Fly remote agents to
+ * review. See docs/PIPELINE-GATES.md and the PAN-3917 PRD ("The patrol loop",
+ * FR-11, D1/D4/D5/D6/D7).
  *
  * No heartbeat file, no patrol-result aggregation, no firing budgets, no
  * invariant checker. Status is in-memory only (see getDeaconLiteStatus
@@ -34,6 +36,7 @@ import { retryDeferredHandoffs } from './deferred-handoff.js';
 import { replayDeferredReviewVerdict } from './deferred-verdict-replay.js';
 import { recoverUndispatchedReviews } from './undispatched-review-recovery.js';
 import { recoverSilentReviewers } from './silent-reviewer-recovery.js';
+import { reapFinishedRemoteAgents } from './remote-reap-routine.js';
 
 export { checkApiErrorAgents, retryDeferredHandoffs, recoverUndispatchedReviews, recoverSilentReviewers };
 
@@ -555,6 +558,8 @@ export async function runDeaconLite(): Promise<void> {
   await recoverSilentReviewers();
   // PAN-4155: re-send a planning hand-off a spawn guardrail refused.
   await retryDeferredHandoffs();
+  // PAN-4295: hand finished Fly remote agents to review (the PAN-1676 patrol call the Cut dropped).
+  await reapFinishedRemoteAgents();
 }
 
 // ============================================================================

@@ -14,15 +14,11 @@ describe('managed Kimi effort', () => {
       maxContextTokens: contextWindow,
     });
   });
-  it.each(['k3', 'k3-256k', 'k3[1m]', 'kimi-code/k3', 'kimi-code/k3-256k'])(
+  it.each(['k3', 'k3-256k', 'k3[1m]', 'kimi-code/k3', 'kimi-code/k3-256k', 'k3.1-pro', 'k3.1-pro-highspeed', 'kimi-code/k3.1-pro', 'kimi-code/k3.1-pro-highspeed', 'kimi-code/kimi-for-coding'])(
     'requires a resolved effort for %s', (model) => {
       expect(() => resolveKimiNativeEffort(model, undefined)).toThrow('requires a resolved effort level');
     },
   );
-
-  it('exposes no adjustable effort for kimi-for-coding even with no effort given', () => {
-    expect(resolveKimiNativeEffort('kimi-code/kimi-for-coding', undefined)).toBeUndefined();
-  });
 
   it.each([['low', 'low'], ['medium', 'high'], ['high', 'high'], ['xhigh', 'max'], ['max', 'max']])(
     'preserves the meaning of saved %s effort', (requested, expected) => {
@@ -31,10 +27,19 @@ describe('managed Kimi effort', () => {
   );
 
   it('rejects an unknown K3 effort rather than silently using the CLI default', () => {
-    expect(() => resolveKimiNativeEffort('k3', 'invalid')).toThrow('Invalid Kimi K3 effort');
+    expect(() => resolveKimiNativeEffort('k3', 'invalid')).toThrow('Invalid Kimi K3/K3.1/K2.8 effort');
   });
 
-  it.each(['kimi-k2.7-code', 'kimi-for-coding', 'kimi-code/kimi-for-coding', 'kimi-code/kimi-for-coding-highspeed'])(
+  it('translates K3.1 effort the same way as K3', () => {
+    expect(resolveKimiNativeEffort('kimi-code/k3.1-pro', 'medium')).toBe('high');
+    expect(resolveKimiNativeEffort('k3.1-pro-highspeed', 'xhigh')).toBe('max');
+  });
+
+  it('translates K2.8 Preview (kimi-code/kimi-for-coding) effort the same way as K3', () => {
+    expect(resolveKimiNativeEffort('kimi-code/kimi-for-coding', 'medium')).toBe('high');
+  });
+
+  it.each(['kimi-k2.7-code', 'kimi-for-coding', 'kimi-code/kimi-for-coding-highspeed'])(
     'exposes no adjustable effort for %s', (model) => {
       expect(resolveKimiNativeEffort(model, 'high')).toBeUndefined();
     },
@@ -57,10 +62,18 @@ describe('managed Kimi effort', () => {
   it('clears an inherited forced effort for K2.7 instead of claiming it supports levels', () => {
     const script = generateLauncherScript({
       role: 'work', workingDir: '/workspace', harness: 'kimi-code',
-      kimiCodeModel: 'kimi-code/kimi-for-coding', kimiCodeEffort: 'high',
+      kimiCodeModel: 'kimi-code/kimi-for-coding-highspeed', kimiCodeEffort: 'high',
     });
     expect(script).toContain('unset KIMI_MODEL_THINKING_EFFORT');
     expect(script).not.toContain('export KIMI_MODEL_THINKING_EFFORT');
+  });
+
+  it('exports explicit effort for a K2.8 Preview native launch', () => {
+    const script = generateLauncherScript({
+      role: 'work', workingDir: '/workspace', harness: 'kimi-code',
+      kimiCodeModel: 'kimi-code/kimi-for-coding', kimiCodeEffort: 'high',
+    });
+    expect(script).toContain("export KIMI_MODEL_THINKING_EFFORT='high'");
   });
 
   it.each([['low', 'low'], ['medium', 'high'], ['high', 'high'], ['xhigh', 'max'], ['max', 'max']] as const)(

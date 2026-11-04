@@ -74,6 +74,14 @@ async function loadLaunchLayers(ctx: LaunchSkillContext): Promise<SkillOverrideL
   return conversation ? { ...layers, conversation } : layers;
 }
 
+/** PAN-4820: the launch's issue runs on Deft's pipeline. */
+async function isDeftPipelineLaunch(ctx: LaunchSkillContext): Promise<boolean> {
+  const { issueId } = await resolveLaunchScope(ctx);
+  if (!issueId) return false;
+  const { readIssuePipeline } = await import('../deft/issue-pipeline.js');
+  return (await readIssuePipeline(issueId)) === 'deft';
+}
+
 /** Skill names the launch should hide. */
 export async function resolveLaunchDisabledSkills(ctx: LaunchSkillContext): Promise<string[]> {
   const { disabledSkillNames } = await import('./resolve.js');
@@ -82,24 +90,33 @@ export async function resolveLaunchDisabledSkills(ctx: LaunchSkillContext): Prom
 
 /**
  * The pack skills enabled for this launch, from the cached extraction of each
- * pack's trusted commit. PD-4: a pack whose commit is not cached is skipped,
+ * pack's trusted commit (a `gstack-runtime` pack's render of it). PD-4: a pack whose commit is not cached is skipped,
  * with a warning when anything in it would have been on.
  */
 export async function resolveLaunchPackSelection(
   ctx: LaunchSkillContext,
   exclude: ReadonlySet<string> = new Set(),
 ): Promise<{ selection: MountSelection; warnings: string[] }> {
-  const [{ resolvePackSkill, resolvePackToggle }, { listPackCatalog }, { packExtractDir }] =
-    await Promise.all([
-      import('./resolve.js'),
-      import('./catalog.js'),
-      import('../skill-packs/sources.js'),
-    ]);
-  const [layers, packs] = await Promise.all([loadLaunchLayers(ctx), listPackCatalog()]);
+  const [
+    { resolvePackSkill, resolvePackToggle },
+    { listPackCatalog },
+    { packExtractDir, packRenderDir },
+    { KNOWN_PACKS },
+    { GSTACK_BROWSER_SKILLS },
+  ] = await Promise.all([
+    import('./resolve.js'),
+    import('./catalog.js'),
+    import('../skill-packs/sources.js'),
+    import('../skill-packs/adapters.js'),
+    import('../skill-packs/gstack.js'),
+  ]);
+  const [layers, packs, deftPipeline] = await Promise.all([loadLaunchLayers(ctx), listPackCatalog(), isDeftPipelineLaunch(ctx)]);
   const selection: MountSelection = { packs: [] };
   const warnings: string[] = [];
   for (const pack of packs) {
     if (exclude.has(pack.id)) continue;
+    // PAN-4820: a Deft-pipeline issue runs Deft's own deposit, never the read-only deft pack.
+    if (deftPipeline && pack.id === 'deft') continue;
     if (!pack.manifest) {
       const perSkillOn = [layers.conversation, layers.global, layers.project, layers.issue].some(map =>
         Object.entries(map ?? {}).some(([id, enabled]) => enabled && id.startsWith(`${pack.id}/`)));
@@ -108,16 +125,27 @@ export async function resolveLaunchPackSelection(
       }
       continue;
     }
+    // PAN-4730 D8: consent recorded but the browser runtime not built; launches never build, so they warn.
+    if (pack.browser === 'missing') {
+      const browserSkillOn = [layers.conversation, layers.global, layers.project, layers.issue].some(map =>
+        Object.entries(map ?? {}).some(([id, enabled]) => enabled && GSTACK_BROWSER_SKILLS.some(name => id === `${pack.id}/${name}`)));
+      if (browserSkillOn || resolvePackToggle(pack.id, layers).enabled) {
+        warnings.push(`[launcher] WARNING: gstack browser runtime not built; run pan skills pack sync ${pack.id}`);
+      }
+    }
     const skills = pack.manifest.skills
       .filter(skill => resolvePackSkill(`${pack.id}/${skill.name}`, skill.optIn, layers).enabled)
       .map(skill => ({ name: skill.name, dir: skill.dir }));
     if (skills.length > 0) {
+      const known = KNOWN_PACKS[pack.id];
       selection.packs.push({
         id: pack.id,
         commit: pack.commit,
-        root: packExtractDir(pack.id, pack.commit),
-        ...(pack.adapter === 'deft-readonly' ? { transform: 'deft-readonly' as const } : {}),
+        root: pack.adapter === 'gstack-runtime' ? packRenderDir(pack.id, pack.commit) : packExtractDir(pack.id, pack.commit),
+        ...(pack.adapter === 'deft-readonly' || pack.adapter === 'gstack-runtime' ? { transform: pack.adapter } : {}),
         skills,
+        ...(known?.pluginRoot ? { pluginRoot: known.pluginRoot } : {}),
+        ...(known?.mountExtras?.length ? { extras: [...known.mountExtras] } : {}),
       });
     }
   }

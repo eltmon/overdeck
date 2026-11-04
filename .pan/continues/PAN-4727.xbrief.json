@@ -1,0 +1,392 @@
+{
+  "version": "1",
+  "issueId": "PAN-4727",
+  "created": "2026-11-01T17:45:56.667Z",
+  "updated": "2026-11-01T19:27:43.669Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-01T18:55Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-01T18:55:05.917Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-01T19:03Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-11-01T19:03:19.220Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-01T19:11:37.144Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-01T19:19Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-01T19:19:35.345Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-01T19:20Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-11-01T19:20:40.140Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-01T19:27:43.669Z"
+    }
+  ],
+  "items": {
+    "fork-pack-render": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4727",
+      "claimedAt": "2026-11-01T17:45:56.667Z",
+      "doneAt": "2026-11-01T17:49:26.300Z"
+    },
+    "fork-state-root-marker": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4727",
+      "claimedAt": "2026-11-01T17:49:32.879Z",
+      "doneAt": "2026-11-01T17:52:30.378Z"
+    },
+    "fork-pack-mode-test": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4727",
+      "claimedAt": "2026-11-01T17:52:36.463Z",
+      "doneAt": "2026-11-01T17:56:37.991Z"
+    },
+    "fork-publish": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4727",
+      "claimedAt": "2026-11-01T17:56:43.365Z",
+      "doneAt": "2026-11-01T17:57:24.812Z"
+    },
+    "gstack-skill-map": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4727",
+      "claimedAt": "2026-11-01T17:57:32.328Z",
+      "doneAt": "2026-11-01T17:58:56.146Z"
+    },
+    "gstack-adapter-manifest": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4727",
+      "claimedAt": "2026-11-01T17:59:00.417Z",
+      "doneAt": "2026-11-01T18:01:55.533Z"
+    },
+    "gstack-render-runner": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4727",
+      "claimedAt": "2026-11-01T18:01:59.900Z",
+      "doneAt": "2026-11-01T18:03:52.609Z"
+    },
+    "gstack-add-update-sync": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4727",
+      "claimedAt": "2026-11-01T18:03:58.892Z",
+      "doneAt": "2026-11-01T18:05:54.987Z"
+    },
+    "gstack-mount-transform": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4727",
+      "claimedAt": "2026-11-01T18:06:00.777Z",
+      "doneAt": "2026-11-01T18:07:03.512Z"
+    },
+    "gstack-launch-root": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4727",
+      "claimedAt": "2026-11-01T18:07:07.440Z",
+      "doneAt": "2026-11-01T18:08:49.175Z"
+    },
+    "gstack-cli-preview": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4727",
+      "claimedAt": "2026-11-01T18:08:53.785Z",
+      "doneAt": "2026-11-01T18:10:12.899Z"
+    },
+    "gstack-remove-sweep": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4727",
+      "claimedAt": "2026-11-01T18:10:18.707Z",
+      "doneAt": "2026-11-01T18:12:35.475Z"
+    },
+    "gstack-gc-renders": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4727",
+      "claimedAt": "2026-11-01T18:12:47.659Z",
+      "doneAt": "2026-11-01T18:13:59.152Z"
+    },
+    "gstack-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4727",
+      "claimedAt": "2026-11-01T18:14:04.434Z",
+      "doneAt": "2026-11-01T18:15:28.353Z"
+    },
+    "gstack-live-acceptance": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4727",
+      "claimedAt": "2026-11-01T18:15:34.866Z",
+      "doneAt": "2026-11-01T18:35:34.040Z"
+    },
+    "fork-pack-render.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:36:47.790Z"
+    },
+    "fork-pack-render.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:37:00.570Z"
+    },
+    "fork-pack-render.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:37:13.720Z"
+    },
+    "fork-pack-render.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:37:25.994Z"
+    },
+    "fork-pack-render.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:37:38.604Z"
+    },
+    "fork-state-root-marker.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:37:52.268Z"
+    },
+    "fork-state-root-marker.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:38:05.800Z"
+    },
+    "fork-state-root-marker.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:38:19.490Z"
+    },
+    "fork-state-root-marker.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:38:32.773Z"
+    },
+    "fork-pack-mode-test.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:38:46.236Z"
+    },
+    "fork-pack-mode-test.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:39:00.052Z"
+    },
+    "fork-pack-mode-test.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:39:13.987Z"
+    },
+    "fork-pack-mode-test.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:39:29.667Z"
+    },
+    "fork-pack-mode-test.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:39:46.431Z"
+    },
+    "fork-publish.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:40:00.562Z"
+    },
+    "fork-publish.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:40:16.412Z"
+    },
+    "fork-publish.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:40:33.447Z"
+    },
+    "gstack-skill-map.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:40:48.955Z"
+    },
+    "gstack-skill-map.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:41:07.742Z"
+    },
+    "gstack-skill-map.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:41:23.443Z"
+    },
+    "gstack-skill-map.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:41:36.728Z"
+    },
+    "gstack-adapter-manifest.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:41:50.465Z"
+    },
+    "gstack-adapter-manifest.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:42:03.714Z"
+    },
+    "gstack-adapter-manifest.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:42:18.277Z"
+    },
+    "gstack-adapter-manifest.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:42:32.808Z"
+    },
+    "gstack-adapter-manifest.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:42:46.936Z"
+    },
+    "gstack-render-runner.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:43:01.575Z"
+    },
+    "gstack-render-runner.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:43:15.898Z"
+    },
+    "gstack-render-runner.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:43:29.680Z"
+    },
+    "gstack-render-runner.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:43:43.184Z"
+    },
+    "gstack-render-runner.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:43:56.958Z"
+    },
+    "gstack-add-update-sync.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:44:11.377Z"
+    },
+    "gstack-add-update-sync.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:44:25.313Z"
+    },
+    "gstack-add-update-sync.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:44:39.167Z"
+    },
+    "gstack-add-update-sync.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:44:52.751Z"
+    },
+    "gstack-add-update-sync.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:45:06.446Z"
+    },
+    "gstack-mount-transform.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:45:21.883Z"
+    },
+    "gstack-mount-transform.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:45:36.913Z"
+    },
+    "gstack-mount-transform.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:45:51.805Z"
+    },
+    "gstack-mount-transform.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:46:06.476Z"
+    },
+    "gstack-launch-root.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:46:21.264Z"
+    },
+    "gstack-launch-root.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:46:36.039Z"
+    },
+    "gstack-launch-root.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:46:50.525Z"
+    },
+    "gstack-remove-sweep.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:47:04.032Z"
+    },
+    "gstack-remove-sweep.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:47:18.050Z"
+    },
+    "gstack-remove-sweep.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:47:31.647Z"
+    },
+    "gstack-remove-sweep.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:47:45.881Z"
+    },
+    "gstack-gc-renders.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:47:59.557Z"
+    },
+    "gstack-gc-renders.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:48:13.748Z"
+    },
+    "gstack-gc-renders.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:48:27.514Z"
+    },
+    "gstack-gc-renders.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:48:42.927Z"
+    },
+    "gstack-cli-preview.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:48:56.951Z"
+    },
+    "gstack-cli-preview.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:49:10.685Z"
+    },
+    "gstack-cli-preview.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:49:24.361Z"
+    },
+    "gstack-cli-preview.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:49:36.778Z"
+    },
+    "gstack-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:49:50.370Z"
+    },
+    "gstack-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:50:04.002Z"
+    },
+    "gstack-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:50:18.508Z"
+    },
+    "gstack-docs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:50:32.973Z"
+    },
+    "gstack-live-acceptance.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:50:47.639Z"
+    },
+    "gstack-live-acceptance.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:51:02.203Z"
+    },
+    "gstack-live-acceptance.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:51:16.152Z"
+    },
+    "gstack-live-acceptance.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:51:28.868Z"
+    },
+    "gstack-live-acceptance.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:51:42.288Z"
+    }
+  },
+  "feedback": [],
+  "agentModel": "claude-opus-5-5"
+}

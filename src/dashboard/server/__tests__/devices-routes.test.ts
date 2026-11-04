@@ -75,8 +75,8 @@ describe('device list and revoke routes (PAN-3762)', () => {
     expect(res.status).toBe(200);
     expect(res.text).not.toContain('tokenHash');
     expect(res.json.devices).toEqual([
-      { id: phone.record.id, name: 'phone', scopes: ['admin'], createdAt: phone.record.createdAt, lastUsedAt: null, revokedAt: null },
-      { id: laptop.record.id, name: 'laptop', scopes: ['admin'], createdAt: laptop.record.createdAt, lastUsedAt: null, revokedAt: null },
+      { id: phone.record.id, name: 'phone', kind: 'device', scopes: ['admin'], createdAt: phone.record.createdAt, lastUsedAt: null, revokedAt: null },
+      { id: laptop.record.id, name: 'laptop', kind: 'device', scopes: ['admin'], createdAt: laptop.record.createdAt, lastUsedAt: null, revokedAt: null },
     ]);
   });
 

@@ -1,0 +1,22 @@
+{
+  "name": "@overdeck/connect-service",
+  "version": "0.0.0",
+  "private": true,
+  "license": "FSL-1.1-MIT",
+  "type": "module",
+  "description": "overdeck.ai connect service: Cloudflare Worker (one Durable Object per account) for the Anywhere machine directory, WebRTC signalling, relay credentials and the webhook inbox (PAN-2356)",
+  "scripts": {
+    "dev": "wrangler dev --local",
+    "build:dry": "wrangler deploy --dry-run --outdir dist"
+  },
+  "dependencies": {
+    "@noble/ciphers": "2.4.0",
+    "@noble/curves": "2.4.0",
+    "@noble/hashes": "2.4.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20261002.1",
+    "miniflare": "5.20261001.0-alpha",
+    "wrangler": "4.146.0"
+  }
+}

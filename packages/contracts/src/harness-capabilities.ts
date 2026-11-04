@@ -13,6 +13,8 @@ export type HarnessContextChannel =
 export type HarnessAttachmentDelivery = "native" | "inline-paths"
 export type HarnessBinaryConfigKey = "acp.kimi.binaryPath" | "kimiCode.binaryPath"
 export type HarnessLaunchPreflight = "claude-code-model-minimum"
+/** message = an AskUserQuestion answer is sent as a conversation message; pi-ask-modal = keystrokes drive the open ask modal (a queued message would be swallowed); codex-approval = answered as a numbered approval prompt (PAN-4944), not a question. */
+export type HarnessAskAnswerDelivery = "message" | "pi-ask-modal" | "codex-approval"
 /** claude-project-hash = resolve via HashResolver; agent-dir = first-message cwd, else the agent dir; first-message-only = first-message cwd, else null. */
 export type HarnessWorkspaceResolution = "claude-project-hash" | "agent-dir" | "first-message-only"
 
@@ -41,6 +43,10 @@ export interface HarnessCapabilities {
   readonly binaryLabel: string
   /** Install command shown when the binary is missing, or null for none. */
   readonly installHint: string | null
+  /** Argv after the binary that updates the CLI in place, or null when Overdeck must not update it (PAN-4654). */
+  readonly updateArgs: readonly string[] | null
+  /** npm package of the CLI; a binary installed under <prefix>/lib/node_modules/<package>/ is updated with npm (PAN-4654). */
+  readonly npmPackage: string | null
   /** Config key holding an operator-configured binary path, or null for none. */
   readonly binaryConfigKey: HarnessBinaryConfigKey | null
   /** Preflight check run before a launch, or null for none. */
@@ -49,6 +55,19 @@ export interface HarnessCapabilities {
   readonly workspaceResolution: HarnessWorkspaceResolution
   /** The conversation scanner correlates transcripts to agents by session id. */
   readonly correlatesBySessionId: boolean
+  /**
+   * The MCP `answer_question` tool may answer this harness's pending question with a composed
+   * message (PAN-4649). Narrower than `askAnswerDelivery`: the tool carries no toolUseId, so it
+   * cannot tell a Codex approval from a question and serves only harnesses where a message is
+   * always the answer.
+   */
+  readonly answersQuestionByMessage: boolean
+  /** How the dashboard delivers an operator's answer to a pending AskUserQuestion in a conversation. */
+  readonly askAnswerDelivery: HarnessAskAnswerDelivery
+  /** A conversation may be started on a Fly machine (pan machines add-fly): Claude Code (PAN-4652) and Codex (PAN-4296). */
+  readonly runsOnFlyMachine: boolean
+  /** Launches get the `overdeck` MCP server with a per-agent token (PAN-4927 D-13): Claude Code (PAN-4932), Codex (PAN-4933 W-INJ2) and the ACP harnesses (PAN-4934). */
+  readonly overdeckMcp: boolean
 }
 
 export const HARNESS_CAPABILITY_KEYS = [
@@ -64,10 +83,16 @@ export const HARNESS_CAPABILITY_KEYS = [
   "hostEffortFlag",
   "binaryLabel",
   "installHint",
+  "updateArgs",
+  "npmPackage",
   "binaryConfigKey",
   "launchPreflight",
   "workspaceResolution",
   "correlatesBySessionId",
+  "answersQuestionByMessage",
+  "askAnswerDelivery",
+  "runsOnFlyMachine",
+  "overdeckMcp",
 ] as const satisfies readonly (keyof HarnessCapabilities)[]
 
 export const CLAUDE_CODE_CAPABILITIES: HarnessCapabilities = {
@@ -83,10 +108,16 @@ export const CLAUDE_CODE_CAPABILITIES: HarnessCapabilities = {
   hostEffortFlag: false,
   binaryLabel: "Claude Code",
   installHint: "curl -fsSL https://claude.ai/install.sh | bash",
+  updateArgs: ["update"],
+  npmPackage: "@anthropic-ai/claude-code",
   binaryConfigKey: null,
   launchPreflight: "claude-code-model-minimum",
   workspaceResolution: "claude-project-hash",
   correlatesBySessionId: false,
+  answersQuestionByMessage: true,
+  askAnswerDelivery: "message",
+  runsOnFlyMachine: true,
+  overdeckMcp: true,
 }
 
 export const OHMYPI_CAPABILITIES: HarnessCapabilities = {
@@ -102,10 +133,16 @@ export const OHMYPI_CAPABILITIES: HarnessCapabilities = {
   hostEffortFlag: false,
   binaryLabel: "OhMyPi",
   installHint: null,
+  updateArgs: null,
+  npmPackage: null,
   binaryConfigKey: null,
   launchPreflight: null,
   workspaceResolution: "first-message-only",
   correlatesBySessionId: true,
+  answersQuestionByMessage: false,
+  askAnswerDelivery: "pi-ask-modal",
+  runsOnFlyMachine: false,
+  overdeckMcp: false,
 }
 
 export const CODEX_CAPABILITIES: HarnessCapabilities = {
@@ -121,10 +158,16 @@ export const CODEX_CAPABILITIES: HarnessCapabilities = {
   hostEffortFlag: false,
   binaryLabel: "Codex CLI",
   installHint: null,
+  updateArgs: ["update"],
+  npmPackage: "@openai/codex",
   binaryConfigKey: null,
   launchPreflight: null,
   workspaceResolution: "agent-dir",
   correlatesBySessionId: true,
+  answersQuestionByMessage: false,
+  askAnswerDelivery: "codex-approval",
+  runsOnFlyMachine: true,
+  overdeckMcp: true,
 }
 
 export const ACP_CAPABILITIES: HarnessCapabilities = {
@@ -140,10 +183,16 @@ export const ACP_CAPABILITIES: HarnessCapabilities = {
   hostEffortFlag: false,
   binaryLabel: "Kimi Code CLI",
   installHint: null,
+  updateArgs: ["upgrade", "--yes"],
+  npmPackage: null,
   binaryConfigKey: "acp.kimi.binaryPath",
   launchPreflight: null,
   workspaceResolution: "agent-dir",
   correlatesBySessionId: true,
+  answersQuestionByMessage: false,
+  askAnswerDelivery: "message",
+  runsOnFlyMachine: false,
+  overdeckMcp: true,
 }
 
 export const KIMI_CODE_CAPABILITIES: HarnessCapabilities = {
@@ -159,10 +208,16 @@ export const KIMI_CODE_CAPABILITIES: HarnessCapabilities = {
   hostEffortFlag: false,
   binaryLabel: "Kimi Code CLI",
   installHint: null,
+  updateArgs: ["upgrade", "--yes"],
+  npmPackage: null,
   binaryConfigKey: "kimiCode.binaryPath",
   launchPreflight: null,
   workspaceResolution: "first-message-only",
   correlatesBySessionId: true,
+  answersQuestionByMessage: false,
+  askAnswerDelivery: "message",
+  runsOnFlyMachine: false,
+  overdeckMcp: false,
 }
 
 export const OPENCODE_CAPABILITIES: HarnessCapabilities = {
@@ -178,10 +233,16 @@ export const OPENCODE_CAPABILITIES: HarnessCapabilities = {
   hostEffortFlag: true,
   binaryLabel: "OpenCode",
   installHint: null,
+  updateArgs: ["upgrade"],
+  npmPackage: "opencode-ai",
   binaryConfigKey: null,
   launchPreflight: null,
   workspaceResolution: "agent-dir",
   correlatesBySessionId: true,
+  answersQuestionByMessage: false,
+  askAnswerDelivery: "message",
+  runsOnFlyMachine: false,
+  overdeckMcp: true,
 }
 
 export const MUSE_CAPABILITIES: HarnessCapabilities = {
@@ -197,10 +258,16 @@ export const MUSE_CAPABILITIES: HarnessCapabilities = {
   hostEffortFlag: false,
   binaryLabel: "Muse Code",
   installHint: null,
+  updateArgs: null,
+  npmPackage: null,
   binaryConfigKey: null,
   launchPreflight: null,
   workspaceResolution: "first-message-only",
   correlatesBySessionId: true,
+  answersQuestionByMessage: false,
+  askAnswerDelivery: "message",
+  runsOnFlyMachine: false,
+  overdeckMcp: false,
 }
 
 export const PRIME_AGENT_CAPABILITIES: HarnessCapabilities = {
@@ -216,8 +283,14 @@ export const PRIME_AGENT_CAPABILITIES: HarnessCapabilities = {
   hostEffortFlag: false,
   binaryLabel: "Prime Agent",
   installHint: null,
+  updateArgs: null,
+  npmPackage: null,
   binaryConfigKey: null,
   launchPreflight: null,
   workspaceResolution: "first-message-only",
   correlatesBySessionId: true,
+  answersQuestionByMessage: false,
+  askAnswerDelivery: "message",
+  runsOnFlyMachine: false,
+  overdeckMcp: false,
 }

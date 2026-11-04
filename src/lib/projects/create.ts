@@ -810,13 +810,13 @@ export async function resolveProjectCreateIntent(
   // 5. Issue prefix. Computed whenever a key exists so a prefix problem can open
   // Options even while another field is still being fixed (D-3).
   if (intent.key) {
-    const proposed = (input.issuePrefix ?? key.toUpperCase().replace(/-/g, '').slice(0, 10)).trim();
-    if (!/^[A-Z][A-Z0-9]{0,9}$/.test(proposed)) {
+    // parseIssueId's standard format only matches letters-only prefixes (PAN-4860).
+    const proposed = (input.issuePrefix ?? key.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 10)).trim();
+    if (!/^[A-Z]{1,10}$/.test(proposed)) {
       findings.push({
         field: 'issuePrefix',
         code: 'issue-prefix-invalid',
-        message:
-          'Issue prefix must start with a letter and contain only uppercase letters and digits (max 10 chars).',
+        message: 'Issue prefix must be 1 to 10 uppercase letters (A-Z), with no digits.',
         detail: proposed,
       });
     } else {

@@ -120,7 +120,7 @@ describe('access-token registry (PAN-3762)', () => {
 });
 
 describe('access-token scopes (PAN-2351)', () => {
-  const ALL = ['read:events', 'read:state', 'read:conversations', 'tell', 'operate', 'admin'] as const;
+  const ALL = ['read:events', 'read:state', 'read:conversations', 'read:costs', 'read:settings', 'tell', 'operate', 'approve', 'forward', 'admin'] as const;
 
   it('scopeSatisfies: admin covers every scope, operate covers tell, each other scope covers only itself', () => {
     expect(registry.ACCESS_TOKEN_SCOPES).toEqual(ALL);
@@ -134,6 +134,13 @@ describe('access-token scopes (PAN-2351)', () => {
     expect(registry.scopeSatisfies(['operate'], 'read:events')).toBe(false);
     expect(registry.scopeSatisfies(['tell'], 'operate')).toBe(false);
     expect(registry.scopeSatisfies(['read:events', 'tell'], 'tell')).toBe(true);
+  });
+
+  it('scopeSatisfies: approve is an independent grant that only admin implies (PAN-4649)', () => {
+    expect(registry.scopeSatisfies(['operate'], 'approve')).toBe(false);
+    expect(registry.scopeSatisfies(['admin'], 'approve')).toBe(true);
+    expect(registry.scopeSatisfies(['approve'], 'approve')).toBe(true);
+    expect(registry.parseAccessTokenScopes('read:state,approve')).toEqual(['read:state', 'approve']);
   });
 
   it('scopeSatisfies: an unknown scope string satisfies nothing', () => {

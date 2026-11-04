@@ -33,18 +33,38 @@ import { WorkspaceServiceLive } from './services/workspace-service.js';
 import { OpenRouterServiceLive } from './services/openrouter-service.js';
 import { PanOpenLive } from './services/open.js';
 import { setupTerminalWebSocket } from './ws-terminal.js';
+import { setupLinkedWebSocket } from './ws-linked.js';
+import { setupForwardWebSocket } from './ws-forward.js';
 import { knowledgeViewerRouteLayer, setupKnowledgeViewerProxy } from './routes/knowledge-viewer.js';
 import { setupVoiceWebSocket } from './ws-voice.js';
 import { setupAutoPresoWebSocket } from './ws-autopreso.js';
+import { installChannelListener } from './channel-listener.js';
+import { plainHttpNavigationGuard } from './plain-http-guard.js';
+import { recordPairingExchangeFailure, takePairingById } from './pairing-credentials.js';
+import { currentApprovalService } from './services/directory-approval.js';
+import { getOverdeckVersion } from './routes/misc/shared.js';
+import { hostsMachineLinks } from '../../lib/boot-gates.js';
+import { ensureMachineKey } from '../../lib/anywhere/machine-key.js';
+import { findActiveChannelTokenByKey } from '../../lib/access-tokens.js';
 import { websocketRpcRouteLayer } from './ws-rpc.js'
 import { issuesRouteLayer } from './routes/issues.js'
 import { testRemovalWaiverRouteLayer } from './routes/test-removal-waiver.js'
+import { deftRouteLayer } from './routes/deft.js'
 import { pipelineMembershipRouteLayer } from './routes/pipeline-membership.js'
 import { parkedRouteLayer } from './routes/parked.js'
 import { velocityRouteLayer } from './routes/velocity.js'
 import { agentsRouteLayer } from './routes/agents.js'
 import { agentDirectoryRouteLayer } from './routes/agent-directory.js'
 import { workersRegisterRouteLayer } from './routes/workers-register.js'
+import { workersRouteLayer } from './routes/workers.js'
+import { selfJobsRouteLayer } from './routes/self-jobs.js'
+import { selfLanesRouteLayer } from './routes/self-lanes.js'
+import { selfWorkersRouteLayer } from './routes/self-workers.js'
+import { selfWorkflowRouteLayer } from './routes/self-workflow.js'
+import { selfRequestsRouteLayer } from './routes/self-requests.js'
+import { selfPullRequestsRouteLayer } from './routes/self-pull-requests.js'
+import { selfMemoryRouteLayer } from './routes/self-memory.js'
+import { agentRequestsRouteLayer } from './routes/agent-requests.js'
 import { lanesRouteLayer } from './routes/lanes.js'
 import { workspacesRouteLayer } from './routes/workspaces.js'
 import { workspaceRegistryRouteLayer } from './routes/workspace-registry.js'
@@ -57,11 +77,42 @@ import { remoteRouteLayer } from './routes/remote.js'
 import { environmentRouteLayer } from './routes/environment.js'
 import { pairingRouteLayer } from './routes/pairing.js'
 import { anywhereRouteLayer } from './routes/anywhere.js'
+import { machinesRouteLayer } from './routes/machines.js'
+import { machinesSshRouteLayer } from './routes/machines-ssh.js'
+import { machinesFlyRouteLayer, machinesFlyEnableRemoteRouteLayer } from './routes/machines-fly.js'
+import { remoteWorkAgentsRouteLayer } from './routes/remote-work-agents.js'
+import { versionsSelfRouteLayer } from './routes/versions-self.js'
+import { machinesFleetRouteLayer } from './routes/machines-fleet.js'
+import { machinesPeerRouteLayer } from './routes/machines-peer.js'
+import { phonesRouteLayer } from './routes/phones.js'
+import { connectorsRouteLayer } from './routes/connectors.js'
+import { machinesWorkRouteLayer } from './routes/machines-work.js'
+import { machinesWorkLanesRouteLayer } from './routes/machines-work-lanes.js'
+import { fleetWorkRouteLayer } from './routes/fleet-work.js'
+import { fleetProjectsRouteLayer } from './routes/fleet-projects.js'
+import { machinesProjectsRouteLayer } from './routes/machines-projects.js'
+import { fleetAwarenessRouteLayer } from './routes/fleet-awareness.js'
+import { needsYouRouteLayer } from './routes/needs-you.js'
+import { costsDigestRouteLayer } from './routes/costs-digest.js'
+import { fleetUsageRouteLayer } from './routes/fleet-usage.js'
+import { settingsResolvedRouteLayer } from './routes/settings-resolved.js'
+import { fleetSettingsRouteLayer } from './routes/fleet-settings.js'
+import { directoryRouteLayer } from './routes/directory.js'
+import { directoryApprovalRouteLayer } from './routes/directory-approval.js'
+import { pushRouteLayer } from './routes/push.js'
+import { tailscaleRouteLayer } from './routes/tailscale.js'
 import { accessTokensRouteLayer } from './routes/access-tokens.js'
+import { mcpRouteLayer } from './routes/mcp.js'
+import { mcpOAuthRouteLayer } from './routes/mcp-oauth.js'
+import { mcpOAuthAdminRouteLayer } from './routes/mcp-oauth-admin.js'
+import { mcpPublicRouteLayer } from './routes/mcp-public.js';
 import { remoteRequestGateLayer } from './remote-request-gate.js'
+import { linkedConversationProxyLayer } from './linked-conversation-proxy.js';
+import { publicMcpFunnelLayer } from './public-mcp-funnel.js';
 import { settingsRouteLayer } from './routes/settings.js'
 import { modelPresetsRouteLayer } from './routes/model-presets.js'
 import { jevRouteLayer } from './routes/jev.js'
+import { colorThemesRouteLayer } from './routes/color-themes.js'
 import { vaultRouteLayer } from './routes/vault.js'
 import { voiceRouteLayer } from './routes/voice.js';
 import { autopresoRouteLayer } from './routes/autopreso.js';
@@ -70,7 +121,12 @@ import { miscRouteLayer } from './routes/misc.js';
 import { paletteRouteLayer } from './routes/palette.js';
 import { conversationsRouteLayer } from './routes/conversations.js';
 import { conversationKickoffRouteLayer } from './routes/conversation-kickoff.js';
+import { conversationPullRouteLayer } from './routes/conversation-pull.js';
+import { conversationPreviewPortsRouteLayer } from './routes/conversation-preview-ports.js';
+import { linkedOpenRouteLayer } from './routes/linked-open.js';
 import { conversationBookmarksRouteLayer } from './routes/conversation-bookmarks.js';
+import { conversationTriageRouteLayer } from './routes/conversation-triage.js';
+import { conversationScheduledMessagesRouteLayer } from './routes/conversation-scheduled-messages.js';
 import { conversationSchedulesRouteLayer } from './routes/conversation-schedules.js';
 import { conversationsRetrospectiveRouteLayer } from './routes/conversations-retrospective.js';
 import { conversationCompanionTerminalRouteLayer } from './routes/conversation-companion-terminal.js';
@@ -81,6 +137,7 @@ import { eventsRouteLayer } from './routes/events.js';
 import { projectsRouteLayer } from './routes/projects.js';
 import { projectsMergeTrainRouteLayer } from './routes/projects-merge-train.js';
 import { mergeTrainRouteLayer } from './routes/merge-train.js';
+import { mergeTrainLanesRouteLayer } from './routes/merge-train-lanes.js';
 import { flywheelRouteLayer } from './routes/flywheel.js';
 import { contextRouteLayer } from './routes/context.js';
 import { commandsRouteLayer } from './routes/commands.js';
@@ -90,6 +147,10 @@ import { cliproxyRouteLayer } from './routes/cliproxy.js';
 import { githubQuotaRouteLayer } from './routes/github-quota.js';
 import { ttsRouteLayer } from './routes/tts.js';
 import { webhooksRouteLayer } from './routes/webhooks.js';
+import { triggerHooksRouteLayer } from './routes/trigger-hooks.js';
+import { triggersRouteLayer } from './routes/triggers.js';
+import { sharesRouteLayer } from './routes/shares.js';
+import { joinsRouteLayer } from './routes/joins.js';
 import { hooksRouteLayer } from './routes/hooks.js';
 import { diffsRouteLayer } from './routes/diffs.js';
 import { diffCompareRouteLayer } from './routes/diff-compare.js';
@@ -128,9 +189,29 @@ const HttpServerLive = Layer.unwrap(
       const nodeServer = NodeHttp.createServer();
       holdRequestsUntilServed(nodeServer);
       setupTerminalWebSocket(nodeServer);
+      setupLinkedWebSocket(nodeServer);
+      setupForwardWebSocket(nodeServer);
       setupKnowledgeViewerProxy(nodeServer);
       setupVoiceWebSocket(nodeServer);
       setupAutoPresoWebSocket(nodeServer);
+      // PAN-4645: secure machine channels on the dashboard port (the primary, or a
+      // peer-mode dashboard that opted in; see hostsMachineLinks). An IK initiator is
+      // pinned when an active machine, phone or connector token is bound to its key
+      // (PAN-4835, PAN-4927); a pairing initiator must name a live `pan pair` credential.
+      installChannelListener(nodeServer, {
+        primary: hostsMachineLinks(),
+        localKey: ensureMachineKey,
+        isPinnedPeer: (remoteKeyHex) => findActiveChannelTokenByKey(remoteKeyHex) !== null,
+        takePairing: (pairingId) => {
+          const taken = takePairingById(pairingId);
+          return taken === 'unknown' || taken === 'expired' ? 'unknown' : taken;
+        },
+        onPairingFailure: recordPairingExchangeFailure,
+        serverVersion: getOverdeckVersion,
+        // PAN-2356: an approval channel only for this machine's own live join request.
+        takeApproval: (requestId) => currentApprovalService()?.takeApproval(requestId) ?? false,
+        onApprovalChannel: (channel) => currentApprovalService()?.onIncomingChannel(channel),
+      });
       return nodeServer;
     }, {
       host: config.host,
@@ -181,6 +262,11 @@ const staticRouteLayer = HttpRouter.add(
     if (url.value.pathname === '/api' || url.value.pathname.startsWith('/api/')) {
       return jsonResponse({ error: 'Not Found' }, { status: 404 });
     }
+
+    // PAN-4645 D-4645-13: a remote browser on plain HTTP gets "Use HTTPS"
+    // instead of the SPA shell (both `/` and the SPA fallback); assets are untouched.
+    const useHttps = plainHttpNavigationGuard(request, url.value.pathname);
+    if (useHttps) return useHttps;
 
     const config = yield* ServerConfig;
     const fileSystem = yield* FileSystem.FileSystem;
@@ -283,18 +369,32 @@ const staticRouteLayer = HttpRouter.add(
 export const makeRoutesLayer = Layer.mergeAll(
   // PAN-3762: global middleware; requires a credential for non-local /api and /events requests.
   remoteRequestGateLayer,
+  // PAN-4947 D-5: rate limit and audit public MCP requests through Tailscale Funnel.
+  publicMcpFunnelLayer,
+  // PAN-4650 D-4650-4: /api/conversations/@<machine>/… forwards to the owner (admitted requests only).
+  linkedConversationProxyLayer,
   healthRouteLayer,
   dashboardSessionPreflightRouteLayer,
   dashboardSessionRouteLayer,
   websocketRpcRouteLayer,
   issuesRouteLayer,
   testRemovalWaiverRouteLayer,
+  deftRouteLayer,
   pipelineMembershipRouteLayer,
   parkedRouteLayer,
   velocityRouteLayer,
   agentsRouteLayer,
   agentDirectoryRouteLayer,
   workersRegisterRouteLayer,
+  workersRouteLayer,
+  selfJobsRouteLayer,
+  selfWorkersRouteLayer,
+  selfLanesRouteLayer,
+  selfWorkflowRouteLayer,
+  selfRequestsRouteLayer,
+  selfPullRequestsRouteLayer,
+  selfMemoryRouteLayer,
+  agentRequestsRouteLayer,
   lanesRouteLayer,
   workspacesRouteLayer,
   workspaceRegistryRouteLayer,
@@ -307,6 +407,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   settingsRouteLayer,
   modelPresetsRouteLayer,
   jevRouteLayer,
+  colorThemesRouteLayer,
   vaultRouteLayer,
   voiceRouteLayer,
   autopresoRouteLayer,
@@ -315,7 +416,12 @@ export const makeRoutesLayer = Layer.mergeAll(
   paletteRouteLayer,
   conversationsRouteLayer,
   conversationKickoffRouteLayer,
+  conversationPullRouteLayer,
+  conversationPreviewPortsRouteLayer,
+  linkedOpenRouteLayer,
   conversationBookmarksRouteLayer,
+  conversationTriageRouteLayer,
+  conversationScheduledMessagesRouteLayer,
   conversationSchedulesRouteLayer,
   conversationsRetrospectiveRouteLayer,
   conversationCompanionTerminalRouteLayer,
@@ -326,6 +432,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   projectsRouteLayer,
   projectsMergeTrainRouteLayer,
   mergeTrainRouteLayer,
+  mergeTrainLanesRouteLayer,
   flywheelRouteLayer,
   contextRouteLayer,
   commandsRouteLayer,
@@ -335,6 +442,10 @@ export const makeRoutesLayer = Layer.mergeAll(
   githubQuotaRouteLayer,
   ttsRouteLayer,
   webhooksRouteLayer,
+  triggerHooksRouteLayer,
+  triggersRouteLayer,
+  sharesRouteLayer,
+  joinsRouteLayer,
   hooksRouteLayer,
   diffsRouteLayer,
   diffCompareRouteLayer,
@@ -354,7 +465,36 @@ export const makeRoutesLayer = Layer.mergeAll(
   environmentRouteLayer,
   pairingRouteLayer,
   anywhereRouteLayer,
+  machinesRouteLayer,
+  machinesSshRouteLayer,
+  machinesFlyRouteLayer,
+  machinesFlyEnableRemoteRouteLayer,
+  remoteWorkAgentsRouteLayer,
+  versionsSelfRouteLayer,
+  machinesFleetRouteLayer,
+  machinesPeerRouteLayer,
+  phonesRouteLayer,
+  connectorsRouteLayer,
+  machinesWorkRouteLayer,
+  machinesWorkLanesRouteLayer,
+  fleetWorkRouteLayer,
+  fleetProjectsRouteLayer,
+  machinesProjectsRouteLayer,
+  fleetAwarenessRouteLayer,
+  needsYouRouteLayer,
+  costsDigestRouteLayer,
+  fleetUsageRouteLayer,
+  settingsResolvedRouteLayer,
+  fleetSettingsRouteLayer,
+  directoryRouteLayer,
+  directoryApprovalRouteLayer,
+  pushRouteLayer,
+  tailscaleRouteLayer,
   accessTokensRouteLayer,
+  mcpRouteLayer,
+  mcpOAuthRouteLayer,
+  mcpOAuthAdminRouteLayer,
+  mcpPublicRouteLayer,
   staticRouteLayer,
 );
 

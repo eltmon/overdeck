@@ -1,0 +1,199 @@
+---
+title: "Shared sessions"
+description: "Share one live conversation by link and let other people watch it in their own Overdeck"
+---
+
+# Shared sessions
+
+A shared session lets you share one live conversation with other people by link. Each
+viewer watches it in their own Overdeck, in their own browser, while you keep working.
+
+## What it is
+
+You create a link for one conversation. A person who opens the link asks to join, and you
+decide who gets in. Once you admit someone, the conversation streams to their Overdeck
+directly from yours, peer to peer. The share service at overdeck.ai only introduces the two
+machines and checks who is allowed in. It never sees the conversation.
+
+In this release:
+
+- Only Claude Code conversations can be shared.
+- Viewers see the messages. Tool calls, thinking, the work log, cost and context usage are
+  not shared in the conversation view.
+- Every admitted viewer can also open the **Terminal** view and watch the conversation's
+  live terminal, read-only. Anything that terminal shows is visible to them, including tool
+  calls or thinking the agent prints there.
+- Viewers can suggest prompts. Contributors can also send prompts straight to the
+  conversation.
+
+## Before you start
+
+- The host runs Overdeck on their own computer and is signed in to overdeck.ai with
+  [`pan account login`](/cli/account), which the host needs to create the link.
+- A viewer can join in three ways: from their own Overdeck (signed in with
+  `pan account login`), without installing it with `npx @overdeck/core join <CODE>`
+  (Node 22 or newer), or from a browser (see [Join in a browser](#join-in-a-browser)).
+  Every way signs the viewer in, so the host sees who is asking to join.
+- overdeck.ai accounts are invite-only. A viewer must be on the allowlist before they can
+  sign in.
+
+## Share a conversation
+
+1. Open the conversation in the dashboard.
+2. Open the ⋮ menu and choose **Share this conversation**, then **Create link**.
+3. Click **Copy** and send the link to the people you want to invite.
+
+The share dialog lists the people waiting to join and the people in the room. For each
+person you can:
+
+- **Admit** them, so they start to see the conversation.
+- **Admit as contributor**, so they can also send prompts straight to the conversation.
+- **Grant contributor** / **Remove contributor** for someone already in the room.
+- **Kick** them out. They can ask to join again.
+- **Revoke** them. They are blocked from this share and cannot ask again.
+- **Un-revoke** a blocked person, so they can ask to join again.
+
+**End share** closes the room for everyone. The link stops working.
+
+If your network drops or your dashboard restarts, Overdeck reconnects the share on its own.
+People you admitted come back without the lobby if you return within 5 minutes.
+
+From a terminal, run `pan share <conversation>`; it prints the link and the join code. See
+[`pan share and pan join`](/cli/share).
+
+## Join a shared conversation
+
+These steps join from your own Overdeck. To join with only a browser, see
+[Join in a browser](#join-in-a-browser).
+
+1. Open the link in a browser on the computer that runs your Overdeck.
+2. The page looks for Overdeck on this computer, on port 3011, and opens it for you.
+   Chrome may ask whether the page may reach apps on this device. Choose **Allow**.
+3. If Overdeck does not open, start it with `pan up` and reload the page. If your dashboard
+   uses another port, open `http://localhost:<port>/#/shared/<CODE>` yourself, with the
+   8-letter code from the link. The page also always shows a manual
+   **Open it in Overdeck on this computer** link.
+4. Click **Join**. The host sees your GitHub name and avatar before letting you in.
+5. Wait in the lobby until the host admits you.
+
+Click **Leave** at any time to leave the shared conversation.
+
+### From a terminal
+
+`pan join <link-or-code>` signs you in if needed, starts Overdeck if it is not running and opens
+the lobby. On a computer without Overdeck, `npx @overdeck/core join <CODE>` does the same with only
+Node 22 or newer. See [`pan share and pan join`](/cli/share).
+
+## Join in a browser
+
+You do not need Overdeck installed to join. You need a browser and a GitHub account that is
+on the overdeck.ai allowlist.
+
+1. Open the link. Below the Overdeck instructions, the page shows **Join in this browser**.
+2. Click **Sign in with GitHub** and approve the sign-in on GitHub. You come back to the
+   same page.
+3. Check the name shown under **Signed in as**, then click **Join**. The host sees your
+   GitHub name and avatar before letting you in.
+4. Wait in the lobby until the host admits you. The conversation then appears on the page.
+
+overdeck.ai is invite-only. If your GitHub account is not on the allowlist yet, the sign-in
+page tells you so; ask the person who shared the link to get you added, then sign in again.
+
+A browser viewer is read-only: it shows the messages and the people in the room, with no
+prompt box. If the connection to the host drops, click **Reconnect**. Reloading the page
+rejoins without another click. Click **Leave** to leave, and **Sign out** on the page to
+sign this browser out of overdeck.ai.
+
+## Roles
+
+- **Host**: the person who shared the conversation. The conversation runs on the host's
+  machine, and the host admits, kicks and revokes people.
+- **Controller**: the person who drives the conversation and runs the lobby. The host
+  starts as controller and can hand control to a viewer.
+- **Viewer**: a person the host admitted. Viewers watch the conversation live and can
+  suggest prompts.
+- **Contributor**: a viewer who can also send prompts straight to the conversation.
+
+## Suggestions and contributor prompts
+
+- Every viewer gets a box under the conversation. What they type is a **suggestion**, and
+  every other participant sees it live.
+- The host sees the suggestions in the share dialog. Click **Use** on one, edit it if you
+  want, and click **Send**. The person who suggested it sees "The host sent your
+  suggestion."
+- A contributor also gets **Send prompt** (or Ctrl/Cmd+Enter), which sends the prompt
+  straight to the conversation.
+- Every prompt waits its turn: the agent finishes the current turn first, and the line
+  **Agent is working · N queued** shows the wait.
+- Prompts cannot start with `/`, `!` or `#`, so nobody can run a slash command, a shell
+  command or a memory note through a shared session.
+- The conversation shows who sent each shared prompt.
+
+**Only make someone a contributor if you trust them to prompt your agent as you.** Their
+prompts run on your machine, with your agent's permissions.
+
+## Hand over control
+
+1. In the share dialog, click **Hand control to @name** next to a person in the room.
+2. That person's page shows **You have control**. They can now admit, kick and revoke
+   people, grant or remove contributor, send prompts with **Send prompt**, pick and send
+   suggestions, and hand control to someone else or back to you.
+3. While someone else has control, your share dialog says "@name has control." and shows
+   only **Reclaim control**. Click it to take control back at once. It always works.
+
+Only the host can un-revoke a blocked person or end the share. Reclaim control first to
+un-revoke; **End share** works whoever has control.
+
+**Only hand control to someone you trust to prompt your agent as you.** The controller's
+prompts run on your machine, with your agent's permissions.
+
+## What viewers see
+
+- **Join a shared conversation**: the confirmation before you join.
+- **Waiting for the host to let you in**: you are in the lobby. You see no part of the
+  conversation until the host admits you.
+- The conversation itself, with the conversation's title, the host and the number of
+  people watching in the header. New messages appear as the host's agent writes them.
+- A **Conversation** / **Terminal** toggle once you are connected. **Terminal** shows the
+  host's live terminal for that conversation. It is read-only: nothing you type reaches the
+  host's machine. **The host's terminal is not running.** means the conversation has no live
+  terminal; **The host's terminal session ended.** means it stopped while you watched.
+- **Host disconnected — reconnecting…**: the host's machine lost its connection to the
+  share service. You keep the messages you already have. If the host comes back within
+  5 minutes, the conversation returns on its own and you do not wait in the lobby again.
+- **Reconnecting to the share service…**: your own machine lost its connection to the share
+  service. Overdeck reconnects on its own, and you keep your place in the room.
+- **Connection to the host was lost.**: the direct connection to the host dropped. Overdeck
+  tries to reconnect on its own, up to three times. If that does not work, click
+  **Reconnect**.
+- **Removed by host**: the host kicked you, and you can ask to join again, or the host
+  revoked you, and you cannot.
+- **This share has ended.**: the host ended the share.
+- **This share is full.**: the room has no space left.
+- **This is your own share.**: you opened a link to a conversation you are sharing.
+- **This share is open in another tab or on another device.**: you joined the same share
+  somewhere else. Only one place at a time can watch.
+- **Sign in to join**: run `pan account login` first.
+- **Agent is working · N queued**: the host's agent is busy and N shared prompts wait for
+  their turn.
+- **Queued (#N)**: your prompt is number N in the queue.
+- **The host sent your suggestion.**: the host picked your suggestion and sent it.
+- **You can no longer send prompts directly.**: the host removed your contributor role.
+
+## Networks and privacy
+
+The two machines connect directly when they can. When a firewall or a strict NAT blocks a
+direct connection, Cloudflare's TURN service relays the encrypted packets, and it cannot read
+them. The share service only introduces the machines and checks who may join. An automated test
+checks on every build that no conversation text, prompt, draft or terminal output passes
+through it.
+
+## Limits
+
+- A room holds at most 50 people, of whom at most 20 can wait in the lobby at once.
+- The link works as long as the share exists.
+- If the host's machine stays away from the share service for more than 5 minutes, the
+  room ends and the link stops working. Share again to get a new link, and everyone joins
+  through the lobby.
+- A queue holds at most 20 prompts, at most 3 from one contributor, each up to 8,000
+  characters.

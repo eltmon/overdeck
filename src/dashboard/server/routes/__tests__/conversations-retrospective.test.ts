@@ -7,6 +7,8 @@
  * window validation and kickoff rendering are exercised end to end.
  */
 
+import { rmSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Effect } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
@@ -19,6 +21,7 @@ import {
   dashboardSessionCookieHeader,
 } from '../dashboard-auth.js';
 import { _resetInternalTokenCacheForTests } from '../../../../lib/internal-token.js';
+import { getOverdeckHome } from '../../../../lib/paths.js';
 
 const handleConversationCreate = vi.fn(
   async () => jsonResponse({ name: 'conv-x', id: 1 }, { status: 201 }),
@@ -75,6 +78,7 @@ describe('POST /api/conversations/retrospective', () => {
     handleConversationCreate.mockClear();
     process.env.OVERDECK_INTERNAL_TOKEN = 'test-dashboard-token';
     process.env.OVERDECK_DASHBOARD_CSRF_TOKEN = 'test-csrf-token';
+    rmSync(join(getOverdeckHome(), 'internal-token'), { force: true });
     _resetInternalTokenCacheForTests();
     _resetDashboardSessionTokenForTests();
   });

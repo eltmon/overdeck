@@ -1,0 +1,15 @@
+{
+  "unresolved": [
+    {
+      "scopeId": "scope-done",
+      "reason": "Item c1 has no spec coverage",
+      "specImpact": "minor",
+      "completedAt": "2026-11-01T18:00:00Z",
+      "uncoveredItemIds": [
+        "c1"
+      ]
+    }
+  ],
+  "coverage": [],
+  "baselineRevision": "abc1234"
+}

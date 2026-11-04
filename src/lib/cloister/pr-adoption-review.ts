@@ -17,8 +17,15 @@
  *     never the cached repo listing, and reports a forge failure as an error,
  *     never as "no PR".
  *   - `answerMissingWorkspace` is the `/request` route's pre-guard: with no
- *     workspace and an open pipeline-branch PR it starts adoption in the
+ *     workspace and an open pipeline-branch PR it runs the network-free
+ *     adoption preflight (PAN-4785) and answers 409 with the refusal and its
+ *     fix when adoption would refuse; otherwise it starts adoption in the
  *     background and answers 202.
+ *
+ * PAN-4785: a refusal with no workspace has no journal to land in (the journal
+ * dies with the workspace and is never recreated for a refusal), so it is also
+ * commented on the PR once per (issue, reason, head) in this process. The PR
+ * then says why it was never reviewed.
  */
 import type { IssueState } from '@overdeck/contracts';
 
@@ -28,7 +35,14 @@ import { inferProjectForge } from '../project-repos.js';
 import { findProjectByPath, resolveProjectFromIssueSync } from '../projects.js';
 import { surfaceIssueFeedbackNeedsYou } from './feedback-target.js';
 import { appendPipelineEntry } from './pipeline-journal.js';
-import { adoptPrWorkspace, type AdoptablePr, type AdoptionOutcome } from './pr-workspace-adoption.js';
+import {
+  adoptPrWorkspace,
+  preflightPrAdoption,
+  type AdoptablePr,
+  type AdoptionOutcome,
+  type AdoptionPreflight,
+  type AdoptionRefusalOutcome,
+} from './pr-workspace-adoption.js';
 import { getRequestReviewStarter, type RequestReviewSource, type RequestReviewStarter } from './request-review-pipeline.js';
 
 export type AdoptAndReviewOutcome =
@@ -47,13 +61,32 @@ export interface AdoptAndReviewOptions {
   announce?: (issueId: string, reason: string, details: Record<string, unknown>) => Promise<void>;
   /** Default `appendPipelineEntry`. */
   journal?: typeof appendPipelineEntry;
+  /** PAN-4785: posts a refusal on the PR; default `gh pr comment`. */
+  comment?: (repo: string, prNumber: number, body: string) => Promise<void>;
 }
 
 const inFlight = new Map<string, Promise<AdoptAndReviewOutcome>>();
+/** PAN-4785: `<ISSUE>:<reason>:<head>` refusals already commented on the PR by this process. */
+const refusalsCommented = new Set<string>();
 
-/** Test hook: forget every in-flight adoption. */
+/** Test hook: forget every in-flight adoption and every posted refusal comment. */
 export function __resetPrAdoptionForTests(): void {
   inFlight.clear();
+  refusalsCommented.clear();
+}
+
+async function defaultComment(repo: string, prNumber: number, body: string): Promise<void> {
+  await runGh(['pr', 'comment', String(prNumber), '--repo', repo, '--body', body], { caller: 'pr-adoption', timeout: 20_000 });
+}
+
+/** The PR comment for an adoption refusal. The marker line names the reason and head it answers. */
+export function adoptionRefusalComment(pr: AdoptablePr, refusal: AdoptionRefusalOutcome): string {
+  return [
+    `<!-- overdeck-adoption-refused reason=${refusal.reason} sha=${pr.headSha ?? 'unknown'} -->`,
+    `**Overdeck has not verified or reviewed this PR.** It could not adopt \`${pr.headRef}\` into a pipeline workspace (\`${refusal.reason}\`).`,
+    '',
+    refusal.fix,
+  ].join('\n');
 }
 
 function errorMessage(err: unknown): string {
@@ -109,6 +142,7 @@ async function runAdoptAndReview(pr: AdoptablePr, options: AdoptAndReviewOptions
       reason: adoption.reason,
       ...(adoption.worktreePath ? { worktreePath: adoption.worktreePath } : {}),
     });
+    await commentRefusal(pr, adoption, options.comment ?? defaultComment);
     return { kind: 'refused', adoption };
   }
 
@@ -150,6 +184,26 @@ async function runAdoptAndReview(pr: AdoptablePr, options: AdoptAndReviewOptions
       `PR #${pr.number} was adopted into ${workspacePath} but review did not start (${detail}). Resolve that, then run \`pan review request ${issueId}\`.`,
     );
     return { kind: 'review-not-started', workspacePath, reason: detail };
+  }
+}
+
+/**
+ * PAN-4785: say on the PR why it was not adopted, once per reason and head in
+ * this process. A restart may post one more. Never throws.
+ */
+async function commentRefusal(
+  pr: AdoptablePr,
+  refusal: AdoptionRefusalOutcome,
+  comment: NonNullable<AdoptAndReviewOptions['comment']>,
+): Promise<void> {
+  if (!pr.repo) return;
+  const key = `${pr.issueId.toUpperCase()}:${refusal.reason}:${pr.headSha ?? ''}`;
+  if (refusalsCommented.has(key)) return;
+  refusalsCommented.add(key);
+  try {
+    await comment(pr.repo, pr.number, adoptionRefusalComment(pr, refusal));
+  } catch (err) {
+    console.warn(`[pr-adoption] Could not comment the refusal on PR #${pr.number}: ${errorMessage(err)}`);
   }
 }
 
@@ -220,7 +274,12 @@ export async function answerMissingWorkspace(
   issueId: string,
   source: RequestReviewSource,
   context: { derivedState: IssueState; workspaceExists: boolean },
-  deps: { findPr?: typeof findOpenPipelinePr; adoptAndReview?: typeof adoptPrAndStartReview } = {},
+  deps: {
+    findPr?: typeof findOpenPipelinePr;
+    adoptAndReview?: typeof adoptPrAndStartReview;
+    /** PAN-4785: default `preflightPrAdoption`. */
+    preflight?: (pr: AdoptablePr) => Promise<AdoptionPreflight>;
+  } = {},
 ): Promise<{ status: number; body: Record<string, unknown> } | null> {
   if (context.workspaceExists || context.derivedState === 'merged') return null;
   const id = issueId.toUpperCase();
@@ -248,6 +307,34 @@ export async function answerMissingWorkspace(
     };
   }
 
+  // PAN-4785: answer a refusal the requester can see, never "queued".
+  let preflight: AdoptionPreflight;
+  try {
+    preflight = await (deps.preflight ?? ((pr: AdoptablePr) => preflightPrAdoption(pr)))(lookup.pr);
+  } catch (err) {
+    return {
+      status: 503,
+      body: {
+        success: false,
+        error: `Could not check whether PR #${lookup.pr.number} (${branch}) can be adopted: ${errorMessage(err)}`,
+        hint: `Retry pan review request ${id}.`,
+      },
+    };
+  }
+  if (!preflight.ok) {
+    const { refusal } = preflight;
+    return {
+      status: 409,
+      body: {
+        success: false,
+        error: `PR #${lookup.pr.number} cannot be adopted into a pipeline workspace: ${refusal.detail}`,
+        hint: refusal.fix,
+        reason: refusal.reason,
+        ...(refusal.worktreePath ? { worktreePath: refusal.worktreePath } : {}),
+      },
+    };
+  }
+
   void (deps.adoptAndReview ?? adoptPrAndStartReview)(lookup.pr, { source }).catch(() => {});
   return {
     status: 202,
@@ -255,7 +342,7 @@ export async function answerMissingWorkspace(
       success: true,
       queued: true,
       adopting: true,
-      message: `No pipeline workspace for ${id}: adopting PR #${lookup.pr.number} (${branch}) into one — verification starts when it is ready. If adoption is refused, the reason appears under Needs you and in pan show ${id}.`,
+      message: `No pipeline workspace for ${id}: adopting PR #${lookup.pr.number} (${branch}) into one — verification starts when it is ready. If adoption is refused later, the reason appears under Needs you, in pan show ${id}, and as a comment on the PR.`,
     },
   };
 }

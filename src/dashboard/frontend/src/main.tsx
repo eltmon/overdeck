@@ -6,10 +6,15 @@ import { DialogProvider } from './components/DialogProvider';
 import App from './App';
 import { installRecovery, RootErrorBoundary } from './recovery';
 import { useDesignLanguage } from './hooks/useDesignLanguage';
+import { useColorTheme } from './hooks/useColorTheme';
 import { installQueryRecovery } from './lib/queryRecovery';
 import { LinkPullRequestDialogHost } from './components/chat/LinkPullRequestDialog';
+import { ConversationScheduleDialogHost } from './components/chat/ConversationScheduleDialog';
+import { PullHereDialogHost } from './components/chat/PullHereDialog';
 import { ContinueOnDeviceDialogHost } from './components/chat/continueOnDevice/ContinueOnDeviceDialog';
 import { NewConversationDialogHost } from './components/newConversation/NewConversationDialog';
+import { ShareDialogHost } from './components/chat/sharing/ShareDialog';
+import { AnywhereDialogHost } from './components/Settings/anywhere/AnywhereDialogHost';
 import { ImageLightboxHost } from './components/chat/ImageLightbox';
 import './index.css';
 
@@ -19,6 +24,11 @@ void initTelemetry();
 // config.yaml's resolved ui.theme once at boot — the mirror can be stale
 // relative to a change made on another device or directly in config.yaml.
 void useDesignLanguage.getState().reconcileFromServer();
+
+// Reconcile the locally-mirrored color theme selection against config.yaml
+// (PAN-4644) once at boot, for the same reason as the design-language
+// reconcile above.
+void useColorTheme.getState().reconcileFromServer();
 
 // Recover from asset/module load failures during a server restart (the blank
 // page + 404 symptom). Install before render so a failure mid-boot is caught.
@@ -70,8 +80,12 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <DialogProvider>
           <App />
           <LinkPullRequestDialogHost />
+          <ConversationScheduleDialogHost />
+          <PullHereDialogHost />
           <ContinueOnDeviceDialogHost />
           <NewConversationDialogHost />
+          <ShareDialogHost />
+          <AnywhereDialogHost />
           <ImageLightboxHost />
         </DialogProvider>
       </QueryClientProvider>

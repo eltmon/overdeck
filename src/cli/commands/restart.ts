@@ -312,10 +312,14 @@ export function spawnDashboardDetached(config: PlatformConfig, opts?: DashboardS
     env: fullEnv,
   });
   child.unref();
-  console.warn(
-    '[dashboard] WARNING (PAN-2804): could not start the dashboard via systemd-run. ' +
-      'It shares the invoking process tree\'s cgroup; restarting that unit/scope will kill it.',
-  );
+  // PAN-4896: only Linux tries systemd-run; elsewhere (macOS launchd) the
+  // detached child is the normal path, so there is nothing to warn about.
+  if (process.platform === 'linux') {
+    console.warn(
+      '[dashboard] WARNING (PAN-2804): could not start the dashboard via systemd-run. ' +
+        'It shares the invoking process tree\'s cgroup; restarting that unit/scope will kill it.',
+    );
+  }
   return {
     stop: () => {
       if (!child.pid) return;

@@ -163,20 +163,8 @@ export function firePostMergeLifecycle(issueId: string, options?: FirePostMergeL
         options?.sourceBranch,
         Object.keys(lifecycleOptions).length > 0 ? lifecycleOptions : undefined,
       );
+      // PAN-4801: postMergeLifecycle rolls the merge train itself, once per merge.
       console.log(`[merge] post-merge lifecycle completed for ${normalizedIssueId}`);
-
-      // PAN-1691: roll the merge train — rebase ready siblings onto the new main,
-      // re-verify the clean ones, agent-resolve conflicts. No-op unless the
-      // flywheel.merge_train_enabled flag is on. Runs inside the in-flight guard,
-      // so it cannot re-enter postMergeLifecycle for this issue.
-      const { runMergeTrainReconcile } = await import('../../../../lib/cloister/merge-train.js');
-      const outcomes = await runMergeTrainReconcile(normalizedIssueId);
-      if (outcomes.length > 0) {
-        console.log(
-          `[merge-train] reconciled ${outcomes.length} sibling(s) after ${normalizedIssueId}: ` +
-            outcomes.map((o) => `${o.issueId}=${o.result}`).join(', '),
-        );
-      }
     },
     (err) => console.error(`[merge] post-merge lifecycle failed for ${normalizedIssueId}:`, err),
   );
