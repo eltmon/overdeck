@@ -145,7 +145,7 @@ export async function getAcpLauncherFields(
     acpProvider: getProviderForModel(model).name,
     acpWorkspace: workspace,
     acpBinaryPath: binaryPath,
-    acpContextFile: materializeAcpContextFile(getAgentDir(agentId), workspace, harness, { overdeckMcp: await overdeckMcpEnabledFor(harness) }),
+    acpContextFile: materializeAcpContextFile(getAgentDir(agentId), workspace, harness, { overdeckMcp: await overdeckMcpEnabledFor(harness).catch(() => false) }),
     acpEffort: harness === 'opencode' && effort && !isEffortLevel(effort) ? effort : resolveEffort({ explicit: effort, role, model, harness }).effort,
     model,
     unsetProviderEnv: true,

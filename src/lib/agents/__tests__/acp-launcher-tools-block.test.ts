@@ -9,12 +9,16 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mcpAgents = vi.hoisted(() => ({ value: true }));
+const configRejects = vi.hoisted(() => ({ value: false }));
 
 vi.mock('../../config-yaml.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../config-yaml.js')>();
   return {
     ...actual,
-    loadConfigNoMigration: vi.fn(async () => ({ config: { mcp: { agents: mcpAgents.value, public: { enabled: false } } } })),
+    loadConfigNoMigration: vi.fn(async () => {
+      if (configRejects.value) throw new Error('simulated config read failure');
+      return { config: { mcp: { agents: mcpAgents.value, public: { enabled: false } } } };
+    }),
   };
 });
 
@@ -31,6 +35,7 @@ describe('getAcpLauncherFields tools block (PAN-4935 W-4)', () => {
 
   beforeEach(() => {
     mcpAgents.value = true;
+    configRejects.value = false;
     overdeckHome = mkdtempSync(join(tmpdir(), 'pan-acp-launcher-tools-block-'));
     prevOverdeckHome = process.env.OVERDECK_HOME;
     process.env.OVERDECK_HOME = overdeckHome;
@@ -58,6 +63,12 @@ describe('getAcpLauncherFields tools block (PAN-4935 W-4)', () => {
   it('gives the CLI block when mcp.agents is false', async () => {
     mcpAgents.value = false;
     const fields = await getAcpLauncherFields('agent-pan-3', 'opencode/some-model', join(overdeckHome, 'workspace'), '/bin/x');
+    expect(readFileSync(fields.acpContextFile, 'utf8')).toContain('## Overdeck commands');
+  });
+
+  it('gives the CLI block, never rejecting, when the config read fails (NFR-5)', async () => {
+    configRejects.value = true;
+    const fields = await getAcpLauncherFields('agent-pan-4', 'opencode/some-model', join(overdeckHome, 'workspace'), '/bin/x');
     expect(readFileSync(fields.acpContextFile, 'utf8')).toContain('## Overdeck commands');
   });
 });

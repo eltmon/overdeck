@@ -9,12 +9,16 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mcpAgents = vi.hoisted(() => ({ value: true }));
+const configRejects = vi.hoisted(() => ({ value: false }));
 
 vi.mock('../../../../src/lib/config-yaml.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../src/lib/config-yaml.js')>();
   return {
     ...actual,
-    loadConfigNoMigration: vi.fn(async () => ({ config: { mcp: { agents: mcpAgents.value, public: { enabled: false } } } })),
+    loadConfigNoMigration: vi.fn(async () => {
+      if (configRejects.value) throw new Error('simulated config read failure');
+      return { config: { mcp: { agents: mcpAgents.value, public: { enabled: false } } } };
+    }),
   };
 });
 
@@ -28,6 +32,7 @@ describe('claudeSystemPromptFiles tools block (PAN-4935 W-3)', () => {
 
   beforeEach(() => {
     mcpAgents.value = true;
+    configRejects.value = false;
     root = mkdtempSync(join(tmpdir(), 'pan-launch-sources-tools-block-'));
     prevHome = process.env.HOME;
     prevOverdeckHome = process.env.OVERDECK_HOME;
@@ -77,6 +82,12 @@ describe('claudeSystemPromptFiles tools block (PAN-4935 W-3)', () => {
 
   it('gives claude-code the CLI block when mcp.agents is false', async () => {
     mcpAgents.value = false;
+    const content = await sharedLaunchFileContent('claude-code');
+    expect(content).toContain('## Overdeck commands');
+  });
+
+  it('gives claude-code the CLI block, never rejecting, when the config read fails (NFR-5)', async () => {
+    configRejects.value = true;
     const content = await sharedLaunchFileContent('claude-code');
     expect(content).toContain('## Overdeck commands');
   });

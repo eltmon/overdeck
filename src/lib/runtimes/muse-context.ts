@@ -24,7 +24,7 @@ export async function materializeMuseContext(agentId: string, workspace: string,
   });
   sections.push(renderForHarness(project ? workspaceContextWithoutProjectLayer(workspaceLayer) : workspaceLayer, 'muse'));
   // PAN-4935: Muse is a no-MCP harness (F-1), so this always resolves to the CLI block.
-  sections.push(overdeckInstructionsBlock(await overdeckMcpEnabledFor('muse')));
+  sections.push(overdeckInstructionsBlock(await overdeckMcpEnabledFor('muse').catch(() => false)));
   if (roleFile) sections.push(await readFile(roleFile, 'utf8'));
   const dir = join(getOverdeckHome(), 'agents', agentId);
   await mkdir(dir, { recursive: true });
