@@ -132,6 +132,13 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   { method: 'GET', path: '/api/self/secret-requests/:id/wait', scope: 'read:state' },
   { method: 'GET', path: '/api/agent-requests', scope: 'read:conversations' },
   // POST /api/agent-requests/:id/secret and /decline have no row: root credentials only (D-4).
+  // PAN-4943 W-PR1: PR-link routes (PAN-3822), for the MCP link/watch tools.
+  { method: 'GET', path: '/api/conversations/:name/pull-requests', scope: 'read:conversations' },
+  { method: 'POST', path: '/api/conversations/:name/pull-requests', scope: 'tell' },
+  { method: 'DELETE', path: '/api/conversations/:name/pull-requests', scope: 'tell' },
+  { method: 'POST', path: '/api/conversations/:name/pull-requests/sync', scope: 'tell' },
+  { method: 'GET', path: '/api/pull-requests', scope: 'read:state' },
+  { method: 'GET', path: '/api/pull-requests/conversations', scope: 'read:state' },
   // PAN-4650 WI-9: the owner's half of Pull here (a linked machine's operator only, checked by the routes).
   { method: 'POST', path: '/api/conversations/:name/release', scope: 'operate' },
   { method: 'GET', path: '/api/conversations/:name/release/transfer/:transferId', scope: 'operate' },
