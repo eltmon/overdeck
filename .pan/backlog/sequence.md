@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-04T04:58:23.658560Z · model: claude-opus-5-5 · open: 877_
+_Last sequenced: 2026-11-04T05:24:07.701597Z · model: claude-opus-5-5 · open: 875_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -872,15 +872,13 @@ _Last sequenced: 2026-11-04T04:58:23.658560Z · model: claude-opus-5-5 · open: 
 | 881 | PAN-4851 | S | low | needs-refinement |  |  | Open question: opt-in Overdeck reviewer for Deft-pipeline issues; operator says low priority, do not plan or start without them |
 | 882 | PAN-4887 | M | medium | ok |  |  | Phone app: let phone credentials reach linked machines (fleet Needs-you, linked-conv proxy, /ws/linked); PAN-4835 merged. |
 | 885 | PAN-4958 | S | low | ok |  |  | Docs for agent MCP and bot plugins; no hard deps but best written once Part A and B surfaces have landed. |
-| 892 | PAN-4937 | M | medium | ok |  |  | Checklist, done, handoff and worker-report as MCP tools so agents stop shelling to pan over Bash. |
-| 897 | PAN-4933 | S | medium | ok |  |  | Codex harness: write [mcp_servers.overdeck] so Codex agents get the Overdeck tools. |
 | 900 | PAN-4946 | M | medium | ok |  |  | Dashboard OAuth approval card and sign-in list for /mcp clients. |
 | 902 | PAN-4951 | M | medium | ok |  |  | "Connect a bot" flow in Settings > Anywhere for pairing outside bots. |
 | 904 | PAN-4953 | M | medium | ok |  | PAN-4950 | integrations/hermes/: Hermes plugin with its own revocable scoped token. |
 | 905 | PAN-4954 | M | medium | ok |  | PAN-4950 | integrations/openclaw/: OpenClaw plugin with its own revocable scoped token. |
 | 906 | PAN-4955 | S | medium | ok |  | PAN-4950 | integrations/grok-build/: Grok Build plugin with its own revocable scoped token. |
 | 907 | PAN-4956 | S | low | ok |  | PAN-4946, PAN-4947 | integrations/grok-bot/ and xAI API example; needs OAuth UI and public Funnel /mcp, not the connector. |
-| 908 | PAN-4935 | M | medium | ok |  | PAN-4937, PAN-4938, PAN-4940, PAN-4942, PAN-4943 | Instruction blocks and no-MCP fallback; lands last in Part A since it documents every tool to agents. |
+| 908 | PAN-4935 | M | medium | ok |  | PAN-4938, PAN-4940, PAN-4942, PAN-4943 | Instruction blocks and no-MCP fallback; lands last in Part A since it documents every tool to agents. |
 | 909 | PAN-4957 | S | low | ok |  | PAN-4953, PAN-4954, PAN-4955, PAN-4956 | CI for the four integration packages; lands after all integrations exist. |
 
 ## Rationale detail
@@ -1212,10 +1210,10 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-04T04:58:23.658560Z",
+  "generatedAt": "2026-11-04T05:24:07.701597Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 877,
+  "openCount": 875,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -12008,32 +12006,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "planning": "auto"
     },
     {
-      "issue": "PAN-4937",
-      "rank": 892,
-      "size": "M",
-      "importance": "medium",
-      "score": 50,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Checklist, done, handoff and worker-report as MCP tools so agents stop shelling to pan over Bash.",
-      "rationale": "New child W-SELF2 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4933",
-      "rank": 897,
-      "size": "S",
-      "importance": "medium",
-      "score": 46,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Codex harness: write [mcp_servers.overdeck] so Codex agents get the Overdeck tools.",
-      "rationale": "New child W-INJ2 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-4946",
       "rank": 900,
       "size": "M",
@@ -12128,14 +12100,13 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "score": 42,
       "condition": "ok",
       "dependsOn": [
-        "PAN-4937",
         "PAN-4938",
         "PAN-4940",
         "PAN-4942",
         "PAN-4943"
       ],
       "why": "Instruction blocks and no-MCP fallback; lands last in Part A since it documents every tool to agents.",
-      "rationale": "New child W-INJ4 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic. Dependency PAN-4939 (W-SCHED1) closed 2026-11-04; rank unchanged since other Part A tools remain open. Dependency PAN-4932 (W-INJ1) closed 2026-11-04; rank unchanged. Dependency PAN-4941 (request_secret) closed 2026-11-04; rank unchanged since other Part A tools remain open.",
+      "rationale": "Dependency PAN-4937 (MCP checklist/done/handoff tools) merged, so it drops from dependsOn; rank unchanged while four siblings stay open.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13330,13 +13301,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "from": "PAN-4927",
-      "to": "PAN-4937",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4927",
       "to": "PAN-4938",
       "type": "contains",
       "source": "github-ref",
@@ -13352,13 +13316,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     {
       "from": "PAN-4927",
       "to": "PAN-4943",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4927",
-      "to": "PAN-4933",
       "type": "contains",
       "source": "github-ref",
       "confidence": 1
@@ -13458,13 +13415,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "from": "PAN-4927",
       "to": "PAN-4956",
       "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4937",
-      "to": "PAN-4935",
-      "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
     },

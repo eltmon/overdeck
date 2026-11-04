@@ -9,9 +9,8 @@
  * delegation reaches the owner as that agent, not the operator), prints
  * `Started <localId> on <label>`, and waits on the stand-in like a local worker.
  *
- * Stand-in waits read `remote.json`: `running` is alive, `exited` / `stopped`
- * are confirmed dead, and an owner that cannot be reached is alive with no idle
- * age, so a sleeping desktop delays the report but never fails the wait.
+ * The stand-in wait (`standInWaitDeps`, `waitForAnyWorker`) lives in
+ * `src/lib/agents/worker/wait-any.ts` (PAN-4938 D-4) and is re-exported here.
  *
  * `--machine fly` refuses here (PAN-4743 D-4743-1): a worker needs its issue
  * workspace, which a new VM never has. `pan start <id> --machine fly` never
@@ -20,11 +19,10 @@
  */
 import type { PlacementAnswer, PlacementRejection } from '@overdeck/contracts';
 
-import type { LivenessVerdict } from '../../lib/agents/liveness.js';
-import { readRemoteStandIn, type RemoteStandIn } from '../../lib/agents/worker/remote-standin.js';
-import type { WaitDeps, WaitOptions, WaitOutcome } from '../../lib/agents/worker/wait.js';
 import { senderFromEnv } from '../../lib/terminal-backends/prompt-guard.js';
 import type { PushCheckOptions, PushCheckResult } from './delegation-push-check.js';
+
+export { standInWaitDeps, waitForAnyWorker } from '../../lib/agents/worker/wait-any.js';
 
 export interface RemoteWorkerCliDeps {
   call: (path: string, init: { method: string; body?: unknown; headers?: Record<string, string> }) => Promise<{ status: number; json: unknown }>;
@@ -95,34 +93,6 @@ export async function resolveMachineFlag(
   if (body?.self && (machine === body.self.environmentId || wanted === body.self.label.toLowerCase())) return { kind: 'self', reason: null };
   const link = body?.links?.find((candidate) => candidate.environmentId === machine || candidate.label.toLowerCase() === wanted);
   return { kind: 'remote', machine, label: link?.label ?? machine, reason: null };
-}
-
-/** WaitDeps for a stand-in, read fresh from `remote.json` on every poll. */
-export function standInWaitDeps(localId: string, read: (id: string) => Promise<RemoteStandIn | null> = readRemoteStandIn): WaitDeps {
-  return {
-    isAlive: async (): Promise<LivenessVerdict> => {
-      const standIn = await read(localId);
-      if (!standIn) return { alive: false, reason: 'runtime-indeterminate' };
-      if (standIn.state === 'running' || standIn.unreachableSince !== null) return { alive: true, paneAlive: true };
-      return { alive: false, reason: 'no-session' };
-    },
-    idleAgeMs: async () => {
-      const standIn = await read(localId);
-      return standIn && standIn.unreachableSince === null ? standIn.idleAgeMs : null;
-    },
-    fetchLastAssistantMessage: async () => (await read(localId))?.lastAssistantMessage ?? null,
-    resolveTranscriptPath: async () => null,
-  };
-}
-
-/** The wait every `pan worker run` / `wait` uses: a stand-in reads `remote.json`, a local worker the liveness oracle. */
-export async function waitForAnyWorker(
-  id: string,
-  options: WaitOptions,
-  wait: (id: string, options: WaitOptions, deps: WaitDeps) => Promise<WaitOutcome>,
-  read: (id: string) => Promise<RemoteStandIn | null> = readRemoteStandIn,
-): Promise<WaitOutcome> {
-  return wait(id, options, (await read(id)) ? standInWaitDeps(id, read) : {});
 }
 
 export interface RemoteRunInput {

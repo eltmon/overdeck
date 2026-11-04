@@ -29,6 +29,9 @@ There is no second path to any operation.
 | `send_message` | Sends a message to a running conversation. | `tell` (`operate` includes it) |
 | `start_conversation` | Starts a conversation with a first message. Optional `projectKey`, `model`, `harness`, `effort`, `issueId`, `machine` (a label, environment id or `auto`), `needs`. | `operate` |
 | `start_worker` | Starts a registered worker on an issue that has a workspace on the chosen machine. `issueId`, `prompt`, optional `model`, `harness`, `effort`, `readOnly`, `name`, `machine`, `needs`. | `operate` |
+| `start_issue` | Starts a planned issue's work agent on this machine through the same gates as the dashboard's Start button, or on `machine` through that machine's work door. `issueId`, optional `model`, `harness`, `effort`, `machine`, `needs`. An unplanned issue answers an error that says to run `pan start <id>`, which plans first. | `operate` |
+| `stop_conversation` | Stops a conversation. `conversation` (`@<machine>/<name>` for one on a linked machine). | `operate` |
+| `interrupt_conversation` | Interrupts the current turn of a Pi conversation. Other harnesses answer an error; use `stop_conversation` to end them. | `operate` |
 | `schedule_message` | Queues a message for a Claude Code conversation that Overdeck sends after its usage limit resets, or at once if it is not limited. At most 20 queued; `/pan` commands are refused. | `tell` |
 | `schedule_recurring` | Creates a recurring schedule: `prompt`, a 5-field `cron` (runs at least 15 minutes apart), optional `timeZone` (default: the Overdeck machine's zone) and `enabled`. Not for agent conversations. | `tell` |
 | `list_scheduled` | Lists a conversation's pending one-shot messages (`once`) and its schedules (`recurring`). | `read:conversations` |
@@ -65,6 +68,18 @@ agent tokens.
 | `worker_report` | Records a worker's report with `status` `done`, `blocked` or `failed` (`pan worker report`). Workers only. | `tell` (agent tokens only) |
 | `request_secret` | Asks the operator for a secret, such as an API key, by an environment-variable-style `name` and a short `prompt`; answers a `requestId` and `next`, the `secret_wait` call to make. | `tell` (agent tokens only) |
 | `secret_wait` | Waits up to 50 s for the operator's answer. Answers `pending` with `next`, `delivered` with `file` (the path of the secret, never the value), `declined` or `expired`. | `read:state` (agent tokens only) |
+| `delegate_task` | Starts a worker on your own issue to do `task`, here or on `machine`; you are its parent. Optional `harness`, `model`, `effort`, `readOnly`, `name`, `needs`. A caller without an issue gets `delegate_task needs an issue; use start_conversation`. | `operate` |
+| `task_wait` | Waits up to 50 s for one of your workers to report. Answers `done` with the report, `ended` when it stopped without one (with its last message), or `running` with `next`. Pass `afterSeq` for the report after the one you consumed. | `read:state` |
+| `task_status` | One of your workers: state, idle time, where it runs and its newest report's seq, time and status. Your workers only, including ones on linked machines. | `read:state` |
+| `list_workers` | Every worker you started, on this machine or linked ones, with the same fields as `task_status`. | `read:state` |
+| `task_cancel` | Stops one of your workers, on this machine or another. Its reports so far stay readable. | `operate` |
+| `lane_start` | Launches a gauntlet lane (`role`, `brief`, with `key` or `for`, and optional `run`, `project`, `model`, `harness`, `effort`, `title`, `branch`, `from`, `at`, `machine`, `needs`, `reuse`, `replace`). Conversations only: the lane's parent is the calling conversation. | `operate` |
+| `lane_status` | Reads one lane by name. | `read:state` |
+| `lane_stop` | Stops one lane, here or on the machine it runs on. | `operate` |
+| `lane_wait` | Waits up to 50 s for the next report of any lane you launched, or of `run`. Answers `done` with the report and a cursor, or `running`; pass the cursor as `after` for the next report. Stopped lanes that never reported come back as `warnings`. | `read:state` |
+| `lane_report` | Files this lane's report (`report`, optional `status`, `verdict`, `defects`). Lane conversations only. | `tell` |
+
+A worker or lane wait returns within 50 s; call its `next` again instead of polling.
 
 Each workflow tool runs the `pan` command for the calling agent, on that
 agent's issue, and waits up to 50 s. It answers `done` with the exit code and
@@ -314,8 +329,8 @@ warning. The agent can still reach Overdeck through `pan`.
 ## Scopes and the approve scope
 
 An MCP token is an ordinary access token. Copy MCP URL gives it `read:state`,
-`read:conversations` and `operate` by default. `operate` covers `tell` and the
-two start tools.
+`read:conversations` and `operate` by default. `operate` covers `tell`, the
+start tools and the stop and interrupt tools.
 
 The box **Allow answering questions and approving permissions** adds
 `approve`. It is off by default, and only `approve` or `admin` satisfies it.
@@ -369,6 +384,13 @@ conversation's permission prompt, and one without `tell` cannot message it. Sett
 never reachable: `PUT /api/settings` answers 403 because an MCP token never carries `admin`,
 and linked machines never forward it. A linked machine cannot use this one to reach a third
 machine (no chained hops), so the URL reaches only the machines linked to this dashboard.
+
+**An agent's token acts as that agent on a linked machine.** A managed agent's token is
+forwarded as `{ agentId }`, with its scopes as the ceiling, so the agent can read a linked
+conversation but not change it, and `delegate_task` or `start_issue` with `machine` start the
+work through that machine's work door as the agent, which may later stop what it started. A
+conversation's token acts as the operator, limited to its scopes, as the conversation's own
+`pan` does.
 
 Agent answers (`answer_agent_plan`, `answer_agent_permission`, `answer_question` with
 `agentId`) reach agents on this machine only; `list_pending_input` marks a linked machine's
