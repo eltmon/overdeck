@@ -18,6 +18,9 @@
  *   on that machine (a remote lane stand-in) carries the lane facts — parent,
  *   run, key, role, critic link — and home's project key, so the Command Deck
  *   nests it under its orchestrator and the Awareness rail counts it in the run.
+ * - PAN-5000: a linked row with no title, or a title that is only a file
+ *   path (e.g. an attachment path), shows `linkedRowTitle`'s fallback instead
+ *   of leaking the owner's list name or a filesystem path into the UI.
  */
 import { linkedConversationName, type LinkState, type SharedConversationRow } from '@overdeck/contracts';
 
@@ -25,6 +28,7 @@ import type { MachineLink } from '../anywhere/link-store.js';
 import type { LaneRole } from './conversations.js';
 import { EMPTY_CONVERSATION_TRIAGE } from './conversation-triage-store.js';
 import { VAULT_BROWSE_PREFIX } from './conversation-vault-rows.js';
+import { linkedRowTitle } from './linked-conversation-title.js';
 import type { LinkedConversationRecord } from './linked-conversations.js';
 
 export interface LinkPresence {
@@ -80,7 +84,7 @@ function linkedListRow(
     lastAttachedAt: null,
     lastActivityAt: row.lastActivityAt,
     claudeSessionId: row.nativeSessionId,
-    title: row.title,
+    title: linkedRowTitle(row.title),
     model: row.model,
     harness: row.harness,
     projectKey: row.projectKey,
