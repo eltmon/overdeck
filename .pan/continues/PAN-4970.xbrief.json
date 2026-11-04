@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4970",
   "created": "2026-11-04T00:20:58.327Z",
-  "updated": "2026-11-04T01:50:59.703Z",
+  "updated": "2026-11-04T01:51:21.105Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -118,6 +118,10 @@
     "promote-fast-refusal.ac3": {
       "status": "completed",
       "doneAt": "2026-11-04T01:50:59.703Z"
+    },
+    "reconciler-wiring.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:51:21.105Z"
     }
   }
 }
