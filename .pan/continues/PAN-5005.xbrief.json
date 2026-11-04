@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5005",
   "created": "2026-11-04T11:43:00.100Z",
-  "updated": "2026-11-04T12:03:31.344Z",
+  "updated": "2026-11-04T12:07:57.185Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -22,9 +22,10 @@
       "doneAt": "2026-11-04T12:03:26.139Z"
     },
     "verdict-link-route": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5005",
-      "claimedAt": "2026-11-04T12:03:31.344Z"
+      "claimedAt": "2026-11-04T12:03:31.344Z",
+      "doneAt": "2026-11-04T12:07:57.184Z"
     }
   }
 }
