@@ -32,6 +32,7 @@ import { upsertLink, type UpsertLinkInput } from '../../../lib/anywhere/link-sto
 import { ensureMachineKey, machineKeyFingerprint } from '../../../lib/anywhere/machine-key.js';
 import { mergeAdvertised } from '../../../lib/anywhere/routes.js';
 import { ensureEnvironmentIdentity } from '../../../lib/environment-identity.js';
+import { type AnywhereAnalytics, captureLinkApproved, captureLinkFailed, captureLinkStarted } from '../../../lib/telemetry/anywhere.js';
 import type { ChannelMarker } from '../channel-peer.js';
 import { notifyLinksChanged } from '../routes/machines.js';
 import { currentDirectoryRtc } from './directory-rtc.js';
@@ -76,6 +77,8 @@ export interface ApprovalServiceDeps {
   now(): number;
   /** Waits between exchange re-posts; injected so tests drive the 10-minute expiry on a fake clock. */
   sleep?(ms: number): Promise<void>;
+  /** PAN-5016: link telemetry; undefined uses the process analytics service. */
+  analytics?: AnywhereAnalytics;
 }
 
 interface Join {
@@ -211,6 +214,7 @@ export class DirectoryApprovalService {
     this.prune();
     const requestId = randomBytes(16).toString('hex');
     if (!this.deps.directory.send({ type: 'approval-request', requestId, to })) {
+      captureLinkFailed('directory_approval', 'requester', 'offline', this.deps.analytics);
       throw new DirectoryApprovalError('offline', 'Not connected to the overdeck.ai directory');
     }
     this.joins.set(requestId, {
@@ -223,6 +227,7 @@ export class DirectoryApprovalService {
       sas: null,
       granted: null,
     });
+    captureLinkStarted('directory_approval', this.deps.analytics);
     return requestId;
   }
 
@@ -257,6 +262,7 @@ export class DirectoryApprovalService {
   rejectJoin(requestId: string): void {
     const join = this.liveJoin(requestId);
     join.state = 'rejected';
+    captureLinkFailed('directory_approval', 'requester', 'approval_refused', this.deps.analytics);
     this.deps.directory.send({ type: 'approval-cancel', requestId });
   }
 
@@ -293,6 +299,7 @@ export class DirectoryApprovalService {
         reverse: { token: body.reverseToken, endpoints: body.endpoints },
       });
       join.granted = { token, label: self.label, environmentId: self.environmentId };
+      captureLinkApproved('directory_approval', 'requester', this.deps.analytics);
     }
     return { status: 200, json: join.granted };
   }
@@ -385,9 +392,11 @@ export class DirectoryApprovalService {
       });
       this.deps.notifyLinksChanged();
       this.approvals.delete(approval.requestId);
+      captureLinkApproved('directory_approval', 'approver', this.deps.analytics);
     } catch (error) {
       if (mintedId) await this.deps.revokeToken(mintedId).catch(() => null);
       approval.state = 'failed';
+      captureLinkFailed('directory_approval', 'approver', 'approval_failed', this.deps.analytics);
       approval.error = (error as Error).message;
     } finally {
       channel.destroy();

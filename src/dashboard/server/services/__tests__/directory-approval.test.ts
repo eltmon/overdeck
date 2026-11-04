@@ -26,6 +26,7 @@ const { channelRequest } = await import('../machine-link-service.js');
 const { DirectoryApprovalService } = await import('../directory-approval.js');
 type Service = InstanceType<typeof DirectoryApprovalService>;
 type MachineKeyPair = import('../../../../lib/anywhere/machine-key.js').MachineKeyPair;
+type AnywhereAnalytics = import('../../../../lib/telemetry/anywhere.js').AnywhereAnalytics;
 
 const _require = createRequire(import.meta.url);
 const dh = _require('noise-handshake/dh') as { generateKeyPair(): MachineKeyPair };
@@ -46,11 +47,18 @@ interface World {
   servers: http.Server[];
 }
 
+/** PAN-5016: per-machine analytics fakes, and a requester whose directory socket is down. */
+interface WorldTelemetry {
+  a?: AnywhereAnalytics;
+  r?: AnywhereAnalytics;
+  rOffline?: boolean;
+}
+
 /**
  * `advertisedKey` is the key the directory claims for R; a different value models a directory
  * that lies about R's key.
  */
-function world(advertisedKey = hex(keyR)): World {
+function world(advertisedKey = hex(keyR), telemetry: WorldTelemetry = {}): World {
   const clock = { now: Date.UTC(2026, 10, 1, 12, 0, 0) };
   const handlers = new Map<string, Map<string, Set<Handler>>>();
   const deliver = (to: string, frame: DirectoryToMachineFrame) => {
@@ -123,6 +131,7 @@ function world(advertisedKey = hex(keyR)): World {
 
   const a = new DirectoryApprovalService({
     ...common,
+    analytics: telemetry.a,
     directory: port(A_ENV),
     identity: async () => ({ environmentId: A_ENV, label: 'approver' }),
     endpoints: () => [{ kind: 'lan', url: 'tcp://192.168.1.8:3011' }],
@@ -141,9 +150,11 @@ function world(advertisedKey = hex(keyR)): World {
       return openChannelOverTransport(mine, { mode: 'approval', localKey: keyA, requestId });
     },
   });
+  const rPort = port(R_ENV);
   r = new DirectoryApprovalService({
     ...common,
-    directory: port(R_ENV),
+    analytics: telemetry.r,
+    directory: telemetry.rOffline ? { ...rPort, send: () => false } : rPort,
     identity: async () => ({ environmentId: R_ENV, label: 'requester' }),
     endpoints: () => [],
     openApprovalChannel: () => Promise.reject(new Error('the requester never dials')),
@@ -254,5 +265,65 @@ describe('directory approval (PAN-2356 WI-14)', () => {
     expect(w.a.views().approvals).toEqual([]);
     expect(() => w.a.approve(requestId)).toThrow(/No live approval request/);
     expect(listActiveRecordsOfKind('machine')).toEqual([]);
+  });
+});
+
+describe('directory approval telemetry (PAN-5016 WI-5)', () => {
+  function spies() {
+    const a = vi.fn();
+    const r = vi.fn();
+    return { a, r, telemetry: { a: { capture: a }, r: { capture: r } } };
+  }
+
+  it('join records started on the requester; an offline directory records the offline failure and throws', () => {
+    const { r, telemetry } = spies();
+    const w = (current = world(hex(keyR), telemetry));
+    w.r.join(null);
+    expect(r.mock.calls).toEqual([['machine_link_started', { method: 'directory_approval' }]]);
+
+    const offline = spies();
+    const down = world(hex(keyR), { ...offline.telemetry, rOffline: true });
+    try {
+      expect(() => down.r.join(null)).toThrow(expect.objectContaining({ code: 'offline' }));
+    } finally {
+      down.a.stop();
+      down.r.stop();
+      for (const server of down.servers) server.close();
+    }
+    expect(offline.r.mock.calls).toEqual([['machine_link_failed', { method: 'directory_approval', side: 'requester', reason: 'offline' }]]);
+  });
+
+  it('a full approve run records approved on both sides, and a repeated exchange records the requester once', async () => {
+    const { a, r, telemetry } = spies();
+    const w = (current = world(hex(keyR), telemetry));
+    const requestId = w.r.join(null);
+    await w.a.open(requestId);
+    await vi.waitFor(() => expect(w.r.views().joins[0]?.state).toBe('open'));
+    const done = w.a.approve(requestId);
+    w.r.accept(requestId);
+    await done;
+
+    expect(a.mock.calls).toEqual([['machine_link_approved', { method: 'directory_approval', side: 'approver' }]]);
+    const marker = { mode: 'approval' as const, remoteKeyHex: hex(keyA), pairingId: null, requestId, approvalSas: '000 000' };
+    expect(await w.r.handleExchange('{}', marker)).toMatchObject({ status: 200 });
+    expect(r.mock.calls).toEqual([
+      ['machine_link_started', { method: 'directory_approval' }],
+      ['machine_link_approved', { method: 'directory_approval', side: 'requester' }],
+    ]);
+  });
+
+  it('a requester reject records approval_refused there and approval_failed on the approver', async () => {
+    const { a, r, telemetry } = spies();
+    const w = (current = world(hex(keyR), telemetry));
+    const requestId = w.r.join(null);
+    await w.a.open(requestId);
+    await vi.waitFor(() => expect(w.r.views().joins[0]?.state).toBe('open'));
+    const done = w.a.approve(requestId);
+    w.r.rejectJoin(requestId);
+    await done;
+
+    expect(r).toHaveBeenLastCalledWith('machine_link_failed', { method: 'directory_approval', side: 'requester', reason: 'approval_refused' });
+    expect(a.mock.calls).toEqual([['machine_link_failed', { method: 'directory_approval', side: 'approver', reason: 'approval_failed' }]]);
+    expect(await listLinks()).toEqual([]);
   });
 });
