@@ -163,6 +163,17 @@ notifications allowed, paired with `eltmon-z790`, app swiped closed and the phon
 - `wrangler tail overdeck-connect --format json` during the run: 59 events captured; the unique
   title occurs 0 times (`grep -c 'PAN-4841 device check'` prints `0`).
 
+Rerun on 2026-11-04 with TestFlight 1.0 (3), which carries the PAN-5018 link fixes and the
+pair-link fix (see "Simulator check before the device run"):
+
+- Send: a scratch conversation raised "PAN-4841 build 3 check 1706 - tap me" at 17:07:19.5 UTC; the
+  directory handed it to APNs (`push` `delivered`) for the new install at 17:07:25.4 UTC (5.9 s).
+- Display, decryption and tap: **pass.** The operator confirmed the exact title showed on the locked
+  phone, and tapping it from the closed state opened `eltmon-z790`'s Needs-you screen with that
+  question and no error (answer "All good"). This replaces the build 1 cold-launch tap failure
+  (PAN-5018).
+- `wrangler tail` during the rerun: 34 events; the unique title occurs 0 times.
+
 ## Live Activity (PAN-4839)
 
 Evidence for PRD WI-11. The Simulator run checks that the widget extension builds, embeds and draws
@@ -193,7 +204,15 @@ window, unlock, open another app, and run `xcrun simctl io $U screenshot 11-live
 
 ### Device checkpoint (AC-12, D-16)
 
-**Not run: APNs secrets unset (PAN-4841).** On 2026-11-03, `GET https://connect.overdeck.ai/healthz`
+**Run on 2026-11-04 with TestFlight 1.0 (3) (PAN-4841): pass.** The operator's iPhone, signed in
+and paired with `eltmon-z790`, app closed and phone locked, Live Activity card on the lock screen.
+A scratch conversation raised one AskUserQuestion at 17:07:19.5 UTC, which raised the needs-you
+count by one. The directory handed the Live Activity update to APNs (`push-activity` `pushed`)
+at 17:07:36.1 UTC, 16.6 s after the question (target: the card shows the new count within 30 s).
+The operator confirmed the card's "need you" count went up by one (answer "All good"); they did not
+report a separate display time, so 16.6 s is the server-side part, not a lock-screen measurement.
+
+Earlier note — **not run: APNs secrets unset (PAN-4841).** On 2026-11-03, `GET https://connect.overdeck.ai/healthz`
 answered `{"ok":true,"configured":true,"turn":true,"apns":false,"fcm":false}`. The AC-12 timing,
 the widget App ID `ai.overdeck.app.widgets` and the reuse of the existing APNs key are handed to
 PAN-4841's TestFlight run:
