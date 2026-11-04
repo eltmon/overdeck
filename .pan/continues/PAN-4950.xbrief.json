@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4950",
   "created": "2026-11-04T10:02:21.153Z",
-  "updated": "2026-11-04T10:47:12.733Z",
+  "updated": "2026-11-04T10:47:24.530Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -74,6 +74,11 @@
       "claimedBy": "agent-pan-4950",
       "claimedAt": "2026-11-04T10:43:40.634Z",
       "doneAt": "2026-11-04T10:47:12.733Z"
+    },
+    "conn-docs": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4950",
+      "claimedAt": "2026-11-04T10:47:24.530Z"
     }
   }
 }
