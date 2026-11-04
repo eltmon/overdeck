@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4482",
   "created": "2026-11-03T23:55:28.272Z",
-  "updated": "2026-11-04T00:34:00.752Z",
+  "updated": "2026-11-04T00:34:16.885Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -138,6 +138,10 @@
     "forced-turn-checkpoint.ac3": {
       "status": "completed",
       "doneAt": "2026-11-04T00:34:00.752Z"
+    },
+    "forced-turn-checkpoint.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T00:34:16.884Z"
     }
   }
 }
