@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5018",
   "created": "2026-11-04T13:12:52.932Z",
-  "updated": "2026-11-04T15:12:43.288Z",
+  "updated": "2026-11-04T15:12:56.774Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -184,6 +184,10 @@
     "docs-link-diagnostics.ac2": {
       "status": "completed",
       "doneAt": "2026-11-04T15:12:43.288Z"
+    },
+    "docs-link-diagnostics.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:12:56.774Z"
     }
   }
 }
