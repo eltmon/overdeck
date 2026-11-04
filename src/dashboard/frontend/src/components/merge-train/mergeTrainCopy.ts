@@ -11,6 +11,18 @@ export interface ConfirmCopy {
   confirmLabel: string;
 }
 
+/** Short display name: uat/pan-otter-0610 → pan-otter-0610. */
+export function shortName(name: string): string {
+  return name.replace(/^uat\//, '');
+}
+
+/**
+ * PAN-3965: the reconciler assembles no batch for a single ready feature — a
+ * one-member batch is the PR branch itself and its CI run a duplicate — unless
+ * the project holds merges for UAT, where that batch is the UAT stack.
+ */
+export const SINGLE_FEATURE_READY_LINE = '1 feature ready — merges directly; batches assemble when 2+ are ready.';
+
 /** ` at Sep 20, 19:14` for a failed generation, or '' when its time is unreadable. */
 export function formatFailedAt(gen: { updatedAt?: string; createdAt?: string }): string {
   const at = Date.parse(gen.updatedAt || gen.createdAt || '');
