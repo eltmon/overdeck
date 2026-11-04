@@ -5,8 +5,8 @@
  *
  * These paths are outside `/api/` and `/events/`, so the remote request gate
  * does not judge them; every handler checks its own input, and none needs a
- * credential. A Funnel request still reaches none of them (the gate's Funnel
- * rule answers 404) until W-FUN1 opens it.
+ * credential. A Funnel request reaches them only while Public MCP is on
+ * (PAN-4947, `src/lib/mcp/public-mcp.ts`).
  *
  * Every metadata URL is built from `issuerFor(request)`, which picks a trusted
  * origin matching the request's host (D-2) and never echoes a raw `Host`, so

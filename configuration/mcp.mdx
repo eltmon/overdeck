@@ -263,7 +263,89 @@ code is case-insensitive and the dash is optional.
 The sign-in endpoints answer on this machine, the LAN, the tailnet (Tailscale
 Serve) and the dashboard's other trusted addresses. The discovery documents are
 built from the address the client used, so a request for an address Overdeck
-does not trust gets 400. A Tailscale Funnel request gets 404.
+does not trust gets 400. A Tailscale Funnel request gets 404 unless Public MCP is
+on (below).
+
+## Public MCP for hosted bots
+
+A hosted bot, such as Grok Bot or the xAI API, runs on servers you do not
+control. It cannot join your tailnet or run the Overdeck connector, so it needs
+a public HTTPS address for `/mcp`. Public MCP publishes exactly `/mcp` and the
+sign-in endpoints on the internet through Tailscale Funnel. TLS ends on this
+machine, and only OAuth sign-ins you approve can use it.
+
+Public MCP is **off** by default. Turn it on in Settings → Anywhere → "Public MCP
+for hosted bots", or with `PUT /api/mcp/public` and the body `{ "enabled": true }`
+(root credentials only). The switch is `mcp.public.enabled` in
+`~/.overdeck/config.yaml`. A project `.pan.yaml` or `.overdeck.yaml` cannot turn
+it on. The dashboard reads the value once and keeps it, so a hand edit of
+`config.yaml` takes effect after a dashboard restart or the next switch change.
+
+**Prerequisites** are the same as for triggers (see Triggers → Publish with
+Tailscale Funnel): HTTPS certificates on the tailnet, the `funnel` node
+attribute for this machine, `sudo tailscale set --operator=$USER`, and this
+machine's `.ts.net` address saved as a trusted address. Without that trusted
+address the dashboard cannot build the public URL, and the sign-in documents
+answer 400.
+
+**Publish the paths** (replace `3011` if your dashboard API port is different;
+the Settings panel prints the commands with your port). Overdeck never runs
+`tailscale` for you:
+
+```bash
+tailscale funnel --bg --https=8443 --set-path=/mcp http://127.0.0.1:3011/mcp
+tailscale funnel --bg --https=8443 --set-path=/.well-known http://127.0.0.1:3011/.well-known
+tailscale funnel --bg --https=8443 --set-path=/oauth http://127.0.0.1:3011/oauth
+```
+
+**Remove them:**
+
+```bash
+tailscale funnel --https=8443 --set-path=/mcp off
+tailscale funnel --https=8443 --set-path=/.well-known off
+tailscale funnel --https=8443 --set-path=/oauth off
+```
+
+Give the bot the public URL `https://<machine>.<tailnet>.ts.net:8443/mcp`.
+
+**What is reachable.** While the switch is on, a Funnel request reaches only
+these nine surfaces, matched on the exact path; everything else gets 404:
+
+- `POST /mcp`
+- `GET /.well-known/oauth-protected-resource`
+- `GET /.well-known/oauth-protected-resource/mcp`
+- `GET /.well-known/oauth-authorization-server`
+- `POST /oauth/mcp/register`
+- `GET /oauth/mcp/authorize`
+- `GET /oauth/mcp/authorize/status`
+- `POST /oauth/mcp/token`
+- `POST /oauth/mcp/revoke`
+
+**Only OAuth sign-ins work.** Over Funnel, a `pan token create` token, a Copy
+MCP URL token or an agent token gets 403 `public MCP accepts only OAuth
+sign-ins`. Those tokens still work on this machine, the LAN and the tailnet.
+
+**Limits.** Each limit counts requests in a 60-second window that starts at the
+first request:
+
+| Requests | Limit |
+| --- | --- |
+| `POST /mcp` with an OAuth sign-in | 60 per minute per sign-in |
+| `GET /oauth/mcp/authorize/status` (the sign-in page's status checks) | 60 per minute per address |
+| Every other public surface | 20 per minute per address |
+
+Over a limit, the answer is 429 `{ "error": "rate_limited" }` with a
+`Retry-After` header.
+
+**Audit.** Every public request writes one entry to the activity feed:
+`Public MCP <METHOD> <path> <status>`, with the OAuth client id when there is
+one. No entry carries a token, a code or a request body. The sign-in page checks
+its status every 2 seconds, so a sign-in that waits for you writes one entry
+each time.
+
+**Turning it off** makes Funnel requests get 404 again. It does not end any
+sign-in: approved apps keep working on the tailnet and this machine. End a
+sign-in with `pan mcp oauth revoke <sign-in id>` (see Revoking below).
 
 ## Agents get these tools
 
