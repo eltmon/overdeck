@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4932",
   "created": "2026-11-04T01:06:56.441Z",
-  "updated": "2026-11-04T01:51:54.141Z",
+  "updated": "2026-11-04T01:52:10.303Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -98,6 +98,10 @@
     "mcp-config-switch.ac3": {
       "status": "completed",
       "doneAt": "2026-11-04T01:51:54.141Z"
+    },
+    "overdeck-mcp-capability.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:52:10.303Z"
     }
   }
 }
