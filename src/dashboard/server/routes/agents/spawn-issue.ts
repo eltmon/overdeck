@@ -39,6 +39,7 @@ import { ProviderHealthError, validateProviderHealth } from '../../../../lib/pro
 import { getProjectSync, resolveProjectFromIssueSync } from '../../../../lib/projects.js';
 import { isGeneratedGitHookPath, isOverdeckWorkspaceRuntimePath, parsePorcelainStatusPaths } from '../../../../lib/state-plane.js';
 import { assertWorkspaceStackHealthyForSpawn } from '../../../../lib/agents/spawn-prep.js';
+import { resolveIssueStackDiskHold } from '../../../../lib/workspace/disk-cost.js';
 import { getWorkspaceStackHealth } from '../../../../lib/workspace/stack-health.js';
 import { writeAutoStartXBrief } from '../../../../lib/xbrief/auto-synthesize.js';
 import { findPlan, readPlan } from '../../../../lib/xbrief/io.js';
@@ -490,6 +491,17 @@ export const spawnIssueAgentForRoute = (input: { body: unknown; internalRequest:
       emitStartAgentPhase(issueId, 'stackHealthGate', 'start', 'checking workspace docker stack health', { workspacePath });
       let stackHealth = yield* getWorkspaceStackHealth(issueId, { projectConfig, workspacePath });
       if (!stackHealth.healthy && !allowHost) {
+        // PAN-4961: a rebuild that would breach the disk floor is held, not attempted.
+        const diskHold = yield* Effect.promise(() => resolveIssueStackDiskHold(issueId));
+        if (diskHold) {
+          emitStartAgentPhase(issueId, 'stackHealthGate', 'failure', diskHold, { workspacePath });
+          emitActivityEntry({ source: 'dashboard', level: 'warn', issueId: issueId.toUpperCase(), message: `agent-spawn-held-disk-low: ${issueId.toUpperCase()}`, details: diskHold });
+          return jsonResponse({
+            success: false, blocked: true, skipped: true, diskLow: true,
+            error: diskHold,
+            hint: `Workspace starts are held until free space recovers. Free disk space (see /resources), then retry pan start ${issueId}.`,
+          }, { status: 507 });
+        }
         emitStartAgentPhase(issueId, 'stackHealthGate', 'start', 'stack unhealthy — attempting workspace stack rebuild', { workspacePath });
         yield* Effect.promise(() =>
           assertWorkspaceStackHealthyForSpawn(issueId, 'work', false, workspacePath).catch(() => undefined));

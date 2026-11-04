@@ -564,6 +564,76 @@ created before the marker existed. Soft setup failures (port assignment,
 devcontainer render, tunnel, Hume, Docker) are reported but do not keep the
 marker, so a retry does not repeat them.
 
+## Disk floor and in-flight reservations (PAN-4961)
+
+Below 10 GiB free (`DISK_SAFETY_FLOOR_BYTES` in `src/lib/disk-floor.ts`, equal
+to the disk-pressure patrol's prune trigger), an ENOSPC write can zero-fill a
+file instead of failing (PAN-1674). A plain "is there 10 GiB free?" check is not
+enough: six starts that each pass it at 15 GB free can together write the disk
+down to 5 GB, because each check runs before any of them has written anything.
+So every disk-heavy phase is admitted against the phases already running.
+
+A workspace costs disk in two phases:
+
+- **Host phase** — the git worktree and the package install. `createWorkspace`
+  (`src/lib/workspace-manager/create.ts`) admits it where it used to check the
+  floor, and adds the stack phase too when it is called with `startDocker`.
+- **Stack phase** — `docker compose up -d --build`, whose `init` service fills
+  the `<compose-project>_container-node-modules` volume (about 1.9 GB).
+  `rebuildWorkspaceStack` (`src/lib/workspace/rebuild-stack.ts`) admits it after
+  its `down -v` teardown, which frees the old volume. Both containerize doors —
+  `POST /api/workspaces/:issueId/containerize` (host plus stack) and
+  `WorkspaceService.containerize` (stack) — admit before they build.
+
+A phase is admitted when
+
+```text
+available − in-flight reserved bytes − own cost ≥ 10 GiB
+```
+
+`reserveDiskFloor` decides this under a cross-process lock and, on admission,
+writes a reservation file to `~/.overdeck/disk-reservations/<uuid>.json`
+(`{ pid, bytes, label, path, createdAt }`). The file is a lease, not stored
+status: the phase deletes it when it returns, success or failure, because from
+then on `statfs` sees the real bytes. The holder renews the file's mtime every
+60 s. The next admission deletes a reservation whose pid is not running or whose
+mtime is older than 10 minutes, so a crashed process or a pid reused after a
+reboot stops counting, while a long install never expires. If the ledger
+directory cannot be created, listed, locked or written, admission refuses —
+ignoring it would let concurrent starts all pass the plain check. If `statfs`
+itself fails, admission admits (there is nothing to compare). Every refusal
+starts with `Disk low — new workspace starts are held`.
+
+Admission covers space taken by other setups; a plain re-check covers space
+lost since admission. `createWorkspace` re-checks the floor before the root
+package install, before each polyrepo per-repo install, and before its
+`docker compose up`. An install-time hold returns `success: false` and keeps the
+`setup-incomplete` marker, so a retry resumes the setup (PAN-4171).
+
+The cost of a phase comes from `estimateWorkspaceDiskCost`
+(`src/lib/workspace/disk-cost.ts`), measured from what is already on the
+machine and memoized per project for 6 hours (a release invalidates the memo):
+
+- host bytes = the blob sizes from `git ls-tree -r -l HEAD` plus the bytes of
+  single-link files in the newest finished sibling's `node_modules` (bun
+  hardlinks from its cache, so `du` overstates by gigabytes);
+- stack bytes = the largest finished sibling stack in `docker system df -v`
+  (its volumes plus its images' unique size); with no sibling stack, the largest
+  compose-project volume group on the host, at least 2 GiB; when Docker cannot
+  be read, the 2 GiB seed (the host seed is 0.5 GiB). A project with no
+  `compose_template` has no stack cost.
+
+Over-counting is the safe direction: while a phase runs, part of its
+reservation is already written and counted twice, which can refuse a start that
+would have fit but never admits one that does not. The ledger assumes the
+workspaces and Docker's data root share one filesystem; if they do not, the sum
+over-counts in the same safe direction.
+
+Planning builds no stack. A planning session creates its workspace without
+`startDocker`, and the spawn-time stack gate returns at once for the plan role.
+The stack is built when the work agent starts: the work-start hold is described
+in [PIPELINE-GATES.md](PIPELINE-GATES.md) ("Disk-low hold").
+
 ## User-facing surfaces vs. pipeline worktrees (PAN-3286)
 
 `backfillIssueWorkspaces()` enrolls *every* `feature-*` worktree as a

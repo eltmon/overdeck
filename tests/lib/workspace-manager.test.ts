@@ -3,9 +3,11 @@ import { existsSync, mkdtempSync, rmSync, writeFileSync, mkdirSync, readFileSync
 import { join } from 'path';
 import { tmpdir } from 'os';
 
-const { mockExecAsync, mockCheckDiskFloor } = vi.hoisted(() => ({
+const { mockExecAsync, mockCheckDiskFloor, mockReserveDiskFloor, mockEstimateWorkspaceDiskCost } = vi.hoisted(() => ({
   mockExecAsync: vi.fn().mockResolvedValue({ stdout: '', stderr: '' }),
   mockCheckDiskFloor: vi.fn(),
+  mockReserveDiskFloor: vi.fn(),
+  mockEstimateWorkspaceDiskCost: vi.fn(),
 }));
 
 vi.mock('child_process', async () => {
@@ -39,11 +41,19 @@ vi.mock('os', async () => {
   };
 });
 
-// checkDiskFloor reads real free space via statfs (PAN-4723): mock it so tests
-// don't fail on CI runners whose /tmp has less than the 10 GiB floor.
+// checkDiskFloor and reserveDiskFloor read real free space via statfs
+// (PAN-4723, PAN-4961): mock both so tests don't fail on CI runners whose /tmp
+// has less than the 10 GiB floor. The disk-cost estimator runs real git and
+// docker, so it is mocked too.
 vi.mock('../../src/lib/disk-floor.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../src/lib/disk-floor.js')>()),
   checkDiskFloor: mockCheckDiskFloor,
+  reserveDiskFloor: mockReserveDiskFloor,
+}));
+
+vi.mock('../../src/lib/workspace/disk-cost.js', () => ({
+  estimateWorkspaceDiskCost: mockEstimateWorkspaceDiskCost,
+  invalidateWorkspaceDiskCostMemo: vi.fn(),
 }));
 
 describe('copyOverdeckSettingsToWorkspace', () => {
@@ -238,6 +248,10 @@ describe('createWorkspace', () => {
     mockExecAsync.mockResolvedValue({ stdout: '', stderr: '' });
     mockCheckDiskFloor.mockReset();
     mockCheckDiskFloor.mockResolvedValue(null);
+    mockReserveDiskFloor.mockReset();
+    mockReserveDiskFloor.mockResolvedValue({ ok: true, reservation: { release: vi.fn(async () => {}) } });
+    mockEstimateWorkspaceDiskCost.mockReset();
+    mockEstimateWorkspaceDiskCost.mockResolvedValue({ hostBytes: 1, stackBytes: 1, hostSource: 'measured', stackSource: 'measured' });
     vi.resetModules();
   });
 

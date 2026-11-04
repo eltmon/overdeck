@@ -31,7 +31,8 @@ import {
   stagePreWorktreeMetadata,
   validateFeatureName,
 } from './worktree-ops.js';
-import { checkDiskFloor } from '../disk-floor.js';
+import { checkDiskFloor, reserveDiskFloor } from '../disk-floor.js';
+import { estimateWorkspaceDiskCost, invalidateWorkspaceDiskCostMemo } from '../workspace/disk-cost.js';
 import { hasPackageJson, installCommandFor } from './dependency-install.js';
 import type { WorkspaceCreateOptions, WorkspaceCreateResult } from './types.js';
 import {
@@ -162,8 +163,24 @@ export async function commitPolyrepoWorkspaceGitignoreAsync(workspacePath: strin
   }
 }
 
-/** Create a new workspace (git worktree + scaffolding). */
+/**
+ * Create a new workspace (git worktree + scaffolding). The disk reservation
+ * taken for its host (and optional stack) phase is released when it returns,
+ * success or failure, because from then on statfs sees the bytes (PAN-4961).
+ */
 export async function createWorkspace(options: WorkspaceCreateOptions): Promise<WorkspaceCreateResult> {
+  const hold = { release: async () => {} };
+  try {
+    return await createWorkspaceHoldingReservation(options, hold);
+  } finally {
+    await hold.release();
+  }
+}
+
+async function createWorkspaceHoldingReservation(
+  options: WorkspaceCreateOptions,
+  hold: { release: () => Promise<void> },
+): Promise<WorkspaceCreateResult> {
   const { projectConfig, featureName, startDocker, dryRun, onProgress } = options;
   const progress = (label: string, detail: string, status: 'active' | 'complete' | 'error' = 'active') => {
     onProgress?.({ label, detail, status });
@@ -200,12 +217,23 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
     return result;
   }
 
-  const diskError = await checkDiskFloor(projectConfig.path);
-  if (diskError) {
+  // PAN-4961: admission counts every in-flight workspace setup, so concurrent
+  // starts cannot all pass the floor and then together run the disk out.
+  const cost = await estimateWorkspaceDiskCost(projectConfig);
+  const admission = await reserveDiskFloor({
+    path: projectConfig.path,
+    bytes: cost.hostBytes + (startDocker ? cost.stackBytes : 0),
+    label: `workspace:${featureName}`,
+  });
+  if (!admission.ok) {
     result.success = false;
-    result.errors.push(diskError);
+    result.errors.push(admission.error);
     return result;
   }
+  hold.release = async () => {
+    await admission.reservation.release();
+    invalidateWorkspaceDiskCostMemo(projectConfig.path);
+  };
 
   // PAN-1990 FR-6/AC-4: create the kind='issue' workspace row before any git
   // worktree operation — never skipped and never swallowed. Idempotent
@@ -468,6 +496,16 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
       }
     }
 
+    // Re-check before the install: space may have gone since admission. The
+    // setup-incomplete marker stays, so a retry resumes (PAN-4171).
+    const installDiskError = await checkDiskFloor(workspacePath);
+    if (installDiskError) {
+      result.errors.push(installDiskError);
+      result.success = false;
+      progress('Installing dependencies', 'Disk low — workspace creation held', 'error');
+      return result;
+    }
+
     const installCmd = installCommandFor(pkgManager);
     try {
       // No timeout — cold installs on fresh machines can take several minutes.
@@ -494,6 +532,13 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
       if (!hasPackageJson(repoDir)) {
         result.steps.push(`${repo.name}: no package.json; skipped install`);
         continue;
+      }
+      const repoDiskError = await checkDiskFloor(repoDir);
+      if (repoDiskError) {
+        result.errors.push(repoDiskError);
+        result.success = false;
+        progress('Installing dependencies', `Disk low — workspace creation held in ${repo.name}`, 'error');
+        return result;
       }
       progress('Installing dependencies', `${repo.name} (${repo.package_manager})`);
       try {
@@ -719,6 +764,11 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
 
     for (const composePath of composeLocations) {
       if (existsSync(composePath)) {
+        const composeDiskError = await checkDiskFloor(workspacePath);
+        if (composeDiskError) {
+          result.errors.push(composeDiskError);
+          break;
+        }
         try {
           // Don't pass -p: the compose file's `name:` field is the authority.
           // Passing -p with a different value creates a second Docker project
