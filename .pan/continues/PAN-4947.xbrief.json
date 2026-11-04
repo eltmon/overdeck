@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4947",
   "created": "2026-11-04T05:30:29.044Z",
-  "updated": "2026-11-04T06:19:09.406Z",
+  "updated": "2026-11-04T06:19:23.702Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -186,6 +186,10 @@
     "public-mcp-panel.ac4": {
       "status": "completed",
       "doneAt": "2026-11-04T06:19:09.405Z"
+    },
+    "public-mcp-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:19:23.701Z"
     }
   }
 }
