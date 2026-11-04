@@ -568,7 +568,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
       ? getCodexLauncherFields(sessionName, planningModel, workspacePath, 'plan', resolvedEffort.effort, await prepareCodexOverdeckMcp({ agentId: sessionName, agentKind: 'agent', role: 'plan', harness: effectiveHarness }))
       : {};
     const acpLauncherFields = behavior.launchCommandKind === 'acp-host'
-      ? getAcpLauncherFields(
+      ? await getAcpLauncherFields(
           sessionName,
           planningModel,
           workspacePath,

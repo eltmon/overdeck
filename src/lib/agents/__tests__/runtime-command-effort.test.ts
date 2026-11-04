@@ -180,13 +180,13 @@ describe('getKimiCodeLauncherFields --effort (PAN-4260)', () => {
 });
 
 describe('getAcpLauncherFields --effort (PAN-4260)', () => {
-  it('passes an OpenCode variant through unchanged', () => {
-    const fields = getAcpLauncherFields('agent-x', 'opencode/some-model', '/tmp/ws', '/bin/acp-host', undefined, 'custom-variant');
+  it('passes an OpenCode variant through unchanged', async () => {
+    const fields = await getAcpLauncherFields('agent-x', 'opencode/some-model', '/tmp/ws', '/bin/acp-host', undefined, 'custom-variant');
     expect(fields.acpEffort).toBe('custom-variant');
   });
 
-  it('defaults to high for a Kimi ACP model with no effort', () => {
-    const fields = getAcpLauncherFields('agent-x', 'k3', '/tmp/ws', '/bin/acp-host');
+  it('defaults to high for a Kimi ACP model with no effort', async () => {
+    const fields = await getAcpLauncherFields('agent-x', 'k3', '/tmp/ws', '/bin/acp-host');
     expect(fields.acpEffort).toBe('high');
   });
 });

@@ -612,3 +612,44 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
 - `pan handoff self` fails in conv-flywheel ("Could not determine the current conversation"); pass the conversation id (3399) instead.
 - Landed 2026-11-04: PR #4994 merged. `evaluateReviewConvergence` now judges only the rounds after the last 0-blocker round; the operator message still shows the full series.
 - Learning: a handoff worktree must not run `pan review request` right after `gh pr create`. The PR-opened webhook already adopts the branch, and the request races it: verification merged main into the half-adopted workspace and adoption refused with `workspace-head-mismatch` (false needs-you; self-healed when verification passed and pushed). Filed PAN-4995.
+
+## 2026-11-04 — Phone app store setup released; connect Worker deployed
+
+- Operator released PAN-4841 (store, Firebase, APNs, directory setup) to the pipeline, overriding the earlier "orchestrator-driven" hold. PAN-4842 (docs) is still held.
+- The operator already has Apple Developer Program membership and a Google Play developer account. Mind Your Now (`~/Projects/myn`) is the reference setup for Firebase push, the Android upload keystore (`release-secrets/android/`) and signed builds. Overdeck gets its own Firebase project, never MYN's service account.
+- Operator ran the connect and account Worker deploys (wrangler had been waiting on the D1 migration confirmation). That unblocked PAN-4950, which is started; PAN-4953/4954/4955 follow it.
+
+## 2026-11-04 — Orchestrator directives after the overnight sweep
+
+- Until PAN-4995 (PR adoption races `pan review request`) is fixed, handoff briefs must not run `pan review request` right after `gh pr create`. Opening the PR already triggers webhook adoption plus review; an immediate request-review starts verification mid-adoption and causes a false `workspace-head-mismatch` needs-you (seen on PAN-4993 / #4994). The PAN-4993 brief in this log prescribed exactly that order; don't copy it.
+- PAN-4841 belongs to the Flywheel now; the orchestrator keeps only PAN-4842 (phone docs).
+- Strike PRs (`pan strike`) bypass plan/review/test and wait for an operator merge; the merge train never schedules them. Five (#4678, #4679, #4698, #4701, #4707) sat green and unreviewed from Nov 1. Their issues were still open with no fix on main, so on the orchestrator's instruction they were updated with main and merged once fresh CI was green. Check `gh pr list --search "head:strike/"` each tick, because nothing else drains them.
+
+## 2026-11-04 — Reload hold for the live three-machine Anywhere check
+
+- From about 10:35Z the operator holds every `pan reload` of home while conv hoff-pan-4638-live runs PAN-4638 then PAN-4886 against build 65e3b1adf86 (Fly VM in pan-workspaces plus the Mac rig). A reload mid-run drops the links and lanes. Do not deploy until the operator says the VMs are torn down; a later entry here records the lift.
+- Merged but held from deploy meanwhile: strike PRs #4678, #4679, #4698, #4707.
+
+## 2026-11-04 — PAN-5003: merge door rebases away merge-main resolutions
+
+- #4997 (PAN-4935) was approved, green and GitHub-CLEAN, but the automatic merge failed with "Rebase conflicts in .overdeck/context/codebase/architecture.md ... merge it by hand". Cause: conflict repair merges `main` into branches, while `src/lib/cloister/merge-rebase.ts` (line 246) runs a plain `git rebase origin/main` that replays the old commits and re-hits the conflict the merge commit had resolved. GitHub never shows CONFLICTING, so conflict repair never fires. Filed PAN-5003 (merge route, TENET-10, so it goes via handoff); the handoff is deferred until disk recovers above about 15 GB. Instance: hand squash-merged #4997.
+- Recognize it: `merge.failed` with "an automatic merge is rebased by the server only" on a PR whose `mergeStateStatus` is CLEAN. Hand-merge with `gh pr merge --squash` while PAN-5003 is open.
+- GitHub 5xx/GraphQL errors at about 10:15Z also swallowed a review verdict: the PAN-4956 reviewer's `pan admin specialists done review --status passed` failed twice on `gh pr review --approve`. The approval was for an older head and the PR had since conflicted, so the recovery was to tell the work agent to merge main and re-request review, not to replay the verdict. If this recurs, file a durable-verdict retry.
+
+## 2026-11-04 — A reload hold given to one conversation doesn't hold (PAN-5007)
+
+- Despite the operator's hold, session da0f6a07 (the PAN-5001 conversation) ran `pan reload` at 10:43Z and self-approved it; the dashboard restarted at 10:45Z onto e06356cb5ff. That shipped the four strike merges and PAN-4935, and also wiped PAN-4841's five in-memory secret requests just as the operator went looking for them. Filed PAN-5007 (operator-owned restart hold that every `pan reload`/`approve` must honor). The operator's hold still binds the Flywheel until they lift it.
+- A dashboard restart drops every pending `request_secret`/link request (D-8). After any restart, check `GET /api/agent-requests` and tell the requesting agent to re-create its requests; an agent idle after `pan ask` won't notice on its own.
+- Operator directions for secret cards: the small orange person-icon count badge in the header (left of the "Needs you · N" pill) opens the Decisions dropdown with one paste card per request.
+- `pan close --force` refuses an open issue whose fix came from a strike PR ("reviewDecision: " empty). Close it with `gh issue close` and a comment naming the PR and live build.
+- #4701 (PAN-4690) merged after handoff conv 3609 extracted the workspace stack spawn gate from spawn-prep.ts to clear the file-size guard.
+
+## 2026-11-04 — PAN-5011: composer locked on every idle Herdr work agent
+
+- Herdr reports `agent_status: done` for an agent that finished its turn and sits at its prompt. `nodeStatusFor` in `src/dashboard/server/routes/command-deck.ts` (around line 440) maps pane state `done` to `presence: 'ended'`, SessionPanel sets `sessionAlive` false, and `ComposerFooter.tsx:182` disables the composer. The operator could not type to PAN-4841 while it waited on them. Filed PAN-5011 and started it.
+- Until it ships, relay operator answers to an idle agent with `pan tell`.
+- PAN-4841 progress: A1-A4 and P1-P2 are done, connect healthz reports apns and fcm true, and the TestFlight build is running on the Mac rig. The agent did the console work itself; the operator signed in and accepted the agreements.
+
+## 2026-11-04 — Reload hold lifted
+
+- The operator lifted the live-check reload hold (Fly VMs destroyed; PAN-4638 passed, PAN-4886 not run). Normal deploys resumed.

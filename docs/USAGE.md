@@ -322,6 +322,7 @@ less ~/.overdeck/agents/agent-pan-123/spawn.log
 
 # Send message to agent
 pan tell agent-pan-123 "Your message"
+pan tell 20260928-7563 "Your message"   # a conversation, by the name the dashboard shows
 
 # Kill stuck agent
 pan kill agent-pan-123

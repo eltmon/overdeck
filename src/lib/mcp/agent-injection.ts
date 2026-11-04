@@ -17,7 +17,6 @@ import { join } from 'node:path';
 import type { AgentRole } from '@overdeck/contracts';
 import type { RuntimeName } from '../runtimes/types.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
-import { loadConfigNoMigration } from '../config-yaml.js';
 import { getDashboardLoopbackApiUrl } from '../config.js';
 import { getOverdeckHome } from '../paths.js';
 import { panCliInvocation } from '../pan-cli-invocation.js';
@@ -25,19 +24,10 @@ import { getAgentDir } from '../agents/agent-state-read.js';
 import { normalizeAgentId } from '../agents/identity.js';
 import { FLYWHEEL_CONVERSATION_SESSION } from '../flywheel/constants.js';
 import { ensureAgentMcpToken, type AgentTokenRole } from './agent-token.js';
+import { overdeckMcpEnabledFor } from './overdeck-mcp-gate.js';
 import { CLAUDE_OVERDECK_MCP_CONFIG_FILE, OVERDECK_MCP_SERVER_NAME } from './overdeck-mcp-args.js';
 
-/** D-1: the harness declares `capabilities.overdeckMcp`. */
-export function harnessGetsOverdeckMcp(harness: RuntimeName): boolean {
-  return getHarnessBehavior(harness).capabilities.overdeckMcp;
-}
-
-/** FR-5: capability, not a Docker workspace, and config `mcp.agents`. */
-export async function overdeckMcpEnabledFor(harness: RuntimeName, env: NodeJS.ProcessEnv = process.env): Promise<boolean> {
-  if (!harnessGetsOverdeckMcp(harness)) return false;
-  if (env.OVERDECK_DOCKER_WORKSPACE === '1' || env.PAN_DOCKER === '1') return false;
-  return (await loadConfigNoMigration()).config.mcp.agents;
-}
+export { harnessGetsOverdeckMcp, overdeckMcpEnabledFor } from './overdeck-mcp-gate.js';
 
 /** The stdio server entry: `pan mcp serve` with only paths and the loopback URL in env (C-6, C-7). */
 export function overdeckStdioServer(tokenFile: string): { type: 'stdio'; command: string; args: string[]; env: Record<string, string> } {

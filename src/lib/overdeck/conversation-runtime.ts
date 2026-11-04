@@ -611,7 +611,7 @@ export async function spawnConversationSession(
     codexNativeEndpoint?: boolean;
     resumeSessionId?: string;
   } | undefined;
-  let acpFields: (ReturnType<typeof getAcpLauncherFields> & { resumeSessionId?: string }) | undefined;
+  let acpFields: (Awaited<ReturnType<typeof getAcpLauncherFields>> & { resumeSessionId?: string }) | undefined;
   let primeLaunch: Awaited<ReturnType<typeof getPrimeAgentLauncherFields>> | undefined;
   const museSavedSession = behavior.launchCommandKind === 'muse-tui' && resume ? await resolveMuseSessionPath(tmuxSession) : null;
   const museFields = behavior.launchCommandKind === 'muse-tui' ? {
@@ -632,7 +632,7 @@ export async function spawnConversationSession(
       : undefined;
     await rm(sessionIdPath, { force: true }); // PAN-3357: not a dir removal
     acpFields = {
-      ...getAcpLauncherFields(tmuxSession, model, cwd, harnessLaunch.binaryPath, 'work', launchEffort),
+      ...(await getAcpLauncherFields(tmuxSession, model, cwd, harnessLaunch.binaryPath, 'work', launchEffort)),
       ...(bareContext ? { acpContextFile: undefined } : {}),
       resumeSessionId,
     };

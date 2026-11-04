@@ -663,6 +663,10 @@ connections.
   route answered but none proved the expected key. Either the other machine's key changed
   (its `machine-key.json` was replaced) or a proxy answered for a dead peer. Unlink and
   link again if the key really changed.
+- **"Secure channel to … did not open within 10000 ms" while the machine shows Online**: the route reached
+  the other machine but the connection and handshake took longer than 10 seconds. This is usually a slow
+  moment on the route (for example the public Fly edge); run the command again. If it keeps happening, the
+  route itself is congested: check the machine's routes in Settings → Machines.
 - **`add-fly` fails with `unreachable`**: the Fly app has no public IPs. Run
   `fly ips allocate-v4 --shared -a <app>` and `fly ips allocate-v6 -a <app>` once, then
   try again. The failed VM was already destroyed.

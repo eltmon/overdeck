@@ -1,0 +1,523 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-04T08:02:02Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4935: Agent MCP and bots (W-INJ4): Instructions blocks and the no-MCP fallback",
+    "updated": "2026-11-04T08:09:22.921Z"
+  },
+  "plan": {
+    "id": "pan-4935",
+    "title": "Agent MCP and bots (W-INJ4): Instructions blocks and the no-MCP fallback",
+    "status": "running",
+    "uid": "6e0cf004-7080-4ca6-acb6-0b223e9c1870",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-04T08:02:02Z",
+    "updated": "2026-11-04T08:09:22.921Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4935",
+        "label": "PAN-4935",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4927",
+        "label": "PAN-4927 (epic)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "mcp",
+      "context-layers",
+      "agents",
+      "pan-4927"
+    ],
+    "narratives": {
+      "Problem": "Since W-INJ1-3, Claude Code, Codex, ACP and OpenCode agents start with an `overdeck` MCP server, but nothing in their launch context tells them it exists, which tools matter, or that wait tools return in 50 s chunks with `next`. Agents without the server (kimi-code, ohmypi, muse, prime-agent, Docker workspaces, mcp.agents: false) are not told the `pan` equivalents either.",
+      "Proposal": "Add a leaf module `src/lib/mcp/agent-instructions.ts` with two blocks (MCP block 'Overdeck tools', CLI block 'Overdeck commands', each <= 1,500 characters) and `overdeckInstructionsBlock(overdeckMcp)`. Move the existing injection gate (`harnessGetsOverdeckMcp`, `overdeckMcpEnabledFor`) to a leaf `src/lib/mcp/overdeck-mcp-gate.ts`. `renderManagedLaunchContext` and its materializers take `opts.overdeckMcp` (absent => CLI block) and append the block as the last section; the shared launch file name ends in -mcp.md or -cli.md. The flag is computed from the gate in exactly three places: `claudeSystemPromptFiles` (claude-code, codex, kimi-code, ohmypi), `getAcpLauncherFields` (made async; acp, opencode) and `materializeMuseContext`. Document both blocks. Full detail: .pan/drafts/PAN-4935.md.",
+      "NonGoals": "- Threading the actual mint result into the context; a failed mint still gets the MCP block (PRD H-1).\n- Per-role or per-scope variants of the MCP block.\n- Injecting the MCP server into AcpRuntime.spawnAgent launches or any no-MCP harness.\n- Deleting old <harness>-<hash>.md shared launch files.\n- Changing Docker-workspace injection behavior.\n- Any line growth in spawn.ts, spawn-prep.ts, spawn-planning-session.ts or conversation-runtime.ts.\n- The epic-wide documentation pass (W-DOC, PAN-4958).\n- A new *Sync function or a sync/async twin of the gate."
+    },
+    "metadata": {
+      "sizeJustification": "Six small items across mcp, context-layers, agents launcher fields, muse runtime and docs; one coherent feature that cannot ship partially.",
+      "canonicalFilename": "2026-11-04-PAN-4935-agent-mcp-and-bots-w-inj4-instructions-blocks-and-the-no-mcp-fallback.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Compute the MCP/CLI flag from the existing injection gate (overdeckMcpEnabledFor) instead of threading the injection result from every launch site.",
+        "rationale": "The gate is the exact condition every prepare*OverdeckMcp call checks; threading results would touch five god files at their size caps. Only a failed mint diverges, and that path already warns (PRD D-1, H-1)."
+      },
+      {
+        "summary": "An absent flag renders the CLI block.",
+        "rationale": "Fail safe: never promise tools a launch may not have; prime-agent and AcpRuntime.spawnAgent inject no server (PRD D-2)."
+      },
+      {
+        "summary": "Move the gate to a leaf module overdeck-mcp-gate.ts and re-export it from agent-injection.ts.",
+        "rationale": "context-layers must not import the token/registry graph agent-injection.ts pulls in (PRD D-3)."
+      },
+      {
+        "summary": "Make getAcpLauncherFields async and compute the gate inside it.",
+        "rationale": "spawn.ts has one spare line under its cap; awaiting in place adds zero lines and keeps the decision in one place (PRD D-4)."
+      },
+      {
+        "summary": "Correct two lines of the epic's verbatim MCP block: wait tools answer running or pending, and a missing tool means the role lacks the scope.",
+        "rationale": "secret_wait and link_machine_wait answer pending; review/test/ship tokens lack operate so delegate_task and done are hidden (PRD D-8)."
+      },
+      {
+        "summary": "Muse gets the tools block through its own composer.",
+        "rationale": "Epic D-13 names muse as a CLI-block harness and muse-context.ts never calls renderManagedLaunchContext (PRD W-5)."
+      }
+    ],
+    "items": [
+      {
+        "id": "instructions-text",
+        "title": "Add agent-instructions.ts with the MCP and CLI blocks",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T08:02:02Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4935",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/mcp/agent-instructions.ts",
+            "tests/unit/lib/mcp/agent-instructions.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run tests/unit/lib/mcp/agent-instructions.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors",
+            "agent-instructions.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/mcp/agent-instructions.ts with no imports, exporting OVERDECK_MCP_INSTRUCTIONS, OVERDECK_CLI_INSTRUCTIONS, INSTRUCTION_TOOL_NAMES and overdeckInstructionsBlock(overdeckMcp) exactly as PRD W-1 step 1 gives them (built with [...].join('\\n')). Write tests/unit/lib/mcp/agent-instructions.test.ts per PRD W-1 step 2; the test imports ALL_TOOLS from src/lib/mcp/server.js, the module does not."
+        },
+        "items": [
+          {
+            "id": "instructions-text.ac1",
+            "title": "Given the module, when the test measures both blocks, then each length is <= 1500 characters",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "instructions-text.ac2",
+            "title": "Given INSTRUCTION_TOOL_NAMES, when compared with ALL_TOOLS, then every entry is an ALL_TOOLS name and appears backticked in the MCP block, and every backticked underscore token in the MCP block is in INSTRUCTION_TOOL_NAMES",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "instructions-text.ac3",
+            "title": "Given the CLI block, when the test scans it, then it contains each of the twelve pan commands listed in PRD W-1 step 2 and no backticked ALL_TOOLS name with an underscore",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "instructions-text.ac4",
+            "title": "Given agent-instructions.ts, when read, then it has no import statements and overdeckInstructionsBlock(true) returns the MCP block while overdeckInstructionsBlock(false) returns the CLI block",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mcp-gate-leaf",
+        "title": "Move the Overdeck MCP gate to a leaf module",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T08:02:02Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-4935",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/mcp/overdeck-mcp-gate.ts",
+            "src/lib/mcp/agent-injection.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run tests/unit/lib/mcp/agent-injection.test.ts tests/unit/lib/mcp/agent-injection-launch.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint (including lint:circular) completes without errors",
+            "both agent-injection test files pass unchanged"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/mcp/overdeck-mcp-gate.ts holding harnessGetsOverdeckMcp and overdeckMcpEnabledFor moved verbatim from agent-injection.ts:30-40; it imports only '../runtimes/types.js' (type), '../runtimes/behavior.js' and '../config-yaml.js'. In agent-injection.ts delete the two definitions and the now-unused loadConfigNoMigration import, import overdeckMcpEnabledFor from './overdeck-mcp-gate.js' for internal use, and add `export { harnessGetsOverdeckMcp, overdeckMcpEnabledFor } from './overdeck-mcp-gate.js';`. Do not edit any test."
+        },
+        "items": [
+          {
+            "id": "mcp-gate-leaf.ac1",
+            "title": "Given the change, when overdeck-mcp-gate.ts is read, then it defines harnessGetsOverdeckMcp and overdeckMcpEnabledFor and imports nothing beyond runtimes/types, runtimes/behavior and config-yaml",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-gate-leaf.ac2",
+            "title": "Given agent-injection.ts, when read, then it re-exports both functions from overdeck-mcp-gate.js and defines neither",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-gate-leaf.ac3",
+            "title": "Given the unchanged agent-injection.test.ts and agent-injection-launch.test.ts, when vitest runs them, then they pass and npm run lint:circular exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "launch-context-block",
+        "title": "Append the tools block to the shared managed launch context",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T08:02:02Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4935",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "acp-context-block"
+          ],
+          "files_scope": [
+            "src/lib/context-layers/materialize.ts",
+            "src/lib/context-layers/launch-sources.ts",
+            "tests/lib/context-layers/materialize.test.ts",
+            "tests/unit/lib/context-layers/launch-sources-tools-block.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run tests/lib/context-layers/materialize.test.ts tests/unit/lib/context-layers/launch-sources-tools-block.test.ts tests/unit/lib/context-layers/prime-agent.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors",
+            "the three context-layers test files pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "FR-5",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD W-3: in materialize.ts add exported interface ManagedLaunchContextOptions { overdeckMcp?: boolean }; renderManagedLaunchContext(workspace, harness, opts = {}) pushes overdeckInstructionsBlock(opts.overdeckMcp === true) as the last section; materializeManagedLaunchContext and materializeSharedManagedLaunchContext take and pass the same opts; the shared file is named `${harness}-${workspaceHash}-${opts.overdeckMcp === true ? 'mcp' : 'cli'}.md`. In launch-sources.ts pass { overdeckMcp: await overdeckMcpEnabledFor(effectiveHarness) } (import from ../mcp/overdeck-mcp-gate.js) after the existing early return. Extend materialize.test.ts and add launch-sources-tools-block.test.ts as PRD W-3 steps 3-4 describe, mocking only loadConfigNoMigration and stubbing OVERDECK_DOCKER_WORKSPACE/PAN_DOCKER with vi.stubEnv."
+        },
+        "items": [
+          {
+            "id": "launch-context-block.ac1",
+            "title": "Given renderManagedLaunchContext called without options, when it returns, then the output ends with OVERDECK_CLI_INSTRUCTIONS; with { overdeckMcp: true } it ends with OVERDECK_MCP_INSTRUCTIONS",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launch-context-block.ac2",
+            "title": "Given materializeSharedManagedLaunchContext for one workspace and harness, when called with overdeckMcp true and without it, then it writes two different files ending in -mcp.md and -cli.md with different contents",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launch-context-block.ac3",
+            "title": "Given mcp.agents true and no Docker env, when claudeSystemPromptFiles runs for claude-code and codex, then the shared launch file it returns contains '## Overdeck tools'; for kimi-code it contains '## Overdeck commands' and not '## Overdeck tools' (epic AC-6)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launch-context-block.ac4",
+            "title": "Given claude-code with OVERDECK_DOCKER_WORKSPACE=1 or with mcp.agents false, when claudeSystemPromptFiles runs, then the shared launch file contains '## Overdeck commands' (falls back to the CLI block)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "acp-context-block",
+        "title": "Give ACP and OpenCode context files the gate's tools block",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T08:02:02Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4935",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/acp/context.ts",
+            "src/lib/agents/runtime-command.ts",
+            "src/lib/agents/spawn.ts",
+            "src/lib/agents/spawn-prep.ts",
+            "src/lib/planning/spawn-planning-session.ts",
+            "src/lib/overdeck/conversation-runtime.ts",
+            "src/lib/agents/__tests__/runtime-command-effort.test.ts",
+            "src/lib/agents/__tests__/acp-launcher-tools-block.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run src/lib/agents/__tests__/acp-launcher-tools-block.test.ts src/lib/agents/__tests__/runtime-command-effort.test.ts tests/lib/context-layers/materialize.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint (including lint:file-size and lint:circular) completes without errors",
+            "the three test files pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD W-4: materializeAcpContextFile(agentDir, workspace, harness, opts: ManagedLaunchContextOptions = {}) passes opts on. getAcpLauncherFields becomes async (return type Promise<{...}>) and passes { overdeckMcp: await overdeckMcpEnabledFor(harness) } (import from ../mcp/overdeck-mcp-gate.js). Add `await` on the same line at spawn.ts:327, spawn-prep.ts:752, spawn-planning-session.ts:571; change conversation-runtime.ts:635 to `...(await getAcpLauncherFields(...)),` and conversation-runtime.ts:614 to Awaited<ReturnType<typeof getAcpLauncherFields>>. Add no lines to those four files. Leave runtimes/acp.ts unchanged. Make the two runtime-command-effort.test.ts ACP tests async and await the call. Add acp-launcher-tools-block.test.ts (temp OVERDECK_HOME, mocked loadConfigNoMigration, findProjectByPath mocked to null if needed)."
+        },
+        "items": [
+          {
+            "id": "acp-context-block.ac1",
+            "title": "Given mcp.agents true and no Docker env, when await getAcpLauncherFields runs for an opencode/ model, then the acpContextFile it returns contains '## Overdeck tools'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-context-block.ac2",
+            "title": "Given PAN_DOCKER=1 or mcp.agents false, when await getAcpLauncherFields runs, then the acpContextFile contains '## Overdeck commands' instead",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-context-block.ac3",
+            "title": "Given the diff against main, when wc -l runs, then spawn.ts, spawn-prep.ts, spawn-planning-session.ts and conversation-runtime.ts keep their main line counts and runtime-command.ts stays <= 1000 lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-context-block.ac4",
+            "title": "Given the updated runtime-command-effort.test.ts, when vitest runs it, then the two getAcpLauncherFields effort tests pass with awaited calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "muse-context-block",
+        "title": "Append the tools block to the Muse context file",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T08:02:02Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4935",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/runtimes/muse-context.ts",
+            "tests/unit/lib/runtimes/muse-context.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run tests/unit/lib/runtimes/muse-context.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors",
+            "muse-context.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD W-5: in materializeMuseContext, after the workspace-layer push and before `if (roleFile)`, add sections.push(overdeckInstructionsBlock(await overdeckMcpEnabledFor('muse'))) with imports from ../mcp/agent-instructions.js and ../mcp/overdeck-mcp-gate.js. Extend muse-context.test.ts with the two cases from PRD W-5 step 2."
+        },
+        "items": [
+          {
+            "id": "muse-context-block.ac1",
+            "title": "Given a Muse launch, when materializeMuseContext writes muse-context.md, then the file contains '## Overdeck commands' and not '## Overdeck tools'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "muse-context-block.ac2",
+            "title": "Given a roleFile, when materializeMuseContext writes the file, then the role text appears after the '## Overdeck commands' block",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document the Overdeck tools and Overdeck commands blocks",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T08:02:02Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4935",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/mcp.mdx",
+            "configuration/harnesses.mdx",
+            "docs/CONTEXT-LAYERS.md",
+            "configuration/context-layers.mdx",
+            ".pan/drafts/pan-4927.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "lint (including lint:docs) completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD W-6: merge main first (W-DOC PAN-4958 also edits mcp.mdx). Add the '### What the agent is told' subsection under '## Agents get these tools' in configuration/mcp.mdx; add the paragraph to configuration/harnesses.mdx '### Overdeck MCP server'; add the 'Overdeck tools block' row to the docs/CONTEXT-LAYERS.md 'Instruction source inventory' table; in configuration/context-layers.mdx rename the Kimi artifact to kimi-code-<workspace-hash>-cli.md and add the one-sentence tools-block note with its link. Also add a 'Revision 2 (PAN-4935 planning)' block under '### W-INJ4' in .pan/drafts/pan-4927.md, matching the sibling revision notes, as PRD W-6 step 5 gives it."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "Given configuration/mcp.mdx, when read, then a '### What the agent is told' subsection names both blocks, states each is at most 1,500 characters, and lists kimi-code, ohmypi, muse, prime-agent, Docker workspaces and mcp.agents false as the CLI-block cases",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "Given docs/CONTEXT-LAYERS.md, when read, then the instruction source inventory table has an 'Overdeck tools block' row naming src/lib/mcp/agent-instructions.ts and the -mcp.md / -cli.md file names",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "Given configuration/harnesses.mdx and configuration/context-layers.mdx, when read, then each links to /configuration/mcp#what-the-agent-is-told and context-layers.mdx names the Kimi artifact kimi-code-<workspace-hash>-cli.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac4",
+            "title": "Given .pan/drafts/pan-4927.md, when read, then the W-INJ4 section ends with a 'Revision 2 (PAN-4935 planning)' block listing corrections C-1 to C-4 from PRD W-6 step 5",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "instructions-text",
+        "to": "launch-context-block",
+        "type": "blocks"
+      },
+      {
+        "from": "instructions-text",
+        "to": "muse-context-block",
+        "type": "blocks"
+      },
+      {
+        "from": "mcp-gate-leaf",
+        "to": "launch-context-block",
+        "type": "blocks"
+      },
+      {
+        "from": "mcp-gate-leaf",
+        "to": "acp-context-block",
+        "type": "blocks"
+      },
+      {
+        "from": "mcp-gate-leaf",
+        "to": "muse-context-block",
+        "type": "blocks"
+      },
+      {
+        "from": "launch-context-block",
+        "to": "acp-context-block",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}
