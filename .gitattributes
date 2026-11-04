@@ -18,6 +18,12 @@
 # unsorted or with a duplicate line; scripts/run-frontend-test-subset.mjs dedupes (PAN-4697).
 scripts/frontend-test-subset.txt merge=union
 
+# apps/mobile/ACCEPTANCE.md is deliberately NOT merge=union (PAN-5054). Its sections share
+# identical lines (blank lines, `| --- |` table rows, `**Result: PASS.**`), and git's merge
+# emits those once and splits the rest around them, so union interleaves two appended sections
+# with no conflict markers. New phone evidence goes in its own apps/mobile/acceptance/PAN-<n>.md,
+# so parallel PRs add different files. union is safe only for one-entry-per-line files.
+
 # WARNING: The single-JSON state files under .pan/specs/, .pan/continues/, and .pan/records/
 # must NOT receive a content-merge driver like `union`. union concatenates hunks into
 # invalid JSON. These files need a take-one-whole-side strategy, not line-level merging.

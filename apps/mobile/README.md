@@ -242,6 +242,10 @@ The root `npm test` does not run these tests. The CI job `mobile-android` runs t
 web build, the Capacitor sync, `testDebugUnitTest` and `assembleDebug`, and uploads the `app-debug` APK. The `test`
 check requires it.
 
+Device and emulator acceptance evidence goes in one file per issue, `acceptance/PAN-<n>.md`, with
+its screenshots beside it as `acceptance/pan-<n>-<step>.png`. `ACCEPTANCE.md` holds the evidence
+written before PAN-5054; do not add sections to it.
+
 ## Release
 
 [`RELEASE.md`](RELEASE.md) holds the operator's one-time store checklist, the secrets the agent asks for,

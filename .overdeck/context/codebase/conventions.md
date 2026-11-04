@@ -81,5 +81,8 @@
 - Root `setupFiles` (`vitest.config.ts`) run in order: `tests/setup/overdeck-home.ts`,
   `tests/setup/no-real-home-writes.ts`, `tests/setup/no-worker-signals.ts`, `tests/setup.ts`; the
   latter two guards throw `[test-guard]` errors (PAN-4925).
+- Phone-app (`apps/mobile`) acceptance evidence goes in one file per issue,
+  `apps/mobile/acceptance/PAN-<n>.md`, never a new section in `apps/mobile/ACCEPTANCE.md`;
+  union cannot merge sectioned markdown safely (PAN-5054).
 
 <!-- last-verified: 2026-11-03 -->

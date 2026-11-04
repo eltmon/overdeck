@@ -4,6 +4,13 @@ Evidence for epic AC-10 (PRD WI-21) and the checkpoints CP-3 and CP-4 (WI-22). S
 [`acceptance/`](acceptance/). The request inventory from the same run is
 [`request-log.json`](request-log.json).
 
+> **New evidence goes in its own file.** Write a new issue's evidence in
+> `acceptance/PAN-<n>.md`, where `<n>` is the issue number, with its screenshots beside it as
+> `acceptance/pan-<n>-<step>.png`. Do not append a section to this file, and never edit another
+> issue's section. Parallel phone PRs that all appended here conflicted at the end of the file
+> (PAN-5054). `merge=union` is not a fix: it interleaves two sections' lines with no conflict
+> markers.
+
 ## AC-10 on the Android emulator
 
 **Result: PASS.** All five steps passed against the production overdeck.ai services.
