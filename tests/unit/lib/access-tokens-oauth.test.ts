@@ -103,6 +103,13 @@ describe('OAuth tokens in the access-token registry (PAN-4945)', () => {
     expect(registry.verifyAccessToken(token)).toEqual({ ok: false });
   });
 
+  it('treats a connector record with OAuth fields as a corrupt file', async () => {
+    await writeRegistryFile([
+      baseRecord({ kind: 'connector', connectorKey: 'c'.repeat(64), clientId: '123e4567-e89b-42d3-a456-426614174000', oauthClientId: CLIENT_ID, oauthFamilyId: FAMILY_ID, expiresAt: '2026-12-01T00:00:00.000Z' }),
+    ]);
+    await expect(registry.refreshAccessTokens()).rejects.toThrow(/unexpected shape/);
+  });
+
   it('prunes OAuth records expired more than olderThanMs ago, and revoked ones only past the 90-day refresh window', async () => {
     const ago = (days: number) => new Date(NOW.getTime() - days * DAY_MS).toISOString();
     const oauth = { kind: 'token', oauthClientId: CLIENT_ID, oauthFamilyId: FAMILY_ID };
