@@ -4,17 +4,17 @@
     "created": "2026-11-04T12:33:37Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5019: Phone app: pause notifications and choose which notification types to receive",
-    "updated": "2026-11-04T12:37:20.198Z"
+    "updated": "2026-11-04T13:11:33.544Z"
   },
   "plan": {
     "id": "pan-5019",
     "title": "Phone app: pause notifications and choose which notification types to receive",
-    "status": "proposed",
+    "status": "running",
     "uid": "57d75631-081c-464a-880a-6a70d8e0abf5",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-04T12:33:37Z",
-    "updated": "2026-11-04T12:37:20.198Z",
+    "updated": "2026-11-04T13:11:33.544Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5019",
@@ -871,5 +871,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
