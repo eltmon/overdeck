@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5020",
   "created": "2026-11-04T12:51:44.824Z",
-  "updated": "2026-11-04T13:09:11.002Z",
+  "updated": "2026-11-04T13:09:27.785Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -72,6 +72,10 @@
     "w3-pan-map-skill.ac1": {
       "status": "completed",
       "doneAt": "2026-11-04T13:09:11.002Z"
+    },
+    "w3-pan-map-skill.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:09:27.784Z"
     }
   }
 }
