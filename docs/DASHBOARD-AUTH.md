@@ -140,6 +140,13 @@ Hosted MCP clients sign in through OAuth 2.1 (authorization code with PKCE
 S256, dynamic client registration, public clients only). User guide:
 [configuration/mcp.mdx](../configuration/mcp.mdx) "Sign in with OAuth".
 
+- **Lifetimes and levels** (`src/lib/mcp/oauth-flow.ts`). An authorization code
+  lives 60 s and is single use; a pending approval lives 10 minutes; an access
+  token lives 30 days (`ACCESS_TOKEN_TTL_MS`). The refresh token is
+  `odr_` + 64 hex, valid 90 days (`OAUTH_REFRESH_WINDOW_MS`,
+  `src/lib/access-token-records.ts`) and single use. Levels map to scopes in
+  `OAUTH_LEVELS`: `read` = `read:state`, `read:conversations`; `message` adds
+  `tell`; `operate` adds `operate`; `approve` adds `approve`.
 - **Record fields.** An OAuth access token is a `kind: 'token'` record that
   also carries `oauthClientId` (`odc_` + 32 hex), `oauthFamilyId` (32 hex, the
   sign-in) and `expiresAt` (ISO 8601). `oauthFieldsValid`
@@ -176,7 +183,7 @@ S256, dynamic client registration, public clients only). User guide:
   authorize, authorize/status, token, revoke) are outside the gate's `/api/`
   and `/events/` prefixes and check their own input
   (`src/dashboard/server/routes/mcp-oauth.ts`). The gate's Funnel rule answers
-  them 404 unless Public MCP is on (see "Public MCP (PAN-4947)"). The authorize page escapes every value and sends a nonce
+  them 404 unless Public MCP is on (see "Public MCP (PAN-4947)"). The rate limits in "Public MCP (PAN-4947)" apply only to Funnel requests; `routes/mcp-oauth.ts` has no limiter of its own. The authorize page escapes every value and sends a nonce
   CSP with `connect-src 'self'`, `frame-ancestors 'none'` and `form-action 'none'`.
 - **Operator routes.** `GET /api/mcp-oauth/approvals`,
   `POST /api/mcp-oauth/approvals/:id`, `GET /api/mcp-oauth/sign-ins`,
@@ -268,7 +275,7 @@ for a token that carries `agentId` (PAN-4927 D-14); a hidden tool answers like
 an unknown one. `pan mcp serve` takes the token from `OVERDECK_MCP_TOKEN` or a
 0600 `OVERDECK_MCP_TOKEN_FILE`. The endpoint is stateless (a fresh MCP
 server per `POST`, no session); `GET /mcp` and `DELETE /mcp` answer 405 with
-`Allow: POST`. See [configuration/mcp.mdx](../configuration/mcp.mdx).
+`Allow: POST`. Over Tailscale Funnel, `/mcp` accepts only OAuth tokens (403 `public MCP accepts only OAuth sign-ins` otherwise) and is rate limited; see "Public MCP (PAN-4947)". See [configuration/mcp.mdx](../configuration/mcp.mdx).
 
 ### `/api/self/*` (PAN-4927)
 
