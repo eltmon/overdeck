@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4941",
   "created": "2026-11-04T02:31:39.368Z",
-  "updated": "2026-11-04T03:01:53.724Z",
+  "updated": "2026-11-04T03:20:16.608Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -62,6 +62,10 @@
       "claimedBy": "agent-pan-4941",
       "claimedAt": "2026-11-04T03:00:55.330Z",
       "doneAt": "2026-11-04T03:01:53.724Z"
+    },
+    "store.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:20:16.607Z"
     }
   }
 }
