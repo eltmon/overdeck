@@ -29,7 +29,7 @@ This skill guides you through sending messages to running autonomous agents via 
 ## Prerequisites
 
 - Agent must be running in a tmux session
-- `<id>` accepts an issue ID (`PAN-1148`), a full agent ID (`agent-pan-1148`, `strike-pan-1723`, `conv-20260928-7563`), a conversation (`conv/2972`, `conv:2972`, or a dashboard URL), or a bare number when it is unambiguous
+- `<id>` accepts an issue ID (`PAN-1148`), a full agent ID (`agent-pan-1148`, `strike-pan-1723`, `conv-20260928-7563`), a conversation (its name `20260928-7563`, `conv/2972`, `conv:2972`, or a dashboard URL), or a bare number when it is unambiguous. A name that matches both a conversation and an agent is refused with both explicit forms listed.
 
 ## Quick Command
 
