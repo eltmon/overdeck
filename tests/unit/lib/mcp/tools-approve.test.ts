@@ -12,12 +12,16 @@ import { callTool, connectClient, fakeApi, resultJson, resultText } from './harn
 const APPROVER = ['approve', 'tell', 'read:conversations'];
 
 describe('MCP approval tools (PAN-4649 W-7)', () => {
-  it('the approval tools close the list, making ten tools in all', () => {
-    expect(APPROVE_TOOLS.map((tool) => tool.name)).toEqual(['list_pending_input', 'answer_question', 'answer_permission']);
+  it('the approval tools close the list, making fourteen tools in all', () => {
+    expect(APPROVE_TOOLS.map((tool) => tool.name)).toEqual([
+      'list_pending_input', 'answer_question', 'answer_permission',
+      'answer_pane_choice', 'answer_codex_approval', 'answer_pi_ask', 'answer_plan',
+    ]);
     expect(ALL_TOOLS.map((tool) => tool.name)).toEqual([
       'list_machines', 'list_conversations', 'search_conversations', 'read_conversation',
       'send_message', 'start_conversation', 'start_worker',
       'list_pending_input', 'answer_question', 'answer_permission',
+      'answer_pane_choice', 'answer_codex_approval', 'answer_pi_ask', 'answer_plan',
     ]);
   });
 
@@ -96,5 +100,79 @@ describe('MCP approval tools (PAN-4649 W-7)', () => {
     const result = await callTool(client, 'answer_permission', { conversation: 'conv-a', signature: 'sig-1', choice: 'allow-once' });
     expect(result.isError).toBeFalsy();
     expect(api.calls).toEqual([{ method: 'POST', path: '/api/conversations/conv-a/permission', body: { signature: 'sig-1', choice: 'allow-once' } }]);
+  });
+
+  it('answer_pane_choice posts { selectedIndex, signature } to the pane-choice route', async () => {
+    const api = fakeApi({ 'POST /api/conversations/conv-a/pane-choice': { status: 200, json: { ok: true } } });
+    const client = await connectClient(api, APPROVER);
+    const result = await callTool(client, 'answer_pane_choice', { conversation: 'conv-a', selectedIndex: 1, signature: 'sig' });
+    expect(result.isError).toBeFalsy();
+    expect(api.calls).toEqual([{ method: 'POST', path: '/api/conversations/conv-a/pane-choice', body: { selectedIndex: 1, signature: 'sig' } }]);
+  });
+
+  it('answer_pane_choice encodes a linked conversation name as one path segment', async () => {
+    const api = fakeApi({ 'POST /api/conversations/%40desk%2Fconv-a/pane-choice': { status: 200, json: { ok: true } } });
+    const client = await connectClient(api, APPROVER);
+    const result = await callTool(client, 'answer_pane_choice', { conversation: '@desk/conv-a', selectedIndex: 0, signature: 'sig' });
+    expect(result.isError).toBeFalsy();
+    expect(api.calls[0]?.path).toBe('/api/conversations/%40desk%2Fconv-a/pane-choice');
+  });
+
+  it('answer_pane_choice makes zero requests for an out-of-range index or a missing signature', async () => {
+    const api = fakeApi({});
+    const client = await connectClient(api, APPROVER);
+    expect((await callTool(client, 'answer_pane_choice', { conversation: 'conv-a', selectedIndex: 9, signature: 'sig' })).isError).toBe(true);
+    expect((await callTool(client, 'answer_pane_choice', { conversation: 'conv-a', selectedIndex: 1 })).isError).toBe(true);
+    expect(api.calls).toEqual([]);
+  });
+
+  it('answer_codex_approval posts { optionNumber } with toolUseId when given, else without it', async () => {
+    const api = fakeApi({ 'POST /api/conversations/conv-a/codex-approval': { status: 200, json: { ok: true } } });
+    const client = await connectClient(api, APPROVER);
+    expect((await callTool(client, 'answer_codex_approval', { conversation: 'conv-a', optionNumber: 2, toolUseId: 't1' })).isError).toBeFalsy();
+    expect((await callTool(client, 'answer_codex_approval', { conversation: 'conv-a', optionNumber: 3 })).isError).toBeFalsy();
+    expect(api.calls).toEqual([
+      { method: 'POST', path: '/api/conversations/conv-a/codex-approval', body: { optionNumber: 2, toolUseId: 't1' } },
+      { method: 'POST', path: '/api/conversations/conv-a/codex-approval', body: { optionNumber: 3 } },
+    ]);
+  });
+
+  it('answer_codex_approval makes zero requests for an out-of-range optionNumber', async () => {
+    const api = fakeApi({});
+    const client = await connectClient(api, APPROVER);
+    expect((await callTool(client, 'answer_codex_approval', { conversation: 'conv-a', optionNumber: 0 })).isError).toBe(true);
+    expect(api.calls).toEqual([]);
+  });
+
+  it('answer_pi_ask posts { toolUseId, answers } to the pi-ask-answer route', async () => {
+    const api = fakeApi({ 'POST /api/conversations/conv-a/pi-ask-answer': { status: 200, json: { ok: true } } });
+    const client = await connectClient(api, APPROVER);
+    const result = await callTool(client, 'answer_pi_ask', { conversation: 'conv-a', toolUseId: 't1', answers: ['Yes'] });
+    expect(result.isError).toBeFalsy();
+    expect(api.calls).toEqual([{ method: 'POST', path: '/api/conversations/conv-a/pi-ask-answer', body: { toolUseId: 't1', answers: ['Yes'] } }]);
+  });
+
+  it('answer_pi_ask makes zero requests for two answers or a blank answer', async () => {
+    const api = fakeApi({});
+    const client = await connectClient(api, APPROVER);
+    expect((await callTool(client, 'answer_pi_ask', { conversation: 'conv-a', toolUseId: 't1', answers: ['Yes', 'No'] })).isError).toBe(true);
+    expect((await callTool(client, 'answer_pi_ask', { conversation: 'conv-a', toolUseId: 't1', answers: ['  '] })).isError).toBe(true);
+    expect(api.calls).toEqual([]);
+  });
+
+  it('answer_plan posts { action, feedback } for reject-feedback with feedback', async () => {
+    const api = fakeApi({ 'POST /api/conversations/conv-a/plan-action': { status: 200, json: { ok: true } } });
+    const client = await connectClient(api, APPROVER);
+    const result = await callTool(client, 'answer_plan', { conversation: 'conv-a', action: 'reject-feedback', feedback: 'try again' });
+    expect(result.isError).toBeFalsy();
+    expect(api.calls).toEqual([{ method: 'POST', path: '/api/conversations/conv-a/plan-action', body: { action: 'reject-feedback', feedback: 'try again' } }]);
+  });
+
+  it('answer_plan makes zero requests for an invalid action', async () => {
+    const api = fakeApi({});
+    const client = await connectClient(api, APPROVER);
+    const result = await callTool(client, 'answer_plan', { conversation: 'conv-a', action: 'approve' });
+    expect(result.isError).toBe(true);
+    expect(api.calls).toEqual([]);
   });
 });

@@ -17,6 +17,10 @@ const SINGLE_ROUTE_PATHS: Record<string, { method: string; path: string }> = {
   start_worker: { method: 'POST', path: '/api/fleet/workers' },
   list_pending_input: { method: 'GET', path: '/api/conversations/pending-input' },
   answer_permission: { method: 'POST', path: '/api/conversations/conv-a/permission' },
+  answer_pane_choice: { method: 'POST', path: '/api/conversations/conv-a/pane-choice' },
+  answer_codex_approval: { method: 'POST', path: '/api/conversations/conv-a/codex-approval' },
+  answer_pi_ask: { method: 'POST', path: '/api/conversations/conv-a/pi-ask-answer' },
+  answer_plan: { method: 'POST', path: '/api/conversations/conv-a/plan-action' },
 };
 
 describe('MCP tool annotations (PAN-4927 W-MCP1)', () => {
