@@ -97,6 +97,12 @@ file. The key is never shown in the Settings UI.
   `instance_heartbeat` with bucketed project and agent counts
 - With operator grouping on, the pseudonymous `operatorHash`
 - Sanitized categorical browser and server exceptions for error grouping
+- Overdeck Anywhere: how machine links start and end (method and failure
+  category), phone pair and remove events, which route kind a link's channel
+  uses and why it failed (at most one event per change), and an hourly bucket
+  of relayed bytes
+
+The overdeck.ai hosted services (account, directory and share) send no telemetry.
 
 Raw counts and durations are replaced by coarse buckets. The complete,
 mechanically checked event and property list is in

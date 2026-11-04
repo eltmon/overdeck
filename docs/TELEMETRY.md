@@ -147,6 +147,49 @@ after the canonical pipeline-membership resolver confirms that the issue is in
 the pipeline, so a stale or orphaned agent's on-disk state cannot supply
 harness or model metadata for an issue that already left the pipeline.
 
+## Overdeck Anywhere events
+
+The dashboard server on each machine sends the Anywhere events, and only about
+its own side of a link, pairing or channel. In a machine link, the requester is
+the machine that starts the link: it pastes a pairing link, runs `pan machines
+add-ssh`, provisions a Fly machine, or asks for two-screen approval. The
+approver is the machine that accepts it. Each machine reports `side` as the
+role it played.
+
+- The approver of a pairing-code exchange cannot tell whether the requester
+  used a pasted pairing link, SSH or Fly, because all three present an `odp_`
+  code. So the approver always reports `method=pairing_code`.
+- `anywhere_channel_opened` is sent at most once per change in route, result
+  and error class per link. A linked machine that stays offline retries
+  indefinitely, but ten failed probes with the same class produce one event.
+  A failed probe reports the last probe phase it tried (`stored`, `direct` or
+  `relay`); a failure while adopting a channel reports that route's kind.
+- `relay_usage_sampled` is sent at most hourly. It carries the bytes this
+  machine relayed since the previous sample as a bucket in decimal megabytes.
+  Bytes in a window that never sees another relayed byte are not sent.
+- A relay refusal because the plan has no relay, or because the monthly
+  allowance is used, reports as `unreachable`. The one exception is a direct
+  path that failed when the plan has no relay to fall back on: that reports as
+  `no_relay_plan`.
+
+No Anywhere event carries a machine label, environment id, token id, URL, key,
+client id or raw byte count. Every value comes from a closed domain above, and
+the same opt-out covers these events as every other event.
+
+## Hosted services
+
+The overdeck.ai account, directory and share Workers (`services/account`,
+`services/connect` and `services/share`) send no telemetry to PostHog. They keep
+only Cloudflare's own request metrics. The events above already measure the
+link, pairing and relay funnel from the machines. Both the account and
+directory Workers hold GitHub account ids and device ids by design, so any
+event they sent would sit next to an identity. The user docs
+(`configuration/telemetry.mdx`) also promise that account ids and GitHub logins
+are never sent.
+
+The phone app sends no telemetry yet. [PAN-5021](https://github.com/eltmon/overdeck/issues/5021)
+tracks adding it, with its own switch and store privacy declarations.
+
 ## Local DB job diagnostics
 
 The dashboard logs slow worker jobs locally as
@@ -195,5 +238,6 @@ No production feature is controlled by a PostHog flag yet.
   `pan doctor github-quota` remote view); it sends the `operatorHash` as a
   HogQL placeholder value, never inside the SQL.
 - Event names and property types come from `@overdeck/contracts`.
+- The `services/` Workers do not import a PostHog SDK.
 - The release workflow is the source-map upload owner because it rebuilds the
   dashboard bundle that is actually published.
