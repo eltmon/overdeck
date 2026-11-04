@@ -41,6 +41,15 @@ touches the session vault.
 see answers `Unknown tool <name>`. Tools for managed agents are listed only to
 agent tokens.
 
+### Agent-only tools
+
+| Tool | What it does | Scope the token needs |
+| --- | --- | --- |
+| `wait_job` | Waits up to 50 s for a job another tool started. Answers `done` with the exit code and output, or `running` with `next`, the call to make again. Never poll or sleep; jobs are forgotten when the dashboard restarts. | `read:state` (agent tokens only) |
+
+Agent-only tools call routes under `/api/self/`, which refuse any token that
+is not an agent token.
+
 A tool the token's scopes hide answers `Unknown tool <name>`. A route can
 still refuse a listed tool, for example a linked machine's ceiling, with
 `HTTP 403: insufficient_scope (missingScope: approve)`.
