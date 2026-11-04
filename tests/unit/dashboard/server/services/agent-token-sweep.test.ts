@@ -96,10 +96,17 @@ describe('sweepAgentTokensOnce (PAN-4930 D-9)', () => {
     expect(await sweepAgentTokensOnce(deps)).toEqual({ revoked: 0, pruned: 0 });
   });
 
-  it('revokes an agent token whose state is missing, without probing liveness', async () => {
-    const deps = makeDeps([token('agent-gone', 'agent', 1)]);
+  it('revokes an agent token whose state is missing past the grace, without probing liveness', async () => {
+    const deps = makeDeps([token('agent-gone', 'agent', 11)]);
     expect((await sweepAgentTokensOnce(deps)).revoked).toBe(1);
     expect(deps.revokeAgentMcpTokens).toHaveBeenCalledWith('agent-gone');
+    expect(deps.isAlive).not.toHaveBeenCalled();
+  });
+
+  it('keeps a fresh agent token whose state is not saved yet (PAN-4932 D-9)', async () => {
+    const deps = makeDeps([token('agent-planning', 'agent', 1)]);
+    expect((await sweepAgentTokensOnce(deps)).revoked).toBe(0);
+    expect(deps.revokeAgentMcpTokens).not.toHaveBeenCalled();
     expect(deps.isAlive).not.toHaveBeenCalled();
   });
 
