@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4947",
+  "created": "2026-11-04T05:30:29.044Z",
+  "updated": "2026-11-04T05:30:29.044Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "public-mcp-flag": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4947",
+      "claimedAt": "2026-11-04T05:30:29.043Z"
+    }
+  }
+}
