@@ -16,7 +16,7 @@ export const ACCESS_TOKEN_SCOPES = [
   'admin',
 ] as const;
 export type AccessTokenScope = (typeof ACCESS_TOKEN_SCOPES)[number];
-export type AccessTokenKind = 'device' | 'token' | 'machine' | 'phone';
+export type AccessTokenKind = 'device' | 'token' | 'machine' | 'phone' | 'connector';
 /** Access level of a machine link (PAN-4645 FR-4). */
 export type MachineAccess = 'operator' | 'agent-fenced';
 export const MACHINE_ACCESS_LEVELS: readonly MachineAccess[] = ['operator', 'agent-fenced'];
@@ -52,10 +52,12 @@ export interface AccessTokenRecord {
   access?: MachineAccess;
   /** `phone` only: the phone's link public key, 64 lowercase hex (PAN-4835). */
   phoneKey?: string;
-  /** `phone` only: the phone app's directory client id, a UUID v4. */
+  /** `phone` and `connector` only: the directory client id, a UUID v4. */
   clientId?: string;
   /** `phone` only: the phone's push public key, 64 lowercase hex; absent until the app sends one. */
   pushKey?: string;
+  /** `connector` only (PAN-4927 D-17): the connector's link public key, 64 lowercase hex. */
+  connectorKey?: string;
   /** `token` only (PAN-4927 D-6): the managed agent this token belongs to — an agent id or a conversation name. */
   agentId?: string;
   /** `token` only: what `agentId` names. */
@@ -110,7 +112,7 @@ export function isRecord(value: unknown): value is AccessTokenRecord {
     typeof r.createdAt === 'string' &&
     (r.lastUsedAt === null || typeof r.lastUsedAt === 'string') &&
     (r.revokedAt === undefined || typeof r.revokedAt === 'string') &&
-    (r.kind === undefined || r.kind === 'device' || r.kind === 'token' || r.kind === 'machine' || r.kind === 'phone');
+    (r.kind === undefined || r.kind === 'device' || r.kind === 'token' || r.kind === 'machine' || r.kind === 'phone' || r.kind === 'connector');
   if (!base) return false;
   const machineKeyOk = typeof r.machineKey === 'string' && MACHINE_KEY_HEX.test(r.machineKey);
   const environmentOk = typeof r.environmentId === 'string' && r.environmentId !== '';
@@ -118,15 +120,18 @@ export function isRecord(value: unknown): value is AccessTokenRecord {
   const phoneKeyOk = typeof r.phoneKey === 'string' && MACHINE_KEY_HEX.test(r.phoneKey);
   const clientIdOk = typeof r.clientId === 'string' && UUID_V4.test(r.clientId);
   const pushKeyOk = r.pushKey === undefined || (typeof r.pushKey === 'string' && MACHINE_KEY_HEX.test(r.pushKey));
+  const connectorKeyOk = typeof r.connectorKey === 'string' && MACHINE_KEY_HEX.test(r.connectorKey);
   const agentFieldsAbsent = r.agentId === undefined && r.agentKind === undefined && r.role === undefined;
   const oauthFieldsAbsent = r.oauthClientId === undefined && r.oauthFamilyId === undefined && r.expiresAt === undefined;
   // A machine record needs all three binding fields; a phone record needs its
-  // own two plus an optional push key; other kinds may carry none of either
-  // set, and any field present must still be well-formed. Only a `token`
-  // record may carry the agent fields, and then all three (PAN-4927); the same
-  // holds for the OAuth fields, never together with the agent fields (PAN-4945).
-  if (r.kind === 'machine') return machineKeyOk && environmentOk && accessOk && r.phoneKey === undefined && r.clientId === undefined && r.pushKey === undefined && agentFieldsAbsent && oauthFieldsAbsent;
-  if (r.kind === 'phone') return phoneKeyOk && clientIdOk && pushKeyOk && r.machineKey === undefined && r.environmentId === undefined && r.access === undefined && agentFieldsAbsent && oauthFieldsAbsent;
+  // own two plus an optional push key; a connector record needs its link key
+  // and client id (PAN-4927 D-17); other kinds may carry none of those sets,
+  // and any field present must still be well-formed. Only a `token` record
+  // may carry the agent fields, and then all three (PAN-4927); the same holds
+  // for the OAuth fields, never together with the agent fields (PAN-4945).
+  if (r.kind === 'machine') return machineKeyOk && environmentOk && accessOk && r.phoneKey === undefined && r.clientId === undefined && r.pushKey === undefined && r.connectorKey === undefined && agentFieldsAbsent && oauthFieldsAbsent;
+  if (r.kind === 'phone') return phoneKeyOk && clientIdOk && pushKeyOk && r.machineKey === undefined && r.environmentId === undefined && r.access === undefined && r.connectorKey === undefined && agentFieldsAbsent && oauthFieldsAbsent;
+  if (r.kind === 'connector') return connectorKeyOk && clientIdOk && r.machineKey === undefined && r.environmentId === undefined && r.access === undefined && r.phoneKey === undefined && r.pushKey === undefined && agentFieldsAbsent && oauthFieldsAbsent;
   return (
     (r.machineKey === undefined || machineKeyOk) &&
     (r.environmentId === undefined || environmentOk) &&
@@ -134,6 +139,7 @@ export function isRecord(value: unknown): value is AccessTokenRecord {
     r.phoneKey === undefined &&
     r.clientId === undefined &&
     r.pushKey === undefined &&
+    r.connectorKey === undefined &&
     (agentFieldsAbsent || (r.kind === 'token' && agentFieldsValid(r))) &&
     (oauthFieldsAbsent || (r.kind === 'token' && agentFieldsAbsent && oauthFieldsValid(r)))
   );

@@ -110,13 +110,19 @@ export type RemoteGateRejection =
   | { status: 403; code: 'agent-fenced' }
   | { status: 404 };
 
-/** `METHOD path` pairs a pairing-mode channel may reach without a credential (PAN-4645, PAN-4835). */
-export const PAIRING_CHANNEL_ALLOWLIST: ReadonlySet<string> = new Set(['GET /api/environment', 'POST /api/machines/exchange', 'POST /api/phones/exchange']);
+/** `METHOD path` pairs a pairing-mode channel may reach without a credential (PAN-4645, PAN-4835, PAN-4927). */
+export const PAIRING_CHANNEL_ALLOWLIST: ReadonlySet<string> = new Set([
+  'GET /api/environment',
+  'POST /api/machines/exchange',
+  'POST /api/phones/exchange',
+  'POST /api/connectors/exchange',
+]);
 /** `METHOD path` pairs an approval-mode channel may reach without a credential (PAN-2356 D-2356-9). */
 export const APPROVAL_CHANNEL_ALLOWLIST: ReadonlySet<string> = new Set(['GET /api/environment', 'POST /api/machines/approval-exchange']);
 const MACHINES_EXCHANGE = 'POST /api/machines/exchange';
 const APPROVAL_EXCHANGE = 'POST /api/machines/approval-exchange';
 const PHONES_EXCHANGE = 'POST /api/phones/exchange';
+const CONNECTORS_EXCHANGE = 'POST /api/connectors/exchange';
 
 /** The gate decision for one request: `null` lets it through. */
 export function remoteGateRejection(
@@ -136,7 +142,7 @@ export function remoteGateRejection(
   const surface = `${request.method} ${pathname}`;
   if (channel?.mode === 'pairing') return PAIRING_CHANNEL_ALLOWLIST.has(surface) ? null : { status: 401 };
   if (channel?.mode === 'approval') return APPROVAL_CHANNEL_ALLOWLIST.has(surface) ? null : { status: 401 };
-  if (surface === MACHINES_EXCHANGE || surface === APPROVAL_EXCHANGE || surface === PHONES_EXCHANGE) return { status: 401 };
+  if (surface === MACHINES_EXCHANGE || surface === APPROVAL_EXCHANGE || surface === PHONES_EXCHANGE || surface === CONNECTORS_EXCHANGE) return { status: 401 };
   if (REMOTE_GATE_ALLOWLIST.has(surface)) return null;
   const headers = request.headers as HeaderMap;
   const credential = resolveDashboardCredential(headers, channel);
