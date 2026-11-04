@@ -10,7 +10,7 @@ import type { SelfJobRunInput, SelfJobRunResult } from '../services/self-jobs.js
 import type { DashboardCredential } from '../routes/dashboard-auth.js';
 import { createSelfJobs } from '../services/self-jobs.js';
 import { requiredScopeFor } from '../route-scopes.js';
-import { handleSelfMemoryAdd, memoryAddJobArgs } from '../routes/self-memory.js';
+import { handleSelfMemoryAdd, handleSelfMemorySearch, memoryAddJobArgs, memorySearchJobArgs } from '../routes/self-memory.js';
 
 const callerDeps: SelfCallerDeps = {
   getAgentState: (agentId) => (agentId === 'agent-pan-1' ? { workspace: '/w/agent-pan-1', issueId: 'PAN-1' } : null),
@@ -161,8 +161,75 @@ describe('handleSelfMemoryAdd', () => {
   });
 });
 
+describe('memory_search job args', () => {
+  it('builds the search argv: limit, --facts, --json, then the query after --', () => {
+    const result = memorySearchJobArgs({ query: 'decide' });
+    expect(result).toEqual({
+      ok: true,
+      args: [{ flag: 'limit', value: '10' }, { switch: 'facts' }, { switch: 'json' }, { rest: ['decide'] }],
+    });
+
+    const withLimit = memorySearchJobArgs({ query: 'decide', limit: 5 });
+    expect(withLimit).toEqual({
+      ok: true,
+      args: [{ flag: 'limit', value: '5' }, { switch: 'facts' }, { switch: 'json' }, { rest: ['decide'] }],
+    });
+  });
+
+  it.each([
+    [{ limit: 10 }],
+    [{ query: '' }],
+    [{ query: 'a'.repeat(501) }],
+    [{ query: 'decide', limit: 0 }],
+    [{ query: 'decide', limit: 21 }],
+    [{ query: 'decide', limit: 1.5 }],
+  ])('refuses a bad field: %j', (body) => {
+    expect(memorySearchJobArgs(body as Record<string, unknown>).ok).toBe(false);
+  });
+});
+
+describe('handleSelfMemorySearch', () => {
+  it('starts the search job in the caller cwd, and answers done', async () => {
+    const { jobs, finish, getInput } = controlledJobs();
+    const promise = handleSelfMemorySearch(
+      agentCredential('agent-pan-1'),
+      JSON.stringify({ query: 'decide' }),
+      undefined,
+      { jobs, caller: callerDeps },
+    );
+    finish(0, { stdout: '{"facts":[],"observations":[]}' });
+    const result = await promise;
+    expect(result.status).toBe(200);
+    expect((result.body as { status: string }).status).toBe('done');
+    const input = getInput();
+    expect(input?.cwd).toBe('/w/agent-pan-1');
+    expect(input?.args.slice(1)).toEqual(['memory', 'search', '--limit=10', '--facts', '--json', '--', 'decide']);
+  });
+
+  it('refuses a non-agent caller and a bad body before any job', async () => {
+    const { jobs } = controlledJobs();
+    const notAgent = await handleSelfMemorySearch(tokenCredentialNoAgent, '{"query":"decide"}', undefined, { jobs, caller: callerDeps });
+    expect(notAgent).toEqual({ status: 403, body: { error: 'self routes need an agent token', code: 'not-an-agent-token' } });
+
+    const badBody = await handleSelfMemorySearch(agentCredential('agent-pan-1'), 'not json', undefined, { jobs, caller: callerDeps });
+    expect(badBody).toEqual({ status: 400, body: { error: 'body must be a JSON object', code: 'bad-body' } });
+  });
+
+  it('refuses a bad query with 400 bad-request before any job', async () => {
+    const { jobs, getInput } = controlledJobs();
+    const result = await handleSelfMemorySearch(agentCredential('agent-pan-1'), JSON.stringify({ query: '' }), undefined, { jobs, caller: callerDeps });
+    expect(result.status).toBe(400);
+    expect((result.body as { code: string }).code).toBe('bad-request');
+    expect(getInput()).toBeUndefined();
+  });
+});
+
 describe('the gate', () => {
   it('needs tell for POST /api/self/memory/facts', () => {
     expect(requiredScopeFor('POST', '/api/self/memory/facts')).toBe('tell');
+  });
+
+  it('needs read:state for POST /api/self/memory/search', () => {
+    expect(requiredScopeFor('POST', '/api/self/memory/search')).toBe('read:state');
   });
 });

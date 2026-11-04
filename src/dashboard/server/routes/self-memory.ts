@@ -1,12 +1,12 @@
 /**
- * `POST /api/self/memory/facts` (PAN-4927 W-MEM1, PAN-4940; epic D-10, D-11,
- * D-12): an agent adds a curated memory fact. `POST /api/self/memory/search`
- * (WI-3, mem-search-route) shares this file. Each route needs an agent token
- * and takes the agent and its cwd from the token, never the body; builds argv
- * only from `SelfJobArg` pieces; starts a `pan memory` self job in the
- * caller's cwd, waits up to 50 s and answers 200 with the job answer. No CSRF
- * check: only a header-borne agent token is accepted. Bad bodies are 400
- * `bad-body` / `bad-request`.
+ * `POST /api/self/memory/facts` and `POST /api/self/memory/search` (PAN-4927
+ * W-MEM1, PAN-4940; epic D-10, D-11, D-12): an agent adds a curated memory
+ * fact or searches memory. Each route needs an agent token and takes the
+ * agent and its cwd from the token, never the body; builds argv only from
+ * `SelfJobArg` pieces; starts a `pan memory` self job in the caller's cwd,
+ * waits up to 50 s and answers 200 with the job answer. No CSRF check: only
+ * a header-borne agent token is accepted. Bad bodies are 400 `bad-body` /
+ * `bad-request`.
  */
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
@@ -30,6 +30,9 @@ const MEMORY_FACT_BODY_MAX = 16_384;
 const MEMORY_FACT_TITLE_MAX = 200;
 const MEMORY_FACT_TAGS_MAX = 20;
 const MEMORY_FACT_TAG_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$/;
+const MEMORY_SEARCH_QUERY_MAX = 500;
+const MEMORY_SEARCH_LIMIT_MAX = 20;
+const MEMORY_SEARCH_LIMIT_DEFAULT = 10;
 
 const BAD_BODY = { error: 'body must be a JSON object', code: 'bad-body' } as const;
 const UNKNOWN_JOB = { error: 'no such job', code: 'unknown-job' } as const;
@@ -155,6 +158,44 @@ export async function handleSelfMemoryAdd(
   return startMemoryJob(deps.jobs ?? selfJobs, resolved.caller, 'memory-add', parsed.args, signal);
 }
 
+/** D-8: `memory_search`'s body into `pan memory search --facts`'s SelfJobArg argv, or the first validation failure. */
+export function memorySearchJobArgs(body: Record<string, unknown>): { ok: true; args: SelfJobArg[] } | { ok: false; error: string } {
+  const { query: rawQuery, limit: rawLimit } = body;
+
+  if (typeof rawQuery !== 'string') return { ok: false, error: 'query must be 1 to 500 characters' };
+  const query = rawQuery.trim();
+  if (query.length < 1 || query.length > MEMORY_SEARCH_QUERY_MAX) return { ok: false, error: 'query must be 1 to 500 characters' };
+
+  let limit = MEMORY_SEARCH_LIMIT_DEFAULT;
+  if (rawLimit !== undefined) {
+    if (typeof rawLimit !== 'number' || !Number.isInteger(rawLimit) || rawLimit < 1 || rawLimit > MEMORY_SEARCH_LIMIT_MAX) {
+      return { ok: false, error: `limit must be an integer from 1 to ${MEMORY_SEARCH_LIMIT_MAX}` };
+    }
+    limit = rawLimit;
+  }
+
+  return { ok: true, args: [{ flag: 'limit', value: String(limit) }, { switch: 'facts' }, { switch: 'json' }, { rest: [query] }] };
+}
+
+/** `POST /api/self/memory/search`. */
+export async function handleSelfMemorySearch(
+  credential: DashboardCredential | null,
+  bodyText: string,
+  signal?: AbortSignal,
+  deps: SelfMemoryRouteDeps = {},
+): Promise<SelfRouteResult> {
+  const resolved = selfCallerFromCredential(credential, deps.caller);
+  if (!resolved.ok) return { status: resolved.status, body: resolved.body };
+
+  const body = parseJsonObject(bodyText);
+  if (body === null) return { status: 400, body: BAD_BODY };
+
+  const parsed = memorySearchJobArgs(body);
+  if (!parsed.ok) return badRequest(parsed.error);
+
+  return startMemoryJob(deps.jobs ?? selfJobs, resolved.caller, 'memory-search', parsed.args, signal);
+}
+
 export function makeSelfMemoryRouteLayer(deps: SelfMemoryRouteDeps = {}) {
   const addRoute = HttpRouter.add(
     'POST',
@@ -168,7 +209,19 @@ export function makeSelfMemoryRouteLayer(deps: SelfMemoryRouteDeps = {}) {
     })),
   );
 
-  return Layer.mergeAll(addRoute);
+  const searchRoute = HttpRouter.add(
+    'POST',
+    '/api/self/memory/search',
+    httpHandler(Effect.gen(function* () {
+      const request = yield* HttpServerRequest.HttpServerRequest;
+      const bodyText = yield* request.text;
+      const credential = resolveRequestCredential(request);
+      const result = yield* Effect.promise((signal) => handleSelfMemorySearch(credential, bodyText, signal, deps));
+      return jsonResponse(result.body, { status: result.status });
+    })),
+  );
+
+  return Layer.mergeAll(addRoute, searchRoute);
 }
 
 export const selfMemoryRouteLayer = makeSelfMemoryRouteLayer();

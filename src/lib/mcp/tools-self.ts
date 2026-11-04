@@ -125,4 +125,30 @@ const memoryAdd: OverdeckTool = {
   },
 };
 
-export const SELF_TOOLS: readonly OverdeckTool[] = [waitJob, requestSecret, secretWait, memoryAdd];
+const memorySearch: OverdeckTool = {
+  name: 'memory_search',
+  description:
+    'Search Overdeck memory (runs pan memory search --facts in your checkout). Returns facts: up to 5 matching curated facts from this checkout\'s store (the one memory_add writes), the operator store and the machine store, each { scope, type, id, title, description, tags, file } with no body; and observations: matching automatically extracted session records from your project, each a short summary without the full narrative. query is the search text, at most 500 characters; limit (default 10, max 20) bounds the observations. Answers status "done" with exitCode and stdout (the { facts, observations } JSON), or status "running" with next: call next.',
+  scope: 'read:state',
+  audience: 'agent',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      query: { type: 'string', maxLength: 500, description: 'Search text, at most 500 characters.' },
+      limit: { type: 'integer', minimum: 1, maximum: 20, description: 'Maximum observations to return; default 10.' },
+    },
+    required: ['query'],
+  },
+  async run(args, ctx) {
+    const query = requiredString(args, 'query');
+    if (!query.ok) return query.error;
+    const limit = optionalInteger(args, 'limit', 1, 20, undefined);
+    if (!limit.ok) return limit.error;
+    return routeResult(await ctx.api.request('POST', '/api/self/memory/search', {
+      query: query.value,
+      ...(limit.value !== undefined ? { limit: limit.value } : {}),
+    }));
+  },
+};
+
+export const SELF_TOOLS: readonly OverdeckTool[] = [waitJob, requestSecret, secretWait, memoryAdd, memorySearch];
