@@ -1,0 +1,223 @@
+/**
+ * PAN-4945: the public OAuth routes for `/mcp` — discovery metadata, client
+ * registration, the authorize page and its status, and the token and
+ * revocation endpoints — behind the unchanged remote request gate, with a
+ * `GET *` stub standing in for the SPA so a missing route would answer HTML.
+ * Real access-token registry and store under a temporary OVERDECK_HOME.
+ */
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+import { Effect, Layer, Option } from 'effect';
+import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
+import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
+
+const LOOPBACK = '127.0.0.1';
+const REDIRECT = 'http://127.0.0.1:8123/callback';
+const CHALLENGE = 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM';
+const VERIFIER = 'dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk';
+const FORM = { 'content-type': 'application/x-www-form-urlencoded' };
+const originalHome = process.env.OVERDECK_HOME;
+const originalPort = { API_PORT: process.env.API_PORT, PORT: process.env.PORT, DASHBOARD_URL: process.env.DASHBOARD_URL };
+const home = mkdtempSync(join(tmpdir(), 'pan-4945-oauth-routes-'));
+process.env.OVERDECK_HOME = home;
+process.env.API_PORT = '3011';
+delete process.env.PORT;
+delete process.env.DASHBOARD_URL;
+
+const { _resetAccessTokensForTests, _settleAccessTokenWritesForTests } = await import('../../../lib/access-tokens.js');
+const { _resetMcpOAuthStoreForTests } = await import('../../../lib/mcp/oauth-store.js');
+const { createMcpOAuthService } = await import('../../../lib/mcp/oauth-service.js');
+const { _resetTrustedOriginsForTests } = await import('../routes/origin-validation.js');
+const { remoteRequestGateLayer } = await import('../remote-request-gate.js');
+const { issuerFor, makeMcpOAuthRouteLayer } = await import('../routes/mcp-oauth.js');
+
+let service = createMcpOAuthService();
+let app = buildApp();
+
+function buildApp() {
+  return Layer.mergeAll(
+    remoteRequestGateLayer,
+    makeMcpOAuthRouteLayer({ service, issuerFor }),
+    HttpRouter.add('GET', '*', Effect.succeed(HttpServerResponse.text('<html>SPA</html>', { contentType: 'text/html' }))),
+  );
+}
+
+interface SentResponse {
+  status: number;
+  headers: Record<string, string>;
+  text: string;
+  json: unknown;
+}
+
+async function send(method: string, path: string, headers: Record<string, string> = {}, body?: string): Promise<SentResponse> {
+  const request = HttpServerRequest.fromWeb(new Request(`http://localhost:3011${path}`, { method, headers: { host: 'localhost:3011', ...headers }, body }))
+    .modify({ remoteAddress: Option.some(LOOPBACK) });
+  const response = await Effect.runPromise(Effect.scoped(Effect.flatMap(
+    HttpRouter.toHttpEffect(app),
+    (handler) => Effect.provideService(handler, HttpServerRequest.HttpServerRequest, request),
+  )));
+  const raw = response as unknown as { status: number; headers: Record<string, string>; body: { body?: Uint8Array } };
+  const text = raw.body.body ? new TextDecoder().decode(raw.body.body) : '';
+  let json: unknown = null;
+  try {
+    json = text ? JSON.parse(text) : null;
+  } catch {
+    json = null;
+  }
+  return { status: raw.status, headers: raw.headers, text, json };
+}
+
+async function registerClient(clientName = 'Claude'): Promise<string> {
+  const response = await send('POST', '/oauth/mcp/register', { 'content-type': 'application/json' }, JSON.stringify({ client_name: clientName, redirect_uris: [REDIRECT] }));
+  expect(response.status).toBe(201);
+  return (response.json as { client_id: string }).client_id;
+}
+
+afterAll(() => {
+  if (originalHome === undefined) delete process.env.OVERDECK_HOME;
+  else process.env.OVERDECK_HOME = originalHome;
+  for (const [name, value] of Object.entries(originalPort)) {
+    if (value === undefined) delete process.env[name];
+    else process.env[name] = value;
+  }
+  _resetTrustedOriginsForTests();
+  rmSync(home, { recursive: true, force: true });
+});
+
+beforeEach(() => {
+  _resetTrustedOriginsForTests();
+  _resetAccessTokensForTests();
+  service = createMcpOAuthService();
+  app = buildApp();
+});
+
+afterEach(async () => {
+  await _settleAccessTokenWritesForTests();
+  _resetAccessTokensForTests();
+  _resetMcpOAuthStoreForTests();
+  rmSync(join(home, 'access-tokens.json'), { force: true });
+  rmSync(join(home, 'mcp-oauth.json'), { force: true });
+});
+
+describe('discovery and registration (PAN-4945)', () => {
+  it('answers authorization-server metadata built from the request host, never the SPA', async () => {
+    const response = await send('GET', '/.well-known/oauth-authorization-server');
+    expect(response.status).toBe(200);
+    expect(response.headers['content-type']).toContain('application/json');
+    expect(response.headers['cache-control']).toBe('no-store');
+    expect(response.text).not.toContain('SPA');
+    expect(response.json).toMatchObject({ issuer: 'http://localhost:3011', token_endpoint: 'http://localhost:3011/oauth/mcp/token', code_challenge_methods_supported: ['S256'] });
+  });
+
+  it('answers protected-resource metadata for /mcp and refuses an unknown host', async () => {
+    const response = await send('GET', '/.well-known/oauth-protected-resource/mcp');
+    expect(response.json).toMatchObject({ resource: 'http://localhost:3011/mcp', authorization_servers: ['http://localhost:3011'] });
+    await expect(send('GET', '/.well-known/oauth-protected-resource')).resolves.toMatchObject({ status: 200, json: { resource: 'http://localhost:3011/mcp' } });
+    await expect(send('GET', '/.well-known/oauth-protected-resource/mcp', { host: 'evil.example' })).resolves.toMatchObject({ status: 400, json: { error: 'unknown host' } });
+  });
+
+  it('registers a loopback client and refuses a text/plain or oversized body', async () => {
+    expect(await registerClient()).toMatch(/^odc_[0-9a-f]{32}$/);
+    const plain = await send('POST', '/oauth/mcp/register', { 'content-type': 'text/plain' }, JSON.stringify({ redirect_uris: [REDIRECT] }));
+    expect(plain).toMatchObject({ status: 400, json: { error: 'invalid_client_metadata' } });
+    const huge = await send('POST', '/oauth/mcp/register', { 'content-type': 'application/json' }, JSON.stringify({ redirect_uris: [REDIRECT], pad: 'x'.repeat(17 * 1024) }));
+    expect(huge.status).toBe(400);
+    const broken = await send('POST', '/oauth/mcp/register', { 'content-type': 'application/json; charset=utf-8' }, '{nope');
+    expect(broken).toMatchObject({ status: 400, json: { error: 'invalid_client_metadata' } });
+  });
+
+  it('leaves a Funnel request to the gate, which answers 404', async () => {
+    const response = await send('GET', '/.well-known/oauth-authorization-server', { 'tailscale-funnel-request': '?1' });
+    expect(response.status).toBe(404);
+    expect(response.text).not.toContain('issuer');
+  });
+});
+
+function authorizePath(clientId: string, extra: Record<string, string> = {}): string {
+  const query = new URLSearchParams({ client_id: clientId, redirect_uri: REDIRECT, response_type: 'code', code_challenge: CHALLENGE, code_challenge_method: 'S256', ...extra });
+  return `/oauth/mcp/authorize?${query.toString()}`;
+}
+
+describe('the authorize page and its status (PAN-4945)', () => {
+  it('renders the approval page with the approval code and the nonce CSP, never the SPA', async () => {
+    const clientId = await registerClient();
+    const response = await send('GET', authorizePath(clientId, { state: 's1' }));
+    expect(response.status).toBe(200);
+    expect(response.headers['content-type']).toContain('text/html');
+    expect(response.text).not.toContain('SPA');
+    const [approval] = service.listApprovals();
+    expect(response.text).toContain(approval!.approvalCode);
+    const csp = response.headers['content-security-policy']!;
+    expect(csp).toContain("connect-src 'self'");
+    const nonce = /script-src 'nonce-([^']+)'/.exec(csp)![1]!;
+    expect(response.text).toContain(`<script nonce="${nonce}">`);
+    expect(response.headers['cache-control']).toBe('no-store');
+    expect(response.headers['x-frame-options']).toBe('DENY');
+    expect(response.headers['referrer-policy']).toBe('no-referrer');
+    await expect(send('GET', `/oauth/mcp/authorize/status?request=${approval!.id}`)).resolves.toMatchObject({ status: 200, json: { status: 'pending' } });
+  });
+
+  it('answers 400 HTML with no Location for an unregistered redirect URI', async () => {
+    const clientId = await registerClient();
+    const response = await send('GET', authorizePath(clientId, { redirect_uri: 'https://attacker.example/cb' }));
+    expect(response.status).toBe(400);
+    expect(response.headers['content-type']).toContain('text/html');
+    expect(response.headers.location).toBeUndefined();
+    expect(response.text).toContain('This sign-in link is not valid.');
+  });
+
+  it('redirects with error=invalid_request for code_challenge_method=plain', async () => {
+    const clientId = await registerClient();
+    const response = await send('GET', authorizePath(clientId, { code_challenge_method: 'plain' }));
+    expect(response.status).toBe(302);
+    const location = new URL(response.headers.location!);
+    expect(location.origin + location.pathname).toBe(REDIRECT);
+    expect(location.searchParams.get('error')).toBe('invalid_request');
+  });
+
+  it('escapes a hostile client name and answers expired for an unknown request id', async () => {
+    const clientId = await registerClient('<script>alert(1)</script>');
+    const response = await send('GET', authorizePath(clientId));
+    expect(response.text).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
+    expect(response.text).not.toContain('<script>alert(1)');
+    await expect(send('GET', '/oauth/mcp/authorize/status?request=nope')).resolves.toMatchObject({ status: 200, json: { status: 'expired' } });
+  });
+});
+
+describe('the token and revocation endpoints (PAN-4945)', () => {
+  it('refuses a JSON body and an unsupported grant type', async () => {
+    const json = await send('POST', '/oauth/mcp/token', { 'content-type': 'application/json' }, JSON.stringify({ grant_type: 'authorization_code' }));
+    expect(json).toMatchObject({ status: 400, json: { error: 'invalid_request' } });
+    const password = await send('POST', '/oauth/mcp/token', FORM, 'grant_type=password&username=a&password=b');
+    expect(password).toMatchObject({ status: 400, json: { error: 'unsupported_grant_type' } });
+    expect(password.headers['cache-control']).toBe('no-store');
+  });
+
+  it('swaps an approved code for tokens, then rotates them with the refresh token', async () => {
+    const clientId = await registerClient();
+    await send('GET', authorizePath(clientId));
+    const [approval] = service.listApprovals();
+    service.decideApproval(approval!.id, 'approve', 'message');
+    const status = await send('GET', `/oauth/mcp/authorize/status?request=${approval!.id}`);
+    const code = new URL((status.json as { redirect: string }).redirect).searchParams.get('code')!;
+
+    const form = new URLSearchParams({ grant_type: 'authorization_code', code, client_id: clientId, redirect_uri: REDIRECT, code_verifier: VERIFIER });
+    const response = await send('POST', '/oauth/mcp/token', FORM, form.toString());
+    expect(response).toMatchObject({ status: 200, json: { token_type: 'Bearer', expires_in: 2_592_000, scope: 'message' } });
+    expect(response.headers['cache-control']).toBe('no-store');
+    expect(response.headers.pragma).toBe('no-cache');
+
+    const refreshToken = (response.json as { refresh_token: string }).refresh_token;
+    const rotated = await send('POST', '/oauth/mcp/token', FORM, new URLSearchParams({ grant_type: 'refresh_token', refresh_token: refreshToken, client_id: clientId }).toString());
+    expect(rotated).toMatchObject({ status: 200, json: { token_type: 'Bearer' } });
+    const reused = await send('POST', '/oauth/mcp/token', FORM, new URLSearchParams({ grant_type: 'refresh_token', refresh_token: refreshToken, client_id: clientId }).toString());
+    expect(reused).toMatchObject({ status: 400, json: { error: 'invalid_grant' } });
+  });
+
+  it('answers 200 for an unknown token at the revocation endpoint', async () => {
+    await expect(send('POST', '/oauth/mcp/revoke', FORM, 'token=odk_unknown')).resolves.toMatchObject({ status: 200, json: {} });
+    await expect(send('POST', '/oauth/mcp/revoke', FORM, 'token=garbage&token_type_hint=refresh_token')).resolves.toMatchObject({ status: 200, json: {} });
+  });
+});
