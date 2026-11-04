@@ -4,17 +4,17 @@
     "created": "2026-11-04T03:31:46Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4938: Agent MCP and bots (W-DEL1): Delegation, lanes, issue start, conversation stop and interrupt",
-    "updated": "2026-11-04T03:37:52.553Z"
+    "updated": "2026-11-04T03:39:05.388Z"
   },
   "plan": {
     "id": "pan-4938",
     "title": "Agent MCP and bots (W-DEL1): Delegation, lanes, issue start, conversation stop and interrupt",
-    "status": "proposed",
+    "status": "running",
     "uid": "45c6560e-2f22-4dc2-8222-cc754945cc3c",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-04T03:31:46Z",
-    "updated": "2026-11-04T03:37:52.553Z",
+    "updated": "2026-11-04T03:39:05.388Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4938",
@@ -1133,5 +1133,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
