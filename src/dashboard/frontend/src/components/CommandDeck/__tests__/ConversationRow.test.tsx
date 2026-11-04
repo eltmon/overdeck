@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -6,6 +6,8 @@ import { ConversationRow } from '../ConversationRow';
 import type { Conversation } from '../ConversationList';
 import type { ConversationMutations } from '../useConversationMutations';
 import { useContinueOnDeviceStore } from '../../chat/continueOnDevice/continueOnDeviceStore';
+import { useScheduleDialogStore } from '../../chat/ConversationScheduleDialog';
+import { formatLocalWhen } from '../conversation-triage';
 import styles from '../styles/command-deck.module.css';
 
 vi.mock('../../../lib/wsTransport', () => ({
@@ -55,6 +57,8 @@ const mutations: ConversationMutations = {
   move: vi.fn(),
   linkPullRequest: vi.fn(),
   unlinkPullRequest: vi.fn(),
+  triage: vi.fn(),
+  undoLastTriage: vi.fn(() => false),
   openForkModal: vi.fn(),
   submitFork: vi.fn(),
   forkTarget: null,
@@ -558,5 +562,57 @@ describe('ConversationRow leaving state (PAN-4626)', () => {
 
     await waitFor(() => expect(archive).toHaveBeenCalledTimes(1));
     expect(archive).toHaveBeenCalledWith('test-conversation');
+  });
+});
+
+describe('ConversationRow schedule badge (PAN-4657 badge-row)', () => {
+  const FIXED_NOW = new Date(2026, 10, 1, 12, 0, 0, 0);
+  const NEXT_RUN_ISO = new Date(2026, 10, 3, 9, 0, 0, 0).toISOString();
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('renders the badge with a pluralized title and formatLocalWhen text when scheduleCount is 2', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(FIXED_NOW);
+    renderRow({ nextScheduledRunAt: NEXT_RUN_ISO, scheduleCount: 2 });
+    const badge = screen.getByTestId('schedule-badge');
+    expect(badge.getAttribute('title')).toMatch(/^2 active schedules · next run/);
+    expect(badge).toHaveTextContent(formatLocalWhen(NEXT_RUN_ISO, FIXED_NOW));
+  });
+
+  it('renders a singular title when scheduleCount is 1', () => {
+    renderRow({ nextScheduledRunAt: NEXT_RUN_ISO, scheduleCount: 1 });
+    const badge = screen.getByTestId('schedule-badge');
+    expect(badge.getAttribute('title')).toMatch(/^1 active schedule ·/);
+  });
+
+  it('renders no badge when there is no scheduled run', () => {
+    renderRow({ nextScheduledRunAt: null, scheduleCount: 0 });
+    expect(screen.queryByTestId('schedule-badge')).not.toBeInTheDocument();
+  });
+});
+
+describe('ConversationRow schedule menu item (PAN-4657 menu-wiring)', () => {
+  afterEach(() => {
+    act(() => useScheduleDialogStore.getState().close());
+  });
+
+  it('opens the schedule dialog store for a local conversation from the overflow menu', () => {
+    renderRow({ origin: 'local' });
+    fireEvent.click(screen.getByLabelText('More actions for Test conversation'));
+    fireEvent.click(screen.getByText('Schedule…'));
+
+    expect(useScheduleDialogStore.getState().conversationName).toBe('test-conversation');
+    expect(screen.queryByRole('menu', { name: 'Actions for Test conversation' })).not.toBeInTheDocument();
+  });
+
+  it('renders no "Schedule…" item for a vault row', () => {
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response(JSON.stringify({ running: false, state: 'off' }), { status: 200 }))));
+    renderRow({ origin: 'vault' });
+    fireEvent.click(screen.getByLabelText('More actions for Test conversation'));
+    expect(screen.queryByText('Schedule…')).not.toBeInTheDocument();
+    vi.unstubAllGlobals();
   });
 });

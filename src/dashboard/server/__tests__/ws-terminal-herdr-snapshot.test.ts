@@ -1,4 +1,6 @@
 import http from 'node:http';
+import { rmSync } from 'node:fs';
+import { join } from 'node:path';
 
 import { WebSocket as WsClient } from 'ws';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -7,6 +9,7 @@ import { _resetInternalTokenCacheForTests } from '../../../lib/internal-token.js
 import { _resetDashboardSessionTokenForTests, dashboardSessionCookieHeader } from '../routes/dashboard-auth.js';
 import { _resetTrustedOriginsForTests } from '../routes/origin-validation.js';
 import { setupTerminalWebSocket } from '../ws-terminal.js';
+import { getOverdeckHome } from '../../../lib/paths.js';
 
 const TRUSTED_ORIGIN = 'http://localhost:3011';
 
@@ -115,6 +118,7 @@ describe('serveHerdrTerminal snapshot bracketed paste (PAN-4557)', () => {
   beforeEach(() => {
     delete process.env.OVERDECK_DASHBOARD_SESSION_TOKEN;
     process.env.OVERDECK_INTERNAL_TOKEN = 'stable-internal-token';
+    rmSync(join(getOverdeckHome(), 'internal-token'), { force: true });
     _resetInternalTokenCacheForTests();
     _resetDashboardSessionTokenForTests();
     _resetTrustedOriginsForTests();

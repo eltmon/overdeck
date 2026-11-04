@@ -369,6 +369,7 @@ export const AgentSnapshot = Schema.Struct({
     askedAt: Schema.String,
     questions: Schema.Array(Schema.Struct({
       question: Schema.String,
+      context: Schema.optional(Schema.String),
       header: Schema.optional(Schema.String),
       multiSelect: Schema.optional(Schema.Boolean),
       options: Schema.Array(Schema.Struct({
@@ -387,6 +388,8 @@ export const AgentSnapshot = Schema.Struct({
   resolution: Schema.optional(AgentResolution),
   resolutionCount: Schema.optional(Schema.Number),
   turnEndAssessment: Schema.optional(TurnEndAssessment),
+  // PAN-4849 — open Deft `external` escalations: a quiet indicator, not pending input.
+  deftExternalEscalations: Schema.optional(Schema.Number),
 })
 export type AgentSnapshot = typeof AgentSnapshot.Type
 

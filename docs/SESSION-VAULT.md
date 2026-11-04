@@ -363,7 +363,8 @@ works the same way against the same on-disk vault.
   `debounceSec` timer (`vault/config.json`, default **30 seconds**) that settles the transcript
   once it has been quiet that long, so a busy conversation is not settled mid-turn; a first
   settle that mints a record for a pipeline agent names it with `recordTitle`
-  (`<issue> <role> agent (<agent id>)`) instead of the transcript's first human text. Session
+  (`<issue> <role> agent (<agent id>)`) instead of the transcript's first human text. A Pull
+  here transfer also passes `recordTitle`: the owner's conversation title. Session
   end and dashboard shutdown force an immediate settle regardless of the debounce, bounded by a
   **10-second** flush budget on shutdown; anything not settled in time is picked up by the next
   boot's sync cycle.
@@ -536,7 +537,7 @@ src/lib/vault/format.ts           chunk and record wire format, ref names, key r
 src/lib/vault/keyring.ts          openKeyring, KeyGuardedStore: header-verified keys, guarded writes
 src/lib/vault/rotate.ts           rotateVaultKey: one-batch key rotation, key.next
 src/lib/vault/continuity.ts       line hashes, noop/append/diverged
-src/lib/vault/turns.ts            human-turn filter (FR-18)
+src/lib/vault/turns.ts            human-turn filter (FR-18); Codex injected prefixes: <environment_context>, <recommended_plugins>, # AGENTS.md instructions, <turn_aborted>, <subagent_notification>
 src/lib/vault/secrets.ts          pre-settlement secret scan and allow list
 src/lib/vault/cwd-state.ts        bounded git summary and drift comparison
 src/lib/vault/store/{types,dir,git}.ts   VaultStore contract and backends

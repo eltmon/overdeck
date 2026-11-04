@@ -11,6 +11,9 @@ import {
   type UpdateSnapshot,
 } from '@overdeck/contracts';
 
+import { ensureDurableRuntime } from './anywhere/connect-runtime.js';
+import { panCliInvocation } from './pan-cli-invocation.js';
+
 const execFileAsync = promisify(execFile);
 const NPM_DIST_TAGS_URL = 'https://registry.npmjs.org/-/package/%40overdeck%2Fcore/dist-tags';
 const GITHUB_RELEASES_URL = 'https://api.github.com/repos/eltmon/overdeck/releases';
@@ -56,13 +59,55 @@ export function isVersionNewer(candidate: string, current: string): boolean {
   return false;
 }
 
+/** The side effects of an Overdeck install; injectable for tests (PAN-4722). */
+export interface UpdateInstallDeps {
+  /** Runs a command; rejects on a non-zero exit. */
+  execFile: (file: string, args: readonly string[]) => Promise<void>;
+  ensureDurableRuntime: (overdeckHome: string, version: string) => Promise<{ root: string; installed: boolean }>;
+}
+
+const defaultInstallDeps: UpdateInstallDeps = {
+  execFile: async (file, args) => {
+    await execFileAsync(file, [...args]);
+  },
+  ensureDurableRuntime: (overdeckHome, version) => ensureDurableRuntime(overdeckHome, version),
+};
+
+/**
+ * Installs @overdeck/core@<version> where the running copy lives: the
+ * `pan connect` runtime under `runtimeHome` (PAN-4722), else the global
+ * npm prefix.
+ */
+export async function installOverdeckPackage(
+  version: string,
+  runtimeHome: string | null,
+  deps: UpdateInstallDeps = defaultInstallDeps,
+): Promise<void> {
+  if (runtimeHome) {
+    await deps.ensureDurableRuntime(runtimeHome, version);
+    return;
+  }
+  await deps.execFile('npm', ['install', '--global', `@overdeck/core@${version}`]);
+}
+
 export class UpdateManager {
   private snapshot: UpdateSnapshot;
   private readonly fetchImpl: typeof fetch;
+  private readonly runtimeHome: string | null;
+  private readonly installDeps: UpdateInstallDeps;
   private installPromise: Promise<void> | null = null;
 
-  constructor(options: { currentVersion: string; installMode: UpdateInstallMode; fetchImpl?: typeof fetch }) {
+  constructor(options: {
+    currentVersion: string;
+    installMode: UpdateInstallMode;
+    fetchImpl?: typeof fetch;
+    /** OVERDECK_HOME whose `pan connect` runtime this process runs from; install() updates that runtime (PAN-4722). */
+    runtimeHome?: string | null;
+    installDeps?: Partial<UpdateInstallDeps>;
+  }) {
     this.fetchImpl = options.fetchImpl ?? fetch;
+    this.runtimeHome = options.runtimeHome ?? null;
+    this.installDeps = { ...defaultInstallDeps, ...options.installDeps };
     this.snapshot = {
       phase: 'idle',
       installMode: options.installMode,
@@ -140,9 +185,8 @@ export class UpdateManager {
       this.snapshot = { ...this.snapshot, phase: 'installing', error: null };
       this.installPromise = (async () => {
         try {
-          await execFileAsync('npm', ['install', '--global', `@overdeck/core@${version}`]);
-          await execFileAsync('pan', ['sync']);
-          this.snapshot = { ...this.snapshot, phase: 'ready' };
+          await installOverdeckPackage(version, this.runtimeHome, this.installDeps);
+          this.snapshot = { ...this.snapshot, phase: 'ready', error: await this.syncAfterInstall(version) };
         } catch (error) {
           this.snapshot = { ...this.snapshot, phase: 'error', error: error instanceof Error ? error.message : String(error) };
         } finally {
@@ -151,5 +195,18 @@ export class UpdateManager {
       })();
     }
     return this.getSnapshot();
+  }
+
+  /** D-5: the files are already replaced, so a sync failure is reported, never fatal. Null on success. */
+  private async syncAfterInstall(version: string): Promise<string | null> {
+    const sync = panCliInvocation(['sync']);
+    try {
+      await this.installDeps.execFile(sync.command, sync.args);
+      return null;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error('[update] pan sync after install failed:', error);
+      return `Installed ${version}, but pan sync failed: ${message}. Run pan sync on this machine.`;
+    }
   }
 }

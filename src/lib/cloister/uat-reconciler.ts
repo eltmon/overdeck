@@ -108,6 +108,18 @@ export interface UatReconcilerDeps {
    * Omitted = not held.
    */
   holdsForUat?(feature: ReadyFeature): boolean | Promise<boolean>;
+  /**
+   * PAN-4970: true when the per-PR auto-merge scheduler, not this reconciler,
+   * owns the feature right now (`mergePathOwner` returning 'per-pr'). A
+   * feature this says yes to is dropped from the batch-owned ready set before
+   * anchors, staleness, single-feature, backoff and assembly all run — it is
+   * never bundled, and a live generation that already bundled it is
+   * invalidated with a reason naming the per-PR train, not "left the ready
+   * queue". A synchronous throw or a rejected promise counts as false: the
+   * feature stays batch-owned rather than silently losing its merge path.
+   * Omitted = every feature is batch-owned (pre-PAN-4970 behavior).
+   */
+  mergesPerPr?(feature: ReadyFeature): boolean | Promise<boolean>;
   now?: () => number;
   log?: (msg: string) => void;
 }
@@ -119,6 +131,8 @@ export interface ReconcileResult {
     | 'single-feature';
   invalidated: string[];
   generation?: UatGeneration;
+  /** PAN-4970: ready features the per-PR auto-merge scheduler owns this tick, upper-cased and sorted. */
+  perPr?: string[];
 }
 
 /**
@@ -191,9 +205,17 @@ function isStale(
   gen: UatGeneration,
   desiredIds: ReadonlySet<string>,
   headShas: ReadonlyMap<string, string>,
+  perPrIds: ReadonlySet<string>,
 ): string | null {
   for (const member of gen.members) {
-    if (!desiredIds.has(member.issueId.toUpperCase())) {
+    const id = member.issueId.toUpperCase();
+    // PAN-4970: a member the per-PR scheduler now owns invalidates with its
+    // own reason, checked before "left the ready queue" — the member is
+    // still ready, just merging through a different path.
+    if (perPrIds.has(id)) {
+      return `${member.issueId} merges through the per-PR auto-merge train`;
+    }
+    if (!desiredIds.has(id)) {
       return `${member.issueId} left the ready queue`;
     }
     const current = headShas.get(member.branch);
@@ -202,6 +224,43 @@ function isStale(
     }
   }
   return null;
+}
+
+/** Per-project last-logged per-PR set, so the line logs only on change. */
+const lastLoggedPerPr = new Map<string, string>();
+
+/**
+ * Partition the ready set into per-PR-owned ids and the batch-owned subset.
+ * A `mergesPerPr` that throws synchronously or rejects counts as false — the
+ * feature stays batch-owned. Logs the resulting set only when it changes for
+ * this project.
+ */
+async function partitionPerPr(
+  projectRoot: string,
+  readySet: readonly ReadyFeature[],
+  deps: UatReconcilerDeps,
+  log: (msg: string) => void,
+): Promise<{ perPrIds: Set<string>; batchReadySet: ReadyFeature[] }> {
+  const perPrIds = new Set<string>();
+  const batchReadySet: ReadyFeature[] = [];
+  for (const feature of readySet) {
+    let ownedByPerPr = false;
+    if (deps.mergesPerPr) {
+      try {
+        ownedByPerPr = (await deps.mergesPerPr(feature)) === true;
+      } catch {
+        ownedByPerPr = false;
+      }
+    }
+    if (ownedByPerPr) perPrIds.add(feature.issueId.toUpperCase());
+    else batchReadySet.push(feature);
+  }
+  const key = [...perPrIds].sort().join(',');
+  if (lastLoggedPerPr.get(projectRoot) !== key) {
+    lastLoggedPerPr.set(projectRoot, key);
+    log(`[uat-reconciler] per-PR owned: ${key ? [...perPrIds].sort().join(', ') : '(none)'}`);
+  }
+  return { perPrIds, batchReadySet };
 }
 
 export async function reconcileUatGenerations(
@@ -221,19 +280,28 @@ export async function reconcileUatGenerations(
     const readySet = await deps.getReadySet();
     if (readySet === null) return { action: 'no-queue', invalidated };
 
+    // PAN-4970: drop whatever the per-PR auto-merge scheduler already owns
+    // before anchors, staleness, single-feature, backoff and assembly run.
+    const { perPrIds, batchReadySet } = await partitionPerPr(projectRoot, readySet, deps, log);
+    const perPr = [...perPrIds].sort();
+
     // Polyrepo supplies composite anchors in place of single SHAs; both are
     // opaque strings to everything downstream, so the comparison logic is
-    // identical either way.
+    // identical either way. Anchors are read only for the batch-owned subset
+    // — a per-PR-owned feature's head is the scheduler's concern.
     const mainSha = deps.getBaseAnchor
       ? await deps.getBaseAnchor()
       : await deps.getMainHeadSha();
     const headShas = new Map<string, string>();
-    for (const f of readySet) {
+    for (const f of batchReadySet) {
       const anchor = deps.getFeatureAnchor
         ? await deps.getFeatureAnchor(f).catch(() => 'unknown')
         : await deps.getBranchHeadSha(f.branch).catch(() => 'unknown');
       headShas.set(f.branch, anchor);
     }
+    // The full ready set (not just batch-owned) — a per-PR-owned feature has
+    // not "left the ready queue", it merges through a different path, which
+    // isStale distinguishes via perPrIds before falling back to this check.
     const desiredIds = new Set(readySet.map((f) => f.issueId.toUpperCase()));
 
     // Promoted is terminal: stamp positive merge evidence before stale checks,
@@ -244,7 +312,7 @@ export async function reconcileUatGenerations(
         deps.store.update(gen.name, { status: 'promoted' });
         continue;
       }
-      const staleReason = isStale(gen, desiredIds, headShas);
+      const staleReason = isStale(gen, desiredIds, headShas, perPrIds);
       if (!staleReason) continue;
       log(`[uat-reconciler] invalidating ${gen.name}: ${staleReason}`);
       deps.store.update(gen.name, { status: 'invalidated' });
@@ -269,21 +337,21 @@ export async function reconcileUatGenerations(
       }
     }
     if (!options.force && deps.store.listChain(projectRoot, ['assembling']).length > 0) {
-      return { action: 'in-flight', invalidated };
+      return { action: 'in-flight', invalidated, perPr };
     }
 
-    if (readySet.length === 0) {
+    if (batchReadySet.length === 0) {
       await deps.cleanup().catch(() => {});
-      return { action: 'idle', invalidated };
+      return { action: 'idle', invalidated, perPr };
     }
 
     // 3. Assemble when nothing live answers the current desired set.
-    const desired = desiredSignature(readySet, headShas, mainSha);
+    const desired = desiredSignature(batchReadySet, headShas, mainSha);
     if (!options.force) {
       const live = deps.store.listChain(projectRoot, ['ready', 'superseded']);
-      if (live.some((gen) => liveSignatureMatches(gen, readySet, headShas, mainSha))) {
+      if (live.some((gen) => liveSignatureMatches(gen, batchReadySet, headShas, mainSha))) {
         await deps.cleanup().catch(() => {});
-        return { action: 'idle', invalidated };
+        return { action: 'idle', invalidated, perPr };
       }
     }
     // PAN-3965: a batch exists to union-test 2+ features. One ready feature
@@ -292,10 +360,10 @@ export async function reconcileUatGenerations(
     // batch assembled earlier is left alone (the stale checks above own it).
     // A feature held for UAT (its label, else the project, else global) keeps
     // the one-member batch: it is the UAT stack the operator tests on.
-    if (readySet.length < MIN_BATCH_FEATURES && !((await deps.holdsForUat?.(readySet[0]!)) ?? false)) {
-      log(`[uat-reconciler] 1 feature ready (${readySet[0]!.issueId}) — merges directly; batches assemble when ${MIN_BATCH_FEATURES}+ are ready`);
+    if (batchReadySet.length < MIN_BATCH_FEATURES && !((await deps.holdsForUat?.(batchReadySet[0]!)) ?? false)) {
+      log(`[uat-reconciler] 1 feature ready (${batchReadySet[0]!.issueId}) — merges directly; batches assemble when ${MIN_BATCH_FEATURES}+ are ready`);
       await deps.cleanup().catch(() => {});
-      return { action: 'single-feature', invalidated };
+      return { action: 'single-feature', invalidated, perPr };
     }
     if (!options.force) {
       // Consecutive-failure cutoff (PAN-3963): the backoff spaces retries out,
@@ -320,7 +388,7 @@ export async function reconcileUatGenerations(
           `[uat-reconciler] BLOCKED — ${failedStreak} consecutive assemblies failed (${names}); `
           + `not re-assembling for ${Math.round(FAILED_STREAK_WINDOW_MS / 3_600_000)}h. Fix the logged cause, then click Retry batch assembly on the Flywheel UAT card`,
         );
-        return { action: 'assembly-blocked', invalidated };
+        return { action: 'assembly-blocked', invalidated, perPr };
       }
       const failed = deps.store.listChain(projectRoot, ['failed']);
       const recentFailure = failed.find((gen) =>
@@ -329,17 +397,18 @@ export async function reconcileUatGenerations(
       );
       if (recentFailure) {
         log(`[uat-reconciler] backing off — ${recentFailure.name} failed recently for the same input`);
-        return { action: 'backoff', invalidated };
+        return { action: 'backoff', invalidated, perPr };
       }
     }
 
-    log(`[uat-reconciler] assembling next generation for ${readySet.length} ready feature(s)`);
-    const generation = await deps.assemble(readySet);
+    log(`[uat-reconciler] assembling next generation for ${batchReadySet.length} ready feature(s)`);
+    const generation = await deps.assemble(batchReadySet);
     await deps.cleanup().catch(() => {});
     return {
       action: generation.status === 'ready' ? 'assembled' : 'assembly-failed',
       invalidated,
       generation,
+      perPr,
     };
   };
 

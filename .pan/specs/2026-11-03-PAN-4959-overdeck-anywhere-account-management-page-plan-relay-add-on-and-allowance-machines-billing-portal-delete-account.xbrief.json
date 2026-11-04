@@ -1,0 +1,858 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-03T21:50:29Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4959: Overdeck Anywhere: account management page (plan, relay add-on and allowance, machines, billing portal, delete account)",
+    "updated": "2026-11-03T21:54:07.577Z"
+  },
+  "plan": {
+    "id": "pan-4959",
+    "title": "Overdeck Anywhere: account management page (plan, relay add-on and allowance, machines, billing portal, delete account)",
+    "status": "running",
+    "uid": "3e6cff11-28bf-45c1-abdd-8eded9313d6e",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-03T21:50:29Z",
+    "updated": "2026-11-03T21:54:07.577Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4959",
+        "label": "PAN-4959",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4960",
+        "label": "PAN-4960 (dashboard half)",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4959.md",
+        "label": "PRD",
+        "type": "document"
+      }
+    ],
+    "tags": [
+      "anywhere",
+      "account-service",
+      "connect-service",
+      "cloudflare-workers"
+    ],
+    "metadata": {
+      "sizeJustification": "About 30 files, almost all in services/account and its tests: the web session, the page, its two actions and the Directory DO paths they read are one user-visible feature that cannot ship in parts (a page without its data source or its delete is incomplete). The separable dashboard half was already split out to PAN-4960.",
+      "canonicalFilename": "2026-11-03-PAN-4959-overdeck-anywhere-account-management-page-plan-relay-add-on-and-allowance-machines-billing-portal-delete-account.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "A signed-in Overdeck Anywhere user has nowhere to see their plan, relay use or machines, remove a machine or delete their account. services/account serves only sign-in and the owner's /admin; machines and relay use live only in the connect service's per-account Durable Object.",
+      "Proposal": "Phase 1, read-only, for invite-allowlisted testers: a server-rendered /account page on account.overdeck.ai behind a new user web session (migration 0002, purpose 'account'), reading machines and relay use from connect's AccountDirectory Durable Object through a cross-script DIRECTORY binding. The DO gains internal paths /account-view, /remove-machine and /delete-account. Remove revokes the machine's device token and forgets it; Delete is a typed-login two-step that also clears directory data as a new deletion data holder. Billing, upgrade and Add 50 GB show 'Paid plans are invite-only for now.' with no prices.",
+      "NonGoals": "- The dashboard Settings → Anywhere Account card, PKCE Sign in button and Manage account link (PAN-4960)\n- Checkout, upgrade/downgrade, relay add-on toggle, Add 50 GB, Creem customer portal, prices or lapse rules (phase 2, PAN-4294)\n- Hosted vault storage use and the storage add-on (PAN-4297)\n- Listing or removing phones (clients) on the page\n- Renaming machines or devices on the page, or listing account-service devices that never joined the directory\n- Recording pending attempts from the account page sign-in\n- A service binding from the account Worker to the connect Worker (cycle)\n- Any deploy, secret or live D1 change (operator only)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Split the dashboard Account card and PKCE sign-in into sibling issue PAN-4960",
+        "rationale": "The two halves share no code and together exceed one plan's size limits; each ships and is reviewed on its own. Recorded on PAN-4959 as a comment."
+      },
+      {
+        "summary": "Read machines and relay use through a cross-script Durable Object binding (script_name overdeck-connect)",
+        "rationale": "Connect already binds account via a service binding; a binding back would be a cycle Cloudflare does not document as deployable, while cross-script DO bindings are a documented pattern."
+      },
+      {
+        "summary": "Remove revokes the machine's device token and then forgets it in the directory",
+        "rationale": "Forgetting alone lets an offline machine re-register on its next hello, so the free slot would not stay free."
+      },
+      {
+        "summary": "Add the directory as an account-deletion data holder",
+        "rationale": "Makes the page's deletion statement true: today nothing hosted is deleted while the DO keeps labels, keys, push tokens and sealed inbox events."
+      },
+      {
+        "summary": "The account page sign-in records no pending attempts and lets expired-grant users in",
+        "rationale": "Mirrors GET /v1/me (expired users can still see status and delete) and avoids a second pending_attempts CHECK migration; invitations keep coming from device and PKCE sign-ins."
+      },
+      {
+        "summary": "Delete account needs the GitHub login typed on a confirm page",
+        "rationale": "Deletion is irreversible and the page has no JavaScript, so a two-step form is the safe confirmation."
+      },
+      {
+        "summary": "Phones are not listed in phase 1",
+        "rationale": "The issue names machines only; phones already have removal paths in the app and on machines."
+      }
+    ],
+    "items": [
+      {
+        "id": "connect-account-view",
+        "title": "Directory DO answers GET /account-view with machines and relay status",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T21:50:29Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4959",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "services/connect/src/account-view.ts",
+            "services/connect/src/directory.ts",
+            "tests/unit/services/connect/account-view.test.ts",
+            "tests/integration/services/connect/miniflare.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:connect",
+            "npx vitest run tests/unit/services/connect/account-view.test.ts tests/integration/services/connect/miniflare.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:connect completes without errors",
+            "account-view.test.ts and the connect miniflare test pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "FR-6",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4959.md WI-1. Create services/connect/src/account-view.ts exporting ACCOUNT_PATHS {view:'/account-view', removeMachine:'/remove-machine', deleteAccount:'/delete-account'}, the AccountViewMachine/AccountView types and the pure accountView(state, online, now, capBytes) builder (machines in state order with ISO lastSeenAt and deviceId; relay = relayStatusOf(state.relay, now, capBytes)). In DirectoryHost.fetch (services/connect/src/directory.ts, next to the INTERNAL.inbox branch) answer GET ACCOUNT_PATHS.view with json(accountView(this.state, set of this.registered() environment ids, this.deps.now(), relayCapBytes(this.env.RELAY_CAP_BYTES))). Unit-test the builder; integration-test the path through (await mf.getDurableObjectNamespace('DIRECTORY')).get(ns.idFromName(userId)).fetch('https://directory/account-view')."
+        },
+        "items": [
+          {
+            "id": "connect-account-view.ac1",
+            "title": "Given two stored machines with one open socket, when accountView runs, then it returns both machines oldest first with online true for the connected one and false for the other",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "connect-account-view.ac2",
+            "title": "Given a relay_usage row from the previous UTC month, when accountView runs, then relay.bytesUsed is 0 and stopped is false; a row for this month at the cap returns stopped true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "connect-account-view.ac3",
+            "title": "Given two machines registered on real workerd, when the test fetches https://directory/account-view on the account's DO stub, then the response is 200 JSON listing both machines with online true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "connect-remove-machine",
+        "title": "Directory DO removes a machine on POST /remove-machine without a calling socket",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T21:50:29Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4959",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "services/connect/src/directory-state.ts",
+            "services/connect/src/directory.ts",
+            "tests/unit/services/connect/directory-state.test.ts",
+            "tests/integration/services/connect/miniflare.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:connect",
+            "npx vitest run tests/unit/services/connect/directory-state.test.ts tests/integration/services/connect/miniflare.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:connect completes without errors",
+            "directory-state.test.ts and the connect miniflare test pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-10"
+          ],
+          "foundationFor": [
+            "connect-delete-account",
+            "account-remove-machine"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2 and D-5. Add DirectoryEvent kind 'remove-machine' {environmentId} and a removeMachine reducer (copy of the 'forget' effects minus every send/close to 'self'; broadcast with withOnline(ctx.online, null, target); close the target with CONNECT_CLOSE_CODES.forgotten). In DirectoryHost change apply/context/execute/resolve to accept self: WebSocket | null: resolve(null,'self') = [], resolve(null,'all'|'others') = every registered machine socket; the five self-using execute cases (inbox-create, fetch-turn, deliver-push, register-client, register) start with if (!self) break. fetch answers POST ACCOUNT_PATHS.removeMachine: JSON {environmentId} string 1-64 chars else 400 {error:'bad_request'}; unknown id 404 {error:'unknown_machine'}; else apply(null, event) and 200 {removed:true}."
+        },
+        "items": [
+          {
+            "id": "connect-remove-machine.ac1",
+            "title": "Given a known machine, when reduce handles remove-machine, then the effects contain delete-machine, inbox-forget, a directory frame to others and clients without the machine, a close 4012 to that machine, and no send to 'self'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "connect-remove-machine.ac2",
+            "title": "Given an unknown environment id, when reduce handles remove-machine, then it returns the state unchanged and only a log effect with outcome unknown_machine",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "connect-remove-machine.ac3",
+            "title": "Given a free account with 3 connected machines on real workerd, when POST /remove-machine names machine 1, then machine 1's socket closes 4012, machine 2 receives a directory frame listing 2 machines, and a new fourth environment's hello receives welcome instead of close 4009",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "connect-remove-machine.ac4",
+            "title": "Given a body without a string environmentId, when POST /remove-machine runs, then it returns 400 {error:'bad_request'}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "connect-delete-account",
+        "title": "Directory DO empties itself on POST /delete-account",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T21:50:29Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4959",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "services/connect/src/directory.ts",
+            "services/connect/src/account-view.ts",
+            "tests/integration/services/connect/miniflare.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:connect",
+            "npx vitest run tests/integration/services/connect/miniflare.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:connect completes without errors",
+            "the connect miniflare test passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3 and D-6. account-view.ts exports ACCOUNT_TABLES = ['machines','meta','approvals','relay_usage','clients','inboxes','inbox_events']. DirectoryHost.fetch answers POST ACCOUNT_PATHS.deleteAccount: safeClose every socket from this.ctx.getWebSockets(MACHINE_TAG) with CONNECT_CLOSE_CODES.unauthorized reason 'account deleted', DELETE FROM each table, await this.ctx.storage.deleteAlarm(), set this.state = EMPTY_DIRECTORY, answer 200 {deleted:true}. Do not call storage.deleteAll() (the schema is created only in the constructor)."
+        },
+        "items": [
+          {
+            "id": "connect-delete-account.ac1",
+            "title": "Given a connected machine and a connected phone, when POST /delete-account runs, then both sockets close with code 4001",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "connect-delete-account.ac2",
+            "title": "Given a DO with machines, an inbox and relay usage, when POST /delete-account runs, then a following GET /account-view returns machines [] and relay.bytesUsed 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "connect-delete-account.ac3",
+            "title": "Given an already emptied DO, when POST /delete-account runs again, then it returns 200 {deleted:true}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "account-web-session",
+        "title": "Account service signs ordinary users in to a web session at /account (migration 0002)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T21:50:29Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4959",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "services/account/migrations/0002_account_page.sql",
+            "services/account/src/account-page/session.ts",
+            "services/account/src/sign-in.ts",
+            "services/account/src/github-callback.ts",
+            "services/account/src/grants.ts",
+            "services/account/src/routes.ts",
+            "services/account/src/rate-limit.ts",
+            "services/account/src/maintenance.ts",
+            "tests/unit/services/account/account-session.test.ts",
+            "tests/unit/services/account/helpers/account.ts",
+            "tests/unit/services/account/schema.test.ts",
+            "tests/unit/services/account/maintenance.test.ts",
+            "tests/integration/services/account/miniflare.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:account",
+            "npx vitest run tests/unit/services/account/ tests/integration/services/account/miniflare.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:account completes without errors",
+            "every account unit test and the account miniflare test pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1",
+            "NFR-3",
+            "NFR-4"
+          ],
+          "foundationFor": [
+            "account-page",
+            "account-remove-machine",
+            "account-delete"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4, D-7, D-8, D-9. Add migrations/0002_account_page.sql exactly as in the PRD (user_sessions table + index; rebuild auth_requests with purpose CHECK including 'account'; no semicolons in comments). Purpose union gains 'account'; resolveSignIn flow becomes SignInFlow | null (null skips recordPendingAttempt). New account-page/session.ts mirrors admin/session.ts: ACCOUNT_COOKIE '__Host-od_account', 12 h TTL, signInPage, login (Origin check then startGitHubLeg(rc,'account',{})), grants.ts gains getGrant(rc, githubId) returning the grants row whether or not it expired (same SELECT as getActiveGrant without the expiry clause). onGitHubIdentity with the PRD's order (deleting -> 403 'This account is being deleted.'; isAllowed -> resolveSignIn(...,null) -> session; existing users row + expired grants row -> session; else inviteOnlyPage()), onGitHubDenied, requireUserSession (csrf + Origin on POSTs, users.deleted_at IS NULL; access is revoked when the user is not the owner and getGrant returns null), logout. Register the purpose in github-callback defaultHandlers. Add rate buckets 'account-login' (10/10 min) and 'account-action' (30/15 min). routes.ts rows: GET /account (temporary identity page), POST /account/login, POST /account/logout; replace the stale 'never edit this file' header sentence. maintenance.ts purges expired user_sessions. Update schema.test.ts (both migration files, user_sessions in TABLES, purpose 'account' accepted and 'bogus' refused), maintenance.test.ts (user_sessions key), the account miniflare test (apply every migrations/*.sql in name order), and add helpers/account.ts makeAccountClient."
+        },
+        "items": [
+          {
+            "id": "account-web-session.ac1",
+            "title": "Given no cookie, when GET /account runs, then it renders a form posting to /account/login with the button text 'Sign in with GitHub'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-web-session.ac2",
+            "title": "Given an allowlisted GitHub id completing the GitHub leg with purpose account, when the callback returns, then the response sets __Host-od_account and exactly one user_sessions row exists for that user",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-web-session.ac3",
+            "title": "Given a GitHub id with no grant, when it completes the account sign-in, then it receives the invite-only page and zero pending_attempts rows exist",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-web-session.ac4",
+            "title": "Given a user whose grant expired, when they complete the account sign-in, then a web session is created; given a user mid-deletion, the response is 403 with 'This account is being deleted.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-web-session.ac5",
+            "title": "Given a valid session, when POST /account/logout arrives without the csrf field, then it returns 403 'Request rejected.' and the session row persists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "account-directory-client",
+        "title": "Account Worker reads and changes the Directory DO through a cross-script DIRECTORY binding",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T21:50:29Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4959",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "services/account/src/directory-view.ts",
+            "services/account/src/env.ts",
+            "services/account/wrangler.jsonc",
+            "tests/unit/services/account/directory-view.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:account",
+            "npx vitest run tests/unit/services/account/directory-view.test.ts",
+            "npm --prefix services/account run build:dry"
+          ],
+          "expected_outputs": [
+            "typecheck:account completes without errors",
+            "directory-view.test.ts passes",
+            "build:dry exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5, D-2, D-11. env.ts Env gains optional DIRECTORY?: DurableObjectNamespace with the PRD comment. wrangler.jsonc gains durable_objects.bindings [{name:'DIRECTORY', class_name:'AccountDirectory', script_name:'overdeck-connect'}] (no migrations entry) and a comment that overdeck-connect deploys first. New directory-view.ts declares structural DirectoryMachine/DirectoryView types (no import from services/connect) and readDirectoryView (null when unbound, on throw, non-200 or failed shape check), removeDirectoryMachine ('removed' | 'unknown' | 'unavailable' for 200 / 404 / anything else or throw) and deleteDirectoryAccount (throws Error('directory delete failed: HTTP <status>') on non-200); each uses env.DIRECTORY.get(env.DIRECTORY.idFromName(userId)).fetch('https://directory<path>'). Implementation checkpoint: if build:dry fails because of the cross-script binding, stop and report with pan tell instead of changing the binding shape."
+        },
+        "items": [
+          {
+            "id": "account-directory-client.ac1",
+            "title": "Given env without DIRECTORY, when readDirectoryView runs, then it returns null without throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-directory-client.ac2",
+            "title": "Given a fake namespace whose stub answers 200 with a valid view, when readDirectoryView runs, then it returns the parsed machines and relay; a malformed body or a 500 returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-directory-client.ac3",
+            "title": "Given a stub answering 404, when removeDirectoryMachine runs, then it returns 'unknown'; a thrown fetch returns 'unavailable'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-directory-client.ac4",
+            "title": "Given a stub answering 500, when deleteDirectoryAccount runs, then it rejects with the message 'directory delete failed: HTTP 500'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "account-page",
+        "title": "Account page renders identity, plan, relay use, machines and billing text",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T21:50:29Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4959",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "services/account/src/account-page/page.ts",
+            "services/account/src/routes.ts",
+            "tests/unit/services/account/account-page.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:account",
+            "npx vitest run tests/unit/services/account/account-page.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:account completes without errors",
+            "account-page.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-8",
+            "FR-9",
+            "FR-12",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. New account-page/page.ts with renderAccountPage(rc, session, notice?) and the GET /account handler (no session -> signInPage(); revoked access -> signInPage('Access to this account was removed.') and delete the session row). Sections in order with the PRD's exact headings and strings: h1 'Your Overdeck account' + 'Signed in as <login> (GitHub id <id>)' + Sign out form; Plan (Free account / Tester from entitlementFor(getGrant(...)) so an expired grant keeps its own plan, owner with no row shows Tester; expiry text from that row's expires_at: 'No expiry', the date, or 'Expired on <date>'; 'Paid plans are invite-only for now.'); Relay (tester usage line + 'Resets on <YYYY-MM-01> (UTC).' + cap message when stopped; free 'The relay is not included in the free account.'); Machines (count line '<n> of 3 machines' on free, '<n> machines' on tester; table Label/Status/Last seen/Version with a Remove form per row posting to /account/machines/<environmentId>/remove with csrf; the D-3 note under the table); Billing ('Billing is not available yet. Paid plans are invite-only for now.'); Delete account (FR-9 statement + form posting to /account/delete). Unavailable view -> 'Machines and relay use are unavailable right now.' in Relay and Machines and no Remove forms. Every value through escapeHtml; no '$' anywhere. Point routes.ts GET /account at it."
+        },
+        "items": [
+          {
+            "id": "account-page.ac1",
+            "title": "Given a tester session, two machines (one online) and 12.3e9 relay bytes with the clock at 2026-11-15, when GET /account runs, then the body contains 'Tester', '2 machines', 'Online', 'Offline', '12.3 of 50 GB relay traffic this month' and 'Resets on 2026-12-01 (UTC).'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-page.ac2",
+            "title": "Given a free session with one machine, when GET /account runs, then the body contains 'Free account', '1 of 3 machines' and 'The relay is not included in the free account.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-page.ac3",
+            "title": "Given no DIRECTORY binding, when GET /account runs, then the body contains 'Machines and relay use are unavailable right now.' and no form posting to /account/machines/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-page.ac4",
+            "title": "Given any session, when GET /account runs, then the body contains 'Billing is not available yet. Paid plans are invite-only for now.' and no '$' character, and a machine label '<script>' renders as '&lt;script&gt;'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-page.ac5",
+            "title": "Given a session whose free grant expired on 2026-11-01, when GET /account runs with the clock at 2026-11-15, then the body contains 'Free account' and 'Expired on 2026-11-01'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "account-remove-machine",
+        "title": "Remove on the account page signs a machine out and frees its directory slot",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T21:50:29Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4959",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "services/account/src/account-page/actions.ts",
+            "services/account/src/routes.ts",
+            "tests/unit/services/account/account-page.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:account",
+            "npx vitest run tests/unit/services/account/account-page.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:account completes without errors",
+            "account-page.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-12",
+            "NFR-1",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7 and D-3. New account-page/actions.ts handler removeMachine for POST /account/machines/:environmentId/remove (bucket account-action): requireUserSession (csrf + Origin); readDirectoryView; view null -> page with the FR-12 sentence and status 503; machine absent -> page with 'That machine is no longer in the directory.' and status 404; else revokeDevice(rc, userId, row.deviceId, 'user'), then removeDirectoryMachine; 'removed' or 'unknown' -> 303 /account; 'unavailable' -> 503 page. Add the route row."
+        },
+        "items": [
+          {
+            "id": "account-remove-machine.ac1",
+            "title": "Given a session and a listed machine, when the Remove form posts with csrf and same-site Origin, then the response is 303 to /account, the machine's devices row has revoked_by 'user', and the fake DO received POST /remove-machine with that environmentId",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-remove-machine.ac2",
+            "title": "Given a Remove post without the csrf field or with a foreign Origin, when it runs, then it returns 403 and no devices row is revoked",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-remove-machine.ac3",
+            "title": "Given an environmentId the view does not list, when Remove posts, then it returns 404 with 'That machine is no longer in the directory.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-remove-machine.ac4",
+            "title": "Given a DIRECTORY stub that throws, when Remove posts, then it returns 503 with 'Machines and relay use are unavailable right now.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "account-delete",
+        "title": "Delete account from the page with a typed-login confirmation",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T21:50:29Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4959",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "services/account/src/account-page/actions.ts",
+            "services/account/src/deletion.ts",
+            "services/account/src/routes.ts",
+            "tests/unit/services/account/account-page.test.ts",
+            "tests/unit/services/account/deletion.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:account",
+            "npx vitest run tests/unit/services/account/account-page.test.ts tests/unit/services/account/deletion.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:account completes without errors",
+            "account-page.test.ts and deletion.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-1",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. POST /account/delete (bucket account-action, csrf + Origin) renders the confirm page: FR-9 statement, input name='confirm', csrf field, 'Delete my account' button posting to /account/delete/confirm, 'Cancel' link to /account. POST /account/delete/confirm: confirm != githubLogin (case-insensitive) -> confirm page with 'Type your GitHub login to confirm.' and 400; match -> requestDeletion(rc, userId), rc.ctx.waitUntil(runDeletionJob(rc, userId)), page 'Your account is being deleted.' with Set-Cookie clearCookie(ACCOUNT_COOKIE). requestDeletion's batch in deletion.ts adds DELETE FROM user_sessions WHERE user_id = ?."
+        },
+        "items": [
+          {
+            "id": "account-delete.ac1",
+            "title": "Given a session, when POST /account/delete/confirm carries a confirm value that differs from the GitHub login, then it returns 400 with 'Type your GitHub login to confirm.' and users.deleted_at stays null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-delete.ac2",
+            "title": "Given a session, when POST /account/delete/confirm carries the login in another letter case, then users.deleted_at is set, zero user_sessions rows remain for the user and the response clears __Host-od_account",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-delete.ac3",
+            "title": "Given a user with two web sessions, when DELETE /v1/account runs with a device token, then both user_sessions rows are deleted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "account-directory-holder",
+        "title": "Account deletion clears the Directory DO as a data holder",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T21:50:29Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4959",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "services/account/src/deletion.ts",
+            "tests/unit/services/account/deletion.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:account",
+            "npx vitest run tests/unit/services/account/deletion.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:account completes without errors",
+            "deletion.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9 and D-4. HOLDER_NAMES = ['vault','directory']; boundHolders(env) returns 'vault' when env.VAULT and 'directory' when env.DIRECTORY, in that order; holderFor(env,'directory') adapts deleteDirectoryAccount into AccountDataHolder. Keep the existing [] and ['vault'] expectations passing."
+        },
+        "items": [
+          {
+            "id": "account-directory-holder.ac1",
+            "title": "Given env with a fake DIRECTORY only, when boundHolders runs, then it returns ['directory']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-directory-holder.ac2",
+            "title": "Given a deletion job with the directory holder and a DO stub answering 200, when runDeletionJob runs, then the stub received POST /delete-account and the job's completed_at is set",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-directory-holder.ac3",
+            "title": "Given the DO stub answering 500, when runDeletionJob runs, then the job stays open with attempts 1 and last_error 'directory delete failed: HTTP 500'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "account-page-docs",
+        "title": "Document the account page, its routes, the DIRECTORY binding and the deploy order",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T21:50:29Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4959",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/ACCOUNT-SERVICE.md",
+            "docs/CONNECT-SERVICE.md",
+            "anywhere.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'GET | `/account`' docs/ACCOUNT-SERVICE.md",
+            "grep -n '/remove-machine' docs/CONNECT-SERVICE.md"
+          ],
+          "expected_outputs": [
+            "both greps print a matching line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-9",
+            "FR-10",
+            "FR-11",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10. docs/ACCOUNT-SERVICE.md: new '## Account page' section (sign-in rules, sections, cookie, csrf/Origin, unavailable state); API table rows for GET /account, POST /account/login, POST /account/logout, POST /account/machines/:environmentId/remove, POST /account/delete, POST /account/delete/confirm; rate-limit rows account-login and account-action; web sessions in 'What it stores'; Configuration row DIRECTORY; the directory holder in 'Account deletion'; Deploy steps for migration 0002 and 'deploy overdeck-connect before overdeck-account'. docs/CONNECT-SERVICE.md: '## Account service paths (PAN-4959)' listing /account-view, /remove-machine, /delete-account with answers, plus the deploy-order note. anywhere.mdx: say the page at https://account.overdeck.ai/account shows plan, relay use and machines, removes machines and deletes the account, and that deletion also clears directory data."
+        },
+        "items": [
+          {
+            "id": "account-page-docs.ac1",
+            "title": "Given docs/ACCOUNT-SERVICE.md, when a reader opens the API table, then it contains rows for all six /account routes, and the Configuration table contains a DIRECTORY row naming script_name overdeck-connect",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-page-docs.ac2",
+            "title": "Given docs/CONNECT-SERVICE.md, when a reader opens the 'Account service paths (PAN-4959)' section, then it contains GET /account-view, POST /remove-machine and POST /delete-account with their status codes, and the Deploy section shows that overdeck-connect deploys before overdeck-account",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-page-docs.ac3",
+            "title": "Given anywhere.mdx, when a reader opens the account text, then it contains the URL https://account.overdeck.ai/account and shows that deleting the account also removes directory data",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "connect-account-view",
+        "to": "connect-remove-machine",
+        "type": "blocks"
+      },
+      {
+        "from": "connect-remove-machine",
+        "to": "connect-delete-account",
+        "type": "blocks"
+      },
+      {
+        "from": "connect-account-view",
+        "to": "account-directory-client",
+        "type": "informs"
+      },
+      {
+        "from": "account-web-session",
+        "to": "account-page",
+        "type": "blocks"
+      },
+      {
+        "from": "account-directory-client",
+        "to": "account-page",
+        "type": "blocks"
+      },
+      {
+        "from": "account-page",
+        "to": "account-remove-machine",
+        "type": "blocks"
+      },
+      {
+        "from": "account-remove-machine",
+        "to": "account-delete",
+        "type": "blocks"
+      },
+      {
+        "from": "account-directory-client",
+        "to": "account-directory-holder",
+        "type": "blocks"
+      },
+      {
+        "from": "account-delete",
+        "to": "account-directory-holder",
+        "type": "blocks"
+      },
+      {
+        "from": "connect-delete-account",
+        "to": "account-page-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "account-directory-holder",
+        "to": "account-page-docs",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

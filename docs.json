@@ -59,12 +59,22 @@
               "anywhere",
               "configuration/session-vault",
               "configuration/remote-access",
+              "configuration/linked-machines",
+              "configuration/shared-sessions",
+              "configuration/triggers",
+              "configuration/tailscale",
+              "configuration/mcp",
+              "configuration/phone",
               "configuration/push-notifications",
               "cli/vault",
               "cli/pair",
+              "cli/tailscale",
               "cli/account",
+              "cli/share",
               "cli/devices",
-              "cli/token"
+              "cli/machines",
+              "cli/token",
+              "cli/triggers"
             ]
           }
         ]
@@ -80,7 +90,8 @@
               "cli/hygiene",
               "cli/agent-commands",
               "cli/workspace-commands",
-              "cli/review-commands"
+              "cli/review-commands",
+              "cli/skills-commands"
             ]
           }
         ]
@@ -96,6 +107,7 @@
               "features/specialists",
               "features/cloister",
               "features/skills",
+              "features/skill-packs",
               "features/workspaces",
               "features/convoys",
               "features/swarm",

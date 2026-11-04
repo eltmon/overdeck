@@ -4,6 +4,7 @@
  *
  *   POST /api/restart-gate/requests  upsert + poll + TTL refresh (every 5s)
  *   POST /api/restart-gate/claim     take the exclusive right to restart
+ *   POST /api/restart-gate/withdraw  leave the gate while outside an epoch (PAN-4888)
  *   POST /api/restart-gate/approve   operator approval (banner, `pan restart approve`)
  *   GET  /api/restart-gate           read door for the current gate
  *
@@ -87,6 +88,22 @@ const postClaimRoute = HttpRouter.add(
   ),
 );
 
+const postWithdrawRoute = HttpRouter.add(
+  'POST',
+  '/api/restart-gate/withdraw',
+  httpHandler(
+    Effect.gen(function* () {
+      const body = yield* readJsonBody;
+      const requesterId = typeof body['requesterId'] === 'string' ? body['requesterId'].trim() : '';
+      if (!requesterId) {
+        return jsonResponse({ error: 'requesterId is required' }, { status: 400 });
+      }
+      const result = yield* Effect.promise(() => getRestartGate().withdraw(requesterId));
+      return jsonResponse(result);
+    }),
+  ),
+);
+
 const postApproveRoute = HttpRouter.add(
   'POST',
   '/api/restart-gate/approve',
@@ -112,6 +129,7 @@ const getRestartGateRoute = HttpRouter.add(
 export const restartGateRouteLayer = Layer.mergeAll(
   postRequestRoute,
   postClaimRoute,
+  postWithdrawRoute,
   postApproveRoute,
   getRestartGateRoute,
 );

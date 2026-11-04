@@ -136,7 +136,7 @@ describe('launchLane critic link (PAN-4223 WI-19)', () => {
   it('launches a verifier without --for when --at is given', async () => {
     const { deps, git } = harness();
     const result = await launchLane(request(root(), { role: 'verifier', key: 'whole-run', at: 'feed123' }), deps);
-    expect(result.conversation).toMatchObject({ laneRole: 'verifier', criticOfConversationName: null });
+    expect(getConversationByName(result.conversation.name)).toMatchObject({ laneRole: 'verifier', criticOfConversationName: null });
     expect(git.addDetachedWorktree).toHaveBeenLastCalledWith(PROJECT_PATH, join(LANES_ROOT, 'hotel-whole-run-verify-i1'), 'feed123');
   });
 

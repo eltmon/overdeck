@@ -26,6 +26,7 @@ import { BRIDGE_TOKEN_HEADER } from "../bridge-token.js";
 import { INPUT_PURGE_MAX_CHARS } from "../channels/injection-budget.js";
 import { resolveKimiNativeEffort } from "../kimi-effort.js";
 import { renderAcpHostEvent, stripAcpPaneControl } from "./host-render.js";
+import { readAcpMcpServers } from "./mcp-config.js";
 import {
   isRejectPermissionOption,
   selectAutoPermissionOutcome,
@@ -783,6 +784,7 @@ interface AcpHostArgs {
   readonly model?: string;
   readonly effort?: string;
   readonly contextFile?: string;
+  readonly mcpConfig?: string;
 }
 
 export function parseAcpHostArgs(argv: ReadonlyArray<string>): AcpHostArgs {
@@ -813,6 +815,7 @@ export function parseAcpHostArgs(argv: ReadonlyArray<string>): AcpHostArgs {
     ...(values.get("--model") ? { model: values.get("--model") } : {}),
     ...(values.get("--effort") ? { effort: values.get("--effort") } : {}),
     ...(values.get("--context-file") ? { contextFile: values.get("--context-file") } : {}),
+    ...(values.get("--mcp-config") ? { mcpConfig: values.get("--mcp-config") } : {}),
   };
 }
 
@@ -852,6 +855,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
     await Effect.runPromise(Scope.close(scope, Exit.void));
     await capture?.close();
   };
+  const mcpServers = args.mcpConfig ? await readAcpMcpServers(args.mcpConfig) : [];
   try {
     const runtime = await Effect.runPromise(
       Effect.gen(function* () {
@@ -869,6 +873,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
           environment: process.env,
           ...(openCodePort === undefined ? {} : { port: openCodePort }),
           ...(capture ? { protocolLogging: acpCaptureProtocolLogging(capture) } : {}),
+          ...(mcpServers.length > 0 ? { mcpServers } : {}),
         });
       }).pipe(
         Effect.provideService(Scope.Scope, scope),

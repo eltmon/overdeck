@@ -1,0 +1,660 @@
+---
+title: pan machines
+description: Link this machine's dashboard to another machine, list or remove the links, see or update versions on every machine, or turn a server into a lasting linked machine
+---
+
+# `pan machines`
+
+Link this machine's dashboard to another machine over an encrypted channel and manage
+the links. Released in v0.73.0. **Settings → Anywhere → Machines** has the same actions.
+See [Linked machines](/configuration/linked-machines).
+
+Every verb talks to the running dashboard with this machine's internal token, so the
+dashboard must be up (`pan up`); without one it prints the not-running message and exits 1.
+`add-ssh` and `test-ssh` also run through the dashboard: the dashboard server runs `ssh`
+with its own keys and `~/.ssh/config`, not the shell you type the command in.
+[`pan connect`](#connect) is the exception: it starts the dashboard itself, on the machine
+you want to link to.
+
+## link
+
+```bash
+pan machines link <pairing-url> [--one-way] [--agent-fenced] [--allow-loopback] [--json]
+```
+
+Links this machine to the one that printed `<pairing-url>` (`pan pair` or **Pair a
+device** there). By default the link goes both ways at operator level.
+
+| Flag | Effect |
+| --- | --- |
+| `--one-way` | Only this machine reaches the other; the other gets no link back. |
+| `--agent-fenced` | Agent-fenced access: forwarded requests are never operator-level. |
+| `--allow-loopback` | Accept a `localhost` pairing link (both servers on this host). |
+| `--json` | Print the new link as JSON. |
+
+```
+Linked desk (0a71-b2da-d646-3485-3ce1) over tailnet tcp://100.101.1.2:3011, both ways, operator-level
+See configuration/linked-machines.mdx for routes and access levels; `pan machines list` shows its state.
+```
+
+Failures name the cause and exit 1: not a pairing link, the other machine unreachable,
+the pairing link expired or already used, the other machine running an Overdeck without
+machine links, or a machine answering with a key other than the one the link names.
+
+## add-ssh
+
+```bash
+pan machines add-ssh <host> [--pan-path <path>] [--one-way] [--agent-fenced] [--json]
+```
+
+Links a machine that this machine reaches over SSH. The dashboard runs `ssh` to `<host>`,
+checks that the host has the same `pan` version, adopts the Overdeck dashboard already
+running there or starts one with `pan up`, forwards a loopback port to it, and links over
+that port. `<host>` is an SSH config alias (`desk`), `user@host`, a host name, an IP, or
+`ssh://user@host:port`. See [SSH machines](/configuration/linked-machines#ssh-machines).
+
+| Flag | Effect |
+| --- | --- |
+| `--pan-path <path>` | Absolute path to `pan` on the host. Default: `pan` from the host's login `PATH`. |
+| `--one-way` | Only this machine reaches the other; the other gets no link back. |
+| `--agent-fenced` | Agent-fenced access: forwarded requests are never operator-level. |
+| `--json` | Print the new link as JSON, with its `ssh` block. |
+
+```
+Linked vps (0a71-b2da-d646-3485-3ce1) over ssh me@vps.example.com; Overdeck started there
+`pan machines list` shows its state; `pan machines unlink` removes it.
+```
+
+`Overdeck started there` means this machine ran `pan up` on the host, so removing the
+machine stops that server. `was already running there` means it adopted a running server,
+which removal never stops. The command can take up to a few minutes when it starts Overdeck.
+
+Failures print the server's message and exit 1:
+
+| Error | Remedy |
+| --- | --- |
+| `bad-destination` | Use an alias, `user@host`, a host name or `ssh://user@host:port`. A `:port` needs the `ssh://` prefix. |
+| `busy` | Another add, remove or reconnect for this host is running here or on another machine. Try again in a minute. |
+| `unresolvable` | The host name does not resolve from this machine. |
+| `unreachable` | SSH could not connect (refused, timed out, no route). |
+| `host-key` | The host key is unknown or changed. Run `ssh <host>` once in a terminal on this machine and check it. |
+| `auth-failed` | SSH refused the login. The dashboard needs a key or agent it can use without a prompt. |
+| `pan-missing` | `pan` is not on the host. Install it there: `npm install -g @overdeck/core@<version>`, or pass `--pan-path`. |
+| `version-mismatch` | The host has another `pan` version; the message names both. Install this machine's version there: `npm install -g @overdeck/core@<version>`. |
+| `helper-failed` | The helper on the host failed. The message carries the last lines it printed. |
+| `start-failed` | `pan up` on the host did not bring a dashboard up. The message carries its last output lines. |
+| `forward-failed` | The port forward did not come up within 15 s. |
+| `self-link` | The host is this machine. |
+
+## test-ssh
+
+```bash
+pan machines test-ssh <host> [--pan-path <path>] [--json]
+```
+
+Checks that the dashboard reaches `<host>` over SSH and that the host has the same `pan`
+version. It never starts, stops or pairs anything.
+
+```
+Reached desk: pan 0.73.0 (matches this machine)
+```
+
+A failure prints the same messages as `add-ssh` and exits 1. `--json` prints
+`{ reachable, panVersion, localVersion, versionMatches, error, message }`.
+
+## add-fly
+
+```bash
+pan machines add-fly [--project <key>] [--message <text>] [--harness <name>] [--model <id>]
+  [--effort <level>] [--region <code>] [--image <ref>] [--json]
+```
+
+Starts a Fly.io VM that runs Overdeck, links it one way from this machine and, optionally,
+clones a project and starts a Claude Code or Codex conversation on it. The dashboard does the whole
+flow in one request, which takes a few minutes (longer with a large clone); the command
+waits for it. See [Fly machines](/configuration/linked-machines#fly-machines) for setup,
+lifetime and cost.
+
+| Flag | Effect |
+| --- | --- |
+| `--project <key>` | Clone this project onto the VM into `/workspace/<key>` and register it there. GitHub projects only. |
+| `--message <text>` | Start a conversation with this first message. Needs `--project`. |
+| `--harness <name>` | Harness for the conversation: `claude-code` (default) or `codex`. See [Codex](/configuration/linked-machines#codex). |
+| `--model <id>` | Model for the conversation. Required with `--harness codex`, and it must be an OpenAI model id. |
+| `--effort <level>` | Reasoning effort for the conversation. |
+| `--region <code>` | Fly region. Default: `[remote.fly] region`, else `iad`. |
+| `--image <ref>` | Image. Default: `[remote.fly] image`, else `registry.fly.io/<app>:latest` (the Fly registry is app-scoped). |
+| `--json` | Print `{ link, record, conversation? }` as JSON. `record.codexAuthPath` is the path of the Codex sign-in on the VM, or `null` when Codex was not prepared there. |
+
+```
+Starting a Fly machine; this takes a few minutes (longer with a project clone)...
+Linked fly-148e21ea7e1689 (Fly app pan-workspaces, region iad; docker: yes; codex: yes)
+Open: http://localhost:3011/conv/@3f2c1b7e-9a4d-4c2b-8e1f-0a1b2c3d4e5f/conv-fly-1
+`pan machines list` shows its state; `pan machines unlink` destroys it.
+```
+
+Every failure after the VM exists destroys it again, removes any link it made and prints
+the server's message, then exits 1:
+
+| Error | Remedy |
+| --- | --- |
+| `remote-disabled` | Set `remote.enabled = true` in `~/.overdeck/config.toml`. |
+| `no-fly-token` | Run `fly auth login`, or set `FLY_API_TOKEN` (or the variable `[remote.fly] api_token_env` names). |
+| `harness-unsupported` | The harness cannot run on a Fly machine (only Claude Code and Codex can), or the model does not belong to the harness. |
+| `bad-request` | `--message` needs `--project`, `--harness codex` needs `--model`, or a field was empty. |
+| `cap-reached` | `remote.max_concurrent_agents` is full. Unlink a Fly machine, stop a remote agent, or raise the cap. |
+| `credentials-failed` | This machine's Claude Code credentials did not reach the VM. Log in to Claude Code here (`~/.claude/.credentials.json`), then try again. With `--harness codex`: this machine has no Codex CLI or no valid Codex sign-in, or the sign-in did not reach the VM. Run `codex login` here, then try again. |
+| `version-mismatch` | The VM could not install this machine's Overdeck version, or with `--harness codex` this machine's `@openai/codex` version; the message names both. |
+| `server-not-ready` | Overdeck on the VM did not answer within 2 minutes. The message carries the last lines of its log. |
+| `pairing-failed` | Overdeck on the VM issued no pairing code. |
+| `unreachable` | This machine could not reach the VM. Give the Fly app public IPs once: `fly ips allocate-v4 --shared -a <app>` and `fly ips allocate-v6 -a <app>`. |
+| `project-failed` | The project is not a GitHub project here, or the clone on the VM failed; the message carries the clone's last lines. |
+| `conversation-failed` | The VM refused the conversation; the message carries its answer. |
+
+## list
+
+```bash
+pan machines list [--json]
+```
+
+Shows this machine (first row), every link with its state, load and capability tags, and
+the machines that hold access here.
+
+```
+This machine: studio (1111-2222-3333-4444-5555)
+
+LABEL                  STATE                             ROUTE                    ACCESS    SSH                   FINGERPRINT               LOAD                         TAGS
+studio (this machine)  self                              -                        -         -                     1111-2222-3333-4444-5555  CPU 1% · 12 GB · 0 agents    linux
+desk                   online                            tcp://192.168.1.5:3011   operator  -                     0a71-b2da-d646-3485-3ce1  CPU 3% · 41 GB · 2 agents    docker, gpu, linux
+laptop                 offline (network 12.0 s, 1 h ago) tcp://10.0.0.9:3011      operator  -                     7c0d-11aa-9b3e-4d2f-88e1  -                            -
+vps                    online                            tcp://127.0.0.1:41234    operator  me@vps (up, managed)  5e1f-0b9c-2d44-a1e7-63c0  CPU n/a · 3 GB · 0 agents    linux · reserved
+
+Inbound
+LABEL  ACCESS    FINGERPRINT               LAST USED  TOKEN ID
+desk   operator  0a71-b2da-d646-3485-3ce1  just now   tok_…
+```
+
+LOAD is the machine's last 15-second load sample: CPU pressure (PSI `some avg10`, `n/a` off
+Linux), free memory and working agents; `-` before the first sample or for a machine whose
+Overdeck predates it. TAGS lists its capability tags and `reserved` for a machine with
+`anywhere.machine.placement: on-request` (see
+[Auto placement](/configuration/linked-machines#auto-placement)).
+
+The STATE cell carries the last incident (`froze` when the other dashboard stalled,
+`network` otherwise) and, for `unsupported`, `revoked` and `offline`, the detail. The SSH
+cell shows `<destination> (<forward state>, <managed|external>)` for an SSH machine and
+`-` for any other link.
+
+| Flag | Effect |
+| --- | --- |
+| `--json` | Print `{ self, links, inbound }` as JSON. |
+
+With no links: `` No linked machines. Link one with `pan machines link <pairing-url>` using a `pan pair` link from the other machine. ``
+
+## Starting work on another machine: `--machine`, `--machine auto`, `--needs`
+
+Three commands take a machine:
+
+```bash
+pan start PAN-123 --machine desk
+pan worker run --issue PAN-123 --prompt "Run the suite" --machine auto --needs docker
+pan lane start --run hotel --key 663 --role builder --brief b.md --machine auto
+```
+
+| Flag | Effect |
+| --- | --- |
+| `--machine <label\|environment-id>` | Run on that linked machine (honored even when it is reserved or busy). |
+| `--machine auto` | Let Auto placement pick by load and print `Auto → <label> (…)`; when it picks this machine the normal local path runs. |
+| `--needs <tag,…>` | Only machines with every listed capability tag. |
+| `--push-first` | (`pan start`, `pan worker run`) Push unpushed commits before starting on the other machine. |
+| `--ignore-unpushed` | (`pan start`, `pan worker run`) Start even though local commits are not pushed. |
+
+`pan start <id> --machine fly` starts the issue's work agent on a new Fly machine, the same
+as `pan start <id> --remote` (PAN-4734); see
+[Work agents on Fly](/configuration/linked-machines#work-agents-on-fly). `--machine fly`
+refuses on `pan worker run` and `pan lane start`: a worker needs its issue workspace, which
+a new VM never has. A new Fly machine for a *conversation* is the new-conversation dialog's
+**Fly (new VM)** choice, or `pan machines add-fly --project <key> --message <text>`. See
+[Linked machines](/configuration/linked-machines#start-work-on-another-machine).
+
+## Messaging a conversation on another machine: `pan tell @<label>/<conv>`
+
+```bash
+pan tell @desk/20261102-1a2b "Run the tests again"
+```
+
+`pan tell @<machine>/<conv>` sends a message to a conversation on a linked machine, through
+this machine's dashboard and the encrypted link. `<machine>` is the link's label or
+environment id. It prints `Delivered to <conv> on <machine>`, or the other machine's error
+and exits 1. Only conversations are accepted after `@<machine>/`. See
+[`pan tell`](/cli/agent-commands) for `--message-id` and `--steer`.
+
+## who
+
+```bash
+pan machines who <issue> [--json]
+```
+
+Lists which machines run agents or conversations for an issue: this machine first, then every
+online linked machine (2.5 seconds each; a machine that does not answer is named on stderr).
+
+```
+MACHINE  KIND          ID           STATUS
+studio   agent         agent-pan-7  running
+desk     conversation  conv-a1b2    working
+```
+
+| Flag | Effect |
+| --- | --- |
+| `--json` | Print `{ machines: [{ environmentId, label, self, agents, conversations, error? }] }`. |
+
+## add-project
+
+```bash
+pan machines add-project <machine> <project-key> [--file <path>]... [--no-env] [--parent-dir <dir>] [--to <machine>] [--json]
+```
+
+Copies a project between linked machines through the normal project creation: the target
+clones the repository from its origin, registers it, then receives the chosen git-ignored
+files (written 0600; an existing file is kept and reported `skipped`). By default
+`<machine>`'s `<project-key>` is added to **this** machine; with `--to <target>`, this
+machine's `<project-key>` is added to `<target>` (`pan machines add-project <this label> <key> --to desk`).
+Files cross only an operator-level link.
+
+| Flag | Effect |
+| --- | --- |
+| `--file <path>` | Also copy this git-ignored file (repeat for more; at most 1 MiB each). |
+| `--no-env` | Do not copy `.env`, `.envrc` and `.dev.vars` (copied by default). |
+| `--parent-dir <dir>` | Clone under this directory instead of the projects folder (this machine only). |
+| `--to <machine>` | Add this machine's project to `<machine>` instead. |
+| `--json` | Print the finished add job as JSON. |
+
+## unlink
+
+```bash
+pan machines unlink <label|environment-id|link-id> [--keep-server] [--json]
+```
+
+Removes the link and tells the other machine to revoke this machine's access.
+
+```
+Unlinked "desk"; the other machine was told and its token here was revoked.
+```
+
+When the other machine cannot be reached it prints that it will see the link as revoked
+when it next connects. An unknown target prints `No machine link matches "<target>"` and
+exits 1. `--json` prints `{ ok, peerNotified, ssh, fly }`.
+
+A Fly machine is destroyed unless you pass `--keep-server`, and its record here is deleted
+either way. With `--keep-server` nothing heartbeats the machine any more, so it stops itself
+within about 5 minutes and loses its disk:
+
+```
+Destroyed the Fly machine behind fly-148e21ea7e1689.
+```
+
+For an SSH machine, unlink also stops its port forward. When this machine started the
+host's server (`managed`), unlink stops that server too, unless you pass `--keep-server`.
+A second line says which:
+
+```
+Stopped the Overdeck server on vps.
+Left the Overdeck server on vps running (in-use).
+```
+
+| Reason | Meaning |
+| --- | --- |
+| `kept` | You passed `--keep-server`. |
+| `external` | The server was already running when this machine added it. |
+| `in-use` | Another machine holds an active link to that server. |
+| `restarted` | The server was restarted since this machine started it. |
+| `not-running` | No server was running on the host. |
+| `stop-failed` | The host could not be reached; the link was removed anyway. |
+
+| Flag | Effect |
+| --- | --- |
+| `--keep-server` | For an SSH machine this dashboard started: leave its Overdeck server running. For a Fly machine: do not destroy it now; with no heartbeat from here it stops itself within about 5 minutes. |
+| `--json` | Print `{ ok, peerNotified, ssh, fly }` as JSON. |
+
+## forward
+
+```bash
+pan machines forward <label|environment-id|link-id> <port> [--json]
+pan machines forward --list [--json]
+pan machines forward --stop <id>
+```
+
+Forwards a TCP port of a linked machine to `127.0.0.1` on this machine and prints the
+local URL, for previewing a dev server that runs there (PAN-4650).
+
+```
+Forwarding desk:5173 → http://127.0.0.1:52811
+  Stop it with: pan machines forward --stop 3f6c…
+```
+
+The other machine connects only to its own `127.0.0.1`. It refuses (`port-refused`)
+ports below 1024 or above 65535 and Overdeck's own ports: the dashboard and its API, the
+supervisor, 80, 443 and Traefik's dashboard port. A forward needs an operator-level link,
+and closes on `--stop`, when the link goes away, or after 30 minutes with no open
+connection. `--list` shows the open forwards; `--json` prints the forward (or the list)
+as JSON. The dashboard's **Preview** button in a remote conversation does the same.
+
+## Through the overdeck.ai directory
+
+These verbs need a signed-in machine (`pan account login`). See
+[Find your machines through overdeck.ai](/configuration/remote-access#find-your-machines-through-overdeck-ai).
+Each one exits 1 with the dashboard's error text.
+
+### directory
+
+```bash
+pan machines directory [--json]
+```
+
+Lists your account's machines in the directory, then pending approval requests and your own
+join requests. `--json` prints the `GET /api/directory` response unchanged.
+
+```
+LABEL   FINGERPRINT               STATE              LINKED  ENVIRONMENT
+desk    0a71-b2da-d646-3485-3ce1  online             linked  0b5c9e7a-4c1d-4f2e-9a3b-6d7e8f901234
+vps     4c2e-91aa-0d13-7f60-be52  last seen 2 h ago  -       7d0e1f22-9a8b-4c3d-8e2f-1a2b3c4d5e6f
+```
+
+### join
+
+```bash
+pan machines join [--to <label|environment-id>] [--json]
+```
+
+Asks your other machines (or the one named by `--to`) to link with this one, then waits up to
+10 minutes for one of them to open the request.
+
+```
+Requested approval (request 9f2c…). This machine's fingerprint: 4c2e-91aa-0d13-7f60-be52
+Code: 123 456 · approver desk 0a71-b2da-d646-3485-3ce1
+Accept? [y/N]
+```
+
+Accept only if the approving machine shows the same code. Without a terminal (for example
+over a script) it prints `Confirm with: pan machines accept <requestId>` and exits 0; run that
+command after comparing the codes. `--json` prints `{ requestId, sas, fingerprint, approver }`.
+
+### approve
+
+```bash
+pan machines approve <request-id> [--yes]
+```
+
+Opens a direct connection to the requesting machine, prints the code and its fingerprint, asks
+`Approve? [y/N]` unless `--yes`, then approves. The link appears in `pan machines list` once
+the other machine accepts.
+
+```
+Code: 123 456 · fingerprint 4c2e-91aa-0d13-7f60-be52
+Approve only if the other machine shows the same code.
+Approved. The link appears in pan machines list once the other machine accepts.
+```
+
+### accept and reject
+
+```bash
+pan machines accept <request-id>
+pan machines reject <request-id>
+```
+
+`accept` confirms this machine's join request after comparing the codes. `reject` refuses an
+incoming approval request or this machine's own join request.
+
+### forget
+
+```bash
+pan machines forget <label|environment-id>
+```
+
+Removes a machine from the directory and frees its slot on the free account. Links that already
+exist keep working over their other routes.
+
+```
+Removed vps from the directory.
+```
+
+## versions
+
+```bash
+pan machines versions [--json]
+```
+
+Shows the Overdeck version and the version of each installed harness CLI on every
+machine: this machine first, then each linked machine. A linked machine that is not
+`online` shows its last known Overdeck version and no CLI versions.
+
+```
+MACHINE  STATE         OVERDECK  CLAUDE         CODEX               KIMI   UPDATE
+studio   this machine  0.73.0    2.1.0 → 2.1.5  0.150.0 → 0.159.0   2.0.2  done
+desk     online        0.73.0    2.1.293        0.159.0             -      waiting (2 turns)
+attic    unsupported   0.71.0    -              -                   -      -
+
+attic: install Overdeck 0.73.0 on attic: npm install -g @overdeck/core@0.73.0
+```
+
+There is one column per harness CLI found on any machine. While an update job has
+changed a version, the cell shows `before → after`. The UPDATE cell shows the machine's
+update job: `waiting (N turns)` while it waits for running turns to end (after 30
+minutes, `waiting (N turns, M min: use --now)`), then `updating`, `restarting`, `done`,
+`failed: <component>` or `cancelled`. After the table, each machine that needs another
+Overdeck version gets one line with the exact install command.
+
+| Flag | Effect |
+| --- | --- |
+| `--json` | Print `{ rows }` as JSON. |
+
+Exit codes: 0 when the table printed; 1 when the dashboard is not running or refused the request.
+
+## update
+
+```bash
+pan machines update [--now] [--machine <label>]... [--cancel] [--json]
+```
+
+Starts **Update all**: each online machine updates its installed harness CLIs (Claude
+Code, Codex CLI, Kimi Code CLI, OpenCode) with their own update commands, then updates
+Overdeck itself on an `npm install -g` install or a machine set up with `pan connect`
+(into its `~/.overdeck/runtime`), and restarts its dashboard. By default each
+machine waits until no turn is running there. A development checkout or the desktop app
+keeps its Overdeck and still updates the CLIs. Offline, connecting, unsupported and
+revoked machines are skipped with the reason, and so is a machine whose link is
+agent-fenced: Update all needs an operator-level link.
+
+```
+Started on desk (when-idle)
+Started on studio (when-idle)
+Skipped attic: attic is unsupported: Install Overdeck 0.73.0 on attic: npm install -g @overdeck/core@0.73.0
+Run `pan machines versions` to follow the update.
+```
+
+| Flag | Effect |
+| --- | --- |
+| `--now` | Do not wait for running turns to end. On a machine already waiting, this starts its update at once. |
+| `--machine <label>` | Only this machine; repeat for more. An unknown label prints `No machine named <label>` and exits 1. |
+| `--cancel` | Cancel waiting updates (on every machine, or on the `--machine` ones). |
+| `--json` | Print `{ started, skipped }` as JSON. |
+
+Exit codes: 0 when the request went out, even if some machines were skipped; 1 when the
+dashboard is not running, refused the request, or a `--machine` label is unknown.
+
+## connect
+
+```bash
+pan connect [--url <base>] [--label <name>] [--json]
+npx @overdeck/core connect [--url <base>] [--label <name>] [--json]
+```
+
+Turns the machine you run it on (typically a fresh server you reached over SSH) into a
+lasting linked machine. It installs the Overdeck server as a service that survives logout
+and reboot, starts it, and prints one link. You paste that link into
+`pan machines link` on the machine that should reach this one. Run it from your normal
+login shell: it saves that shell's `PATH` for the service, so agents started later find
+`node` and the harness CLIs. Linux and macOS only; on Windows it exits 1 and asks you to
+run it inside WSL.
+
+| Flag | Effect |
+| --- | --- |
+| `--url <base>` | Address the other machine reaches this one at, such as `https://box.example.com`. Default: picked automatically (see below). |
+| `--label <name>` | Name recorded for the pairing in the activity log. |
+| `--json` | Print the result as one JSON object: `url`, `credential`, `expiresAt`, `base`, `service`, `linger`, `runtime`, `replacedRepoRoot`. Never waits for input. |
+
+What it does, in order:
+
+1. **Installs a durable copy under npx.** `npx` runs from a cache that npm may delete at any
+   time, so `npx @overdeck/core connect` first installs the same version into
+   `~/.overdeck/runtime` (`npm install --prefix`, no `sudo`) and runs itself again from there.
+   Every path the service uses points into that copy. A machine that already has that version
+   skips the install.
+2. **Starts the dashboard.** A dashboard already running from this install is left alone.
+   Otherwise it starts one and waits up to two minutes for it. If a dashboard from another
+   checkout held the port, it is replaced and the output says so.
+3. **Installs the service.** On Linux, the systemd user unit `overdeck-supervisor.service`:
+   installed, enabled at boot, and started. On macOS, the launch agent
+   `ai.overdeck.supervisor`. The service runs the supervisor, whose watchdog starts the
+   dashboard again whenever it is down.
+4. **Turns lingering on (Linux).** See below.
+5. **Prints the link.** The link is printed last because it expires 10 minutes after it is
+   created.
+
+```
+Overdeck server: user service overdeck-supervisor.service, enabled at boot.
+Lingering is on for alice, so the server keeps running after you log out and starts at boot.
+
+Link this machine from another machine within 10 minutes, before this machine restarts:
+
+  pan machines link 'http://203.0.113.7:3011/#pair=odp_…'
+
+or paste the link into Settings → Anywhere → Machines → Link a machine.
+Expires: 2026-11-01T14:10:00.000Z (single use)
+The other machine must reach 203.0.113.7:3011. If a firewall blocks it, open that port or set up Tailscale with `pan tailscale setup`, then run pan connect again.
+Run Overdeck commands on this machine with: /home/alice/.overdeck/runtime/node_modules/.bin/pan
+```
+
+The last line appears only after an `npx` run. The link works once and is held in the
+dashboard's memory, so a restart of this machine before you use it drops it; run
+`pan connect` again for a fresh one. Running `pan connect` again on a connected machine is
+safe: it installs nothing twice, leaves the running dashboard alone, and prints a new link.
+
+### Lingering (Linux)
+
+Without lingering, systemd stops every user service when you log out and starts them again
+only when you log in, so the server would not come back after a reboot. `pan connect` turns
+lingering on with `loginctl enable-linger`. When that needs a password, it prints the
+command to run in another terminal:
+
+```
+Lingering is off for alice. Run this in another terminal on this machine:
+  sudo loginctl enable-linger alice
+Waiting for lingering to turn on… (press Enter to continue without it)
+```
+
+It waits (checking every 2 seconds) until lingering is on, then carries on. Press Enter to
+continue without it. Without a terminal, or with `--json`, it does not wait. Continuing
+without lingering is not an error, and the output says what it means:
+
+```
+Lingering is off for alice, so the server stops when you log out and starts again only when you log in. Turn it on with: sudo loginctl enable-linger alice
+```
+
+### macOS
+
+The launch agent `~/Library/LaunchAgents/ai.overdeck.supervisor.plist` starts when you log
+in. macOS has no lingering for user agents, so a Mac that must come back after a reboot
+with nobody logged in needs automatic login (**System Settings → Users & Groups**).
+
+macOS 15+'s Local Network privacy blocks that launch agent's connections to other machines
+on this network until you allow them. `pan connect` prints the exact note:
+
+```
+macOS blocks the server's connections to other machines on this network until you allow them: on this Mac, open System Settings → Privacy & Security → Local Network and turn on node (/opt/homebrew/bin/node). node appears in that list after the server first tries to reach another machine, so check it once this Mac is linked.
+```
+
+Turn on `node` at the printed path in **System Settings → Privacy & Security → Local
+Network**; the entry only appears there after the server's first attempt to reach another
+machine, so it will not be listed immediately after `pan connect`. Homebrew's `node` is
+ad-hoc signed, so macOS can treat an upgraded binary as a new app — check the grant again
+after `brew upgrade node`. When `node` is not in the list at all, link over Tailscale
+instead (`pan tailscale setup`).
+
+### No systemd
+
+In a container, without `XDG_RUNTIME_DIR` (for example after `su` instead of logging in over
+SSH as that user), or wherever `systemctl --user` does not work, `pan connect` runs the
+supervisor as a plain process and says why:
+
+```
+No systemd user manager is available here (this is a container), so the server runs as a plain process: it stops when you log out and does not start after a reboot.
+```
+
+The same fallback applies when `OVERDECK_HOME` is not `~/.overdeck`, unless you set
+`OVERDECK_SUPERVISOR_UNIT=1`.
+
+### Which address the link uses
+
+The first match wins:
+
+1. `--url`, exactly as given.
+2. This machine's Tailscale address (`100.64.0.0/10`).
+3. The address you reached this machine at over SSH (from `SSH_CONNECTION`), unless it is
+   a loopback address.
+4. Another address on a real network interface (container bridges are skipped), public
+   addresses before private ones.
+5. `localhost`, with the `pan pair` warning that the link only works on this machine.
+
+Unless the address is a Tailscale address, the output names the host and port the other
+machine must reach. If a firewall blocks that port, open it or set up Tailscale with
+`pan tailscale setup`, then run `pan connect` again.
+
+### After a reboot
+
+On a Linux machine with lingering on, systemd starts the supervisor at boot. The watchdog
+waits out its 5-minute boot grace and then starts the dashboard, so the dashboard answers
+within about 6 minutes. A linked machine retries with a back-off of up to 5 minutes, so it
+shows this machine **online** again within about 15 minutes. If Traefik is enabled here,
+the output adds that Traefik and CLIProxy wait for `pan up` after a reboot.
+
+### Updating and removing
+
+Update a machine connected with npx from any linked machine with **Update all** (or `pan
+machines update`): it installs the newest version into `~/.overdeck/runtime` with `npm
+install --prefix` (no `sudo`) and restarts the dashboard from it. On the machine itself,
+`~/.overdeck/runtime/node_modules/.bin/pan update` does the same install. Running the
+newest version of `pan connect` also works, and also rewrites the service:
+
+```bash
+npx @overdeck/core@latest connect
+```
+
+It installs that version into `~/.overdeck/runtime` and rewrites the service. To remove
+the service:
+
+```bash
+# Linux
+systemctl --user disable --now overdeck-supervisor.service
+sudo loginctl disable-linger <user>
+
+# macOS
+launchctl bootout gui/$(id -u)/ai.overdeck.supervisor
+rm ~/Library/LaunchAgents/ai.overdeck.supervisor.plist
+```
+
+`pan connect` installs only the Overdeck server. Agents on that machine still need the
+harness CLIs and Herdr: run `~/.overdeck/runtime/node_modules/.bin/pan install` there.
+
+### Troubleshooting
+
+The watchdog stops restarting the dashboard after three failed restarts in a row, and it
+remembers that across supervisor restarts (and so across reboots). If the dashboard is
+still down after a reboot, start it by hand:
+
+```bash
+~/.overdeck/runtime/node_modules/.bin/pan restart --dashboard --now
+```
+
+Do not use `pan up` for this on a server: it expects the full host setup from `pan install`
+(terminal backend and sidecars), which a fresh server may not have.

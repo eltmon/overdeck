@@ -1,0 +1,137 @@
+{
+  "version": "1",
+  "issueId": "PAN-4661",
+  "created": "2026-11-02T03:25:40.567Z",
+  "updated": "2026-11-02T04:08:14.544Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "extract-pipeline-helpers": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4661",
+      "claimedAt": "2026-11-02T03:25:40.567Z",
+      "doneAt": "2026-11-02T03:36:36.866Z"
+    },
+    "mobile-pipeline-list": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4661",
+      "claimedAt": "2026-11-02T03:37:08.100Z",
+      "doneAt": "2026-11-02T03:42:19.148Z"
+    },
+    "mobile-issue-sheet": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4661",
+      "claimedAt": "2026-11-02T03:42:30.304Z",
+      "doneAt": "2026-11-02T03:46:05.471Z"
+    },
+    "mobile-route-pipeline": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4661",
+      "claimedAt": "2026-11-02T03:46:15.110Z",
+      "doneAt": "2026-11-02T03:50:17.037Z"
+    },
+    "e2e-pipeline-tab": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4661",
+      "claimedAt": "2026-11-02T03:50:25.851Z",
+      "doneAt": "2026-11-02T03:55:32.633Z"
+    },
+    "docs-phone-pipeline": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4661",
+      "claimedAt": "2026-11-02T03:55:38.319Z",
+      "doneAt": "2026-11-02T03:56:52.067Z"
+    },
+    "extract-pipeline-helpers.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:00:15.922Z"
+    },
+    "extract-pipeline-helpers.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:00:38.908Z"
+    },
+    "extract-pipeline-helpers.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:01:00.246Z"
+    },
+    "extract-pipeline-helpers.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:01:20.460Z"
+    },
+    "mobile-pipeline-list.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:01:45.209Z"
+    },
+    "mobile-pipeline-list.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:02:07.498Z"
+    },
+    "mobile-pipeline-list.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:02:26.423Z"
+    },
+    "mobile-pipeline-list.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:02:44.049Z"
+    },
+    "mobile-issue-sheet.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:03:07.710Z"
+    },
+    "mobile-issue-sheet.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:03:25.630Z"
+    },
+    "mobile-issue-sheet.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:03:45.323Z"
+    },
+    "mobile-issue-sheet.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:04:05.557Z"
+    },
+    "mobile-route-pipeline.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:04:29.476Z"
+    },
+    "mobile-route-pipeline.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:04:51.426Z"
+    },
+    "mobile-route-pipeline.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:05:22.291Z"
+    },
+    "mobile-route-pipeline.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:05:52.737Z"
+    },
+    "e2e-pipeline-tab.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:06:24.752Z"
+    },
+    "e2e-pipeline-tab.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:06:50.350Z"
+    },
+    "e2e-pipeline-tab.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:07:10.454Z"
+    },
+    "e2e-pipeline-tab.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:07:29.907Z"
+    },
+    "docs-phone-pipeline.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:07:53.286Z"
+    },
+    "docs-phone-pipeline.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:08:14.544Z"
+    }
+  }
+}

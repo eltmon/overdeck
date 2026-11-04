@@ -274,6 +274,14 @@ vi.mock('./TasksRail', async () => {
 })
 vi.mock('./PickupGateCard', () => ({ PickupGateCard: () => <div>Pickup gate</div> }))
 vi.mock('./ChangedFilesView', () => ({ ChangedFilesView: () => <div>Changed files</div> }))
+const deftSummary = vi.hoisted(() => ({ isDeft: false }))
+vi.mock('../../deft/queries', () => ({ useDeftIssueSummary: () => ({ isDeft: deftSummary.isDeft, summary: null, isLoading: false }) }))
+vi.mock('../../deft/DeftDecisionsTab', () => ({ DeftDecisionsTab: () => <div data-testid="deft-decisions">Deft decisions</div> }))
+vi.mock('../../deft/DeftScopeView', () => ({ DeftScopeView: () => null }))
+vi.mock('../../deft/DeftScopeDag', () => ({ DeftScopeDag: () => null }))
+vi.mock('../../deft/DeftGatesPanel', () => ({ DeftGatesPanel: () => null }))
+vi.mock('../../deft/DeftReviewCyclePanel', () => ({ DeftReviewCyclePanel: () => null }))
+vi.mock('../../deft/DeftBadges', () => ({ DeftDeliveryChip: () => null }))
 // The ONE IssueDetail pulls in the whole transcript/WS chain; these tests
 // cover the cockpit chrome (tabs, header, lane). The mount contract is
 // asserted via this props-recording stub.
@@ -391,6 +399,31 @@ describe('IssueMissionControl', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Overview' }))
     expect(screen.getByTestId('overview-live')).toBeInTheDocument()
+  })
+
+  it('adds a Decisions tab before Discussion for a Deft issue (PAN-4849)', () => {
+    deftSummary.isDeft = true
+    try {
+      renderMissionControl()
+      const nav = screen.getByRole('navigation', { name: 'Issue cockpit tabs' })
+      const labels = Array.from(nav.querySelectorAll('button[aria-selected]')).map((button) => button.textContent?.replace(/\d+\/\d+$/, ''))
+      expect(labels).toEqual(['Overview', 'Session', 'Plan', 'Changes✓', 'Activity', 'Decisions', 'Discussion'])
+      fireEvent.click(within(nav).getByRole('button', { name: 'Decisions' }))
+      expect(screen.getByTestId('deft-decisions')).toBeInTheDocument()
+    } finally {
+      deftSummary.isDeft = false
+    }
+  })
+
+  it('opens the Decisions body from a ?tab=decisions route (PAN-4849)', () => {
+    deftSummary.isDeft = true
+    window.history.replaceState(null, '', '/?tab=decisions')
+    try {
+      renderMissionControl()
+      expect(screen.getByTestId('deft-decisions')).toBeInTheDocument()
+    } finally {
+      deftSummary.isDeft = false
+    }
   })
 
   it('renders one cost chip, the tracker link, and the narrative phase sentence in the header', () => {

@@ -27,6 +27,8 @@ pan admin config shadow --enable
 pan admin config shadow --disable
 pan admin config shadow --tracker github --enable
 pan admin config tiers
+pan admin config set resources.quality_gate_slots 3
+pan admin config set agents.rtk.enabled false
 ```
 
 ## What It Does
@@ -38,9 +40,12 @@ declared model (`workhorse:<slot>` refs resolved, e.g. `workhorse:mid → claude
 Tiers marked `[overrides roles.work]` launch a different model than `roles.work` for planned
 issues while tiered execution is on.
 
-This command does **not** expose general-purpose `show`, `edit`, `get`, or `set`
-subcommands for the YAML router config. For model routing and provider settings, use the
-Settings page or edit `~/.overdeck/config.yaml` directly.
+`set <key> <value>` writes one value into `~/.overdeck/config.yaml` and keeps comments and every
+other block. The key is dotted snake_case exactly as the file nests it
+(`resources.quality_gate_slots`); the value is parsed as YAML, so `3` is a number, `true` a
+boolean and `[a, b]` a list. The config is loaded again after the write; if the value makes it
+invalid, the previous file is restored and the error is printed. Settings → Anywhere → Machines →
+**Compare settings** prints this command for each value that differs from a linked machine.
 
 ## When to Use
 

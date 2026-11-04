@@ -22,6 +22,14 @@ import {
 } from '../issueActions';
 import { useDashboardStore } from '../store';
 
+// refreshDashboardState awaits a live-snapshot request over the WebSocket
+// transport before the mutation's toasts. With no server it must fail at once,
+// as it does on CI, instead of waiting on whatever listens on this host.
+vi.mock('../wsTransport', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../wsTransport')>()),
+  getTransport: () => ({ request: () => Promise.reject(new Error('no live transport in tests')) }),
+}));
+
 vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
@@ -143,6 +151,21 @@ describe('ISSUE_ACTIONS', () => {
     for (const key of prdActionKeys) expect(registered.has(key), key).toBe(true);
     for (const key of preservedActionKeys) expect(registered.has(key), key).toBe(true);
     expect(registered.size).toBe(ISSUE_ACTIONS.length);
+  });
+
+  it('offers Run on Deft for an unmerged Overdeck issue and Back to Overdeck only for a Deft issue (PAN-4849)', () => {
+    const runOnDeft = ISSUE_ACTIONS.find((action) => action.key === 'runOnDeft')!;
+    const backToOverdeck = ISSUE_ACTIONS.find((action) => action.key === 'backToOverdeck')!;
+    const base: IssueActionState = { hasPlan: false, hasTasks: false };
+    expect(runOnDeft.enabledWhen({ ...base, isDeftPipeline: false, isMerged: false })).toBe(true);
+    expect(runOnDeft.enabledWhen({ ...base, isDeftPipeline: false, isMerged: true })).toBe(false);
+    expect(runOnDeft.enabledWhen({ ...base, isDeftPipeline: true, isMerged: false })).toBe(false);
+    expect(backToOverdeck.enabledWhen({ ...base, isDeftPipeline: true })).toBe(true);
+    expect(backToOverdeck.enabledWhen({ ...base, isDeftPipeline: false })).toBe(false);
+    expect(backToOverdeck.enabledWhen(base)).toBe(false);
+    for (const action of [runOnDeft, backToOverdeck]) {
+      expect(action).toMatchObject({ endpoint: '/api/issues/:id/pipeline', kind: 'safe', group: 'lifecycle', placement: 'menu' });
+    }
   });
 
   it('exports every action group once in the fixed four-group order (PAN-4198)', () => {
@@ -473,6 +496,45 @@ describe('requestReview mode submenu', () => {
       description: 'Review already passed for PAN-3340',
     }));
     expect(toast.success).not.toHaveBeenCalled();
+  });
+});
+
+describe('pipeline switch actions (PAN-4849)', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/api/dashboard/session')) return Response.json({ csrfToken: 'test-csrf-token' });
+      if (url === '/api/orders') return Response.json({ books: [] });
+      if (url === '/api/deft/issues') return Response.json({ issues: [] });
+      return Response.json({ accepted: true, issueId: 'PAN-3340', pipeline: 'deft' }, { status: 202 });
+    }));
+    useDashboardStore.setState({
+      issuesRaw: [reviewIssue()],
+      agentsById: { 'agent-pan-3340': stoppedWorkAgent() },
+      derivedIssueStateByIssueId: { 'PAN-3340': { issueId: 'PAN-3340', state: 'working' } },
+      backendPanesById: {},
+      drawer: { issueId: null, tab: 'overview' },
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.clearAllMocks();
+  });
+
+  it('posts { pipeline: deft } to the pipeline route and toasts the switch', async () => {
+    const { result } = renderReviewActions();
+    const runOnDeft = result.current.all.find((view) => view.action.key === 'runOnDeft');
+    expect(runOnDeft?.enabled).toBe(true);
+    expect(result.current.all.find((view) => view.action.key === 'backToOverdeck')?.enabled).toBe(false);
+
+    act(() => runOnDeft?.invoke());
+
+    await waitFor(() => expect(vi.mocked(fetch)).toHaveBeenCalledWith(
+      '/api/issues/PAN-3340/pipeline',
+      expect.objectContaining({ method: 'POST', body: JSON.stringify({ pipeline: 'deft' }) }),
+    ));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Switching PAN-3340 to deft…'));
   });
 });
 

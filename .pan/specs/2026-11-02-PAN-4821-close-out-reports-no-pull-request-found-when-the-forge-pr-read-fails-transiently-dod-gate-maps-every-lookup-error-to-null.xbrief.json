@@ -1,0 +1,413 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-02T15:51:17Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4821: Close-out reports 'no pull request found' when the forge PR read fails transiently (dod-gate maps every lookup error to null)",
+    "updated": "2026-11-02T15:59:52.932Z"
+  },
+  "plan": {
+    "id": "pan-4821",
+    "title": "Close-out reports 'no pull request found' when the forge PR read fails transiently (dod-gate maps every lookup error to null)",
+    "status": "running",
+    "uid": "0d2f7a4d-498b-4246-9876-43b04c048ed8",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-02T15:51:17Z",
+    "updated": "2026-11-02T15:59:52.932Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4821",
+        "label": "PAN-4821",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "close-out",
+      "dod-gate",
+      "forge",
+      "bugfix"
+    ],
+    "narratives": {
+      "Problem": "DoD rows 1 and 2 map every forge PR read failure to null and report 'no pull request found on the forge for this issue', discarding the real error; a failed read can even be waived by the strike or terminal-settlement paths. fetchIssuePullRequest also caches the error response for up to 60 s, so later readers in the same process see the same failure. Three merged issues failed close-out this way on 2026-11-02 and passed on retry.",
+      "Proposal": "Stop caching error responses in fetchIssuePullRequest. Add src/lib/lifecycle/dod-pr-read.ts with readPullRequestWithRetry (2 attempts, 1000 ms pause, console.warn per failed attempt) and a typed PullRequestReadError. Wire DoD rows 1, 2, 4 and 5 through it: rows 1/2 report a failed read as a miss carrying the real error and never skip it; row 4 keeps its 'forge metadata unavailable' text with the new message; row 5 tolerates the failure as an absent mergedAt. Document the new text in MERGE-WORKFLOW.md and the pan-close skill.",
+      "NonGoals": "- No new DodRowStatus value; a read failure is a miss\n- No change to --accept-* flags or their semantics\n- No change to src/lib/github-app.ts or the GitHub quota layer\n- No fix for the underlying post-reload trigger (follow-up once the warn line names it)\n- No retry inside fetchIssuePullRequest itself; the dashboard PR tab and merge gate keep their behavior apart from not caching errors\n- No change to checkVerificationRow's catch on the verification-artifact door\n- No single-flight de-duplication of concurrent PR reads in one gate evaluation\n- No change to row 5's observed wording when mergedAt is unavailable"
+    },
+    "autoDecisions": [
+      {
+        "summary": "A failed PR read keeps DoD status 'miss' with distinct observed text; no fourth DodRowStatus",
+        "rationale": "An unreadable PR must block exactly like a miss and stay overridable with --accept-review/--accept-tests; a new status would ripple into workflows.ts, close.ts renderDodGate, the pan-close skill table and --accept semantics for no behavioral gain. The issue's 'typed unknown/error row' is met by PullRequestReadError plus distinct text."
+      },
+      {
+        "summary": "A failed read fails closed in rows 1 and 2: no strike skip and no terminal-settlement skip",
+        "rationale": "Both waivers reason from 'no PR exists'; a failed read cannot rule out CHANGES_REQUESTED or red checks. Matches readCompletedCloseOut's fail-closed rule."
+      },
+      {
+        "summary": "Retry once (2 attempts) with a 1000 ms pause",
+        "rationale": "The issue asks for one retry; a short pause bounds added latency during a real outage."
+      },
+      {
+        "summary": "Retry lives in a new src/lib/lifecycle/dod-pr-read.ts, not in fetchIssuePullRequest",
+        "rationale": "Keeps dashboard PR-tab latency and the merge gate's own reread unchanged; dod-gate.ts is 933/1000 lines so the helper belongs in a sibling file like dod-deploy-probe.ts."
+      },
+      {
+        "summary": "Row 4 also reads through the retrying helper",
+        "rationale": "Row 4 reads first; a successful retry is cached and serves rows 1, 2 and 5, and row 4's mergeCommit feeds rows 6 and 8."
+      },
+      {
+        "summary": "Row 5's mergedAt read returns undefined on PullRequestReadError",
+        "rationale": "Row 5's evidence is the canonical state; a missing mergedAt can only turn a pass into a miss, so tolerance cannot wrongly pass the row, while throwing would regress a 'canonical state: done' pass during an outage."
+      },
+      {
+        "summary": "Log every failed attempt with console.warn prefixed [dod-gate]",
+        "rationale": "A successful retry leaves nothing in the row text, so the warn line is the only trace of the post-reload trigger; console.warn is the lifecycle convention and reaches the operator's terminal in the CLI."
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-02-PAN-4821-close-out-reports-no-pull-request-found-when-the-forge-pr-read-fails-transiently-dod-gate-maps-every-lookup-error-to-null.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "wi1-no-error-cache",
+        "title": "Stop caching failed PR reads in fetchIssuePullRequest",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T15:51:17Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4821",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/pull-requests.ts",
+            "tests/unit/dashboard/server/routes/issue-pr.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/server/routes/issue-pr.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "issue-pr.test.ts passes including the three new PAN-4821 cache tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4821.md WI-1. In fetchIssuePullRequest (src/lib/overdeck/pull-requests.ts, grep anchor `setCachedIssuePrTabResponse('pr', issueId, generation, result);`) wrap the cache write in `if (!result.error)` with the PAN-4821 comment from the PRD. Add the three tests named in WI-1 to the existing describe block in tests/unit/dashboard/server/routes/issue-pr.test.ts, using its mockExec child_process mock."
+        },
+        "items": [
+          {
+            "id": "wi1-no-error-cache.ac1",
+            "title": "Given gh pr view rejects on the first fetchIssuePullRequest call, when the same issue is read a second time and gh pr view now resolves, then the second call returns PR 642 with no error and mockExec shows 6 calls in total (the forge was asked again)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-no-error-cache.ac2",
+            "title": "Given the first gh pr list probe rejects with ETIMEDOUT, when the issue is read again, then the second call re-probes and returns the PR instead of the cached 'gh pr list failed' error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-no-error-cache.ac3",
+            "title": "Given both branch probes return empty output, when fetchIssuePullRequest is called twice, then both calls return pr null with no error and mockExec shows exactly 2 calls (the absent answer is still cached)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi2-pr-read-helper",
+        "title": "Add readPullRequestWithRetry with PullRequestReadError and per-attempt warn lines",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T15:51:17Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4821",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/lifecycle/dod-pr-read.ts",
+            "tests/unit/lib/lifecycle/dod-pr-read.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/lifecycle/dod-pr-read.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "dod-pr-read.test.ts passes with five tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Create src/lib/lifecycle/dod-pr-read.ts exactly as the PRD snippet: PR_READ_ATTEMPTS=2, PR_READ_PAUSE_MS=1000, class PullRequestReadError (issueId, underlying; message `pull request read failed on the forge after 2 attempts: <underlying>`), readPullRequestWithRetry(fetchPr, issueId). A response with `error` or a thrown fetch is a failed attempt; each failed attempt calls console.warn with `[dod-gate] <ISSUE> pull request read failed (attempt n of 2): <error>`. Create tests/unit/lib/lifecycle/dod-pr-read.test.ts with the five tests named in WI-2, using vi.useFakeTimers and vi.advanceTimersByTimeAsync (template: dod-deploy-probe.test.ts). No real setTimeout waits in tests."
+        },
+        "items": [
+          {
+            "id": "wi2-pr-read-helper.ac1",
+            "title": "Given the first read returns an error response and the second returns PR 42, when readPullRequestWithRetry runs and timers advance 1000 ms, then it resolves to PR 42 after exactly 2 fetches and emits one console.warn line containing 'attempt 1 of 2' and the first error text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-pr-read-helper.ac2",
+            "title": "Given the forge answers pr null with no error, when readPullRequestWithRetry runs, then it returns null after exactly 1 fetch and emits no warn line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-pr-read-helper.ac3",
+            "title": "Given every read fails with 'gh pr view failed: timeout', when readPullRequestWithRetry runs, then it rejects with a PullRequestReadError whose message is 'pull request read failed on the forge after 2 attempts: gh pr view failed: timeout' and stops at 2 fetches even after 10 more seconds of fake time",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-pr-read-helper.ac4",
+            "title": "Given the first read fails, when only 999 ms of fake time elapse, then the second fetch has not been issued, and it is issued once the 1000th ms elapses",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi3-verdict-read-error",
+        "title": "Report a failed PR read in DoD rows 1 and 2 instead of 'no pull request found'",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T15:51:17Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4821",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/lifecycle/dod-gate.ts",
+            "tests/unit/lib/lifecycle/dod-gate.test.ts",
+            "tests/unit/lib/lifecycle/dod-gate-pr-read.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/lifecycle/dod-gate.test.ts tests/unit/lib/lifecycle/dod-gate-pr-read.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "both dod-gate test files pass",
+            "typecheck completes without errors",
+            "file-size guard reports no violation for src/lib/lifecycle/dod-gate.ts"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-6",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. In src/lib/lifecycle/dod-gate.ts: import PullRequestReadError and readPullRequestWithRetry from './dod-pr-read.js'; set defaultDeps.readPullRequest to `issueId => readPullRequestWithRetry(fetchIssuePullRequest, issueId)`; replace the `.catch(() => null)` in checkVerdict with the try/catch from the PRD that returns result(id, 'miss', <error text>) before any strike or terminal-settlement logic; add exported readPullRequestMergedAt (returns undefined on PullRequestReadError) and wire defaultPostMergeRowDeps.readMergedAt to it. Split the existing test at dod-gate.test.ts line 153 into the four tests named in WI-3 (change assertions; never skip or delete). Create tests/unit/lib/lifecycle/dod-gate-pr-read.test.ts with the four default-wiring tests, mocking fetchIssuePullRequest via vi.mock with importOriginal and using fake timers."
+        },
+        "items": [
+          {
+            "id": "wi3-verdict-read-error.ac1",
+            "title": "Given readPullRequest throws Error('forge unavailable'), when checkReviewRow and checkTestsRow run, then both return status miss with observed 'pull request read failed on the forge: forge unavailable' and the observed text does not contain 'no pull request found'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-verdict-read-error.ac2",
+            "title": "Given readPullRequest throws, when the rows run with settlement {trackerClosed: true, landedWork: true, mainVerifyStatus: 'pass'} or landing {strikeLanded: true}, then every row returns status miss, never skip",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-verdict-read-error.ac3",
+            "title": "Given readPullRequest returns null (forge answered, no PR), when checkReviewRow runs, then it still returns miss with observed 'no pull request found on the forge for this issue'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-verdict-read-error.ac4",
+            "title": "Given the default deps and a mocked fetchIssuePullRequest that errors once then returns an APPROVED PR with green checks, when checkReviewRow runs and fake timers advance 1000 ms, then it returns status pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-verdict-read-error.ac5",
+            "title": "Given a mocked fetchIssuePullRequest that always errors, when readPullRequestMergedAt runs, then it resolves to undefined instead of rejecting",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi4-merged-row-retry",
+        "title": "Read the PR for DoD row 4 through the retrying helper",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T15:51:17Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4821",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/lifecycle/dod-gate.ts",
+            "tests/unit/lib/lifecycle/dod-gate-pr-read.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/lifecycle/dod-gate.test.ts tests/unit/lib/lifecycle/dod-gate-pr-read.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both dod-gate test files pass including the three row-4 tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. In src/lib/lifecycle/dod-gate.ts add exported readMergedRowPullRequest(ctx, branchName) (returns {} without reading when ctx.github is unset; otherwise `(await readPullRequestWithRetry(fetchIssuePullRequest, ctx.issueId)) ?? {}`) and set defaultMergedRowDeps.readPullRequest to it, removing the `if (response.error) throw new Error(response.error)` body. Leave checkMergedRow's catch untouched. Add the three row-4 tests from WI-4 to tests/unit/lib/lifecycle/dod-gate-pr-read.test.ts."
+        },
+        "items": [
+          {
+            "id": "wi4-merged-row-retry.ac1",
+            "title": "Given a mocked fetchIssuePullRequest that errors once then returns a MERGED PR #7, when readMergedRowPullRequest runs and fake timers advance 1000 ms, then it returns PR #7 after exactly 2 fetches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-merged-row-retry.ac2",
+            "title": "Given a context with no github coordinates, when readMergedRowPullRequest runs, then it returns {} and fetchIssuePullRequest is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-merged-row-retry.ac3",
+            "title": "Given every PR read fails, when checkMergedRow runs with readPullRequest set to readMergedRowPullRequest, then the row's observed text contains 'forge metadata unavailable: pull request read failed on the forge after 2 attempts:'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi5-docs",
+        "title": "Document the PR read-failure text and single retry for close-out rows 1 and 2",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T15:51:17Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4821",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/MERGE-WORKFLOW.md",
+            "sync-sources/skills/pan-close/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'pull request read failed on the forge after 2 attempts' docs/MERGE-WORKFLOW.md sync-sources/skills/pan-close/SKILL.md"
+          ],
+          "expected_outputs": [
+            "grep prints one or more matching lines from each of the two files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ],
+          "acJustification": "Docs-only item: two files, one observable statement each."
+        },
+        "narrative": {
+          "Action": "PRD WI-5. Add the MERGE-WORKFLOW.md paragraph after the paragraph that starts \"Close-out's DoD row 8 (deploy) probes\", and add the two-sentence note to sync-sources/skills/pan-close/SKILL.md after the 'Row 3 passes a stale ...' sentence. Use the exact wording in the PRD."
+        },
+        "items": [
+          {
+            "id": "wi5-docs.ac1",
+            "title": "Given docs/MERGE-WORKFLOW.md, when grep searches for 'pull request read failed on the forge after 2 attempts', then it produces a match in a paragraph that also says rows 1 and 2 retry the read once after 1 s and that 'no pull request found' now means the forge answered with no PR",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-docs.ac2",
+            "title": "Given sync-sources/skills/pan-close/SKILL.md, when grep searches for 'pull request read failed on the forge after 2 attempts', then it produces a match in a note that says the text means the forge could not be read and that the operator should re-run pan close",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "wi2-pr-read-helper",
+        "to": "wi3-verdict-read-error",
+        "type": "blocks"
+      },
+      {
+        "from": "wi2-pr-read-helper",
+        "to": "wi4-merged-row-retry",
+        "type": "blocks"
+      },
+      {
+        "from": "wi3-verdict-read-error",
+        "to": "wi4-merged-row-retry",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

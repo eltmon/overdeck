@@ -6,7 +6,7 @@ import type { ITurnEmitter } from '../../voice/transcription.js';
 import { createTranscriptionManager, type TranscriptionManager } from '../../voice/transcription-manager.js';
 import { createTurnQueue, type TurnQueue } from '../../voice/turn-queue.js';
 import { loadVoiceSettings, subscribeVoiceSettings } from './routes/voice.js';
-import { authorizeDashboardUpgrade, rejectUpgrade, trackDeviceSocket } from './ws-auth.js';
+import { authorizeDashboardUpgrade, channelOfIncoming, rejectUpgrade, trackDeviceSocket } from './ws-auth.js';
 
 function sendJson(ws: WebSocket, payload: unknown): void {
   if (ws.readyState === WebSocket.OPEN) {
@@ -44,7 +44,7 @@ export function setupVoiceWebSocket(server: http.Server): void {
   originalOn('upgrade', (request: http.IncomingMessage, socket: import('net').Socket, head: Buffer) => {
     const url = new URL(request.url || '', `http://${request.headers.host}`);
     if (url.pathname !== '/ws/voice') return;
-    const auth = authorizeDashboardUpgrade(request.headers, request.method ?? 'GET');
+    const auth = authorizeDashboardUpgrade(request.headers, request.method ?? 'GET', 'admin', channelOfIncoming(request));
     if (!auth.ok) {
       rejectUpgrade(socket, auth.status, auth.message);
       return;

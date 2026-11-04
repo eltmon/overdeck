@@ -11,6 +11,7 @@ import {
 import { Effect } from 'effect';
 import { markAgentStateServiceInProcess, setAgentRuntimeMirror } from '../../src/lib/agent-runtime-mirror.js';
 import { assertCanStartFresh, getWorkAgentLifecycleState } from '../../src/lib/work-agent-lifecycle.js';
+import { getOverdeckHome } from '../../src/lib/paths.js';
 import * as claudeStorage from '../../src/lib/runtimes/storage/claude-code.js';
 import * as tmux from '../../src/lib/tmux.js';
 import * as liveness from '../../src/lib/agents/liveness.js';
@@ -58,6 +59,9 @@ describe('work-agent-lifecycle', () => {
         rmSync(dir, { recursive: true, force: true });
       }
     }
+    // Fixture writes reach ensureInternalToken() (agent-runtime.ts), which
+    // mints <OVERDECK_HOME>/internal-token in the shared worker home (PAN-4881).
+    rmSync(join(getOverdeckHome(), 'internal-token'), { force: true });
   });
 
   it('blocks fresh start when a stopped agent has a saved session', async () => {

@@ -1,0 +1,1928 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-03T03:03:41Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4849: Deft Directive per issue, part B: Deft state in the dashboard and the Run on Deft switch",
+    "updated": "2026-11-03T03:09:29.770Z"
+  },
+  "plan": {
+    "id": "pan-4849",
+    "title": "Deft Directive per issue, part B: Deft state in the dashboard and the Run on Deft switch",
+    "status": "running",
+    "uid": "941ec8f2-8294-4b3c-864b-1ad91f36a449",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 4,
+    "created": "2026-11-03T03:03:41Z",
+    "updated": "2026-11-03T03:09:29.770Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4849",
+        "label": "PAN-4849",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4820",
+        "label": "PAN-4820 (parent, plan source)",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4849.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "deft",
+      "dashboard",
+      "skill-packs",
+      "frontend",
+      "api"
+    ],
+    "metadata": {
+      "sizeJustification": "The operator split PAN-4820 into exactly two issues on 2026-11-02 and assigned this whole dashboard set (PAN-4820 WI-15..WI-29) plus the review-cycle view to PAN-4849. The surfaces share one contract, one state reader and one route file, and the DAG already lets a foreman fan out the frontend leaves; PRD section 11 names the three-sibling split if the operator prefers flywheel parallelism.",
+      "canonicalFilename": "2026-11-03-PAN-4849-deft-directive-per-issue-part-b-deft-state-in-the-dashboard-and-the-run-on-deft-switch.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "PAN-4820 shipped the per-issue Deft pipeline as lib and CLI code, but the dashboard shows none of Deft's state (scopes, escalations, gates, heartbeats, review cycle) and switching an issue needs the CLI.",
+      "Proposal": "Add an fs-only Deft state reader with shared contract types, Deft routes (state, batched summary, pipeline switch, escalation resolve, scope sign-off, review cycle), Needs-you and question-dialog integration for escalations and deterministic menus, frontend surfaces on the live cockpit, board and tree, a Deft review-cycle panel reconstructed from Greptile comments and fix-batch commits, Run on Deft / Back to Overdeck menu actions, and docs.",
+      "NonGoals": "- No Overdeck reviewer, check, test agent or extra instruction is added to a Deft issue (AD-22); the optional second reviewer is PAN-4851.\n- No Deft CLI is run by the dashboard server and no execSync is added.\n- No new field on the contracts DerivedIssueState and no change to the board's derivation path (AD-19).\n- No change to PAN-4820's install, merge guard, lift, archive or kickoff behavior.\n- No reading of .deft/review-monitor.json (obsolete in Directive).\n- No deterministic-menu parsing for Codex agents; their menus stay in the terminal.\n- No persistence of review rounds; rounds are reconstructed for display only.\n- No escalation surfacing in Needs-you when the issue has no work agent (the Decisions tab still shows them).\n- No minimatch dependency and no glob matching beyond exact and directory-prefix entries.\n- No file-size allowlist raise."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Plan from the PAN-4820 PRD WI-15..WI-29 and AD-9..AD-12, AD-19, AD-20, AD-22 unchanged except where the targets drifted.",
+        "rationale": "The issue body says not to re-decide them; drift corrections are re-verification, which the issue asks for."
+      },
+      {
+        "summary": "BD-1: scope view and scope DAG mount in the cockpit Plan tab (tasks and map sub-views), not in XBriefTab.",
+        "rationale": "XBriefTab is mounted only by dead IssueDigTabs and the buried PlanPane."
+      },
+      {
+        "summary": "BD-2: gates and review-cycle panels mount in IssueOverviewTab after SpecialistStrip.",
+        "rationale": "That is where Overdeck's own review verdicts render; AD-22 says show Deft's steps the same way."
+      },
+      {
+        "summary": "BD-3: the review lease is read from the <!-- deft:review-owner --> PR comment, not .deft/review-monitor.json.",
+        "rationale": "Directive made that file a no-op (record.ts:690-692, SKILL.md:693)."
+      },
+      {
+        "summary": "BD-4: review rounds are reconstructed from fix-batch commits and Greptile inline comments, labeled as reconstructed.",
+        "rationale": "Deft records no rounds and Greptile edits its summary in place."
+      },
+      {
+        "summary": "BD-5: the review cycle gets its own lib module and route; the state reader stays fs-only.",
+        "rationale": "Keeps NFR-1 for the reader and the forge reads out of the 15 s cockpit poll."
+      },
+      {
+        "summary": "BD-6/BD-7: 'not running' when no supported reviewer signal; verdicts use Deft's names CLEAN, NEW_P0_P1, PENDING, NO_REVIEWER_INSTALLED.",
+        "rationale": "Mirrors evaluateReviewerExpectation; the issue asks for an explicit not-running state; AD-22 asks for Deft's wording."
+      },
+      {
+        "summary": "BD-8: escalations and menus live in src/lib/deft/pending.ts and enter enrichment beside the operator decision, outside the cached scan.",
+        "rationale": "agent-enrichment.ts has limited room, and escalation files change without the transcript changing."
+      },
+      {
+        "summary": "BD-9/BD-10: answer mapping handles the dialog's note suffix; menus accept one verbatim option only.",
+        "rationale": "Matches AskUserQuestionDialog's two submit shapes and AD-11."
+      },
+      {
+        "summary": "BD-11: the frontend learns 'is Deft' from GET /api/deft/issues; IssueActionState gains isDeftPipeline.",
+        "rationale": "The contracts DerivedIssueState does not carry deftPipeline and AD-19 forbids growing it."
+      },
+      {
+        "summary": "BD-12: DeftIssueState carries installDrift and liftConflicts; the tree row shows spec drift and install drift separately.",
+        "rationale": "The architecture doc already promises drift, and the two drifts mean different things."
+      },
+      {
+        "summary": "BD-14: component tests render from a golden JSON that the state-reader test proves equals the reader's fixture output.",
+        "rationale": "Issue acceptance requires fixture-derived values."
+      },
+      {
+        "summary": "BD-15: switch activity entries use source 'dashboard'.",
+        "rationale": "ActivitySource has no 'deft'."
+      },
+      {
+        "summary": "BD-17: one xBRIEF with sizeJustification.",
+        "rationale": "The operator assigned exactly this set to PAN-4849 when splitting PAN-4820; auto mode may not re-scope it."
+      }
+    ],
+    "items": [
+      {
+        "id": "state-reader",
+        "title": "Contract types and the fs-only Deft state reader",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T03:03:41Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4849",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "packages/contracts/src/deft-state.ts",
+            "packages/contracts/src/index.ts",
+            "src/lib/deft/state-reader.ts",
+            "src/lib/deft/__tests__/fixtures/deft-issue-state.golden.json",
+            "src/lib/deft/__tests__/state-reader.test.ts",
+            "src/lib/deft/__tests__/fixtures/directive/xbrief/proposed/scope-proposed.xbrief.json",
+            "src/lib/deft/__tests__/fixtures/directive/xbrief/pending/scope-pending.xbrief.json",
+            "src/lib/deft/__tests__/fixtures/directive/xbrief/active/scope-active.xbrief.json",
+            "src/lib/deft/__tests__/fixtures/directive/xbrief/completed/scope-completed.xbrief.json",
+            "src/lib/deft/__tests__/fixtures/directive/xbrief/cancelled/scope-cancelled.xbrief.json",
+            "src/lib/deft/__tests__/fixtures/directive/xbrief/PROJECT-DEFINITION.xbrief.json",
+            "src/lib/deft/__tests__/fixtures/directive/xbrief/decisions/d1.decision.json",
+            "src/lib/deft/__tests__/fixtures/directive/xbrief/.audit/spec-drift-ledger.json",
+            "src/lib/deft/__tests__/fixtures/directive/.deft/escalations/esc-20261102120000-aaaaaa.json",
+            "src/lib/deft/__tests__/fixtures/directive/.deft/escalations/esc-20261102120100-bbbbbb.json",
+            "src/lib/deft/__tests__/fixtures/directive/.deft/escalations/esc-20261102120200-cccccc.json",
+            "src/lib/deft/__tests__/fixtures/directive/.deft/escalations/esc-20261101120000-dddddd.json",
+            "src/lib/deft/__tests__/fixtures/directive/.deft/escalations/esc-bad.json",
+            "src/lib/deft/__tests__/fixtures/directive/.deft/approved-scope/scope-active.json",
+            "src/lib/deft/__tests__/fixtures/directive/.deft-scratch/subagent-status/impl-1.json",
+            "src/lib/deft/__tests__/fixtures/directive/.deft-scratch/subagent-status/pr-watch-12-4242.json",
+            "src/lib/deft/__tests__/fixtures/directive/.deft-scratch/merge-path-arm/pr-12.clean.json",
+            "src/lib/deft/__tests__/fixtures/directive/.deft-cache/finish-loop-progress.jsonl",
+            "src/lib/deft/__tests__/fixtures/directive/.overdeck/deft-run-summary.jsonl",
+            "src/lib/deft/__tests__/fixtures/directive/greptile.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/deft/__tests__/state-reader.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "state-reader.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13",
+            "NFR-1",
+            "NFR-5"
+          ],
+          "prdWorkItem": "WI-1",
+          "foundationFor": [
+            "deft-routes",
+            "pending-escalations",
+            "deft-queries",
+            "review-cycle-derive"
+          ],
+          "parallelSafeReason": "New files only (contract module, reader, fixtures); the one shared edit is a single export line in packages/contracts/src/index.ts."
+        },
+        "narrative": {
+          "Action": "Add packages/contracts/src/deft-state.ts (DeftIssueState, DeftIssueSummary and parts) and src/lib/deft/state-reader.ts with readDeftIssueState(worktree, issueId, now) and summarizeDeftIssueState(state), reading every Directive file with fs/promises only, plus the fixture tree and the hand-written golden JSON. Full spec: .pan/drafts/PAN-4849.md WI-1."
+        },
+        "items": [
+          {
+            "id": "state-reader.ac1",
+            "title": "Given the fixture tree and now=2026-11-02T18:00:00Z, readDeftIssueState returns an object that deep-equals deft-issue-state.golden.json (scopes, escalations with dueAt/overdue, heartbeats, decisions, approved scopes, policy with requireHumanMerge true and minGreptileConfidence 4, spec drift, finish loop, gate runs, reviewerConfigPresent true, cleanRecords).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "state-reader.ac2",
+            "title": "Given the malformed fixture esc-bad.json, the reader records one entry naming that path in errors and still returns every other escalation without throwing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "state-reader.ac3",
+            "title": "Given an empty directory, the reader returns empty arrays, mode 'not-installed', and requireHumanMerge 'unknown'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "state-reader.ac4",
+            "title": "state-reader.ts imports nothing from node:child_process and contains no execSync (grep returns no match).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "deft-routes",
+        "title": "Deft read routes and the pipeline switch route",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T03:03:41Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4849",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/deft.ts",
+            "src/dashboard/server/server.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/routes/__tests__/deft-routes.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/deft-routes.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "deft-routes.test.ts and no-loss-matrix.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13",
+            "FR-17",
+            "NFR-1",
+            "NFR-3"
+          ],
+          "prdWorkItem": "WI-2"
+        },
+        "narrative": {
+          "Action": "Create routes/deft.ts (deftRouteLayer, registered in server.ts) serving GET /api/issues/:id/deft, GET /api/deft/issues, and POST /api/issues/:id/pipeline that answers 202 and spawns `pan skills deft use|back <ID> [--start]` detached with async spawn; add three no-loss rows. Full spec: .pan/drafts/PAN-4849.md WI-2."
+        },
+        "items": [
+          {
+            "id": "deft-routes.ac1",
+            "title": "GET /api/issues/PAN-1/deft returns 404 when the issue is not on Deft and 200 with the golden state when it is (pipeline and workspace path mocked).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deft-routes.ac2",
+            "title": "POST /api/issues/PAN-1/pipeline with {pipeline:'deft',start:true} returns 202 and spawns exactly one child with args ['skills','deft','use','PAN-1','--start'] through the injected spawner.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deft-routes.ac3",
+            "title": "A second POST for the same issue before the first child exits returns 409, and after the child exits an activity entry with source 'dashboard' is emitted.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deft-routes.ac4",
+            "title": "no-loss-matrix.ts contains rows for GET /api/issues/:id/deft, GET /api/deft/issues and POST /api/issues/:id/pipeline, and grep for execSync in routes/deft.ts returns no match.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "escalation-resolve",
+        "title": "Resolve a Deft escalation file and its route",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T03:03:41Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4849",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/deft/escalations.ts",
+            "src/lib/deft/__tests__/escalations.test.ts",
+            "src/dashboard/server/routes/deft.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/routes/__tests__/deft-routes.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/deft/__tests__/escalations.test.ts src/dashboard/server/routes/__tests__/deft-routes.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts"
+          ],
+          "expected_outputs": [
+            "escalations.test.ts, deft-routes.test.ts and no-loss-matrix.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-14",
+            "NFR-4"
+          ],
+          "prdWorkItem": "WI-3"
+        },
+        "narrative": {
+          "Action": "Add resolveDeftEscalation (AD-10 atomic rewrite, id regex ^esc-[0-9]{14}-[0-9a-f]{6}$) and notifyEscalationResolved in src/lib/deft/escalations.ts, and route POST /api/issues/:id/deft/escalations/:escId/resolve with a no-loss row. Full spec: .pan/drafts/PAN-4849.md WI-3."
+        },
+        "items": [
+          {
+            "id": "escalation-resolve.ac1",
+            "title": "Given an open escalation file, resolveDeftEscalation rewrites it with status 'resolved' and a resolution holding decision, resolvedAt, resolvedBy, note and answer, and leaves every other field unchanged.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "escalation-resolve.ac2",
+            "title": "A second call on the same id returns 'already-resolved' and the route answers 409.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "escalation-resolve.ac3",
+            "title": "An escId of '../x' returns 'not-found' and writes no file.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "escalation-resolve.ac4",
+            "title": "After a 200 the route sends a notice through deliverAgentMessage to agent-<issue> with caller 'deft-escalation-answer', and a delivery failure shows in the response body while the status stays 200.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pending-escalations",
+        "title": "Deft escalations as pending questions and their answer branch",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T03:03:41Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4849",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/deft/pending.ts",
+            "src/lib/deft/__tests__/pending.test.ts",
+            "src/lib/agent-enrichment.ts",
+            "src/dashboard/server/routes/agents/permissions.ts",
+            "src/lib/__tests__/compute-agent-enrichment.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/deft/__tests__/pending.test.ts src/lib/__tests__/compute-agent-enrichment.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "pending.test.ts and compute-agent-enrichment.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-14",
+            "NFR-2"
+          ],
+          "prdWorkItem": "WI-4",
+          "parallelSafeReason": "Its shared files (agent-enrichment.ts, permissions.ts, pending.ts) are serialized by blocks edges with escalation-resolve before and deft-menu-dialog after; no other item touches them."
+        },
+        "narrative": {
+          "Action": "Add src/lib/deft/pending.ts (tool-id prefixes, deftEscalationQuestions with a 10 s cache, answerDeftEscalation implementing BD-9), call it from computeAgentEnrichment beside the operator decision (outside the cached scan) and from getAgentPendingQuestions, add the 'deftExternal' PendingInputKind, and branch on the deft-escalation: prefix in handlePostAgentAnswerQuestion. Full spec: .pan/drafts/PAN-4849.md WI-4. Deft questions are not filtered by the agent's startedAt."
+        },
+        "items": [
+          {
+            "id": "pending-escalations.ac1",
+            "title": "Given a Deft work agent whose worktree holds the fixture escalations, deftEscalationQuestions returns two questions (cmd_approval with Approve/Deny/Dismiss, question with Dismiss) and hasExternal true, and omits the resolved escalation.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pending-escalations.ac2",
+            "title": "Given an unchanged cachedScan, computeAgentEnrichment still returns pendingInputKinds containing 'askUserQuestion' and 'deftExternal' when the mocked Deft reader reports one open escalation and one external.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pending-escalations.ac3",
+            "title": "answerDeftEscalation resolves 'Approve' as approved, 'Deny\\n\\nNote: too risky' as denied with note 'too risky', and 'use port 8080' as answered with that answer.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pending-escalations.ac4",
+            "title": "When a second read happens within 10 s under fake timers, deftEscalationQuestions returns the cached state and the reader mock records one call.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pending-escalations.ac5",
+            "title": "`wc -l src/lib/agent-enrichment.ts` prints a count at or under 1000 after this item.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "deft-menu-dialog",
+        "title": "Deterministic Deft menus in the question dialog",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T03:03:41Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4849",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/deft/menu-parser.ts",
+            "src/lib/deft/__tests__/menu-parser.test.ts",
+            "src/lib/deft/pending.ts",
+            "src/lib/deft/__tests__/pending.test.ts",
+            "src/lib/agent-enrichment.ts",
+            "src/dashboard/server/routes/agents/permissions.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/deft/__tests__/menu-parser.test.ts src/lib/deft/__tests__/pending.test.ts"
+          ],
+          "expected_outputs": [
+            "menu-parser.test.ts and pending.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-15"
+          ],
+          "prdWorkItem": "WI-5"
+        },
+        "narrative": {
+          "Action": "Add parseDeftMenu (last 40 lines, 1..N with no gap, Discuss and Back last), deftMenuQuestion reading the transcript tail for a Deft agent, answerDeftMenu implementing BD-10, and wire both into agent-enrichment.ts and the answer route under the deft-menu: prefix. Full spec: .pan/drafts/PAN-4849.md WI-5."
+        },
+        "items": [
+          {
+            "id": "deft-menu-dialog.ac1",
+            "title": "Given a canonical five-option menu, parseDeftMenu returns options ending '4. Discuss' and '5. Back' with the line above the run as the prompt.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deft-menu-dialog.ac2",
+            "title": "A numbered list without Discuss/Back, or with a numbering gap, returns null.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deft-menu-dialog.ac3",
+            "title": "The answer branch sends '2. Approve' verbatim through deliverAgentMessage with caller 'deft-menu-answer', after stripping a trailing '\\n\\nNote: x'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deft-menu-dialog.ac4",
+            "title": "The answer branch rejects an answer that is not an option verbatim, such as 'Approve' without its number, with 400.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "deft-queries",
+        "title": "Frontend hooks for Deft state",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T03:03:41Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4849",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/deft/queries.ts",
+            "src/dashboard/frontend/src/components/deft/queries.test.ts",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/deft/queries.test.ts"
+          ],
+          "expected_outputs": [
+            "queries.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-16",
+            "NFR-7"
+          ],
+          "prdWorkItem": "WI-6"
+        },
+        "narrative": {
+          "Action": "Add components/deft/queries.ts with useDeftIssues, useDeftIssueSummary, useDeftIssueState (enabled only for a Deft issue), useResolveEscalation and useSignOffScope, typed from @overdeck/contracts. Full spec: .pan/drafts/PAN-4849.md WI-6."
+        },
+        "items": [
+          {
+            "id": "deft-queries.ac1",
+            "title": "useDeftIssueSummary('pan-1') reports isDeft true and returns the PAN-1 row from a mocked /api/deft/issues response.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deft-queries.ac2",
+            "title": "Given an issue absent from the list, useDeftIssueSummary returns isDeft false and useDeftIssueState sends no request.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deft-queries.ac3",
+            "title": "useResolveEscalation posts to /api/issues/:id/deft/escalations/:escId/resolve and invalidates the ['deft', issueId] query on success.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "decisions-tab",
+        "title": "Cockpit Decisions tab with escalations, decision records and policy",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T03:03:41Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4849",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx",
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.test.tsx",
+            "src/dashboard/frontend/src/components/deft/DeftDecisionsTab.tsx",
+            "src/dashboard/frontend/src/components/deft/DeftPolicyPanel.tsx",
+            "src/dashboard/frontend/src/components/deft/DeftDecisionsTab.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/deft/DeftDecisionsTab.test.tsx",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Stage/cockpit/IssueMissionControl.test.tsx"
+          ],
+          "expected_outputs": [
+            "DeftDecisionsTab.test.tsx and IssueMissionControl.test.tsx pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-14",
+            "FR-16",
+            "NFR-2",
+            "NFR-7"
+          ],
+          "prdWorkItem": "WI-7"
+        },
+        "narrative": {
+          "Action": "Add a Decisions tab (shown only for Deft issues) to IssueMissionControl.tsx rendering DeftDecisionsTab: escalations with SLA, due, overdue, dangerous and a Resolve control; decision records; and the read-only DeftPolicyPanel. Full spec: .pan/drafts/PAN-4849.md WI-7. The URL tab lookup (TABS.find, ~line 113) must also resolve 'decisions' via a DEFT_DECISIONS_TAB constant."
+        },
+        "items": [
+          {
+            "id": "decisions-tab.ac1",
+            "title": "Given the golden state, DeftDecisionsTab renders the cmd_approval title with a 'dangerous' pill, lists the resolved approval after the open escalations, and renders the decision record's whyWinner.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "decisions-tab.ac2",
+            "title": "DeftPolicyPanel renders requireHumanMerge as 'true' from the golden policy.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "decisions-tab.ac3",
+            "title": "When the operator submits Resolve on an open escalation, the component sends the resolve mutation with that escId and the chosen decision.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "decisions-tab.ac4",
+            "title": "IssueMissionControl renders 6 tabs for a non-Deft issue and 7 tabs including 'Decisions' when useDeftIssueSummary reports isDeft true, and an initial tab of 'decisions' opens the Decisions body.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "board-scope-summary",
+        "title": "Deft chip and scope counts on board cards",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T03:03:41Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4849",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/KanbanBoard/cards/KanbanCards.tsx",
+            "src/dashboard/frontend/src/components/deft/DeftScopeSummary.tsx",
+            "src/dashboard/frontend/src/components/deft/DeftScopeSummary.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/deft/DeftScopeSummary.test.tsx"
+          ],
+          "expected_outputs": [
+            "DeftScopeSummary.test.tsx passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-16",
+            "NFR-7"
+          ],
+          "prdWorkItem": "WI-8"
+        },
+        "narrative": {
+          "Action": "Render DeftScopeSummary after the IssueCard title: a neutral 'Deft' chip and AD-20 scope counts, nothing for non-Deft issues. Full spec: .pan/drafts/PAN-4849.md WI-8."
+        },
+        "items": [
+          {
+            "id": "board-scope-summary.ac1",
+            "title": "Given the golden summary, DeftScopeSummary renders 'Deft' and 'In progress 1 · Planned 1 · Proposed 1 · Done 1 · Cancelled 1'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "board-scope-summary.ac2",
+            "title": "Given an issue absent from /api/deft/issues, DeftScopeSummary renders nothing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "board-scope-summary.ac3",
+            "title": "IssueCard in KanbanCards.tsx renders <DeftScopeSummary issueId={issue.identifier} /> directly after the title <h3>.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "heartbeat-rows",
+        "title": "Deft subagent heartbeat rows in the agents lane",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T03:03:41Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4849",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/cockpit/AgentsLane.tsx",
+            "src/dashboard/frontend/src/components/deft/DeftSubagentRows.tsx",
+            "src/dashboard/frontend/src/components/deft/DeftSubagentRows.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/deft/DeftSubagentRows.test.tsx",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Stage/cockpit/AgentsLane.test.tsx"
+          ],
+          "expected_outputs": [
+            "DeftSubagentRows.test.tsx and AgentsLane.test.tsx pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-16",
+            "NFR-7"
+          ],
+          "prdWorkItem": "WI-9"
+        },
+        "narrative": {
+          "Action": "Add DeftSubagentRows (agentId, phase, lastMessage, PR #n, age, quiet after 10 minutes in a non-terminal phase) and render it in AgentsLane after the ships rows. Full spec: .pan/drafts/PAN-4849.md WI-9."
+        },
+        "items": [
+          {
+            "id": "heartbeat-rows.ac1",
+            "title": "Given the golden heartbeats under fake timers, two rows render and pr-watch-12-4242 shows 'PR #12' and 'polling'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "heartbeat-rows.ac2",
+            "title": "A heartbeat older than 10 minutes in a non-terminal phase shows a 'quiet' pill.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "heartbeat-rows.ac3",
+            "title": "For a non-Deft issue DeftSubagentRows renders nothing, and AgentsLane renders its existing agent rows unchanged.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "scope-signoff",
+        "title": "Sign off a scope item's disposition (lib and route)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T03:03:41Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4849",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/deft/signoff.ts",
+            "src/lib/deft/__tests__/signoff.test.ts",
+            "src/dashboard/server/routes/deft.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/routes/__tests__/deft-routes.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/deft/__tests__/signoff.test.ts src/dashboard/server/routes/__tests__/deft-routes.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts"
+          ],
+          "expected_outputs": [
+            "signoff.test.ts, deft-routes.test.ts and no-loss-matrix.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-16",
+            "NFR-4"
+          ],
+          "prdWorkItem": "WI-10"
+        },
+        "narrative": {
+          "Action": "Add signOffDisposition (AD-12, scope path regex, atomic rewrite) and POST /api/issues/:id/deft/scopes/signoff with a no-loss row. Full spec: .pan/drafts/PAN-4849.md WI-10."
+        },
+        "items": [
+          {
+            "id": "scope-signoff.ac1",
+            "title": "Given the fixture item whose disposition provenance kind is 'agent', signOffDisposition returns 'signed' and the file now holds provenance {kind:'human-event', actor:'overdeck:dashboard'} with recorded_at set and the disposition and reason unchanged.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scope-signoff.ac2",
+            "title": "A second call returns 'not-needed'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scope-signoff.ac3",
+            "title": "A scope path 'xbrief/../x.json' returns 'not-found' and writes nothing, and the route answers 404.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "scope-view",
+        "title": "Deft scopes with evidence and Sign off in Plan › Tasks",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T03:03:41Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4849",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/deft/DeftScopeView.tsx",
+            "src/dashboard/frontend/src/components/deft/DeftScopeView.test.tsx",
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/deft/DeftScopeView.test.tsx",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Stage/cockpit/IssueMissionControl.test.tsx"
+          ],
+          "expected_outputs": [
+            "DeftScopeView.test.tsx and IssueMissionControl.test.tsx pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-16",
+            "NFR-7"
+          ],
+          "prdWorkItem": "WI-11"
+        },
+        "narrative": {
+          "Action": "Add DeftScopeView (scopes grouped by folder with AD-20 headings, items with status, evidence, disposition and a Sign off button) and render it above TasksPanel in the cockpit Plan tab's tasks sub-view (BD-1). Full spec: .pan/drafts/PAN-4849.md WI-11."
+        },
+        "items": [
+          {
+            "id": "scope-view.ac1",
+            "title": "Given the golden state, DeftScopeView renders the active scope under 'In progress' with its evidence pointer.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scope-view.ac2",
+            "title": "The item with agent provenance shows a 'Sign off' button, and clicking it calls the sign-off mutation with that scope's path and item id.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scope-view.ac3",
+            "title": "An item whose provenance kind is human-event shows no 'Sign off' button, and a non-Deft issue renders nothing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "scope-dag",
+        "title": "Deft scope DAG in Plan › Map",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T03:03:41Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4849",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/deft/DeftScopeDag.tsx",
+            "src/dashboard/frontend/src/components/deft/DeftScopeDag.test.tsx",
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/deft/DeftScopeDag.test.tsx"
+          ],
+          "expected_outputs": [
+            "DeftScopeDag.test.tsx passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-16",
+            "NFR-7"
+          ],
+          "prdWorkItem": "WI-12"
+        },
+        "narrative": {
+          "Action": "Add deftScopesToDag and DeftScopeDag (DagRenderer with swarm dependsOn edges, conflict group in the title, file scope list) and render it above PlanMapCard in the Plan tab's map sub-view. Full spec: .pan/drafts/PAN-4849.md WI-12."
+        },
+        "items": [
+          {
+            "id": "scope-dag.ac1",
+            "title": "Given the golden scopes, deftScopesToDag returns nodes with completed→done, active→in-progress, cancelled→blocked and the rest waiting.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scope-dag.ac2",
+            "title": "It returns one edge from the pending scope to the active scope, appends ' [ui]' to the active scope's title, and drops a dependsOn id that names no known scope.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scope-dag.ac3",
+            "title": "DeftScopeDag renders the file scope line 'src/a.ts, docs/' for the active scope and renders nothing for a non-Deft issue.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gates-panel",
+        "title": "Deft gates panel on the Overview tab",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T03:03:41Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4849",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/deft/DeftGatesPanel.tsx",
+            "src/dashboard/frontend/src/components/deft/DeftGatesPanel.test.tsx",
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueOverviewTab.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/deft/DeftGatesPanel.test.tsx"
+          ],
+          "expected_outputs": [
+            "DeftGatesPanel.test.tsx passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-16",
+            "NFR-7"
+          ],
+          "prdWorkItem": "WI-13"
+        },
+        "narrative": {
+          "Action": "Add DeftGatesPanel (last 10 run-summary gate runs, Deft's run/skipped/failed words) and render it after SpecialistStrip in IssueOverviewTab.tsx (BD-2). Full spec: .pan/drafts/PAN-4849.md WI-13."
+        },
+        "items": [
+          {
+            "id": "gates-panel.ac1",
+            "title": "Given the golden state, DeftGatesPanel renders the gate run's target and three gates with statuses 'run', 'skipped' and 'failed'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gates-panel.ac2",
+            "title": "The failed gate shows its exit code and cause.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gates-panel.ac3",
+            "title": "With zero gate runs it renders 'No Deft gate runs recorded yet.', and for a non-Deft issue it renders nothing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "delivery-chip",
+        "title": "Deft delivery chip in the cockpit phase rail",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T03:03:41Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4849",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/deft/DeftBadges.tsx",
+            "src/dashboard/frontend/src/components/deft/DeftBadges.test.tsx",
+            "src/dashboard/frontend/src/components/Stage/cockpit/CockpitPhaseRail.tsx",
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/deft/DeftBadges.test.tsx",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Stage/cockpit/CockpitPhaseRail.test.tsx"
+          ],
+          "expected_outputs": [
+            "DeftBadges.test.tsx and CockpitPhaseRail.test.tsx pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-16",
+            "NFR-2",
+            "NFR-7"
+          ],
+          "prdWorkItem": "WI-14"
+        },
+        "narrative": {
+          "Action": "Add DeftDeliveryChip ('Deft: <handoffState>', muted CockpitPill) in DeftBadges.tsx, give CockpitPhaseRail an optional issueId prop that renders it beside ShipProgress, and pass issueId from IssueMissionControl. Full spec: .pan/drafts/PAN-4849.md WI-14."
+        },
+        "items": [
+          {
+            "id": "delivery-chip.ac1",
+            "title": "Given the golden summary, DeftDeliveryChip renders 'Deft: pr_open'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delivery-chip.ac2",
+            "title": "CockpitPhaseRail rendered without issueId renders no 'Deft:' chip.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delivery-chip.ac3",
+            "title": "`wc -l IssueMissionControl.tsx` prints a count at or under 1000 after this item.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "drift-badges",
+        "title": "Spec drift and install drift badges on the project tree row",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T03:03:41Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4849",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/deft/DeftBadges.tsx",
+            "src/dashboard/frontend/src/components/deft/DeftBadges.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/deft/DeftBadges.test.tsx"
+          ],
+          "expected_outputs": [
+            "DeftBadges.test.tsx passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-16",
+            "NFR-6",
+            "NFR-2"
+          ],
+          "prdWorkItem": "WI-15"
+        },
+        "narrative": {
+          "Action": "Add DeftDriftBadges ('spec drift <n>', 'install drift <n>' as neutral featureBadge chips with classes passed by the caller) and render it in FeatureItem's Badges span. Full spec: .pan/drafts/PAN-4849.md WI-15."
+        },
+        "items": [
+          {
+            "id": "drift-badges.ac1",
+            "title": "Given a summary with specDriftUnresolved 1 and installDrift 2, DeftDriftBadges renders 'spec drift 1' and 'install drift 2'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drift-badges.ac2",
+            "title": "Given zero counts or a non-Deft issue, it renders nothing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drift-badges.ac3",
+            "title": "`wc -l FeatureItem.tsx` prints a count at or under 1000 after this item.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "approved-scope-check",
+        "title": "Approved-scope check in Changes › Files",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T03:03:41Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4849",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/deft/ApprovedScopeCheck.tsx",
+            "src/dashboard/frontend/src/components/deft/ApprovedScopeCheck.test.tsx",
+            "src/dashboard/frontend/src/components/Stage/cockpit/ChangedFilesView.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/deft/ApprovedScopeCheck.test.tsx"
+          ],
+          "expected_outputs": [
+            "ApprovedScopeCheck.test.tsx passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-16",
+            "NFR-7"
+          ],
+          "prdWorkItem": "WI-16"
+        },
+        "narrative": {
+          "Action": "Add outOfScopeFiles and ApprovedScopeCheck (exact and directory-prefix match, .pan/deft/ always in scope, '*' entries listed as unchecked) and render it above the changed-file list in ChangedFilesView. Full spec: .pan/drafts/PAN-4849.md WI-16."
+        },
+        "items": [
+          {
+            "id": "approved-scope-check.ac1",
+            "title": "outOfScopeFiles(['src/a.ts','docs/x.md','src/b.ts'], golden approvedScopes) returns ['src/b.ts'].",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "approved-scope-check.ac2",
+            "title": "Given a changed path under .pan/deft/, outOfScopeFiles returns it as in scope (not in the result).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "approved-scope-check.ac3",
+            "title": "The component renders 'All changed files are in the approved scope' when nothing is out of scope, and renders nothing for a non-Deft issue.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "finish-loop-feed",
+        "title": "Deft finish-loop feed in the Activity tab",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T03:03:41Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4849",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/deft/DeftFinishLoopFeed.tsx",
+            "src/dashboard/frontend/src/components/deft/DeftFinishLoopFeed.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/ActivityTab.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/deft/DeftFinishLoopFeed.test.tsx"
+          ],
+          "expected_outputs": [
+            "DeftFinishLoopFeed.test.tsx passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-16",
+            "NFR-7"
+          ],
+          "prdWorkItem": "WI-17"
+        },
+        "narrative": {
+          "Action": "Add DeftFinishLoopFeed (last 20 finish-loop entries, newest first, with phase, iteration, message, PR and halt reason) and render it above ActivityFeedSidebar in ActivityTab. Full spec: .pan/drafts/PAN-4849.md WI-17."
+        },
+        "items": [
+          {
+            "id": "finish-loop-feed.ac1",
+            "title": "Given the golden state, the feed renders three entries with the newest first.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "finish-loop-feed.ac2",
+            "title": "An entry with a haltReason shows that reason.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "finish-loop-feed.ac3",
+            "title": "For a non-Deft issue or zero entries the feed renders nothing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "switch-actions",
+        "title": "Run on Deft and Back to Overdeck in the issue menu",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T03:03:41Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4849",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/issueActions.ts",
+            "src/dashboard/frontend/src/components/IssueActionMenu/useIssueActions.ts",
+            "src/dashboard/frontend/src/lib/__tests__/issueActions.test.ts",
+            "src/dashboard/frontend/src/lib/__tests__/issueActions.parity.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/lib/__tests__/issueActions.test.ts",
+            "npm --prefix ./src/dashboard/frontend run test -- src/lib/__tests__/issueActions.parity.test.tsx",
+            "npm --prefix ./src/dashboard/frontend run test -- src/lib/__tests__/issueActions.c-actions.test.ts",
+            "npm --prefix ./src/dashboard/frontend run test -- src/lib/__tests__/issueActions.menu-by-state.test.ts"
+          ],
+          "expected_outputs": [
+            "the four issueActions test files pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-17"
+          ],
+          "prdWorkItem": "WI-18"
+        },
+        "narrative": {
+          "Action": "Add runOnDeft and backToOverdeck registry entries (endpoint /api/issues/:id/pipeline, panVerb 'skills deft use|back'), an isDeftPipeline field on IssueActionState filled from useDeftIssueSummary, the POST handler with the 'Switching <ID> to <pipeline>…' toast, and list both keys in AUDITED_REGISTRY_KEYS. Full spec: .pan/drafts/PAN-4849.md WI-18. useDeftIssues uses retry:false and a failed fetch reads as not Deft; existing tests broken by the extra shared fetch mock components/deft/queries instead of loosening the hook (hazard H13)."
+        },
+        "items": [
+          {
+            "id": "switch-actions.ac1",
+            "title": "runOnDeft is enabled for {isDeftPipeline:false,isMerged:false} and disabled when isMerged is true or isDeftPipeline is true.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "switch-actions.ac2",
+            "title": "backToOverdeck is enabled only when isDeftPipeline is true.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "switch-actions.ac3",
+            "title": "Running runOnDeft posts {pipeline:'deft'} to /api/issues/PAN-1/pipeline and shows the toast 'Switching PAN-1 to deft…'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "switch-actions.ac4",
+            "title": "Given both new keys listed in AUDITED_REGISTRY_KEYS, the parity test's registry-key equality passes, and the c-actions test finds '/api/issues/:id/pipeline' served under src/dashboard/server/routes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "needs-you-frontend",
+        "title": "deftExternal label and escalation SLA/dangerous chips in the Decisions panel",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T03:03:41Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4849",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/pendingInput.ts",
+            "src/dashboard/frontend/src/lib/__tests__/pendingInput.test.ts",
+            "src/dashboard/frontend/src/components/DecisionsPanel.tsx",
+            "src/dashboard/frontend/src/components/__tests__/DecisionsPanel.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/lib/__tests__/pendingInput.test.ts",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/__tests__/DecisionsPanel.test.tsx"
+          ],
+          "expected_outputs": [
+            "pendingInput.test.ts and DecisionsPanel.test.tsx pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-14",
+            "NFR-6"
+          ],
+          "prdWorkItem": "WI-19"
+        },
+        "narrative": {
+          "Action": "Add 'deftExternal' with the label 'Deft: waiting on external' to the frontend PendingInputKind union and PENDING_INPUT_KIND_LABEL (not to BLOCKING_KINDS), and render neutral 'SLA <n>h' and 'dangerous' chips in DecisionRow for deft-escalation: questions, parsed from the question context. Full spec: .pan/drafts/PAN-4849.md WI-19."
+        },
+        "items": [
+          {
+            "id": "needs-you-frontend.ac1",
+            "title": "describePendingInput(['deftExternal']) returns 'Deft: waiting on external'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "needs-you-frontend.ac2",
+            "title": "Given a decision whose kinds are ['deftExternal'] only, useDecisions classifies it as non-blocking (BLOCKING_KINDS does not contain deftExternal).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "needs-you-frontend.ac3",
+            "title": "Given a decision built from the golden cmd_approval escalation (toolUseId deft-escalation:esc-20261102120000-aaaaaa), DecisionRow renders the chips 'SLA 1h' and 'dangerous'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "needs-you-frontend.ac4",
+            "title": "A DecisionRow whose toolUseId lacks the deft-escalation: prefix renders neither chip.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "review-cycle-derive",
+        "title": "Pure review-cycle view model from Greptile comments, checks and fix commits",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T03:03:41Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4849",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/deft-state.ts",
+            "src/lib/deft/review-cycle.ts",
+            "src/lib/deft/__tests__/review-cycle.test.ts",
+            "src/lib/deft/__tests__/fixtures/review-cycle.golden.json",
+            "src/lib/deft/__tests__/fixtures/review-cycle/main.input.json",
+            "src/lib/deft/__tests__/fixtures/review-cycle/clean.input.json",
+            "src/lib/deft/__tests__/fixtures/review-cycle/not-running.input.json",
+            "src/lib/deft/__tests__/fixtures/review-cycle/policy-empty.input.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/deft/__tests__/review-cycle.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "review-cycle.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-18",
+            "FR-19"
+          ],
+          "prdWorkItem": "WI-20",
+          "foundationFor": [
+            "review-cycle-route",
+            "review-cycle-panel"
+          ],
+          "parallelSafeReason": "New module and fixtures plus an append to deft-state.ts, which state-reader (its predecessor) owns; nothing else edits these files."
+        },
+        "narrative": {
+          "Action": "Add the DeftReviewCycle contract types and deriveDeftReviewCycle(input, now): reviewer presence (BD-6), Deft severity regexes, rounds reconstructed from fix-batch commits (BD-4), the five exit fields, Deft's verdict names (BD-7), and the deft:review-owner lease. Full spec: .pan/drafts/PAN-4849.md WI-20."
+        },
+        "items": [
+          {
+            "id": "review-cycle-derive.ac1",
+            "title": "Given the main fixture, deriveDeftReviewCycle deep-equals review-cycle.golden.json: two rounds (round 1 P0 1 / P1 0 / P2 1 with the fix commit, round 2 P1 1 from the summary), verdict NEW_P0_P1, confidence met at 4/5, lease active.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "review-cycle-derive.ac2",
+            "title": "Given the summary with zero P0/P1, a matching Last reviewed commit and a completed/success Greptile check run, the verdict is CLEAN with all five exit fields met.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "review-cycle-derive.ac3",
+            "title": "Given no Greptile comment, no Greptile check run, reviewerConfigPresent false and policy reviewers null, the verdict is NO_REVIEWER_INSTALLED with reviewer.source 'none' and rounds [].",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "review-cycle-derive.ac4",
+            "title": "Given policy reviewers [], the verdict is NO_REVIEWER_INSTALLED with source 'policy', and a CodeRabbit check run is listed in reviewer.unsupported.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "review-cycle-derive.ac5",
+            "title": "Given a '**P0**' line inside a fenced code block, countSeverities returns p0 0 for that body.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "review-cycle-route",
+        "title": "GET /api/issues/:id/deft/review-cycle",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T03:03:41Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4849",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/deft/review-cycle-load.ts",
+            "src/dashboard/server/routes/deft.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/routes/__tests__/deft-routes.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/deft-routes.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "deft-routes.test.ts and no-loss-matrix.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-18",
+            "NFR-1",
+            "NFR-3"
+          ],
+          "prdWorkItem": "WI-21"
+        },
+        "narrative": {
+          "Action": "Add loadDeftReviewCycle (PR head, check runs, PR discussions, fix commits from an async `git log <base>..HEAD` with a 15 s timeout, state reader) with injectable deps that never throws, and serve it at GET /api/issues/:id/deft/review-cycle with a no-loss row. Full spec: .pan/drafts/PAN-4849.md WI-21."
+        },
+        "items": [
+          {
+            "id": "review-cycle-route.ac1",
+            "title": "With injected deps the route returns 200 and the derived verdict for a Deft issue, and 404 for a non-Deft issue.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "review-cycle-route.ac2",
+            "title": "When the discussions loader rejects, the response is still 200 and errors holds exactly one entry.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "review-cycle-route.ac3",
+            "title": "loadDeftReviewCycle keeps only commits whose subject starts with 'fix: address Greptile review findings' as fixCommits.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "review-cycle-route.ac4",
+            "title": "review-cycle-load.ts contains promisify(execFile) for git, and grep for execSync in it returns no match.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "review-cycle-panel",
+        "title": "Deft review cycle panel on the Overview tab",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T03:03:41Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4849",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/deft/DeftReviewCyclePanel.tsx",
+            "src/dashboard/frontend/src/components/deft/DeftReviewCyclePanel.test.tsx",
+            "src/dashboard/frontend/src/components/deft/queries.ts",
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueOverviewTab.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/deft/DeftReviewCyclePanel.test.tsx"
+          ],
+          "expected_outputs": [
+            "DeftReviewCyclePanel.test.tsx passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-18",
+            "FR-19",
+            "NFR-7"
+          ],
+          "prdWorkItem": "WI-22"
+        },
+        "narrative": {
+          "Action": "Add useDeftReviewCycle and DeftReviewCyclePanel (verdict, five exit rows in Deft's wording, reconstructed rounds with severities and fix commit, lease, pr-watch heartbeats, CLEAN records, the not-running state) and render it after DeftGatesPanel in IssueOverviewTab. Full spec: .pan/drafts/PAN-4849.md WI-22."
+        },
+        "items": [
+          {
+            "id": "review-cycle-panel.ac1",
+            "title": "Given review-cycle.golden.json, the panel renders 'NEW_P0_P1', 'Round 1' with 'P0 1 · P1 0 · P2 1' and the fix commit subject, and 'Round 2' marked current.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "review-cycle-panel.ac2",
+            "title": "The exit predicate row 'Confidence ≥ 4/5 (now 4/5)' renders as met, and the lease owner renders.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "review-cycle-panel.ac3",
+            "title": "The footnote 'Rounds are reconstructed from Greptile comments and fix-batch commits; Deft does not record rounds.' renders.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "review-cycle-panel.ac4",
+            "title": "Given the not-running fixture, the panel renders 'No supported bot reviewer — Deft review cycle not running' and no 'Round' text.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Dashboard documentation for Deft issues",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T03:03:41Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4849",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/skill-packs.mdx",
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "docs/ISSUE-VIEW.md",
+            "docs/SKILL-PACKS.md",
+            "CHANGELOG.md",
+            ".overdeck/context/codebase/architecture.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'In the dashboard.' features/skill-packs.mdx",
+            "grep -c 'none of them is served today' docs/DASHBOARD-ARCHITECTURE.md || true"
+          ],
+          "expected_outputs": [
+            "the first grep prints 1",
+            "the second grep prints 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13",
+            "FR-14",
+            "FR-15",
+            "FR-16",
+            "FR-17",
+            "FR-18",
+            "FR-19"
+          ],
+          "prdWorkItem": "WI-23"
+        },
+        "narrative": {
+          "Action": "Write the 'In the dashboard.' paragraph in features/skill-packs.mdx 'Running an issue on Deft', rewrite the planned-routes section of docs/DASHBOARD-ARCHITECTURE.md as served routes plus the review-cycle route, add runOnDeft/backToOverdeck to docs/ISSUE-VIEW.md, add the new modules to docs/SKILL-PACKS.md, add a CHANGELOG Unreleased entry, and extend the codebase map's Deft sentence. Full spec: .pan/drafts/PAN-4849.md WI-23."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "features/skill-packs.mdx contains the paragraph 'In the dashboard.' naming Run on Deft, Back to Overdeck, the Decisions tab, the Deft review cycle panel and its 'Deft review cycle not running' state, and no longer contains 'are planned in [PAN-4849]'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md has the heading '## Deft pipeline routes (PAN-4849)', lists GET /api/issues/:id/deft/review-cycle, and no longer contains 'none of them is served today'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "docs/ISSUE-VIEW.md contains runOnDeft and backToOverdeck, and docs/SKILL-PACKS.md contains rows for state-reader.ts, pending.ts, menu-parser.ts, signoff.ts, review-cycle.ts and review-cycle-load.ts.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac4",
+            "title": "CHANGELOG.md contains an Unreleased section 'Added: Deft state in the dashboard' with bullets ending '(PAN-4849)', and .overdeck/context/codebase/architecture.md contains exactly one last-verified line, at the end.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "state-reader",
+        "to": "deft-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "state-reader",
+        "to": "pending-escalations",
+        "type": "blocks"
+      },
+      {
+        "from": "state-reader",
+        "to": "deft-queries",
+        "type": "blocks"
+      },
+      {
+        "from": "state-reader",
+        "to": "review-cycle-derive",
+        "type": "blocks"
+      },
+      {
+        "from": "deft-routes",
+        "to": "escalation-resolve",
+        "type": "blocks"
+      },
+      {
+        "from": "escalation-resolve",
+        "to": "scope-signoff",
+        "type": "blocks"
+      },
+      {
+        "from": "scope-signoff",
+        "to": "review-cycle-route",
+        "type": "blocks"
+      },
+      {
+        "from": "deft-routes",
+        "to": "switch-actions",
+        "type": "blocks"
+      },
+      {
+        "from": "escalation-resolve",
+        "to": "pending-escalations",
+        "type": "blocks"
+      },
+      {
+        "from": "pending-escalations",
+        "to": "deft-menu-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "deft-queries",
+        "to": "decisions-tab",
+        "type": "blocks"
+      },
+      {
+        "from": "deft-queries",
+        "to": "board-scope-summary",
+        "type": "blocks"
+      },
+      {
+        "from": "deft-queries",
+        "to": "heartbeat-rows",
+        "type": "blocks"
+      },
+      {
+        "from": "deft-queries",
+        "to": "scope-view",
+        "type": "blocks"
+      },
+      {
+        "from": "deft-queries",
+        "to": "scope-dag",
+        "type": "blocks"
+      },
+      {
+        "from": "deft-queries",
+        "to": "gates-panel",
+        "type": "blocks"
+      },
+      {
+        "from": "deft-queries",
+        "to": "delivery-chip",
+        "type": "blocks"
+      },
+      {
+        "from": "deft-queries",
+        "to": "drift-badges",
+        "type": "blocks"
+      },
+      {
+        "from": "deft-queries",
+        "to": "approved-scope-check",
+        "type": "blocks"
+      },
+      {
+        "from": "deft-queries",
+        "to": "finish-loop-feed",
+        "type": "blocks"
+      },
+      {
+        "from": "deft-queries",
+        "to": "switch-actions",
+        "type": "blocks"
+      },
+      {
+        "from": "deft-queries",
+        "to": "review-cycle-panel",
+        "type": "blocks"
+      },
+      {
+        "from": "decisions-tab",
+        "to": "scope-view",
+        "type": "blocks"
+      },
+      {
+        "from": "scope-view",
+        "to": "scope-dag",
+        "type": "blocks"
+      },
+      {
+        "from": "scope-dag",
+        "to": "delivery-chip",
+        "type": "blocks"
+      },
+      {
+        "from": "delivery-chip",
+        "to": "drift-badges",
+        "type": "blocks"
+      },
+      {
+        "from": "gates-panel",
+        "to": "review-cycle-panel",
+        "type": "blocks"
+      },
+      {
+        "from": "review-cycle-derive",
+        "to": "review-cycle-route",
+        "type": "blocks"
+      },
+      {
+        "from": "review-cycle-derive",
+        "to": "review-cycle-panel",
+        "type": "blocks"
+      },
+      {
+        "from": "deft-menu-dialog",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "board-scope-summary",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "heartbeat-rows",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "drift-badges",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "approved-scope-check",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "finish-loop-feed",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "switch-actions",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "review-cycle-panel",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "review-cycle-route",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "needs-you-frontend",
+        "to": "docs",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

@@ -1,0 +1,448 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-01T16:05:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4724: getCostsByIssueSnapshot re-aggregates all 771k cost_events rows every 15 s (~1.5 s each); make the per-issue cost rollup incremental",
+    "updated": "2026-11-01T16:06:13.187Z"
+  },
+  "plan": {
+    "id": "pan-4724",
+    "title": "getCostsByIssueSnapshot re-aggregates all 771k cost_events rows every 15 s (~1.5 s each); make the per-issue cost rollup incremental",
+    "status": "running",
+    "uid": "bb1201ea-9869-48fe-bdc0-b647d3d13255",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-01T16:05:00Z",
+    "updated": "2026-11-01T16:06:13.187Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4724",
+        "label": "PAN-4724",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "performance",
+      "costs",
+      "sqlite",
+      "dashboard",
+      "overdeck-db"
+    ],
+    "narratives": {
+      "Problem": "The dashboard's per-issue cost snapshot (getCostsByIssueSnapshot, refreshed every 15 s on the database worker's poll lane) runs four GROUP BY queries over every row of cost_events (771,393 rows). Each refresh takes ~1.5 s, holds the poll lane, burns a steady slice of a CPU core, and logs '[db-jobs] slow: op=getCostsByIssueSnapshot' (66,494 lines in dashboard.log). Cost grows with every agent turn.",
+      "Proposal": "Add a derived table cost_issue_rollup at grain (UPPER(issue_id), model, session_type, provider), about 3k rows, maintained by SQLite AFTER INSERT and AFTER UPDATE triggers on cost_events so every writer (insertCostEvent, CostWriter.record, reclassifyUnknownCostEvents, and the prebuilt hook bundle sync-sources/hooks/record-cost-event.js) keeps it current in the same transaction. A new module src/lib/overdeck/cost-issue-rollup.ts installs table, index, backfill and triggers atomically (BEGIN IMMEDIATE, double-checked, _v1 names) from ensureRuntimeIndexesSync. getCostsByIssue reads the rollup (~5 ms) with identical JS shaping, keeps the old query as getCostsByIssueFullScan for fallback and as the equivalence oracle. Full detail, SQL and tests are in .pan/drafts/PAN-4724.md.",
+      "NonGoals": "- Do not change other full-scan cost queries (getCostForIssueAggregate, getTodayCostSummary, getEffortRollup, CostWriter Drizzle aggregates, src/lib/costs/aggregator.ts).\n- Do not change the snapshot TTL (15 s), the poll lane, or the /api/costs/by-issue response shape.\n- Do not add a DELETE trigger; no code deletes cost_events rows.\n- Do not fix the pre-existing NULL-model vs literal 'unknown' model overwrite quirk in JS shaping; preserve it.\n- Do not rebuild or edit sync-sources/hooks/record-cost-event.js.\n- Do not add the rollup to drizzle/overdeck/0000_overdeck_init.sql or change OVERDECK_TABLE_COUNT.\n- Do not replace the triggers with JS-side maintenance next to each insert.\n- Do not open ~/.overdeck/overdeck.db from any test."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Use SQLite triggers to maintain the rollup (issue option 1) instead of a rowid watermark (option 2) or JS-side maintenance.",
+        "rationale": "reclassifyUnknownCostEvents UPDATEs issue_id on existing rows, which a rowid watermark cannot see; and the prebuilt hook bundle sync-sources/hooks/record-cost-event.js inserts from a separate process with stale bundled code, which only a database-level trigger observes."
+      },
+      {
+        "summary": "One rollup table at the finest grain (UPPER(issue_id), model, session_type, provider) with nullable keys matched by IS; no upsert.",
+        "rationale": "~3k rows serve all four read queries; SQLite unique indexes treat NULLs as distinct, and 195k live rows have NULL issue_id, so ON CONFLICT upserts would duplicate the NULL bucket."
+      },
+      {
+        "summary": "Install the rollup from its own module via ensureRuntimeIndexesSync; keep it out of 0000_overdeck_init.sql.",
+        "rationale": "Creation must be atomic with the backfill and triggers, so a single source avoids drift; precedent is sessions_fts in discovered-sessions.ts; keeps OVERDECK_TABLE_COUNT and gen-overdeck-erd.py untouched; infra.ts is at 941/1000 lines so only one call line goes there."
+      },
+      {
+        "summary": "Cost equality tolerance is 1e-6 absolute; integers and lastUpdated must match exactly.",
+        "rationale": "Running additions differ in order from SQLite's compensated SUM, so REAL sums can differ in the last bits; the issue requires 'same numbers' and integers can be exact."
+      },
+      {
+        "summary": "Production-size benchmark is an opt-in bench test (VITEST_INCLUDE_BENCH=1) at 750k rows asserting median < 50 ms; the 'no slow warning' AC is proven by that number being below formatSlowJobLine's 1000 ms threshold plus a post-deploy operator check.",
+        "rationale": "Matches tests/bench/sessions-feed.bench.ts; timing assertions in the default suite would flake under CI CPU contention."
+      },
+      {
+        "summary": "AFTER UPDATE trigger recomputes last_ts exactly when the moved row held the grain's max ts.",
+        "rationale": "Keeps lastUpdated identical to MAX(ts) at the cost of one indexed lookup on a rare path (UNKNOWN reclassification only)."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Five items over 11 files in two subsystems (overdeck db library, dashboard docs); within limits.",
+      "canonicalFilename": "2026-11-01-PAN-4724-getcostsbyissuesnapshot-re-aggregates-all-771k-cost-events-rows-every-15-s-1-5-s-each-make-the-per-issue-cost-rollup-incremental.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "rollup-install",
+        "title": "Create cost-issue-rollup module with table, insert trigger, atomic backfill install, wired into ensureRuntimeIndexesSync",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T16:05:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4724",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "rollup-update-trigger",
+            "rollup-read",
+            "rollup-bench"
+          ],
+          "files_scope": [
+            "src/lib/overdeck/cost-issue-rollup.ts",
+            "src/lib/overdeck/infra.ts",
+            "tests/lib/overdeck/cost-issue-rollup.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/overdeck/cost-issue-rollup.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "tests/lib/overdeck/cost-issue-rollup.test.ts passes all 5 tests",
+            "typecheck completes without errors",
+            "lint passes including lint:circular and the file-size guard"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-1 exactly (.pan/drafts/PAN-4724.md, 'WI-1'). New file src/lib/overdeck/cost-issue-rollup.ts importing only `type SqliteDatabase` from '../database/driver.js'. Export COST_ISSUE_ROLLUP_TABLE, COST_ISSUE_ROLLUP_V1_OBJECTS ['cost_issue_rollup','cost_issue_rollup_key_idx_v1','cost_issue_rollup_ai_v1'], COST_ISSUE_ROLLUP_GRAIN_SELECT_SQL, and ensureCostIssueRollup(db): boolean. Install: return false silently if cost_events table is absent; return true if every V1 object exists in sqlite_master (no transaction); otherwise BEGIN IMMEDIATE, re-check, DROP TRIGGER IF EXISTS each trigger, DROP TABLE IF EXISTS cost_issue_rollup, CREATE TABLE (columns per FR-1), CREATE INDEX cost_issue_rollup_key_idx_v1 (issue_key, model, session_type, provider), backfill INSERT ... SELECT GROUP BY UPPER(issue_id), model, session_type, provider, then CREATE TRIGGER cost_issue_rollup_ai_v1 (INSERT ... WHERE NOT EXISTS grain match using IS, then UPDATE adding COALESCE'd NEW values, tokens += COALESCE(sum of four token columns, 0), last_ts = MAX(last_ts, NEW.ts)); COMMIT; on error ROLLBACK, console.error '[cost-issue-rollup] install failed: ...', return false. Keep triggers in a module array ROLLUP_TRIGGERS_SQL so WI-2 appends. In infra.ts ensureRuntimeIndexesSync add one import and one call `ensureCostIssueRollup(db);` right after the idx_cost_issue_upper top-up line. Implementation checkpoint: if BEGIN IMMEDIATE fails because a transaction is open, use SAVEPOINT/RELEASE/ROLLBACK TO instead. Write the five tests listed in the PRD."
+        },
+        "items": [
+          {
+            "id": "rollup-install.ac1",
+            "title": "Given a fresh OVERDECK_HOME, when getOverdeckDatabase() opens the db, then sqlite_master contains every name in COST_ISSUE_ROLLUP_V1_OBJECTS",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rollup-install.ac2",
+            "title": "Given cost_events rows (NULL issue, pan-1/PAN-1, NULL provider) inserted while the rollup is absent, when ensureCostIssueRollup(db) runs, then it returns true and the rollup rows equal COST_ISSUE_ROLLUP_GRAIN_SELECT_SQL output (integers exact, cost within 1e-6)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rollup-install.ac3",
+            "title": "Given an installed rollup, when rows are inserted via insertCostEvent and via raw INSERT SQL (and one duplicate request_id is ignored), then the rollup still equals the grain SELECT output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rollup-install.ac4",
+            "title": "Given an installed rollup and a second connection holding BEGIN IMMEDIATE, when ensureCostIssueRollup(firstDb) runs, then it returns true without throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rollup-install.ac5",
+            "title": "Given a database with no cost_events table, when ensureCostIssueRollup runs, then it returns false and console.error is not called; and infra.ts grows by at most 3 lines with cost-issue-rollup.ts importing nothing from infra.ts or cost-sync.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rollup-update-trigger",
+        "title": "Add AFTER UPDATE trigger that moves a row's contribution between grains",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T16:05:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4724",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/cost-issue-rollup.ts",
+            "tests/lib/overdeck/cost-issue-rollup-update.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/overdeck/cost-issue-rollup-update.test.ts tests/lib/overdeck/cost-issue-rollup.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both rollup test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-2. Append 'cost_issue_rollup_au_v1' to COST_ISSUE_ROLLUP_V1_OBJECTS and the trigger SQL from the PRD to ROLLUP_TRIGGERS_SQL: AFTER UPDATE OF ts, issue_id, model, session_type, provider, cost, input, output, cache_read, cache_write ON cost_events. Body: subtract OLD from the OLD grain (calls - 1, COALESCE'd sums); DELETE the OLD grain row when calls <= 0; when the OLD grain row still exists and last_ts = OLD.ts, set last_ts = (SELECT MAX(ts) FROM cost_events WHERE grain match on OLD); then add NEW to the NEW grain with the same two statements as the insert trigger. Keep the object names _v1 (they ship in the same PR as WI-1). Write the five tests in tests/lib/overdeck/cost-issue-rollup-update.test.ts, comparing rollup rows to COST_ISSUE_ROLLUP_GRAIN_SELECT_SQL output; one test calls reclassifyUnknownCostEvents() from src/lib/costs/attribution.ts."
+        },
+        "items": [
+          {
+            "id": "rollup-update-trigger.ac1",
+            "title": "Given three UNKNOWN rows, when an UPDATE statement sets one row's issue_id to CONVERSATIONS, then the rollup equals the grain SELECT output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rollup-update-trigger.ac2",
+            "title": "Given a grain whose every row is moved to another issue, when the updates finish, then no rollup row remains with the old issue_key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rollup-update-trigger.ac3",
+            "title": "Given a grain with rows at ts 1000 and 2000, when the ts 2000 row moves to another issue, then that grain's last_ts becomes 1000",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rollup-update-trigger.ac4",
+            "title": "Given seeded UNKNOWN rows with no matching conversation, when reclassifyUnknownCostEvents() runs, then the rows move to UNATTRIBUTED and the rollup equals the grain SELECT output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rollup-update-trigger.ac5",
+            "title": "Given an installed rollup, when an UPDATE statement sets only cost_events.effort, then the rollup rows are deep-equal before and after",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rollup-read",
+        "title": "Make getCostsByIssue read cost_issue_rollup and keep the old query as getCostsByIssueFullScan",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T16:05:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4724",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/cost-sync.ts",
+            "tests/lib/overdeck/cost-sync.test.ts",
+            "tests/lib/overdeck/cost-sync-rollup-fallback.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/overdeck/cost-sync.test.ts tests/lib/overdeck/cost-sync-rollup-fallback.test.ts src/dashboard/server/services/__tests__/dashboard-cost-snapshot.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "all three test files pass, including the existing getCostsByIssue tests unchanged",
+            "typecheck completes without errors",
+            "lint passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-3 in src/lib/overdeck/cost-sync.ts. Rename today's getCostsByIssue body to exported getCostsByIssueFullScan() with a 'reference/fallback, never on a polling path' comment. Extract the shared JS shaping into a private shapeIssueAggregates(rows, modelRows, stageRows, providerRows) used by both functions so shaping stays byte-identical (?? 'unknown', ?? 0, lastUpdated conversion and fallback, budgetWarning false). Export COST_ISSUE_ROLLUP_READ_SQL { totals, models, stages, providers } exactly as in the PRD (FROM cost_issue_rollup, SUM(calls) for calls, SUM(tokens) for tokens, MAX(last_ts) for last_updated, COALESCE(provider,'unknown') grouping, ORDER BY total_cost DESC on totals). New getCostsByIssue(): db = getOverdeckDatabase(); if !ensureCostIssueRollup(db) then warn once ('[cost-issue-rollup] rollup unavailable; using full-scan aggregate') and return getCostsByIssueFullScan(); else run the four rollup reads and shape. Add the equivalence, after-insert, and EXPLAIN-plan tests to tests/lib/overdeck/cost-sync.test.ts, and the fallback test in the new file tests/lib/overdeck/cost-sync-rollup-fallback.test.ts using a top-level vi.mock with importOriginal (ESM exports cannot be spied). dashboard-cost-snapshot.ts does not change."
+        },
+        "items": [
+          {
+            "id": "rollup-read.ac1",
+            "title": "Given ~200 seeded rows incl. NULL issue, mixed case ids, NULL provider and model 'unknown', when getCostsByIssue() and getCostsByIssueFullScan() run, then their sorted key lists are equal (including 'null') and every field matches (cost within 1e-6, all other fields exact)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rollup-read.ac2",
+            "title": "Given the equal state above, when 50 more rows are inserted for new and existing issues, then getCostsByIssue() still equals getCostsByIssueFullScan() under the same rule",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rollup-read.ac3",
+            "title": "Given each statement in COST_ISSUE_ROLLUP_READ_SQL, when EXPLAIN QUERY PLAN runs on it, then no plan detail contains 'cost_events'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rollup-read.ac4",
+            "title": "Given ensureCostIssueRollup is mocked to return false, when getCostsByIssue() is called twice, then it returns the full-scan result and console.warn is called exactly once with a message containing '[cost-issue-rollup]'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rollup-bench",
+        "title": "Add 750k-row benchmark proving a snapshot refresh under 50 ms",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T16:05:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4724",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/bench/cost-issue-rollup.bench.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "VITEST_INCLUDE_BENCH=1 npx vitest run tests/bench/cost-issue-rollup.bench.ts"
+          ],
+          "expected_outputs": [
+            "tests/bench/cost-issue-rollup.bench.ts passes with median snapshot < 50 ms"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-4. Mirror tests/bench/sessions-feed.bench.ts (temp OVERDECK_HOME via mkdtempSync, dynamic imports, closeOverdeckDatabase in afterEach, 60_000 ms timeout). Seed 750,000 cost_events rows with triggers active in one transaction using the recursive-CTE INSERT from the PRD (NULL issue when i % 7 = 0, else 'PAN-' || (i % 900)). Import getCostsByIssueSnapshot from src/dashboard/server/services/dashboard-cost-snapshot.ts, call once to warm up, time 5 calls with performance.now(), assert median < 50, assert formatSlowJobLine({ op: 'getCostsByIssueSnapshot', lane: 'poll', waitMs: 0, runMs: Math.round(median), depth: 0 }) returns null, and assert issues.length === 901."
+        },
+        "items": [
+          {
+            "id": "rollup-bench.ac1",
+            "title": "Given 750,000 seeded cost_events rows, when getCostsByIssueSnapshot() runs 5 times after a warm-up, then the median duration is below 50 ms",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rollup-bench.ac2",
+            "title": "Given that median, when formatSlowJobLine is called with it as runMs for op getCostsByIssueSnapshot, then it returns null (no slow line is emitted)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rollup-bench.ac3",
+            "title": "Given the seeded data, when the snapshot is read, then it returns 901 issues (PAN-0..PAN-899 plus the 'null' bucket)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rollup-docs",
+        "title": "Document the trigger-maintained cost rollup in dashboard, schema and codebase-map docs",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T16:05:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4724",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "docs/overdeck-db-erd-notes.md",
+            ".overdeck/context/codebase/concerns.md",
+            ".overdeck/context/codebase/architecture.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c cost_issue_rollup docs/DASHBOARD-ARCHITECTURE.md docs/overdeck-db-erd-notes.md .overdeck/context/codebase/concerns.md .overdeck/context/codebase/architecture.md",
+            "grep -c schema-audit docs/overdeck-db-erd-notes.md; true"
+          ],
+          "expected_outputs": [
+            "each of the four files reports a count of at least 1",
+            "the schema-audit count for docs/overdeck-db-erd-notes.md is 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-5. (1) docs/DASHBOARD-ARCHITECTURE.md poll-lane paragraph starting 'Cost polling, conversation-list ledger totals' (~line 289): state that the per-issue cost snapshot reads cost_issue_rollup, a trigger-maintained table of ~3k grain rows, instead of aggregating every cost_events row (PAN-4724, ~1.5 s to ~5 ms). (2) docs/overdeck-db-erd-notes.md 'Schema changes': add that derived tables whose creation must be atomic with a backfill (cost_issue_rollup and its _v1 triggers, src/lib/overdeck/cost-issue-rollup.ts) are created by their module from ensureRuntimeIndexesSync, not the init SQL, stay outside OVERDECK_TABLE_COUNT, and a grain or aggregate-column change ships _v2 object names; delete the stale paragraph about src/lib/overdeck/schema-audit.ts (deleted in PAN-3917 W3, cc1a23ba457). (3) .overdeck/context/codebase/concerns.md 'Cost and session-index writers copy fields by explicit list' bullet: add that cost_events inserts/updates are rolled up by the cost_issue_rollup_*_v1 triggers so new writers need nothing, but a new aggregated column, a changed grain, or any code that DELETEs cost_events rows needs a _v2 install (no delete trigger); update last-verified. (4) .overdeck/context/codebase/architecture.md 'Cost metering' bullet: add overdeck/cost-issue-rollup.ts; update last-verified."
+        },
+        "items": [
+          {
+            "id": "rollup-docs.ac1",
+            "title": "Given docs/DASHBOARD-ARCHITECTURE.md, when a reader reaches the poll-lane cost snapshot paragraph, then it states that the per-issue snapshot reads the trigger-maintained cost_issue_rollup table instead of scanning every cost_events row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rollup-docs.ac2",
+            "title": "Given docs/overdeck-db-erd-notes.md, when a reader reaches 'Schema changes', then it names cost_issue_rollup as a module-created derived table outside the init SQL with the _v2 rename rule, and grep -c schema-audit on the file returns 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rollup-docs.ac3",
+            "title": "Given .overdeck/context/codebase/concerns.md and architecture.md, when a reader opens the cost writer and Cost metering bullets, then concerns.md says a new aggregated column, changed grain, or cost_events DELETE path needs a _v2 rollup install and architecture.md names overdeck/cost-issue-rollup.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "rollup-install",
+        "to": "rollup-update-trigger",
+        "type": "blocks"
+      },
+      {
+        "from": "rollup-install",
+        "to": "rollup-read",
+        "type": "blocks"
+      },
+      {
+        "from": "rollup-read",
+        "to": "rollup-bench",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

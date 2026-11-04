@@ -25,8 +25,7 @@ import {
 import { emitActivityEntry } from '../../../lib/activity-logger.js';
 import { closeDeviceConnections } from '../device-connections.js';
 import { jsonResponse } from '../http-helpers.js';
-import { rejectUnauthorizedDashboardRequest, rejectUnsafeDashboardMutationRequest, resolveDashboardCredential } from './dashboard-auth.js';
-import type { HeaderMap } from './origin-validation.js';
+import { rejectUnauthorizedDashboardRequest, rejectUnsafeDashboardMutationRequest, resolveRequestCredential } from './dashboard-auth.js';
 
 function noStore(response: HttpServerResponse.HttpServerResponse): HttpServerResponse.HttpServerResponse {
   return HttpServerResponse.setHeader(response, 'Cache-Control', 'no-store');
@@ -43,7 +42,7 @@ function parseJsonObject(text: string): Record<string, unknown> | null {
 
 /** A 403 unless the request carries a root credential (PAN-2351 D-11). */
 function rejectNonRootCredential(request: HttpServerRequest.HttpServerRequest, action: string): HttpServerResponse.HttpServerResponse | null {
-  const kind = resolveDashboardCredential(request.headers as HeaderMap)?.kind;
+  const kind = resolveRequestCredential(request)?.kind;
   if (kind === 'internal-token' || kind === 'root-session') return null;
   return noStore(jsonResponse({ error: `only the internal token or the root session can ${action} access tokens` }, { status: 403 }));
 }

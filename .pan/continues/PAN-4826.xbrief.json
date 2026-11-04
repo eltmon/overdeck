@@ -1,0 +1,220 @@
+{
+  "version": "1",
+  "issueId": "PAN-4826",
+  "created": "2026-11-02T16:31:08.878Z",
+  "updated": "2026-11-02T17:47:35.729Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-02T17:47Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-11-02T17:47:35.728Z"
+    }
+  ],
+  "items": {
+    "openai-cost-reprice": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4826",
+      "claimedAt": "2026-11-02T16:31:08.878Z",
+      "doneAt": "2026-11-02T16:33:17.697Z"
+    },
+    "openai-capability-reprice": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4826",
+      "claimedAt": "2026-11-02T16:33:24.619Z",
+      "doneAt": "2026-11-02T16:36:01.206Z"
+    },
+    "openai-picker-reprice": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4826",
+      "claimedAt": "2026-11-02T16:36:08.556Z",
+      "doneAt": "2026-11-02T16:52:12.985Z"
+    },
+    "register-rosalind-astra-law": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4826",
+      "claimedAt": "2026-11-02T16:52:21.453Z",
+      "doneAt": "2026-11-02T16:57:49.412Z"
+    },
+    "rosalind-astra-law-cost": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4826",
+      "claimedAt": "2026-11-02T16:57:58.747Z",
+      "doneAt": "2026-11-02T16:59:05.010Z"
+    },
+    "settings-catalog-order": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4826",
+      "claimedAt": "2026-11-02T16:59:13.860Z",
+      "doneAt": "2026-11-02T17:02:31.277Z"
+    },
+    "picker-rows-friendly-names": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4826",
+      "claimedAt": "2026-11-02T17:02:38.806Z",
+      "doneAt": "2026-11-02T17:15:54.197Z"
+    },
+    "sonnet-4-5-retire": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4826",
+      "claimedAt": "2026-11-02T17:16:02.713Z",
+      "doneAt": "2026-11-02T17:18:08.706Z"
+    },
+    "claude-46-context-lock": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4826",
+      "claimedAt": "2026-11-02T17:18:17.354Z",
+      "doneAt": "2026-11-02T17:20:00.205Z"
+    },
+    "docs-catalog-refresh": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4826",
+      "claimedAt": "2026-11-02T17:20:10.299Z",
+      "doneAt": "2026-11-02T17:22:15.867Z"
+    },
+    "openai-cost-reprice.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:27:06.648Z"
+    },
+    "openai-cost-reprice.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:27:28.538Z"
+    },
+    "openai-cost-reprice.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:27:46.722Z"
+    },
+    "openai-cost-reprice.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:28:05.248Z"
+    },
+    "openai-capability-reprice.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:28:26.789Z"
+    },
+    "openai-capability-reprice.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:28:44.249Z"
+    },
+    "openai-capability-reprice.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:29:03.628Z"
+    },
+    "openai-capability-reprice.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:29:21.093Z"
+    },
+    "openai-picker-reprice.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:29:39.506Z"
+    },
+    "openai-picker-reprice.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:29:57.942Z"
+    },
+    "openai-picker-reprice.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:30:18.082Z"
+    },
+    "register-rosalind-astra-law.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:30:44.525Z"
+    },
+    "register-rosalind-astra-law.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:31:05.280Z"
+    },
+    "register-rosalind-astra-law.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:31:22.004Z"
+    },
+    "register-rosalind-astra-law.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:31:37.405Z"
+    },
+    "rosalind-astra-law-cost.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:31:52.480Z"
+    },
+    "rosalind-astra-law-cost.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:32:07.550Z"
+    },
+    "settings-catalog-order.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:32:23.624Z"
+    },
+    "settings-catalog-order.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:32:38.627Z"
+    },
+    "settings-catalog-order.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:32:54.192Z"
+    },
+    "picker-rows-friendly-names.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:33:19.651Z"
+    },
+    "picker-rows-friendly-names.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:33:37.328Z"
+    },
+    "picker-rows-friendly-names.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:33:54.140Z"
+    },
+    "sonnet-4-5-retire.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:34:11.494Z"
+    },
+    "sonnet-4-5-retire.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:34:28.731Z"
+    },
+    "sonnet-4-5-retire.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:34:46.178Z"
+    },
+    "claude-46-context-lock.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:35:01.733Z"
+    },
+    "claude-46-context-lock.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:35:18.814Z"
+    },
+    "claude-46-context-lock.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:35:36.252Z"
+    },
+    "docs-catalog-refresh.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:36:02.048Z"
+    },
+    "docs-catalog-refresh.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:36:18.621Z"
+    },
+    "docs-catalog-refresh.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:36:36.693Z"
+    },
+    "docs-catalog-refresh.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:36:53.627Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-11-02T17:47:35Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-4826\n\n# Review — PAN-4826\n## Verdict: CHANGES REQUESTED — PR #4855 body omits the issue's required \"Verified\" / \"Not changed\" lists, so the deliberate non-implementation of issue AC #4 (1M window) is undocumented\n\n## Context\n- Run ID: agent-pan-4826-review-54d02d0f\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-4826/.pan/review/agent-pan-4826-review-54d02d0f/context.json\n- Branch / workspace: feature/pan-4826 / /home/eltmon/Projects/overdeck/workspaces/feature-pan-4826\n- PR: https://github.com/eltmon/overdeck/pull/4855\n- HEAD reviewed: 54d02d0fb13c715d7ffd2ce2ee2bb014cd03e79a\n- Base / prior cycle SHA: merge-base 4f33445291a3600a4a187a8db6036517b51c05a5; no prior review cycle\n- Note: source/tests/docs are unchanged since 2e762f1bd83 (`git diff --stat 2e762f1bd83..HEAD -- src tests configuration docs` is empty); the later commits only touch `.pan/` plan artifacts.\n\n## Blocking Findings\n\n### [requirements] PR body lacks the \"Verified\" and \"Not changed\" lists required by issue AC #5 and PRD AC-PR — PR #4855 body\n- Severity: ! (explicit in-scope acceptance criterion unmet)\n- Classification / requirement scope: validation gap (deliverable missing); in_pr_scope. Root cause looks like a plan-lowering gap: the xBRIEF spec carries 10 work items (traces list) and no item for AC-PR, so the work agent's checklist never contained it.\n- Trigger and changed-code connection: Issue #4826 AC #5: \"The PR body lists the facts verified and those skipped.\" Shared decision rule 1: \"If the official page disagrees with this issue, the official page wins, and the PR body says so. If you cannot confirm a fact … list it under 'Not changed (unverified)' in the PR body.\" PRD AC-PR requires a \"Verified\" list (each fact with its URL) and a \"Not changed\" list naming: (a) issue AC #4's 1M window not applied (D1, quoting the code.claude.com sentence), (b) no Codex floor for gpt-6-rosalind / gpt-6-astra-law (D5), (c) no published gpt-5.6-sol post-promo rate, (d) the claude-sonnet-4-5 target kept at claude-sonnet-4-6 although Anthropic recommends claude-sonnet-5-5 (D2).\n- Expected / observed / impact: Expected those two lists. Observed: `gh pr view 4855 --json body` shows only the issue link and a 10-line checklist of xBRIEF item titles. Impact: issue AC #4 (\"contextWindow equals the window stated by the claude-api skill\", i.e. 1M) is visibly unmet in code (still 200000), and nothing on the PR tells the merging operator that this is a deliberate, sourced deviation rather than an incomplete implementation. The same applies to the skipped Codex floors, which issue item 2 asked for (\"including any Codex CLI minimum version\").\n- Evidence: `gh pr view 4855 --json body -q .body`; `gh issue view 4826`; `.pan/drafts/PAN-4826.md` \"AC-PR\"; `grep -n \"AC-PR\\|Not changed\" .pan/specs/…xbrief.json` finds only rationale text, no item.\n- Fix: Edit the PR body (`gh pr edit 4855 --body-file …`); no code change. Add a \"Verified\" section listing each fact from the PRD's \"Verified facts\" with its URL, and a \"Not changed\" section with items (a)–(d) above, quoting for (a): \"Opus 4.6 and Sonnet 4.6 reach 1M only through their `[1m]` variant, and access to that variant depends on your plan\" (code.claude.com/docs/en/model-config). Keep the existing checklist. Spec correction for future plans: the planner should lower PR-body ACs into an xBRIEF item so they reach the work agent's checklist.\n\n## Non-blocking Findings\n\n- `?` [UX] gpt-6-rosalind is offered in both pickers and the Settings catalog to every operator, but OpenAI limits its API access to a trusted-access program and it is absent from the Codex 0.159.0 ChatGPT-sign-in catalog. A typical operator who picks it will get a provider-side rejection at launch rather than an Overdeck preflight refusal, because D5 deliberately adds no Codex floor row. The descriptions do state the restriction, and this follows the issue's \"opt-in\" rule and PRD D5/D7, so it is advisory. A follow-up could hide or badge trusted-access models.\n- `?` [requirements] gpt-6-astra-law is priced at the promotional $10/$1/$50 \"through at least 2026-12-31\", and gpt-5.6-sol at the promotional $4/$20 \"through at least 2026-11-21\" (19 days away). Both carry dated comments as the PRD requires; someone needs to revisit them when the promos end. No post-promo rates are published, so nothing more can be done now.\n- Intended side effect (PRD D3), confirmed: `tier-table.ts` `knownModelIds()` reads only `PROVIDERS.*.models`, so a tiered-execution config naming `claude-sonnet-4-5` now reports it as unknown. `providers.ts` `knownModelIds()` (UnknownModelError suggestions) and `tier-fitness-context.ts` still know it through `MODEL_DEPRECATIONS` keys and `MODEL_CAPABILITIES` keys, and `getProviderForModel` still resolves it to anthropic (asserted in the new audit test).\n\n## Coverage\n\n### Changed-file ledger\n| File | Status | Notes |\n|---|---|---|\n| configuration/harnesses.mdx | reviewed | New ids in family list, no-[372k] list, Rosalind/Astra-law price paragraph using `&#36;`, CLIProxy not-probed note. Matches WI-10. |\n| docs/MODEL-CONTEXT-AUDIT.md | reviewed | 272K row extended with 404 evidence; 4.6 row evidence corrected; two Sources bullets. |\n| docs/TESTING-PROVIDERS.md | reviewed | sonnet-4-5 → sonnet-4-6 example. |\n| docs/USAGE.md | reviewed | Retired ids replaced with current ones. |\n| src/dashboard/frontend/src/components/Settings/modelCatalog.ts | reviewed | New rows after gpt-6-luna; gpt-5.6-sol rows at 12 with promo text. |\n| src/dashboard/frontend/src/components/chat/ModelPicker.tsx | reviewed | New rows use `EFFORT_LEVELS` (lint:effort-safe); Sol rows at $12. |\n| src/dashboard/frontend/src/lib/dashboard-utils.ts | reviewed | astra-law / rosalind checks precede other GPT matches; no earlier branch (claude opus/sonnet/haiku `includes`) can catch these ids. |\n| src/dashboard/server/routes/settings.ts | reviewed | Appended to existing line; file still 1104 lines (allowlist cap 1104). |\n| src/lib/agents/provider-env.ts | reviewed | Comment only; `GPT_56_MODELS` unchanged (non-goal respected). |\n| src/lib/cost.ts | reviewed | Exact rows for new ids placed before prefix-capable `gpt-6-*` rows; gpt-5.6 trio and gpt-5.2 repriced with source comments; gpt-5.5/5.5-pro/5.4-mini untouched; no >272K tiers. |\n| src/lib/model-capabilities.ts | reviewed | In-place edits only; 1422 lines (allowlist cap 1422). 4.6 windows stay 200000. |\n| src/lib/model-capability-additions.ts | reviewed | New entries match D7 (no minTier, no maxOutputTokens, unranked skills, 272K pin constant). |\n| src/lib/model-capability-class.ts | reviewed | Both ids `frontier`. |\n| src/lib/model-fallback.ts | reviewed | MODEL_PROVIDERS, FALLBACK_MAP (→ claude-sonnet-5-5, an existing configured mapping, not a new hardcoded default path), MODEL_TIER_RANK 3 (same as gpt-6-astra). |\n| src/lib/providers.ts | reviewed | sonnet-4-5 removed from `PROVIDERS.anthropic.models` only; new ids in openai models and `getProviderForModel` array; `tierModels` unchanged. |\n| src/lib/settings-model-catalog.ts | reviewed | Order 8/9 between 5.6-luna (7) and 5.5 (10). |\n| src/lib/settings.ts | reviewed | Union + available list extended. |\n| src/dashboard/frontend/src/lib/__tests__/dashboard-utils.test.ts | reviewed | Two friendly-name assertions. |\n| src/lib/__tests__/fixtures/pre-opencode-model-catalog.json | reviewed | Only the two gpt-5.6-sol costs 17.5 → 12. |\n| src/lib/__tests__/model-capabilities.test.ts | reviewed | Blend table, gpt-5.2 window, 4.6 200K lock incl. policy, new-id registration, no-[372k] guard. |\n| src/lib/__tests__/model-catalog-audit.test.ts | reviewed | New ids at 272K; sonnet-4-5 retirement test. |\n| src/lib/__tests__/settings-model-catalog.test.ts | reviewed | gpt6Additions extended in catalog order. |\n| src/lib/costs/__tests__/cost-calculation.test.ts | reviewed | No-cache test repointed to gpt-5.5-pro; expected 0.12 is correct ((1000·30 + 500·180)/1M). |\n| src/lib/runtimes/__tests__/codex.test.ts | reviewed | Two pin rows; `codex.ts` untouched, its `startsWith('gpt-6-')` branch covers both ids. |\n| tests/lib/cost.test.ts | reviewed | Price assertions per PRD. |\n| tests/lib/model-fallback.test.ts | reviewed | Counts 21→23, 40→42, 23→25. |\n| tests/lib/settings.test.ts | reviewed | List extended. |\n| .pan/continues/PAN-4826.xbrief.json, .pan/drafts/PAN-4826.md, .pan/specs/…xbrief.json | not applicable (planning artifacts); read for requirements |\n\n### Dimensions\n- Correctness: Traced `getPricing` exact-then-prefix lookup; exact rows prevent `gpt-6-astra-law` falling to a `gpt-6-astra` prefix (asserted). Traced the Codex 272K pin path (`runtimes/codex.ts:296`) and the claude-code policy fallthrough. No other `startsWith`/`includes` prefix matcher in src can misroute the new ids. No defects found.\n- Security: Data-only catalog change; no trust boundary, input path, or dependency change. Nothing to report.\n- Performance: Static table additions; no runtime cost. Nothing to report.\n- Requirements/UX: See AC matrix. One blocker (PR body). Non-goals all respected: no [1m] ids, 4.6 windows unchanged, sonnet-4-5 deprecation target unchanged, no tierModels/haikuModel change, no retired-row change, no Codex floor / GPT_56_MODELS / CLIProxy route for new ids, `codex.ts` untouched, no >272K tiers, only OpenAI/Anthropic touched, no changelog.mdx edit, no line growth in the two capped files, no hardcoded fallback.\n\n### Acceptance criteria\n| AC | Status | Evidence |\n|---|---|---|\n| AC-1 (cost rows) | met | tests/lib/cost.test.ts new cases; focused run passed |\n| AC-2 (capability blends, gpt-5.2 window, 1422 lines) | met | model-capabilities.test.ts; `wc -l` = 1422 |\n| AC-3 (picker Sol rows at 12) | met | diff of ModelPicker.tsx / modelCatalog.ts |\n| AC-4 (new ids registered, Codex pin, not in GPT_56_MODELS) | met | model-capabilities/codex/audit tests; provider-env.ts set unchanged |\n| AC-5 (exact pricing rows) | met | cost.test.ts \"prices %s through its own exact row\" |\n| AC-6 (settings order, routes/settings.ts 1104) | met | settings-model-catalog.test.ts; `wc -l` = 1104 |\n| AC-7 (friendly names, picker rows) | met | dashboard-utils.ts trace; frontend test green on CI (not run locally, see Verification) |\n| AC-8 (sonnet-4-5 retired from selection, still migrates) | met | model-catalog-audit.test.ts new test |\n| AC-9 (4.6 at 200K + policy) | met | model-capabilities.test.ts new test |\n| AC-10 (docs) | met | `git grep -n \"claude-sonnet-4-5\" -- '*.mdx' ':!changelog.mdx'` prints nothing; harnesses.mdx has Rosalind price + trusted-access |\n| AC-PR / issue AC #5 (PR body Verified / Not changed) | **unmet** | Blocking finding above |\n| Issue AC #4 (1M window) | deliberately not met (PRD D1, sourced) | Acceptable only once documented in the PR body |\n\n## Verification\n- `npx vitest run` on tests/lib/cost.test.ts, src/lib/costs/__tests__/cost-calculation.test.ts, src/lib/__tests__/model-capabilities.test.ts, src/lib/__tests__/model-catalog-audit.test.ts, src/lib/__tests__/settings-model-catalog.test.ts, tests/lib/model-fallback.test.ts, tests/lib/settings.test.ts, src/lib/runtimes/__tests__/codex.test.ts, tests/lib/providers.test.ts, tests/lib/model-deprecation.test.ts, src/lib/__tests__/model-validation.test.ts: 11 files, 376 tests passed.\n- `npx vitest run tests/unit/lib/conversations/model-pattern-drift.test.ts` (issue-named): 3 passed.\n- `npm run lint:effect-diagnostics`: passed (227 known findings; none new).\n- `wc -l`: model-capabilities.ts 1422, routes/settings.ts 1104, both equal to their allowlist caps.\n- Frontend `dashboard-utils.test.ts`: not run locally. The frontend vitest invocation failed on a workspace node_modules symlink EEXIST (environment issue, not the change); left to CI.\n- CI (`gh pr checks 4855` re-read just before signaling, HEAD 54d02d0fb13): all checks pass: test-shard 1–4, test, test-e2e, build (22), lint and all lint groups, clean-install smoke, prompt-trailer gate, non-blocking flake lane, `overdeck/test`. Mintlify skipped. The frontend `dashboard-utils.test.ts` is therefore covered by the green CI test job.\n- Full `npm test` not run (per role).\n\n## Scope Note\nThe AC-PR requirement was in the PRD and the issue but was not lowered into an xBRIEF work item, so the work agent had no checklist entry for it. The fix is a PR-body edit only.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-4826/.pan/review/agent-pan-4826-review-54d02d0f/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-4826 -m \"Fixed review issues\"`"
+    }
+  ]
+}

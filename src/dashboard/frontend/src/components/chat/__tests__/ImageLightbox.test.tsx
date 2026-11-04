@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, it } from 'vitest';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import { ImageLightboxHost, openImageLightbox, useImageLightboxStore } from '../ImageLightbox';
 
@@ -44,5 +44,26 @@ describe('ImageLightbox', () => {
     act(() => openImageLightbox('/a.png', 'a.png'));
     fireEvent.click(screen.getByAltText('a.png'));
     expect(screen.queryByTestId('image-lightbox')).not.toBeNull();
+  });
+
+  it('loads a machine image through fetch into an object URL in the native shell', async () => {
+    // PAN-4834 CP-2: the <img> would bypass the channel shims, so the phone app fetches it.
+    const flag = globalThis as { __OVERDECK_NATIVE__?: boolean };
+    flag.__OVERDECK_NATIVE__ = true;
+    const fetchMock = vi.fn(async () => new Response(new Blob(['png']), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:capacitor://localhost/lightbox');
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+    try {
+      render(<ImageLightboxHost />);
+      act(() => openImageLightbox('/api/conversations/c/attachments/a.png', 'a'));
+      const img = screen.getByAltText('a') as HTMLImageElement;
+      await waitFor(() => expect(img.getAttribute('src')).toBe('blob:capacitor://localhost/lightbox'));
+      expect(fetchMock).toHaveBeenCalledWith('/api/conversations/c/attachments/a.png');
+    } finally {
+      delete flag.__OVERDECK_NATIVE__;
+      vi.unstubAllGlobals();
+      vi.restoreAllMocks();
+    }
   });
 });

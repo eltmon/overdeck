@@ -1,0 +1,253 @@
+{
+  "version": "1",
+  "issueId": "PAN-4754",
+  "created": "2026-11-02T00:55:26.468Z",
+  "updated": "2026-11-02T01:54:35.144Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "context-field": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4754",
+      "claimedAt": "2026-11-02T00:55:26.468Z",
+      "doneAt": "2026-11-02T01:06:12.912Z"
+    },
+    "dialog-markdown": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4754",
+      "claimedAt": "2026-11-02T01:06:26.430Z",
+      "doneAt": "2026-11-02T01:14:13.852Z"
+    },
+    "work-md-guidance": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4754",
+      "claimedAt": "2026-11-02T01:14:15.358Z",
+      "doneAt": "2026-11-02T01:15:18.078Z"
+    },
+    "docs-pipeline-gates": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4754",
+      "claimedAt": "2026-11-02T01:15:23.899Z",
+      "doneAt": "2026-11-02T01:16:16.925Z"
+    },
+    "answer-surfaces-context": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4754",
+      "claimedAt": "2026-11-02T01:16:23.868Z",
+      "doneAt": "2026-11-02T01:19:37.287Z"
+    },
+    "dialog-a11y": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4754",
+      "claimedAt": "2026-11-02T01:19:41.977Z",
+      "doneAt": "2026-11-02T01:23:06.446Z"
+    },
+    "dialog-option-semantics": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4754",
+      "claimedAt": "2026-11-02T01:23:12.901Z",
+      "doneAt": "2026-11-02T01:26:47.654Z"
+    },
+    "dialog-option-note": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4754",
+      "claimedAt": "2026-11-02T01:26:49.180Z",
+      "doneAt": "2026-11-02T01:29:46.784Z"
+    },
+    "dialog-keys": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4754",
+      "claimedAt": "2026-11-02T01:29:48.249Z",
+      "doneAt": "2026-11-02T01:32:14.933Z"
+    },
+    "dialog-consequences-layout": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4754",
+      "claimedAt": "2026-11-02T01:32:16.216Z",
+      "doneAt": "2026-11-02T01:35:28.229Z"
+    },
+    "dialog-needs-you-tone": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4754",
+      "claimedAt": "2026-11-02T01:35:29.577Z",
+      "doneAt": "2026-11-02T01:37:46.410Z"
+    },
+    "dialog-screenshot": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4754",
+      "claimedAt": "2026-11-02T01:37:47.760Z",
+      "doneAt": "2026-11-02T01:40:16.625Z"
+    },
+    "context-field.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:43:24.296Z"
+    },
+    "context-field.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:44:15.611Z"
+    },
+    "context-field.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:44:30.988Z"
+    },
+    "context-field.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:44:46.564Z"
+    },
+    "dialog-markdown.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:45:03.032Z"
+    },
+    "dialog-markdown.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:45:19.521Z"
+    },
+    "dialog-markdown.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:45:35.540Z"
+    },
+    "dialog-markdown.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:45:51.008Z"
+    },
+    "answer-surfaces-context.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:46:07.551Z"
+    },
+    "answer-surfaces-context.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:46:22.213Z"
+    },
+    "answer-surfaces-context.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:46:37.393Z"
+    },
+    "work-md-guidance.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:46:51.924Z"
+    },
+    "work-md-guidance.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:47:07.394Z"
+    },
+    "work-md-guidance.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:47:21.714Z"
+    },
+    "docs-pipeline-gates.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:47:36.680Z"
+    },
+    "docs-pipeline-gates.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:47:51.497Z"
+    },
+    "docs-pipeline-gates.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:48:06.818Z"
+    },
+    "dialog-screenshot.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:48:21.204Z"
+    },
+    "dialog-screenshot.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:48:35.628Z"
+    },
+    "dialog-screenshot.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:48:50.528Z"
+    },
+    "dialog-screenshot.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:49:06.036Z"
+    },
+    "dialog-a11y.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:49:20.593Z"
+    },
+    "dialog-a11y.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:49:35.612Z"
+    },
+    "dialog-a11y.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:49:51.545Z"
+    },
+    "dialog-a11y.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:50:07.435Z"
+    },
+    "dialog-keys.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:50:23.728Z"
+    },
+    "dialog-keys.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:50:39.629Z"
+    },
+    "dialog-keys.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:50:55.475Z"
+    },
+    "dialog-keys.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:51:11.097Z"
+    },
+    "dialog-option-semantics.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:51:28.716Z"
+    },
+    "dialog-option-semantics.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:51:43.860Z"
+    },
+    "dialog-option-semantics.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:52:00.111Z"
+    },
+    "dialog-option-note.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:52:15.993Z"
+    },
+    "dialog-option-note.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:52:31.740Z"
+    },
+    "dialog-option-note.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:52:48.125Z"
+    },
+    "dialog-consequences-layout.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:53:03.788Z"
+    },
+    "dialog-consequences-layout.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:53:19.134Z"
+    },
+    "dialog-consequences-layout.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:53:34.841Z"
+    },
+    "dialog-consequences-layout.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:53:50.240Z"
+    },
+    "dialog-needs-you-tone.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:54:05.838Z"
+    },
+    "dialog-needs-you-tone.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:54:21.078Z"
+    },
+    "dialog-needs-you-tone.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T01:54:35.144Z"
+    }
+  }
+}

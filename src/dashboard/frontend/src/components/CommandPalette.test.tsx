@@ -8,6 +8,10 @@ import { installStrictFetchMock } from '../test-utils/strictFetchMock';
 import type { Agent, Issue } from '../types';
 import { CommandPalette, PALETTE_CONVERSATIONS_NEWEST_FIRST_KEY } from './CommandPalette';
 
+/** PAN-4651: the palette also asks `/api/fleet/search`; these tests run with no linked machines. */
+const installPaletteFetchMock: typeof installStrictFetchMock = (handler) => installStrictFetchMock((request) =>
+  request.method === 'GET' && request.url.startsWith('/api/fleet/search') ? Response.json({ machines: [] }) : handler(request));
+
 function issue(overrides: Partial<Issue>): Issue {
   return {
     id: overrides.identifier ?? 'PAN-0',
@@ -69,7 +73,7 @@ let fetchControl: ReturnType<typeof installStrictFetchMock>;
 
 beforeEach(() => {
   localStorage.removeItem(PALETTE_CONVERSATIONS_NEWEST_FIRST_KEY);
-  fetchControl = installStrictFetchMock(({ method, url }) => {
+  fetchControl = installPaletteFetchMock(({ method, url }) => {
     if (method === 'GET' && url === '/api/palette/commands') {
       return Response.json({ commands: [] });
     }
@@ -144,7 +148,7 @@ describe('CommandPalette conversation results', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     useDashboardStore.setState({ issuesRaw: [], agentsById: {} } as Parameters<typeof useDashboardStore.setState>[0]);
-    fetchControl = installStrictFetchMock(({ method, url }) => {
+    fetchControl = installPaletteFetchMock(({ method, url }) => {
       if (method === 'GET' && url === '/api/palette/commands') {
         return Response.json({ commands: [] });
       }
@@ -231,7 +235,7 @@ describe('CommandPalette conversation results', () => {
   });
 
   it('renders a title-labelled row using its title text (PAN-4358)', async () => {
-    fetchControl = installStrictFetchMock(({ method, url }) => {
+    fetchControl = installPaletteFetchMock(({ method, url }) => {
       if (method === 'GET' && url === '/api/palette/commands') return Response.json({ commands: [] });
       if (method === 'GET' && url === '/api/workspace-registry') return Response.json({ workspaces: [] });
       if (method === 'GET' && url.startsWith('/api/palette/search')) {
@@ -304,7 +308,7 @@ describe('CommandPalette conversation results', () => {
   });
 
   it('opens a subagent hit with its parent conversation and bare subagent id (PAN-3982)', async () => {
-    fetchControl = installStrictFetchMock(({ method, url }) => {
+    fetchControl = installPaletteFetchMock(({ method, url }) => {
       if (method === 'GET' && url === '/api/palette/commands') return Response.json({ commands: [] });
       if (method === 'GET' && url === '/api/workspace-registry') return Response.json({ workspaces: [] });
       if (method === 'GET' && url.startsWith('/api/palette/search')) {
@@ -387,7 +391,7 @@ describe('CommandPalette newest-first conversation toggle (PAN-3704)', () => {
   });
 
   const installConversationResults = (conversations: ReturnType<typeof conversation>[]) => {
-    fetchControl = installStrictFetchMock(({ method, url }) => {
+    fetchControl = installPaletteFetchMock(({ method, url }) => {
       if (method === 'GET' && url === '/api/palette/commands') return Response.json({ commands: [] });
       if (method === 'GET' && url === '/api/workspace-registry') return Response.json({ workspaces: [] });
       if (method === 'GET' && url.startsWith('/api/palette/search')) {
@@ -521,6 +525,18 @@ describe('CommandPalette navigation actions', () => {
       expect(onNavigate).toHaveBeenCalledWith('context');
     });
   });
+
+  it('shows the Anywhere actions when searching "machine" (PAN-4869)', async () => {
+    const user = userEvent.setup();
+    renderPalette();
+
+    await user.type(screen.getByPlaceholderText('Search commands, issues, conversations, memory…'), 'machine');
+
+    expect(screen.getByText('Anywhere')).toBeInTheDocument();
+    expect(getOptionByValue('anywhere-link-machine')).toBeInTheDocument();
+    expect(getOptionByValue('anywhere-add-fly-machine')).toBeInTheDocument();
+    expect(getOptionByValue('anywhere-add-ssh-machine')).toBeInTheDocument();
+  });
 });
 
 describe('CommandPalette workspaces switcher (PAN-1990)', () => {
@@ -538,7 +554,7 @@ describe('CommandPalette workspaces switcher (PAN-1990)', () => {
   beforeEach(() => {
     window.history.replaceState(null, '', '/');
     useDashboardStore.setState({ issuesRaw: [], agentsById: {} } as Parameters<typeof useDashboardStore.setState>[0]);
-    fetchControl = installStrictFetchMock(({ method, url }) => {
+    fetchControl = installPaletteFetchMock(({ method, url }) => {
       if (method === 'GET' && url === '/api/palette/commands') return Response.json({ commands: [] });
       if (method === 'GET' && url === '/api/workspace-registry') return Response.json({ workspaces: WORKSPACES });
       if (method === 'POST' && url === '/api/workspace-registry/ws-issue/activate') return Response.json({});
@@ -629,7 +645,7 @@ describe('CommandPalette workspaces switcher (PAN-1990)', () => {
   });
 
   it('still offers the action when every row is a collapsed pipeline worktree', async () => {
-    fetchControl = installStrictFetchMock(({ method, url }) => {
+    fetchControl = installPaletteFetchMock(({ method, url }) => {
       if (method === 'GET' && url === '/api/palette/commands') return Response.json({ commands: [] });
       if (method === 'GET' && url === '/api/workspace-registry') {
         return Response.json({
@@ -650,7 +666,7 @@ describe('CommandPalette workspaces switcher (PAN-1990)', () => {
   });
 
   it('ignores archived workspaces when picking the target', async () => {
-    fetchControl = installStrictFetchMock(({ method, url }) => {
+    fetchControl = installPaletteFetchMock(({ method, url }) => {
       if (method === 'GET' && url === '/api/palette/commands') return Response.json({ commands: [] });
       if (method === 'GET' && url === '/api/workspace-registry') {
         return Response.json({
@@ -774,7 +790,7 @@ describe('CommandPalette conversations scope chip (PAN-3705)', () => {
   });
 
   it('renders a Conversations chip alongside the other type chips with zero conversation results (AC1)', () => {
-    fetchControl = installStrictFetchMock(({ method, url }) => {
+    fetchControl = installPaletteFetchMock(({ method, url }) => {
       if (method === 'GET' && url === '/api/palette/commands') return Response.json({ commands: [] });
       if (method === 'GET' && url === '/api/workspace-registry') return Response.json({ workspaces: [] });
       if (method === 'GET' && url.startsWith('/api/palette/search')) {
@@ -790,7 +806,7 @@ describe('CommandPalette conversations scope chip (PAN-3705)', () => {
   });
 
   it('filters to only conversation rows when the Conversations chip is activated by click and by Enter (AC2)', async () => {
-    fetchControl = installStrictFetchMock(({ method, url }) => {
+    fetchControl = installPaletteFetchMock(({ method, url }) => {
       if (method === 'GET' && url === '/api/palette/commands') return Response.json({ commands: [] });
       if (method === 'GET' && url === '/api/workspace-registry') return Response.json({ workspaces: [] });
       if (method === 'GET' && url.startsWith('/api/palette/search')) {
@@ -836,7 +852,7 @@ describe('CommandPalette conversations scope chip (PAN-3705)', () => {
   });
 
   it('shows every result type again once the All chip is activated (AC3)', async () => {
-    fetchControl = installStrictFetchMock(({ method, url }) => {
+    fetchControl = installPaletteFetchMock(({ method, url }) => {
       if (method === 'GET' && url === '/api/palette/commands') return Response.json({ commands: [] });
       if (method === 'GET' && url === '/api/workspace-registry') return Response.json({ workspaces: [] });
       if (method === 'GET' && url.startsWith('/api/palette/search')) {
@@ -865,7 +881,7 @@ describe('CommandPalette conversations scope chip (PAN-3705)', () => {
   });
 
   it('keeps the Conversations scope active on open with initialScope, instead of resetting to All (AC4)', () => {
-    fetchControl = installStrictFetchMock(({ method, url }) => {
+    fetchControl = installPaletteFetchMock(({ method, url }) => {
       if (method === 'GET' && url === '/api/palette/commands') return Response.json({ commands: [] });
       if (method === 'GET' && url === '/api/workspace-registry') return Response.json({ workspaces: [] });
       if (method === 'GET' && url.startsWith('/api/palette/search')) {
@@ -882,7 +898,7 @@ describe('CommandPalette conversations scope chip (PAN-3705)', () => {
   });
 
   it('renders conversation hits in ascending rank order under the Conversations scope (AC5)', async () => {
-    fetchControl = installStrictFetchMock(({ method, url }) => {
+    fetchControl = installPaletteFetchMock(({ method, url }) => {
       if (method === 'GET' && url === '/api/palette/commands') return Response.json({ commands: [] });
       if (method === 'GET' && url === '/api/workspace-registry') return Response.json({ workspaces: [] });
       if (method === 'GET' && url.startsWith('/api/palette/search')) {
@@ -907,7 +923,7 @@ describe('CommandPalette conversations scope chip (PAN-3705)', () => {
   });
 
   it('shows scope-aware empty-query copy under the Conversations scope (AC1)', () => {
-    fetchControl = installStrictFetchMock(({ method, url }) => {
+    fetchControl = installPaletteFetchMock(({ method, url }) => {
       if (method === 'GET' && url === '/api/palette/commands') return Response.json({ commands: [] });
       if (method === 'GET' && url === '/api/workspace-registry') return Response.json({ workspaces: [] });
       if (method === 'GET' && url.startsWith('/api/palette/search')) {
@@ -926,7 +942,7 @@ describe('CommandPalette conversations scope chip (PAN-3705)', () => {
   it('shows scope-aware loading copy while a conversation search is in flight (AC2)', async () => {
     let resolveSearch: (response: Response) => void = () => {};
     const pendingSearch = new Promise<Response>((resolve) => { resolveSearch = resolve; });
-    fetchControl = installStrictFetchMock(({ method, url }) => {
+    fetchControl = installPaletteFetchMock(({ method, url }) => {
       if (method === 'GET' && url === '/api/palette/commands') return Response.json({ commands: [] });
       if (method === 'GET' && url === '/api/workspace-registry') return Response.json({ workspaces: [] });
       if (method === 'GET' && url.startsWith('/api/palette/search')) return pendingSearch;
@@ -950,7 +966,7 @@ describe('CommandPalette conversations scope chip (PAN-3705)', () => {
 
   it('keeps the loading row, not No results, when a superseded search aborts while the newer one is in flight', async () => {
     const pending: Array<{ url: string; resolve: (response: Response) => void }> = [];
-    fetchControl = installStrictFetchMock(({ method, url, init }) => {
+    fetchControl = installPaletteFetchMock(({ method, url, init }) => {
       if (method === 'GET' && url === '/api/palette/commands') return Response.json({ commands: [] });
       if (method === 'GET' && url === '/api/workspace-registry') return Response.json({ workspaces: [] });
       if (method === 'GET' && url.startsWith('/api/palette/search')) {
@@ -981,7 +997,7 @@ describe('CommandPalette conversations scope chip (PAN-3705)', () => {
   });
 
   it('shows a search-unavailable error instead of No results on a 500 and keeps the Conversations scope active (AC3, PAN-3975)', async () => {
-    fetchControl = installStrictFetchMock(({ method, url }) => {
+    fetchControl = installPaletteFetchMock(({ method, url }) => {
       if (method === 'GET' && url === '/api/palette/commands') return Response.json({ commands: [] });
       if (method === 'GET' && url === '/api/workspace-registry') return Response.json({ workspaces: [] });
       if (method === 'GET' && url.startsWith('/api/palette/search')) return new Response(null, { status: 500 });
@@ -1002,7 +1018,7 @@ describe('CommandPalette conversations scope chip (PAN-3705)', () => {
   });
 
   it('shows the search-unavailable error copy on a 401 (expired session), not No results (PAN-3975)', async () => {
-    fetchControl = installStrictFetchMock(({ method, url }) => {
+    fetchControl = installPaletteFetchMock(({ method, url }) => {
       if (method === 'GET' && url === '/api/palette/commands') return Response.json({ commands: [] });
       if (method === 'GET' && url === '/api/workspace-registry') return Response.json({ workspaces: [] });
       if (method === 'GET' && url.startsWith('/api/palette/search')) return new Response(null, { status: 401 });

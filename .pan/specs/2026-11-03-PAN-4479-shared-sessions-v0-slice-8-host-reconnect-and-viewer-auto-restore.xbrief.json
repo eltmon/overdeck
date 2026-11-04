@@ -1,0 +1,891 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-03T14:56:32Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4479: Shared Sessions v0 (slice 8): host reconnect and viewer auto-restore",
+    "updated": "2026-11-03T15:06:21.083Z"
+  },
+  "plan": {
+    "id": "pan-4479",
+    "title": "Shared Sessions v0 (slice 8): host reconnect and viewer auto-restore",
+    "status": "running",
+    "uid": "6e9bc284-1009-4aab-bfbb-c700c6606c97",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-03T14:56:32Z",
+    "updated": "2026-11-03T15:06:21.083Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4479",
+        "label": "PAN-4479",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4479.md",
+        "label": "PRD PAN-4479",
+        "type": "prd"
+      },
+      {
+        "uri": ".pan/drafts/pan-658.md",
+        "label": "Parent PRD PAN-658 rev 3",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "shared-sessions",
+      "share-host",
+      "share-join",
+      "webrtc",
+      "reconnect",
+      "dashboard-server",
+      "frontend"
+    ],
+    "narratives": {
+      "Problem": "A host share dies on the first hiccup: ShareManager (src/dashboard/server/services/share-host.ts) never reconnects the host socket and never re-parks on boot (slice-2 D-1), so a network drop or a pan reload loses the share although the room survives 5 minutes on the share service and the host token is still in ${OVERDECK_HOME}/shared-sessions.json. After a process restart the new PeerHub's host-admitted set is empty and a snapshot can never add an id (slice-3 D-12), so even a re-parked host would never offer a peer. The viewer server turns any unexpected join-socket close into 'disconnected' with a manual Rejoin (slice-4 D-8), and a lost browser peer needs a manual Reconnect click (slice-4 D-11).",
+      "Proposal": "Host: reconnect the host socket in the same process on a backoff table SHARE_RECONNECT_DELAYS_MS = [1s,2s,4s,8s,15s,30s] keeping the hub, with a new ShareConnection 'reconnecting'; stop only on 404/401/4004 (remove record) or 4008 (disconnected, no retry); End share on a share that is not connected forgets it locally when the service cannot be reached. Add ShareManager.resume(), called once at boot from main.ts on the primary dashboard (hostsMachineLinks()), which re-parks every record; the first room frame after a re-park seeds the hub's host-admitted set with the snapshot's admitted participants via hub.admit, exactly once, so reconcile() re-offers every admitted connected viewer. Viewer server: a seated join (one that got a status frame) reconnects on the same backoff with a new JoinState 'reconnecting'; unseated joins keep 'disconnected'. Viewer page: 'reconnecting' is live and shows a banner over the kept timeline; the timeline stays while a new offer negotiates; a lost peer while admitted auto-restarts the event stream after 5 s, at most 3 tries. Prove it with fake-timer unit tests and two Miniflare integration tests (restart inside the window restores without the lobby; a gone room removes the record and re-joining goes through the lobby). Update docs/SHARED-SESSIONS.md and configuration/shared-sessions.mdx.",
+      "NonGoals": "- Viewer dashboard restart auto-rejoin (joins live in viewer-server memory; the page keeps its 'Lost the connection to your Overdeck.' Try again screen)\n- Any change to services/share/ (Worker, ShareRoom reducer, alarm, protocol)\n- Persisting the host-admitted set or any participant data on the host\n- Retrying after close 4008 or arbitrating between two dashboards sharing one OVERDECK_HOME\n- Re-parking on a peer dashboard (hostsMachineLinks() false) or re-parking again when anywhere.share_url changes after boot\n- A give-up limit on host or viewer reconnect attempts\n- Host-side automatic re-offer of a failed peer without a new snapshot (no PeerHub code change)\n- Adding ShareManager.stop() to dashboard shutdown\n- pan share / pan join CLI (slice 9), controller handoff (slice 7), drafts (slice 5), terminal channel (slice 6)\n- New HTTP routes or no-loss-matrix rows"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Backoff table SHARE_RECONNECT_DELAYS_MS = [1000, 2000, 4000, 8000, 15000, 30000], last value repeats, reset on success, no give-up limit, shared by host and viewer server.",
+        "rationale": "The host cannot tell from its own clock whether the service's 5-minute alarm fired (the service measures from when it saw the close), so only the service's 404/4004 answer may end the loop; a 30 s cap keeps many tries inside the window at negligible cost."
+      },
+      {
+        "summary": "Re-park is ShareManager.resume(), called from main.ts right after startAnywhere, gated on hostsMachineLinks().",
+        "rationale": "A peer dashboard sharing ~/.overdeck re-parking the same room would replace the primary's host socket with close 4008; main.ts has 14 lines of ceiling headroom and the hook needs 2."
+      },
+      {
+        "summary": "After a process restart, the first room frame seeds the hub's host-admitted set from the snapshot's admitted participants, once, via the existing hub.admit; created and same-process-reconnected hosts are never seeded.",
+        "rationale": "Slice-3 D-12 reserved exactly this for slice 8 and the parent PRD's data model keeps participants only in the service; the service admits only on host-socket frames (D-R3-3), so the list is the host's own prior decisions, and the service already relays the DTLS fingerprints (D-R3-1)."
+      },
+      {
+        "summary": "Add 'reconnecting' to both ShareConnection and JoinState instead of reusing 'connecting'.",
+        "rationale": "A distinct value makes the state observable in the API, UI and tests and lets the viewer page keep the timeline under a banner instead of a full Connecting panel."
+      },
+      {
+        "summary": "Only a seated join (one that received a status frame) auto-reconnects; an unseated join keeps 'disconnected' with Rejoin.",
+        "rationale": "A first connect that fails should give an explicit error instead of an endless spinner; a viewer who was already in the room or lobby should come back on its own."
+      },
+      {
+        "summary": "The viewer page restarts the event stream 5 s after the peer goes lost while admitted, at most 3 times in a row, keeping messages.",
+        "rationale": "If a host network drop kills peers but not the host socket, no snapshot arrives and the hub never re-offers; the bounded page-side restart is the only automatic path back and avoids a 35-second loop forever."
+      },
+      {
+        "summary": "The after-the-window integration test ends the room with deleteRoom() while the host is down instead of waiting for the Durable Object alarm.",
+        "rationale": "Miniflare cannot fire the 5-minute alarm without real waiting and tests may not sleep; the reducer's alarm and delete share the same end branch, and the alarm itself is covered by room-state.test.ts describe('alarm')."
+      },
+      {
+        "summary": "ShareManagerDeps and JoinManagerDeps gain optional reconnectDelaysMs; integration tests pass [0].",
+        "rationale": "Repo rule: no real setTimeout delays in tests; integration tests use real sockets so the delay must be injectable."
+      },
+      {
+        "summary": "End share on a share that is not connected forgets it locally (drop host, remove record, 204) when the share service cannot be reached; a connected share keeps 500/502.",
+        "rationale": "With no reconnect give-up and 'reconnecting' counted as live, create() returns the stuck share as existing, so End share must always work; the room, if alive, ends itself on the service's 5-minute alarm. Same rule slice-2 D-3 applies to stale records."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "17 files across contracts, dashboard server, frontend, integration tests and docs; one coherent reconnect behaviour whose host and viewer halves are verified together by the restart integration test.",
+      "canonicalFilename": "2026-11-03-PAN-4479-shared-sessions-v0-slice-8-host-reconnect-and-viewer-auto-restore.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "contract-states",
+        "title": "Add 'reconnecting' to ShareConnection and JoinState in the contracts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T14:56:32Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "api",
+          "issueLabel": "pan-4479",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/sharing.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-8",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Edit packages/contracts/src/sharing.ts exactly as PRD .pan/drafts/PAN-4479.md section 'Contracts' shows: ShareConnection (line 95) becomes 'connecting' | 'connected' | 'reconnecting' | 'disconnected' with the new doc comment; JoinState (lines 207-211) gains 'reconnecting' with the comment 'a seated join lost its socket; the viewer server retries on a backoff (PAN-4479)', the 'disconnected' comment becomes 'a join that was never seated failed to connect; POST /api/joins reopens it', and the JoinState doc comment lists reconnecting as live. Add no import statement (the file is type-only, D-R3-8)."
+        },
+        "items": [
+          {
+            "id": "contract-states.ac1",
+            "title": "Given packages/contracts/src/sharing.ts, when read, then ShareConnection includes 'reconnecting' and JoinState includes 'reconnecting' and 'disconnected'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contract-states.ac2",
+            "title": "Given the edited file, when `grep -c '^import' packages/contracts/src/sharing.ts` runs, then it prints 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contract-states.ac3",
+            "title": "Given the change, when `npm run typecheck` runs, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "host-reconnect",
+        "title": "Reconnect the host socket in the same process on a backoff, keeping the hub",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T14:56:32Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4479",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "host-repark-boot",
+            "join-auto-reconnect",
+            "host-repark-integration"
+          ],
+          "files_scope": [
+            "src/dashboard/server/services/share-host.ts",
+            "src/dashboard/server/services/__tests__/share-host.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/share-host.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "share-host.test.ts passes including the reconnect, backoff, 4008 and late-event cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD .pan/drafts/PAN-4479.md section 'Host: ShareManager' rules 1-7 and 9 in src/dashboard/server/services/share-host.ts: export SHARE_RECONNECT_DELAYS_MS = [1_000, 2_000, 4_000, 8_000, 15_000, 30_000]; add optional reconnectDelaysMs to ShareManagerDeps; replace the readonly socket with conn: { socket, done }; add base, retryTimer, attempt, restoring to ShareHost; split openHost(base, code, record, restoring) from connect(host); every listener checks !conn.done && host.conn === conn && this.hosts.get(code) === host; replace disconnect() for close-not-4004/4008, error, pong timeout and non-404/401 upgrades with lose(host, how) that sets connection 'reconnecting' and arms the next retry (unref'd); 4008 keeps today's terminal 'disconnected' + lastError replaced with no retry; 404/401/4004 drop the host and remove the record; room frame resets attempt to 0; dropHost clears retryTimer; sendHostFrame and command use host.conn. createRoomFor passes restoring=false. Update the header comment. Edit (do not delete) the existing tests named in PRD WI-2 and add the new tests listed there, all under vi.useFakeTimers with vi.advanceTimersByTimeAsync."
+        },
+        "items": [
+          {
+            "id": "host-reconnect.ac1",
+            "title": "Given a connected share, when its host socket closes with 1006, then list() shows connection 'reconnecting', the record stays, and a second socket with the same Authorization header opens at 1000 ms and not at 999 ms",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "host-reconnect.ac2",
+            "title": "Given repeated failures without a room frame, when timers advance, then new sockets open after 1, 2, 4, 8, 15, 30 and 30 s, and after a room frame the next drop retries after 1 s again",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "host-reconnect.ac3",
+            "title": "Given a connected share, when the socket closes with 4008, then connection is 'disconnected' with lastError.code 'replaced' and no socket opens within 60 s",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "host-reconnect.ac4",
+            "title": "Given a share retrying after a drop, when the retry's upgrade answers 404 or end()/stop() is called, then the record is removed (404) or the pending retry is cancelled and no further socket opens",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "host-reconnect.ac5",
+            "title": "Given a reconnect, when the new socket delivers a room frame, then createHub was called once, the hub's close count is 0, and a close 4004 emitted later on the old socket leaves the record in place",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "host-repark-boot",
+        "title": "Re-park recorded shares on dashboard boot and seed the hub from the first snapshot",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T14:56:32Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4479",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "host-repark-integration"
+          ],
+          "files_scope": [
+            "src/dashboard/server/services/share-host.ts",
+            "src/dashboard/server/services/__tests__/share-host.test.ts",
+            "src/dashboard/server/main.ts",
+            "src/dashboard/server/sharing/peer-hub.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/share-host.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "share-host.test.ts passes including the resume and seeding cases",
+            "typecheck completes without errors",
+            "file-size guard exits 0 with main.ts at or under 988 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "NFR-2",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD .pan/drafts/PAN-4479.md section 'Host: ShareManager' rules 4 and 8, 'Boot hook' and 'Peer hub comment'. In share-host.ts add async resume(): Promise<string[]> exactly as the PRD snippet (reads records and readShareUrl only, never throws, skips codes already in this.hosts, calls openHost(base.url, code, record, true) inside a per-record try/catch that calls dropHost(code, 'none') when openSocket throws, returns the codes it opened). In onFrame for a room frame: after setting snapshot/connection/attempt, if host.restoring then set it false and call host.hub?.admit(p.githubId) for every participant with state === 'admitted', then call hub.onSnapshot as today. In src/dashboard/server/main.ts add `import { getShareManager } from './services/share-host.js';` and, directly after the startAnywhere line (line 224), `if (hostsMachineLinks()) void getShareManager().resume().catch((err) => console.warn('[share] re-park failed (non-fatal):', err)); // PAN-4479 D-3` — exactly 2 added lines. In src/dashboard/server/sharing/peer-hub.ts append the one-sentence exception to the header comment (lines 5-8); no code change there. Add the WI-3 tests listed in the PRD to share-host.test.ts."
+        },
+        "items": [
+          {
+            "id": "host-repark-boot.ac1",
+            "title": "Given two share records and no hosts, when resume() runs, then it returns both codes, opens one socket per record with Bearer <that record's hostToken>, and readAccount is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "host-repark-boot.ac2",
+            "title": "Given resume(), when the share URL is invalid, the record file is unreadable, or every code is already hosted, then it returns [] and opens no socket",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "host-repark-boot.ac3",
+            "title": "Given a re-parked share whose first room frame lists ids 100 and 101 admitted and 102 in lobby, when the frame arrives, then the hub receives admit(100) and admit(101) before onSnapshot, never admit(102), and a second room frame triggers no admit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "host-repark-boot.ac4",
+            "title": "Given a share created by create() or reconnected in the same process, when a room frame lists an admitted participant, then the hub receives no admit call from that frame",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "host-repark-boot.ac5",
+            "title": "Given src/dashboard/server/main.ts, when `git grep -n 'getShareManager().resume()' src/dashboard/server/main.ts` runs, then it prints one line containing hostsMachineLinks(), and `wc -l` reports at most 988 lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "host-end-offline",
+        "title": "End share forgets an unreachable share that is not connected",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T14:56:32Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4479",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/share-host.ts",
+            "src/dashboard/server/services/__tests__/share-host.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/share-host.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "share-host.test.ts passes including the two end-forgets-locally cases and the unchanged connected 502 case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD .pan/drafts/PAN-4479.md 'Host: ShareManager' rule 9 (D-12) in ShareManager.end() in src/dashboard/server/services/share-host.ts: before calling the share service read const host = this.hosts.get(shortCode) and const offline = host?.connection !== 'connected'. When readShareUrl answers an error or deleteRoom answers ok: false and offline is true, call dropHost(shortCode, 'close'), await records.remove(shortCode) and return { status: 204 }; when the share is connected keep today's 500 share_url_invalid / 502 share_service_error answers and the record. Leave the existing test 'end keeps the record and answers 502 when the share service fails' unchanged (it uses createConnected) and add the two tests listed in PRD WI-2b with fake timers."
+        },
+        "items": [
+          {
+            "id": "host-end-offline.ac1",
+            "title": "Given a share that dropped with 1006 and is reconnecting, when end() runs and deleteRoom answers { ok: false, status: 503 }, then it returns { status: 204 }, the record file has no entry, list() returns [] and no socket opens within 60 s",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "host-end-offline.ac2",
+            "title": "Given a stale record with no host entry, when end() runs and readShareUrl answers an error, then it returns { status: 204 } and removes the record",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "host-end-offline.ac3",
+            "title": "Given a connected share, when end() runs and deleteRoom fails, then it returns status 502 share_service_error and the record is preserved",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "host-dialog-reconnecting",
+        "title": "Show 'Reconnecting to the share service…' in the host share dialog",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:56:32Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4479",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/sharing/ShareDialog.tsx",
+            "src/dashboard/frontend/src/components/chat/sharing/__tests__/ShareDialog.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/chat/sharing/__tests__/ShareDialog.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ShareDialog.test.tsx passes including the reconnecting case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "In ShareDialog.tsx ConnectionLine (lines 80-93) render 'Reconnecting to the share service…' with data-connection=\"reconnecting\" and the muted style when share.connection === 'reconnecting'; keep 'Connected', 'Connecting to the share service…' and the disconnected warning unchanged. SharingLobbyPanel needs no change (actions disabled whenever connection !== 'connected'). Add a test to ShareDialog.test.tsx as in PRD WI-4. Follow pan-style-guide: no new colors or badges."
+        },
+        "items": [
+          {
+            "id": "host-dialog-reconnecting.ac1",
+            "title": "Given a share with connection 'reconnecting', when ShareDialog renders, then it shows 'Reconnecting to the share service…' with data-connection=\"reconnecting\" and does not show 'End this share and create a new link'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "host-dialog-reconnecting.ac2",
+            "title": "Given the same reconnecting share with a lobby participant, when the dialog renders, then the Admit button is disabled",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "join-auto-reconnect",
+        "title": "Reconnect a seated viewer join socket automatically on the viewer server",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T14:56:32Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4479",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/share-join.ts",
+            "src/dashboard/server/services/__tests__/share-join.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/share-join.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "share-join.test.ts passes including the seated reconnect, backoff, unseated disconnected and cancel cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-9",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD .pan/drafts/PAN-4479.md section 'Viewer server: JoinManager' items 1-8 in src/dashboard/server/services/share-join.ts: add seated/attempt/retryTimer to Join and optional reconnectDelaysMs to JoinManagerDeps (default SHARE_RECONNECT_DELAYS_MS imported from ./share-host.js); add 'reconnecting' to LIVE_STATES; any status frame sets seated=true and attempt=0; for a seated join an unexpected close (code not in CLOSE_STATES and no settled intent), socket error, pong timeout or an upgrade status other than 404/401/403 calls scheduleReconnect(join, error) with error connection_lost / unreachable / http_<status>; an unseated join keeps today's 'disconnected'; split reopen() into openNextSocket() + reopen(); reconnectNow() opens the next socket and keeps state 'reconnecting'; clearRetry on non-live setState, stop() and the grace path; the grace timer turns a join waiting to reconnect into 'away'. Update the header comment. Edit the two existing tests named in PRD WI-5 in place and add the new tests listed there with fake timers."
+        },
+        "items": [
+          {
+            "id": "join-auto-reconnect.ac1",
+            "title": "Given an admitted join, when its socket closes with 1006, then the view is { state: 'reconnecting', error: 'connection_lost' }, no leave frame was sent, and a new socket with the same URL and Authorization opens at 1000 ms",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "join-auto-reconnect.ac2",
+            "title": "Given that reconnect, when the new socket delivers status admitted, then the state is 'admitted' and the subscriber received no state event with 'lobby' after the drop",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "join-auto-reconnect.ac3",
+            "title": "Given a join that never received a status frame, when the upgrade answers 503 or the socket emits error, then the state is 'disconnected' with http_503 or unreachable and no new socket opens",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "join-auto-reconnect.ac4",
+            "title": "Given a join waiting to reconnect, when leave() or stop() is called or 60 s pass with no subscriber, then the state becomes 'left' or 'away' (stop: no state) and no further socket opens",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "join-auto-reconnect.ac5",
+            "title": "Given a reconnecting join, when the retry's upgrade answers 404, then the state is 'ended' and no further socket opens within 60 s",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "viewer-page-reconnecting",
+        "title": "Render the reconnecting join state on the viewer page and keep the timeline during renegotiation",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:56:32Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4479",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/sharing/SharedConversationView.tsx",
+            "src/dashboard/frontend/src/components/chat/sharing/useSharedJoin.ts",
+            "src/dashboard/frontend/src/components/chat/sharing/__tests__/SharedConversationView.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/chat/sharing/__tests__/SharedConversationView.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "SharedConversationView.test.tsx passes including the reconnecting cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD .pan/drafts/PAN-4479.md section 'Viewer page' bullets 1-3: add 'reconnecting' to LIVE_JOIN_STATES in useSharedJoin.ts (line 41; no other change in that file in this item); in SharedConversationView.tsx body() add case 'reconnecting' → hasHistory ? admittedScreen(props) : Panel with Note 'Reconnecting to the share service…'; in admittedScreen() add the reconnecting banner 'Reconnecting to the share service…' (role=status, BANNER class) with precedence reconnecting > host-disconnected > lost, set showTimeline = props.hasHistory, and show 'Connecting to the host…' only when !hasHistory && !lost. Add the four tests listed in PRD WI-6."
+        },
+        "items": [
+          {
+            "id": "viewer-page-reconnecting.ac1",
+            "title": "Given a join in 'reconnecting' with history, when the view renders, then the shared-conversation-timeline test id, the banner 'Reconnecting to the share service…' and the Leave button are present",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "viewer-page-reconnecting.ac2",
+            "title": "Given a join in 'reconnecting' without history, when the view renders, then it shows the text 'Reconnecting to the share service…' and Leave, and no timeline",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "viewer-page-reconnecting.ac3",
+            "title": "Given an admitted join with history and peer phase 'connecting', when the view renders, then the timeline is present and 'Connecting to the host…' is not",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "viewer-page-reconnecting.ac4",
+            "title": "Given a 'reconnecting' join whose peer phase is 'lost', when the view renders, then the reconnecting banner shows and the 'Connection to the host was lost.' banner does not",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "viewer-peer-auto-reconnect",
+        "title": "Automatically restart the viewer event stream when an admitted peer is lost (bounded)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:56:32Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4479",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/sharing/useSharedJoin.ts",
+            "src/dashboard/frontend/src/components/chat/sharing/__tests__/useSharedJoin.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/chat/sharing/__tests__/useSharedJoin.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "useSharedJoin.test.tsx passes including the auto-reconnect cases under fake timers",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD .pan/drafts/PAN-4479.md section 'Viewer page' bullet 4 (D-8) in useSharedJoin.ts: export PEER_AUTO_RECONNECT_DELAY_MS = 5_000 and PEER_AUTO_RECONNECT_MAX = 3; keep a useRef counter and an autoTick state; a useEffect on [phase, view?.state, peerPhase, autoTick] arms a 5 s setTimeout when phase === 'live' && view?.state === 'admitted' && peerPhase === 'lost' && counter < 3, whose callback increments the counter, bumps autoTick and calls subscribe() (no resetContent, so messages/hasHistory/presence stay); cleanup clears the timer; onPhase('connected') and the manual reconnect() reset the counter to 0. Do not fire in host-disconnected or reconnecting. Add the five fake-timer tests listed in PRD WI-7 (vi.useFakeTimers + vi.advanceTimersByTimeAsync; assert openJoinEvents call counts)."
+        },
+        "items": [
+          {
+            "id": "viewer-peer-auto-reconnect.ac1",
+            "title": "Given an admitted join with history whose peer becomes 'lost', when 4999 ms pass then 1 ms more, then openJoinEvents is called again only at 5000 ms and the messages list is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "viewer-peer-auto-reconnect.ac2",
+            "title": "Given the peer stays lost, when 60 s pass, then openJoinEvents was called exactly 4 times in total (1 initial + 3 automatic) and the Reconnect banner remains",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "viewer-peer-auto-reconnect.ac3",
+            "title": "Given a lost peer while the join is 'host-disconnected' or 'reconnecting', when 60 s pass, then no automatic openJoinEvents call happens",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "viewer-peer-auto-reconnect.ac4",
+            "title": "Given an automatic try that led to a 'connected' peer, when the peer is lost again, then three more automatic tries are allowed (the counter reset)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "join-restore-integration",
+        "title": "Integration: a dropped join socket returns to admitted with no lobby step on real workerd",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:56:32Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4479",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/integration/services/share/join-manager.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/integration/services/share/join-manager.test.ts"
+          ],
+          "expected_outputs": [
+            "join-manager.test.ts passes all three cases including the dropped-socket case"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD .pan/drafts/PAN-4479.md WI-8 in tests/integration/services/share/join-manager.test.ts: let viewerManager() take options so the new case passes reconnectDelaysMs: [0] and an openSocket wrapper that records each socket from defaultOpenSocket. New it: create a share, join, admit, wait for 'admitted'; terminate() the recorded join socket; wait for a 'reconnecting' state event then 'admitted'; assert no state event 'lobby' after the first 'admitted', joins.get(code)?.state === 'admitted', and the host snapshot lists the viewer admitted and connected. Do not assert a new offer. Use vi.waitFor only; nothing sleeps; keep the two existing cases unchanged."
+        },
+        "items": [
+          {
+            "id": "join-restore-integration.ac1",
+            "title": "Given an admitted viewer on Miniflare, when its join socket is terminated, then the join reports 'reconnecting' and then 'admitted' and no 'lobby' state event appears after the first 'admitted'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "join-restore-integration.ac2",
+            "title": "Given the restored join, when the host's snapshot is read, then it lists the viewer with state 'admitted' and connected true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "host-repark-integration",
+        "title": "Integration: host restart inside the window restores viewers; a gone room clears the record and re-joins hit the lobby",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-03T14:56:32Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "test",
+          "issueLabel": "pan-4479",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/integration/services/share/host-repark.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/integration/services/share/host-repark.test.ts"
+          ],
+          "expected_outputs": [
+            "host-repark.test.ts passes both cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Create tests/integration/services/share/host-repark.test.ts per PRD .pan/drafts/PAN-4479.md WI-9, copying (not importing) the Miniflare bundle, account stub, account(), startHost and Subscriber harness from tests/integration/services/share/join-manager.test.ts; startHost passes reconnectDelaysMs: [0]; the Subscriber sends every signal whose sdp.type === 'offer' to a new LoopbackViewer (closing the previous one) and later candidates to the current one. Case 1: host A creates, viewer joins, host admits, first viewer gets history; hostA.manager.stop(); wait for 'host-disconnected'; host B = new ShareManager on the same OVERDECK_HOME; expect(await hostB.manager.resume()).toEqual([shortCode]); assert join back to 'admitted' with no 'lobby' state event after the first 'admitted', host B view 'connected' with the viewer admitted, a second offer, and the new LoopbackViewer receives the hello and a history with both fixture messages. Case 2: admit, stop host A, end the room with deleteRoom(localUrl, shortCode, record.hostToken) from readShareRecords() (stands in for the expired alarm, D-9), wait for join 'ended'; hostB.resume(); wait until hostB.manager.list() is [] and the record file lacks shortCode; hostB.create() the same conversation gives a different code; joins.join(newCode) reaches 'lobby'. SLOW = 120_000; vi.waitFor only; stop all managers and close viewers in finally."
+        },
+        "items": [
+          {
+            "id": "host-repark-integration.ac1",
+            "title": "Given an admitted viewer and a stopped host, when a new ShareManager on the same home runs resume(), then it returns [shortCode], the join returns to 'admitted' with no 'lobby' state event after the first admission, and the host view becomes 'connected'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "host-repark-integration.ac2",
+            "title": "Given that re-park, when the hub re-offers, then a new LoopbackViewer receives the host hello and a conversation history with 'first fixture message' and 'second fixture message'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "host-repark-integration.ac3",
+            "title": "Given a room ended while the host was down, when the new manager runs resume(), then list() becomes [] and shared-sessions.json no longer has the code",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "host-repark-integration.ac4",
+            "title": "Given the ended room, when the host creates a new share for the same conversation and the viewer joins it, then the new code differs and the join reaches 'lobby'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-reconnect",
+        "title": "Document reconnect, re-park and viewer auto-restore in the developer and user docs",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:56:32Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4479",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/SHARED-SESSIONS.md",
+            "configuration/shared-sessions.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4",
+            "FR-6",
+            "FR-8",
+            "FR-10",
+            "FR-12",
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "Make every edit listed in PRD .pan/drafts/PAN-4479.md WI-10: in docs/SHARED-SESSIONS.md update slice-map row 8 (line 26), replace the 'Not done yet.' paragraph (line 181) with the pointer sentence, add the section '## Reconnect and restore (slice 8, PAN-4479)' before '## Local development' with the listed content (SHARE_RECONNECT_DELAYS_MS and reset rule, hub kept on reconnect, terminal answers, End share forgetting a not-connected share locally when the service is unreachable, resume() on the primary dashboard without an account, the one-time seed and why it is safe, seated-join reconnect and the reconnecting state, the 5 s / 3-try page reconnect, after-window behaviour), append the seed sentence to 'Content gate' (line 191), and update the JoinState table rows and the sentence at line 234; in configuration/shared-sessions.mdx edit the 'Host disconnected — reconnecting…' bullet, add the 'Reconnecting to the share service…' bullet, edit the 'Connection to the host was lost.' bullet, add the sentence to 'Share a conversation', and edit the Limits bullet. Plain, short sentences."
+        },
+        "items": [
+          {
+            "id": "docs-reconnect.ac1",
+            "title": "Given docs/SHARED-SESSIONS.md, when grepped, then it contains '## Reconnect and restore (slice 8, PAN-4479)', 'SHARE_RECONNECT_DELAYS_MS', 'resume()' and 'reconnecting', and no longer contains 'not re-parked after a dashboard restart'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-reconnect.ac2",
+            "title": "Given configuration/shared-sessions.mdx, when grepped, then it contains 'Reconnecting to the share service…' and 'you do not wait in the lobby again'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-reconnect.ac3",
+            "title": "Given both doc edits, when `npm run lint:docs` runs, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "contract-states",
+        "to": "host-reconnect",
+        "type": "blocks"
+      },
+      {
+        "from": "contract-states",
+        "to": "host-dialog-reconnecting",
+        "type": "blocks"
+      },
+      {
+        "from": "contract-states",
+        "to": "join-auto-reconnect",
+        "type": "blocks"
+      },
+      {
+        "from": "contract-states",
+        "to": "viewer-page-reconnecting",
+        "type": "blocks"
+      },
+      {
+        "from": "host-reconnect",
+        "to": "host-repark-boot",
+        "type": "blocks"
+      },
+      {
+        "from": "host-reconnect",
+        "to": "join-auto-reconnect",
+        "type": "blocks"
+      },
+      {
+        "from": "viewer-page-reconnecting",
+        "to": "viewer-peer-auto-reconnect",
+        "type": "blocks"
+      },
+      {
+        "from": "join-auto-reconnect",
+        "to": "join-restore-integration",
+        "type": "blocks"
+      },
+      {
+        "from": "host-repark-boot",
+        "to": "host-repark-integration",
+        "type": "blocks"
+      },
+      {
+        "from": "host-repark-boot",
+        "to": "host-end-offline",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

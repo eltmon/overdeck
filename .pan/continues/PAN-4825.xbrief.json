@@ -1,0 +1,199 @@
+{
+  "version": "1",
+  "issueId": "PAN-4825",
+  "created": "2026-11-02T16:35:14.732Z",
+  "updated": "2026-11-02T17:38:16.225Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "mimo-v26": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4825",
+      "claimedAt": "2026-11-02T16:35:14.732Z",
+      "doneAt": "2026-11-02T16:43:01.501Z"
+    },
+    "groq-gpt-oss": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4825",
+      "claimedAt": "2026-11-02T16:44:36.656Z",
+      "doneAt": "2026-11-02T16:48:42.886Z"
+    },
+    "cerebras-gpt-oss": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4825",
+      "claimedAt": "2026-11-02T16:48:44.556Z",
+      "doneAt": "2026-11-02T16:52:10.075Z"
+    },
+    "mistral-large-4": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4825",
+      "claimedAt": "2026-11-02T16:52:11.378Z",
+      "doneAt": "2026-11-02T16:55:06.089Z"
+    },
+    "xai-grok-47-43": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4825",
+      "claimedAt": "2026-11-02T16:55:07.602Z",
+      "doneAt": "2026-11-02T16:58:26.223Z"
+    },
+    "minimax-m31-flash": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4825",
+      "claimedAt": "2026-11-02T16:58:27.602Z",
+      "doneAt": "2026-11-02T17:03:21.997Z"
+    },
+    "muse-max-effort": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4825",
+      "claimedAt": "2026-11-02T17:03:24.654Z",
+      "doneAt": "2026-11-02T17:08:13.678Z"
+    },
+    "kimi-k28-preview": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4825",
+      "claimedAt": "2026-11-02T17:08:15.020Z",
+      "doneAt": "2026-11-02T17:15:26.148Z"
+    },
+    "docs-ledger": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4825",
+      "claimedAt": "2026-11-02T17:15:27.643Z",
+      "doneAt": "2026-11-02T17:17:29.999Z"
+    },
+    "mimo-v26.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:28:40.622Z"
+    },
+    "mimo-v26.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:28:59.661Z"
+    },
+    "mimo-v26.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:29:17.841Z"
+    },
+    "mimo-v26.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:29:35.840Z"
+    },
+    "mimo-v26.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:29:53.958Z"
+    },
+    "groq-gpt-oss.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:30:13.764Z"
+    },
+    "groq-gpt-oss.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:30:31.531Z"
+    },
+    "groq-gpt-oss.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:30:48.735Z"
+    },
+    "groq-gpt-oss.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:31:09.214Z"
+    },
+    "groq-gpt-oss.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:31:25.174Z"
+    },
+    "cerebras-gpt-oss.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:31:40.996Z"
+    },
+    "cerebras-gpt-oss.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:31:57.499Z"
+    },
+    "cerebras-gpt-oss.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:32:12.379Z"
+    },
+    "mistral-large-4.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:32:27.682Z"
+    },
+    "mistral-large-4.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:32:42.580Z"
+    },
+    "xai-grok-47-43.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:32:59.452Z"
+    },
+    "xai-grok-47-43.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:33:14.767Z"
+    },
+    "xai-grok-47-43.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:33:31.147Z"
+    },
+    "minimax-m31-flash.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:33:48.790Z"
+    },
+    "minimax-m31-flash.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:34:05.661Z"
+    },
+    "minimax-m31-flash.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:34:23.469Z"
+    },
+    "minimax-m31-flash.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:34:41.748Z"
+    },
+    "muse-max-effort.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:34:58.931Z"
+    },
+    "muse-max-effort.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:35:16.116Z"
+    },
+    "kimi-k28-preview.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:35:34.495Z"
+    },
+    "kimi-k28-preview.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:35:51.670Z"
+    },
+    "kimi-k28-preview.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:36:08.790Z"
+    },
+    "kimi-k28-preview.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:36:25.267Z"
+    },
+    "kimi-k28-preview.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:36:42.801Z"
+    },
+    "docs-ledger.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:36:59.365Z"
+    },
+    "docs-ledger.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:37:15.447Z"
+    },
+    "docs-ledger.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:37:32.279Z"
+    },
+    "docs-ledger.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T17:38:16.225Z"
+    }
+  }
+}

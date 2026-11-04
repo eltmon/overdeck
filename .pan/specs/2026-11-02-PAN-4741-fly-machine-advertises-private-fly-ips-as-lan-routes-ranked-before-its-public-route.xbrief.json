@@ -1,0 +1,191 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-02T12:33:17Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4741: Fly machine advertises private Fly IPs as lan routes ranked before its public route",
+    "updated": "2026-11-02T12:35:14.786Z"
+  },
+  "plan": {
+    "id": "pan-4741",
+    "title": "Fly machine advertises private Fly IPs as lan routes ranked before its public route",
+    "status": "running",
+    "uid": "20e75ffd-1cdb-4c16-a3d5-99dffdc7dc89",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-02T12:33:17Z",
+    "updated": "2026-11-02T12:35:14.786Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4741",
+        "label": "PAN-4741",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4741.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "anywhere",
+      "machine-links",
+      "fly",
+      "endpoints"
+    ],
+    "narratives": {
+      "Problem": "A Fly machine's server (run with OVERDECK_PUBLIC_LINK_ONLY=1) advertises its private Fly IPv4 (tcp://172.19.x.y:3011) as a `lan` endpoint in GET /api/environment. Home stores it via mergeAdvertised, and rankRoutes puts `lan` before the `public` pairing route wss://<app>.fly.dev/ws/link?fly-instance=<id>, so every reconnect dials an unreachable address first before falling back to the public route.",
+      "Proposal": "In src/lib/anywhere/endpoints.ts discoverEndpoints, extend the existing OVERDECK_ANYWHERE_NO_ADVERTISE early return so OVERDECK_PUBLIC_LINK_ONLY === '1' also returns []. Fly provisioning pins the VM to home's pan version, so every new Fly machine stops advertising; existing links self-heal because mergeAdvertised drops advertised routes absent from the descriptor and link-supervisor applyDescriptor persists that on the next connect. Document the behavior in docs/ANYWHERE-ARCHITECTURE.md, docs/fly-provider.md and configuration/linked-machines.mdx.",
+      "NonGoals": "- Home does not filter advertised routes by the pairing route's kind or its fly-instance parameter.\n- The serve command env string in src/lib/anywhere/fly/provision.ts is not changed.\n- No change to rankRoutes, classifyHost, mergeAdvertised or isRfc1918IPv4.\n- No migration or one-off cleanup of stored routes in machine-links.json.\n- No import from src/dashboard/server/ into src/lib/ (publicLinkOnly is not reused or hoisted).\n- No handling for Fly machines already running an older pan; they keep advertising until destroyed."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Fix the source: a server with OVERDECK_PUBLIC_LINK_ONLY=1 advertises no endpoints (issue option A), rather than home filtering routes for fly-instance links (option B).",
+        "rationale": "The server is the authority on its own reachability and public-link-only mode already means only the public link reaches it; Fly provisioning forces home's exact pan version onto the VM, so the fix reaches every new Fly machine; mergeAdvertised already heals stored links on the next connect, so no migration is needed; and Fly-specific knowledge stays out of the generic route merge."
+      },
+      {
+        "summary": "Advertise nothing at all (not only drop `lan`) under public-link-only mode.",
+        "rationale": "tailnet IP and Tailscale Serve endpoints are equally outside the mode's 'only the public link' contract, a Fly VM has no Tailscale, and the early return also skips the 5 s tailscale probe. It mirrors the existing OVERDECK_ANYWHERE_NO_ADVERTISE switch exactly."
+      },
+      {
+        "summary": "Read process.env['OVERDECK_PUBLIC_LINK_ONLY'] === '1' inline in endpoints.ts instead of importing publicLinkOnly from the dashboard server.",
+        "rationale": "src/lib must not import src/dashboard/server code (layering, lint:circular); the exact '1' comparison matches publicLinkOnly() semantics."
+      }
+    ],
+    "items": [
+      {
+        "id": "public-link-only-no-advertise",
+        "title": "discoverEndpoints returns [] under OVERDECK_PUBLIC_LINK_ONLY=1",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T12:33:17Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4741",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/anywhere/endpoints.ts",
+            "src/lib/anywhere/__tests__/endpoints.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/anywhere/__tests__/endpoints.test.ts",
+            "npm run typecheck",
+            "grep -n \"dashboard/server\" src/lib/anywhere/endpoints.ts || echo no-server-import"
+          ],
+          "expected_outputs": [
+            "endpoints.test.ts passes, including the two new PAN-4741 tests",
+            "typecheck completes without errors",
+            "grep prints no-server-import"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1. In src/lib/anywhere/endpoints.ts discoverEndpoints (search `export async function discoverEndpoints`), change the first line to `if (process.env['OVERDECK_ANYWHERE_NO_ADVERTISE'] === '1' || process.env['OVERDECK_PUBLIC_LINK_ONLY'] === '1') return [];`, extend its doc comment to name OVERDECK_PUBLIC_LINK_ONLY=1 (PAN-4741), and add a one-line note to the module header. Do not import publicLinkOnly from src/dashboard/server/remote-request-gate.ts. In src/lib/anywhere/__tests__/endpoints.test.ts add the two tests given verbatim in the PRD next to the existing OVERDECK_ANYWHERE_NO_ADVERTISE test, using vi.stubEnv and vi.unstubAllEnvs in finally."
+        },
+        "items": [
+          {
+            "id": "public-link-only-no-advertise.ac1",
+            "title": "Given OVERDECK_PUBLIC_LINK_ONLY=1 and an interface table with eth0 172.19.4.10, when discoverEndpoints runs, then it resolves to [] and neither execFile nor fetch is called (unit test in endpoints.test.ts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "public-link-only-no-advertise.ac2",
+            "title": "Given OVERDECK_PUBLIC_LINK_ONLY=true and the same table, when discoverEndpoints runs, then it returns [{ kind: 'lan', url: 'tcp://172.19.4.10:3011' }] (unit test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "public-link-only-no-advertise.ac3",
+            "title": "grep -n \"dashboard/server\" src/lib/anywhere/endpoints.ts returns no match, and the existing endpoints.test.ts tests still pass unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-public-link-only-advertising",
+        "title": "Document that a public-link-only server advertises no endpoints",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T12:33:17Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4741",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/ANYWHERE-ARCHITECTURE.md",
+            "docs/fly-provider.md",
+            "configuration/linked-machines.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n \"PAN-4741\" docs/ANYWHERE-ARCHITECTURE.md docs/fly-provider.md",
+            "grep -n \"advertises no\" configuration/linked-machines.mdx"
+          ],
+          "expected_outputs": [
+            "grep prints the new PAN-4741 lines in both docs files",
+            "grep prints the new sentence in the Fly machines section of linked-machines.mdx"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2. (1) docs/ANYWHERE-ARCHITECTURE.md `### Public-link-only mode`: add that the server advertises no endpoints (discoverEndpoints returns [] as under OVERDECK_ANYWHERE_NO_ADVERTISE=1), so home's link to a Fly machine holds only the public pairing route, and an older link drops its stale advertised routes via mergeAdvertised on the next connect (PAN-4741). (2) Same file, the bullet starting `OVERDECK_ANYWHERE_NO_ADVERTISE=1 makes a dashboard advertise no endpoints`: add that OVERDECK_PUBLIC_LINK_ONLY=1 has the same effect. (3) docs/fly-provider.md paragraph `**Server environment (D-4).**`: add that OVERDECK_PUBLIC_LINK_ONLY=1 also makes the VM advertise no endpoints, so home never dials Fly's private 172.19.x.y addresses (PAN-4741). (4) configuration/linked-machines.mdx `## Fly machines` list step 3: add a sentence that the Fly machine advertises no private addresses, so this machine reaches it only over wss://<app>.fly.dev."
+        },
+        "items": [
+          {
+            "id": "docs-public-link-only-advertising.ac1",
+            "title": "docs/ANYWHERE-ARCHITECTURE.md contains, in its 'Public-link-only mode' section, a sentence naming PAN-4741 that says the server advertises no endpoints, and the NO_ADVERTISE bullet contains OVERDECK_PUBLIC_LINK_ONLY=1 as having the same effect",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-public-link-only-advertising.ac2",
+            "title": "docs/fly-provider.md contains, in its D-4 paragraph, a sentence saying OVERDECK_PUBLIC_LINK_ONLY=1 makes the VM advertise no endpoints, so home never dials its private 172.19.x.y addresses",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-public-link-only-advertising.ac3",
+            "title": "configuration/linked-machines.mdx Fly machines step 3 renders a sentence saying the machine advertises no private addresses and is reached only over wss://<app>.fly.dev",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [],
+    "metadata": {
+      "canonicalFilename": "2026-11-02-PAN-4741-fly-machine-advertises-private-fly-ips-as-lan-routes-ranked-before-its-public-route.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}

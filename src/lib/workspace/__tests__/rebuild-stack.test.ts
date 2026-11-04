@@ -18,6 +18,16 @@ const mocks = vi.hoisted(() => ({
   reconcileTraefikNetworks: vi.fn(() => Promise.resolve()),
 }));
 
+// PAN-4961: admission reads real statfs and the estimator runs git/docker.
+vi.mock('../../disk-floor.js', () => ({
+  reserveDiskFloor: vi.fn(async () => ({ ok: true, reservation: { release: async () => {} } })),
+}));
+
+vi.mock('../disk-cost.js', () => ({
+  estimateWorkspaceDiskCost: vi.fn(async () => ({ hostBytes: 1, stackBytes: 1, hostSource: 'measured', stackSource: 'measured' })),
+  invalidateWorkspaceDiskCostMemo: vi.fn(),
+}));
+
 vi.mock('../../cloister/issue-closed.js', () => ({
   isIssueClosed: mocks.isIssueClosed,
 }));

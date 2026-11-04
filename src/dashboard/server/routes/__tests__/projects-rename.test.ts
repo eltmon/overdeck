@@ -1,4 +1,5 @@
-import { mkdirSync, readFileSync, rmSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { Effect } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -29,6 +30,7 @@ import {
   _resetInternalTokenCacheForTests,
   INTERNAL_TOKEN_HEADER,
 } from '../../../../lib/internal-token.js';
+import { getOverdeckHome } from '../../../../lib/paths.js';
 
 interface RouteResult {
   status: number;
@@ -36,6 +38,14 @@ interface RouteResult {
 }
 
 const INTERNAL_TOKEN = 'projects-rename-test-token';
+
+function useTestInternalToken(): void {
+  process.env['OVERDECK_INTERNAL_TOKEN'] = INTERNAL_TOKEN;
+  // The token file wins over env (PAN-4628); delete any file a sibling
+  // test in this worker's shared OVERDECK_HOME left behind (PAN-4881).
+  rmSync(join(getOverdeckHome(), 'internal-token'), { force: true });
+  _resetInternalTokenCacheForTests();
+}
 
 async function requestProjectRename(
   projectKey: string,
@@ -67,8 +77,7 @@ async function requestProjectRename(
 }
 
 beforeEach(() => {
-  process.env['OVERDECK_INTERNAL_TOKEN'] = INTERNAL_TOKEN;
-  _resetInternalTokenCacheForTests();
+  useTestInternalToken();
   mkdirSync(TEST_HOME, { recursive: true });
   rmSync(PROJECTS_CONFIG_FILE, { force: true });
   registerProject('alpha', { name: 'Alpha Project', path: '/projects/alpha' });
@@ -77,6 +86,7 @@ beforeEach(() => {
 
 afterEach(() => {
   delete process.env['OVERDECK_INTERNAL_TOKEN'];
+  rmSync(join(getOverdeckHome(), 'internal-token'), { force: true });
   _resetInternalTokenCacheForTests();
   rmSync(TEST_HOME, { recursive: true, force: true });
 });
@@ -142,6 +152,16 @@ describe('POST /api/projects/:projectKey/rename', () => {
       body: { error },
     });
     expect(getProjectSync('alpha')?.name).toBe('Alpha Project');
+  });
+
+  it('authenticates with the test token when a sibling file left a stale token file (PAN-4881)', async () => {
+    writeFileSync(join(getOverdeckHome(), 'internal-token'), 'stale-sibling-token\n');
+    _resetInternalTokenCacheForTests();
+    useTestInternalToken();
+
+    const result = await requestProjectRename('alpha', { name: 'After Stale Token' });
+
+    expect(result).toEqual({ status: 200, body: { key: 'alpha', name: 'After Stale Token' } });
   });
 
   it('rejects unsafe requests before mutating the registry', async () => {

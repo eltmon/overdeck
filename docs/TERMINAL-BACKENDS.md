@@ -516,7 +516,23 @@ with a 90 s spawn grace (Herdr's 60 s detection window plus the 30 s tmux grace)
 tmux census only for a conversation Herdr does not hold. When Herdr does not answer it marks
 nothing. Readiness reads the pane through `readAgentPaneText` (Herdr `pane.read` with
 `source: visible`, or tmux `capture-pane`): `recent` is empty while a full-screen TUI (omp, kimi,
-muse, the codex TUI) draws on the alternate screen, so the agent TUI waiters read `visible` too. The numbered-menu capture in `conversation-pane-choice.ts` stays tmux-only.
+muse, the codex TUI) draws on the alternate screen, so the agent TUI waiters read `visible` too. The numbered-menu capture in `conversation-pane-choice.ts` stays tmux-only. Claude Code
+readiness (`waitForClaudeReady`) does not count a `❯` while a known blocking startup dialog
+title is on screen (today: "Make auto mode your default permission mode?"); if the dialog is
+still there at the 30 s deadline, the conversation start fails with a spawn error naming the
+dialog instead of sending the first message into it (PAN-4738).
+
+The poller's census verdict ("session gone" or "keep-alive corpse") is a candidate, not the
+decision (PAN-4739). Before it ends a row it asks `conversationHarnessAlive`, the door the
+conversation list's repair uses. When the door reports the harness alive, the row stays
+`active` and the poller logs one `WARNING (PAN-4739)` line per episode, naming the session,
+the census verdict and the census health (`available`, `stale`, `error`, pane count, up to 20
+session names). The warning repeats only after the census and the door have agreed again. This
+check runs only for a row about to be ended, so a tick with nothing to end adds no subprocess.
+Without it, the poller (reading the census) and the list route (reading `list-sessions`) flapped
+a Fly machine's live conversation between `ended` and `active` on every tick. The census
+disagreed there because tmux, run without a UTF-8 locale, prints `-F` tabs as `_`; the pane
+readers that parse tab-separated records now pass `-u`.
 
 **On a tmux host the door still asks Herdr** when its socket answers, and only a Herdr `alive`
 counts there (an unreachable Herdr is the normal state of a tmux host). The poller does the same
@@ -634,6 +650,14 @@ full frame repaints the grid but carries no DEC private modes, and Herdr exposes
 `serveHerdrTerminal` prefixes the snapshot with `\x1b[?2004h` (PAN-4557). This is safe because
 Herdr's attach input re-wraps a complete bracketed paste to the pane's live mode. Mouse and focus
 modes are not forced (drag-select, `5d2dafcf16d`).
+
+Shared Sessions (PAN-4477) reads the same two sources for a viewer's read-only terminal, through
+`src/dashboard/server/sharing/terminal-bridge.ts`. On Herdr it opens one `observe` stream per
+watching viewer, without dimensions and without the bracketed-paste prefix, because a viewer never
+writes. On tmux it consumes the session's PTY hub as a listener (`addHubListener` in `pty-hub.ts`,
+`subscribeToTmuxHub` in `pty-hub-attach.ts`); a listener never writes, and a hub the bridge starts
+spawns its PTY at the window's client size so the host window keeps its size. See "Read-only
+terminal" in [SHARED-SESSIONS.md](SHARED-SESSIONS.md).
 
 A prompt whose `wait` stalls or times out is reported **delivered**, not failed: Herdr writes the
 text and Enter before it starts watching for activity, so a stalled wait is no proof the prompt never

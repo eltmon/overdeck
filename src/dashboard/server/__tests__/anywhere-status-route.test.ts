@@ -13,6 +13,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../../lib/activity-logger.js', () => ({ emitActivityEntry: vi.fn() }));
 
+// PAN-1254: the Tailscale summary comes from readTailscaleState; pin it so the
+// result does not depend on whether this machine has Tailscale.
+const tailscaleState = vi.hoisted(() => ({
+  current: {
+    installed: false,
+    nextStep: 'install',
+    serveUrl: null as string | null,
+    magicDnsName: null as string | null,
+    serve: { proxiesDashboard: false, otherHandlerOn443: false, funnelOn443: false },
+  },
+}));
+vi.mock('../../../lib/tailscale/state.js', () => ({ readTailscaleState: async () => tailscaleState.current }));
+
 const { _resetAccessTokensForTests, _settleAccessTokenWritesForTests, createAccessToken, revokeAccessToken } = await import('../../../lib/access-tokens.js');
 const { _resetInternalTokenCacheForTests, INTERNAL_TOKEN_HEADER } = await import('../../../lib/internal-token.js');
 const { _resetDashboardSessionTokenForTests } = await import('../routes/dashboard-auth.js');
@@ -67,6 +80,28 @@ afterEach(async () => {
 });
 
 describe('GET /api/anywhere/status (PAN-4445)', () => {
+  it('reports Tailscale as not installed when no CLI resolves (PAN-1254)', async () => {
+    const res = await get({ [INTERNAL_TOKEN_HEADER]: INTERNAL_TOKEN });
+    expect(res.json.tailscale).toEqual({ nextStep: 'not-installed', serveUrl: null, magicDnsName: null });
+  });
+
+  it('reports unprotected Tailscale Serve as a problem with the setup action (PAN-1254)', async () => {
+    tailscaleState.current = {
+      installed: true,
+      nextStep: 'protect',
+      serveUrl: 'https://desk.tailnet.ts.net',
+      magicDnsName: 'desk.tailnet.ts.net',
+      serve: { proxiesDashboard: true, otherHandlerOn443: false, funnelOn443: false },
+    };
+    try {
+      const res = await get({ [INTERNAL_TOKEN_HEADER]: INTERNAL_TOKEN });
+      expect(res.json.tailscale).toEqual({ nextStep: 'protect', serveUrl: 'https://desk.tailnet.ts.net', magicDnsName: 'desk.tailnet.ts.net' });
+      expect(res.json.problems).toContainEqual(expect.objectContaining({ code: 'tailscale-serve-unprotected', action: { kind: 'tailscale-setup' } }));
+    } finally {
+      tailscaleState.current = { ...tailscaleState.current, installed: false, nextStep: 'install', serveUrl: null, magicDnsName: null, serve: { proxiesDashboard: false, otherHandlerOn443: false, funnelOn443: false } };
+    }
+  });
+
   it('counts only active devices, lists loopback addresses, and is not cacheable', async () => {
     await createAccessToken({ name: 'phone', scopes: ['admin'], kind: 'device' });
     const lost = await createAccessToken({ name: 'lost', scopes: ['admin'], kind: 'device' });

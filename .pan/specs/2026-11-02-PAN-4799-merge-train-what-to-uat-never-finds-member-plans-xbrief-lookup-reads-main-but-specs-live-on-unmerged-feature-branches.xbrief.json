@@ -1,0 +1,366 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-02T05:46:12Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4799: Merge train 'What to UAT' never finds member plans: xBRIEF lookup reads main, but specs live on unmerged feature branches",
+    "updated": "2026-11-02T05:59:05.556Z"
+  },
+  "plan": {
+    "id": "pan-4799",
+    "title": "Merge train 'What to UAT' never finds member plans: xBRIEF lookup reads main, but specs live on unmerged feature branches",
+    "status": "running",
+    "uid": "fb2f6219-2cbd-4bd5-be1f-6c4a4754b051",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-02T05:46:12Z",
+    "updated": "2026-11-02T05:59:05.556Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4799",
+        "label": "PAN-4799",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "merge-train",
+      "uat",
+      "xbrief",
+      "dashboard-server",
+      "bugfix"
+    ],
+    "narratives": {
+      "Problem": "getUatGenerationsPayload (src/dashboard/server/services/uat-train.ts) resolves every batch member's xBRIEF spec with findXBriefByIssue(root, id), where root is the project's primary checkout on main. A spec is committed on the feature branch and reaches main only when its PR merges, and every batch member is unmerged, so the lookup never succeeds and the Merge train card shows 'Plan not found for <ID>' for every member.",
+      "Proposal": "Add a pure resolver memberSpecRoots (src/dashboard/server/services/uat-member-spec-roots.ts) that orders each member's candidate roots: the newest live batch worktree that contains the member, then the member's local feature workspace (getWorkspaceInfoForIssue, the resolver pan review request uses), then the project root. loadAcceptanceCriteriaCache takes a per-member roots map, tries roots in order with the existing findXBriefByIssue (which already resolves polyrepo plan homes inside a workspace path), and keeps its mtime cache keyed by the path actually read plus the candidate-roots signature. Document the lookup order in docs/MERGE-WORKFLOW.md and the codebase concerns map.",
+      "NonGoals": "- No change to findXBriefByIssue, xbrief-index.ts scanning, or its 5 s TTL index cache.\n- No fix to routes/workspaces/workspace-data.ts resolvePlanLocation (a separate findXBriefByIssue(projectPath) caller).\n- No fix to resolveInfraRepo using repo path while polyrepo worktrees are laid out by repo name.\n- No frontend change; MergeTrainView already renders planResolved.\n- No change to the UAT reconciler, assembly, promote, stack, or cleanup.\n- No reading specs from remote branches via git when no local worktree exists.\n- No edit to src/dashboard/server/routes/workspaces.ts (file-size cap) and no allowlist raise."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Lookup order is batch worktree, then feature workspace, then project root, as the issue lists.",
+        "rationale": "The issue body names this order; the batch worktree has every member merged and is one index scan for the whole batch."
+      },
+      {
+        "summary": "The batch worktree is the newest generation in the chain that contains the member, has no cleanedAt, and exists on disk.",
+        "rationale": "listUatGenerations orders created_at DESC; cleaned or missing worktrees cannot hold a spec, so they must fall through silently."
+      },
+      {
+        "summary": "Feature workspace comes from getWorkspaceInfoForIssue in routes/workspaces.ts, skipped when remote or absent.",
+        "rationale": "The issue names the resolver pan review request uses; a madge run shows routes/workspaces.ts does not reach uat-train.ts, so the import adds no cycle, and services already import route modules."
+      },
+      {
+        "summary": "Polyrepo plan homes are resolved by passing the wrapper/workspace path to findXBriefByIssue, with no new seam.",
+        "rationale": "getProjectPanPaths -> resolvePlanHome already maps workspace paths to <checkout>/<pan_records.repo>; every current plan-home repo has name == path, and myn feature-min-1072/infra/.pan/specs exists."
+      },
+      {
+        "summary": "Ordering logic lives in a new pure module with injected exists and featureWorkspacePath.",
+        "rationale": "Unit tests run against fakes instead of the twenty vi.mocks in uat-train.test.ts, and uat-train.ts stays well under the 1000-line ceiling."
+      },
+      {
+        "summary": "Cache entries carry a rootsKey and are stored only for hits from the first candidate root; reuse requires the same candidate list and unchanged mtime.",
+        "rationale": "The issue asks to key the cache by the path actually read; caching only first-root hits (plan critique) stops a cached fallback from masking a spec that later appears in a higher-priority root, and re-searching fallbacks is bounded by the 5 s index TTL."
+      },
+      {
+        "summary": "On an ENOENT for an indexed spec path, invalidate that root index, retry once, then try the remaining roots.",
+        "rationale": "findXBriefByIssue serves a 5 s cached index that can name a deleted file; plan critique showed this would otherwise end the lookup with planResolved false."
+      }
+    ],
+    "items": [
+      {
+        "id": "member-spec-roots",
+        "title": "Add the pure memberSpecRoots resolver with unit tests",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T05:46:12Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4799",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "wire-ac-cache"
+          ],
+          "files_scope": [
+            "src/dashboard/server/services/uat-member-spec-roots.ts",
+            "src/dashboard/server/services/__tests__/uat-member-spec-roots.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/uat-member-spec-roots.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "uat-member-spec-roots.test.ts passes with the five named tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-5",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/server/services/uat-member-spec-roots.ts exporting MemberSpecRootDeps { exists(path): boolean; featureWorkspacePath(issueId): string | null } and memberSpecRoots(issueId, chain, projectRoot, deps): string[], exactly as the PRD W1 snippet shows. Order: (1) worktreePath of the FIRST generation in chain order (newest first) whose cleanedAt is falsy, whose members contain the issue (case-insensitive), and for which deps.exists(worktreePath) is true; (2) deps.featureWorkspacePath(upperIssueId) when non-null and deps.exists is true; (3) projectRoot always, never existence-gated. Deduplicate keeping first occurrence. Import only the UatGeneration type from ../../../lib/overdeck/merge-types.js; no fs, no routes import. Add src/dashboard/server/services/__tests__/uat-member-spec-roots.test.ts with the five tests named in PRD W1 using a fake exists Set; no filesystem."
+        },
+        "items": [
+          {
+            "id": "member-spec-roots.ac1",
+            "title": "Given a chain [genB newer, genA] where both contain PAN-1 and both worktrees exist, when memberSpecRoots runs, then it returns genB.worktreePath as the first root",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "member-spec-roots.ac2",
+            "title": "Given genB has cleanedAt set and genA's worktree is absent from exists, when memberSpecRoots runs, then the result contains no batch worktree and falls back to the workspace or project root",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "member-spec-roots.ac3",
+            "title": "Given featureWorkspacePath returns a path that exists, when memberSpecRoots runs with no live batch, then it returns [workspacePath, projectRoot]; given that path does not exist, it returns [projectRoot]",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "member-spec-roots.ac4",
+            "title": "Given exists returns false for everything, when memberSpecRoots runs, then it returns exactly [projectRoot]; given the workspace path equals projectRoot, the root appears once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wire-ac-cache",
+        "title": "Resolve each member's acceptance criteria through its ordered spec roots",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T05:46:12Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4799",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/uat-train.ts",
+            "src/dashboard/server/services/__tests__/uat-train.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/uat-train.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular",
+            "git diff --stat origin/main -- src/dashboard/server/routes/workspaces.ts"
+          ],
+          "expected_outputs": [
+            "uat-train.test.ts passes, including the four W2 tests and every pre-existing test unchanged",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle",
+            "git diff --stat for routes/workspaces.ts prints nothing"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/services/uat-train.ts follow PRD W2 steps 1-5: import existsSync (node:fs), memberSpecRoots (./uat-member-spec-roots.js) and getWorkspaceInfoForIssue (../routes/workspaces.js); add rootsKey to AcceptanceCriteriaCacheEntry; change loadAcceptanceCriteriaCache to take rootsByIssue: ReadonlyMap<string, readonly string[]> (upper-case keys); reuse a cache entry only when rootsKey (roots.join(\"\\\\0\")) matches and stat(path).mtimeMs is unchanged, delete it on a failed stat and fall through in the same call; try roots in order with findXBriefByIssue, first non-null wins; on no hit warn \"[uat-train] no xBRIEF spec resolved for <ID> under <roots joined by , > — UAT checklist unavailable\" and return planResolved false. In getUatGenerationsPayload build rootsByIssue with memberSpecRoots(id, chain, root, { exists: existsSync, featureWorkspacePath }) where featureWorkspacePath returns getWorkspaceInfoForIssue(id).localPath only when exists && !isRemote. Rewrite the PAN-1696 comment above loadAcceptanceCriteriaCache to state the PAN-4799 order. Do not edit routes/workspaces.ts. In uat-train.test.ts add a hoisted getWorkspaceInfoForIssue mock via vi.mock(\"../../routes/workspaces.js\") defaulting to { exists: false, isRemote: false }, add invalidateXBriefIndex: vi.fn() to the xbrief-index.js mock, and add the four W2 tests named in the PRD using mkdtemp dirs for paths that must exist. Cache-priority and stale-index recovery belong to item ac-cache-recovery, not this item."
+        },
+        "items": [
+          {
+            "id": "wire-ac-cache.ac1",
+            "title": "Given a generation whose worktreePath exists and holds the member's spec while the project root does not, when getUatGenerationsPayload runs, then the member returns planResolved: true with its acceptance criteria and findXBriefByIssue is first called with the worktree path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-ac-cache.ac2",
+            "title": "Given no existing batch worktree and getWorkspaceInfoForIssue returning an existing local workspace holding the spec, when the payload is built, then the member returns planResolved: true via the workspace root",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-ac-cache.ac3",
+            "title": "Given neither the batch worktree nor the workspace exists, when the payload is built, then findXBriefByIssue is called with the project root only; given every root returns null, the member returns planResolved: false with acceptanceCriteria []",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-ac-cache.ac4",
+            "title": "Given the pre-existing uat-train tests, when uat-train.test.ts runs, then findXBriefByIssue is still called with (\"/repos/myn\", \"MIN-831\") in the generation-project test and records exactly 8 calls across two polls in the bounded-reads test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ac-cache-recovery",
+        "title": "Cache only first-root spec hits and recover from stale index entries",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-02T05:46:12Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4799",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/uat-train.ts",
+            "src/dashboard/server/services/__tests__/uat-train.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/uat-train.test.ts",
+            "npm run typecheck",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "uat-train.test.ts passes, including the three W2b tests",
+            "typecheck completes without errors",
+            "lint:file-size reports uat-train.ts at or under 1000 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-9",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W2b. (1) In loadAcceptanceCriteriaCache store an acceptanceCriteriaByIssue entry only when the spec came from roots[0]; a hit from a later root is returned for this poll as planResolved true and any existing entry for the issue is deleted. (2) Import invalidateXBriefIndex from ../../../lib/xbrief/xbrief-index.js. Per root: findXBriefByIssue(root, id); if non-null, stat(found.path); on an error with code ENOENT call invalidateXBriefIndex(root), call findXBriefByIssue(root, id) once more and stat again; if the retry yields null or ENOENT again, continue to the next root. Any other error (non-ENOENT stat, readXBriefDocument failure) goes to the existing outer catch: warn and planResolved false. A small local helper (e.g. resolveInRoot) inside uat-train.ts is fine; keep the file at or under 1000 lines. Add the three W2b tests named in the PRD to uat-train.test.ts."
+        },
+        "items": [
+          {
+            "id": "ac-cache-recovery.ac1",
+            "title": "Given poll 1 resolved a member from its feature workspace because the existing batch worktree returned no spec, when poll 2 runs and the batch worktree now returns a spec, then poll 2 returns the batch worktree spec criteria",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ac-cache-recovery.ac2",
+            "title": "Given poll 1 resolved a member from a feature workspace directory that is then removed, when poll 2 runs, then it falls back to the project root and returns planResolved: true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ac-cache-recovery.ac3",
+            "title": "Given findXBriefByIssue returns a path that does not exist for the first root, when the payload is built, then invalidateXBriefIndex is called with that root and the member resolves planResolved: true from the project root in the same poll",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ac-cache-recovery.ac4",
+            "title": "Given readXBriefDocument fails with a parse error for the first root that has a spec, when the payload is built, then the member returns planResolved: false and no later root is queried",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-uat-lookup",
+        "title": "Document where the What to UAT checklist is read from",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T05:46:12Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4799",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/MERGE-WORKFLOW.md",
+            ".overdeck/context/codebase/concerns.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'feature workspace' docs/MERGE-WORKFLOW.md",
+            "grep -n 'PAN-4799' .overdeck/context/codebase/concerns.md",
+            "grep -c 'last-verified' .overdeck/context/codebase/concerns.md"
+          ],
+          "expected_outputs": [
+            "MERGE-WORKFLOW.md prints a line naming the batch worktree, feature workspace and project root lookup order",
+            "concerns.md prints the PAN-4799 bullet",
+            "the last-verified count is 1"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "In docs/MERGE-WORKFLOW.md, section 'Merging from the Flywheel UAT card (PAN-4598)', after step 1 (the line containing 'What to UAT' checklist), add a short paragraph: the checklist is each member's xBRIEF acceptance criteria, read from the batch worktree first, then the member's feature workspace, then the project root, because a spec reaches main only when its PR merges; a member with no spec anywhere shows 'Plan not found for <ID>'. In .overdeck/context/codebase/concerns.md add the bullet from PRD W3 naming PAN-1696, PAN-3165, PAN-4799 and memberSpecRoots, and update the single trailing <!-- last-verified: --> line to the implementation date. Write plain prose; no em-dash-heavy marketing tone."
+        },
+        "items": [
+          {
+            "id": "docs-uat-lookup.ac1",
+            "title": "docs/MERGE-WORKFLOW.md renders a paragraph next to the 'What to UAT' step that names the lookup order batch worktree, then feature workspace, then project root, and says a missing spec shows 'Plan not found'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-uat-lookup.ac2",
+            "title": ".overdeck/context/codebase/concerns.md contains a bullet naming PAN-4799 and memberSpecRoots, and grep -c 'last-verified' returns 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "member-spec-roots",
+        "to": "wire-ac-cache",
+        "type": "blocks"
+      },
+      {
+        "from": "wire-ac-cache",
+        "to": "ac-cache-recovery",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-02-PAN-4799-merge-train-what-to-uat-never-finds-member-plans-xbrief-lookup-reads-main-but-specs-live-on-unmerged-feature-branches.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}

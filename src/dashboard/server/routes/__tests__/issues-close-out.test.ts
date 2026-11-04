@@ -44,6 +44,9 @@ import { EventStoreService } from '../../services/domain-services.js';
 import { INTERNAL_TOKEN_HEADER, _resetInternalTokenCacheForTests } from '../../../../lib/internal-token.js';
 import { DASHBOARD_CSRF_HEADER, DASHBOARD_SESSION_COOKIE, _resetDashboardSessionTokenForTests, dashboardCsrfToken } from '../dashboard-auth.js';
 import { _resetTrustedOriginsForTests } from '../origin-validation.js';
+import { getOverdeckHome } from '../../../../lib/paths.js';
+import { rmSync } from 'node:fs';
+import { join } from 'node:path';
 
 // PAN-3917 W6: the record plane is deleted by W3; these route trees still reach
 // it transitively (config-yaml → tier-table → record, workspaces/resolver →
@@ -146,6 +149,9 @@ describe('POST /api/issues/:id/close-out', () => {
     process.env.OVERDECK_INTERNAL_TOKEN = 'test-token';
     process.env.OVERDECK_DASHBOARD_SESSION_TOKEN = 'test-browser-session-token';
     process.env.OVERDECK_DASHBOARD_CSRF_TOKEN = 'test-csrf-token';
+    // The token file wins over env (PAN-4628); delete any file a sibling
+    // test in this worker's shared OVERDECK_HOME left behind.
+    rmSync(join(getOverdeckHome(), 'internal-token'), { force: true });
     delete process.env.OVERDECK_TRUSTED_ORIGINS;
     pinDefaultDashboardOrigin();
     _resetInternalTokenCacheForTests();
@@ -325,6 +331,9 @@ describe('POST /api/issues/bulk-close-out', () => {
     process.env.OVERDECK_INTERNAL_TOKEN = 'test-token';
     process.env.OVERDECK_DASHBOARD_SESSION_TOKEN = 'test-browser-session-token';
     process.env.OVERDECK_DASHBOARD_CSRF_TOKEN = 'test-csrf-token';
+    // The token file wins over env (PAN-4628); delete any file a sibling
+    // test in this worker's shared OVERDECK_HOME left behind.
+    rmSync(join(getOverdeckHome(), 'internal-token'), { force: true });
     delete process.env.OVERDECK_TRUSTED_ORIGINS;
     pinDefaultDashboardOrigin();
     _resetInternalTokenCacheForTests();

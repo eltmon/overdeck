@@ -1,0 +1,1204 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-03T06:01:57Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4882: Post-release v0.73 Anywhere gap checks: PAN-4862 live relay on Fly and re-run the five fixed acceptance checks",
+    "updated": "2026-11-03T06:27:25.840Z"
+  },
+  "plan": {
+    "id": "pan-4882",
+    "title": "Post-release v0.73 Anywhere gap checks: PAN-4862 live relay on Fly and re-run the five fixed acceptance checks",
+    "status": "running",
+    "uid": "b479d149-be5b-465a-b3fb-30197314609d",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-03T06:01:57Z",
+    "updated": "2026-11-03T06:27:25.840Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4882",
+        "label": "PAN-4882",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4774",
+        "label": "PAN-4774 release acceptance run",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4862",
+        "label": "PAN-4862 relay TURN order",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4861",
+        "label": "PAN-4861 SSH helper supervisor stop",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4859",
+        "label": "PAN-4859 open in editor SSH destination",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "anywhere",
+      "uat",
+      "fly",
+      "relay",
+      "release-acceptance"
+    ],
+    "narratives": {
+      "Problem": "The PAN-4774 run failed AC-2 relay half, AC-3 relay, AC-4 remote worker, AC-6 managed SSH removal and AC-15 Open in editor on an SSH host. Each fix merged with unit tests (PAN-4862, #4864, PAN-4861, PAN-4859), but none was shown working live, and the PAN-4862 live relay check never ran because its device code expired. docs/ANYWHERE-RELEASE-CHECKLIST.md still lists all five as failed.",
+      "Proposal": "Re-run the five checks live against home's deployed build (verified to contain the four fix SHAs) using the published @overdeck/core at home's version on Fly VMs, with one device-code sign-in for the relay VM. Three independent chains run in parallel: relay VM (UDP blocked both directions, decrypted capture, TCP 443 only), AC-4 (two add-fly VMs, remote worker, three-lane gauntlet), SSH VM (add managed from browser, Open in editor, remove). Each check writes an evidence file under .pan/uat/pan-4882/, failures are filed as issues, the checklist records the re-run, a cleanup audit proves nothing is left, and a status table is posted on PAN-4882. The full procedure is .pan/drafts/PAN-4882.md.",
+      "NonGoals": "- Tailscale setup on this host (AC-3 Tailscale half); needs an operator decision.\n- AC-10 on a real VPS (PAN-4863).\n- AC-6 case two (externally started server); passed on 2026-11-02 and untouched by the PAN-4861 fix.\n- Any source-code change or fix; failures are filed as new issues.\n- Re-running AC-1, AC-5, AC-7, AC-8, AC-9, AC-11, AC-12, AC-13 or AC-14.\n- Publishing v0.73.1, running pan reload, pan restart or pan up on this host, or restarting home.\n- Changing [remote.fly] image or editing ~/.ssh/config.\n- Copying account.json between machines or approving a device code without the operator."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Target build = home's deployed build if it contains the four fix SHAs, even when it predates the v0.73.1 release commit.",
+        "rationale": "All four fixes are ancestors of v0.73.0 and of the deployed build b1d9d9dc554; v0.73.1 adds only unrelated commits and is not published to npm, so requiring it would block the run without changing what is tested."
+      },
+      {
+        "summary": "Fly VMs use registry.fly.io/pan-workspaces:latest plus npm install of home's version; a branch image only when home's version is unpublished.",
+        "rationale": "Provisioning and the SSH add require exactly home's version; npm 0.73.0 contains every fix, so a branch image adds cost and risk for no coverage."
+      },
+      {
+        "summary": "Run the relay check in both directions and add the TCP-443-only variant from PAN-4862 WI-4.",
+        "rationale": "Home's UDP is open, so only the VM exercises the fix; the VM must be tested as both initiator and responder, and the PAN-4862 PRD defined the variant."
+      },
+      {
+        "summary": "Prove end-to-end encryption by decrypting the TURN TLS layer with the VM's own Node TLS key log.",
+        "rationale": "With TLS TURN a raw capture cannot show what the relay sees; decrypting only the outer layer shows the relay receives DTLS ciphertext. If decryption fails the AC-2 relay half is reported approximated."
+      },
+      {
+        "summary": "AC-15 runs on the AC-6 SSH VM between add and remove, using the route's commandLine as evidence and a fake claude on the VM.",
+        "rationale": "Remove stops the server; the route returns commandLine regardless of spawn success and no editor is installed on this host, so nothing opens on the operator's desktop and no model credentials go to the VM."
+      },
+      {
+        "summary": "Device code: re-issue on expiry, give up after 30 minutes with not-run, and continue AC-4/6/15 meanwhile.",
+        "rationale": "The PAN-4862 attempt was lost to a 14-minute expiry; the issue forbids proceeding past sign-in without approval but not running the independent checks."
+      },
+      {
+        "summary": "Allowed statuses are passed, failed, approximated and not-run.",
+        "rationale": "The checklist already uses passed/failed/approximated; not-run is needed for environment blockers such as an unapproved device code, which are not product failures."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Verification run with no source changes: the surface is evidence files under .pan/uat/pan-4882/, one checklist doc, one superseded evidence pointer and one conditional docs sentence. The issue asks for one status comment covering the five checks, so sibling issues would split that report.",
+      "canonicalFilename": "2026-11-03-PAN-4882-post-release-v0-73-anywhere-gap-checks-pan-4862-live-relay-on-fly-and-re-run-the-five-fixed-acceptance-checks.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "preflight",
+        "title": "Record the deployed build, the fix SHAs, the version match and the clean start state",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T06:01:57Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4882",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/uat/pan-4882/preflight.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -E '^install path: ' .pan/uat/pan-4882/preflight.md"
+          ],
+          "expected_outputs": [
+            "one 'install path:' line naming published or branch image"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ],
+          "foundationFor": [
+            "relay-vm-signin",
+            "ac04-fly-setup",
+            "ssh-vm-setup"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1 (.pan/drafts/PAN-4882.md). Read buildCommit from home's /api/health, check each fix SHA (04f8bccc9df, 6ca4ae19e6e, af764fb9907, 054aea3e486) with git merge-base --is-ancestor, compare pan --version with npm view @overdeck/core version, and record fly, account, link, directory, ~/.ssh/id_ed25519 and editor state in .pan/uat/pan-4882/preflight.md. Apply D-1 (stop and tell the Flywheel if a fix SHA is missing) and D-2 (choose published install or branch image), and write the chosen install path as one line."
+        },
+        "items": [
+          {
+            "id": "preflight.ac1",
+            "title": "preflight.md records buildCommit and prints 'yes' for each of the four fix SHAs, or the file ends with 'Status: not-run — deployed build lacks <sha>' and the Flywheel tell is recorded.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "preflight.ac2",
+            "title": "preflight.md contains one line 'install path: published <version>' or 'install path: branch image <tag>' that follows D-2 from the recorded pan --version and npm view outputs.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "preflight.ac3",
+            "title": "preflight.md records 'fly machines list' showing no machine, 'pan machines list' showing no linked machines, and whether ~/.ssh/id_ed25519 is absent.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "relay-vm-signin",
+        "title": "Create the relay VM, sign it in with one approved device code and link it to home",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T06:01:57Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4882",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/uat/pan-4882/ac-02-03-relay.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'Signed in\\|not-run' .pan/uat/pan-4882/ac-02-03-relay.md"
+          ],
+          "expected_outputs": [
+            "a 'Signed in' line or a not-run status line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2 and D-3. Create Fly machine pan4882-relay from the D-2 image, install iptables, tcpdump and tshark, match pan to home's version, install the fake claude in /root/fakebin, write the tmux backend and marker tag to /root/.overdeck/config.yaml (D-8, D-18), start pan serve with DEBUG=werift*, DEBUG_COLORS=0 and NODE_OPTIONS=--tls-keylog, run pan account login, send the code with pan tell conv-flywheel (unsandboxed) and keep waiting for the operator's approval per D-3, re-issuing expired codes and telling flywheel-orchestrator at 30 min and hourly; then join, approve on home and accept. Write the Setup section of ac-02-03-relay.md."
+        },
+        "items": [
+          {
+            "id": "relay-vm-signin.ac1",
+            "title": "Given the device code printed on the VM, ac-02-03-relay.md records the pan tell conv-flywheel command with only the user code and URL, and the VM's 'Signed in' line after approval.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relay-vm-signin.ac2",
+            "title": "ac-02-03-relay.md records the join, approve and accept outputs whose six-digit codes match on both machines.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relay-vm-signin.ac3",
+            "title": "When home runs pan machines list --json after accept, ac-02-03-relay.md shows the relay VM's link online.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relay-vm-signin.ac4",
+            "title": "Given the code is still unapproved after 30 minutes, ac-02-03-relay.md records each re-issued code and each flywheel-orchestrator tell, and the relay VM survives until approval or until cleanup-audit.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "relay-udp-blocked",
+        "title": "Show the relay opens over TLS TURN with UDP blocked, from both directions",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T06:01:57Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "test",
+          "issueLabel": "pan-4882",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/uat/pan-4882/ac-02-03-relay.md",
+            ".pan/uat/pan-4882/ac-03-using-relay.png"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n \"turnTransport: 'tls'\\|rtc+turn://\" .pan/uat/pan-4882/ac-02-03-relay.md"
+          ],
+          "expected_outputs": [
+            "turnTransport 'tls' and rtc+turn:// lines for both directions"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ],
+          "acJustification": "five checks: two directions, the UI screenshot, the failure routing, and the D-3 not-run branch",
+          "parallelSafeReason": "touches only the relay VM and its own evidence file; the AC-4 and SSH chains use other Fly machines"
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3 with D-5, D-9, D-15 and D-16. Arm the self-reverting iptables timer, drop all UDP except DNS on the relay VM for IPv4 and IPv6, post the reconnect on home (VM responds) and then on the VM's own localhost (VM initiates), poll pan machines list --json every 2 s for 120 s, grep the VM's serve.log for iceOptions and turn candidateAddress, and record Outcome A, Outcome B and seconds to online for each direction plus the Using relay screenshot and relay bytesUsed before and after."
+        },
+        "items": [
+          {
+            "id": "relay-udp-blocked.ac1",
+            "title": "For the home-initiated reconnect, ac-02-03-relay.md shows the VM log line with turnServer port 443 and turnTransport 'tls' (Outcome A) and home's link online on an rtc+turn:// route (Outcome B), with reconnect-to-online seconds and the D-16 relay dial seconds.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relay-udp-blocked.ac2",
+            "title": "For the VM-initiated reconnect, ac-02-03-relay.md shows Outcome A and Outcome B with elapsed seconds in the same form.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relay-udp-blocked.ac3",
+            "title": "ac-03-using-relay.png renders home's Anywhere status card with the text 'Using relay', captured from an isolated Playwright profile.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relay-udp-blocked.ac4",
+            "title": "When any Outcome fails or any relay dial time exceeds 7 s, ac-02-03-relay.md names the D-4 or D-16 issue to file.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relay-udp-blocked.ac5",
+            "title": "Given the device code was never approved (D-3), ac-02-03-relay.md contains this item's section with 'not-run — device code not approved' in place of outcomes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "relay-encryption-capture",
+        "title": "Show relay traffic carries no plaintext, with the TURN TLS layer decrypted",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T06:01:57Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "test",
+          "issueLabel": "pan-4882",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/uat/pan-4882/ac-02-03-relay.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'pan4882relaymarker' .pan/uat/pan-4882/ac-02-03-relay.md"
+          ],
+          "expected_outputs": [
+            "marker counts of 0 and the home receipt line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-2"
+          ],
+          "parallelSafeReason": "touches only the relay VM and its own evidence file; the AC-4 and SSH chains use other Fly machines"
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-4 with D-6, D-7 and D-8. With UDP still blocked and the relay current, create a fake-claude conversation on the VM with message 'pan4882relaymarker hello', capture with tcpdump filtered to the resolved turn.cloudflare.com addresses (D-7) while home opens that linked conversation and receives the marker, then count marker and HTTP/1.1 strings and decrypt the TLS layer with tshark and the VM's own key log. Never copy the key log off the VM."
+        },
+        "items": [
+          {
+            "id": "relay-encryption-capture.ac1",
+            "title": "ac-02-03-relay.md records home receiving the text 'pan4882relaymarker' during the capture window.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relay-encryption-capture.ac2",
+            "title": "ac-02-03-relay.md records the tcpdump filter naming the resolved turn.cloudflare.com addresses and strings counts of 0 for 'pan4882relaymarker' and 0 for 'HTTP/1.1' on /root/relay.pcap.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relay-encryption-capture.ac3",
+            "title": "ac-02-03-relay.md contains a tshark excerpt showing TURN messages inside decrypted TLS with marker count 0, or the D-6 checkpoint note and 'approximated' for the AC-2 relay half.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relay-encryption-capture.ac4",
+            "title": "No evidence file or commit contains the contents of /root/tls-keys.log or any token value.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relay-encryption-capture.ac5",
+            "title": "Given the device code was never approved (D-3), ac-02-03-relay.md contains this item's section with 'not-run — device code not approved' in place of outcomes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "relay-tcp443-variant",
+        "title": "Repeat the relay check with only TCP 443 open, then tear down the relay VM",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T06:01:57Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4882",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/uat/pan-4882/ac-02-03-relay.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -E '^Status: (passed|failed|approximated|not-run)' .pan/uat/pan-4882/ac-02-03-relay.md"
+          ],
+          "expected_outputs": [
+            "two Status lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-5. Add the loopback, TCP 443 and established-traffic accept rules and the TCP drop rule for both families with the timer refreshed, repeat the WI-3 reconnects in both directions and record Outcomes A and B, then run pan account logout on the VM, pan machines unlink and pan machines forget on home, destroy the Fly machine (under D-3's never-approved branch: record not-run, stop the login and destroy the VM), and end the file with the AC-2 relay half and AC-3 relay status lines."
+        },
+        "items": [
+          {
+            "id": "relay-tcp443-variant.ac1",
+            "title": "ac-02-03-relay.md section 'TCP 443 only' shows Outcome A and Outcome B for both reconnect directions.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relay-tcp443-variant.ac2",
+            "title": "ac-02-03-relay.md section 'Cleanup' shows 'pan machines directory --json' returning only eltmon-z790 and 'fly machine destroy' output for the relay VM.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relay-tcp443-variant.ac3",
+            "title": "ac-02-03-relay.md contains two final Status lines, one for the AC-2 relay half and one for AC-3 relay, whose values follow D-15.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "relay-tcp443-variant.ac4",
+            "title": "Given the device code was never approved (D-3), ac-02-03-relay.md contains 'not-run' for this section and both Status lines, and records the relay VM destroyed.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ac04-fly-setup",
+        "title": "Register the throwaway project and start two add-fly VMs for AC-4",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T06:01:57Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4882",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/uat/pan-4882/ac-04-fly-worker-lanes.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'online' .pan/uat/pan-4882/ac-04-fly-worker-lanes.md"
+          ],
+          "expected_outputs": [
+            "two online VM labels"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-6 and D-14. Clone eltmon/prepack-webpack-plugin to /home/eltmon/Projects/pan4882-anywhere-smoke, register it with pan project add, check the proposed issue prefix is letters only, set [remote] enabled = true in ~/.overdeck/config.toml, create the issue worktree, and run pan machines add-fly --project pan4882-anywhere-smoke --json twice in parallel. Write the Setup section of ac-04-fly-worker-lanes.md."
+        },
+        "items": [
+          {
+            "id": "ac04-fly-setup.ac1",
+            "title": "ac-04-fly-worker-lanes.md records the registered project's issue_prefix matching ^[A-Z]+$, or the ODKRERUN override plus the regression issue to file.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ac04-fly-setup.ac2",
+            "title": "ac-04-fly-worker-lanes.md records both add-fly JSON outputs and pan machines list --json showing both VMs online.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ac04-fly-setup.ac3",
+            "title": "ac-04-fly-worker-lanes.md records pan --version on each VM equal to home's version.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ac04-remote-worker",
+        "title": "Show home keeps a remote Fly worker running until it reports",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T06:01:57Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4882",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/uat/pan-4882/ac-04-fly-worker-lanes.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'pan worker wait' .pan/uat/pan-4882/ac-04-fly-worker-lanes.md"
+          ],
+          "expected_outputs": [
+            "worker wait output with the report"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-7. Start a root conversation in the throwaway project, run pan worker run --machine <fly1> with the README one-sentence prompt, log remote.json state, lastSeq and lastSeenAt every 2 s printing only on change, then pan worker wait with a 600 s timeout. Write the Remote worker section of ac-04-fly-worker-lanes.md."
+        },
+        "items": [
+          {
+            "id": "ac04-remote-worker.ac1",
+            "title": "When pan worker wait runs, ac-04-fly-worker-lanes.md shows it exiting 0 and printing the worker's one-sentence report.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ac04-remote-worker.ac2",
+            "title": "ac-04-fly-worker-lanes.md contains the remote.json change log, and no entry shows state 'exited' before lastSeq reaches 1.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ac04-remote-worker.ac3",
+            "title": "When the worker fails to report, ac-04-fly-worker-lanes.md records the remote.json log and the worker's VM pane output and marks the remote worker failed for D-4.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ac04-gauntlet",
+        "title": "Run the three-machine lane gauntlet and tear down the AC-4 setup",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T06:01:57Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4882",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/uat/pan-4882/ac-04-fly-worker-lanes.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -E '^Status: (passed|failed|approximated|not-run)' .pan/uat/pan-4882/ac-04-fly-worker-lanes.md"
+          ],
+          "expected_outputs": [
+            "a Status line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-13",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-8. Start play lanes with keys home, fly1 and fly2 under run pan4882, wait for all three in parallel, list them, stop and reap each, then stop the root conversation, unlink both VMs, remove the throwaway project and its clone and lanes directories by literal path, restore [remote] enabled = false, and end ac-04-fly-worker-lanes.md with its Status line."
+        },
+        "items": [
+          {
+            "id": "ac04-gauntlet.ac1",
+            "title": "ac-04-fly-worker-lanes.md records pan lane list --run pan4882 --json with three lanes on home and the two Fly machines, and each pan lane wait printing a report.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ac04-gauntlet.ac2",
+            "title": "ac-04-fly-worker-lanes.md records fly machines list without either AC-4 VM and pan projects list without pan4882-anywhere-smoke.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ac04-gauntlet.ac3",
+            "title": "ac-04-fly-worker-lanes.md records grep of ~/.overdeck/config.toml showing [remote] enabled = false and ends with a Status line.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ssh-vm-setup",
+        "title": "Start the SSH VM and reach it as root@127.0.0.1:10022 through fly proxy",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T06:01:57Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4882",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/uat/pan-4882/ac-06-ssh-host.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'fakebin/claude' .pan/uat/pan-4882/ac-06-ssh-host.md"
+          ],
+          "expected_outputs": [
+            "the ssh probe output"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-9"
+          ],
+          "acJustification": "setup item: reachability and the identity guard are the only observable outcomes"
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-9. Create Fly machine pan4882-ssh from the D-2 image, install openssh-server, match pan to home's version, install the fake claude in /root/fakebin and add it to PATH in /root/.profile, write terminal backend tmux to /root/.overdeck/config.yaml (D-18), start sshd on 2222, authorize a throwaway ed25519 key, copy it to ~/.ssh/id_ed25519 only when preflight recorded it absent, start fly proxy 10022:2222, and confirm a BatchMode ssh login. Write the Setup section of ac-06-ssh-host.md."
+        },
+        "items": [
+          {
+            "id": "ssh-vm-setup.ac1",
+            "title": "Given the proxy is up, ac-06-ssh-host.md records ssh -o BatchMode=yes -p 10022 root@127.0.0.1 printing home's pan version and /root/fakebin/claude.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ssh-vm-setup.ac2",
+            "title": "ac-06-ssh-host.md records that ~/.ssh/id_ed25519 was absent before the copy, or ends with 'Status: not-run — default SSH identity occupied' and no file in ~/.ssh is overwritten.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ac06-add-managed",
+        "title": "Add the SSH machine from the browser with a managed server",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T06:01:57Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4882",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/uat/pan-4882/ac-06-ssh-host.md",
+            ".pan/uat/pan-4882/ac-06-online.png"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'managed' .pan/uat/pan-4882/ac-06-ssh-host.md"
+          ],
+          "expected_outputs": [
+            "launch managed recorded"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-10. In an isolated Playwright profile signed in to home with the overdeck_token link, open Settings, Anywhere, Machines, Add an SSH machine, enter ssh://root@127.0.0.1:10022 and add it; record pan machines list --json, the ac-06-online.png screenshot, and the VM's supervisor and dashboard processes."
+        },
+        "items": [
+          {
+            "id": "ac06-add-managed.ac1",
+            "title": "ac-06-ssh-host.md records pan machines list --json with the SSH machine online, a route of kind ssh, and ssh.launch 'managed'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ac06-add-managed.ac2",
+            "title": "ac-06-online.png renders the machine row with 'Online' and 'Started by Overdeck'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ac06-add-managed.ac3",
+            "title": "ac-06-ssh-host.md records the VM's ps output listing a supervisor/server.js and a dashboard/server.js process.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ac15-open-in-editor",
+        "title": "Show Open in editor on the SSH machine targets root@127.0.0.1:10022",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T06:01:57Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4882",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/uat/pan-4882/ac-15-open-in-editor.md",
+            ".pan/uat/pan-4882/ac-15-open-in-editor.png"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -E '^Status: (passed|failed|approximated|not-run)' .pan/uat/pan-4882/ac-15-open-in-editor.md"
+          ],
+          "expected_outputs": [
+            "a Status line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-11 and D-11. Create a fake-claude conversation on the SSH VM in /root/ac15, wait for it on home's linked list, click Open in editor and VS Code in the isolated browser, capture the open-in-editor response, decode the hex authority after ssh-remote+ with node, and write ac-15-open-in-editor.md with the screenshot."
+        },
+        "items": [
+          {
+            "id": "ac15-open-in-editor.ac1",
+            "title": "ac-15-open-in-editor.md records the open-in-editor response with ok true and a commandLine ending in ' /root/ac15'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ac15-open-in-editor.ac2",
+            "title": "ac-15-open-in-editor.md shows the decoded authority JSON containing hostName 127.0.0.1, user root and port 10022.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ac15-open-in-editor.ac3",
+            "title": "ac-15-open-in-editor.md shows the commandLine contains neither 'ssh-remote+127.0.0.1 ' nor the forward's local port.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ac15-open-in-editor.ac4",
+            "title": "ac-15-open-in-editor.png renders the conversation view with the Open in editor control, and the file ends with a Status line.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ac06-remove-managed",
+        "title": "Remove the SSH machine and show its server and supervisor stay stopped",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T06:01:57Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4882",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/uat/pan-4882/ac-06-ssh-host.md",
+            ".pan/uat/pan-4882/ac-06-remove-dialog.png"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -E '^Status: (passed|failed|approximated|not-run)' .pan/uat/pan-4882/ac-06-ssh-host.md"
+          ],
+          "expected_outputs": [
+            "a Status line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-13",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-12 and D-12. In the isolated browser click Remove with Leave the server running unchecked, then on the VM check at 30, 90 and 180 seconds that no supervisor/server.js or dashboard/server.js runs and that /api/health on port 3011 prints 000; then destroy the VM, stop fly proxy, remove the known_hosts entry and the throwaway key files by literal path, and end ac-06-ssh-host.md with its Status line."
+        },
+        "items": [
+          {
+            "id": "ac06-remove-managed.ac1",
+            "title": "ac-06-remove-dialog.png renders the dialog text 'Removing this machine stops that server.' with the leave-running box unchecked.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ac06-remove-managed.ac2",
+            "title": "ac-06-ssh-host.md records three checks at 30, 90 and 180 seconds, each with no server.js process and health code 000.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ac06-remove-managed.ac3",
+            "title": "ac-06-ssh-host.md records the VM destroyed, ssh-keygen -R output, ~/.ssh/id_ed25519 absent, and ends with a Status line.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "file-failure-issues",
+        "title": "File one GitHub issue per failed check and link it from its evidence",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T06:01:57Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4882",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/uat/pan-4882/issues.md",
+            ".pan/uat/pan-4882/ac-02-03-relay.md",
+            ".pan/uat/pan-4882/ac-04-fly-worker-lanes.md",
+            ".pan/uat/pan-4882/ac-06-ssh-host.md",
+            ".pan/uat/pan-4882/ac-15-open-in-editor.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "test -f .pan/uat/pan-4882/issues.md"
+          ],
+          "expected_outputs": [
+            "issues.md exists"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ],
+          "acJustification": "two checks fully cover filing and linking"
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-13 and D-4, D-14, D-16. For every evidence file whose Status is failed and every D-14 or D-16 trigger, create an issue with gh issue create titled per D-4 with the AC, failing step, command, trimmed output, deployed build and evidence path, append the URL to the Status line, and list all of them in issues.md."
+        },
+        "items": [
+          {
+            "id": "file-failure-issues.ac1",
+            "title": "Given a failed Status line, that line contains a https://github.com/eltmon/overdeck/issues/ URL.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "file-failure-issues.ac2",
+            "title": "issues.md lists each filed issue URL with its title, or contains 'No failures; no issues filed.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cleanup-audit",
+        "title": "Prove no Fly machine, link, identity, project or proxy from the run remains",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T06:01:57Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4882",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/uat/pan-4882/cleanup.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'No machines are available' .pan/uat/pan-4882/cleanup.md"
+          ],
+          "expected_outputs": [
+            "the empty fly machines list line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-14. Run the listed commands for Fly machines and volumes, links, directory, remote.enabled, projects.yaml, the SSH identity, port 10022 and fly proxy processes; remove any leftover, re-run the commands, and record the final outputs in .pan/uat/pan-4882/cleanup.md."
+        },
+        "items": [
+          {
+            "id": "cleanup-audit.ac1",
+            "title": "cleanup.md records fly machines list -a pan-workspaces printing no machine.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cleanup-audit.ac2",
+            "title": "cleanup.md records the directory labels as only eltmon-z790 and pan machines list showing no linked machines.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cleanup-audit.ac3",
+            "title": "cleanup.md records [remote] enabled = false, zero pan4882 entries in projects.yaml, ~/.ssh/id_ed25519 absent, and zero listeners on port 10022.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "checklist-doc",
+        "title": "Record the re-run results in the Anywhere release checklist",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T06:01:57Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4882",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/ANYWHERE-RELEASE-CHECKLIST.md",
+            ".pan/uat/pan-4862/live-relay.md",
+            "configuration/linked-machines.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 're-run (PAN-4882' docs/ANYWHERE-RELEASE-CHECKLIST.md",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "count of 5",
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-15 and D-17. Add a dated 're-run (PAN-4882, build <sha>)' paragraph under AC-2, AC-3, AC-4, AC-6 and AC-15 of docs/ANYWHERE-RELEASE-CHECKLIST.md, rewrite the Prerequisites bullet about the Fly VM's pan version, point .pan/uat/pan-4862/live-relay.md's Status line at the new evidence, change configuration/linked-machines.mdx only under D-17's failure branch, and run npm run lint:docs."
+        },
+        "items": [
+          {
+            "id": "checklist-doc.ac1",
+            "title": "docs/ANYWHERE-RELEASE-CHECKLIST.md contains a 're-run (PAN-4882' paragraph under each of AC-2, AC-3, AC-4, AC-6 and AC-15, each naming its status and its .pan/uat/pan-4882/ evidence file.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "checklist-doc.ac2",
+            "title": "The checklist's Prerequisites section says a Fly VM installs @overdeck/core at home's version from npm and needs a branch image only when that version is unpublished.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "checklist-doc.ac3",
+            "title": ".pan/uat/pan-4862/live-relay.md contains 'Status: superseded — re-run in PAN-4882'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "checklist-doc.ac4",
+            "title": "When the UDP-blocked Outcome B failed, configuration/linked-machines.mdx says a UDP-blocked network does not connect yet and links the filed issue; when it passed, the file shows no diff.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "checklist-doc.ac5",
+            "title": "npm run lint:docs exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "closing-comment",
+        "title": "Post the five-check status table as a PAN-4882 comment",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T06:01:57Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4882",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".tmp/pan-4882/comment.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "gh issue view 4882 --repo eltmon/overdeck --comments --json comments --jq '.comments[-1].body' | grep -c '| AC-'"
+          ],
+          "expected_outputs": [
+            "six table rows"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-16. Write .tmp/pan-4882/comment.md with a table of AC-2 relay half, AC-3 relay UDP blocked, AC-3 relay TCP 443 only, AC-4, AC-6 and AC-15, each with status, evidence link on the feature/pan-4882 branch and issue link, plus the deployed build, home version and the final fly machines list output, then post it with gh issue comment 4882."
+        },
+        "items": [
+          {
+            "id": "closing-comment.ac1",
+            "title": "PAN-4882 receives a comment whose table has six rows, each with exactly one of passed, failed, approximated or not-run.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "closing-comment.ac2",
+            "title": "Each failed row of the comment contains an issue URL, and each row contains a link to its evidence file on feature/pan-4882.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "closing-comment.ac3",
+            "title": "The comment contains the deployed buildCommit and a code block with the final fly machines list output.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "preflight",
+        "to": "relay-vm-signin",
+        "type": "blocks"
+      },
+      {
+        "from": "preflight",
+        "to": "ac04-fly-setup",
+        "type": "blocks"
+      },
+      {
+        "from": "preflight",
+        "to": "ssh-vm-setup",
+        "type": "blocks"
+      },
+      {
+        "from": "relay-vm-signin",
+        "to": "relay-udp-blocked",
+        "type": "blocks"
+      },
+      {
+        "from": "relay-udp-blocked",
+        "to": "relay-encryption-capture",
+        "type": "blocks"
+      },
+      {
+        "from": "relay-encryption-capture",
+        "to": "relay-tcp443-variant",
+        "type": "blocks"
+      },
+      {
+        "from": "ac04-fly-setup",
+        "to": "ac04-remote-worker",
+        "type": "blocks"
+      },
+      {
+        "from": "ac04-remote-worker",
+        "to": "ac04-gauntlet",
+        "type": "blocks"
+      },
+      {
+        "from": "ssh-vm-setup",
+        "to": "ac06-add-managed",
+        "type": "blocks"
+      },
+      {
+        "from": "ac06-add-managed",
+        "to": "ac15-open-in-editor",
+        "type": "blocks"
+      },
+      {
+        "from": "ac15-open-in-editor",
+        "to": "ac06-remove-managed",
+        "type": "blocks"
+      },
+      {
+        "from": "relay-tcp443-variant",
+        "to": "file-failure-issues",
+        "type": "blocks"
+      },
+      {
+        "from": "relay-tcp443-variant",
+        "to": "cleanup-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "ac04-gauntlet",
+        "to": "file-failure-issues",
+        "type": "blocks"
+      },
+      {
+        "from": "ac04-gauntlet",
+        "to": "cleanup-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "ac06-remove-managed",
+        "to": "file-failure-issues",
+        "type": "blocks"
+      },
+      {
+        "from": "ac06-remove-managed",
+        "to": "cleanup-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "file-failure-issues",
+        "to": "checklist-doc",
+        "type": "blocks"
+      },
+      {
+        "from": "checklist-doc",
+        "to": "closing-comment",
+        "type": "blocks"
+      },
+      {
+        "from": "cleanup-audit",
+        "to": "closing-comment",
+        "type": "blocks"
+      },
+      {
+        "from": "file-failure-issues",
+        "to": "closing-comment",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

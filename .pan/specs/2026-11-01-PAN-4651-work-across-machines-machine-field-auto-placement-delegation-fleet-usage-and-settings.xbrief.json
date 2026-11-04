@@ -1,0 +1,2703 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-01T19:30:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4651: Work across machines: Machine field, Auto placement, delegation, fleet usage and settings",
+    "updated": "2026-11-01T18:35:45.317Z"
+  },
+  "plan": {
+    "id": "pan-4651",
+    "title": "Work across machines: Machine field, Auto placement, delegation, fleet usage and settings",
+    "status": "running",
+    "uid": "25f7d986-d219-4f58-b72a-d484db4e8646",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-01T19:30:00Z",
+    "updated": "2026-11-01T18:35:45.317Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4651",
+        "label": "PAN-4651",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4405",
+        "label": "PAN-4405 (closed by this issue)",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4651.md",
+        "label": "PRD",
+        "type": "document"
+      },
+      {
+        "uri": ".pan/drafts/pan-2350.md",
+        "label": "Epic PRD rev 5",
+        "type": "document"
+      }
+    ],
+    "tags": [
+      "anywhere",
+      "linked-machines",
+      "delegation",
+      "placement",
+      "mcp",
+      "fleet"
+    ],
+    "metadata": {
+      "sizeJustification": "The operator decomposed epic PAN-2350 into sibling issues and assigned W-WORK1, W-WORK2, W-WORK4, W-WORK5, W-WORK6, W-WORK7, W-WORK8 and MCP fleet reach to this issue as one unit. They share the work-door module, the fleet routes, the placement service and the heartbeat additions, so the 31 items are already the vertical slices of that unit; the file and subsystem counts are inflated by one test file per source file and by the docs pages each counting as a subsystem (siblings #4645 and #4650 used the same shape).",
+      "docsJustification": null,
+      "canonicalFilename": "2026-11-01-PAN-4651-work-across-machines-machine-field-auto-placement-delegation-fleet-usage-and-settings.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Linked machines (PAN-4645/4650) can see and remote-control each other's conversations, but nothing starts work on another machine, follows delegated work back, chooses a machine by load or capability, groups projects by repository, or shows Needs-You, search, usage and settings across the fleet; the MCP server reaches only this machine.",
+      "Proposal": "Owner-side work doors (/api/machines/work/*) stamp link-started provenance and a narrowed agent fence; viewer-side fleet routes (/api/fleet/*) resolve this machine, a label or Auto (deterministic D-19 placement over heartbeat load, tags and project lists) and forward over the link; delegated workers get a local stand-in kept in step by a follower; projects, Needs-You and load arrive by hash-driven heartbeat sync; search, usage, compare and 'who' fan out per action; odk_ tokens reach linked conversations under a scope ceiling. Details: .pan/drafts/PAN-4651.md.",
+      "NonGoals": "- Running gauntlet lanes on another machine (W-WORK3, PAN-4638); this issue adds only the lane flags and placement.\n- --machine fly, the Fly (new VM) choice and any remote.auto_fly key (PAN-4652).\n- A stop cascade for local (non-delegated) workers.\n- Usage per provider account beyond duplicate request ids.\n- Changing settings on another machine; Compare settings is read-only.\n- Comparing defaults that neither machine sets, or projects.yaml.\n- A dashboard view for 'which machine is working on PAN-<n>' (CLI and fleet route only).\n- Answering a remote work agent's pending input inline from Needs-You.\n- Capability tags in the public environment descriptor.\n- Copying files larger than 1 MiB, directories or symlinks between machines.\n- Polling linked machines on a timer for projects, Needs-You or load.\n- Raising any file-size allowlist cap."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Owner-side work doors under /api/machines/work/* (machine credential only, operate scope) start link-started conversations, workers, issue agents and projects; viewer-side /api/fleet/* routes resolve the machine and forward.",
+        "rationale": "pan start and pan worker run spawn in the CLI process and POST /api/agents needs admin, which machine tokens never carry; a dedicated door stamps provenance in one place without editing god files."
+      },
+      {
+        "summary": "Agent actors may change only conversations and workers their own machine started (started_by_environment_id / worker.json startedBy); bare POST /api/conversations, /api/workers and /api/lanes stay refused to agent actors over a link.",
+        "rationale": "Epic FR-4 states this rule literally; forcing link-started work through the work doors keeps every such item stamped."
+      },
+      {
+        "summary": "Delegated workers get a local stand-in directory with remote.json and mirrored reports, kept in step by a dashboard follower with 1 s to 300 s back-off that resumes from disk and stops the remote worker when the parent dies.",
+        "rationale": "pan worker wait and the parent already read report files; a stand-in reuses that path unchanged and survives dashboard restarts (epic FR-11)."
+      },
+      {
+        "summary": "Unpushed commits make remote pan start / pan worker run exit 1 unless --push-first or --ignore-unpushed.",
+        "rationale": "Epic D-11 says the CLI 'says so and offers --push-first'; refusing by default prevents a delegated agent from silently working on stale code."
+      },
+      {
+        "summary": "Load, capability tags and placement mode ride in the authenticated 15 s heartbeat, not in the public environment descriptor.",
+        "rationale": "GET /api/environment needs no credential and operator tags can name a purpose; the heartbeat already carries per-link facts to the supervisor."
+      },
+      {
+        "summary": "'Running agents' for placement counts live-agent-directory entries in state 'working'.",
+        "rationale": "Same definition the fleet-update turn wait uses; idle agents do not load the machine."
+      },
+      {
+        "summary": "--machine fly and the Fly (new VM) choice are refused / shown disabled with 'needs PAN-4652'; no remote.auto_fly key is added.",
+        "rationale": "Fly VMs are not machines until #4652 (W-FLY2) ships; the issue lists that dependency."
+      },
+      {
+        "summary": "pan lane start gains --machine and --needs with placement; a remote choice exits 1 naming PAN-4638.",
+        "rationale": "The issue assigns W-WORK3 (lanes on other machines) to #4638, which consumes this flag and the placement service."
+      },
+      {
+        "summary": "MCP odk_ calls through a link are forwarded as actor operator with a ceiling equal to the token's scopes; the token's scopes are the fence.",
+        "rationale": "Resolves the tension between epic FR-4 (agents change only link-started conversations) and FR-27/AC-12 (an MCP client messages a desktop conversation); D-21 defines MCP fencing as no pairing, token minting or settings plus the approve scope, which the ceiling enforces."
+      },
+      {
+        "summary": "Lowering the @-prefix proxy from admin to per-path scopes is paired with an explicit no-chained-hops refusal for channel callers.",
+        "rationale": "The admin default was the only guard against a machine credential hopping through the proxy."
+      },
+      {
+        "summary": "Fleet usage dedups by duplicate provider request id (hashed digest), not by a provider account.",
+        "rationale": "cost_events has no account column; the only real cross-machine double count is the same request recorded on two machines; with no overlap the total equals the sum (the epic done-when)."
+      },
+      {
+        "summary": "Compare settings compares explicitly set config.yaml keys (dotted snake_case) and emits 'pan admin config set <key> <value>' lines; a minimal pan admin config set is added.",
+        "rationale": "pan config set does not exist and config lives under pan admin config; comparing set keys keeps every key name exactly what the command writes."
+      },
+      {
+        "summary": "Add this project works both ways: 'here' runs locally with admin, 'there' goes through an operator-only owner work door; selected git-ignored files cross only operator-level links with the operator actor.",
+        "rationale": "Epic FR-12 names 'Add this project to <machine>' as the delegation error's remedy, which needs the remote direction; .env files are secrets."
+      },
+      {
+        "summary": "The Combine matching repositories setting lives in anywhere.json next to shareConversations.",
+        "rationale": "The Settings whole-document save is lossy (PAN-4650 D-4650-15) and the setting is per machine."
+      },
+      {
+        "summary": "One issue with 31 items instead of sibling issues.",
+        "rationale": "The operator already decomposed epic PAN-2350 into sibling issues and assigned these work items to this one; siblings #4650 and #4645 used the same shape."
+      }
+    ],
+    "items": [
+      {
+        "id": "wi1-provenance-fence",
+        "title": "Record which linked machine started a conversation or worker and narrow the agent fence to that work",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T19:30:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4651",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "drizzle/overdeck/0000_overdeck_init.sql",
+            "src/lib/overdeck/infra.ts",
+            "src/lib/overdeck/conversation-provenance.ts",
+            "src/lib/agents/worker/facts.ts",
+            "src/dashboard/server/link-fence.ts",
+            "src/dashboard/server/remote-request-gate.ts",
+            "tests/unit/lib/overdeck/conversation-provenance.test.ts",
+            "src/dashboard/server/__tests__/link-fence.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/conversation-provenance.test.ts src/dashboard/server/__tests__/link-fence.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversation-provenance.test.ts passes",
+            "link-fence.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-3"
+          ],
+          "foundationFor": [
+            "wi4-work-door-conversations",
+            "wi5-work-door-workers",
+            "wi6-work-door-issue-start",
+            "wi19-add-project-there"
+          ],
+          "parallelSafeReason": "Its files are new modules or files no unconnected item edits; every shared real edit is ordered by a blocks edge, and the remaining overlaps are the append-only tables (route-scopes.ts, no-loss-matrix.ts, server.ts route layers, anywhere-boot.ts wiring, frontend-test-subset.txt, machines.ts subcommand registration) resolved by keeping both rows."
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4651.md WI-1, D-4651-1, D-4651-2. Add nullable `started_by_environment_id` text to `conversations`: a runSchemaTopUp ALTER right after the PAN-4639 top-ups (settled_at/snoozed_until) in src/lib/overdeck/infra.ts, mirrored in drizzle/overdeck/0000_overdeck_init.sql (check src/lib/overdeck/paths.ts for any column/table count and keep it consistent). New leaf door src/lib/overdeck/conversation-provenance.ts: markConversationStartedBy(name, environmentId), conversationStartedBy(name) (sync SQLite like other overdeck.db doors). WorkerFacts in src/lib/agents/worker/facts.ts gains optional startedBy: { environmentId, parentId } | null. Rewrite linkActorFence in src/dashboard/server/link-fence.ts per D-4651-2: stays synchronous with optional deps { conversationStartedBy } defaulting to the door; for machine credentials with an agent actor allow POST /api/machines/work/conversations|workers|issues/:id/start, refuse POST /api/machines/work/projects, allow non-GET /api/conversations/<name>/... only when conversationStartedBy(name) === credential.environmentId, keep refusing bare POST /api/conversations, POST /api/workers, POST /api/lanes, /ws/terminal and /ws/forward; POST /api/workers/:id/stop passes the fence (the route checks, WI-5). Callers remote-request-gate.ts:130, ws-terminal.ts:270, ws-forward.ts:68 keep their call shape. Update the file header comment. Repo rules: no execSync in server-reachable code (async execFile with timeouts); fake timers (vi.useFakeTimers + vi.advanceTimersByTimeAsync) for every wait, poll, back-off or heartbeat test; god files must not grow past their origin/main count or allowlist cap (start.ts 1283, CommandPalette.tsx 1124, Sidebar.tsx 1019, settings-api.ts 1508, routes/settings.ts 1104, routes/conversations.ts, conversation-runtime.ts, config-yaml/schema.ts) — extract a module instead, never raise a cap; every new HTTP route needs a tests/unit/lib/overdeck/no-loss-matrix.ts row and, unless admin-only, a src/dashboard/server/route-scopes.ts row; route-scopes.ts, no-loss-matrix.ts, server.ts route layers, anywhere-boot.ts wiring and scripts/frontend-test-subset.txt are append-only shared files (keep both rows on conflict)."
+        },
+        "items": [
+          {
+            "id": "wi1-provenance-fence.ac1",
+            "title": "Given conv-a was started by environment E1, when an agent-actor machine credential for E1 POSTs /api/conversations/conv-a/message, then linkActorFence returns null; for a credential of E2 it returns 'agent-fenced'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-provenance-fence.ac2",
+            "title": "Given an agent-actor machine credential, when it POSTs /api/machines/work/workers, then the fence returns null; when it POSTs /api/conversations, /api/workers, /api/lanes or /api/machines/work/projects, then the fence returns 'agent-fenced'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-provenance-fence.ac3",
+            "title": "Given an operator-actor machine credential, when it POSTs /api/conversations/conv-b/message for a conversation with no provenance, then the fence returns null (unchanged behavior)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-provenance-fence.ac4",
+            "title": "Given a fresh overdeck.db, when the schema top-up runs, then conversations has a started_by_environment_id column and markConversationStartedBy followed by conversationStartedBy returns the stored environment id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi2-load-tags-heartbeat",
+        "title": "Report each machine's load sample, capability tags and placement mode in the link heartbeat",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T19:30:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4651",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/machine-load.ts",
+            "src/lib/anywhere/machine-capabilities.ts",
+            "src/lib/anywhere/machine-config.ts",
+            "src/dashboard/server/services/link-heartbeat.ts",
+            "src/dashboard/server/services/link-supervisor.ts",
+            "src/dashboard/server/services/machine-link-service.ts",
+            "src/dashboard/server/services/fleet-update-service.ts",
+            "src/dashboard/server/services/anywhere-boot.ts",
+            "src/dashboard/server/routes/machines.ts",
+            "packages/contracts/src/machines.ts",
+            "src/lib/anywhere/__tests__/machine-capabilities.test.ts",
+            "src/dashboard/server/__tests__/machine-load.test.ts",
+            "src/dashboard/server/__tests__/link-supervisor-load.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/anywhere/__tests__/machine-capabilities.test.ts src/dashboard/server/__tests__/machine-load.test.ts src/dashboard/server/__tests__/link-supervisor-load.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "machine-capabilities.test.ts passes",
+            "machine-load.test.ts passes",
+            "link-supervisor-load.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "NFR-1",
+            "NFR-4",
+            "NFR-5"
+          ],
+          "parallelSafeReason": "Its files are new modules or files no unconnected item edits; every shared real edit is ordered by a blocks edge, and the remaining overlaps are the append-only tables (route-scopes.ts, no-loss-matrix.ts, server.ts route layers, anywhere-boot.ts wiring, frontend-test-subset.txt, machines.ts subcommand registration) resolved by keeping both rows."
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4651.md WI-2, D-4651-8. New src/dashboard/server/services/machine-load.ts: 15 s unref'd sampler started in startAnywhere taking readCpuPsi().someAvg10, assessCpuPressure().saturated, readProcMemory().memAvailable and workingAgents (move countWorkingTurns out of fleet-update-service.ts into this module and import it back); honors OVERDECK_TEST_FORCE_CPU_SATURATED=1 (smoke hook, read only here). New src/lib/anywhere/machine-capabilities.ts (injected execFile; os tag from process.platform; docker via `docker info` 10 s; gpu via `nvidia-smi -L` 5 s; ios-sim via `xcrun simctl list devices` on darwin 10 s; refresh every 10 min; tags /^[a-z0-9][a-z0-9-]{0,31}$/, dedup, sorted). New src/lib/anywhere/machine-config.ts reads anywhere.machine.tags and anywhere.machine.placement ('auto' default | 'on-request') raw from config.yaml like directory-config.ts. HeartbeatPayload (link-heartbeat.ts:22) gains optional load, tags, placement. Supervisor Entry, status(), SupervisedLinkView/LinkStatusSource Pick lists, default objects and machineLinkView carry them; MachineLinkView and MachinesResponse.self in packages/contracts/src/machines.ts gain load?, tags?, placement? plus the LoadSample and MachinePlacementMode types; buildMachinesResponse fills self from the local sampler. Tags never go into the public descriptor. Repo rules: no execSync in server-reachable code (async execFile with timeouts); fake timers (vi.useFakeTimers + vi.advanceTimersByTimeAsync) for every wait, poll, back-off or heartbeat test; god files must not grow past their origin/main count or allowlist cap (start.ts 1283, CommandPalette.tsx 1124, Sidebar.tsx 1019, settings-api.ts 1508, routes/settings.ts 1104, routes/conversations.ts, conversation-runtime.ts, config-yaml/schema.ts) — extract a module instead, never raise a cap; every new HTTP route needs a tests/unit/lib/overdeck/no-loss-matrix.ts row and, unless admin-only, a src/dashboard/server/route-scopes.ts row; route-scopes.ts, no-loss-matrix.ts, server.ts route layers, anywhere-boot.ts wiring and scripts/frontend-test-subset.txt are append-only shared files (keep both rows on conflict)."
+        },
+        "items": [
+          {
+            "id": "wi2-load-tags-heartbeat.ac1",
+            "title": "Given a fake execFile where `docker info` exits 0 and `nvidia-smi` is missing on linux, when tags are detected, then they equal ['docker','linux']; given darwin with `xcrun simctl list devices` exiting 0, then 'ios-sim' and 'macos' are present",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-load-tags-heartbeat.ac2",
+            "title": "Given anywhere.machine.tags: ['Bad Tag', 'payments'], when the config is read, then only 'payments' is kept and one warning is logged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-load-tags-heartbeat.ac3",
+            "title": "Given fake timers and a link whose heartbeat carries load {cpuPsiSomeAvg10: 3, ...}, tags and placement 'on-request', when the heartbeat arrives, then supervisor status(linkId) returns that load, those tags and 'on-request'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-load-tags-heartbeat.ac4",
+            "title": "Given a heartbeat without the new fields (old peer), when it arrives, then status(linkId) returns load null, tags [] and placement 'auto'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi3-project-lists",
+        "title": "Share each machine's registered projects with git origin slugs and cache them on the viewer",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T19:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4651",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/anywhere/project-origin.ts",
+            "src/lib/anywhere/shared-conversations.ts",
+            "src/dashboard/server/routes/machines-peer.ts",
+            "src/dashboard/server/services/linked-projects-sync.ts",
+            "src/dashboard/server/services/link-heartbeat.ts",
+            "src/dashboard/server/services/anywhere-boot.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/lib/anywhere/__tests__/project-origin.test.ts",
+            "src/dashboard/server/__tests__/linked-projects-sync.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/anywhere/__tests__/project-origin.test.ts src/dashboard/server/__tests__/linked-projects-sync.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "project-origin.test.ts passes",
+            "linked-projects-sync.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-6",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4651.md WI-3, D-4651-11. Move gitOriginOf from src/lib/anywhere/shared-conversations.ts (~:76) into new exported src/lib/anywhere/project-origin.ts (also export a projectsHash helper: first 16 hex of SHA-256 over JSON of the list sorted by key, and a case-insensitive sameOrigin). Owner route GET /api/machines/projects in routes/machines-peer.ts (machine credential only, 403 otherwise; scope read:state) answers { projects: [{ key, name, gitOrigin }] } with no paths. Heartbeat gains optional projectsHash (registered source like setHeartbeatConversationsHashSource). New viewer service src/dashboard/server/services/linked-projects-sync.ts: in-memory Map<environmentId, { projects, hash }>, fetch on connect (onDescriptor) and on a changed heartbeat projectsHash, pruned on unlink; wired in anywhere-boot.ts. Export a getter linkedProjects(environmentId). Repo rules: no execSync in server-reachable code (async execFile with timeouts); fake timers (vi.useFakeTimers + vi.advanceTimersByTimeAsync) for every wait, poll, back-off or heartbeat test; god files must not grow past their origin/main count or allowlist cap (start.ts 1283, CommandPalette.tsx 1124, Sidebar.tsx 1019, settings-api.ts 1508, routes/settings.ts 1104, routes/conversations.ts, conversation-runtime.ts, config-yaml/schema.ts) — extract a module instead, never raise a cap; every new HTTP route needs a tests/unit/lib/overdeck/no-loss-matrix.ts row and, unless admin-only, a src/dashboard/server/route-scopes.ts row; route-scopes.ts, no-loss-matrix.ts, server.ts route layers, anywhere-boot.ts wiring and scripts/frontend-test-subset.txt are append-only shared files (keep both rows on conflict)."
+        },
+        "items": [
+          {
+            "id": "wi3-project-lists.ac1",
+            "title": "Given two registered projects, when a machine credential GETs /api/machines/projects, then the answer lists key, name and gitOrigin for each and contains no 'path' field; a device credential gets 403",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-project-lists.ac2",
+            "title": "Given fake timers, when a link connects, then the viewer fetches the project list once; when later heartbeats carry the same projectsHash, then no further fetch happens; when the hash changes, then exactly one fetch happens",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-project-lists.ac3",
+            "title": "Given github_repo 'Eltmon/Overdeck' on one machine and 'eltmon/overdeck' on another, when sameOrigin compares them, then it returns true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi4-work-door-conversations",
+        "title": "Add the owner work-door module and its conversation door",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T19:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4651",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/machines-work.ts",
+            "src/dashboard/server/server.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/__tests__/machines-work-conversations.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/machines-work-conversations.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "machines-work-conversations.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3"
+          ],
+          "foundationFor": [
+            "wi5-work-door-workers",
+            "wi6-work-door-issue-start",
+            "wi10-fleet-conversations",
+            "wi19-add-project-there"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4651.md WI-4, D-4651-3. New src/dashboard/server/routes/machines-work.ts with workDoorPreflight(request, body): refuses non-machine credentials 403 { code: 'machine-only' }; resolves the project; compares the caller's gitOrigin slug case-insensitively with the resolved project's (project-origin.ts); answers 404 { code: 'project-missing', gitOrigin, machine: <this label> } on no project or mismatch. POST /api/machines/work/conversations { gitOrigin, message, model?, harness?, effort?, issueId? }: gitOrigin null => no project; otherwise the project whose slug matches; calls handleConversationCreate (src/lib/overdeck/conversation-runtime.ts:994) with that projectKey (do NOT edit conversation-runtime.ts or routes/conversations.ts), then markConversationStartedBy(name, credential.environmentId); answers { name }. Register the layer in server.ts; scope row operate; no-loss-matrix row. Repo rules: no execSync in server-reachable code (async execFile with timeouts); fake timers (vi.useFakeTimers + vi.advanceTimersByTimeAsync) for every wait, poll, back-off or heartbeat test; god files must not grow past their origin/main count or allowlist cap (start.ts 1283, CommandPalette.tsx 1124, Sidebar.tsx 1019, settings-api.ts 1508, routes/settings.ts 1104, routes/conversations.ts, conversation-runtime.ts, config-yaml/schema.ts) — extract a module instead, never raise a cap; every new HTTP route needs a tests/unit/lib/overdeck/no-loss-matrix.ts row and, unless admin-only, a src/dashboard/server/route-scopes.ts row; route-scopes.ts, no-loss-matrix.ts, server.ts route layers, anywhere-boot.ts wiring and scripts/frontend-test-subset.txt are append-only shared files (keep both rows on conflict)."
+        },
+        "items": [
+          {
+            "id": "wi4-work-door-conversations.ac1",
+            "title": "Given a machine credential for environment E and a matching gitOrigin, when it POSTs /api/machines/work/conversations, then a conversation is created and conversationStartedBy(name) returns E",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-work-door-conversations.ac2",
+            "title": "Given a gitOrigin that no local project has, when the door is called, then it answers 404 with code 'project-missing' and this machine's label",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-work-door-conversations.ac3",
+            "title": "Given a device or token credential, when it POSTs the door, then it answers 403 with code 'machine-only'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi5-work-door-workers",
+        "title": "Add the worker door plus worker status and stop routes on the owner",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T19:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4651",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/machines-work.ts",
+            "src/dashboard/server/routes/workers.ts",
+            "src/lib/agents/worker/start.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/__tests__/machines-work-workers.test.ts",
+            "src/dashboard/server/__tests__/workers-status.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/machines-work-workers.test.ts src/dashboard/server/__tests__/workers-status.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "machines-work-workers.test.ts passes",
+            "workers-status.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4651.md WI-5, D-4651-3, D-4651-4. startWorker (src/lib/agents/worker/start.ts) accepts startedBy and writes it into worker.json. In machines-work.ts: POST /api/machines/work/workers { gitOrigin, issueId, prompt, model?, harness?, effort?, readOnly?, name?, parentId? } -> resolveProjectFromIssueSync(issueId) + origin check (workDoorPreflight) -> startWorker({ ..., parentId: null, startedBy: { environmentId: credential.environmentId, parentId } }) -> { id, cwd, branch }. In routes/workers.ts: GET /api/workers/:id/status?after=<seq> (read:state) -> { id, liveness: { alive, confirmedDead }, idleAgeMs, reports (seq > after, max 20), lastAssistantMessage (only when confirmedDead, via fetchLastAssistantMessageFromDashboard logic or the transcript) }; POST /api/workers/:id/stop (operate) -> stopAgent(id, 'operator'); an agent-actor machine credential is refused 403 agent-fenced unless worker.json startedBy.environmentId equals its environment id; unknown ids 404 unknown-worker. Scope + no-loss rows. Repo rules: no execSync in server-reachable code (async execFile with timeouts); fake timers (vi.useFakeTimers + vi.advanceTimersByTimeAsync) for every wait, poll, back-off or heartbeat test; god files must not grow past their origin/main count or allowlist cap (start.ts 1283, CommandPalette.tsx 1124, Sidebar.tsx 1019, settings-api.ts 1508, routes/settings.ts 1104, routes/conversations.ts, conversation-runtime.ts, config-yaml/schema.ts) — extract a module instead, never raise a cap; every new HTTP route needs a tests/unit/lib/overdeck/no-loss-matrix.ts row and, unless admin-only, a src/dashboard/server/route-scopes.ts row; route-scopes.ts, no-loss-matrix.ts, server.ts route layers, anywhere-boot.ts wiring and scripts/frontend-test-subset.txt are append-only shared files (keep both rows on conflict)."
+        },
+        "items": [
+          {
+            "id": "wi5-work-door-workers.ac1",
+            "title": "Given a machine credential for E, when it POSTs /api/machines/work/workers with a matching gitOrigin, then the started worker's worker.json carries startedBy.environmentId E and the parentId sent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-work-door-workers.ac2",
+            "title": "Given a worker with reports seq 1..3, when GET /api/workers/<id>/status?after=1 is called, then reports 2 and 3 are returned and lastAssistantMessage is null while the worker is alive",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-work-door-workers.ac3",
+            "title": "Given a worker started by E1, when an agent-actor machine credential for E2 POSTs /api/workers/<id>/stop, then it answers 403 agent-fenced; for E1 it stops the worker",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-work-door-workers.ac4",
+            "title": "Given an id that is not a worker, when status or stop is called, then it answers 404 unknown-worker",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi6-work-door-issue-start",
+        "title": "Add the issue-start work door through an extracted spawn helper",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T19:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4651",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/machines-work.ts",
+            "src/dashboard/server/routes/agents/spawn.ts",
+            "src/dashboard/server/routes/agents/spawn-issue.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/__tests__/machines-work-issue-start.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/machines-work-issue-start.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "machines-work-issue-start.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4651.md WI-6, D-4651-3. Extract the spawn call of the POST /api/agents handler (src/dashboard/server/routes/agents/spawn.ts:268-270, buildPanStartArgs in routes/agents/shared.ts:68) into spawnIssueAgentForRoute(...) in new routes/agents/spawn-issue.ts without behavior change; POST /api/agents calls it. In machines-work.ts: POST /api/machines/work/issues/:id/start { gitOrigin, model?, harness?, effort? } -> resolveProjectFromIssueSync + origin check -> spawnIssueAgentForRoute -> { issueId, agentId }. spawn.ts must end at or below 963 lines. Scope row operate; no-loss row. Repo rules: no execSync in server-reachable code (async execFile with timeouts); fake timers (vi.useFakeTimers + vi.advanceTimersByTimeAsync) for every wait, poll, back-off or heartbeat test; god files must not grow past their origin/main count or allowlist cap (start.ts 1283, CommandPalette.tsx 1124, Sidebar.tsx 1019, settings-api.ts 1508, routes/settings.ts 1104, routes/conversations.ts, conversation-runtime.ts, config-yaml/schema.ts) — extract a module instead, never raise a cap; every new HTTP route needs a tests/unit/lib/overdeck/no-loss-matrix.ts row and, unless admin-only, a src/dashboard/server/route-scopes.ts row; route-scopes.ts, no-loss-matrix.ts, server.ts route layers, anywhere-boot.ts wiring and scripts/frontend-test-subset.txt are append-only shared files (keep both rows on conflict)."
+        },
+        "items": [
+          {
+            "id": "wi6-work-door-issue-start.ac1",
+            "title": "Given a machine credential and an issue whose project slug matches gitOrigin, when it POSTs /api/machines/work/issues/PAN-7/start, then spawnIssueAgentForRoute is called with PAN-7 and the requested model/harness/effort and the answer carries the agent id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-work-door-issue-start.ac2",
+            "title": "Given an issue prefix with no project on this machine, when the door is called, then it answers 404 project-missing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-work-door-issue-start.ac3",
+            "title": "Given the extraction, when `wc -l src/dashboard/server/routes/agents/spawn.ts` runs, then it prints at most 963 and the existing spawn route tests still pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi7-placement-rule",
+        "title": "Implement the deterministic D-19 placement rule as a pure function",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T19:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4651",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/anywhere/placement.ts",
+            "packages/contracts/src/machines.ts",
+            "src/lib/anywhere/__tests__/placement.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/anywhere/__tests__/placement.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "placement.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4651.md WI-7, D-4651-9. New src/lib/anywhere/placement.ts: choosePlacement({ candidates, gitOrigin, needs }) and placementReason(candidate) exactly as D-4651-9 (rejection order offline/unsupported, no project, no <tag>, CPU saturated, reserved with the only-machine-with-tag exception; score lowest cpuPsiSomeAvg10 (null last), then highest memAvailableBytes (null last), fewest workingAgents, self, label ascending; reason 'Auto → <label> (CPU pressure N%, X GB free, K agents)' with n/a for unknowns; GB = floor(bytes / 2^30)). Add PlacementCandidate/PlacementRejection/PlacementAnswer types to packages/contracts/src/machines.ts. No Fly handling, no remote.auto_fly key. Repo rules: no execSync in server-reachable code (async execFile with timeouts); fake timers (vi.useFakeTimers + vi.advanceTimersByTimeAsync) for every wait, poll, back-off or heartbeat test; god files must not grow past their origin/main count or allowlist cap (start.ts 1283, CommandPalette.tsx 1124, Sidebar.tsx 1019, settings-api.ts 1508, routes/settings.ts 1104, routes/conversations.ts, conversation-runtime.ts, config-yaml/schema.ts) — extract a module instead, never raise a cap; every new HTTP route needs a tests/unit/lib/overdeck/no-loss-matrix.ts row and, unless admin-only, a src/dashboard/server/route-scopes.ts row; route-scopes.ts, no-loss-matrix.ts, server.ts route layers, anywhere-boot.ts wiring and scripts/frontend-test-subset.txt are append-only shared files (keep both rows on conflict)."
+        },
+        "items": [
+          {
+            "id": "wi7-placement-rule.ac1",
+            "title": "Given desk CPU-saturated and laptop free, when choosePlacement runs, then it returns laptop and placementReason renders 'Auto → laptop (CPU pressure ...% , ... GB free, ... agents)' with the laptop's numbers and desk rejected 'CPU saturated'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7-placement-rule.ac2",
+            "title": "Given needs ['docker'] and only desk tagged docker, when choosePlacement runs, then it returns desk and laptop is rejected 'no docker'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7-placement-rule.ac3",
+            "title": "Given desk reserved (on-request) and laptop eligible, when choosePlacement runs, then it returns laptop; given desk reserved and the only machine with 'gpu' for needs ['gpu'], then it returns desk",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7-placement-rule.ac4",
+            "title": "Given no eligible machine, when choosePlacement runs, then it returns ok false with one rejection per machine; given equal CPU, then more memory wins, then fewer agents, then self; the same input twice returns the same answer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi8-placement-service",
+        "title": "Add the placement route and the shared target-machine resolver",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T19:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4651",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/fleet-target.ts",
+            "src/dashboard/server/routes/fleet-work.ts",
+            "src/dashboard/server/server.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/__tests__/fleet-target.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/fleet-target.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "fleet-target.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4651.md WI-8, D-4651-10. New src/dashboard/server/services/fleet-target.ts: buildPlacementInput(gitOrigin) (self from a fresh machine-load sample, capability tags, machine-config placement and local project slugs via project-origin.ts; each non-hidden, non-revoked link from the supervisor status() load/tags/placement/state and linkedProjects()) and resolveTargetMachine(machine, gitOrigin, needs) with the D-4651-10 answers (self; auto => choosePlacement; online link label/id; offline => 503 machine-offline; 'fly' => 400 fly-unavailable 'Fly (new VM) needs PAN-4652'; unknown => 404 unknown-machine; explicit label honored even if reserved/saturated but needs checked => 409 needs-unmet with missing). New src/dashboard/server/routes/fleet-work.ts with POST /api/fleet/placement { gitOrigin, needs } (scope read:state) refusing channel callers like refuseFleetRequest in machines-fleet.ts. Register in server.ts; scope + no-loss rows. Repo rules: no execSync in server-reachable code (async execFile with timeouts); fake timers (vi.useFakeTimers + vi.advanceTimersByTimeAsync) for every wait, poll, back-off or heartbeat test; god files must not grow past their origin/main count or allowlist cap (start.ts 1283, CommandPalette.tsx 1124, Sidebar.tsx 1019, settings-api.ts 1508, routes/settings.ts 1104, routes/conversations.ts, conversation-runtime.ts, config-yaml/schema.ts) — extract a module instead, never raise a cap; every new HTTP route needs a tests/unit/lib/overdeck/no-loss-matrix.ts row and, unless admin-only, a src/dashboard/server/route-scopes.ts row; route-scopes.ts, no-loss-matrix.ts, server.ts route layers, anywhere-boot.ts wiring and scripts/frontend-test-subset.txt are append-only shared files (keep both rows on conflict)."
+        },
+        "items": [
+          {
+            "id": "wi8-placement-service.ac1",
+            "title": "Given machine 'fly', when resolveTargetMachine runs, then it answers 400 with code fly-unavailable and the PAN-4652 message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8-placement-service.ac2",
+            "title": "Given an offline link label, when resolveTargetMachine runs, then it answers 503 machine-offline; given an explicit reserved, saturated online label, then it returns that machine",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8-placement-service.ac3",
+            "title": "Given machine 'auto' and a link whose cached load is saturated, when POST /api/fleet/placement runs, then it answers ok true for this machine with the reason string and the link rejected 'CPU saturated'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8-placement-service.ac4",
+            "title": "Given a request that arrives through a link channel, when it calls POST /api/fleet/placement, then it answers 403",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi9-machines-list-load",
+        "title": "Show load and tags in pan machines list and the Settings machines panel",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T19:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4651",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/machines.ts",
+            "packages/contracts/src/machines.ts",
+            "src/dashboard/frontend/src/components/Settings/anywhere/MachinesPanel.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/machinesApi.ts",
+            "tests/unit/cli/machines-list-load.test.ts",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/MachinesPanel.load.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/machines-list-load.test.ts",
+            "npm run test:frontend-subset",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "machines-list-load.test.ts passes",
+            "MachinesPanel.load.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4651.md WI-9. src/cli/commands/machines.ts runMachinesList (:101): add a self row first and LOAD ('CPU 3% · 41 GB · 2 agents', n/a parts when unknown) and TAGS columns to the table (:114); --json already includes the view fields. MachinesPanel.tsx MachineLinkRow meta line (~:181) appends the same load text, 'tags: a, b' and 'reserved' when placement is on-request; machinesApi.ts types follow the contract. Add a shared formatter formatLoad(load) to packages/contracts/src/machines.ts so the CLI and the frontend render the same text. Muted text only (pan-style-guide). Repo rules: no execSync in server-reachable code (async execFile with timeouts); fake timers (vi.useFakeTimers + vi.advanceTimersByTimeAsync) for every wait, poll, back-off or heartbeat test; god files must not grow past their origin/main count or allowlist cap (start.ts 1283, CommandPalette.tsx 1124, Sidebar.tsx 1019, settings-api.ts 1508, routes/settings.ts 1104, routes/conversations.ts, conversation-runtime.ts, config-yaml/schema.ts) — extract a module instead, never raise a cap; every new HTTP route needs a tests/unit/lib/overdeck/no-loss-matrix.ts row and, unless admin-only, a src/dashboard/server/route-scopes.ts row; route-scopes.ts, no-loss-matrix.ts, server.ts route layers, anywhere-boot.ts wiring and scripts/frontend-test-subset.txt are append-only shared files (keep both rows on conflict)."
+        },
+        "items": [
+          {
+            "id": "wi9-machines-list-load.ac1",
+            "title": "Given a machine view with load {cpuPsiSomeAvg10: 3.2, memAvailableBytes: 41 GiB, workingAgents: 2}, when formatLoad runs, then it returns 'CPU 3% · 41 GB · 2 agents'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi9-machines-list-load.ac2",
+            "title": "Given pan machines list without --json, when a link has tags ['docker','linux'], then the output table has LOAD and TAGS columns and a row for this machine first",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi9-machines-list-load.ac3",
+            "title": "Given a link view without load, when MachinesPanel renders it, then no load text renders; given placement 'on-request', then 'reserved' renders in the meta line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi10-fleet-conversations",
+        "title": "Start a conversation on this machine, a named machine or Auto through one fleet route",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T19:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4651",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/fleet-work.ts",
+            "src/dashboard/server/services/linked-conversations-sync.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/__tests__/fleet-conversations.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/fleet-conversations.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "fleet-conversations.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4651.md WI-10, D-4651-12. In routes/fleet-work.ts add POST /api/fleet/conversations { machine?, needs?, projectKey?, message, model?, harness?, effort?, issueId? } (scope operate; refuse channel callers): resolveTargetMachine with the local project's slug (null when no projectKey); self => handleConversationCreate locally; remote => linkFetch POST /api/machines/work/conversations with gitOrigin and the actor and ceiling from forwardIdentityFor(credential, request) (WI-28: operator for the browser and operator CLIs, agent for other x-overdeck-sender values, operator plus the token's scopes as ceiling for odk_ token credentials) then call the linked-conversations sync onConnect(link) so the row lists at once. Answer { conversation: name or '@<env>/<name>', machine: { environmentId, label, self }, reason }. Owner 404 project-missing passes through with message '<label> has no project for <slug>. Add it with: pan machines add-project <this label> <key> --to <label>'. Repo rules: no execSync in server-reachable code (async execFile with timeouts); fake timers (vi.useFakeTimers + vi.advanceTimersByTimeAsync) for every wait, poll, back-off or heartbeat test; god files must not grow past their origin/main count or allowlist cap (start.ts 1283, CommandPalette.tsx 1124, Sidebar.tsx 1019, settings-api.ts 1508, routes/settings.ts 1104, routes/conversations.ts, conversation-runtime.ts, config-yaml/schema.ts) — extract a module instead, never raise a cap; every new HTTP route needs a tests/unit/lib/overdeck/no-loss-matrix.ts row and, unless admin-only, a src/dashboard/server/route-scopes.ts row; route-scopes.ts, no-loss-matrix.ts, server.ts route layers, anywhere-boot.ts wiring and scripts/frontend-test-subset.txt are append-only shared files (keep both rows on conflict)."
+        },
+        "items": [
+          {
+            "id": "wi10-fleet-conversations.ac1",
+            "title": "Given machine omitted, when POST /api/fleet/conversations runs, then it creates the conversation locally and answers self true and reason null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi10-fleet-conversations.ac2",
+            "title": "Given machine 'desk' online, when the route runs, then it posts /api/machines/work/conversations on desk with the local project's slug, answers '@<deskEnv>/<name>' and triggers exactly one linked-conversation list fetch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi10-fleet-conversations.ac3",
+            "title": "Given machine 'auto', when placement picks desk, then the answer's reason starts with 'Auto → desk'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi10-fleet-conversations.ac4",
+            "title": "Given the owner answers 404 project-missing, when the route runs, then it answers 404 whose error text contains 'pan machines add-project'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi11-machine-field-ui",
+        "title": "Add the Machine and Needs fields to the new-conversation dialog",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T19:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4651",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/newConversation/NewConversationDialog.tsx",
+            "src/dashboard/frontend/src/components/newConversation/MachineField.tsx",
+            "src/dashboard/frontend/src/components/newConversation/newConversationApi.ts",
+            "src/dashboard/frontend/src/components/newConversation/__tests__/MachineField.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run test:frontend-subset",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "MachineField.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4651.md WI-11, D-4651-23. New newConversation/MachineField.tsx: select fed by GET /api/machines (machinesApi loadMachines) with 'This machine (<label>)' (default), 'Auto', each online non-hidden link label, and a disabled 'Fly (new VM)' option titled 'Needs PAN-4652'; when Auto is chosen a Needs text input (comma-separated). NewConversationDialog.tsx mounts it (keep the file under 300 lines) and on submit with a non-self machine calls createFleetConversation (new in newConversationApi.ts: POST /api/fleet/conversations) then navigates to /conv/@<env>/<name> for remote answers and shows the reason in a toast. Muted text, no pill badges (pan-style-guide). Repo rules: no execSync in server-reachable code (async execFile with timeouts); fake timers (vi.useFakeTimers + vi.advanceTimersByTimeAsync) for every wait, poll, back-off or heartbeat test; god files must not grow past their origin/main count or allowlist cap (start.ts 1283, CommandPalette.tsx 1124, Sidebar.tsx 1019, settings-api.ts 1508, routes/settings.ts 1104, routes/conversations.ts, conversation-runtime.ts, config-yaml/schema.ts) — extract a module instead, never raise a cap; every new HTTP route needs a tests/unit/lib/overdeck/no-loss-matrix.ts row and, unless admin-only, a src/dashboard/server/route-scopes.ts row; route-scopes.ts, no-loss-matrix.ts, server.ts route layers, anywhere-boot.ts wiring and scripts/frontend-test-subset.txt are append-only shared files (keep both rows on conflict)."
+        },
+        "items": [
+          {
+            "id": "wi11-machine-field-ui.ac1",
+            "title": "Given one online link 'desk', when the dialog renders, then the Machine select offers 'This machine (<label>)', 'Auto', 'desk' and a disabled 'Fly (new VM)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi11-machine-field-ui.ac2",
+            "title": "Given Auto is selected, when the dialog re-renders, then a Needs input renders; given this machine is selected, then no Needs input renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi11-machine-field-ui.ac3",
+            "title": "Given machine 'desk' and a message, when the operator submits, then POST /api/fleet/conversations is called with machine 'desk' and the app navigates to the returned /conv/@<env>/<name> URL",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi12-remote-worker-follower",
+        "title": "Delegate workers to another machine with a local stand-in kept in step by a follower",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T19:30:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4651",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/fleet-work.ts",
+            "src/dashboard/server/services/remote-worker-follower.ts",
+            "src/lib/agents/worker/remote-standin.ts",
+            "src/dashboard/server/services/anywhere-boot.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/__tests__/remote-worker-follower.test.ts",
+            "src/lib/agents/worker/__tests__/remote-standin.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/remote-worker-follower.test.ts src/lib/agents/worker/__tests__/remote-standin.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "remote-worker-follower.test.ts passes",
+            "remote-standin.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-3"
+          ],
+          "parallelSafeReason": "Its files are new modules or files no unconnected item edits; every shared real edit is ordered by a blocks edge, and the remaining overlaps are the append-only tables (route-scopes.ts, no-loss-matrix.ts, server.ts route layers, anywhere-boot.ts wiring, frontend-test-subset.txt, machines.ts subcommand registration) resolved by keeping both rows."
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4651.md WI-12, D-4651-5. New src/lib/agents/worker/remote-standin.ts (read/write remote.json 0600 temp+rename with the D-4651-5 fields). In routes/fleet-work.ts: POST /api/fleet/workers { machine, needs?, issueId, prompt, model?, harness?, effort?, readOnly?, name?, parentId? } (scope operate): self => startWorker as today; remote => allocateWorkerId(issueId), mkdir the stand-in dir, POST the work door with the issue's local project slug, write remote.json; answer { id: localId, machine, reason, remote }. Also POST /api/fleet/workers/:id/stop (operate) that, for a stand-in, forwards POST /api/workers/<remoteId>/stop and sets state 'stopped'. New src/dashboard/server/services/remote-worker-follower.ts started in startAnywhere (primary only): loads running stand-ins at boot; polls each every 5 s while its link is online via GET /api/workers/<remoteId>/status?after=<lastSeq>, mirrors each report into reports/<seq>.json keeping the owner's seq (same JSON shape as writeWorkerReport), updates lastSeq/idleAgeMs/lastSeenAt, sets exited + lastAssistantMessage on confirmedDead; on offline or LinkUnavailableError backs off 1 s doubling to 300 s with ±20% jitter and sets unreachableSince, never giving up; parent stop cascade: when parentId is an agent id and isAlive(parentId) is confirmed dead on two consecutive polls, or parentId is a conversation name (conv-…) whose row is archived or has status 'ended' on two consecutive polls, post stop (actor operator) and set 'stopped'; any other parentId never cascades. allocateWorkerId already creates the stand-in directory. No agent state row for stand-ins. Repo rules: no execSync in server-reachable code (async execFile with timeouts); fake timers (vi.useFakeTimers + vi.advanceTimersByTimeAsync) for every wait, poll, back-off or heartbeat test; god files must not grow past their origin/main count or allowlist cap (start.ts 1283, CommandPalette.tsx 1124, Sidebar.tsx 1019, settings-api.ts 1508, routes/settings.ts 1104, routes/conversations.ts, conversation-runtime.ts, config-yaml/schema.ts) — extract a module instead, never raise a cap; every new HTTP route needs a tests/unit/lib/overdeck/no-loss-matrix.ts row and, unless admin-only, a src/dashboard/server/route-scopes.ts row; route-scopes.ts, no-loss-matrix.ts, server.ts route layers, anywhere-boot.ts wiring and scripts/frontend-test-subset.txt are append-only shared files (keep both rows on conflict)."
+        },
+        "items": [
+          {
+            "id": "wi12-remote-worker-follower.ac1",
+            "title": "Given fake timers and an owner that returns reports seq 1 then 2, when the follower polls, then the stand-in holds reports/0001.json and reports/0002.json with those bodies and remote.json lastSeq is 2",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi12-remote-worker-follower.ac2",
+            "title": "Given the link goes offline, when the follower keeps polling under fake timers, then the delays are 1 s, 2 s, 4 s ... capped at 300 s (within ±20%), state stays 'running' and unreachableSince is set",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi12-remote-worker-follower.ac3",
+            "title": "Given a running stand-in on disk, when a new follower instance boots, then it resumes polling with after=<lastSeq>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi12-remote-worker-follower.ac4",
+            "title": "Given an agent parentId confirmed dead on two consecutive polls (or a conv- parent whose row is ended), when the follower runs, then it posts exactly one POST /api/workers/<remoteId>/stop and sets state 'stopped'; a parent that is alive never triggers a stop",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi13-worker-cli-machine",
+        "title": "Add --machine, --needs and the unpushed-commit check to pan worker run, and wait on stand-ins",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T19:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4651",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/worker.ts",
+            "src/cli/commands/worker-remote.ts",
+            "src/cli/commands/delegation-push-check.ts",
+            "sync-sources/skills/pan-worker/SKILL.md",
+            "tests/unit/cli/worker-remote.test.ts",
+            "tests/unit/cli/delegation-push-check.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/worker-remote.test.ts tests/unit/cli/delegation-push-check.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "worker-remote.test.ts passes",
+            "delegation-push-check.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4651.md WI-13, D-4651-6, D-4651-7. New src/cli/commands/delegation-push-check.ts: count `git rev-list --count @{u}..HEAD` (async execFile) in the cwd; >0 => exit 1 with 'N commits on <branch> are not pushed; <label> starts from origin. Re-run with --push-first to push them, or --ignore-unpushed.'; --push-first runs `git push` and proceeds only on exit 0; no upstream => count 0 with a one-line note. New src/cli/commands/worker-remote.ts: remote run posts /api/fleet/workers via callDashboard (src/cli/commands/dashboard-call.ts) with header 'x-overdeck-sender: senderFromEnv().id' (as tell.ts:45 does) so a run from an agent shell is forwarded as that agent, not as the operator, prints 'Started <localId> on <label>' (+ reason for auto), then unless --detach waits with WaitDeps built from remote.json (running => alive; exited/stopped => confirmed dead; unreachableSince set => alive; idleAgeMs and lastAssistantMessage from the file); --stop-after-report posts /api/fleet/workers/<localId>/stop. worker.ts registers --machine <label|auto>, --needs <tags>, --push-first, --ignore-unpushed and routes `pan worker wait` on a stand-in through the same deps. Update sync-sources/skills/pan-worker/SKILL.md in the same commit (lint:skills). Repo rules: no execSync in server-reachable code (async execFile with timeouts); fake timers (vi.useFakeTimers + vi.advanceTimersByTimeAsync) for every wait, poll, back-off or heartbeat test; god files must not grow past their origin/main count or allowlist cap (start.ts 1283, CommandPalette.tsx 1124, Sidebar.tsx 1019, settings-api.ts 1508, routes/settings.ts 1104, routes/conversations.ts, conversation-runtime.ts, config-yaml/schema.ts) — extract a module instead, never raise a cap; every new HTTP route needs a tests/unit/lib/overdeck/no-loss-matrix.ts row and, unless admin-only, a src/dashboard/server/route-scopes.ts row; route-scopes.ts, no-loss-matrix.ts, server.ts route layers, anywhere-boot.ts wiring and scripts/frontend-test-subset.txt are append-only shared files (keep both rows on conflict)."
+        },
+        "items": [
+          {
+            "id": "wi13-worker-cli-machine.ac1",
+            "title": "Given 2 unpushed commits and --machine desk, when pan worker run executes, then it exits 1 and prints the D-4651-7 message naming 2 commits and desk",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi13-worker-cli-machine.ac2",
+            "title": "Given --push-first and a successful git push, when pan worker run --machine desk executes with OVERDECK_AGENT_ID=agent-x, then it posts /api/fleet/workers carrying x-overdeck-sender agent-x and prints 'Started <localId> on desk'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi13-worker-cli-machine.ac3",
+            "title": "Given a stand-in whose remote.json has unreachableSince set and no reports, when waitForWorkerReport runs with the stand-in deps under fake timers, then it keeps waiting (no exited-without-report outcome)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi13-worker-cli-machine.ac4",
+            "title": "Given a stand-in in state 'exited' with lastAssistantMessage 'done' and no reports, when it is waited on, then the outcome is exited-without-report carrying lastAssistantMessage 'done'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi14-start-cli-machine",
+        "title": "Add --machine and --needs to pan start through the fleet issue-start route",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T19:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4651",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/index.ts",
+            "src/cli/commands/start-register.ts",
+            "src/cli/commands/start.ts",
+            "src/cli/commands/start-options.ts",
+            "src/cli/commands/start-machine.ts",
+            "src/dashboard/server/routes/fleet-work.ts",
+            "sync-sources/skills/pan-start/SKILL.md",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "tests/unit/cli/start-machine.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/start-machine.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "start-machine.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4651.md WI-14, D-4651-7, D-4651-12. Move the `start` command declaration out of src/cli/index.ts (:479-496) into new src/cli/commands/start-register.ts (keep lazyAction), adding --machine <label|auto> and --needs <tags>; index.ts net line change <= 0. New src/cli/commands/start-machine.ts startOnMachine(id, options): resolves self vs remote via POST /api/fleet/placement (auto) or the machines list (label); self returns false; 'fly' prints the PAN-4652 refusal and exits 1; remote runs the push check (delegation-push-check.ts, cwd = the issue workspace if it exists else process.cwd()), posts POST /api/fleet/issues/:id/start with header 'x-overdeck-sender: senderFromEnv().id', prints 'Started <issue> on <label>' plus the reason, returns true. In start.ts issueCommand add one early line calling it; start.ts must end <= 1283 lines. In routes/fleet-work.ts add POST /api/fleet/issues/:id/start (operate; remote only, self => 400 use-local-start) forwarding to the work door with the issue's local project slug. IssueOptions gains machine?/needs?. Update sync-sources/skills/pan-start/SKILL.md (lint:skills). Repo rules: no execSync in server-reachable code (async execFile with timeouts); fake timers (vi.useFakeTimers + vi.advanceTimersByTimeAsync) for every wait, poll, back-off or heartbeat test; god files must not grow past their origin/main count or allowlist cap (start.ts 1283, CommandPalette.tsx 1124, Sidebar.tsx 1019, settings-api.ts 1508, routes/settings.ts 1104, routes/conversations.ts, conversation-runtime.ts, config-yaml/schema.ts) — extract a module instead, never raise a cap; every new HTTP route needs a tests/unit/lib/overdeck/no-loss-matrix.ts row and, unless admin-only, a src/dashboard/server/route-scopes.ts row; route-scopes.ts, no-loss-matrix.ts, server.ts route layers, anywhere-boot.ts wiring and scripts/frontend-test-subset.txt are append-only shared files (keep both rows on conflict)."
+        },
+        "items": [
+          {
+            "id": "wi14-start-cli-machine.ac1",
+            "title": "Given --machine desk online, when pan start PAN-7 runs, then it posts /api/fleet/issues/PAN-7/start with the issue's local project slug and prints 'Started PAN-7 on desk'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi14-start-cli-machine.ac2",
+            "title": "Given --machine resolving to this machine, when pan start runs, then startOnMachine returns false and the local spawn path runs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi14-start-cli-machine.ac3",
+            "title": "Given --machine fly, when pan start runs, then it exits 1 printing 'Fly (new VM) needs PAN-4652'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi14-start-cli-machine.ac4",
+            "title": "Given the change, when `wc -l src/cli/commands/start.ts` runs, then it prints at most 1283, and src/cli/index.ts is not longer than on origin/main",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi15-lane-cli-machine",
+        "title": "Add --machine and --needs to pan lane start with placement and the PAN-4638 boundary",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T19:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4651",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/lane.ts",
+            "sync-sources/skills/pan-lane/SKILL.md",
+            "tests/unit/cli/lane-machine.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/lane-machine.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "lane-machine.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4651.md WI-15, D-4651-22. src/cli/commands/lane.ts (flags at :566-587): --machine <label|auto>, --needs <tags>. Resolve with POST /api/fleet/placement for auto (the lane's project slug from --project) or the machines list for a label. Self => launch as today. Another machine => exit 1 'Lanes on other machines arrive with PAN-4638 (chosen: <label>)'. No candidate => print 'No machine fits: <label>: <reason>; ...' and exit 1. Update sync-sources/skills/pan-lane/SKILL.md (lint:skills). Repo rules: no execSync in server-reachable code (async execFile with timeouts); fake timers (vi.useFakeTimers + vi.advanceTimersByTimeAsync) for every wait, poll, back-off or heartbeat test; god files must not grow past their origin/main count or allowlist cap (start.ts 1283, CommandPalette.tsx 1124, Sidebar.tsx 1019, settings-api.ts 1508, routes/settings.ts 1104, routes/conversations.ts, conversation-runtime.ts, config-yaml/schema.ts) — extract a module instead, never raise a cap; every new HTTP route needs a tests/unit/lib/overdeck/no-loss-matrix.ts row and, unless admin-only, a src/dashboard/server/route-scopes.ts row; route-scopes.ts, no-loss-matrix.ts, server.ts route layers, anywhere-boot.ts wiring and scripts/frontend-test-subset.txt are append-only shared files (keep both rows on conflict)."
+        },
+        "items": [
+          {
+            "id": "wi15-lane-cli-machine.ac1",
+            "title": "Given --machine auto --needs docker and placement answering this machine, when pan lane start runs, then it posts /api/lanes as today",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi15-lane-cli-machine.ac2",
+            "title": "Given placement answering desk, when pan lane start runs, then it exits 1 printing 'Lanes on other machines arrive with PAN-4638 (chosen: desk)' and posts no /api/lanes request",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi15-lane-cli-machine.ac3",
+            "title": "Given placement answering ok false with rejections, when pan lane start runs, then it exits 1 printing 'No machine fits:' followed by each machine's reason",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi16-repo-grouping",
+        "title": "Group projects by git origin across machines with a Combine switch",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T19:30:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-4651",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/anywhere/anywhere-settings.ts",
+            "src/dashboard/server/routes/machines.ts",
+            "src/dashboard/server/routes/fleet-projects.ts",
+            "src/dashboard/server/server.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/projectsData.ts",
+            "src/dashboard/frontend/src/components/sidebar/OtherMachineProjects.tsx",
+            "src/dashboard/frontend/src/components/Sidebar.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/SharingSwitches.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/MachinesPanel.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/machinesApi.ts",
+            "src/dashboard/server/__tests__/fleet-projects.test.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/projectsData.origin.test.ts",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/fleet-projects.test.ts",
+            "npm run test:frontend-subset",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "fleet-projects.test.ts passes",
+            "projectsData.origin.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-2"
+          ],
+          "parallelSafeReason": "Its files are new modules or files no unconnected item edits; every shared real edit is ordered by a blocks edge, and the remaining overlaps are the append-only tables (route-scopes.ts, no-loss-matrix.ts, server.ts route layers, anywhere-boot.ts wiring, frontend-test-subset.txt, machines.ts subcommand registration) resolved by keeping both rows."
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4651.md WI-16, D-4651-13. anywhere-settings.ts gains combineRepositories (default true); PUT /api/machines/sharing (routes/machines.ts ~:369/444) accepts { conversations?, combineRepositories? } with at least one. New routes/fleet-projects.ts: GET /api/fleet/projects (admin) -> { combine, projects: [{ gitOrigin, name, local: { key } | null, machines: [{ environmentId, label, key, state }] }] } grouped by slug from local projects + linkedProjects(); register in server.ts. Frontend: extend resolveEffectiveProjectKey in CommandDeck/projectsData.ts so an origin 'linked' row whose gitOrigin equals a local project's slug resolves to that key when combine is on; new components/sidebar/OtherMachineProjects.tsx lists remote-only projects under 'On other machines' (each with an 'Add this project to <this machine>' button that WI-18 wires to its dialog) and exports ProjectMachineCount({ projectKey }) rendering muted '· N machines' (N counts this machine) for a project present on other machines, used in the Sidebar project row; Sidebar.tsx gains only the two mounts (<= +3 lines in total, cap 1019). Move the Share my conversations switch out of MachinesPanel.tsx into new Settings/anywhere/SharingSwitches.tsx and add the Combine switch there; machinesApi.ts gains the PUT field. Repo rules: no execSync in server-reachable code (async execFile with timeouts); fake timers (vi.useFakeTimers + vi.advanceTimersByTimeAsync) for every wait, poll, back-off or heartbeat test; god files must not grow past their origin/main count or allowlist cap (start.ts 1283, CommandPalette.tsx 1124, Sidebar.tsx 1019, settings-api.ts 1508, routes/settings.ts 1104, routes/conversations.ts, conversation-runtime.ts, config-yaml/schema.ts) — extract a module instead, never raise a cap; every new HTTP route needs a tests/unit/lib/overdeck/no-loss-matrix.ts row and, unless admin-only, a src/dashboard/server/route-scopes.ts row; route-scopes.ts, no-loss-matrix.ts, server.ts route layers, anywhere-boot.ts wiring and scripts/frontend-test-subset.txt are append-only shared files (keep both rows on conflict)."
+        },
+        "items": [
+          {
+            "id": "wi16-repo-grouping.ac1",
+            "title": "Given combine on and a linked row with gitOrigin 'github.com/eltmon/overdeck' and a local project with github_repo 'eltmon/overdeck', when resolveEffectiveProjectKey runs, then it returns the local key; with combine off it returns the row's own projectKey",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi16-repo-grouping.ac2",
+            "title": "Given desk and this machine both register eltmon/overdeck and desk alone registers x/tool, when GET /api/fleet/projects runs, then overdeck appears once with machines [desk] and local set, and x/tool appears with local null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi16-repo-grouping.ac3",
+            "title": "Given PUT /api/machines/sharing { combineRepositories: false }, when GET /api/fleet/projects runs next, then combine is false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi16-repo-grouping.ac4",
+            "title": "Given the change, when Sidebar.tsx is measured, then it is at most 1019 lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi17-owner-project-files",
+        "title": "Serve a project's clone facts and selected git-ignored files over operator-level links",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T19:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4651",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/projects/ignored-files.ts",
+            "src/dashboard/server/routes/machines-projects.ts",
+            "src/dashboard/server/server.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "tests/unit/lib/projects/ignored-files.test.ts",
+            "src/dashboard/server/__tests__/machines-projects.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/projects/ignored-files.test.ts src/dashboard/server/__tests__/machines-projects.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ignored-files.test.ts passes",
+            "machines-projects.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4651.md WI-17, D-4651-14 (owner half). New src/lib/projects/ignored-files.ts: listIgnoredFiles(root) runs `git ls-files --others --ignored --exclude-standard --directory` (async execFile, 10 s), keeps regular files only (no dirs, no symlinks), <= 1 MiB, depth <= 3, <= 200 entries, excluding node_modules/, .git/, .overdeck/, .pan/, dist/, build/; preselected when basename is .env, .envrc or .dev.vars; readProjectFile(root, rel) refuses absolute, '..', symlinks and realpath outside root. cloneUrl = `git remote get-url origin` with userinfo stripped, else https://<gitOrigin>.git. New routes/machines-projects.ts: GET /api/machines/projects/:key/source -> { key, name, issuePrefix, gitOrigin, cloneUrl, ignoredFiles } and GET /api/machines/projects/:key/file?path= -> bytes; both scope read:state, machine credential only, and 403 project-files-forbidden unless credential access is 'operator' and actor is 'operator'. Register, scope + no-loss rows. Repo rules: no execSync in server-reachable code (async execFile with timeouts); fake timers (vi.useFakeTimers + vi.advanceTimersByTimeAsync) for every wait, poll, back-off or heartbeat test; god files must not grow past their origin/main count or allowlist cap (start.ts 1283, CommandPalette.tsx 1124, Sidebar.tsx 1019, settings-api.ts 1508, routes/settings.ts 1104, routes/conversations.ts, conversation-runtime.ts, config-yaml/schema.ts) — extract a module instead, never raise a cap; every new HTTP route needs a tests/unit/lib/overdeck/no-loss-matrix.ts row and, unless admin-only, a src/dashboard/server/route-scopes.ts row; route-scopes.ts, no-loss-matrix.ts, server.ts route layers, anywhere-boot.ts wiring and scripts/frontend-test-subset.txt are append-only shared files (keep both rows on conflict)."
+        },
+        "items": [
+          {
+            "id": "wi17-owner-project-files.ac1",
+            "title": "Given a temp git repo with ignored .env, apps/web/.env, node_modules/x and a 2 MiB ignored file, when listIgnoredFiles runs, then it returns exactly .env and apps/web/.env, both preselected",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi17-owner-project-files.ac2",
+            "title": "Given path '../etc/passwd' or a symlinked file, when readProjectFile or the file route runs, then it is refused with 400",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi17-owner-project-files.ac3",
+            "title": "Given an agent actor or an agent-fenced link credential, when either route is called, then it answers 403 project-files-forbidden",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi17-owner-project-files.ac4",
+            "title": "Given origin 'https://user:tok@github.com/x/y.git', when the source route answers, then cloneUrl is 'https://github.com/x/y.git'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi18-add-project-here",
+        "title": "Add a linked machine's project to this machine with its selected env files",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T19:30:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-4651",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/fleet-projects.ts",
+            "src/dashboard/server/services/fleet-add-project.ts",
+            "src/cli/commands/machines-add-project.ts",
+            "src/cli/commands/machines.ts",
+            "src/dashboard/frontend/src/components/sidebar/AddProjectToMachineDialog.tsx",
+            "src/dashboard/frontend/src/components/sidebar/OtherMachineProjects.tsx",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/__tests__/fleet-add-project.test.ts",
+            "src/dashboard/frontend/src/components/sidebar/__tests__/AddProjectToMachineDialog.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/fleet-add-project.test.ts",
+            "npm run test:frontend-subset",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "fleet-add-project.test.ts passes",
+            "AddProjectToMachineDialog.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-6"
+          ],
+          "parallelSafeReason": "Its files are new modules or files no unconnected item edits; every shared real edit is ordered by a blocks edge, and the remaining overlaps are the append-only tables (route-scopes.ts, no-loss-matrix.ts, server.ts route layers, anywhere-boot.ts wiring, frontend-test-subset.txt, machines.ts subcommand registration) resolved by keeping both rows."
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4651.md WI-18, D-4651-14 (here). New services/fleet-add-project.ts: job (in-memory, 1 h) that fetches /api/machines/projects/:key/source from the owner, runs resolveProjectCreateIntent({ mode: 'clone', url: cloneUrl, name, issuePrefix, homeBoundary: true, refreshRemote: true, parentDir }) + startProjectCreateJob, waits for done, then fetches each selected file and writes it at the same relative path with mode 0600 and flag 'wx' (existing => skipped). Routes in fleet-projects.ts: POST /api/fleet/projects/add-here { machine, projectKey, files, parentDir? } (admin) -> 202 { jobId }; GET /api/fleet/projects/add-jobs/:jobId -> { step: clone|files|done|failed, error?, projectKey?, skipped? }. CLI new src/cli/commands/machines-add-project.ts registered from machines.ts: `pan machines add-project <machine> <projectKey> [--file <path>]... [--no-env]` (default files = preselected). Frontend new components/sidebar/AddProjectToMachineDialog.tsx (file checklist with preselected checked, progress steps) opened from OtherMachineProjects.tsx. Repo rules: no execSync in server-reachable code (async execFile with timeouts); fake timers (vi.useFakeTimers + vi.advanceTimersByTimeAsync) for every wait, poll, back-off or heartbeat test; god files must not grow past their origin/main count or allowlist cap (start.ts 1283, CommandPalette.tsx 1124, Sidebar.tsx 1019, settings-api.ts 1508, routes/settings.ts 1104, routes/conversations.ts, conversation-runtime.ts, config-yaml/schema.ts) — extract a module instead, never raise a cap; every new HTTP route needs a tests/unit/lib/overdeck/no-loss-matrix.ts row and, unless admin-only, a src/dashboard/server/route-scopes.ts row; route-scopes.ts, no-loss-matrix.ts, server.ts route layers, anywhere-boot.ts wiring and scripts/frontend-test-subset.txt are append-only shared files (keep both rows on conflict)."
+        },
+        "items": [
+          {
+            "id": "wi18-add-project-here.ac1",
+            "title": "Given a stubbed link and project-create job, when add-here runs for desk's project with ['.env'], then the project is cloned and registered and .env is written with mode 0600",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi18-add-project-here.ac2",
+            "title": "Given a local .env already exists after the clone, when the files step runs, then it is not overwritten and the job reports it under skipped",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi18-add-project-here.ac3",
+            "title": "Given the dialog opens for a desk project whose source lists .env (preselected) and config/local.json, when it renders, then .env is checked and config/local.json is unchecked",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi18-add-project-here.ac4",
+            "title": "Given pan machines add-project desk tool, when it runs, then it posts add-here with the preselected files and prints each job step until done",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi19-add-project-there",
+        "title": "Add one of this machine's projects to a linked machine through an operator-only work door",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T19:30:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4651",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/machines-work.ts",
+            "src/dashboard/server/routes/fleet-projects.ts",
+            "src/dashboard/server/services/fleet-add-project.ts",
+            "src/cli/commands/machines-add-project.ts",
+            "src/dashboard/frontend/src/components/sidebar/AddProjectToMachineDialog.tsx",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/__tests__/machines-work-projects.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/machines-work-projects.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "machines-work-projects.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "NFR-6"
+          ],
+          "parallelSafeReason": "Its files are new modules or files no unconnected item edits; every shared real edit is ordered by a blocks edge, and the remaining overlaps are the append-only tables (route-scopes.ts, no-loss-matrix.ts, server.ts route layers, anywhere-boot.ts wiring, frontend-test-subset.txt, machines.ts subcommand registration) resolved by keeping both rows."
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4651.md WI-19, D-4651-14 (there). In machines-work.ts: POST /api/machines/work/projects { gitOrigin, cloneUrl, name, issuePrefix, files: [{ path, contentBase64 }] } — 403 project-files-forbidden unless access 'operator' and actor 'operator' (the fence already refuses agents, WI-1); runs the same clone + job, then writes files with the readProjectFile path rules (0600, 'wx'); answers 202 { jobId } with a GET status route under /api/machines/work/projects/jobs/:jobId. Viewer: POST /api/fleet/projects/add-there { machine, projectKey, files } (admin) in fleet-projects.ts reading local files via ignored-files.ts and posting the door. CLI: machines-add-project.ts gains --to <machine>. The dialog gains the 'there' direction for local projects. Each file <= 1 MiB; the request body <= 32 MiB. Repo rules: no execSync in server-reachable code (async execFile with timeouts); fake timers (vi.useFakeTimers + vi.advanceTimersByTimeAsync) for every wait, poll, back-off or heartbeat test; god files must not grow past their origin/main count or allowlist cap (start.ts 1283, CommandPalette.tsx 1124, Sidebar.tsx 1019, settings-api.ts 1508, routes/settings.ts 1104, routes/conversations.ts, conversation-runtime.ts, config-yaml/schema.ts) — extract a module instead, never raise a cap; every new HTTP route needs a tests/unit/lib/overdeck/no-loss-matrix.ts row and, unless admin-only, a src/dashboard/server/route-scopes.ts row; route-scopes.ts, no-loss-matrix.ts, server.ts route layers, anywhere-boot.ts wiring and scripts/frontend-test-subset.txt are append-only shared files (keep both rows on conflict)."
+        },
+        "items": [
+          {
+            "id": "wi19-add-project-there.ac1",
+            "title": "Given an operator actor on an operator-level link, when POST /api/machines/work/projects runs, then the project is cloned on the owner and the files are written with mode 0600",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi19-add-project-there.ac2",
+            "title": "Given an agent actor or an agent-fenced link, when the door is called, then it answers 403 (agent-fenced or project-files-forbidden) and nothing is cloned",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi19-add-project-there.ac3",
+            "title": "Given a file entry with path '../x', when the door runs, then it is refused with 400 and no file is written",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi19-add-project-there.ac4",
+            "title": "Given pan machines add-project laptop overdeck --to desk, when it runs, then it posts /api/fleet/projects/add-there with machine desk",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi20-fleet-needs-you",
+        "title": "Show linked machines' pending questions and approvals in Needs-You, labelled by machine",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T19:30:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-4651",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/machines-peer.ts",
+            "src/dashboard/server/services/linked-needs-you-sync.ts",
+            "src/dashboard/server/services/link-heartbeat.ts",
+            "src/dashboard/server/services/anywhere-boot.ts",
+            "src/dashboard/server/routes/fleet-awareness.ts",
+            "src/dashboard/server/server.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/frontend/src/lib/useDecisions.ts",
+            "src/dashboard/frontend/src/components/sessionFeed/DecisionsPanel.tsx",
+            "src/dashboard/server/__tests__/linked-needs-you-sync.test.ts",
+            "src/dashboard/frontend/src/lib/__tests__/useDecisions.fleet.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/linked-needs-you-sync.test.ts",
+            "npm run test:frontend-subset",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "linked-needs-you-sync.test.ts passes",
+            "useDecisions.fleet.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-1",
+            "NFR-2"
+          ],
+          "parallelSafeReason": "Its files are new modules or files no unconnected item edits; every shared real edit is ordered by a blocks edge, and the remaining overlaps are the append-only tables (route-scopes.ts, no-loss-matrix.ts, server.ts route layers, anywhere-boot.ts wiring, frontend-test-subset.txt, machines.ts subcommand registration) resolved by keeping both rows."
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4651.md WI-20, D-4651-15. Closes PAN-4405. Owner route GET /api/machines/needs-you in routes/machines-peer.ts (machine credential; scope read:conversations) -> { hash, conversations: getConversationsPendingInputFeed() rows, agents: [{ id, issueId, pendingInputKinds }] (from the agent enrichment used by GET /api/agents, only non-empty kinds) }; heartbeat gains optional needsYouHash. New services/linked-needs-you-sync.ts (in-memory, hash-driven, fetch on connect and on changed hash; pruned on unlink), wired in anywhere-boot.ts. New routes/fleet-awareness.ts with GET /api/fleet/needs-you (read:conversations) -> { machines: [{ environmentId, label, conversations, agents }] } for online links only. useDecisions.ts adds query ['fleet-needs-you'] (5 s) mapping conversation rows to name '@<env>/<name>' plus machineLabel; DecisionsPanel.tsx renders 'on <label>' in the row meta and opens /conv/@<env>/<name>; remote agent rows render 'on <label>' with no inline answer. Repo rules: no execSync in server-reachable code (async execFile with timeouts); fake timers (vi.useFakeTimers + vi.advanceTimersByTimeAsync) for every wait, poll, back-off or heartbeat test; god files must not grow past their origin/main count or allowlist cap (start.ts 1283, CommandPalette.tsx 1124, Sidebar.tsx 1019, settings-api.ts 1508, routes/settings.ts 1104, routes/conversations.ts, conversation-runtime.ts, config-yaml/schema.ts) — extract a module instead, never raise a cap; every new HTTP route needs a tests/unit/lib/overdeck/no-loss-matrix.ts row and, unless admin-only, a src/dashboard/server/route-scopes.ts row; route-scopes.ts, no-loss-matrix.ts, server.ts route layers, anywhere-boot.ts wiring and scripts/frontend-test-subset.txt are append-only shared files (keep both rows on conflict)."
+        },
+        "items": [
+          {
+            "id": "wi20-fleet-needs-you.ac1",
+            "title": "Given fake timers, when heartbeats carry an unchanged needsYouHash, then the viewer makes no fetch; when the hash changes, then exactly one GET /api/machines/needs-you is made",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi20-fleet-needs-you.ac2",
+            "title": "Given desk has a conversation with a pending AskUserQuestion, when this machine's Needs-You renders, then a row for '@<deskEnv>/<name>' shows 'on desk' and clicking it navigates to /conv/@<deskEnv>/<name>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi20-fleet-needs-you.ac3",
+            "title": "Given a link that is offline, when GET /api/fleet/needs-you runs, then that machine contributes no rows and the route answers 200",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi21-fleet-search",
+        "title": "Group palette search hits from every online linked machine by machine",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T19:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4651",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/fleet-awareness.ts",
+            "src/dashboard/frontend/src/components/CommandPalette.tsx",
+            "src/dashboard/frontend/src/components/palette-fleet-hits.tsx",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/__tests__/fleet-search.test.ts",
+            "src/dashboard/frontend/src/components/__tests__/palette-fleet-hits.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/fleet-search.test.ts",
+            "npm run test:frontend-subset",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "fleet-search.test.ts passes",
+            "palette-fleet-hits.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4651.md WI-21, D-4651-16. In routes/fleet-awareness.ts: GET /api/fleet/search?q=&limit= (read:conversations) runs GET /api/palette/search on each online link in parallel with a 2.5 s timeout (the fetchPeer pattern, machines-fleet.ts:239) and answers { machines: [{ environmentId, label, conversations (names rewritten to '@<env>/<name>'), error? }] }, never including this machine. New components/palette-fleet-hits.tsx renders an 'On <label>' group per machine; CommandPalette.tsx issues the fleet query alongside its local search (:246) and mounts the component, growing by at most 15 lines and staying <= 1124. Repo rules: no execSync in server-reachable code (async execFile with timeouts); fake timers (vi.useFakeTimers + vi.advanceTimersByTimeAsync) for every wait, poll, back-off or heartbeat test; god files must not grow past their origin/main count or allowlist cap (start.ts 1283, CommandPalette.tsx 1124, Sidebar.tsx 1019, settings-api.ts 1508, routes/settings.ts 1104, routes/conversations.ts, conversation-runtime.ts, config-yaml/schema.ts) — extract a module instead, never raise a cap; every new HTTP route needs a tests/unit/lib/overdeck/no-loss-matrix.ts row and, unless admin-only, a src/dashboard/server/route-scopes.ts row; route-scopes.ts, no-loss-matrix.ts, server.ts route layers, anywhere-boot.ts wiring and scripts/frontend-test-subset.txt are append-only shared files (keep both rows on conflict)."
+        },
+        "items": [
+          {
+            "id": "wi21-fleet-search.ac1",
+            "title": "Given desk returns one conversation hit 'conv-x', when GET /api/fleet/search runs, then desk's group lists '@<deskEnv>/conv-x'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi21-fleet-search.ac2",
+            "title": "Given a link that does not answer within 2.5 s, when the route runs under fake timers, then that machine's entry carries error and other machines' hits are still returned",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi21-fleet-search.ac3",
+            "title": "Given fleet hits for desk, when the palette renders, then an 'On desk' group lists them; and CommandPalette.tsx is at most 1124 lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi22-which-machine",
+        "title": "Answer which machines run agents or conversations for an issue",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T19:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4651",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/machines-peer.ts",
+            "src/dashboard/server/routes/fleet-awareness.ts",
+            "src/cli/commands/machines-who.ts",
+            "src/cli/commands/machines.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/__tests__/fleet-issue-activity.test.ts",
+            "tests/unit/cli/machines-who.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/fleet-issue-activity.test.ts tests/unit/cli/machines-who.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "fleet-issue-activity.test.ts passes",
+            "machines-who.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4651.md WI-22, D-4651-16. Owner GET /api/machines/issue-activity?issue=<id> in routes/machines-peer.ts (read:state, machine credential) -> { agents: [{ id, status }], conversations: [{ name, isWorking }] } filtered by issueId. In routes/fleet-awareness.ts GET /api/fleet/issues/:id/activity (read:state) combining this machine and every online link (2.5 s each). New src/cli/commands/machines-who.ts registered from machines.ts: `pan machines who <issue> [--json]` printing MACHINE KIND ID STATUS. Repo rules: no execSync in server-reachable code (async execFile with timeouts); fake timers (vi.useFakeTimers + vi.advanceTimersByTimeAsync) for every wait, poll, back-off or heartbeat test; god files must not grow past their origin/main count or allowlist cap (start.ts 1283, CommandPalette.tsx 1124, Sidebar.tsx 1019, settings-api.ts 1508, routes/settings.ts 1104, routes/conversations.ts, conversation-runtime.ts, config-yaml/schema.ts) — extract a module instead, never raise a cap; every new HTTP route needs a tests/unit/lib/overdeck/no-loss-matrix.ts row and, unless admin-only, a src/dashboard/server/route-scopes.ts row; route-scopes.ts, no-loss-matrix.ts, server.ts route layers, anywhere-boot.ts wiring and scripts/frontend-test-subset.txt are append-only shared files (keep both rows on conflict)."
+        },
+        "items": [
+          {
+            "id": "wi22-which-machine.ac1",
+            "title": "Given an agent for PAN-7 on desk and a conversation for PAN-7 on this machine, when GET /api/fleet/issues/PAN-7/activity runs, then it lists both with machine labels desk and this label",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi22-which-machine.ac2",
+            "title": "Given that answer, when pan machines who PAN-7 runs, then it prints two rows with columns MACHINE KIND ID STATUS; with --json it prints the route's JSON",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi22-which-machine.ac3",
+            "title": "Given desk is offline, when the route runs, then desk is listed with state offline and no rows, and the route answers 200",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi23-owner-usage",
+        "title": "Let machine credentials read the cost summary and a request-id digest",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T19:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4651",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/costs/request-digest.ts",
+            "src/dashboard/server/routes/costs-digest.ts",
+            "src/dashboard/server/server.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "tests/unit/lib/costs/request-digest.test.ts",
+            "src/dashboard/server/__tests__/route-scopes-costs.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/costs/request-digest.test.ts src/dashboard/server/__tests__/route-scopes-costs.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "request-digest.test.ts passes",
+            "route-scopes-costs.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4651.md WI-23, D-4651-19 (owner half). Scope row GET /api/costs/summary -> read:costs. New src/lib/costs/request-digest.ts: for the month window, entries [first 16 hex of SHA-256(request_id), ts ms, cost] for events with non-null request_id, capped at 50,000 (complete false beyond); read events asynchronously like the summary route (readEventsSince). New routes/costs-digest.ts GET /api/costs/request-digest (read:costs); register in server.ts; no-loss rows. Repo rules: no execSync in server-reachable code (async execFile with timeouts); fake timers (vi.useFakeTimers + vi.advanceTimersByTimeAsync) for every wait, poll, back-off or heartbeat test; god files must not grow past their origin/main count or allowlist cap (start.ts 1283, CommandPalette.tsx 1124, Sidebar.tsx 1019, settings-api.ts 1508, routes/settings.ts 1104, routes/conversations.ts, conversation-runtime.ts, config-yaml/schema.ts) — extract a module instead, never raise a cap; every new HTTP route needs a tests/unit/lib/overdeck/no-loss-matrix.ts row and, unless admin-only, a src/dashboard/server/route-scopes.ts row; route-scopes.ts, no-loss-matrix.ts, server.ts route layers, anywhere-boot.ts wiring and scripts/frontend-test-subset.txt are append-only shared files (keep both rows on conflict)."
+        },
+        "items": [
+          {
+            "id": "wi23-owner-usage.ac1",
+            "title": "Given a machine credential, when it GETs /api/costs/summary, then it answers 200 (no longer insufficient_scope admin)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi23-owner-usage.ac2",
+            "title": "Given events with and without request ids, when the digest is built, then only events with a request id appear, each hash is 16 lowercase hex characters, and ts and cost match the event",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi23-owner-usage.ac3",
+            "title": "Given 50,001 events with request ids, when the digest is built, then it holds 50,000 entries and complete is false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi24-fleet-usage",
+        "title": "Add fleet usage with per-machine rows, cached offline numbers and an All machines total",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T19:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4651",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/fleet-usage.ts",
+            "src/dashboard/server/services/fleet-usage-cache.ts",
+            "src/dashboard/server/server.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/frontend/src/components/CostsPage.tsx",
+            "src/dashboard/frontend/src/components/costs/FleetUsagePanel.tsx",
+            "src/dashboard/server/__tests__/fleet-usage.test.ts",
+            "src/dashboard/frontend/src/components/costs/__tests__/FleetUsagePanel.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/fleet-usage.test.ts",
+            "npm run test:frontend-subset",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "fleet-usage.test.ts passes",
+            "FleetUsagePanel.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4651.md WI-24, D-4651-19 (viewer half). New services/fleet-usage-cache.ts (${OVERDECK_HOME}/fleet-usage-cache.json, 0600, temp+rename, totals per environment id with fetchedAt). New routes/fleet-usage.ts GET /api/fleet/usage (admin): this machine first, then links by label; online => summary + digest (2.5 s each) and cache write; offline => cached totals with cached true and fetchedAt, or no numbers; allMachines per window = sum of rows minus the cost of each digest hash already counted on an earlier machine; duplicates per window = what was removed. CostsPage.tsx gains a third tab 'Machines' (activeTab union at :633) rendering new components/costs/FleetUsagePanel.tsx: table Machine | Today | Week | Month, a muted 'cached <relative time>' line for cached rows, and an 'All machines' footer row. Repo rules: no execSync in server-reachable code (async execFile with timeouts); fake timers (vi.useFakeTimers + vi.advanceTimersByTimeAsync) for every wait, poll, back-off or heartbeat test; god files must not grow past their origin/main count or allowlist cap (start.ts 1283, CommandPalette.tsx 1124, Sidebar.tsx 1019, settings-api.ts 1508, routes/settings.ts 1104, routes/conversations.ts, conversation-runtime.ts, config-yaml/schema.ts) — extract a module instead, never raise a cap; every new HTTP route needs a tests/unit/lib/overdeck/no-loss-matrix.ts row and, unless admin-only, a src/dashboard/server/route-scopes.ts row; route-scopes.ts, no-loss-matrix.ts, server.ts route layers, anywhere-boot.ts wiring and scripts/frontend-test-subset.txt are append-only shared files (keep both rows on conflict)."
+        },
+        "items": [
+          {
+            "id": "wi24-fleet-usage.ac1",
+            "title": "Given this machine $2.00 today and desk $3.00 today with no shared request ids, when GET /api/fleet/usage runs, then allMachines.today.totalCost is 5.00 and duplicates.today.totalCost is 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi24-fleet-usage.ac2",
+            "title": "Given one request id present on both machines with cost $0.50, when the route runs, then allMachines.today.totalCost is 4.50 and duplicates.today.totalCost is 0.50",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi24-fleet-usage.ac3",
+            "title": "Given desk offline with a cached entry, when the route runs, then desk's row has cached true and the cached fetchedAt and its numbers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi24-fleet-usage.ac4",
+            "title": "Given the route's answer, when the Machines tab renders, then it shows one row per machine, 'cached' text under the offline machine and an 'All machines' row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi25-resolved-settings",
+        "title": "Expose redacted flat config.yaml values to machine credentials",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T19:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4651",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/settings-resolved.ts",
+            "src/lib/diagnostics/redact.ts",
+            "src/dashboard/server/routes/settings-resolved.ts",
+            "src/dashboard/server/server.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "tests/unit/lib/settings-resolved.test.ts",
+            "src/dashboard/server/__tests__/settings-resolved-route.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/settings-resolved.test.ts src/dashboard/server/__tests__/settings-resolved-route.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "settings-resolved.test.ts passes",
+            "settings-resolved-route.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4651.md WI-25, D-4651-20 (owner half). Export isSecretKeyName from src/lib/diagnostics/redact.ts. New src/lib/settings-resolved.ts readResolvedSettings(): yaml.parse ~/.overdeck/config.yaml (GLOBAL_CONFIG_PATH), flatten to dotted snake_case keys (arrays are leaves as YAML flow), values as YAML flow scalars; a key is secret when any segment isSecretKeyName or it starts with api_keys. => { secret: true, set: boolean }. New routes/settings-resolved.ts GET /api/settings/resolved (read:settings) -> { settings }. Register; scope + no-loss rows. Do not edit settings-api.ts or routes/settings.ts. Repo rules: no execSync in server-reachable code (async execFile with timeouts); fake timers (vi.useFakeTimers + vi.advanceTimersByTimeAsync) for every wait, poll, back-off or heartbeat test; god files must not grow past their origin/main count or allowlist cap (start.ts 1283, CommandPalette.tsx 1124, Sidebar.tsx 1019, settings-api.ts 1508, routes/settings.ts 1104, routes/conversations.ts, conversation-runtime.ts, config-yaml/schema.ts) — extract a module instead, never raise a cap; every new HTTP route needs a tests/unit/lib/overdeck/no-loss-matrix.ts row and, unless admin-only, a src/dashboard/server/route-scopes.ts row; route-scopes.ts, no-loss-matrix.ts, server.ts route layers, anywhere-boot.ts wiring and scripts/frontend-test-subset.txt are append-only shared files (keep both rows on conflict)."
+        },
+        "items": [
+          {
+            "id": "wi25-resolved-settings.ac1",
+            "title": "Given config resources: { quality_gate_slots: 3 }, when readResolvedSettings runs, then it returns 'resources.quality_gate_slots' with value '3'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi25-resolved-settings.ac2",
+            "title": "Given api_keys: { openai: 'sk-test' }, when a machine credential GETs /api/settings/resolved, then 'api_keys.openai' is { secret: true, set: true } and the response body does not contain 'sk-test'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi25-resolved-settings.ac3",
+            "title": "Given the same machine credential, when it sends PUT /api/settings, then it answers 403",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi26-config-set",
+        "title": "Add pan admin config set for dotted config.yaml keys",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T19:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4651",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/config-set.ts",
+            "src/cli/commands/config.ts",
+            "sync-sources/skills/pan-admin-config/SKILL.md",
+            "tests/unit/cli/config-set.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/config-set.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "config-set.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4651.md WI-26, D-4651-21. New src/cli/commands/config-set.ts registered in registerConfigCommand (src/cli/commands/config.ts): `set <key> <value>`; key must match /^[a-z0-9_]+(\\.[a-z0-9_]+)*$/ (else exit 1); value parsed with yaml.parse; edit GLOBAL_CONFIG_PATH with parseDocument + setIn keeping comments; then loadConfig(); on throw restore the previous file text, print the error, exit 1; on success print 'Set <key> = <value> in <path>'. Update sync-sources/skills/pan-admin-config/SKILL.md: document set and remove the sentence saying set is not exposed (lint:skills). Repo rules: no execSync in server-reachable code (async execFile with timeouts); fake timers (vi.useFakeTimers + vi.advanceTimersByTimeAsync) for every wait, poll, back-off or heartbeat test; god files must not grow past their origin/main count or allowlist cap (start.ts 1283, CommandPalette.tsx 1124, Sidebar.tsx 1019, settings-api.ts 1508, routes/settings.ts 1104, routes/conversations.ts, conversation-runtime.ts, config-yaml/schema.ts) — extract a module instead, never raise a cap; every new HTTP route needs a tests/unit/lib/overdeck/no-loss-matrix.ts row and, unless admin-only, a src/dashboard/server/route-scopes.ts row; route-scopes.ts, no-loss-matrix.ts, server.ts route layers, anywhere-boot.ts wiring and scripts/frontend-test-subset.txt are append-only shared files (keep both rows on conflict)."
+        },
+        "items": [
+          {
+            "id": "wi26-config-set.ac1",
+            "title": "Given a temp config.yaml with a comment, when `pan admin config set resources.quality_gate_slots 3` runs, then the file holds quality_gate_slots: 3 as a number and the comment is preserved",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi26-config-set.ac2",
+            "title": "Given key 'Resources.slots', when set runs, then it exits 1 and the file is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi26-config-set.ac3",
+            "title": "Given a value that makes loadConfig throw, when set runs, then the previous file text is restored byte for byte and it exits 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi27-compare-settings",
+        "title": "Add read-only Compare settings with copyable pan admin config set lines",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T19:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4651",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/fleet-settings.ts",
+            "src/dashboard/server/server.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/frontend/src/components/Settings/anywhere/CompareSettingsDialog.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/MachinesPanel.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/machinesApi.ts",
+            "src/dashboard/server/__tests__/fleet-settings-compare.test.ts",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/CompareSettingsDialog.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/fleet-settings-compare.test.ts",
+            "npm run test:frontend-subset",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "fleet-settings-compare.test.ts passes",
+            "CompareSettingsDialog.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4651.md WI-27, D-4651-20 (viewer half). New routes/fleet-settings.ts GET /api/fleet/settings-compare/:machine (admin; refuses channel callers): local readResolvedSettings + the peer's /api/settings/resolved (2.5 s); differences sorted by key with here/there (null = not set), copyLine 'pan admin config set <key> <value>' (value shell-quoted; null for secrets or when here is null); dashboardUrl https://<name>/ from a tailnet route wss://<name>/ws/link else null; peer predating the route => 409 { code: 'peer-too-old', version } per predatesFleetUpdates. Frontend: new Settings/anywhere/CompareSettingsDialog.tsx (table Setting | Here | <label>, copy button per row, 'set'/'not set' for secrets, 'Open <label>'s dashboard' link when dashboardUrl), a 'Compare settings' button in MachineLinkRow (MachinesPanel.tsx actions div ~:188) for online links, machinesApi.ts fetcher. Repo rules: no execSync in server-reachable code (async execFile with timeouts); fake timers (vi.useFakeTimers + vi.advanceTimersByTimeAsync) for every wait, poll, back-off or heartbeat test; god files must not grow past their origin/main count or allowlist cap (start.ts 1283, CommandPalette.tsx 1124, Sidebar.tsx 1019, settings-api.ts 1508, routes/settings.ts 1104, routes/conversations.ts, conversation-runtime.ts, config-yaml/schema.ts) — extract a module instead, never raise a cap; every new HTTP route needs a tests/unit/lib/overdeck/no-loss-matrix.ts row and, unless admin-only, a src/dashboard/server/route-scopes.ts row; route-scopes.ts, no-loss-matrix.ts, server.ts route layers, anywhere-boot.ts wiring and scripts/frontend-test-subset.txt are append-only shared files (keep both rows on conflict)."
+        },
+        "items": [
+          {
+            "id": "wi27-compare-settings.ac1",
+            "title": "Given here resources.quality_gate_slots 2 and desk 4, when GET /api/fleet/settings-compare/desk runs, then differences holds that key with here '2', there '4' and copyLine 'pan admin config set resources.quality_gate_slots 2'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi27-compare-settings.ac2",
+            "title": "Given differing api_keys.openai values that are set on both machines, when the route runs, then the key is absent; given set here and not set there, then it is listed as { secret: true, set: true } vs null with copyLine null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi27-compare-settings.ac3",
+            "title": "Given a desk link with a tailnet route wss://desk.tail.ts.net/ws/link, when the dialog renders, then an 'Open desk's dashboard' link to https://desk.tail.ts.net/ renders; without that route it does not",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi28-proxy-token-ceiling",
+        "title": "Let odk_ tokens reach linked conversations under a scope ceiling and refuse chained hops",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T19:30:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4651",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/dashboard/server/route-scopes.ts",
+            "src/dashboard/server/linked-conversation-proxy.ts",
+            "src/lib/anywhere/link-client.ts",
+            "src/dashboard/server/__tests__/route-scopes-linked.test.ts",
+            "src/dashboard/server/__tests__/linked-conversation-proxy-token.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/route-scopes-linked.test.ts src/dashboard/server/__tests__/linked-conversation-proxy-token.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "route-scopes-linked.test.ts passes",
+            "linked-conversation-proxy-token.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-10"
+          ],
+          "foundationFor": [
+            "wi29-mcp-fleet-tools",
+            "wi10-fleet-conversations",
+            "wi12-remote-worker-follower"
+          ],
+          "parallelSafeReason": "Its files are new modules or files no unconnected item edits; every shared real edit is ordered by a blocks edge, and the remaining overlaps are the append-only tables (route-scopes.ts, no-loss-matrix.ts, server.ts route layers, anywhere-boot.ts wiring, frontend-test-subset.txt, machines.ts subcommand registration) resolved by keeping both rows."
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4651.md WI-28, D-4651-17. route-scopes.ts requiredScopeFor: a pathname /api/conversations/@<target>/<rest> returns the scope of /api/conversations/<rest> (strip one segment). linked-conversation-proxy.ts: first check — channelOfRequest(request) non-null => 403 { code: 'no-chained-hops' }; for credential.kind === 'token' forward with actor 'operator' and ceiling = credentialScopes(credential) without 'admin' (derived from the resolved credential, never from a header); browser and operator CLI unchanged (no ceiling). link-client.ts: LinkForwardInit gains ceiling?: AccessTokenScope[] sent as x-overdeck-link-ceiling (LINK_CEILING_HEADER). Export a helper forwardIdentityFor(credential, request) -> { actor, ceiling } used here and by fleet-work.ts (WI-10/12/14 import it once it lands; they refuse token credentials for remote targets until then). Repo rules: no execSync in server-reachable code (async execFile with timeouts); fake timers (vi.useFakeTimers + vi.advanceTimersByTimeAsync) for every wait, poll, back-off or heartbeat test; god files must not grow past their origin/main count or allowlist cap (start.ts 1283, CommandPalette.tsx 1124, Sidebar.tsx 1019, settings-api.ts 1508, routes/settings.ts 1104, routes/conversations.ts, conversation-runtime.ts, config-yaml/schema.ts) — extract a module instead, never raise a cap; every new HTTP route needs a tests/unit/lib/overdeck/no-loss-matrix.ts row and, unless admin-only, a src/dashboard/server/route-scopes.ts row; route-scopes.ts, no-loss-matrix.ts, server.ts route layers, anywhere-boot.ts wiring and scripts/frontend-test-subset.txt are append-only shared files (keep both rows on conflict)."
+        },
+        "items": [
+          {
+            "id": "wi28-proxy-token-ceiling.ac1",
+            "title": "Given a token with read:conversations only, when it GETs /api/conversations/@desk/conv-a/messages, then the gate admits it and the stubbed owner receives the forwarded GET; when it POSTs /api/conversations/@desk/conv-a/message, then it answers 403 insufficient_scope with missingScope tell",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi28-proxy-token-ceiling.ac2",
+            "title": "Given a token with read:conversations and tell, when it POSTs a message under @desk/, then the owner receives x-overdeck-link-actor operator and x-overdeck-link-ceiling listing exactly the token's scopes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi28-proxy-token-ceiling.ac3",
+            "title": "Given a request that arrives through a link channel, when it targets /api/conversations/@desk/conv-a/messages, then the proxy answers 403 with code no-chained-hops",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi28-proxy-token-ceiling.ac4",
+            "title": "Given a token without approve, when it POSTs /api/conversations/@desk/conv-a/permission, then it answers 403 at the viewer's gate",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi29-mcp-fleet-tools",
+        "title": "Make the MCP tools reach every linked machine",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T19:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4651",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/mcp/tools-read.ts",
+            "src/lib/mcp/tools-write.ts",
+            "src/lib/mcp/tools-approve.ts",
+            "src/dashboard/server/routes/fleet-work.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "tests/unit/lib/mcp/tools-read.test.ts",
+            "tests/unit/lib/mcp/tools-write.test.ts",
+            "src/dashboard/server/__tests__/mcp-acceptance.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/mcp/tools-read.test.ts tests/unit/lib/mcp/tools-write.test.ts src/dashboard/server/__tests__/mcp-acceptance.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tools-read.test.ts passes",
+            "tools-write.test.ts passes",
+            "mcp-acceptance.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4651.md WI-29, D-4651-18. Add GET /api/fleet/machines (read:state, refuses channel callers) to routes/fleet-work.ts answering only [{ environmentId, label, thisMachine, state, load, tags }] (self first; no routes, fingerprints or access levels) with a no-loss row. tools-read.ts: list_machines calls GET /api/fleet/machines and returns [{ environmentId, label, thisMachine, state, load, tags }] (self first) with an updated description; CONVERSATION_KEYS adds environmentId, machineLabel, machineState; search_conversations merges GET /api/fleet/search groups (machineLabel on each hit); delete resolveMachine. tools-write.ts: MACHINE_PROPERTY text becomes 'Where to run: omit for this machine, auto, or a linked machine label or environment id.'; start_conversation posts /api/fleet/conversations and start_worker posts /api/fleet/workers with machine and an optional needs array. read_conversation, send_message and the tools-approve.ts tools pass '@<label|env>/<name>' names unchanged (encodeURIComponent already yields the proxy's form). Update tests/unit/lib/mcp/* and src/dashboard/server/__tests__/mcp-acceptance.test.ts. Repo rules: no execSync in server-reachable code (async execFile with timeouts); fake timers (vi.useFakeTimers + vi.advanceTimersByTimeAsync) for every wait, poll, back-off or heartbeat test; god files must not grow past their origin/main count or allowlist cap (start.ts 1283, CommandPalette.tsx 1124, Sidebar.tsx 1019, settings-api.ts 1508, routes/settings.ts 1104, routes/conversations.ts, conversation-runtime.ts, config-yaml/schema.ts) — extract a module instead, never raise a cap; every new HTTP route needs a tests/unit/lib/overdeck/no-loss-matrix.ts row and, unless admin-only, a src/dashboard/server/route-scopes.ts row; route-scopes.ts, no-loss-matrix.ts, server.ts route layers, anywhere-boot.ts wiring and scripts/frontend-test-subset.txt are append-only shared files (keep both rows on conflict)."
+        },
+        "items": [
+          {
+            "id": "wi29-mcp-fleet-tools.ac1",
+            "title": "Given one link 'desk', when list_machines runs, then it returns this machine with thisMachine true and desk with its state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi29-mcp-fleet-tools.ac2",
+            "title": "Given conversation '@desk/conv-a', when send_message runs, then it posts to /api/conversations/%40desk%2Fconv-a/message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi29-mcp-fleet-tools.ac3",
+            "title": "Given start_worker with machine 'auto', when it runs, then it posts /api/fleet/workers with machine 'auto'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi29-mcp-fleet-tools.ac4",
+            "title": "Given the acceptance test's token, when it calls PUT /api/settings and POST @desk/.../permission without approve, then both answer 403",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi30-two-machine-smoke",
+        "title": "Extend the two-machine smoke with delegation, placement, usage, compare and MCP steps",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T19:30:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "test",
+          "issueLabel": "pan-4651",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/anywhere/two-machine-smoke.mjs"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run build",
+            "node scripts/anywhere/two-machine-smoke.mjs"
+          ],
+          "expected_outputs": [
+            "build completes",
+            "smoke exits 0 and prints the nine new step names"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-6",
+            "FR-8",
+            "FR-9",
+            "FR-10"
+          ],
+          "parallelSafeReason": "Its files are new modules or files no unconnected item edits; every shared real edit is ordered by a blocks edge, and the remaining overlaps are the append-only tables (route-scopes.ts, no-loss-matrix.ts, server.ts route layers, anywhere-boot.ts wiring, frontend-test-subset.txt, machines.ts subcommand registration) resolved by keeping both rows."
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4651.md WI-30, D-4651-24. scripts/anywhere/two-machine-smoke.mjs: after the PAN-4650 steps add load, projects, remote-worker, worker-offline (SIGSTOP B 25 s then SIGCONT), auto (OVERDECK_TEST_FORCE_CPU_SATURATED=1 on B), needs (anywhere.machine.tags: [smoke-tag] on B only), usage, compare and mcp, exactly as PRD WI-30. Fake harness for the remote worker: reuse the smoke's fake CLI approach (a worker whose harness writes one report via `pan worker report`). Each step prints its name; failure prints 'FAILED at step <name>: <why>'. Run `npm run build` then the script; paste its output into the PR description. CI does not run it. Repo rules: no execSync in server-reachable code (async execFile with timeouts); fake timers (vi.useFakeTimers + vi.advanceTimersByTimeAsync) for every wait, poll, back-off or heartbeat test; god files must not grow past their origin/main count or allowlist cap (start.ts 1283, CommandPalette.tsx 1124, Sidebar.tsx 1019, settings-api.ts 1508, routes/settings.ts 1104, routes/conversations.ts, conversation-runtime.ts, config-yaml/schema.ts) — extract a module instead, never raise a cap; every new HTTP route needs a tests/unit/lib/overdeck/no-loss-matrix.ts row and, unless admin-only, a src/dashboard/server/route-scopes.ts row; route-scopes.ts, no-loss-matrix.ts, server.ts route layers, anywhere-boot.ts wiring and scripts/frontend-test-subset.txt are append-only shared files (keep both rows on conflict)."
+        },
+        "items": [
+          {
+            "id": "wi30-two-machine-smoke.ac1",
+            "title": "Given a built tree, when `node scripts/anywhere/two-machine-smoke.mjs` runs, then it exits 0 and prints each of the steps load, projects, remote-worker, worker-offline, auto, needs, usage, compare and mcp",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi30-two-machine-smoke.ac2",
+            "title": "Given the worker-offline step, when B is stopped for 25 s mid-wait, then `pan worker wait` on A still returns B's report after B resumes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi30-two-machine-smoke.ac3",
+            "title": "Given the mcp step, when the odk_ token sends PUT /api/settings, then the step observes 403 and the message to B's conversation is accepted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi31-docs",
+        "title": "Document work across machines, Auto placement, fleet views and MCP fleet reach",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T19:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-4651",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/linked-machines.mdx",
+            "cli/machines.mdx",
+            "configuration/mcp.mdx",
+            "docs/ANYWHERE-ARCHITECTURE.md",
+            "reference/workers.mdx",
+            "reference/lanes.mdx",
+            "cli/agent-commands.mdx",
+            ".overdeck/context/codebase/architecture.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'Auto placement' configuration/linked-machines.mdx",
+            "grep -n '## who' cli/machines.mdx",
+            "grep -n 'Fleet reach' configuration/mcp.mdx",
+            "grep -c '#4651: D-19, D-21' docs/ANYWHERE-ARCHITECTURE.md",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "each grep prints a match",
+            "the #4651 D-19 count prints 0",
+            "lint:docs passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "FR-9",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4651.md WI-31. configuration/linked-machines.mdx: sections 'Start work on another machine', 'Delegation', 'Auto placement', 'Projects across machines', 'Fleet Needs-You and search', 'Fleet usage', 'Compare settings' per the PRD. cli/machines.mdx: a section for --machine, --machine auto and --needs on the three commands, '## who', '## add-project', LOAD/TAGS under '## list'. configuration/mcp.mdx: replace the 'This machine only'/'Fleet reach' placeholder (~:152-163) with a 'Fleet reach' section and update the list_machines row (~:25). docs/ANYWHERE-ARCHITECTURE.md: sections 'Work doors and provenance', 'Delegation follower', 'Auto placement (D-19)', 'MCP fleet reach (D-21)', 'Fleet usage and compare'; delete both '#4651: D-19, D-21.' lines. reference/workers.mdx: --machine, --needs, --push-first, --ignore-unpushed, stand-ins. reference/lanes.mdx: --machine/--needs and the PAN-4638 note. cli/agent-commands.mdx: pan start --machine and pan admin config set. .overdeck/context/codebase/architecture.md: one paragraph naming the new modules; keep exactly one last-verified line at the end, dated today. Repo rules: no execSync in server-reachable code (async execFile with timeouts); fake timers (vi.useFakeTimers + vi.advanceTimersByTimeAsync) for every wait, poll, back-off or heartbeat test; god files must not grow past their origin/main count or allowlist cap (start.ts 1283, CommandPalette.tsx 1124, Sidebar.tsx 1019, settings-api.ts 1508, routes/settings.ts 1104, routes/conversations.ts, conversation-runtime.ts, config-yaml/schema.ts) — extract a module instead, never raise a cap; every new HTTP route needs a tests/unit/lib/overdeck/no-loss-matrix.ts row and, unless admin-only, a src/dashboard/server/route-scopes.ts row; route-scopes.ts, no-loss-matrix.ts, server.ts route layers, anywhere-boot.ts wiring and scripts/frontend-test-subset.txt are append-only shared files (keep both rows on conflict)."
+        },
+        "items": [
+          {
+            "id": "wi31-docs.ac1",
+            "title": "Given the docs, when `grep -n 'Auto placement' configuration/linked-machines.mdx` runs, then it prints a match, and the section states that a reserved machine is picked only when it is the only machine with a required tag",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi31-docs.ac2",
+            "title": "Given the docs, when `grep -n '## who' cli/machines.mdx` and `grep -n -- '--needs' cli/machines.mdx` run, then each prints a match",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi31-docs.ac3",
+            "title": "Given the docs, when `grep -n 'Fleet reach' configuration/mcp.mdx` runs, then it prints a match and the section explains that settings changes answer 403",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi31-docs.ac4",
+            "title": "Given docs/ANYWHERE-ARCHITECTURE.md, when `grep -c '#4651: D-19, D-21' docs/ANYWHERE-ARCHITECTURE.md` runs, then it prints 0, and `grep -n 'D-19' docs/ANYWHERE-ARCHITECTURE.md` prints a match",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "wi1-provenance-fence",
+        "to": "wi4-work-door-conversations",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-provenance-fence",
+        "to": "wi5-work-door-workers",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-provenance-fence",
+        "to": "wi6-work-door-issue-start",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-provenance-fence",
+        "to": "wi19-add-project-there",
+        "type": "blocks"
+      },
+      {
+        "from": "wi4-work-door-conversations",
+        "to": "wi5-work-door-workers",
+        "type": "blocks"
+      },
+      {
+        "from": "wi5-work-door-workers",
+        "to": "wi6-work-door-issue-start",
+        "type": "blocks"
+      },
+      {
+        "from": "wi6-work-door-issue-start",
+        "to": "wi19-add-project-there",
+        "type": "blocks"
+      },
+      {
+        "from": "wi4-work-door-conversations",
+        "to": "wi10-fleet-conversations",
+        "type": "blocks"
+      },
+      {
+        "from": "wi2-load-tags-heartbeat",
+        "to": "wi3-project-lists",
+        "type": "blocks"
+      },
+      {
+        "from": "wi2-load-tags-heartbeat",
+        "to": "wi7-placement-rule",
+        "type": "blocks"
+      },
+      {
+        "from": "wi2-load-tags-heartbeat",
+        "to": "wi9-machines-list-load",
+        "type": "blocks"
+      },
+      {
+        "from": "wi3-project-lists",
+        "to": "wi8-placement-service",
+        "type": "blocks"
+      },
+      {
+        "from": "wi7-placement-rule",
+        "to": "wi8-placement-service",
+        "type": "blocks"
+      },
+      {
+        "from": "wi7-placement-rule",
+        "to": "wi9-machines-list-load",
+        "type": "blocks"
+      },
+      {
+        "from": "wi3-project-lists",
+        "to": "wi16-repo-grouping",
+        "type": "blocks"
+      },
+      {
+        "from": "wi3-project-lists",
+        "to": "wi17-owner-project-files",
+        "type": "blocks"
+      },
+      {
+        "from": "wi3-project-lists",
+        "to": "wi20-fleet-needs-you",
+        "type": "blocks"
+      },
+      {
+        "from": "wi8-placement-service",
+        "to": "wi10-fleet-conversations",
+        "type": "blocks"
+      },
+      {
+        "from": "wi10-fleet-conversations",
+        "to": "wi11-machine-field-ui",
+        "type": "blocks"
+      },
+      {
+        "from": "wi10-fleet-conversations",
+        "to": "wi12-remote-worker-follower",
+        "type": "blocks"
+      },
+      {
+        "from": "wi5-work-door-workers",
+        "to": "wi12-remote-worker-follower",
+        "type": "blocks"
+      },
+      {
+        "from": "wi12-remote-worker-follower",
+        "to": "wi13-worker-cli-machine",
+        "type": "blocks"
+      },
+      {
+        "from": "wi12-remote-worker-follower",
+        "to": "wi14-start-cli-machine",
+        "type": "blocks"
+      },
+      {
+        "from": "wi13-worker-cli-machine",
+        "to": "wi14-start-cli-machine",
+        "type": "blocks"
+      },
+      {
+        "from": "wi6-work-door-issue-start",
+        "to": "wi14-start-cli-machine",
+        "type": "blocks"
+      },
+      {
+        "from": "wi8-placement-service",
+        "to": "wi15-lane-cli-machine",
+        "type": "blocks"
+      },
+      {
+        "from": "wi9-machines-list-load",
+        "to": "wi16-repo-grouping",
+        "type": "blocks"
+      },
+      {
+        "from": "wi16-repo-grouping",
+        "to": "wi18-add-project-here",
+        "type": "blocks"
+      },
+      {
+        "from": "wi17-owner-project-files",
+        "to": "wi18-add-project-here",
+        "type": "blocks"
+      },
+      {
+        "from": "wi18-add-project-here",
+        "to": "wi19-add-project-there",
+        "type": "blocks"
+      },
+      {
+        "from": "wi17-owner-project-files",
+        "to": "wi19-add-project-there",
+        "type": "blocks"
+      },
+      {
+        "from": "wi20-fleet-needs-you",
+        "to": "wi21-fleet-search",
+        "type": "blocks"
+      },
+      {
+        "from": "wi21-fleet-search",
+        "to": "wi22-which-machine",
+        "type": "blocks"
+      },
+      {
+        "from": "wi9-machines-list-load",
+        "to": "wi22-which-machine",
+        "type": "blocks"
+      },
+      {
+        "from": "wi23-owner-usage",
+        "to": "wi24-fleet-usage",
+        "type": "blocks"
+      },
+      {
+        "from": "wi25-resolved-settings",
+        "to": "wi27-compare-settings",
+        "type": "blocks"
+      },
+      {
+        "from": "wi16-repo-grouping",
+        "to": "wi27-compare-settings",
+        "type": "blocks"
+      },
+      {
+        "from": "wi28-proxy-token-ceiling",
+        "to": "wi29-mcp-fleet-tools",
+        "type": "blocks"
+      },
+      {
+        "from": "wi28-proxy-token-ceiling",
+        "to": "wi10-fleet-conversations",
+        "type": "blocks"
+      },
+      {
+        "from": "wi10-fleet-conversations",
+        "to": "wi29-mcp-fleet-tools",
+        "type": "blocks"
+      },
+      {
+        "from": "wi12-remote-worker-follower",
+        "to": "wi29-mcp-fleet-tools",
+        "type": "blocks"
+      },
+      {
+        "from": "wi21-fleet-search",
+        "to": "wi29-mcp-fleet-tools",
+        "type": "blocks"
+      },
+      {
+        "from": "wi14-start-cli-machine",
+        "to": "wi29-mcp-fleet-tools",
+        "type": "blocks"
+      },
+      {
+        "from": "wi13-worker-cli-machine",
+        "to": "wi30-two-machine-smoke",
+        "type": "blocks"
+      },
+      {
+        "from": "wi8-placement-service",
+        "to": "wi30-two-machine-smoke",
+        "type": "blocks"
+      },
+      {
+        "from": "wi9-machines-list-load",
+        "to": "wi30-two-machine-smoke",
+        "type": "blocks"
+      },
+      {
+        "from": "wi16-repo-grouping",
+        "to": "wi30-two-machine-smoke",
+        "type": "blocks"
+      },
+      {
+        "from": "wi24-fleet-usage",
+        "to": "wi30-two-machine-smoke",
+        "type": "blocks"
+      },
+      {
+        "from": "wi27-compare-settings",
+        "to": "wi30-two-machine-smoke",
+        "type": "blocks"
+      },
+      {
+        "from": "wi29-mcp-fleet-tools",
+        "to": "wi30-two-machine-smoke",
+        "type": "blocks"
+      },
+      {
+        "from": "wi20-fleet-needs-you",
+        "to": "wi30-two-machine-smoke",
+        "type": "blocks"
+      },
+      {
+        "from": "wi11-machine-field-ui",
+        "to": "wi31-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "wi14-start-cli-machine",
+        "to": "wi31-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "wi15-lane-cli-machine",
+        "to": "wi31-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "wi18-add-project-here",
+        "to": "wi31-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "wi19-add-project-there",
+        "to": "wi31-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "wi22-which-machine",
+        "to": "wi31-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "wi24-fleet-usage",
+        "to": "wi31-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "wi26-config-set",
+        "to": "wi31-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "wi27-compare-settings",
+        "to": "wi31-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "wi29-mcp-fleet-tools",
+        "to": "wi31-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "wi30-two-machine-smoke",
+        "to": "wi31-docs",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

@@ -1,0 +1,467 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-02T15:33:16Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4722: Fleet Update all runs npm install --global on machines set up with pan connect (runtime install)",
+    "updated": "2026-11-02T15:36:53.914Z"
+  },
+  "plan": {
+    "id": "pan-4722",
+    "title": "Fleet Update all runs npm install --global on machines set up with pan connect (runtime install)",
+    "status": "running",
+    "uid": "773f7c1f-dd93-4583-a0d6-cf612930f379",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-02T15:33:16Z",
+    "updated": "2026-11-02T15:36:53.914Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4722",
+        "label": "PAN-4722",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4722.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "anywhere",
+      "fleet-update",
+      "pan-connect",
+      "update-manager"
+    ],
+    "narratives": {
+      "Problem": "On a machine set up with npx @overdeck/core connect, Overdeck runs from <OVERDECK_HOME>/runtime, but Fleet Update all (and the update dialog and pan update) runs npm install --global. That fails without sudo or installs a copy nothing runs, and the following bare 'pan sync' fails with ENOENT because pan is not on PATH, so the dashboard is never restarted and every later Update all fails the same way.",
+      "Proposal": "Detect the connect runtime by comparing the running package root with runtimePackageRoot(OVERDECK_HOME) (isRuntimePackageRoot, realpath on both sides). UpdateManager gets a runtimeHome option; install() then calls ensureDurableRuntime(home, version) instead of npm install --global. pan sync runs through panCliInvocation (the bundled CLI, no PATH lookup), and a sync failure after a good install leaves the snapshot ready so the fleet job still restarts. The dashboard's getUpdateManager() and the pan update CLI both pass the detected home. The wire install mode stays npm-global (no contract change). Docs describe the new path.",
+      "NonGoals": "- No new install mode literal (npm-runtime) in packages/contracts or in GET /api/versions/self\n- No change to the desktop update path or to how getUpdateManager() derives installMode\n- No supervisor service restart after an update; the unit's ExecStart path is unchanged so its next start runs the new version\n- No change to ensureDurableRuntime() itself, its error text or its 600 s timeout\n- No change to fleet-update-service.ts polling, timeout or restart logic\n- No detection of a runtime under an OVERDECK_HOME other than the process's own\n- The pan sync warning is not surfaced in the fleet row or the update dialog; it is logged with console.error and carried in the pre-restart /api/update/status snapshot only"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Use a prefix-aware UpdateManager (runtimeHome option) instead of a new npm-runtime install mode; connect machines keep reporting npm-global",
+        "rationale": "The issue offers both without a recommendation. The peer report decoder is a strict Schema.Literals set, so a new literal makes older viewers reject the report; nothing displays installMode; and the only branch on it treats both installs the same. The smaller change meets the Expected section with no contract change."
+      },
+      {
+        "summary": "Reuse ensureDurableRuntime() for the runtime install",
+        "rationale": "It is the exact command the issue names, with the timeout, --omit=dev, stderr tail and required-file check already tested."
+      },
+      {
+        "summary": "Run pan sync through panCliInvocation for both global and runtime installs, and treat a sync failure after a good install as ready-with-warning",
+        "rationale": "A connect machine has no pan on PATH, so a bare 'pan sync' throws ENOENT, blocks the restart and repeats on every Update all. The files are already replaced at that point, so restarting is the safer outcome."
+      },
+      {
+        "summary": "Include pan update (src/cli/commands/update.ts) in scope",
+        "rationale": "It hardcodes the same npm install --global, and ~/.overdeck/runtime/node_modules/.bin/pan is the documented way to run commands on a connect machine; the fix is a call-site swap onto the shared helper."
+      }
+    ],
+    "items": [
+      {
+        "id": "runtime-detect",
+        "title": "Add isRuntimePackageRoot to connect-runtime.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T15:33:16Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4722",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/anywhere/connect-runtime.ts",
+            "src/lib/anywhere/__tests__/connect-runtime.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/anywhere/__tests__/connect-runtime.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "connect-runtime.test.ts passes including the new isRuntimePackageRoot describe block",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1 in .pan/drafts/PAN-4722.md: export isRuntimePackageRoot(root, overdeckHome) from src/lib/anywhere/connect-runtime.ts. It compares root with runtimePackageRoot(overdeckHome) after canonicalPath() (realpathSync, falling back to path.resolve when the path does not exist). Add the one-sentence PAN-4722 note to the module header and the two named tests (plain paths and a symlinked home built with mkdtemp)."
+        },
+        "items": [
+          {
+            "id": "runtime-detect.ac1",
+            "title": "Given root '/h/.overdeck/runtime/node_modules/@overdeck/core' and home '/h/.overdeck', isRuntimePackageRoot returns true, and it also returns true for the same root with a trailing slash or an 'x/..' segment",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "runtime-detect.ac2",
+            "title": "Given root '/usr/lib/node_modules/@overdeck/core' and home '/h/.overdeck', isRuntimePackageRoot returns false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "runtime-detect.ac3",
+            "title": "Given a temp home reached through a symlink to a real directory that contains runtime/node_modules/@overdeck/core, isRuntimePackageRoot returns true for the real package path with the symlinked home",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "install-target",
+        "title": "Add installOverdeckPackage and the runtimeHome option to UpdateManager",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T15:33:16Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4722",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/update-manager.ts",
+            "tests/unit/lib/update-manager.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/update-manager.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "update-manager.test.ts passes including the three WI-2 install tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "NFR-1",
+            "NFR-3"
+          ],
+          "foundationFor": [
+            "sync-via-cli",
+            "dashboard-wiring",
+            "cli-update"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2: in src/lib/update-manager.ts export the UpdateInstallDeps interface and installOverdeckPackage(version, runtimeHome, deps). With a runtimeHome it calls deps.ensureDurableRuntime(runtimeHome, version); without one it runs npm install --global @overdeck/core@<version>. Add constructor options runtimeHome and installDeps (Partial, merged over defaults), and replace only the npm line in install() with installOverdeckPackage. Leave the pan sync line to the sync-via-cli item. Add the three named tests using injected deps and the existing fetchImpl stub."
+        },
+        "items": [
+          {
+            "id": "install-target.ac1",
+            "title": "Given an UpdateManager built with runtimeHome '/h/.overdeck' and an available 1.2.4, when install() runs, ensureDurableRuntime receives ('/h/.overdeck', '1.2.4') once and no execFile call contains '--global'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "install-target.ac2",
+            "title": "Given an UpdateManager built without runtimeHome, when install() runs, execFile receives ('npm', ['install', '--global', '@overdeck/core@1.2.4']) and ensureDurableRuntime is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "install-target.ac3",
+            "title": "Given ensureDurableRuntime throws 'Could not install …', when install() settles, the snapshot phase returns 'error' and its error contains 'Could not install'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sync-via-cli",
+        "title": "Run pan sync through panCliInvocation and keep a sync failure non-fatal",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T15:33:16Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4722",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/update-manager.ts",
+            "tests/unit/lib/update-manager.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/update-manager.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "update-manager.test.ts passes including the two WI-3 sync tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3: in UpdateManager.install() replace execFileAsync('pan', ['sync']) with a private syncAfterInstall(version) that runs panCliInvocation(['sync']) through installDeps.execFile. On failure it logs with console.error and returns 'Installed <v>, but pan sync failed: <message>. Run pan sync on this machine.'. After a successful package install the snapshot moves to phase 'ready' with error set to that return value (null on success). Add the two named tests."
+        },
+        "items": [
+          {
+            "id": "sync-via-cli.ac1",
+            "title": "Given a successful install, when pan sync runs, execFile receives (process.execPath, [join(packageRoot, 'dist', 'cli', 'index.js'), 'sync']) and no call uses the file 'pan'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sync-via-cli.ac2",
+            "title": "Given the package install succeeds and the sync call rejects, when install() settles, the snapshot phase returns 'ready' and its error starts with 'Installed 1.2.4, but pan sync failed:'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sync-via-cli.ac3",
+            "title": "src/lib/update-manager.ts contains no execFileAsync('pan' call after the change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dashboard-wiring",
+        "title": "Pass the connect runtime home into the dashboard's UpdateManager",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T15:33:16Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4722",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/misc/updates.ts",
+            "src/dashboard/server/routes/__tests__/update-runtime-home.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/update-runtime-home.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "update-runtime-home.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-4: in src/dashboard/server/routes/misc/updates.ts add exported connectRuntimeHome(root = packageRoot, overdeckHome = getOverdeckHome()), which returns overdeckHome when isRuntimePackageRoot(root, overdeckHome) and null otherwise. Pass runtimeHome: connectRuntimeHome() in getUpdateManager(). Keep currentInstallMode() and the installMode expression unchanged, and extend its doc comment. Add the new two-case test file."
+        },
+        "items": [
+          {
+            "id": "dashboard-wiring.ac1",
+            "title": "Given root '/h/.overdeck/runtime/node_modules/@overdeck/core' and home '/h/.overdeck', connectRuntimeHome returns '/h/.overdeck'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-wiring.ac2",
+            "title": "Given root '/usr/lib/node_modules/@overdeck/core' and home '/h/.overdeck', connectRuntimeHome returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-wiring.ac3",
+            "title": "getUpdateManager() constructs UpdateManager with runtimeHome: connectRuntimeHome(), and the diff contains no change to currentInstallMode() or to packages/contracts/src/fleet-versions.ts and packages/contracts/src/update.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-update",
+        "title": "Route pan update through installOverdeckPackage with runtime-aware hints",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T15:33:16Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4722",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/update.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-5: in src/cli/commands/update.ts compute runtimeHome with isRuntimePackageRoot(packageRoot, getOverdeckHome()), then install with installOverdeckPackage(latestVersion, runtimeHome) instead of the hardcoded npm install --global. When runtimeHome is set, print the runtime 'pan restart --dashboard --now' command after success, and in the catch print the 'npm install --prefix <home>/runtime @overdeck/core@latest' hint instead of the sudo and migration hints. Drop imports that become unused."
+        },
+        "items": [
+          {
+            "id": "cli-update.ac1",
+            "title": "src/cli/commands/update.ts contains no '--global' literal and calls installOverdeckPackage(latestVersion, runtimeHome)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-update.ac2",
+            "title": "When runtimeHome is set and the install throws, the catch block prints 'npm install --prefix <home>/runtime @overdeck/core@latest' and prints no line containing 'sudo'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-update.ac3",
+            "title": "When runtimeHome is set and the install succeeds, the command prints '<home>/runtime/node_modules/.bin/pan restart --dashboard --now'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document that Update all and pan update update the pan connect runtime",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T15:33:16Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4722",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/machines.mdx",
+            "configuration/linked-machines.mdx",
+            "docs/ANYWHERE-ARCHITECTURE.md",
+            ".overdeck/context/codebase/architecture.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'overdeck/runtime' cli/machines.mdx configuration/linked-machines.mdx",
+            "grep -n 'isRuntimePackageRoot' docs/ANYWHERE-ARCHITECTURE.md .overdeck/context/codebase/architecture.md"
+          ],
+          "expected_outputs": [
+            "the update paragraph and Updating and removing section of cli/machines.mdx and step 3 of linked-machines.mdx mention ~/.overdeck/runtime",
+            "ANYWHERE-ARCHITECTURE.md and architecture.md mention isRuntimePackageRoot"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Make the six exact edits listed in PRD WI-6: the cli/machines.mdx update paragraph and its Updating and removing section, step 3 of Fleet versions and Update all in configuration/linked-machines.mdx, the Overdeck-last bullet and the pan connect section in docs/ANYWHERE-ARCHITECTURE.md, and the anywhere/ bullet in .overdeck/context/codebase/architecture.md. Keep its single last-verified line at the end with the work date."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "cli/machines.mdx '## update' states that Update all updates Overdeck on a machine set up with pan connect into its ~/.overdeck/runtime, and 'Updating and removing' names Update all and ~/.overdeck/runtime/node_modules/.bin/pan update before the npx connect fallback",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "configuration/linked-machines.mdx step 3 of 'Fleet versions and Update all' states that a pan connect machine updates into ~/.overdeck/runtime with npm install --prefix and no sudo",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "docs/ANYWHERE-ARCHITECTURE.md's 'Overdeck last' bullet names isRuntimePackageRoot, ensureDurableRuntime and the non-fatal pan sync, and .overdeck/context/codebase/architecture.md contains exactly one last-verified line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "install-target",
+        "to": "sync-via-cli",
+        "type": "blocks"
+      },
+      {
+        "from": "runtime-detect",
+        "to": "dashboard-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "install-target",
+        "to": "dashboard-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "runtime-detect",
+        "to": "cli-update",
+        "type": "blocks"
+      },
+      {
+        "from": "install-target",
+        "to": "cli-update",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "One bug fix touching 11 files: 6 source/test files in the update path (connect-runtime.ts, update-manager.ts, misc/updates.ts, cli update.ts and their tests) plus 4 doc files that describe it. The 8 'subsystems' are directory prefixes of one path (detect runtime, install there, restart). A sibling split would ship a detector nobody calls or docs ahead of the behavior.",
+      "canonicalFilename": "2026-11-02-PAN-4722-fleet-update-all-runs-npm-install-global-on-machines-set-up-with-pan-connect-runtime-install.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}

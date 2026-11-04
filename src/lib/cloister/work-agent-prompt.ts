@@ -2,6 +2,8 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'fs';
 import { join, dirname } from 'path';
 import { Effect } from 'effect';
 import { renderPrompt } from './prompts.js';
+import { isDeftPipelineIssue } from '../deft/issue-pipeline.js';
+import { buildDeftWorkAgentPrompt } from '../deft/kickoff.js';
 import { extractTeamPrefix, findProjectByPath, findProjectByTeam } from '../projects.js';
 import { resolveVerificationTestsMode } from './verification-tests-mode.js';
 import { getReadableWorkspacePanPaths, readWorkspaceContext, readFeedback, writeWorkspaceContext, resolvePlanningDraftPath } from '../pan-dir/index.js';
@@ -30,6 +32,8 @@ export async function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): Promise
   // `Cannot read properties of undefined (reading 'toUpperCase')`.
   const issueId = ctx.issueId ?? '';
   const issueIdLower = issueId.toLowerCase();
+  // PAN-4820: an issue on Deft's pipeline gets Deft's kickoff instead.
+  if (issueId && await isDeftPipelineIssue(issueId)) return buildDeftWorkAgentPrompt(ctx);
 
   let stitchDesignsStr = '';
   let featureContextStr = '';

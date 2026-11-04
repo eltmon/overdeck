@@ -16,6 +16,7 @@ const writePtyToken = vi.hoisted(() => vi.fn(async () => {}));
 const setOption = vi.hoisted(() => vi.fn(() => Effect.succeed(undefined)));
 const closeConversationPane = vi.hoisted(() => vi.fn(async () => {}));
 const claudeSystemPromptFiles = vi.hoisted(() => vi.fn(async (): Promise<string[]> => []));
+const initCodexHomeMock = vi.hoisted(() => vi.fn());
 
 vi.mock('../../harness-binary.js', () => ({
   prepareHarnessLaunch: vi.fn(async () => ({ binaryPath: '/usr/bin/claude', pathExport: "export PATH='/usr/bin':\"$PATH\"" })),
@@ -68,6 +69,18 @@ vi.mock('../conversation-liveness.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../conversation-liveness.js')>()),
   closeConversationPane,
 }));
+// PAN-4933: spy on the real initCodexHome (keeping its behavior) so Codex
+// launch cases can assert the mcpServers it was given.
+vi.mock('../../runtimes/codex.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../runtimes/codex.js')>();
+  return {
+    ...actual,
+    initCodexHome: (...args: Parameters<typeof actual.initCodexHome>) => {
+      initCodexHomeMock(...args);
+      return actual.initCodexHome(...args);
+    },
+  };
+});
 
 const { conversationUsesSupervisor, spawnConversationSession } = await import('../conversation-runtime.js');
 const { toPaneRole } = await import('../../terminal-backends/prompt-guard.js');
@@ -127,6 +140,7 @@ beforeEach(() => {
   writePtyToken.mockClear();
   setOption.mockClear();
   closeConversationPane.mockClear();
+  initCodexHomeMock.mockClear();
 });
 
 afterEach(() => {
@@ -280,5 +294,100 @@ describe('bare conversations launch without Overdeck context (PAN-4185)', () => 
       'export CLAUDE_CODE_DISABLE_CLAUDE_MDS=1',
       'export CLAUDE_CODE_DISABLE_AUTO_MEMORY=1',
     ]));
+  });
+});
+
+describe('conversations get the overdeck MCP server (PAN-4932)', () => {
+  const launch = (name: string, context: { bareContext?: boolean } = {}) =>
+    spawnConversationSession(name, overdeckHome, '11111111-1111-4111-8111-111111111111', undefined, 'high', undefined, false, 'claude-code', false, { backend: fakeBackend('herdr').backend, ...context });
+
+  afterEach(async () => {
+    const { _resetAccessTokensForTests, _settleAccessTokenWritesForTests } = await import('../../access-tokens.js');
+    await _settleAccessTokenWritesForTests();
+    _resetAccessTokensForTests();
+  });
+
+  async function tokenFor(agentId: string) {
+    const { listAccessTokens } = await import('../../access-tokens.js');
+    return (await listAccessTokens()).filter((record) => !record.revokedAt && record.agentId === agentId);
+  }
+
+  it('mints a conversation token and passes the config under the conversation state dir', async () => {
+    const { createConversation } = await import('../conversations.js');
+    createConversation({ name: 'op', tmuxSession: 'conv-op', cwd: overdeckHome, workspaceId: null });
+
+    await launch('conv-op');
+
+    expect(launcherConfigs[0]!['overdeckMcpConfig']).toBe(join(overdeckHome, 'conversations', 'conv-op', 'overdeck-mcp.json'));
+    expect(await tokenFor('op')).toEqual([expect.objectContaining({ agentKind: 'conversation', role: 'conversation' })]);
+  });
+
+  it('passes no config for a bare conversation', async () => {
+    const { createConversation } = await import('../conversations.js');
+    createConversation({ name: 'bare', tmuxSession: 'conv-bare', cwd: overdeckHome, workspaceId: null });
+
+    await launch('conv-bare', { bareContext: true });
+
+    expect(launcherConfigs[0]!['overdeckMcpConfig']).toBeUndefined();
+    expect(await tokenFor('bare')).toEqual([]);
+  });
+
+  it('passes no config for a conversation without a row', async () => {
+    await launch('conv-norow');
+    expect(launcherConfigs[0]!['overdeckMcpConfig']).toBeUndefined();
+    expect(await tokenFor('norow')).toEqual([]);
+  });
+
+  it('mints a worker token for a lane row', async () => {
+    const { createConversation } = await import('../conversations.js');
+    createConversation({ name: 'lane-root2', tmuxSession: 'conv-lane-root2', cwd: overdeckHome, workspaceId: null });
+    createConversation({
+      name: 'lane-c1',
+      tmuxSession: 'conv-lane-c1',
+      cwd: overdeckHome,
+      workspaceId: null,
+      parentName: 'lane-root2',
+      lane: { run: 'beta', key: 'c1', role: 'builder' },
+    });
+
+    await launch('conv-lane-c1');
+
+    expect(launcherConfigs[0]!['overdeckMcpConfig']).toBe(join(overdeckHome, 'conversations', 'conv-lane-c1', 'overdeck-mcp.json'));
+    expect(await tokenFor('lane-c1')).toEqual([expect.objectContaining({ agentKind: 'conversation', role: 'worker' })]);
+    expect((await tokenFor('lane-c1'))[0]!.scopes).not.toContain('approve');
+  });
+
+  it('gives a Codex conversation the overdeck MCP server under its own [mcp_servers.overdeck] table (PAN-4933)', async () => {
+    const { createConversation } = await import('../conversations.js');
+    createConversation({ name: 'cx', tmuxSession: 'conv-cx', cwd: overdeckHome, workspaceId: null });
+
+    await spawnConversationSession(
+      'conv-cx', overdeckHome, '11111111-1111-4111-8111-111111111111', 'gpt-5.5', 'high',
+      undefined, false, 'codex', false, { backend: fakeBackend('herdr').backend },
+    );
+
+    expect(initCodexHomeMock).toHaveBeenCalledTimes(1);
+    const opts = initCodexHomeMock.mock.calls[0]![1] as {
+      mcpServers?: Record<string, { env: Record<string, string>; defaultToolsApprovalMode?: string }>;
+    };
+    expect(opts.mcpServers?.overdeck?.env.OVERDECK_MCP_TOKEN_FILE).toBe(join(overdeckHome, 'conversations', 'conv-cx', 'mcp-token'));
+    expect(opts.mcpServers?.overdeck?.defaultToolsApprovalMode).toBe('approve');
+    expect(await tokenFor('cx')).toEqual([expect.objectContaining({ agentKind: 'conversation', role: 'conversation' })]);
+
+    const config = readFileSync(join(overdeckHome, 'agents', 'conv-cx', 'codex-home-v2', 'config.toml'), 'utf8');
+    expect(config).toContain('[mcp_servers.overdeck]');
+    expect(config).not.toContain('odk_');
+  });
+
+  it('passes mcpServers undefined and mints no token for a bare Codex conversation (PAN-4933)', async () => {
+    await spawnConversationSession(
+      'conv-codex-bare', overdeckHome, '11111111-1111-4111-8111-111111111111', 'gpt-5.5', 'high',
+      undefined, false, 'codex', false, { backend: fakeBackend('herdr').backend, bareContext: true },
+    );
+
+    expect(initCodexHomeMock).toHaveBeenCalledTimes(1);
+    const opts = initCodexHomeMock.mock.calls[0]![1] as { mcpServers?: unknown };
+    expect(opts.mcpServers).toBeUndefined();
+    expect(await tokenFor('conv-codex-bare')).toEqual([]);
   });
 });

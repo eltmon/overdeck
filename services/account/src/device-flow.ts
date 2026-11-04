@@ -62,7 +62,8 @@ export const issueCode: Handler = async (req, rc) => {
   const form = await readForm(req);
   const platform = form?.get('platform') ?? '';
   const environmentId = form?.get('environment_id') ?? '';
-  if (!form || !isValidPlatform(platform) || !isValidEnvironmentId(environmentId)) return json({ error: 'invalid_request' }, 400);
+  // A web device signs in only through the share Worker's PKCE redirect (PAN-4481 FR-2), never the device flow.
+  if (!form || !isValidPlatform(platform) || platform === 'web' || !isValidEnvironmentId(environmentId)) return json({ error: 'invalid_request' }, 400);
 
   const deviceCode = `oddc_${randomHex(32)}`;
   const deviceCodeHash = await sha256Hex(deviceCode);

@@ -1,11 +1,13 @@
 import { Effect } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
+import { rmSync } from 'node:fs';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { INTERNAL_TOKEN_HEADER } from '../../../../../src/lib/internal-token.js';
+import { getOverdeckHome } from '../../../../../src/lib/paths.js';
 
 const routeMocks = vi.hoisted(() => ({
   getAgentState: vi.fn(),
@@ -80,6 +82,9 @@ beforeEach(async () => {
   workspace = join(projectPath, 'workspaces', 'feature-pan-3451');
   await mkdir(workspace, { recursive: true });
   process.env.OVERDECK_INTERNAL_TOKEN = 'test-token';
+  // The token file wins over env (PAN-4628); delete any file a sibling
+  // test in this worker's shared OVERDECK_HOME left behind.
+  rmSync(join(getOverdeckHome(), 'internal-token'), { force: true });
   routeMocks.getAgentState.mockReset();
   routeMocks.getAgentState.mockReturnValue({
     id: 'agent-pan-3451',

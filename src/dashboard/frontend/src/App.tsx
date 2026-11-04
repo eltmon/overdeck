@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { lazy, Suspense, useState, useCallback, useEffect, useRef } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { Toaster, toast } from 'sonner';
 import { capture } from './lib/telemetry';
@@ -6,10 +6,13 @@ import { fetchWithTimeout } from './lib/apiFetch';
 import { dashboardMutationJsonHeaders } from './lib/wsTransport';
 import { EmergencyStopOverlay } from './components/EmergencyStopOverlay';
 import { EventRouter } from './components/EventRouter';
+import { sharedRouteCode } from './components/chat/sharing/joinApi';
+import { SharedConversationRoute } from './components/chat/sharing/SharedConversationView';
 import { SearchModal } from './components/search/SearchModal';
 import { CommandPalette, type ConversationPaletteOpenRequest } from './components/CommandPalette';
 import { NO_PROJECT_KEY } from './components/CommandDeck/projectsData';
 import { IssueDrawer } from './components/drawer/IssueDrawer';
+import { IssueDrawerAvailableContext } from './components/drawer/issueDrawerAvailableContext';
 import { ConversationDock } from './components/dock/ConversationDock';
 import { ResumableSessionDialog } from './components/ResumableSessionDialog';
 import { SessionFeedSidebar } from './components/sessionFeed/SessionFeedSidebar';
@@ -82,6 +85,10 @@ export {
 } from './App/routes';
 export type { ConversationViewModeMap } from './App/routes';
 
+// PAN-2355 (D-4) — the phone shell loads in its own chunk; the desktop bundle
+// carries only this lazy import.
+const MobileApp = lazy(() => import('./components/mobile/MobileApp'));
+
 export const SESSION_FEED_SIDEBAR_OPEN_STORAGE_KEY = 'overdeck.ui.sessionFeedSidebarOpen';
 
 function readSessionFeedSidebarOpen(): boolean {
@@ -107,7 +114,13 @@ function PrdViewerHost() {
 export default function App() {
   useEffect(() => {
     normalizeCurrentRoute();
+    // PAN-4475: the shared-conversation route is chosen on load; a same-tab hash change into it reloads.
+    const onHash = () => { if (sharedRouteCode(window.location.hash)) window.location.reload(); };
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
   }, []);
+  const sharedCode = sharedRouteCode(window.location.hash);
+  if (sharedCode) return <SharedConversationRoute code={sharedCode} />;
   const terminalPath = window.location.pathname;
   const terminalSession = new URLSearchParams(window.location.search).get('terminal');
   if (terminalPath.startsWith('/terminal/') || terminalSession) {
@@ -130,6 +143,10 @@ export default function App() {
 
   if (terminalPath === '/popout/diff') {
     return <StandaloneDiffPopoutRoute />;
+  }
+
+  if (terminalPath === '/m' || terminalPath === '/m/' || terminalPath === '/m/pipeline' || terminalPath === '/m/pipeline/') {
+    return <Suspense fallback={null}><MobileApp /></Suspense>;
   }
 
   const [activeTab, setActiveTabState] = useState<Tab>(() => getConversationRouteState().tab);
@@ -790,6 +807,7 @@ export default function App() {
   }, [openIssue, setActiveTab]);
 
   return (
+    <IssueDrawerAvailableContext.Provider value>
     <div className="h-screen flex flex-row overflow-hidden bg-background">
       {/* Event-sourced state: connects WsTransport → DashboardStore (PAN-428 B4) */}
       <EventRouter />
@@ -923,5 +941,6 @@ export default function App() {
       {/* Toast Notifications */}
       <Toaster />
     </div>
+    </IssueDrawerAvailableContext.Provider>
   );
 }

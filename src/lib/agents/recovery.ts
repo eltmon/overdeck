@@ -9,6 +9,7 @@ import { getLatestSessionId } from './activity.js';
 import { sendGracefulRestartWarning } from '../graceful-restart.js';
 import { checkHook, generateFixedPointPrompt } from '../hooks.js';
 import { generateLauncherScript } from '../launcher-generator.js';
+import { prepareClaudeOverdeckMcp, prepareCodexOverdeckMcp } from '../mcp/agent-injection.js';
 import { resolveHarness } from '../harness-resolve.js';
 import { prepareHarnessLaunch } from '../harness-binary.js';
 import { normalizeModelOverride, requireModelOverride } from '../model-validation.js';
@@ -814,7 +815,7 @@ export async function recoverAgent(
   }
 
   const recoveryCodexFields = recoveryHarness === 'codex'
-    ? getCodexLauncherFields(normalizedId, state.model, state.workspace, recoveryRole, relaunchEffort.effort)
+    ? getCodexLauncherFields(normalizedId, state.model, state.workspace, recoveryRole, relaunchEffort.effort, await prepareCodexOverdeckMcp({ agentId: normalizedId, agentKind: 'agent', role: recoveryRole, harness: recoveryHarness }))
     : {};
   const recoveryLauncherContent = generateLauncherScript({
     role: recoveryRole,
@@ -830,6 +831,7 @@ export async function recoverAgent(
     useSupervisor: recoverySupervisorLaunch.useSupervisor,
     supervisorScriptPath: recoverySupervisorLaunch.supervisorScriptPath,
     ...recoveryCodexFields,
+    ...(await prepareClaudeOverdeckMcp({ agentId: normalizedId, agentKind: 'agent', role: recoveryRole, harness: recoveryHarness })),
   });
   const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
   await writeLauncherScriptAtomic(launcherScript, recoveryLauncherContent);

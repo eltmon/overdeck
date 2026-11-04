@@ -28,6 +28,7 @@ import {
   startRestartGateSweep,
   toRestartGateSnapshot,
   upsertRestartRequest,
+  withdrawRestartRequest,
   type RestartGate,
   type RestartGateState,
 } from '../restart-gate.js';
@@ -234,6 +235,48 @@ describe('restart gate state machine', () => {
     // The restart happens next; the in-memory gate dies with the process and
     // every member re-registers against the fresh server (PAN-3917 D2).
     expect(deriveRestartGateStatus(direct, T0)).toBe('claimed');
+  });
+
+  it('withdraws a pending request and drops it from the snapshot', () => {
+    let state = upsertRestartRequest(emptyRestartGateState(), deployRequest('reload:1', 'old reload'), T0).state;
+    state = upsertRestartRequest(state, deployRequest('deploy:2', 'deploy'), T0).state;
+
+    const withdrawn = withdrawRestartRequest(state, 'reload:1', T0 + 1_000);
+
+    expect(withdrawn.result).toEqual({ withdrawn: true, status: 'pending' });
+    expect(toRestartGateSnapshot(withdrawn.state, T0 + 1_000).pending.map((request) => request.requesterId)).toEqual(['deploy:2']);
+  });
+
+  it('keeps a request that is already in the approved epoch', () => {
+    let state = upsertRestartRequest(emptyRestartGateState(), deployRequest('reload:1', 'old reload'), T0).state;
+    state = approveRestartGate(state, T0).state;
+
+    const kept = withdrawRestartRequest(state, 'reload:1', T0 + 1_000);
+
+    expect(kept.result).toEqual({ withdrawn: false, status: 'approved' });
+    expect(kept.state.pending.map((request) => request.requesterId)).toEqual(['reload:1']);
+    expect(kept.state.epoch?.requesterIds).toEqual(['reload:1']);
+  });
+
+  it('keeps a satisfied request', () => {
+    const state: RestartGateState = {
+      ...emptyRestartGateState(),
+      satisfied: [{ requesterId: 'reload:1', satisfiedAt: new Date(T0).toISOString() }],
+    };
+
+    const kept = withdrawRestartRequest(state, 'reload:1', T0 + 1_000);
+
+    expect(kept.result).toEqual({ withdrawn: false, status: 'satisfied' });
+    expect(kept.state.satisfied.map((entry) => entry.requesterId)).toEqual(['reload:1']);
+  });
+
+  it('withdrawing an unknown request answers withdrawn and changes nothing else', () => {
+    const state = upsertRestartRequest(emptyRestartGateState(), deployRequest('deploy:2', 'deploy'), T0).state;
+
+    const withdrawn = withdrawRestartRequest(state, 'reload:404', T0 + 1_000);
+
+    expect(withdrawn.result).toEqual({ withdrawn: true, status: 'pending' });
+    expect(withdrawn.state).toEqual(pruneRestartGateState(state, T0 + 1_000));
   });
 });
 

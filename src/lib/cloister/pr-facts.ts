@@ -36,6 +36,7 @@ import {
   type ReadAuthorKinds,
   type TrustedAuthors,
 } from './forge-identity.js';
+import { listFailedChecks, listFailedTestChecks, type FailedCheck } from './check-failures.js';
 import type { GitLabMrApprovals, GitLabMrView } from './gitlab-mr-types.js';
 import { readReviewDatabaseIds, verdictOutranks } from './review-order.js';
 import { parseUatVerdict } from './uat-verdict-marker.js';
@@ -95,6 +96,8 @@ export interface PrFacts {
    * failure. Absent when the forge reports no per-check detail (GitLab).
    */
   testCheckFailures?: readonly FailedCheck[];
+  /** PAN-4917: every failing check on the head, with its conclusion. GitHub only. */
+  checkFailures?: readonly FailedCheck[];
   /**
    * #4021: at least one CI test-job check on the head concluded `SUCCESS`.
    * `testChecks` alone reads a skipped-only test job as green; in
@@ -111,6 +114,7 @@ export interface PrFacts {
   error?: string;
 }
 
+export { listFailedChecks, listFailedTestChecks, type FailedCheck } from './check-failures.js';
 export { formatUatMarker, parseUatVerdict } from './uat-verdict-marker.js';
 export {
   approvalProvenAtHead,
@@ -127,14 +131,6 @@ export interface UatVerdict {
   sha: string | null;
   /** When the verdict comment was posted. */
   postedAt: string | null;
-}
-
-/** A failing check as the forge reported it (conclusion or status state, upper-cased). */
-export interface FailedCheck {
-  name: string;
-  conclusion: string;
-  /** A commit status's link (Dagger Cloud check page), when the check is a status. */
-  targetUrl?: string;
 }
 
 export interface PrFactsDeps {
@@ -259,30 +255,6 @@ function summarizeStatusCheckRollup(
   if (failed) return 'red';
   if (pending) return 'pending';
   return 'green';
-}
-
-/** PAN-3965 (review of #3993): the CI test job's failing checks, each with its conclusion. */
-export function listFailedTestChecks(
-  rollup: IssuePullRequestData['statusCheckRollup'] | null | undefined,
-): FailedCheck[] {
-  const failed: FailedCheck[] = [];
-  for (const check of rollup ?? []) {
-    if (!isCiTestRollupCheck(check)) continue;
-    const failure = (verdict: string): FailedCheck => ({
-      name: check.name ?? check.context ?? '',
-      conclusion: verdict,
-      ...(check.targetUrl ? { targetUrl: check.targetUrl } : {}),
-    });
-    const status = normalize(check.status);
-    const conclusion = normalize(check.conclusion);
-    const state = normalize(check.state);
-    if (status === 'COMPLETED' && conclusion && !['SUCCESS', 'NEUTRAL', 'SKIPPED'].includes(conclusion)) {
-      failed.push(failure(conclusion));
-    } else if (state === 'FAILURE' || state === 'ERROR') {
-      failed.push(failure(state));
-    }
-  }
-  return failed;
 }
 
 /** PAN-3965: the verdict over only the CI test job's checks. */
@@ -466,6 +438,7 @@ function gitHubFacts(
     mergeableState: pr.mergeable ? pr.mergeable.toLowerCase() : null,
     checks: summarizeStatusCheckRollup(pr.statusCheckRollup),
     testChecks: summarizeTestChecks(pr.statusCheckRollup),
+    checkFailures: listFailedChecks(pr.statusCheckRollup),
     testCheckFailures: listFailedTestChecks(pr.statusCheckRollup),
     testJobSucceeded: testJobSucceeded(pr.statusCheckRollup),
     uatVerdict: uatVerdictAtHead(pr, trusted),
@@ -914,6 +887,8 @@ export interface MergeReadinessPolicy {
    * never counts. A GitLab approval is the forge's own and is taken as it is.
    */
   requireApprovalAtHead?: boolean;
+  /** PAN-4750: `false` waives approval entirely (operator-started strike merge only). */
+  requireApproval?: boolean;
 }
 
 /**
@@ -929,7 +904,9 @@ export function evaluateMergeReadiness(facts: PrFacts, policy: MergeReadinessPol
   if (facts.closed) return { ready: false, reason: 'PR is closed' };
   if (facts.draft) return { ready: false, reason: 'PR is a draft' };
   if (facts.changesRequested) return { ready: false, reason: 'latest review requested changes' };
-  if (policy.requireApprovalAtHead && facts.forge === 'github') {
+  if (policy.requireApproval === false) {
+    // PAN-4750: no approval rule applies; every other check below still does.
+  } else if (policy.requireApprovalAtHead && facts.forge === 'github') {
     // PAN-4540: the reviews are read only for a green, mergeable PR
     // (withForgeApprovalAtHead), so an unproven approval on any other PR is a
     // missing read, not a missing review. Let the checks and mergeability

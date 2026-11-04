@@ -83,6 +83,7 @@ export interface TickMarkerMessage {
   role: string;
   text: string;
   createdAt: string;
+  id?: string;
 }
 
 /**
@@ -91,12 +92,14 @@ export interface TickMarkerMessage {
  * `flywheel-tick:` template, and the skill's own example lands in a user
  * turn when the slash command expands.
  */
-export function findLastTick(messages: readonly TickMarkerMessage[]): (TickMarker & { at: string }) | null {
+export function findLastTick(
+  messages: readonly TickMarkerMessage[],
+): (TickMarker & { at: string; messageId?: string }) | null {
   for (let i = messages.length - 1; i >= 0; i -= 1) {
     const message = messages[i];
     if (!message || message.role !== 'assistant' || !message.text.includes(TICK_MARKER_PREFIX)) continue;
     const parsed = parseTickMarker(message.text);
-    if (parsed) return { ...parsed, at: message.createdAt };
+    if (parsed) return { ...parsed, at: message.createdAt, ...(message.id ? { messageId: message.id } : {}) };
   }
   return null;
 }

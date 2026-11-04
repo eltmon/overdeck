@@ -36,6 +36,20 @@ const mocks = vi.hoisted(() => ({
   getProjectSync: vi.fn(),
   ensureDevcontainer: vi.fn(),
   getPrFacts: vi.fn(),
+  reserveDiskFloor: vi.fn(),
+  release: vi.fn(),
+  estimateWorkspaceDiskCost: vi.fn(),
+}));
+
+// PAN-4961: admission reads real statfs and the estimator runs git/docker.
+vi.mock('../../../../src/lib/disk-floor.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../src/lib/disk-floor.js')>()),
+  reserveDiskFloor: mocks.reserveDiskFloor,
+}));
+
+vi.mock('../../../../src/lib/workspace/disk-cost.js', () => ({
+  estimateWorkspaceDiskCost: mocks.estimateWorkspaceDiskCost,
+  invalidateWorkspaceDiskCostMemo: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/cloister/issue-closed.js', () => ({
@@ -63,6 +77,7 @@ vi.mock('../../../../src/lib/cloister/pr-facts.js', () => ({
   getPrFacts: mocks.getPrFacts,
 }));
 
+import { DISK_LOW_HELD_PREFIX } from '../../../../src/lib/disk-floor.js';
 import { rebuildWorkspaceStack } from '../../../../src/lib/workspace/rebuild-stack.js';
 
 let tmpRoot: string | null = null;
@@ -99,6 +114,9 @@ beforeEach(() => {
   responses = {};
   mocks.getPrFacts.mockResolvedValue({ merged: false });
   mocks.isIssueClosed.mockResolvedValue(false);
+  mocks.release.mockResolvedValue(undefined);
+  mocks.reserveDiskFloor.mockResolvedValue({ ok: true, reservation: { release: mocks.release } });
+  mocks.estimateWorkspaceDiskCost.mockResolvedValue({ hostBytes: 1, stackBytes: 2_000, hostSource: 'measured', stackSource: 'measured' });
 });
 
 afterEach(() => {
@@ -229,5 +247,71 @@ describe('rebuildWorkspaceStack — resolve name after render (PAN-3049)', () =>
     expect(result.success).toBe(false);
     expect(result.error).toContain('Cannot resolve compose project name for workspace');
     expect(composeCalls('up')).toHaveLength(0);
+  });
+});
+
+describe('rebuildWorkspaceStack — disk admission (PAN-4961)', () => {
+  const HELD = `${DISK_LOW_HELD_PREFIX}: 11.0 GiB free on the filesystem holding /x, 0.0 GiB reserved by 0 in-flight workspace setup(s), this step needs 2.0 GiB, and the safety floor is 10.0 GiB. Free disk space (see /resources) and retry.`;
+
+  function prepareRenderedWorkspace(): string {
+    const workspacePath = makeWorkspace();
+    setupProject(workspacePath);
+    const compose = 'name: myn-feature-min-901\nservices:\n  api:\n    image: test\n';
+    writeComposeFile(workspacePath, compose);
+    mocks.ensureDevcontainer.mockImplementation(() => {
+      writeComposeFile(workspacePath, compose);
+      return { step: { success: true } };
+    });
+    return workspacePath;
+  }
+
+  it('stack-admission.ac1: a refused admission returns diskLow and never runs up', async () => {
+    prepareRenderedWorkspace();
+    mocks.reserveDiskFloor.mockResolvedValue({ ok: false, error: HELD });
+
+    const result = await Effect.runPromise(rebuildWorkspaceStack('MIN-901'));
+
+    expect(result.success).toBe(false);
+    expect(result.diskLow).toBe(true);
+    expect(result.error?.startsWith('Disk low — new workspace starts are held')).toBe(true);
+    expect(composeCalls('up')).toHaveLength(0);
+  });
+
+  it('stack-admission.ac2: releases once after a successful up', async () => {
+    prepareRenderedWorkspace();
+
+    const result = await Effect.runPromise(rebuildWorkspaceStack('MIN-901'));
+
+    expect(result.success).toBe(true);
+    expect(composeCalls('up')).toHaveLength(1);
+    expect(mocks.release).toHaveBeenCalledTimes(1);
+  });
+
+  it('stack-admission.ac3: releases once after a failing up', async () => {
+    const workspacePath = prepareRenderedWorkspace();
+    const composeFile = join(workspacePath, '.devcontainer', 'docker-compose.devcontainer.yml');
+    responses[`compose -f ${composeFile} -p myn-feature-min-901 up`] = new Error('compose up exploded');
+
+    const result = await Effect.runPromise(rebuildWorkspaceStack('MIN-901'));
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('compose up exploded');
+    expect(result.diskLow).toBeUndefined();
+    expect(mocks.release).toHaveBeenCalledTimes(1);
+  });
+
+  it('stack-admission.ac4: reserves the stack bytes after the down -v teardown', async () => {
+    const workspacePath = prepareRenderedWorkspace();
+    let downCallsAtReserve = -1;
+    mocks.reserveDiskFloor.mockImplementation(async () => {
+      downCallsAtReserve = composeCalls('down').length;
+      return { ok: true, reservation: { release: mocks.release } };
+    });
+
+    await Effect.runPromise(rebuildWorkspaceStack('MIN-901'));
+
+    expect(composeCalls('down')).toHaveLength(1);
+    expect(downCallsAtReserve).toBe(1);
+    expect(mocks.reserveDiskFloor).toHaveBeenCalledWith({ path: workspacePath, bytes: 2_000, label: 'stack:min-901' });
   });
 });

@@ -19,6 +19,8 @@ const mocks = vi.hoisted(() => ({
   isDeaconGloballyPaused: vi.fn(() => false),
   recoverUndispatchedReviews: vi.fn(async () => [] as string[]),
   recoverSilentReviewers: vi.fn(async () => [] as string[]),
+  retryDeferredHandoffs: vi.fn(async () => [] as string[]),
+  reapFinishedRemoteAgents: vi.fn(async () => [] as string[]),
 }));
 
 vi.mock('../../../../src/lib/overdeck/control-settings.js', () => ({
@@ -82,6 +84,15 @@ vi.mock('../../../../src/lib/cloister/undispatched-review-recovery.js', () => ({
 
 vi.mock('../../../../src/lib/cloister/silent-reviewer-recovery.js', () => ({
   recoverSilentReviewers: mocks.recoverSilentReviewers,
+}));
+
+vi.mock('../../../../src/lib/cloister/deferred-handoff.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../src/lib/cloister/deferred-handoff.js')>()),
+  retryDeferredHandoffs: mocks.retryDeferredHandoffs,
+}));
+
+vi.mock('../../../../src/lib/cloister/remote-reap-routine.js', () => ({
+  reapFinishedRemoteAgents: mocks.reapFinishedRemoteAgents,
 }));
 
 const {
@@ -515,6 +526,19 @@ describe('deacon-lite', () => {
       expect(mocks.listAgentStates).not.toHaveBeenCalled();
       expect(mocks.liveAgentInventory).not.toHaveBeenCalled();
       expect(mocks.reconcileClosedIssueAgents).not.toHaveBeenCalled();
+      expect(mocks.reapFinishedRemoteAgents).not.toHaveBeenCalled();
+    });
+
+    it('runs the remote reap once, last, after retryDeferredHandoffs (PAN-4295)', async () => {
+      mocks.listAgentStates.mockReturnValue([]);
+      mocks.liveAgentInventory.mockResolvedValue(inventory([]));
+
+      await runDeaconLite();
+
+      expect(mocks.reapFinishedRemoteAgents).toHaveBeenCalledTimes(1);
+      expect(mocks.retryDeferredHandoffs).toHaveBeenCalledTimes(1);
+      expect(mocks.retryDeferredHandoffs.mock.invocationCallOrder[0])
+        .toBeLessThan(mocks.reapFinishedRemoteAgents.mock.invocationCallOrder[0]!);
     });
   });
 

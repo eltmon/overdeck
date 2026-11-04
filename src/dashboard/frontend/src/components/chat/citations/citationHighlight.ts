@@ -104,3 +104,29 @@ export function useCitationHighlight(
 
   return relevant.length > 0;
 }
+
+/** PAN-4658: paints pending file-citation quotes inside an editor Preview. */
+export function useFileCitationHighlight(
+  ref: RefObject<HTMLElement | null>,
+  conversationName: string,
+  path: string,
+  text: string,
+): void {
+  const citations = useConversationCitations(conversationName);
+  const relevant = useMemo(
+    () => citations.filter((citation) => citation.source.kind === 'file' && citation.source.path === path),
+    [citations, path],
+  );
+
+  useLayoutEffect(() => {
+    const root = ref.current;
+    const key = `${conversationName}:file:${path}`;
+    if (!root) return undefined;
+    const ranges = relevant
+      .map((citation) => findQuoteRange(root, citation.quotedText))
+      .filter((range): range is Range => range !== null);
+    setRowCitationRanges(key, ranges);
+    return () => clearRowCitationRanges(key);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [relevant, text, conversationName, path]);
+}

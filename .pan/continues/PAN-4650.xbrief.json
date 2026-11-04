@@ -1,0 +1,568 @@
+{
+  "version": "1",
+  "issueId": "PAN-4650",
+  "created": "2026-11-01T13:36:45.001Z",
+  "updated": "2026-11-01T17:41:05.553Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-01T15:41:55.380Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-01T17:36Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-01T17:36:22.910Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-01T17:41Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-11-01T17:41:05.553Z"
+    }
+  ],
+  "items": {
+    "wi1-linked-cache": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4650",
+      "claimedAt": "2026-11-01T13:36:45.001Z",
+      "doneAt": "2026-11-01T13:37:53.714Z"
+    },
+    "wi2-share-endpoint": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4650",
+      "claimedAt": "2026-11-01T13:45:55.151Z",
+      "doneAt": "2026-11-01T13:46:15.172Z"
+    },
+    "wi3-viewer-sync": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4650",
+      "claimedAt": "2026-11-01T13:49:58.577Z",
+      "doneAt": "2026-11-01T13:53:14.922Z"
+    },
+    "wi4-merged-list": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4650",
+      "claimedAt": "2026-11-01T13:53:26.761Z",
+      "doneAt": "2026-11-01T14:00:05.249Z"
+    },
+    "wi5-released-guard": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4650",
+      "claimedAt": "2026-11-01T14:00:10.790Z",
+      "doneAt": "2026-11-01T14:03:59.210Z"
+    },
+    "wi6-http-proxy-fence": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4650",
+      "claimedAt": "2026-11-01T14:04:05.265Z",
+      "doneAt": "2026-11-01T14:15:31.162Z"
+    },
+    "wi7-ws-pipes": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4650",
+      "claimedAt": "2026-11-01T14:15:38.504Z",
+      "doneAt": "2026-11-01T14:18:51.420Z"
+    },
+    "wi8-remote-frontend": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4650",
+      "claimedAt": "2026-11-01T14:19:00.666Z",
+      "doneAt": "2026-11-01T14:25:57.382Z"
+    },
+    "wi9-owner-release": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4650",
+      "claimedAt": "2026-11-01T14:26:05.861Z",
+      "doneAt": "2026-11-01T14:34:49.404Z"
+    },
+    "wi10-viewer-pull": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4650",
+      "claimedAt": "2026-11-01T14:34:55.757Z",
+      "doneAt": "2026-11-01T14:44:37.493Z"
+    },
+    "wi11-cli-pull": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4650",
+      "claimedAt": "2026-11-01T14:44:45.217Z",
+      "doneAt": "2026-11-01T14:51:39.576Z"
+    },
+    "wi12-title-bar-states": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4650",
+      "claimedAt": "2026-11-01T14:51:47.865Z",
+      "doneAt": "2026-11-01T14:57:50.805Z"
+    },
+    "wi13-rows-hide-machine": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4650",
+      "claimedAt": "2026-11-01T14:57:59.329Z",
+      "doneAt": "2026-11-01T15:07:48.912Z"
+    },
+    "wi14-pull-ui": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4650",
+      "claimedAt": "2026-11-01T15:07:57.097Z",
+      "doneAt": "2026-11-01T15:12:13.839Z"
+    },
+    "wi15-share-toggle": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4650",
+      "claimedAt": "2026-11-01T15:12:21.560Z",
+      "doneAt": "2026-11-01T15:16:24.786Z"
+    },
+    "wi16-tell-remote": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4650",
+      "claimedAt": "2026-11-01T15:16:32.977Z",
+      "doneAt": "2026-11-01T15:21:29.308Z"
+    },
+    "wi17-forward-owner": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4650",
+      "claimedAt": "2026-11-01T15:21:36.980Z",
+      "doneAt": "2026-11-01T15:45:19.134Z"
+    },
+    "wi18-forward-viewer": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4650",
+      "claimedAt": "2026-11-01T15:45:34.276Z",
+      "doneAt": "2026-11-01T15:50:00.240Z"
+    },
+    "wi19-preview-ui": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4650",
+      "claimedAt": "2026-11-01T15:50:09.594Z",
+      "doneAt": "2026-11-01T15:53:10.595Z"
+    },
+    "wi20-remote-editor": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4650",
+      "claimedAt": "2026-11-01T15:53:16.656Z",
+      "doneAt": "2026-11-01T15:56:45.216Z"
+    },
+    "wi21-title-bar-e2e": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4650",
+      "claimedAt": "2026-11-01T15:56:51.541Z",
+      "doneAt": "2026-11-01T16:09:05.599Z"
+    },
+    "wi22-two-machine-smoke": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4650",
+      "claimedAt": "2026-11-01T16:09:11.554Z",
+      "doneAt": "2026-11-01T16:30:48.879Z"
+    },
+    "wi23-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4650",
+      "claimedAt": "2026-11-01T16:30:50.165Z",
+      "doneAt": "2026-11-01T16:31:15.357Z"
+    },
+    "wi1-linked-cache.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:45:05.142Z"
+    },
+    "wi1-linked-cache.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:45:19.132Z"
+    },
+    "wi1-linked-cache.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:45:33.718Z"
+    },
+    "wi1-linked-cache.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:45:48.351Z"
+    },
+    "wi2-share-endpoint.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:46:03.560Z"
+    },
+    "wi2-share-endpoint.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:46:19.973Z"
+    },
+    "wi2-share-endpoint.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:46:35.042Z"
+    },
+    "wi2-share-endpoint.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:46:47.543Z"
+    },
+    "wi2-share-endpoint.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:47:00.278Z"
+    },
+    "wi3-viewer-sync.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:47:12.786Z"
+    },
+    "wi3-viewer-sync.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:47:25.671Z"
+    },
+    "wi3-viewer-sync.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:47:39.293Z"
+    },
+    "wi3-viewer-sync.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:47:57.006Z"
+    },
+    "wi3-viewer-sync.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:48:12.841Z"
+    },
+    "wi4-merged-list.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:48:29.994Z"
+    },
+    "wi4-merged-list.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:48:45.751Z"
+    },
+    "wi4-merged-list.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:49:00.193Z"
+    },
+    "wi4-merged-list.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:49:14.193Z"
+    },
+    "wi4-merged-list.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:49:29.992Z"
+    },
+    "wi5-released-guard.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:49:43.942Z"
+    },
+    "wi5-released-guard.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:49:56.200Z"
+    },
+    "wi5-released-guard.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:50:09.303Z"
+    },
+    "wi5-released-guard.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:50:23.459Z"
+    },
+    "wi6-http-proxy-fence.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:50:40.710Z"
+    },
+    "wi6-http-proxy-fence.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:50:57.168Z"
+    },
+    "wi6-http-proxy-fence.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:51:12.088Z"
+    },
+    "wi6-http-proxy-fence.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:51:24.974Z"
+    },
+    "wi6-http-proxy-fence.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:51:37.933Z"
+    },
+    "wi7-ws-pipes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:51:50.534Z"
+    },
+    "wi7-ws-pipes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:52:03.416Z"
+    },
+    "wi7-ws-pipes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:52:16.609Z"
+    },
+    "wi7-ws-pipes.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:52:30.197Z"
+    },
+    "wi8-remote-frontend.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:52:44.653Z"
+    },
+    "wi8-remote-frontend.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:52:58.450Z"
+    },
+    "wi8-remote-frontend.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:53:10.857Z"
+    },
+    "wi8-remote-frontend.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:53:23.541Z"
+    },
+    "wi9-owner-release.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:53:36.283Z"
+    },
+    "wi9-owner-release.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:53:48.642Z"
+    },
+    "wi9-owner-release.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:54:01.004Z"
+    },
+    "wi9-owner-release.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:54:13.838Z"
+    },
+    "wi9-owner-release.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:54:26.761Z"
+    },
+    "wi10-viewer-pull.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:54:39.216Z"
+    },
+    "wi10-viewer-pull.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:54:51.768Z"
+    },
+    "wi10-viewer-pull.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:55:05.575Z"
+    },
+    "wi10-viewer-pull.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:55:20.574Z"
+    },
+    "wi11-cli-pull.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:55:35.955Z"
+    },
+    "wi11-cli-pull.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:55:50.522Z"
+    },
+    "wi11-cli-pull.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:56:05.917Z"
+    },
+    "wi11-cli-pull.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:56:20.141Z"
+    },
+    "wi12-title-bar-states.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:56:32.485Z"
+    },
+    "wi12-title-bar-states.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:56:46.262Z"
+    },
+    "wi12-title-bar-states.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:57:01.585Z"
+    },
+    "wi12-title-bar-states.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:57:16.468Z"
+    },
+    "wi13-rows-hide-machine.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:57:28.335Z"
+    },
+    "wi13-rows-hide-machine.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:57:40.904Z"
+    },
+    "wi13-rows-hide-machine.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:57:56.443Z"
+    },
+    "wi13-rows-hide-machine.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:58:11.167Z"
+    },
+    "wi14-pull-ui.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:58:22.999Z"
+    },
+    "wi14-pull-ui.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:58:35.043Z"
+    },
+    "wi14-pull-ui.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:58:47.531Z"
+    },
+    "wi14-pull-ui.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:58:59.824Z"
+    },
+    "wi15-share-toggle.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:59:13.321Z"
+    },
+    "wi15-share-toggle.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:59:27.626Z"
+    },
+    "wi15-share-toggle.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:59:41.553Z"
+    },
+    "wi16-tell-remote.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T16:59:54.198Z"
+    },
+    "wi16-tell-remote.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T17:00:07.851Z"
+    },
+    "wi16-tell-remote.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T17:00:22.943Z"
+    },
+    "wi16-tell-remote.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T17:00:38.353Z"
+    },
+    "wi17-forward-owner.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T17:00:54.047Z"
+    },
+    "wi17-forward-owner.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T17:01:07.663Z"
+    },
+    "wi17-forward-owner.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T17:01:20.267Z"
+    },
+    "wi17-forward-owner.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T17:01:32.371Z"
+    },
+    "wi17-forward-owner.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T17:01:44.798Z"
+    },
+    "wi18-forward-viewer.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T17:01:57.348Z"
+    },
+    "wi18-forward-viewer.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T17:02:09.878Z"
+    },
+    "wi18-forward-viewer.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T17:02:25.233Z"
+    },
+    "wi18-forward-viewer.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T17:02:41.013Z"
+    },
+    "wi19-preview-ui.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T17:02:56.163Z"
+    },
+    "wi19-preview-ui.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T17:03:10.468Z"
+    },
+    "wi19-preview-ui.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T17:03:22.673Z"
+    },
+    "wi20-remote-editor.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T17:03:36.683Z"
+    },
+    "wi20-remote-editor.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T17:03:50.776Z"
+    },
+    "wi20-remote-editor.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T17:04:05.068Z"
+    },
+    "wi20-remote-editor.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T17:04:19.890Z"
+    },
+    "wi21-title-bar-e2e.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T17:04:33.744Z"
+    },
+    "wi21-title-bar-e2e.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T17:04:47.451Z"
+    },
+    "wi21-title-bar-e2e.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T17:05:02.003Z"
+    },
+    "wi21-title-bar-e2e.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T17:05:19.961Z"
+    },
+    "wi22-two-machine-smoke.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T17:05:40.150Z"
+    },
+    "wi22-two-machine-smoke.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T17:05:59.290Z"
+    },
+    "wi22-two-machine-smoke.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T17:06:18.239Z"
+    },
+    "wi22-two-machine-smoke.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T17:06:34.881Z"
+    },
+    "wi23-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T17:06:49.475Z"
+    },
+    "wi23-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T17:07:06.168Z"
+    },
+    "wi23-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T17:07:18.897Z"
+    },
+    "wi23-docs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T17:07:31.971Z"
+    }
+  },
+  "agentModel": "claude-opus-5-5",
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-01T17:36:22Z",
+      "markdownBody": "# CI Failure Feedback for PAN-4650\n\nPull request: https://github.com/eltmon/overdeck/pull/4731 (head `30eb3149`)\n\nSource: check_run:test-shard (3/4)\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\n## Failing checks (1)\n\n### test-shard (3/4)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/124923064708/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/41331723080/job/124923064708  \n```\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m packages/contracts/src/__tests__/machines-ssh.test.ts\u001b[2m > \u001b[22mMachineLinkView ssh block\u001b[2m > \u001b[22mdecodes a view without an ssh field\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m packages/contracts/src/__tests__/machines-ssh.test.ts\u001b[2m > \u001b[22mMachineLinkView ssh block\u001b[2m > \u001b[22mdecodes a view without an ssh field\n\u001b[31m\u001b[1mError\u001b[22m: Missing key\n  at [\"hidden\"]\u001b[39m\n\u001b[90m \u001b[2m❯\u001b[22m node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/src/SchemaParser.ts:\u001b[2m948:19\u001b[22m\u001b[39m\n\u001b[90m \u001b[2m❯\u001b[22m node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/src/internal/effect.ts:\u001b[2m1852:21\u001b[22m\u001b[39m\n\u001b[90m \u001b[2m❯\u001b[22m body node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/src/Function.ts:\u001b[2m285:17\u001b[22m\u001b[39m\n\u001b[90m \u001b[2m❯\u001b[22m exitMapError node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/src/internal/effect.ts:\u001b[2m1716:53\u001b[22m\u001b[39m\n\u001b[90m \u001b[2m❯\u001b[22m body node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/src/Function.ts:\u001b[2m285:17\u001b[22m\u001b[39m\n\u001b[90m \u001b[2m❯\u001b[22m mapErrorEager node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/src/SchemaParser.ts:\u001b[2m946:13\u001b[22m\u001b[39m\n\u001b[36m \u001b[2m❯\u001b[22m packages/contracts/src/__tests__/machines-ssh.test.ts:\u001b[2m32:62\u001b[22m\u001b[39m\n    \u001b[90m 30|\u001b[39m \u001b[34mdescribe\u001b[39m(\u001b[32m\"MachineLinkView ssh block\"\u001b[39m\u001b[33m,\u001b[39m () \u001b[33m=>\u001b[39m {\n    \u001b[90m 31|\u001b[39m   \u001b[34mit\u001b[39m(\u001b[32m\"decodes a view without an ssh field\"\u001b[39m\u001b[33m,\u001b[39m () \u001b[33m=>\u001b[39m {\n    \u001b[90m 32|\u001b[39m     \u001b[35mconst\u001b[39m decoded \u001b[33m=\u001b[39m \u001b[33mSchema\u001b[39m\u001b[33m.\u001b[39m\u001b[34mdecodeUnknownSync\u001b[39m(\u001b[33mMachineLinkView\u001b[39m)(view)\n    \u001b[90m   |\u001b[39m                                                              \u001b[31m^\u001b[39m\n    \u001b[90m 33|\u001b[39m     \u001b[34mexpect\u001b[39m(decoded\u001b[33m.\u001b[39mssh)\u001b[33m.\u001b[39m\u001b[34mtoBeUndefined\u001b[39m()\n    \u001b[90m 34|\u001b[39m   })\n\n\u001b[31m\u001b[2m⎯⎯⎯\n…\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m2 failed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[1m\u001b[32m527 passed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[33m1 skipped\u001b[39m\u001b[90m (530)\u001b[39m\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    },
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-11-01T17:41:05Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-4650\n\n# Review — PAN-4650\n## Verdict: CHANGES REQUESTED — the linked-conversation proxy and the new Pull here / open-in-editor routes accept cross-site browser POSTs (no Origin/CSRF check), so any web page can drive another machine's conversations\n\n## Context\n- Run ID: agent-pan-4650-review-30eb3149\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-4650/.pan/review/agent-pan-4650-review-30eb3149/context.json\n- Branch / workspace: feature/pan-4650 · /home/eltmon/Projects/overdeck/workspaces/feature-pan-4650 · PR #4731\n- HEAD reviewed: 30eb3149fe0d49df96a25540f44c6404ec5d355c\n- Base / prior cycle SHA: merge-base 68f80f58793 (origin/main); no prior review cycle\n\n## Blocking Findings\n\n### [security] Cross-site requests reach linked conversations and the new viewer routes — `src/dashboard/server/linked-conversation-proxy.ts:136`\n- Severity: ! MUST\n- Classification / requirement scope: implementation defect (the spec, D-4650-4, is silent on Origin/CSRF; the repo convention is not); in_pr_scope. New call sites skip the unchanged per-route origin helpers.\n- Trigger and changed-code connection:\n  1. `remoteGateRejection` (`src/dashboard/server/remote-request-gate.ts`) admits any loopback request that carries no credential (`isTrustedLocalRequest`). A browser on the operator's machine is a loopback peer, so the per-route Origin/CSRF check is the only defence against a hostile web page. That is why every existing conversation mutation route calls `validateOrigin` or `rejectUnsafeDashboardMutationRequest`: a grep of `routes/conversation*.ts` finds a guard in every file with mutation routes. The exceptions are the new `conversation-pull.ts` (5 mutation routes, 0 guards) and `linked-open.ts` (1 POST, 0 guards).\n  2. `linkedConversationProxyLayer` checks only `remoteGateRejection(request)` and `channelOfRequest`. It then forwards **any method** under `/api/conversations/@<label|env>/<name>/…` to the owner with the link's `odk_` bearer and `actor: 'operator'`. It never reads Origin, Referer or the CSRF token, and `forwardLinkedConversationRequest` never receives those headers.\n  3. On the owner, `POST /api/conversations/:name/message` runs `validateOrigin`. The forwarded request has no Origin, but it carries an `odk_` bearer, so `hasAccessTokenBearer` passes (`origin-validation.ts:122-145`). `readJsonBody` parses the body whatever its content type (`routes/conversations.ts:195-203`).\n  4. As a result, a cross-site `fetch('http://127.0.0.1:3011/api/conversations/@desk/20261101-4426/message', {method:'POST', mode:'no-cors', body:'{\"message\":\"…\"}'})` is a simple request with `text/plain`, so no preflight runs. It reaches the owner as an operator message into a live coding agent that has shell access. The same path reaches stop, abort, switch-model, compact, resume and release.\n  5. The new viewer routes are in the same class. `POST /api/linked-conversations/pull` with `whenTurnRunning:'stop'` aborts the owner's running turn and migrates the session. `POST /api/conversations/:name/reclaim` and `POST /api/linked-conversations/open-in-editor` also lack a guard. The editor route spawns a local process, but its arguments come from the server, so its impact is lower.\n- Expected / observed / impact: Expected: a cross-site browser write is refused, as `POST /api/conversations/:name/message` refuses it locally (\"Invalid origin\", 403). Observed: the proxy and the new routes accept it. Impact: a remote web page can inject prompts into agents on another machine, stop their turns, or pull conversations away. Machine labels are human words. Conversation names are `YYYYMMDD-NNNN` (`generateConversationName`, `conversation-runtime.ts:281-284`), which is about 9,000 candidates a day, so they can be brute-forced. The proxy also accepts the env id or the label (`getLink(idOrEnvOrLabel)`).\n- Evidence: static trace of the files and lines above. I did not reproduce this in a browser. Chrome's Local Network Access prompt may block some browsers, but Firefox and Safari send the request. Test gap: `linked-conversation-proxy.test.ts` drives `forwardLinkedConversationRequest`, which never sees request headers, so it cannot cover this. No test exercises the middleware with a foreign Origin.\n- Fix: refuse a cross-site write and keep both legitimate callers working:\n  - **Proxy (non-GET/HEAD):** admit the request when it carries a header-borne credential (`resolveDashboardCredential(headers)?.kind` is `internal-token` or `token`; this is how `pan tell @…` arrives through `callDashboard`). Otherwise require `validateOrigin(request).ok`. The browser's same-origin fetches send a trusted Origin. Plain `validateOrigin` alone would break `pan tell @…`, because that POST has no Origin and no `odk_` bearer.\n  - **`POST /api/linked-conversations/pull`, `POST /api/conversations/:name/reclaim`, `POST /api/linked-conversations/open-in-editor`:** call `rejectUnsafeDashboardMutationRequest(request)`, as this PR's own `/api/machines/sharing` and forwards routes do. The frontend already sends `dashboardMutationJsonHeaders()` (`pullApi.ts`, `PanOpenInPicker.tsx`), and the CLI uses the internal token, which that helper exempts.\n  - Add a middleware-level test: a POST under `/api/conversations/@desk/x/message` with `Origin: https://evil.example` is refused (403), and the same POST with the internal-token header is forwarded. Add a matching test for the pull route.\n\n## Non-blocking Findings\n\n- `~` **Pull job can create two runners on a post-adopt failure** (`src/dashboard/server/services/conversation-pull.ts:180-191`). After `continueHere` succeeds, three steps still run inside the `try`: `removeOwned`, `markPulledFrom` and `archivePushedBack`. If any of them throws, the `catch` posts `release/undo`, and the owner resumes the harness while this machine has already adopted and started it. This breaks NFR-2. The chance is low, because these are local DB and index writes. Fix: post undo only while `job.step !== 'finish'`, or set a flag once adoption succeeds and skip undo after it.\n- `~` **Viewer trusts the owner's `transferId` as a path** (`conversation-pull.ts:147,194`). `join(home, 'pull-transfers', answer.transferId)` is later passed to `rm -rf`. A malformed or hostile owner answer such as `..` resolves to `OVERDECK_HOME`. A non-string value throws before the `try`, so undo is never posted. The owner validates the id against a UUID regex (`TRANSFER_ID`); the viewer should apply the same regex before use. This needs a compromised linked peer, so it is hardening. It is worth doing because `unpackDirectory` already treats the pack as untrusted.\n- `~` **Pull dialog can trap the operator** (`src/dashboard/frontend/src/components/chat/PullHereDialog.tsx`). If a `getPull` poll fails, for example because the dashboard restarted and the in-memory job is gone (404), `setError` runs but `status` stays `running`. Polling then stops. The error appears only in the pre-start branch. The close button and the backdrop are disabled while a status exists. The modal stays open with a spinner until the page reloads. Show the error in the running branch and allow closing.\n- `?` **The tell-once smoke step accepts a failed first delivery.** In both runs the first `pan tell @…` failed (\"herdr unavailable\" or \"Delivery could not be confirmed\"), and the step passed because the repeat replayed that failure. In `--live-claude`, the `remote-reply` step proves that a message travels through the proxy, so FR-6 delivery is covered. The step name overstates what it checks.\n- `?` **Share my conversations off only empties the shared list.** A linked machine with `read:conversations` can still call the owner's `GET /api/conversations` (a PAN-4645 route scope) and use remote control. The spec defines the switch for the list only (FR-1), and a per-conversation privacy flag is a non-goal, so this is a note for the docs or #4651.\n- `?` **`open-in-editor` passes the owner's `cwd` as a positional CLI argument.** A hostile owner could share a `cwd` beginning with `--`. `spawn` uses no shell, so the exposure is limited to `code` flags. Prefixing with `--` before the path, or refusing a `cwd` that does not start with `/`, would close it. This is hardening only.\n- Stub-UI scanner findings (`ConversationMachineBanner.tsx:79,118`, `OpenPreviewPopover.tsx:55,59`) are false positives. Each `useState(false)` has a setter that the component calls (reconnect, popover open, busy). The `return null` at `:118` is the normal \"no banner in a live state\" branch.\n\n## Coverage\n\n**Four dimensions:** correctness, security, performance and requirements/UX were all applied in one pass, followed by a second pass over defaults, overrides, aliases (`@label` vs `@env`, raw vs `%40…%2F…` paths), persistence (`anywhere.json`, `hidden` on links, `pulled_from` column) and frontend/backend parity.\n\n**Changed-file ledger (136 files):**\n- Reviewed in depth: `drizzle/overdeck/0000_overdeck_init.sql` (the table and `pulled_from` mirror the top-ups in `infra.ts`; `OVERDECK_TABLE_COUNT` is 44), `src/lib/overdeck/{infra,paths,linked-conversations,linked-conversations-merge,conversation-release,conversation-delivery,conversation-kickoff,conversation-message,conversation-runtime,conversation-vault-continuity}.ts`, `src/lib/anywhere/{link-client,link-store,shared-conversations,anywhere-settings}.ts`, `src/lib/vault/{settle,resumable,transfer-pack}.ts`, `packages/contracts/src/{linked-conversations,machines,index}.ts`, `src/dashboard/server/{linked-conversation-proxy,link-fence,remote-request-gate,route-scopes,ws-linked,ws-forward,forward-ports,ws-terminal,server}.ts`, `src/dashboard/server/routes/{conversation-pull,conversation-preview-ports,linked-open,machines,machines-peer,conversations,conversation-kickoff}.ts`, `src/dashboard/server/services/{conversation-release-service,conversation-pull,conversation-list-merged,linked-conversations-sync,link-heartbeat,link-supervisor,anywhere-boot,port-forwards,open-remote,vault-continue,machine-link-service}.ts`, `src/cli/commands/{tell,tell-register,machines,dashboard-call}.ts`, `src/cli/commands/conversations/{pull,index}.ts`, `src/cli/index.ts`, frontend `App/routes.ts`, `lib/{wsTransport,linkedConversation}.ts`, `components/chat/{ConversationMachineBanner,conversationMachineState,ConversationPanel,ComposerFooter,PullHereDialog,pullApi,OpenPreviewPopover,useConversationMessagesStream,ConversationTerminalView}.tsx/ts`, `components/{XTerminal,PanOpenInPicker,CloisterStatusBar}.tsx`, `components/CommandDeck/{index,ConversationList,ConversationRow,ConversationTerminal,LinkedConversationRow}.tsx`, `components/Settings/anywhere/{MachinesPanel,machinesApi}.ts(x)`, `GodView/confluence/useConfluenceData.ts`, `main.tsx`.\n- Reviewed by skim (tests, config, docs): every new `__tests__`/`tests/unit` file listed in the diff stat; `tests/e2e/linked-conversation-title-bar.spec.ts` and its fixture; `scripts/anywhere/two-machine-smoke.mjs` (verified through the PR's pasted output); `scripts/frontend-test-subset.txt` (all 8 new frontend tests are listed); `scripts/harness-branches-baseline.txt` (the helper move is net neutral); `scripts/lint-overdeck-boundaries.sh` (excludes only the smoke harness); `tests/unit/lib/overdeck/no-loss-matrix.ts` (a row for every new route); the docs `configuration/linked-machines.mdx`, `cli/machines.mdx`, `cli/agent-commands.mdx`, `features/conversations.mdx`, `docs/ANYWHERE-ARCHITECTURE.md`, `.overdeck/context/codebase/architecture.md`, the `sync-sources/skills/pan-{conversations,tell}/SKILL.md` skills; CSS (`command-deck.module.css`, `index.css` `--surface-remote` in four scopes); `packages/contracts/src/composer-commands.generated.ts` (generated).\n- Not applicable: `.pan/continues/*.xbrief.json`, `.pan/drafts/PAN-4650.md` and the spec xBRIEF are planning artifacts, read for requirements only.\n\n**God files (NFR-6):** `cli/index.ts` +2/−7, `ConversationPanel.tsx` +15/−18, `routes/conversations.ts` +2/−2, `conversation-runtime.ts` +4/−5. All have a net change ≤ 0. `ws-rpc.ts` and `conversations.ts` (lib) are untouched.\n\n**Performance:** the owner builds its shared list at most once per 5 s for all callers, and the heartbeat waits at most 1 s for the hash before it falls back. The list runs only while a peer holds the heartbeat open. Each build does one realpath per row, for up to 500 rows. The hash includes `lastActivityAt`/`isWorking`, so an active owner changes the hash on most 15 s beats. That causes a full refetch of about 150 KB per beat, which D-4650-2 accepts. Proxy bodies are capped at 32 MiB, and the pull release has a 31-minute timeout. There is no `execSync` and no new `*Sync` tmux call.\n\n**Acceptance criteria:**\n| AC | Status | Evidence |\n| --- | --- | --- |\n| AC-1 | met | `replaceLinkedConversations` uses one transaction for upsert and prune; `tests/unit/lib/overdeck/linked-conversations.test.ts` is in the diff |\n| AC-2 | met | `handleSharedConversations` accepts only machine credentials; `sharing:false` gives `rows:[]` and hash `sharing-off`; heartbeat `conversationsHash` comes from the same build |\n| AC-3 | met | sync logic is connect=`any`, hash-gated heartbeat; focused test `linked-conversations-sync.test.ts` passed |\n| AC-4 | met | `mergeConversationRows` precedence; `?linked=0` path in `getMergedConversationList`; unit tests present |\n| AC-5 | met | the refusal is in the message, resume, switch-model, compact, plan-action and kickoff doors; smoke `released-409` |\n| AC-6 | met (functionally) | proxy forwards operator; fence in `remoteGateRejection`; tests passed. Blocked by the security finding above |\n| AC-7 | met | `ws-linked.test.ts` (frames both ways, link token, no Origin) passed |\n| AC-8 | met | `getConvIdFromPath` linked regex; `transportForConversation` subscribes with owner name; frontend tests listed |\n| AC-9 | met | `releaseConversation` marks the release, settles `wip:'force'`, then stops; a failure clears it; focused test passed |\n| AC-10 | met | `runOnline` catch posts undo; offline path uses `previewContinue`/`continueHere`; focused test passed |\n| AC-11 | met | `pullConversation` prints the steps and `Pulled: /conv/<id>`; `pull.test.ts` present |\n| AC-12 | met | `conversationMachineState` has 5 states; `--surface-remote` appears in 4 theme scopes in `index.css` |\n| AC-13 | met | `LinkedRowMenuItems` Hide; `HiddenMachinesFooter` \"… conversations hidden · Show\"; merge drops `hidden` links |\n| AC-14 | met | dialog shows Wait/Stop only when `isWorking`; it navigates on `done` (see the `~` trap note for the failure path) |\n| AC-15 | met | `PUT /api/machines/sharing`, then `invalidateSharedConversations`, so the owner answers `sharing:false`, no rows |\n| AC-16 | met | `tellRemote` posts `clientMessageId`; smoke \"repeat answered the same / other text refused by the receipt\" |\n| AC-17 | met | `refusedForwardPorts` + `isForwardablePort`; smoke \"forward to B's dashboard port was refused\" |\n| AC-18 | met | smoke `forward … -> http://127.0.0.1:… relayed the page` |\n| AC-19 | met | `OpenPreviewPopover` with ports, refusal text and Open; its test is in the subset |\n| AC-20 | met | `resolveRemoteEditorLaunch` gives `code --remote ssh-remote+<host> <cwd>`, with `cwd` from the cache record |\n| AC-21 | unverified | e2e spec present; CI `test-e2e` pending on this HEAD |\n| AC-22 | met | PR body: both smoke runs end `OK`; open-budget 618,956 / 618,957 ≤ 1,114,112 |\n| AC-23 | met | all four WI-23 greps print matches (1, 5, 3, 3) |\n\n## Verification\n- `npx vitest run` on 9 focused files (proxy, fence, ws-linked, ws-forward, conversation-pull, release service, linked sync, conversation-release, transfer-pack): **9 files, 63 tests passed**.\n- `npm run lint:effect-diagnostics`: **passed** (\"227 known findings; none new\").\n- `overdeck/test` check on this HEAD: pass (typecheck + lint; tests deferred to CI).\n- CI on PR #4731 head `30eb3149`: `build`, `lint-group (core/effect/skills/state)`, `test-shard 1-4/4` and `test-e2e` were **pending** at review time, so they are unverified. Passed: clean install + server smoke, prompt-change trailer gate. CodeRabbit skipped (more than 100 files).\n- Two-machine smoke (with and without `--live-claude`): verified from the output pasted in the PR body, not re-run.\n- Not run: the full test suite (by policy) and a live browser CSRF reproduction (the finding rests on a static trace).\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-4650/.pan/review/agent-pan-4650-review-30eb3149/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-4650 -m \"Fixed review issues\"`"
+    }
+  ]
+}

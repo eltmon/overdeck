@@ -9,6 +9,7 @@ import { _resetInternalTokenCacheForTests, INTERNAL_TOKEN_HEADER } from '../../.
 import { _resetDashboardSessionTokenForTests, dashboardSessionCookieHeader } from '../routes/dashboard-auth.js';
 import { _resetTrustedOriginsForTests } from '../routes/origin-validation.js';
 import { authorizeDashboardUpgrade } from '../ws-auth.js';
+import { getOverdeckHome } from '../../../lib/paths.js';
 
 const TRUSTED_ORIGIN = 'http://localhost:3011';
 
@@ -21,6 +22,9 @@ describe('authorizeDashboardUpgrade', () => {
   beforeEach(() => {
     delete process.env.OVERDECK_DASHBOARD_SESSION_TOKEN;
     process.env.OVERDECK_INTERNAL_TOKEN = 'stable-internal-token';
+    // The token file wins over env (PAN-4628); delete any file a sibling
+    // test in this worker's shared OVERDECK_HOME left behind.
+    rmSync(join(getOverdeckHome(), 'internal-token'), { force: true });
     _resetInternalTokenCacheForTests();
     _resetDashboardSessionTokenForTests();
     _resetTrustedOriginsForTests();
@@ -50,6 +54,14 @@ describe('authorizeDashboardUpgrade', () => {
     const cookie = requestCookie(dashboardSessionCookieHeader());
     const result = authorizeDashboardUpgrade({ origin: TRUSTED_ORIGIN, cookie }, 'GET');
     expect(result).toEqual({ ok: true, credential: { kind: 'root-session' } });
+  });
+
+  it('refuses a Tailscale Funnel upgrade with 403 even with a valid internal token (PAN-4648)', () => {
+    const result = authorizeDashboardUpgrade(
+      { [INTERNAL_TOKEN_HEADER]: 'stable-internal-token', 'tailscale-funnel-request': '?1' },
+      'GET',
+    );
+    expect(result).toEqual({ ok: false, status: 403, message: 'Forbidden: public requests cannot open sockets' });
   });
 
   it('accepts no origin with the internal token header', () => {

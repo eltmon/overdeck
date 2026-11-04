@@ -72,4 +72,18 @@ describe('tick marker (PAN-3964 FR-2)', () => {
     });
     expect(findLastTick([])).toBeNull();
   });
+
+  it('findLastTick carries the tick message id when present (PAN-4751)', () => {
+    const messages = [
+      {
+        role: 'assistant',
+        text: 'flywheel-tick: tick=1 pick=PAN-1 phase=launch in-flight=PAN-1 needs-you=none',
+        createdAt: '2026-09-23T10:00:00Z',
+        id: 'msg-1',
+      },
+    ];
+    expect(findLastTick(messages)).toEqual({
+      tick: 1, pick: 'PAN-1', phase: 'launch', inFlight: ['PAN-1'], needsYou: null, at: '2026-09-23T10:00:00Z', messageId: 'msg-1',
+    });
+  });
 });

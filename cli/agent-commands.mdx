@@ -27,6 +27,17 @@ This command:
 3. Spawns an autonomous agent in a terminal-backend pane (Herdr by default)
 4. The agent reads the issue and plan, explores the codebase, and implements the solution
 
+To run the agent on a linked machine, add `--machine <label|environment-id>`, or
+`--machine auto` to let Auto placement pick one by load (`--needs <tag,…>` limits the
+choice). The other machine needs a project for the same repository. `pan start` refuses
+when your branch has unpushed commits; `--push-first` pushes them, `--ignore-unpushed`
+starts anyway. See [Linked machines](/configuration/linked-machines#start-work-on-another-machine).
+
+```bash
+pan start PAN-123 --machine desk
+pan start PAN-123 --machine auto --needs docker
+```
+
 ## pan status
 
 List all running agents and their status.
@@ -85,6 +96,23 @@ This command:
 - Sends your message to the agent's pane
 - The agent receives it and responds accordingly
 - Useful for providing feedback, clarification, or guidance
+
+### A conversation on a linked machine
+
+Name a conversation another machine runs as `@<machine>/<conv>` (its label or
+environment id; see [Linked machines](/configuration/linked-machines)):
+
+```bash
+pan tell @desk/conv-20261101-1234 "Rebase on main before you push."
+pan tell @desk/conv-20261101-1234 "Rebase on main before you push." --message-id rebase-1
+```
+
+The message goes through this machine's dashboard and the encrypted link. It prints
+`Delivered to <conv> on <machine>`, or the other machine's error and exits 1.
+`--message-id <id>` makes a repeat land once (the default is a fresh id); on a local
+target it is the delivery's idempotency key too. `--steer` works; `--when-limit-resets`
+and `--force` exit 1 for a remote target. Only conversations are accepted after
+`@<machine>/`: an agent name exits 1 with "pan tell @<label>/… targets conversations only".
 
 ## pan pause
 
@@ -210,6 +238,20 @@ pan admin specialists reset review-agent
 ```
 
 See [Specialist Agents](/features/specialists) for detailed information on each specialist type.
+
+## pan admin config set
+
+Set one `config.yaml` key on this machine.
+
+```bash
+pan admin config set resources.quality_gate_slots 2
+pan admin config set anywhere.machine.tags '[docker, payments]'
+```
+
+The value is parsed as YAML, so numbers, booleans and flow lists keep their types. The
+key path is created when missing and the rest of the file is kept. **Compare settings**
+in Settings → Anywhere → Machines prints these lines for the keys that differ between two
+machines; see [Compare settings](/configuration/linked-machines#compare-settings).
 
 ## pan admin remote
 

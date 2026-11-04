@@ -4,22 +4,49 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { ensureHerdrMock } = vi.hoisted(() => ({ ensureHerdrMock: vi.fn() }));
+const { ensureHerdrMock, startSupervisorProcessMock, startSupervisorUnitMock, isSupervisorAgentLoadedMock } = vi.hoisted(() => ({
+  ensureHerdrMock: vi.fn(),
+  startSupervisorProcessMock: vi.fn(),
+  startSupervisorUnitMock: vi.fn(),
+  isSupervisorAgentLoadedMock: vi.fn(),
+}));
 
 vi.mock('../../../src/lib/herdr-setup/ensure.js', () => ({
   ensureHerdr: ensureHerdrMock,
   isHerdrSetupSkipped: (report: object) => 'skipped' in report,
 }));
 
+vi.mock('../../../src/lib/supervisor.js', () => ({
+  startSupervisorProcess: startSupervisorProcessMock,
+  getSupervisorPort: () => 3012,
+}));
+
+vi.mock('../../../src/lib/systemd.js', () => ({
+  startSupervisorUnitIfAvailable: startSupervisorUnitMock,
+  SUPERVISOR_UNIT_NAME: 'overdeck-supervisor.service',
+}));
+
+vi.mock('../../../src/lib/launchd.js', () => ({
+  isSupervisorAgentLoaded: isSupervisorAgentLoadedMock,
+  SUPERVISOR_AGENT_LABEL: 'ai.overdeck.supervisor',
+}));
+
 import {
   deferredSyncLogPath,
   ensureHerdrBeforeDashboard,
   spawnDeferredSync,
+  startSupervisorSidecar,
 } from '../../../src/cli/up-sidecars.js';
+
+const originalPlatform = Object.getOwnPropertyDescriptor(process, 'platform');
 
 afterEach(() => {
   vi.restoreAllMocks();
   ensureHerdrMock.mockReset();
+  startSupervisorProcessMock.mockReset();
+  startSupervisorUnitMock.mockReset();
+  isSupervisorAgentLoadedMock.mockReset();
+  if (originalPlatform) Object.defineProperty(process, 'platform', originalPlatform);
 });
 
 describe('spawnDeferredSync (PAN-3956 review finding 5)', () => {
@@ -102,5 +129,35 @@ describe('ensureHerdrBeforeDashboard (PAN-3956 review finding 8)', () => {
     captureLog();
     ensureHerdrMock.mockRejectedValueOnce(new Error('boom'));
     await expect(ensureHerdrBeforeDashboard()).resolves.toBeUndefined();
+  });
+});
+
+describe('startSupervisorSidecar defers to a loaded launchd agent (PAN-4656)', () => {
+  function onDarwin(): string[] {
+    Object.defineProperty(process, 'platform', { configurable: true, value: 'darwin' });
+    startSupervisorUnitMock.mockResolvedValue(false);
+    const lines: string[] = [];
+    vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => { lines.push(args.map(String).join(' ')); });
+    return lines;
+  }
+
+  it('does not start a second supervisor when the agent is loaded', async () => {
+    const lines = onDarwin();
+    isSupervisorAgentLoadedMock.mockResolvedValue({ loaded: true, domain: 'gui/501' });
+
+    await startSupervisorSidecar();
+
+    expect(startSupervisorProcessMock).not.toHaveBeenCalled();
+    expect(lines.join('\n')).toContain('✓ Supervisor managed by launchd agent ai.overdeck.supervisor');
+  });
+
+  it('starts the supervisor process when no agent is loaded', async () => {
+    const lines = onDarwin();
+    isSupervisorAgentLoadedMock.mockResolvedValue({ loaded: false, domain: null });
+
+    await startSupervisorSidecar();
+
+    expect(startSupervisorProcessMock).toHaveBeenCalledOnce();
+    expect(lines.join('\n')).toContain('✓ Supervisor listening on http://127.0.0.1:3012');
   });
 });

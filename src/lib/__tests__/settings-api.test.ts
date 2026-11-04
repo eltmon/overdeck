@@ -107,7 +107,7 @@ function baseConfig(overrides: Record<string, unknown> = {}) {
       defaultConversationModel: 'claude-sonnet-4-6',
       trackerKeys: {},
       tmux: { configMode: 'managed' },
-      ui: { openInEditorCommand: null, theme: 'broadsheet' },
+      ui: { openInEditorCommand: null, theme: 'broadsheet', colorTheme: { light: null, dark: null } },
       conversations: {
         compactionModel: 'claude-haiku-4-5',
         manualCompactMode: 'claude-code',
@@ -227,8 +227,24 @@ describe('loadSettingsApi', () => {
 
     expect(loadSettingsApi().ui?.theme).toBe('broadsheet');
 
-    mockLoadConfig.mockReturnValue(baseConfig({ ui: { openInEditorCommand: null, theme: 'ledger' } }));
+    mockLoadConfig.mockReturnValue(baseConfig({ ui: { openInEditorCommand: null, theme: 'ledger', colorTheme: { light: null, dark: null } } }));
     expect(loadSettingsApi().ui?.theme).toBe('ledger');
+  });
+
+  it('keeps ui.color_theme in the saved file when the ui block otherwise carries only defaults (PAN-4644)', async () => {
+    mockReadFile.mockResolvedValue('{}\n');
+    mockLoadConfig.mockReturnValue(baseConfig({
+      ui: { openInEditorCommand: null, theme: 'broadsheet', colorTheme: { light: 'ayu-light', dark: 'ayu-dark' } },
+    }));
+    const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
+    const settings = loadSettingsApi();
+
+    await saveSettingsApi({ ...settings } as never);
+
+    const written = String(mockWriteFile.mock.calls[0]?.[1]);
+    expect(written).toContain('color_theme');
+    expect(written).toContain('ayu-light');
+    expect(written).toContain('ayu-dark');
   });
 
   it('reports dashboard.require_token_mint from the enforced value, not the merged config (D-1)', async () => {
@@ -755,7 +771,7 @@ describe('saveSettingsApi', () => {
     // whatever theme is *currently* on disk instead, regardless of what
     // the caller's own `ui.theme` says.
     mockLoadConfig.mockReturnValue(baseConfig({
-      ui: { openInEditorCommand: null, theme: 'ledger' },
+      ui: { openInEditorCommand: null, theme: 'ledger', colorTheme: { light: null, dark: null } },
     }));
     const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
     const settings = loadSettingsApi();
@@ -772,7 +788,7 @@ describe('saveSettingsApi', () => {
 
   it('preserves an existing open_in_editor_command when saveDesignLanguage changes only the theme (no-loss, PAN-3410)', async () => {
     mockLoadConfig.mockReturnValue(baseConfig({
-      ui: { openInEditorCommand: 'cursor {path}', theme: 'ledger' },
+      ui: { openInEditorCommand: 'cursor {path}', theme: 'ledger', colorTheme: { light: null, dark: null } },
     }));
     const { saveDesignLanguage } = await import('../settings-api.js');
 
@@ -792,7 +808,7 @@ describe('saveSettingsApi', () => {
     // in between where staleness could creep in.
     mockLoadConfig.mockReturnValue(baseConfig({
       workhorses: { mid: 'gpt-5.5' },
-      ui: { openInEditorCommand: null, theme: 'broadsheet' },
+      ui: { openInEditorCommand: null, theme: 'broadsheet', colorTheme: { light: null, dark: null } },
     }));
     const { saveDesignLanguage } = await import('../settings-api.js');
 
@@ -817,7 +833,7 @@ describe('saveSettingsApi', () => {
     // saveSettingsApi's `honorThemeFromSettings` gate (cycle 8) — this is
     // the general full-document path, so its own `ui.theme` snapshot must
     // never reach disk regardless of write ordering.
-    let state = { workhorses: { mid: 'claude-sonnet-4-6' }, ui: { openInEditorCommand: null, theme: 'broadsheet' as const } };
+    let state = { workhorses: { mid: 'claude-sonnet-4-6' }, ui: { openInEditorCommand: null, theme: 'broadsheet' as const, colorTheme: { light: null, dark: null } } };
     mockLoadConfig.mockImplementation(() => baseConfig(state));
     mockWriteFile.mockImplementation(async (_path: string, content: string) => {
       const mid = /mid: (\S+)/.exec(content)?.[1];

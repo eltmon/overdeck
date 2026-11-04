@@ -1,0 +1,110 @@
+---
+title: pan triggers
+description: Manage webhook triggers that message or start conversations
+---
+
+# `pan triggers`
+
+<Note>
+Available from the next release.
+</Note>
+
+Create, list, remove and set the signing secret of webhook triggers: secret URLs that send
+an event to a conversation or start a conversation in a project. Every subcommand works
+without a running dashboard; it writes `~/.overdeck/triggers.json` directly, and the
+dashboard reads that file on every event. See [Webhook triggers](/configuration/triggers).
+
+## add
+
+```bash
+pan triggers add <name> (--conversation <name-or-id> | --project <key>) [options]
+```
+
+| Flag | Effect |
+| --- | --- |
+| `--conversation <name-or-id>` | Send each event as a message to this conversation. Takes a name or a numeric id; the name is stored. |
+| `--project <key>` | Start a new conversation in this project for each event. |
+| `--prompt <text>` | Prompt template placed before the event (required for `--project`, at most 2,000 characters). |
+| `--prompt-file <path>` | Read the prompt template from a file. Do not combine with `--prompt`. |
+| `--verify <kind>` | Signature check: `none` (default), `github` or `stripe`. |
+| `--signing-secret <value>` | HMAC signing secret, 8-256 characters without whitespace. `github` generates one when omitted. |
+| `--model <id>` | Model for conversations a project trigger starts. |
+| `--harness <name>` | Harness for conversations a project trigger starts. |
+| `--effort <level>` | Reasoning effort for conversations a project trigger starts. |
+| `--inbox` | Also create an overdeck.ai directory inbox that holds events while this machine is offline (Anywhere plan; needs the running dashboard and `pan account login`). Prints the inbox URL instead of the Funnel lines. |
+| `--json` | Print `{ trigger, hookPath, url, localUrl, funnelCommand, generatedSigningSecret }` as JSON. `url` is `null` when no `.ts.net` address is saved. |
+
+Pass exactly one of `--conversation` and `--project`; otherwise it exits 1. An unknown
+conversation or project exits 1.
+
+It prints the hook path, the local test URL (`http://127.0.0.1:<port>/hooks/…`), the Funnel
+URL (`https://<machine>.<tailnet>.ts.net:8443/hooks/…` unless a `.ts.net` address is saved),
+any generated signing secret, the Funnel command, and then:
+
+```
+The URL is shown once. Save it now.
+```
+
+With `--inbox`, the trigger is created through the dashboard, which asks the directory for the
+inbox. It prints the inbox URL instead of the Funnel lines:
+
+```
+Created trigger trg_3f9a1c2b7d4e ("deploys") with an overdeck.ai inbox
+  inbox URL:  https://connect.overdeck.ai/h/<id>
+
+The inbox holds events for 24 hours while this machine is offline. The URL is shown once. Save it now.
+```
+
+On a free account, signed out, or when the directory does not answer within 10 seconds, it
+creates nothing and exits 1 with the reason. See
+[Hold events with the directory inbox](/configuration/triggers#hold-events-with-the-directory-inbox).
+
+## list
+
+```bash
+pan triggers list [--json]
+```
+
+Lists triggers with columns `ID NAME TARGET VERIFY SIGNING SECRET CREATED`. `TARGET` is
+`conversation <name>` or `project <key>`; `SIGNING SECRET` is `secret set` or
+`secret not set` for `github` and `stripe` triggers. It never prints a secret.
+
+| Flag | Effect |
+| --- | --- |
+| `--json` | Print the triggers as JSON. |
+
+With no triggers: `` `No triggers. Create one with `pan triggers add`.` ``
+
+## remove
+
+```bash
+pan triggers remove <id>
+```
+
+Removes the trigger. Its URL answers `404` from the next event on:
+
+```
+Removed trigger <id>. Its URL now answers 404.
+```
+
+An unknown id prints `No trigger with id <id>.` and exits 1.
+
+## set-secret
+
+```bash
+pan triggers set-secret <id> [--secret <value>]
+```
+
+Sets the signing secret of a `github` or `stripe` trigger, for example a Stripe endpoint's
+`whsec_…` secret. Without `--secret` it reads one line from standard input, so the secret
+stays out of your shell history:
+
+```bash
+pbpaste | pan triggers set-secret trg_3f9a0c1d2e4b
+```
+
+| Flag | Effect |
+| --- | --- |
+| `--secret <value>` | The signing secret. |
+
+An empty value exits 1. An unknown id prints `No trigger with id <id>.` and exits 1.

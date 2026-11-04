@@ -76,7 +76,7 @@ async function stopCloister(): Promise<void> {
 }
 
 async function fetchConversations(): Promise<{ sessionAlive: boolean }[]> {
-  const res = await fetchWithTimeout('/api/conversations');
+  const res = await fetchWithTimeout('/api/conversations?linked=0');
   if (!res.ok) return [];
   return res.json();
 }

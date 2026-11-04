@@ -1,0 +1,155 @@
+{
+  "version": "1",
+  "issueId": "PAN-4934",
+  "created": "2026-11-04T02:59:33.455Z",
+  "updated": "2026-11-04T03:44:15.614Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "acp-capability-flag": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4934",
+      "claimedAt": "2026-11-04T02:59:33.455Z",
+      "doneAt": "2026-11-04T03:00:19.936Z"
+    },
+    "acp-launcher-flag": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4934",
+      "claimedAt": "2026-11-04T03:00:30.355Z",
+      "doneAt": "2026-11-04T03:01:51.339Z"
+    },
+    "acp-mcp-config-reader": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4934",
+      "claimedAt": "2026-11-04T03:01:55.538Z",
+      "doneAt": "2026-11-04T03:02:56.184Z"
+    },
+    "acp-host-mcp-flag": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4934",
+      "claimedAt": "2026-11-04T03:03:01.831Z",
+      "doneAt": "2026-11-04T03:04:28.141Z"
+    },
+    "acp-injection-guard": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4934",
+      "claimedAt": "2026-11-04T03:04:31.684Z",
+      "doneAt": "2026-11-04T03:05:41.350Z"
+    },
+    "acp-cp3-live-check": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4934",
+      "claimedAt": "2026-11-04T03:29:30.139Z",
+      "doneAt": "2026-11-04T03:30:00.158Z"
+    },
+    "acp-mcp-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4934",
+      "claimedAt": "2026-11-04T03:30:09.843Z",
+      "doneAt": "2026-11-04T03:30:42.987Z"
+    },
+    "acp-capability-flag.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:37:01.809Z"
+    },
+    "acp-capability-flag.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:37:18.293Z"
+    },
+    "acp-capability-flag.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:37:35.124Z"
+    },
+    "acp-cp3-live-check.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:37:51.046Z"
+    },
+    "acp-cp3-live-check.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:38:06.794Z"
+    },
+    "acp-cp3-live-check.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:38:23.268Z"
+    },
+    "acp-cp3-live-check.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:38:43.724Z"
+    },
+    "acp-host-mcp-flag.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:39:02.406Z"
+    },
+    "acp-host-mcp-flag.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:39:19.610Z"
+    },
+    "acp-host-mcp-flag.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:39:36.430Z"
+    },
+    "acp-injection-guard.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:39:55.261Z"
+    },
+    "acp-injection-guard.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:40:16.781Z"
+    },
+    "acp-injection-guard.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:40:36.416Z"
+    },
+    "acp-injection-guard.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:40:56.023Z"
+    },
+    "acp-launcher-flag.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:41:15.281Z"
+    },
+    "acp-launcher-flag.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:41:35.315Z"
+    },
+    "acp-launcher-flag.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:41:54.947Z"
+    },
+    "acp-launcher-flag.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:42:13.391Z"
+    },
+    "acp-mcp-config-reader.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:42:30.770Z"
+    },
+    "acp-mcp-config-reader.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:42:48.246Z"
+    },
+    "acp-mcp-config-reader.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:43:06.476Z"
+    },
+    "acp-mcp-config-reader.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:43:24.310Z"
+    },
+    "acp-mcp-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:43:41.141Z"
+    },
+    "acp-mcp-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:43:58.386Z"
+    },
+    "acp-mcp-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:44:15.614Z"
+    }
+  }
+}

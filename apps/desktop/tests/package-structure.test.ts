@@ -165,6 +165,31 @@ describe("scripts/prepare-server-resources.mjs", () => {
     expect(script).not.toContain('cpSync(join(repoRoot, "sync-sources", "hooks")');
   });
 
+  it("finds packages loaded through an inlined createRequire(import.meta.url)(...) call (PAN-4645)", () => {
+    const rootDir = FS.mkdtempSync(Path.join(OS.tmpdir(), "overdeck-import-closure-"));
+    try {
+      FS.writeFileSync(
+        Path.join(rootDir, "server.js"),
+        'import { createRequire } from "node:module";\n' +
+          'const SecretStream = createRequire(import.meta.url)("@hyperswarm/secret-stream");\n' +
+          'const dh = createRequire(import.meta.url)("noise-handshake/dh");\n' +
+          "export { SecretStream, dh };\n",
+      );
+
+      const { packages } = scanImportClosure(rootDir, ["server.js"]);
+
+      expect(packages).toEqual(new Set(["@hyperswarm/secret-stream", "noise-handshake"]));
+    } finally {
+      FS.rmSync(rootDir, { recursive: true, force: true });
+    }
+  });
+
+  it("loads the Noise channel stack under Electron before packaging (PAN-4645)", () => {
+    const script = FS.readFileSync(scriptPath, "utf8");
+
+    expect(script).toContain("require('sodium-native'); require('noise-handshake'); require('@hyperswarm/secret-stream')");
+  });
+
   it("includes chunks reachable only through bare side-effect imports", () => {
     const rootDir = FS.mkdtempSync(Path.join(OS.tmpdir(), "overdeck-import-closure-"));
     try {

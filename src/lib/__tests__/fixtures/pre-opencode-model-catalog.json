@@ -134,7 +134,7 @@
         "xhigh",
         "max"
       ],
-      "costPer1MTokens": 17.5
+      "costPer1MTokens": 12
     },
     {
       "id": "gpt-5.6-terra",
@@ -173,7 +173,7 @@
         "xhigh",
         "max"
       ],
-      "costPer1MTokens": 17.5
+      "costPer1MTokens": 12
     },
     {
       "id": "gpt-5.6-terra[372k]",

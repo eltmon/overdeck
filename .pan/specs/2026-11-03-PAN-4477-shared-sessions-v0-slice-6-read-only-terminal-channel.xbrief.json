@@ -1,0 +1,968 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-03T14:55:14Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4477: Shared Sessions v0 (slice 6): read-only terminal channel",
+    "updated": "2026-11-03T15:02:15.972Z"
+  },
+  "plan": {
+    "id": "pan-4477",
+    "title": "Shared Sessions v0 (slice 6): read-only terminal channel",
+    "status": "running",
+    "uid": "448da68f-24c9-4681-848c-de62ac303570",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-03T14:55:14Z",
+    "updated": "2026-11-03T15:02:15.972Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4477",
+        "label": "PAN-4477",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/658",
+        "label": "PAN-658 (parent PRD .pan/drafts/pan-658.md)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4475",
+        "label": "PAN-4475 (viewer surface, dependency)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "shared-sessions",
+      "webrtc",
+      "terminal",
+      "pty-hub",
+      "herdr",
+      "frontend",
+      "read-only"
+    ],
+    "metadata": {
+      "sizeJustification": "About 25 files across contracts, dashboard server (pty-hub + sharing), dashboard frontend sharing, one Playwright spec, the frontend test subset list and four doc files. It is one vertical feature: the wire types, host source, peer hub, viewer peer and viewer toggle are useless without each other, and the PRD (PAN-658 slice map) defines this as one slice. The work is still split into 11 independently reviewable items.",
+      "canonicalFilename": "2026-11-03-PAN-4477-shared-sessions-v0-slice-6-read-only-terminal-channel.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "PAN-4474 created the terminal data channel on every Shared Sessions peer connection but sends nothing on it, and PAN-4475's viewer gives it no listener. The parent PRD's FR-9 requires a viewer to toggle to a read-only live view of the host's terminal, with viewer keystrokes structurally unable to reach the host shell. The PRD assumed a tmux PTY hub always exists; on main, Herdr is the default backend (no PTY hub) and a tmux hub exists only while a /ws/terminal tab is open.",
+      "Proposal": "Add a viewer->host 'terminal-watch' control payload and a host->viewer TerminalPayload (snapshot/output/size/unavailable) to the v1 wire format, additively. A new TerminalBridge resolves the shared conversation's terminal per watch: on Herdr one read-only observe stream per watching viewer; on tmux a listener on the PTY hub via a new listener seam in pty-hub.ts, creating the hub at the window's client size when no tab holds it (hub spawn/wiring extracted from ws-terminal.ts into pty-hub-attach.ts). PeerHub attaches a watch only for negotiated peers and still subscribes to no inbound message on the terminal channel. The viewer's WebRtcViewer reads terminal envelopes and sends the watch; a Conversation/Terminal toggle mounts a read-only xterm (disableStdin, no onData, sized to the host). Full design: .pan/drafts/PAN-4477.md.",
+      "NonGoals": "- Viewer input to the host terminal in any form, including for contributors or the controller\n- Any inbound message handler on the host's terminal data channel\n- A Herdr viewer following a host resize without re-toggling\n- Terminal scrollback history beyond the snapshot\n- Sharing any terminal other than the shared conversation's own tmuxSession (no companion terminals, no agent panes)\n- Waiting out a conversation respawn during a watch\n- Terminal-specific overflow recovery (the existing 64 Mi-character peer close applies)\n- Linked-machine (@<machine>) conversations as a share scope\n- Any change to the share Worker in services/share/\n- Modifying XTerminal.tsx or the /ws/terminal wire protocol\n- A bump of the shared wire version"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Herdr hosts stream the terminal through one read-only observeTerminal stream per watching viewer; tmux hosts consume the PTY hub as the issue specifies",
+        "rationale": "Herdr is the default backend and has no PTY hub; observe has no write method (read-only by construction) and starts with its own full snapshot. The issue's pty-hub instruction is honoured for tmux."
+      },
+      {
+        "summary": "On tmux, the bridge creates the PTY hub when no /ws/terminal tab holds one, spawning at window height plus status lines",
+        "rationale": "A hub only exists while a tab is open; spawning at the client size keeps the host window size unchanged (NFR-4)."
+      },
+      {
+        "summary": "Rejected a separate 'tmux attach -r -f ignore-size' client per share",
+        "rationale": "Live probe on tmux 3.4 (2026-11-03): an ignore-size client resizes the window when it is the only client and the window snaps back to its size after the host's client leaves, a host-visible side effect; it also contradicts the issue's pty-hub instruction."
+      },
+      {
+        "summary": "The viewer's toggle travels on the control channel as { kind: 'terminal-watch', watch }",
+        "rationale": "The PRD streams terminal bytes only while a viewer has the view toggled, which needs an inbound request; control is the only channel the host reads, so the terminal channel keeps no inbound handler."
+      },
+      {
+        "summary": "Terminal content is wrapped in normal SharedEnvelopes with a TerminalPayload",
+        "rationale": "Reuses seq gap detection, fragmentation for large snapshots and ChannelWriter backpressure unchanged; payload data is still the raw terminal output."
+      },
+      {
+        "summary": "A Herdr viewer does not follow host resizes until it re-toggles; a tmux viewer does",
+        "rationale": "Herdr observe streams keep their opening size (docs/TERMINAL-BACKENDS.md); the hub notifies listeners of resizes for free."
+      },
+      {
+        "summary": "The viewer xterm sizes to the host grid with no FitAddon and does not reuse XTerminal.tsx",
+        "rationale": "Fitting to the container would re-wrap host output; XTerminal is coupled to /ws/terminal and is on the file-size allowlist."
+      },
+      {
+        "summary": "Add a Playwright e2e on a real tmux session instead of a werift loopback terminal test",
+        "rationale": "It proves both issue acceptance criteria (live output, keystrokes without effect) through real Chromium and stays under the 25-file finalize limit."
+      }
+    ],
+    "items": [
+      {
+        "id": "wire-terminal-types",
+        "title": "Add terminal-watch control payload and TerminalPayload to the sharing wire types",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:55:14Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-4477",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/sharing.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run typecheck:share"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "typecheck:share completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-5",
+            "NFR-2"
+          ],
+          "foundationFor": [
+            "terminal-bridge",
+            "peer-hub-terminal",
+            "viewer-peer-terminal",
+            "shared-terminal-view"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1 (.pan/drafts/PAN-4477.md). In packages/contracts/src/sharing.ts replace the ControlPayload union (line 152, comment 'control payloads in slice 3') with the PRD's After block: add `{ kind: 'terminal-watch'; watch: boolean }`, export `TerminalUnavailableReason = 'terminal_not_found' | 'terminal_ended'` and `TerminalPayload` = snapshot {cols, rows, data} | output {data} | size {cols, rows} | unavailable {reason}. The file must stay type-only with no import (the share Worker imports it by path). Wire version stays 1."
+        },
+        "items": [
+          {
+            "id": "wire-terminal-types.ac1",
+            "title": "Given packages/contracts/src/sharing.ts, when read, then it exports TerminalPayload with exactly the four kinds snapshot, output, size and unavailable, and TerminalUnavailableReason with 'terminal_not_found' and 'terminal_ended'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-terminal-types.ac2",
+            "title": "Given ControlPayload, when read, then it includes the variant { kind: 'terminal-watch'; watch: boolean } alongside the unchanged hello and error variants",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-terminal-types.ac3",
+            "title": "Given the change, when `npm run typecheck` and `npm run typecheck:share` run, then both exit 0 and sharing.ts contains no import statement",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pty-hub-listeners",
+        "title": "Add a non-WebSocket listener seam to the PTY hub",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:55:14Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4477",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/pty-hub.ts",
+            "src/dashboard/server/__tests__/pty-hub.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/pty-hub.test.ts"
+          ],
+          "expected_outputs": [
+            "pty-hub.test.ts passes, including every pre-existing case unmodified"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-1"
+          ],
+          "foundationFor": [
+            "hub-pty-attach-extract",
+            "tmux-hub-subscribe"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. In src/dashboard/server/pty-hub.ts add PtyHubListener {onData, onSize, onExit}, a module-level Map<PtyHub, Set<PtyHubListener>> (NOT a new PtyHub field: the existing test builds PtyHub literals), addHubListener, removeHubListener(hubs, sessionName, hub, listener): boolean (acts on the hub object the caller subscribed to, never a fresh registry lookup), notifyHubSize(hub), notifyHubExit(hub). flushHubOutput (line 53) also calls each listener's onData(combined) after the WebSocket loop; a throwing listener is dropped. removeClientFromHub (line 111) tears down only when clients AND listeners are both empty; move the teardown body (clear timer/buffer, pty.kill) into a private teardownHub(hubs, sessionName, hub) used by both remove functions; it deletes the registry entry only when hubs.get(sessionName) === hub. With clients empty but listeners present the existing hand-off sets inputClient to null and the PTY keeps running. Update the module header. Use fake timers (4 ms coalescing)."
+        },
+        "items": [
+          {
+            "id": "pty-hub-listeners.ac1",
+            "title": "Given a hub with one ready open WebSocket client and one listener, when broadcastToHub runs and fake timers advance 4 ms, then the listener's onData receives the same combined string the client's send receives",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pty-hub-listeners.ac2",
+            "title": "Given a hub with one WebSocket client and one listener, when removeClientFromHub removes the client, then it returns false, the registry keeps the hub, pty.kill is not called and inputClient is null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pty-hub-listeners.ac3",
+            "title": "Given a hub with no WebSocket clients and one listener, when removeHubListener removes it, then it returns true, the registry entry is deleted and pty.kill is called once; and given the registry now maps the session to a newer hub, when the old hub's last listener is removed, then only the old PTY is killed and the newer hub stays registered",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pty-hub-listeners.ac4",
+            "title": "Given two listeners where the first throws in onData, when output flushes, then the second still receives the data and notifyHubExit calls onExit once per remaining listener",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pty-hub-listeners.ac5",
+            "title": "Given the existing pty-hub.test.ts cases, when the suite runs, then they pass without edits to their bodies",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "hub-pty-attach-extract",
+        "title": "Extract hub PTY spawn and wiring into pty-hub-attach.ts and notify listeners from ws-terminal",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:55:14Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "refactor",
+          "issueLabel": "pan-4477",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/pty-hub-attach.ts",
+            "src/dashboard/server/ws-terminal.ts",
+            "src/dashboard/server/__tests__/pty-hub-attach.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/pty-hub-attach.test.ts src/dashboard/server/__tests__/pty-hub.test.ts src/dashboard/server/__tests__/ws-terminal-auth.test.ts src/dashboard/server/__tests__/ws-terminal-heartbeat.test.ts src/dashboard/server/__tests__/ws-terminal-heartbeat-wiring.test.ts src/dashboard/server/__tests__/ws-terminal-herdr-snapshot.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "all listed vitest files pass",
+            "typecheck completes without errors",
+            "file-size guard reports no violation for ws-terminal.ts"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. Create src/dashboard/server/pty-hub-attach.ts with spawnTmuxAttachPty(sessionName, cols, rows) (the exact pty.spawn('tmux', buildTmuxArgs(['attach-session','-t',sessionName]), {name:'xterm-256color', cols, rows, cwd: homedir(), env: buildChildEnvWithoutTmux(...TERM/COLORTERM/LANG)}) call moved from ws-terminal.ts line 597 with its comment) and attachHubPty(hubs, sessionName, hub, ptyProcess): sets hub.pty, onData -> broadcastToHub, onExit -> delete the registry entry only if it still points at this hub, close every OPEN client with (1000, 'Session ended'), clear clients/clientStates, notifyHubExit(hub). In ws-terminal.ts startLocalPty use both; keep the diag counters/interval and the '[ws-terminal] PTY for ... exited' log as extra onData/onExit listeners. Call notifyHubSize after the size-frame loops at ws-terminal.ts lines 478 (existingHub), 507 (existingHub) and 677 (hub). Remove imports that become unused. Tests use a fake IPty with emitters and spies. NFR-1 nuance (accepted, do not fix): while a viewer watches a tmux terminal no tab had open, the host's first tab joins the bridge's hub through the existing-hub path, like a second tab does today."
+        },
+        "items": [
+          {
+            "id": "hub-pty-attach-extract.ac1",
+            "title": "Given ws-terminal.ts after the change, when searched for 'pty.spawn(', then it has no match and startLocalPty calls spawnTmuxAttachPty and attachHubPty",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hub-pty-attach-extract.ac2",
+            "title": "Given attachHubPty with a fake PTY and one open ready client, when the PTY emits data and fake timers advance 4 ms, then the client receives it; when the PTY exits, then the client is closed with (1000, 'Session ended'), the registry entry is deleted and a registered listener's onExit fires",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hub-pty-attach-extract.ac3",
+            "title": "Given the registry now maps the session to a different hub, when the old hub's PTY exits, then the registry entry for the new hub is preserved",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hub-pty-attach-extract.ac4",
+            "title": "Given the existing ws-terminal-*.test.ts files, when they run, then they pass unmodified, and `bash scripts/lint-file-size.sh` reports ws-terminal.ts at or under its origin/main line count",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tmux-hub-subscribe",
+        "title": "Add subscribeToTmuxHub: a read-only, snapshot-first tmux terminal source over the PTY hub",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:55:14Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4477",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/pty-hub-attach.ts",
+            "src/dashboard/server/__tests__/pty-hub-attach.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/pty-hub-attach.test.ts"
+          ],
+          "expected_outputs": [
+            "pty-hub-attach.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-5",
+            "FR-6",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. Add TmuxHubDeps {hubs, sessionExists, clientSize, captureViewport, spawn}, productionTmuxHubDeps and subscribeToTmuxHub(sessionName, onFrame: (TerminalFrame) => void, deps?) : Promise<{close()} | null> to pty-hub-attach.ts. No hub: sessionExists false or clientSize null -> null; re-check the registry synchronously after the awaits; else create a hub {pty:null, clients:new Set(), cols, rows, pendingInput:[], inputClient:null, clientStates:new Map()}, register it, attachHubPty(deps.spawn(...)). Register the listener BEFORE capturing; buffer onData until the snapshot is sent; emit {kind:'snapshot', cols: hub.cols, rows: hub.rows, data: captureViewport} then one output with the buffered data; afterwards forward output/size; onExit -> {kind:'exit', code:null}. close() = removeHubListener(deps.hubs, sessionName, hub, listener) once, with the hub object captured when subscribing; nothing emitted after close. Production clientSize: tmuxExecAsync display-message '#{window_width},#{window_height},#{status}' with status off=+0, on=+1, digit n=+n, else null. Production captureViewport: capturePane(sessionName, 0, {escapeSequences:true}) with failure -> ''. Never call pty.write or pty.resize."
+        },
+        "items": [
+          {
+            "id": "tmux-hub-subscribe.ac1",
+            "title": "Given no hub and sessionExists false, when subscribeToTmuxHub runs, then it returns null and spawn is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tmux-hub-subscribe.ac2",
+            "title": "Given no hub and a window of 100x30 with status on, when subscribeToTmuxHub runs, then spawn is called once with (session, 100, 31), the hub is registered with inputClient null, and the first frame is a snapshot with cols 100 and rows 31",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tmux-hub-subscribe.ac3",
+            "title": "Given an existing hub at 120x40, when subscribeToTmuxHub runs, then spawn is not called and the snapshot reports 120x40",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tmux-hub-subscribe.ac4",
+            "title": "Given output arriving while the capture is pending, when the capture resolves, then frames arrive as snapshot then output in arrival order, and a later notifyHubSize produces a size frame",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tmux-hub-subscribe.ac5",
+            "title": "Given a bridge-created hub with no WebSocket clients, when close() is called, then the PTY's kill is called, the hub is unregistered, and across the suite the fake PTY's write and resize spies record zero calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "terminal-bridge",
+        "title": "Add TerminalBridge resolving a shared conversation's terminal to a Herdr observe stream or the tmux hub",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:55:14Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4477",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/sharing/terminal-bridge.ts",
+            "src/dashboard/server/sharing/__tests__/terminal-bridge.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/sharing/__tests__/terminal-bridge.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "terminal-bridge.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-5",
+            "FR-6",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. Create src/dashboard/server/sharing/terminal-bridge.ts: TerminalSink {send(TerminalPayload)}, TerminalTarget (herdr terminalId | tmux sessionName | missing), TerminalBridgeDeps {resolveTarget, observeHerdr, subscribeTmux}, class TerminalBridge(conversationName, deps) with attach(sink): Promise<() => void> and close(), terminalPayloadOf(frame, sawSnapshot), productionTerminalBridgeDeps(). Per attach: missing or resolver throws -> one unavailable terminal_not_found, no-op detach. herdr -> observeHerdr(terminalId), pump frames with for-await: snapshot/output/size map 1:1; exit or iterator end -> unavailable terminal_not_found if no snapshot seen, else terminal_ended, then stop. tmux -> subscribeTmux with the same mapping; null -> terminal_not_found. Detach idempotent; detach during opening closes the source once open; a throwing sink is detached. close() detaches all; later attaches send nothing. Production resolveTarget: runDashboardDbJob('getConversationByName', name) -> conv.tmuxSession; resolveHerdrTerminalId(tmuxSession) -> herdr; else Effect.runPromise(sessionExists(tmuxSession)).catch(()=>false) -> tmux; else missing. observeHerdr = observeTerminal(id) with NO cols/rows. subscribeTmux = subscribeToTmuxHub. No write method anywhere; no logging."
+        },
+        "items": [
+          {
+            "id": "terminal-bridge.ac1",
+            "title": "Given resolveTarget answers missing or throws, when attach runs, then the sink receives exactly one { kind: 'unavailable', reason: 'terminal_not_found' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "terminal-bridge.ac2",
+            "title": "Given a herdr target whose observation yields snapshot, output and size frames, when attach runs, then the sink receives snapshot, output and size payloads in that order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "terminal-bridge.ac3",
+            "title": "Given a herdr observation that exits after a snapshot, when the exit frame arrives, then the sink receives unavailable terminal_ended; if it exits before any snapshot, then unavailable terminal_not_found",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "terminal-bridge.ac4",
+            "title": "Given two attaches on a herdr target, when each is detached and then close() is called, then two observations were opened, each close() was called once, frames after detach are not delivered, and an attach after close() sends nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "terminal-bridge.ac5",
+            "title": "Given a tmux target, when subscribeTmux returns null, then the sink receives terminal_not_found; when it returns a subscription, then frames map identically and detach calls its close()",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "peer-hub-terminal",
+        "title": "Handle the viewer terminal watch in PeerHub and send terminal envelopes to negotiated peers only",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:55:14Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4477",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/sharing/peer-hub.ts",
+            "src/dashboard/server/sharing/__tests__/peer-hub.test.ts",
+            "src/dashboard/server/sharing/__tests__/peer-hub-loopback.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/sharing/__tests__/peer-hub.test.ts src/dashboard/server/sharing/__tests__/peer-hub-loopback.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "peer-hub tests pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-7",
+            "NFR-2"
+          ],
+          "foundationFor": [
+            "shared-terminal-e2e"
+          ],
+          "acJustification": "Six criteria: the five behaviour checks plus the loopback test's required dep update, which otherwise breaks at runtime."
+        },
+        "narrative": {
+          "Action": "PRD WI-6. PeerHubDeps gains terminal: {attach(sink: TerminalSink): Promise<() => void>; close(): void}; productionPeerHubDeps adds new TerminalBridge(conversationName, productionTerminalBridgeDeps()). PeerEntry gains terminalWatch=false, terminalGeneration=0, detachTerminal=null. Keep line 282 unchanged (no onMessage on terminal) and comment that read-only is structural. onControlMessage: kind 'terminal-watch' is honoured only when helloState === 'negotiated' and watch is boolean -> setTerminalWatch. setTerminalWatch: same value -> no-op; true -> maybeAttachTerminal; false -> bump generation, call+clear detachTerminal. maybeAttachTerminal requires not closed, negotiated, terminalWatch, open.has('terminal'), detachTerminal null; capture generation=++terminalGeneration; attach({send: p => sendTerminal(entry, generation, p)}).then(detach => stale or closed ? detach() : store). sendTerminal drops stale generations, else sendEnvelope(entry,'terminal',p) swallowing RangeError. onChannelOpen: 'terminal' -> maybeAttachTerminal. closePeer bumps generation and detaches; close() calls deps.terminal.close(). Update the module header. In peer-hub.test.ts replace the line-553 case 'never writes to or reads from drafts and terminal' (drafts stays silent; terminal sends only after a watch) and add a fake terminal dep; peer-hub-loopback.test.ts builds PeerHubDeps at line 95: add `terminal: { attach: async () => () => undefined, close: () => undefined }` there, otherwise hub.close() throws on the missing dep at runtime."
+        },
+        "items": [
+          {
+            "id": "peer-hub-terminal.ac1",
+            "title": "Given a peer whose viewer hello has not negotiated, when a terminal-watch true control envelope arrives, then deps.terminal.attach is not called; given a failed hello, then a later watch is also ignored",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "peer-hub-terminal.ac2",
+            "title": "Given a negotiated peer with the terminal channel open, when terminal-watch true arrives twice, then attach is called once and the sink's snapshot is sent on the terminal channel as an envelope with ch 'terminal', seq 1 and streamId equal to the conversation id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "peer-hub-terminal.ac3",
+            "title": "Given an attached watch, when terminal-watch false arrives, then the detach function is called once and a payload sent afterwards through the old sink produces no envelope",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "peer-hub-terminal.ac4",
+            "title": "Given an attached watch, when the peer is closed by kick or hub.close() runs, then detach is called and hub.close() calls deps.terminal.close()",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "peer-hub-terminal.ac5",
+            "title": "Given any peer, when its channels are inspected, then the terminal and drafts channels have zero onMessage subscriptions and drafts has zero sends",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "peer-hub-terminal.ac6",
+            "title": "Given peer-hub-loopback.test.ts with a no-op terminal dep added to its PeerHubDeps, when it runs, then it passes and hub.close() does not throw",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "viewer-peer-terminal",
+        "title": "Read terminal envelopes and send the terminal watch from WebRtcViewer",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:55:14Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4477",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/sharing/webrtc-viewer.ts",
+            "src/dashboard/frontend/src/components/chat/sharing/__tests__/webrtc-viewer.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/chat/sharing/__tests__/webrtc-viewer.test.ts"
+          ],
+          "expected_outputs": [
+            "webrtc-viewer.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. WebRtcViewerCallbacks gains onTerminal(payload: TerminalPayload). Negotiation gains control: RTCDataChannel | null and controlSeq (hello reply is seq 1). wireChannel (line 227) wires 'terminal' as well; only 'drafts' stays unwired. Terminal envelopes are accepted only when negotiation.streamId is set and equal; export readTerminalPayload(value): rebuild field by field, cols/rows safe integers 1..1000, data string, reason one of the two, else null (dropped). New public setTerminalWatch(watch): store this.terminalWatch; if the current negotiation completed its hello reply and its control channel is open, send { kind: 'terminal-watch', watch } on control with ++controlSeq. After a successful hello reply, send watch true if this.terminalWatch. Never call send on the terminal channel. Replace the line-262 test 'gives drafts and terminal channels no message listener'."
+        },
+        "items": [
+          {
+            "id": "viewer-peer-terminal.ac1",
+            "title": "Given a negotiated viewer, when a terminal snapshot envelope with an extra key arrives, then onTerminal receives exactly { kind, cols, rows, data } and envelopes with cols 0, cols 1.5 or an unknown reason are dropped",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "viewer-peer-terminal.ac2",
+            "title": "Given the hello reply was sent with seq 1, when setTerminalWatch(true) is called, then one control envelope with seq 2 and payload { kind: 'terminal-watch', watch: true } is sent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "viewer-peer-terminal.ac3",
+            "title": "Given setTerminalWatch(true) was called before the host hello, when the hello arrives, then the watch envelope is sent once after the hello reply; and given a second offer while watching, then the new peer sends watch true after its own hello",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "viewer-peer-terminal.ac4",
+            "title": "Given the whole suite, when the fake terminal channel is inspected, then its send was never called and the drafts channel has no message listener while the terminal channel has one",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "shared-terminal-view",
+        "title": "Add SharedTerminalView: a read-only xterm sized to the host terminal",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:55:14Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4477",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/sharing/SharedTerminalView.tsx",
+            "src/dashboard/frontend/src/components/chat/sharing/__tests__/SharedTerminalView.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/chat/sharing/__tests__/SharedTerminalView.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "SharedTerminalView.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. Create SharedTerminalView({ watch }) where watch(listener) => stop. On mount: new Terminal({ disableStdin: true, cursorBlink: false, cursorInactiveStyle: 'none', scrollback: 0, convertEol: false, fontSize: 14, fontFamily: resolved --font-mono (same lookup as XTerminal.tsx), theme: {...palette} }), open into the container, then stop = watch(onPayload). No FitAddon, no WebglAddon, no onData/onKey/attachCustomKeyEventHandler. Unmount: stop(), dispose(). snapshot -> reset(); resize(cols, rows); write(data) and clear any notice; output -> write; size -> resize; unavailable -> notice text ('The host's terminal is not running.' for terminal_not_found, 'The host's terminal session ended.' for terminal_ended). Palette from useTheme/useColorTheme like XTerminal.tsx lines 101-114; a palette change sets term.options.theme. Root <div data-testid=\"shared-terminal\" className=\"min-h-0 flex-1 overflow-auto bg-background p-2\"> with caption 'Read-only — you are watching the host's terminal.'. Do not modify XTerminal.tsx. Mock @xterm/xterm as XTerminal.test.tsx does. Add the test path to scripts/frontend-test-subset.txt in sorted position."
+        },
+        "items": [
+          {
+            "id": "shared-terminal-view.ac1",
+            "title": "Given the mocked Terminal, when SharedTerminalView mounts, then the constructor options include disableStdin: true and no onData, onKey or attachCustomKeyEventHandler call is recorded",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "shared-terminal-view.ac2",
+            "title": "Given payloads snapshot(100x30), output and size(120x40), when they reach the watch listener, then the mock records reset, resize(100, 30), write(snapshot data), write(output data), resize(120, 40) in that order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "shared-terminal-view.ac3",
+            "title": "Given an unavailable terminal_not_found payload, when it arrives, then the component renders the text \"The host's terminal is not running.\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "shared-terminal-view.ac4",
+            "title": "Given the mounted view, when it unmounts, then the watch stop function and term.dispose are each called once, and scripts/frontend-test-subset.txt lists the new test path in sorted order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "viewer-terminal-toggle",
+        "title": "Add the Conversation / Terminal toggle and terminal plumbing to the viewer page",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:55:14Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4477",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/sharing/useSharedJoin.ts",
+            "src/dashboard/frontend/src/components/chat/sharing/SharedConversationView.tsx",
+            "src/dashboard/frontend/src/components/chat/sharing/__tests__/useSharedJoin.test.tsx",
+            "src/dashboard/frontend/src/components/chat/sharing/__tests__/SharedConversationView.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/chat/sharing/__tests__/useSharedJoin.test.tsx src/components/chat/sharing/__tests__/SharedConversationView.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. useSharedJoin: SharedJoin gains watchTerminal(listener): () => void — stores the listener in a ref, calls viewerRef.current?.setTerminalWatch(true), and returns a stop that clears the listener only if it is still registered and calls setTerminalWatch(false). Viewer callbacks gain onTerminal forwarding to the listener ref when the viewer is current and alive (no React state for terminal data). ensureViewer creating a viewer while a listener is registered calls setTerminalWatch(true) on it. ViewerPeer type adds setTerminalWatch. SharedConversationView admittedScreen: local surface state 'conversation' | 'terminal' (default conversation); when the peer is connected (or host-disconnected with history) render <div role=\"group\" aria-label=\"Shared view\" data-testid=\"shared-view-toggle\"> with NEUTRAL_BUTTON buttons 'Conversation' and 'Terminal' using aria-pressed; surface terminal renders <SharedTerminalView watch={props.watchTerminal} /> instead of the timeline."
+        },
+        "items": [
+          {
+            "id": "viewer-terminal-toggle.ac1",
+            "title": "Given useSharedJoin with a fake viewer, when watchTerminal(listener) is called, then the viewer's setTerminalWatch(true) is called and a payload passed to onTerminal reaches the listener",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "viewer-terminal-toggle.ac2",
+            "title": "Given an active terminal watch, when its stop function runs, then setTerminalWatch(false) is called and later onTerminal payloads do not reach the old listener",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "viewer-terminal-toggle.ac3",
+            "title": "Given an admitted viewer with peerPhase connected, when the view renders, then the Shared view group shows Conversation (aria-pressed true) and Terminal buttons, and the lobby screen renders no such group",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "viewer-terminal-toggle.ac4",
+            "title": "Given the admitted view, when Terminal is clicked, then [data-testid=\"shared-terminal\"] renders and watchTerminal is called; when Conversation is clicked, then the terminal view unmounts and the stop function is called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "shared-terminal-e2e",
+        "title": "Playwright e2e: a viewer watches a live tmux terminal and cannot type into it",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:55:14Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "test",
+          "issueLabel": "pan-4477",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/tests/pan-4477-shared-terminal.spec.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run build",
+            "cd src/dashboard/frontend && npx playwright test tests/pan-4477-shared-terminal.spec.ts"
+          ],
+          "expected_outputs": [
+            "the build completes",
+            "the pan-4477 spec passes in an isolated browser"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10. New spec modelled on src/dashboard/frontend/tests/pan-4475-shared-viewer.spec.ts (Miniflare share Worker, two startIsolatedDashboard children with temp OVERDECK_HOME and fake HOME, dead-loopback account.json baseUrl and anywhere.directory_url, separate isolated browser contexts; never port 3011's real dashboard). Host env adds OVERDECK_TMUX_SOCKET_NAME 'pan4477e2e'; host config.yaml adds 'terminal:\\n  backend: tmux'. Before boot: promisify(execFile) tmux -L pan4477e2e new-session -d -s conv-<NAME> -x 100 -y 30 cat; afterAll kill-server on that socket. Flow: share, admit viewer, viewer clicks Terminal; host send-keys 'live-4477' Enter; expect the viewer's [data-testid=shared-terminal] to contain 'live-4477'. Then the viewer clicks the terminal and types 'viewer-keys-4477' + Enter; after 1 s tmux capture-pane on the host session must not contain it. Screenshots under test-results/pan-4477/. Not added to test:playwright. Implementation checkpoint: if the host shows 'not running', verify getManagedTmuxSocketName() resolution under the child env first; fallback is creating the session through the host's own tmux helper with the same env. Do not drop the test."
+        },
+        "items": [
+          {
+            "id": "shared-terminal-e2e.ac1",
+            "title": "Given a shared conversation whose tmux session runs cat, when the admitted viewer clicks Terminal and the host sends 'live-4477' to the session, then the viewer's shared-terminal element contains the text live-4477",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "shared-terminal-e2e.ac2",
+            "title": "Given the viewer's Terminal view, when the viewer types viewer-keys-4477 and presses Enter, then one second later the host pane capture does not contain viewer-keys-4477",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "shared-terminal-e2e.ac3",
+            "title": "Given the spec run, when it finishes, then the pan4477e2e tmux server is killed and screenshots exist under test-results/pan-4477/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document the read-only terminal channel in the Shared Sessions, terminal-backend and dashboard docs",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:55:14Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4477",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/SHARED-SESSIONS.md",
+            "configuration/shared-sessions.mdx",
+            "docs/TERMINAL-BACKENDS.md",
+            "docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-6",
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-5",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-11. docs/SHARED-SESSIONS.md: change the slice-3 channel table's terminal row to 'A watched viewer's read-only terminal (slice 6)' and the control row to mention terminal-watch; add '## Read-only terminal (slice 6, PAN-4477)' before '## Local development' covering the terminal-watch payload, the TerminalPayload kinds, the Herdr source (one observe stream and herdr child per watching viewer) and the tmux source (hub listener; a hub created at the client size when no tab holds it; torn down when the last listener and client leave), why it is read-only (no inbound subscription on terminal, no write method on any source, viewer disableStdin), that a Herdr viewer does not follow host resizes until it re-toggles, the overflow rule and version-skew behaviour; fix the slice-4 Browser peer paragraph's '(drafts and terminal get no listener yet)'. configuration/shared-sessions.mdx 'What viewers see': add the Conversation / Terminal toggle bullet, the read-only statement and the two messages. docs/TERMINAL-BACKENDS.md paragraph at line 645 ('The dashboard terminal follows the same rule'): add the Shared Sessions observe consumer and the tmux hub listener. docs/DASHBOARD-ARCHITECTURE.md Shared Sessions bullet (lines 83-95): add a PAN-4477 sentence naming sharing/terminal-bridge.ts, pty-hub-attach.ts and the hub-listener seam."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "Given docs/SHARED-SESSIONS.md, when read, then it contains a '## Read-only terminal (slice 6, PAN-4477)' section naming terminal-watch, the four TerminalPayload kinds, both backend sources and the three read-only guarantees, and its channel table's terminal row no longer says 'Nothing yet'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "Given configuration/shared-sessions.mdx, when read, then 'What viewers see' lists the Terminal toggle, states the viewer's typing never reaches the host, and quotes both unavailable messages",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "Given docs/TERMINAL-BACKENDS.md and docs/DASHBOARD-ARCHITECTURE.md, when read, then each names the Shared Sessions terminal consumer (observe stream and hub listener) and PAN-4477, and `npm run lint:docs` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "wire-terminal-types",
+        "to": "terminal-bridge",
+        "type": "blocks"
+      },
+      {
+        "from": "wire-terminal-types",
+        "to": "peer-hub-terminal",
+        "type": "blocks"
+      },
+      {
+        "from": "wire-terminal-types",
+        "to": "viewer-peer-terminal",
+        "type": "blocks"
+      },
+      {
+        "from": "wire-terminal-types",
+        "to": "shared-terminal-view",
+        "type": "blocks"
+      },
+      {
+        "from": "pty-hub-listeners",
+        "to": "hub-pty-attach-extract",
+        "type": "blocks"
+      },
+      {
+        "from": "pty-hub-listeners",
+        "to": "tmux-hub-subscribe",
+        "type": "blocks"
+      },
+      {
+        "from": "hub-pty-attach-extract",
+        "to": "tmux-hub-subscribe",
+        "type": "blocks"
+      },
+      {
+        "from": "tmux-hub-subscribe",
+        "to": "terminal-bridge",
+        "type": "blocks"
+      },
+      {
+        "from": "terminal-bridge",
+        "to": "peer-hub-terminal",
+        "type": "blocks"
+      },
+      {
+        "from": "viewer-peer-terminal",
+        "to": "viewer-terminal-toggle",
+        "type": "blocks"
+      },
+      {
+        "from": "shared-terminal-view",
+        "to": "viewer-terminal-toggle",
+        "type": "blocks"
+      },
+      {
+        "from": "peer-hub-terminal",
+        "to": "shared-terminal-e2e",
+        "type": "blocks"
+      },
+      {
+        "from": "viewer-terminal-toggle",
+        "to": "shared-terminal-e2e",
+        "type": "blocks"
+      },
+      {
+        "from": "wire-terminal-types",
+        "to": "docs",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

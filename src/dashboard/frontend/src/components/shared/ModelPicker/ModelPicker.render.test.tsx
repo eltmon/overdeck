@@ -131,3 +131,35 @@ describe('shared HarnessSelect blocked harness (PAN-2528)', () => {
     expect(onChange).toHaveBeenCalledWith('codex');
   });
 });
+
+describe('shared ModelPicker labelId (PAN-4755 D11)', () => {
+  it('ModelSelect with labelId renders no built-in label and names the trigger by the external label', () => {
+    render(
+      <>
+        <span id="ext">Model</span>
+        <ModelSelect labelId="ext" value="claude-sonnet-4-6" onChange={vi.fn()} groups={groups} label="Model" />
+      </>,
+    );
+
+    expect(screen.getByRole('button', { name: /^Model / })).toBeInTheDocument();
+    expect(screen.getAllByText('Model')).toHaveLength(1);
+  });
+
+  it('HarnessSelect with labelId renders no built-in label and names the trigger by the external label', () => {
+    render(
+      <>
+        <span id="ext">Harness</span>
+        <HarnessSelect labelId="ext" value="claude-code" onChange={vi.fn()} modelId="claude-sonnet-4-6" />
+      </>,
+    );
+
+    expect(screen.getByRole('button', { name: /^Harness / })).toBeInTheDocument();
+    expect(screen.getAllByText('Harness')).toHaveLength(1);
+  });
+
+  it('ModelSelect without labelId still renders its own label', () => {
+    render(<ModelSelect value="claude-sonnet-4-6" onChange={vi.fn()} groups={groups} label="Model" />);
+    expect(screen.getByText('Model')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Claude Sonnet 4\.6/i })).not.toHaveAttribute('aria-labelledby');
+  });
+});

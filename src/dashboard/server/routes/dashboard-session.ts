@@ -18,7 +18,7 @@ import {
   dashboardSessionCookieHeader,
   rejectUnauthorizedDashboardRequest,
   rejectUnauthorizedDashboardSessionMintRequest,
-  resolveDashboardCredential,
+  resolveRequestCredential,
 } from './dashboard-auth.js';
 import { validateOrigin, type HeaderMap } from './origin-validation.js';
 
@@ -83,7 +83,7 @@ export const dashboardSessionRouteLayer = HttpRouter.add(
       return jsonResponse({ error: originCheck.error }, { status: 403 });
     }
     const headers = request.headers as HeaderMap;
-    const credential = resolveDashboardCredential(headers);
+    const credential = resolveRequestCredential(request);
     // PAN-2351 D-12: a token never mints a session. This runs before the
     // loopback mint check, so peer trust cannot turn a token into root.
     if (credential?.kind === 'token') {

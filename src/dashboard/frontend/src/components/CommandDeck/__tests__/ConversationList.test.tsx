@@ -6,8 +6,15 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ConversationList, updateConversationTitle } from '../ConversationList';
+import { __resetTriageUndoStackForTests } from '../useConversationMutations';
 import { DialogProvider } from '../../DialogProvider';
 
+// PAN-4650: the hidden-machines footer reads the machine list; keep it off the fetch these tests count.
+vi.mock('../../Settings/anywhere/machinesApi', () => ({
+  MACHINES_QUERY_KEY: ['anywhere-machines'],
+  loadMachines: async () => ({ links: [] }),
+  setMachineHidden: async () => ({ status: 200, body: {} }),
+}));
 vi.mock('../../DialogProvider', () => ({
   DialogProvider: ({ children }: { children: React.ReactNode }) => children,
   useConfirm: () => vi.fn().mockResolvedValue(true),
@@ -647,5 +654,255 @@ describe('ConversationList nesting (PAN-4223 WI-10)', () => {
     const toggle = screen.getByRole('button', { name: '▾ 1 lane' });
     fireEvent.click(toggle);
     expect(screen.queryByText('Lane 11')).not.toBeInTheDocument();
+  });
+});
+
+describe('ConversationList sections (PAN-4639 WI-5)', () => {
+  function triageConv(id: number, name: string, extra: Record<string, unknown> = {}) {
+    return {
+      ...mockConversation,
+      id,
+      name,
+      tmuxSession: `conv-${name}`,
+      title: name,
+      createdAt: `2026-10-05T00:0${id}:00.000Z`,
+      // Keep the poll interval off the 2s "pending spawn" branch for the
+      // fake-timer test — an ended row with sessionAlive false counts as
+      // pending spawn and would refetch every 2s under advanced timers.
+      endedAt: '2026-10-05T09:00:00.000Z',
+      ...extra,
+    };
+  }
+
+  function renderRows(rows: unknown[]) {
+    const client = makeClient();
+    client.setQueryData(['conversations'], rows);
+    render(
+      <DialogProvider>
+        <QueryClientProvider client={client}>
+          <ConversationList selectedConversation={null} onSelectConversation={() => {}} />
+        </QueryClientProvider>
+      </DialogProvider>,
+    );
+    return client;
+  }
+
+  beforeEach(() => {
+    localStorage.removeItem('commandDeck.sections.expanded');
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
+
+  it('list-sections.ac1: the needsYou wrapper renders above the inbox wrapper and contains the pending conversation', () => {
+    renderRows([
+      triageConv(1, 'plain-a'),
+      triageConv(2, 'needs-you', { pendingInputCount: 1 }),
+      triageConv(3, 'plain-b'),
+    ]);
+    const needsYouRow = screen.getByTitle('needs-you').closest('[data-section]');
+    const inboxRow = screen.getByTitle('plain-a').closest('[data-section]');
+    expect(needsYouRow).toHaveAttribute('data-section', 'needsYou');
+    expect(inboxRow).toHaveAttribute('data-section', 'inbox');
+    // needsYouRow precedes inboxRow in document order.
+    expect(needsYouRow!.compareDocumentPosition(inboxRow!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('list-sections.ac2: Snoozed and Settled headers render collapsed, with their rows hidden until clicked', () => {
+    renderRows([
+      triageConv(1, 'settled-1', { settledAt: '2026-09-01T00:00:00.000Z' }),
+      triageConv(2, 'snoozed-1', { snoozedUntil: '2099-01-01T00:00:00.000Z' }),
+    ]);
+    const settledHeader = screen.getByRole('button', { name: /Settled · 1/ });
+    const snoozedHeader = screen.getByRole('button', { name: /Snoozed · 1/ });
+    expect(settledHeader).toHaveAttribute('aria-expanded', 'false');
+    expect(snoozedHeader).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByTitle('settled-1')).not.toBeInTheDocument();
+    expect(screen.queryByTitle('snoozed-1')).not.toBeInTheDocument();
+
+    fireEvent.click(settledHeader);
+    expect(screen.getByTitle('settled-1')).toBeInTheDocument();
+    expect(settledHeader).toHaveAttribute('aria-expanded', 'true');
+
+    fireEvent.click(snoozedHeader);
+    expect(screen.getByTitle('snoozed-1')).toBeInTheDocument();
+  });
+
+  it('list-sections.ac3: a snoozed row moves to inbox once its wake time passes, driven only by the 30s tick', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-05T10:00:00.000Z'));
+    const rows = [triageConv(1, 'wakes-soon', { snoozedUntil: '2026-10-05T10:00:05.000Z' })];
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json(rows)));
+
+    renderRows(rows);
+    expect(screen.getByRole('button', { name: /Snoozed · 1/ })).toBeInTheDocument();
+    expect(screen.queryByTitle('wakes-soon')).not.toBeInTheDocument();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30_000);
+    });
+
+    expect(screen.queryByRole('button', { name: /Snoozed/ })).not.toBeInTheDocument();
+    expect(screen.getByTitle('wakes-soon')).toBeInTheDocument();
+  });
+
+  it('shows "Inbox clear" when only Snoozed/Settled have rows', () => {
+    renderRows([triageConv(1, 'settled-1', { settledAt: '2026-09-01T00:00:00.000Z' })]);
+    expect(screen.getByText('Inbox clear')).toBeInTheDocument();
+  });
+
+  it('shows the generic empty message when there are no conversations at all', () => {
+    renderRows([]);
+    expect(screen.getByText('No conversations yet')).toBeInTheDocument();
+  });
+});
+
+describe('Cmd/Ctrl+Z undo (PAN-4639 WI-9)', () => {
+  beforeEach(() => {
+    __resetTriageUndoStackForTests();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    __resetTriageUndoStackForTests();
+  });
+
+  function triageRequestBodies(fetchMock: ReturnType<typeof vi.fn>): unknown[] {
+    return fetchMock.mock.calls
+      .filter(([url]: [string]) => url === '/api/conversations/triage')
+      .map(([, init]: [string, RequestInit]) => JSON.parse(init.body as string));
+  }
+
+  it('keyboard-undo.ac1: Ctrl+Z after settling via the row checkbox sends a second POST with settled: false', async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url === '/api/conversations/triage') {
+        return new Response(JSON.stringify({ conversations: [], notFound: [], rejected: [] }), { status: 200 });
+      }
+      if (url === '/api/conversations') {
+        return new Response(JSON.stringify([mockConversation]), { status: 200 });
+      }
+      return new Response(JSON.stringify([]), { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    renderList();
+
+    const checkbox = screen.getByRole('checkbox', { name: /Settle/ });
+    fireEvent.click(checkbox);
+    await waitFor(() => expect(triageRequestBodies(fetchMock)).toHaveLength(1));
+
+    fireEvent.keyDown(checkbox, { key: 'z', ctrlKey: true });
+
+    await waitFor(() => expect(triageRequestBodies(fetchMock)).toHaveLength(2));
+    expect(triageRequestBodies(fetchMock)[1]).toEqual({
+      updates: [{ name: 'test-conv', settled: false, snoozedUntil: null }],
+    });
+  });
+
+  it('keyboard-undo.ac2: Ctrl+Z inside the rename input sends no triage request', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ conversations: [], notFound: [], rejected: [] }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    renderList();
+
+    fireEvent.click(screen.getByTitle('More actions'));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Rename' }));
+    const input = screen.getByRole('textbox', { name: 'Rename test-conv' });
+
+    fireEvent.keyDown(input, { key: 'z', ctrlKey: true });
+
+    expect(triageRequestBodies(fetchMock)).toHaveLength(0);
+  });
+});
+
+describe('Multi-select and bulk bar (PAN-4639 WI-10)', () => {
+  function selectConv(id: number, name: string) {
+    return {
+      ...mockConversation,
+      id,
+      name,
+      tmuxSession: `conv-${name}`,
+      title: name,
+      lastAttachedAt: `2026-10-05T00:0${id}:00.000Z`,
+      endedAt: '2026-10-05T09:00:00.000Z',
+    };
+  }
+
+  function renderThree() {
+    const client = makeClient();
+    client.setQueryData(['conversations'], [selectConv(1, 'a'), selectConv(2, 'b'), selectConv(3, 'c')]);
+    render(
+      <DialogProvider>
+        <QueryClientProvider client={client}>
+          <ConversationList selectedConversation={null} onSelectConversation={() => {}} />
+        </QueryClientProvider>
+      </DialogProvider>,
+    );
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('bulk-select.ac1: Ctrl-click, Ctrl-click, then Shift-click select all three rows', () => {
+    renderThree();
+    fireEvent.click(screen.getByTitle('a'), { ctrlKey: true });
+    fireEvent.click(screen.getByTitle('b'), { ctrlKey: true });
+    fireEvent.click(screen.getByTitle('c'), { shiftKey: true });
+
+    expect(screen.getByText('3 selected')).toBeInTheDocument();
+    expect(screen.getByTitle('a')).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByTitle('b')).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByTitle('c')).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('bulk-select.ac2: clicking the bulk bar Settle sends one request with three updates and closes the bar', async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url === '/api/conversations/triage') {
+        return new Response(JSON.stringify({ conversations: [], notFound: [], rejected: [] }), { status: 200 });
+      }
+      return new Response(JSON.stringify([]), { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    renderThree();
+
+    fireEvent.click(screen.getByTitle('a'), { ctrlKey: true });
+    fireEvent.click(screen.getByTitle('b'), { ctrlKey: true });
+    fireEvent.click(screen.getByTitle('c'), { ctrlKey: true });
+    fireEvent.click(screen.getByRole('button', { name: 'Settle' }));
+
+    await waitFor(() => {
+      const calls = fetchMock.mock.calls.filter(([url]: [string]) => url === '/api/conversations/triage');
+      expect(calls).toHaveLength(1);
+    });
+    const [, init] = fetchMock.mock.calls.find(([url]: [string]) => url === '/api/conversations/triage') as [string, RequestInit];
+    expect(JSON.parse(init.body as string)).toEqual({
+      updates: [
+        { name: 'a', settled: true },
+        { name: 'b', settled: true },
+        { name: 'c', settled: true },
+      ],
+    });
+    expect(screen.queryByText('3 selected')).not.toBeInTheDocument();
+  });
+
+  it('bulk-select.ac3: a plain click clears the selection', () => {
+    renderThree();
+    fireEvent.click(screen.getByTitle('a'), { ctrlKey: true });
+    fireEvent.click(screen.getByTitle('b'), { ctrlKey: true });
+    expect(screen.getByText('2 selected')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTitle('c'));
+    expect(screen.queryByText(/selected/)).not.toBeInTheDocument();
+  });
+
+  it('bulk-select.ac3: Escape clears the selection', () => {
+    renderThree();
+    fireEvent.click(screen.getByTitle('a'), { ctrlKey: true });
+    fireEvent.click(screen.getByTitle('b'), { ctrlKey: true });
+    expect(screen.getByText('2 selected')).toBeInTheDocument();
+
+    fireEvent.keyDown(screen.getByTitle('a'), { key: 'Escape' });
+    expect(screen.queryByText(/selected/)).not.toBeInTheDocument();
   });
 });

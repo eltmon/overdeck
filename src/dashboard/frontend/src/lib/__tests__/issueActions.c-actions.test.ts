@@ -232,12 +232,14 @@ describe('C-ACTIONS · enabled-set snapshot per phase (§3.9 gate)', () => {
       {
         "BACKLOG": [
           "plan",
+          "runOnDeft",
           "cancel",
           "createWorkspace",
         ],
         "CHANGES_REQUESTED": [
           "restartReview",
           "syncMain",
+          "runOnDeft",
           "resetIssue",
           "cancel",
           "open",
@@ -253,6 +255,7 @@ describe('C-ACTIONS · enabled-set snapshot per phase (§3.9 gate)', () => {
         "PLANNED": [
           "startAgent",
           "syncMain",
+          "runOnDeft",
           "rebuildAndStart",
           "resetIssue",
           "cancel",
@@ -261,6 +264,7 @@ describe('C-ACTIONS · enabled-set snapshot per phase (§3.9 gate)', () => {
         ],
         "READY_TO_MERGE": [
           "syncMain",
+          "runOnDeft",
           "merge",
           "resetIssue",
           "cancel",
@@ -271,6 +275,7 @@ describe('C-ACTIONS · enabled-set snapshot per phase (§3.9 gate)', () => {
         "REVIEW_RUNNING": [
           "restartReview",
           "syncMain",
+          "runOnDeft",
           "resetIssue",
           "cancel",
           "open",
@@ -282,6 +287,7 @@ describe('C-ACTIONS · enabled-set snapshot per phase (§3.9 gate)', () => {
           "recoverAgent",
           "restartAgent",
           "syncMain",
+          "runOnDeft",
           "rebuildAndStart",
           "resetIssue",
           "cancel",
@@ -293,6 +299,7 @@ describe('C-ACTIONS · enabled-set snapshot per phase (§3.9 gate)', () => {
           "stopAgent",
           "unpause",
           "restartAgent",
+          "runOnDeft",
           "resetIssue",
           "cancel",
           "open",
@@ -303,6 +310,7 @@ describe('C-ACTIONS · enabled-set snapshot per phase (§3.9 gate)', () => {
           "stopAgent",
           "pause",
           "restartAgent",
+          "runOnDeft",
           "resetIssue",
           "cancel",
           "open",

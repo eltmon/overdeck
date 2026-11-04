@@ -21,8 +21,23 @@ failing is visible directly in the PR's check history.
 runs these steps in order. Each step that fails returns early with the named
 `failedCheck`; later steps do not run.
 
-0. Skip the run if the PR already merged, or if this head already used its
-   `VERIFICATION_MAX_CYCLES` (3) attempts (outcome `skipped`, no `failedCheck`).
+0. Skip the run if the PR already merged. Unless the run sets
+   `syncTargetBranch: false`, bring each repo root to its PR head,
+   `origin/<feature branch>` (`syncWorkspaceRootsToPrHead`, PAN-4810).
+   Commits pushed from elsewhere (a handoff worktree, the merge train, a
+   GitHub suggestion) would otherwise be missing from the verified tree:
+   - A root at the PR head, or ahead of it, is left alone.
+   - A root behind it fast-forwards.
+   - A root whose only local-only commits are merges of the target branch
+     resets to the PR head.
+   - Each move is journaled as `workspace.synced-to-pr-head`.
+   - A root with real commits on both sides, or with uncommitted tracked
+     changes that a reset would destroy, is not moved. The run then fails
+     with `failedCheck: sync-target-branch`, and the agent gets the reason.
+   - A root on another branch, or whose branch is not on origin yet, is
+     skipped.
+   Then skip the run if this head already used its `VERIFICATION_MAX_CYCLES`
+   (3) attempts (outcome `skipped`, no `failedCheck`).
 1. Snapshot the head for the test-skip waiver.
 2. Merge the target branch into each repo root (`syncSingleRepo`), unless the
    project sets `syncTargetBranch: false` — `failedCheck: sync-target-branch`.
@@ -50,7 +65,18 @@ runs these steps in order. Each step that fails returns early with the named
 11. Run the acceptance-criteria check on the xBRIEF (`getXBriefACStatus`) —
     `failedCheck: vbrief-conflicts` or `vbrief-ac`.
 12. Run the plan checklist check (`checkIncompletePlanItems`) —
-    `failedCheck: incomplete-plan-items`.
+    `failedCheck: incomplete-plan-items`. It is skipped (`skipPlanChecklist`)
+    for a strike merge, and for an adopted PR workspace whose journal has
+    `workspace.adopted` or `workspace.adoption-failed` when no xBRIEF resolves
+    for the issue (PAN-4786, PAN-4810). Only adoption writes either entry, so
+    both mean the PR came from outside the pipeline. `runVerificationForIssue`
+    decides this from workspace state on every run, so retries and merge
+    verification get the same answer. The worker decides it again at this
+    step: a review requested while adoption was still creating the workspace
+    is dispatched before `workspace.adopted` is journaled. A feedback-only
+    `.pan/continues/<id>.xbrief.json` written by a failed run is not a plan
+    (`findPlan` reads specs and drafts only). An adopted workspace whose issue
+    has an xBRIEF still runs the check.
 13. Run the empty-changeset guard, which catches a changeset that touched only
     `.pan/` task state — `failedCheck: empty-changeset`.
 14. On a full pass: post a success check run, lift any verification-stuck
@@ -508,7 +534,10 @@ worker already ran:
   instead of starting a fresh worker, provided the head is the same or synced
   head (above), the options match, and the outcome is not `error`. A result is
   consumed at most once, so a second request on the same head is a real
-  re-run and still counts against the attempt budget.
+  re-run and still counts against the attempt budget. A live worker is joined
+  under the same rule: same head and same options. A live worker running with
+  other options (for example `skipPlanChecklist`, PAN-4786) is stopped and a
+  fresh worker starts.
 - **Boot re-attaches.** On boot the primary dashboard
   (`cloister/verification-boot-adoption.ts`) re-enters the review-request door,
   with source `verification-adoption`, for every `request-review` worker that
@@ -736,6 +765,36 @@ the operator once (PAN-3580). The key does not hash the UAT notes: they are
 free text that varies run to run, and a notes-keyed delivery would re-tell
 the agent on every re-run of an unchanged head.
 
+**CodeRabbit findings reach the work agent (PAN-4773).** CodeRabbit is
+advisory: it reviews only sometimes, nothing waits for it, and no merge gate
+reads it (`lint:no-coderabbit-merge-gate`). When it does post a review, the
+`pull_request_review` webhook (`handlePullRequestReview` in
+`lib/webhook-handlers.ts`) hands it to `relayCodeRabbitReview`
+(`cloister/coderabbit-feedback.ts`):
+
+- Only a submitted, not dismissed, review by `coderabbitai[bot]` on a
+  `feature/<issue>` head with a pipeline workspace is routed.
+- The review's top-level inline threads are read
+  (`fetchCodeRabbitReviewThreads` in `cloister/coderabbit-ingestion.ts`); replies
+  are left out. A review with no inline thread (a summary, or "no actionable
+  comments") routes nothing.
+- A feedback file (specialist `coderabbit`) lists each thread: id, path and
+  line, severity, title and link. It tells the agent to fix the findings it
+  agrees with, and to reply on the thread with its reason for each one it
+  rejects (`gh api repos/<repo>/pulls/<n>/comments/<id>/replies`). After a
+  code change the agent pushes and runs `pan review request`; after replies
+  only, it is done.
+- Delivery is keyed on the review id through the resurrection ladder's target,
+  like conflict repair. A delivery is journaled as `feedback.delivered` with
+  kind `coderabbit`, and the same review is never delivered twice, also when
+  GitHub sends its event twice at once.
+- With no reachable work agent (an adopted PR has none), or a delivery that is
+  not accepted, the relay raises Needs-you with the feedback file.
+
+The relay runs on the webhook only, so a review posted while the dashboard is
+down is not routed later. The reviewer context still lists CodeRabbit findings
+as advisory (`cloister/review-context.ts`).
+
 The UAT verdict comment ends with a machine marker carrying the outcome and
 the commit UAT exercised, `<!-- overdeck-uat: failed sha=<commit> -->` (the
 `--tested-sha`, else the PR head when the verdict was posted). Merge
@@ -752,7 +811,19 @@ train), the dashboard Merge button, the auto-merge executor and the merge
 train's merge-next (all through `triggerMerge`), the per-project merge
 queue, and the auto-merge scheduler (#3983,
 `dashboard/server/services/auto-merge-scheduler.ts`), which asks it before it
-schedules a ready, opted-in PR on the merge-train reconciler tick.
+schedules a ready, opted-in PR on the merge-train reconciler tick. When the
+gate refuses a GitHub PR whose approval is stale (GitHub still says approved,
+but no approval names the current head, because the author pushed after the
+review), the scheduler asks the guarded review door once for that head
+(PAN-4772, `stale-approval-rereview.ts`; journal entry
+`review.stale-approval-rerequested`). Only a door answer that started a review,
+or found one running, latches the head; any other answer (a refusal,
+`already-passed`, `tests-requeued`) is asked again on the next tick. It asks
+nothing while a review is already running. Every completed pass keeps each candidate's skip reason
+(`auto-merge-skip-reasons.ts`), served as `notScheduled` on
+`GET /api/merge-train/auto-merge/pending` and shown on the Flywheel page's
+Pending auto-merges card as "Not scheduled: <reason>". A reason is logged only
+when it changes.
 Auto-merge eligibility applies the same rule. Nothing is stored; each input is
 read when the question is asked. The PR is merge-ready when, in order:
 
@@ -927,8 +998,8 @@ other branch.
 An approved PR that turns CONFLICTING with main fails the merge gate on
 its last condition (`PR is not mergeable (state=conflicting)`), so no merge
 door ever reaches the merge executor's conflict step. The pre-review conflict
-gate runs only before review dispatch, and the merge-train reconciler never
-sees a conflicting PR. Before PAN-4384 such a PR sat until someone noticed:
+gate runs only before review dispatch, and the merge-train reconciler leaves
+a conflicting rebase to this patrol (PAN-4801). Before PAN-4384 such a PR sat until someone noticed:
 PR #4317 and PR #4322 sat CONFLICTING and APPROVED for about 13 hours.
 
 **The predicate.** `evaluateConflictRepairGate` in `cloister/merge-gate.ts`
@@ -940,7 +1011,19 @@ A conflicting PR gets no `pull_request` CI, because GitHub builds no merge ref
 for it, so its head can never get a test result (PAN-4451). The predicate
 therefore accepts `pending` or `none` checks and a missing or skipped CI test
 job, and only red checks disqualify it; a red head stays on the CI-failure
-feedback path. The merge gate is unchanged, so the repaired head still needs
+feedback path.
+
+A red head whose failing checks all concluded `CANCELLED`, `TIMED_OUT` or
+`STALE` does not disqualify it either (PAN-4917): those checks stopped before
+they judged the code, and GitHub reports a job that hit its own
+`timeout-minutes` as `CANCELLED`, the same as a run a newer push superseded.
+Any other failing conclusion, or a commit status in `FAILURE` or `ERROR`,
+still disqualifies it. The per-check list is `PrFacts.checkFailures`
+(`cloister/check-failures.ts`, GitHub only), so a red GitLab head still
+disqualifies. Before PAN-4917 a timed-out trailer gate left PR #4911 and PR
+#4915 approved and CONFLICTING.
+
+The merge gate is unchanged, so the repaired head still needs
 green CI and, in `verification.tests: ci` projects, a passed CI test job
 before anything merges. Before PAN-4451 the predicate demanded that CI too,
 and PR #4440 sat approved and CONFLICTING for about 19 hours. A verdict
@@ -959,7 +1042,9 @@ asked.
 **Declined heads are logged.** When the gate declines a candidate whose open
 PR the forge calls `mergeable: false`, the patrol logs
 `[conflict-repair] <ISSUE>: conflicting head <head8> not repaired: <reason>`
-once per issue and head in each dashboard process.
+once per issue and head in each dashboard process. A red-head reason names
+each failing check with its conclusion, for example "CI checks failing on PR
+HEAD <sha>: test (FAILURE)".
 
 **The patrol.** `startConflictRepairPatrol`
 (`dashboard/server/services/conflict-repair-patrol.ts`) runs
@@ -1086,9 +1171,13 @@ that declaration. There is no escalation for blockers that never merge.
 ## Review Convergence Gate (PAN-3151)
 
 When a review round comes back with blocking findings, the finding count is
-tracked across rounds from the round artifacts on disk. When ≥3 rounds are
-recorded and the series shows a reversal (latest count > previous) or a
-stall (two consecutive non-decreases), automatic rework re-drive is
+tracked across rounds from the round artifacts on disk. Only the current
+episode is judged: the rounds after the last 0-blocker (approved) round,
+because blockers found after an approval come from new code such as a
+conflict repair or a main merge, not from the reviewer reversing itself
+(PAN-4993). When the episode has ≥3 rounds and shows a reversal (latest
+count > previous) or a stall (two consecutive non-decreases), automatic
+rework re-drive is
 suppressed — feedback is still written and posted, but the work agent is not
 re-messaged automatically — and a needs-you escalation surfaces with the
 round history and guidance to decompose the change into sibling issues.
@@ -1402,6 +1491,36 @@ Auto-resume is intentionally suppressible:
 These gates are orthogonal to deacon-lite's own start/stop toggle
 (`pan admin cloister start|stop`).
 
+### Disk-low hold (PAN-4961)
+
+A work start whose workspace stack is unhealthy would rebuild it, and a stack
+rebuild writes about 2 GB. Before that rebuild, both start paths ask
+`resolveIssueStackDiskHold` (`src/lib/workspace/disk-cost.ts`) whether the
+project's measured stack cost fits above the 10 GiB disk floor once the
+in-flight reservations are counted (see "Disk floor and in-flight
+reservations" in [WORKSPACES-AND-PROJECTS.md](WORKSPACES-AND-PROJECTS.md)).
+When it does not, the start is held, not attempted:
+
+- `POST /api/agents` (the dashboard Start button and the finalize auto-handoff)
+  answers HTTP 507 with
+  `{ success: false, blocked: true, skipped: true, diskLow: true, error, hint }`.
+- CLI `pan start` spawns in-process, so `assertWorkspaceStackHealthyForSpawn`
+  (`src/lib/agents/spawn-prep.ts`) throws an error whose message is the
+  disk-low text. Review, test and ship fall back to the host instead, as they
+  do for any unhealthy stack.
+
+Both messages start with `Disk low — new workspace starts are held`. A start
+whose stack is already healthy adds no disk cost and is never held. The hold
+counts no rebuild attempt and sets no cooldown or escalation, so the first
+start after space returns rebuilds at once. Both spawn-refusal classifiers map
+`diskLow: true` to the retryable `guardrails` reason, so the finalize
+auto-handoff records the refusal as deferred and deacon-lite retries it on its
+usual backoff (2, 4, 8, 16, then every 20 minutes). Like every deferred
+handoff, the retries stop after `DEFERRED_HANDOFF_WINDOW_MS` (2 hours): if the
+disk is still low then, deacon-lite records `planning.failed
+stage=auto-handoff` and a warn activity asking for `pan start <id>`, and the
+work agent starts only when someone runs it.
+
 ## GitHub quota policy (PAN-4264)
 
 GitHub limits each identity to 5,000 points per hour per bucket (GraphQL and
@@ -1420,11 +1539,15 @@ App pool's usage, which has no separate GraphQL source wired up.
 **The ledger.** Every metered call and every `/rate_limit` sample appends one
 JSON line to `~/.overdeck/github-quota/ledger-<YYYYMMDDHH>.jsonl` (UTC hour):
 `{ ts, pid, kind: 'call' | 'sample', caller, pool, bucket, cost, estimated,
-outcome, remaining?, limit?, resetAt?, agent? }`. The pool is the identity
-spent: `user` (the `gh` CLI token), `pat` (`GITHUB_TOKEN`) or `app` (GitHub
-App installation tokens). Readers aggregate the last 60 minutes from the
-current and previous hour files; files older than 3 hours are deleted on the
-hour rollover. The dashboard, the deacon child, CLI processes and the agent
+outcome, remaining?, limit?, resetAt?, agent? }`. Within one process,
+appends land in call order: each write starts after the previous one
+settles, and an entry's `ts` and file are fixed when the call is metered.
+Lines from different processes interleave in arrival order. The pool is
+the identity spent: `user` (the `gh` CLI token), `pat` (`GITHUB_TOKEN`) or
+`app` (GitHub App installation tokens). Readers aggregate the last 60
+minutes from the current and previous hour files; files older than 3 hours
+are deleted on the hour rollover. The dashboard, the deacon child, CLI
+processes and the agent
 `gh` shim (beside the agent git guard; conversations get it alone), which
 counts every call and, for agent panes and the Flywheel conversation, refuses
 grant-label writes (PAN-4343), all write it.
@@ -1526,6 +1649,8 @@ One piece of stored pipeline state came back, and it is not a status.
 | `merge.attempted` | the MERGE door in `routes/workspaces/merge-ops.ts`, once the merge holds the project's merge slot |
 | `merge.failed` | merge-ops' own `setStatus`, the single funnel every failing exit of `triggerMerge` passes through |
 | `merge.completed` | `cloister/merge-agent.ts` `postMergeLifecycle`, right after the forge answers "merged" |
+| `review.stale-approval-rerequested` | `dashboard/server/services/stale-approval-rereview.ts`, when the auto-merge scheduler asked the guarded review door for a head whose approval is stale, once per head, written only when the door answered `started` or `already-running` (`data.head`, `data.outcome`, PAN-4772) |
+| `feedback.delivered` / `feedback.skipped` | `cloister/feedback-delivery-record.ts`, from the review and UAT relays (kind `review`, `uat`) and the CodeRabbit relay `cloister/coderabbit-feedback.ts` (kind `coderabbit`, keyed per CodeRabbit review; it writes `feedback.delivered` only) (`data.kind`, `dedupKey`, `agentId`) |
 | `conflict.repair-requested` | `cloister/conflict-repair.ts` `tickConflictRepair`, once the sync-main repair for a merge-ready but conflicting head (`data.head`) was delivered, with `data.staleApproval: true` when the approval stood at an older head (PAN-4467) |
 | `conflict.repair-escalated` | `cloister/conflict-repair.ts` `tickConflictRepair`, when that head still conflicts after the 45-minute grace or its work agent cannot be reached (`data.head`, `data.reason`) |
 | `blocked.declared` | `pan task block <issue> <item> --on <ref>...` (source `pan-task-block`), with `data.item` and canonical `data.blockers` |
@@ -1538,6 +1663,7 @@ One piece of stored pipeline state came back, and it is not a status.
 | `operator.decision-withdrawn` | `pan ask --withdraw` |
 | `workspace.adopted` | `cloister/pr-workspace-adoption.ts` `adoptPrWorkspace`, after it creates the pipeline workspace on an outside PR's head (`data.prNumber`, `headSha`, `repo`) |
 | `workspace.adoption-failed` | the same function, when a failure leaves a workspace behind; also `cloister/pr-adoption-review.ts` when the review does not start after a successful adoption (`data.reason`, `detail`, `fix`) |
+| `workspace.synced-to-pr-head` | `cloister/workspace-pr-head-sync.ts` `syncWorkspaceRootsToPrHead`, at the start of a verification run that moved a repo root to its PR head (`data.branch`, `from`, `to`, `mode` `fast-forward` or `reset`, and `repo` for a polyrepo root) |
 
 `pan show <id>` prints the last six entries under the derived state; `--json`
 carries the whole journal.
@@ -1589,6 +1715,10 @@ webhook (`handlePullRequest` in `src/lib/webhook-handlers.ts`) hands that PR
 to `adoptPrAndStartReview` (`cloister/pr-adoption-review.ts`), which adopts
 the branch into a pipeline workspace and then starts the review.
 
+An adopted PR usually has no xBRIEF, so verification skips the plan checklist
+for it (PAN-4786) and still runs typecheck, lint and tests; the review judges
+the PR against the issue's acceptance criteria. See step 12 above.
+
 Adoption (`cloister/pr-workspace-adoption.ts`) takes only the exact branch
 `feature/<issue>` (case-sensitive) and only at the head the PR reports. A
 PR with no head commit in the payload is refused (`head-unknown`). Every
@@ -1626,19 +1756,31 @@ entry is `workspace.adoption-failed`. It carries
 `needs-you` and `api-error` still outrank it. Once a workspace exists, a
 later `review.requested` in its journal clears it. The fix has two forms. When another worktree holds the branch:
 "PR #<n> (<branch>) is checked out in <path>, so Overdeck cannot create the
-pipeline workspace … run `git -C <project> worktree remove <path>`, then
+pipeline workspace … Push any unpushed commits on <branch>, run
+`git -C <path> switch --detach` (the branch and the worktree stay), then
 `pan review request <ID>`." Otherwise: "PR #<n> (<branch>) was opened outside
 a pipeline workspace … Run `pan review request <ID>` to adopt the branch into
 a workspace and start verification." Each refusal is also announced once on
-the activity stream. The webhook calls `refreshIssuePullRequestStateNow` on
+the activity stream, and (PAN-4785) commented on the PR once per reason and
+head in a process, under the marker
+`<!-- overdeck-adoption-refused reason=<reason> sha=<head> -->`. A refusal
+that leaves no workspace is not journaled: the journal lives in the workspace
+and is never recreated for a refusal, so the PR comment is its durable record. The webhook calls `refreshIssuePullRequestStateNow` on
 `opened`, `reopened`, `ready_for_review` and `closed`, so the cached PR
 listing does not hide a just-opened PR for five minutes.
 
 `pan review request` adopts too. The `/api/review/:issueId/request` route
 asks `answerMissingWorkspace` right after it reads the derived state, before
 the approved-head force and nudge shortcuts and `requestReviewGuarded`. With
-no workspace and an open pipeline-branch PR it starts adoption in the
-background and answers 202. A forge failure answers 503, never "no PR". With
+no workspace and an open pipeline-branch PR it first runs the adoption
+preflight (PAN-4785, `preflightPrAdoption`): the checks that need no network
+(pipeline branch, known head, owning non-polyrepo project, and the branch not
+checked out in another worktree). When the preflight refuses, the route
+answers 409 with the reason as `error`, the fix as `hint`, and `reason` and
+`worktreePath`, so `pan review request` exits 1 naming the worktree instead of
+reporting "queued". Otherwise it starts adoption in the background and answers
+202. Adoption runs the same preflight first, so a branch held elsewhere is
+refused before any fetch. A forge failure answers 503, never "no PR". With
 no PR it answers 400 with a hint to run `pan start` or
 `pan workspace create`. A merged issue skips the check.
 
@@ -1656,6 +1798,21 @@ The verb needs 2 to 4 non-empty options and exits 1 otherwise. It appends one
 the question, the options and the asking agent's id. `pan ask <ISSUE> --withdraw`
 appends `operator.decision-withdrawn` for the open request and exits 1 when
 there is none.
+
+The dashboard's answer dialog renders the question and `--context` as
+markdown, in separate blocks: the question first, then the options, then the
+context under an "Agent's notes" label. The pending question carries the
+context as its own optional `context` field. The other answer surfaces (the
+simple issue page's question card and the phone Needs-you list) show the
+context as plain text under the question; summary surfaces (the Needs-you
+strip, the decisions panel row, push previews) show the question only. A
+context line of the form `- **<option label>:** <text>` is shown under that
+option in the dialog instead of in the notes block, so agents must write the
+option label exactly. The dialog supports Esc (minimize), Cmd/Ctrl+Enter
+(send) and the number keys 1–4 (pick an option), and lets the operator send an
+option plus a note. `roles/work.md` tells agents to keep the question to one
+or two sentences, put facts in the context as a bullet list, and keep option
+labels short.
 
 Nothing stores "open". `src/lib/cloister/operator-decision.ts` derives it on
 read: the most recent `operator.decision-requested` entry is the open decision

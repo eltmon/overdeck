@@ -1,0 +1,689 @@
+---
+title: Skill Packs
+description: Pin third-party skill repositories to a commit and turn them on per project, issue or conversation
+---
+
+# Skill Packs
+
+## What a skill pack is
+
+A **skill pack** is a third-party git repository of skills, such as [eltmon/skills](https://github.com/eltmon/skills), a fork of [mattpocock/skills](https://github.com/mattpocock/skills). Overdeck pins each pack to one commit you approve, caches that commit, and mounts the pack skills you turn on into each launch through the harness's own plugin system. Pack skills are never copied into `~/.claude/skills` or `~/.agents/skills`, so they cannot collide with Overdeck's own skills or leak into sessions you start outside Overdeck.
+
+Operators also call skill packs **skill bundles**; these docs use "skill pack."
+
+A skill pack lets you try a third-party skill collection for one project, one issue, or one conversation without installing it for every session on the machine. The pack stays pinned to one commit, so the skills inside it do not change under you until you choose to update. When you are done, `pan skills pack remove <id>` deletes the cached commit and every mount. See [Skills](/features/skills) for the native, per-skill on/off levels that pack skills share.
+
+## Quickstart
+
+```bash
+pan skills pack add mattpocock --ref v1.2.3          # preview, then: Trust this commit? [y/N]
+pan skills list --project myapp                      # pack skills show as off
+pan skills set --pack mattpocock on --project myapp  # turn the pack on for one project
+# start an agent or conversation in myapp, then type: /mattpocock:grilling
+pan skills set --pack mattpocock inherit --project myapp   # turn it off again
+pan skills pack remove mattpocock                    # unregister and delete the cache
+```
+
+Changes apply at the next launch; a running agent keeps the skills it launched with. See [When pack changes apply](#when-pack-changes-apply).
+
+## Pack catalog
+
+| id | Upstream | Source Overdeck uses | Adapter | Skills (default / opt-in) | Runs pack code? | Notes |
+|---|---|---|---|---|---|---|
+| `mattpocock` | `mattpocock/skills` | fork `eltmon/skills`, `--ref v1.2.3` (`6acc160`) | `claude-plugin` | 24 / 1 | No. 2 template scripts are copied, never run by Overdeck | `--ref` required |
+| `pstack` | poteto's pstack in `cursor/plugins` | fork `eltmon/plugins` at `ae5650f` (default ref) | `claude-plugin`, plugin root `harness/pstack/claude-code` | 51 / 7 | No | `agents/` not applied |
+| `gstack` | `garrytan/gstack` | fork `eltmon/gstack`, `--ref main` (pack mode) | `gstack-runtime` | 22 / 14 | Yes: `bash setup --pack-root …` at add, update and sync; skill scripts when you invoke a skill | needs bun; upstream commits fail the pack-mode check |
+| gstack browser runtime | `garrytan/gstack` | the same render | part of `gstack-runtime` | 9 / 9 (browser / browser-opt-in) | Yes: `bun install`, five compiled binaries, Chromium download (about 1 GB on disk) | second consent: `pan skills pack browser gstack` |
+| `deft` | `deftai/directive` | fork `eltmon/directive`, `--ref <ref>` (default branch `master`) | `deft-readonly` | 7 / 0 | No | host notice in every mounted skill |
+| `sageox` | `sageox/ox` | fork `eltmon/ox` at `0e6c7e2` (default ref, branch `overdeck/host-managed-v0.25.0`) | `plain`, skills root `extensions/skills` | 17 / 9 | Overdeck builds `ox` (and the Claude Code and Codex adapters) from the pinned commit; Overdeck-added hooks run it | needs Go; Claude Code and Codex; uploads are a second opt-in |
+| any git repo (example `impeccable`) | `pbakaus/impeccable` | the url you pass, `--ref skill-v4.7.0` | detected: `claude-plugin` (has `.claude-plugin/plugin.json`), else `plain` | 1 / 0 | No | `pan skills pack add impeccable https://github.com/pbakaus/impeccable --ref skill-v4.7.0` |
+
+Counts are at the commit in the Source column. The add and update preview shows the counts for your commit. Each pack has its own section under [Packs](#packs).
+
+## How packs turn on and off
+
+### Names: `pack/skill` and `pack:skill`
+
+Overdeck names a pack skill `pack/skill`, for example `mattpocock/grilling`. You use that id in the CLI, the dashboard, and the override files. The agent sees the skill as `pack:skill` (`mattpocock:grilling`), because the harness namespaces plugin skills. Overdeck's own `grilling` and `mattpocock:grilling` can both be present in the same session.
+
+### Turning packs and pack skills on
+
+Pack skills are **off** until you turn them on. You can turn on a whole pack or single skills, at the same three levels as other skills:
+
+```bash
+pan skills set --pack mattpocock on                      # the whole pack, globally
+pan skills set --pack mattpocock off --issue PAN-12      # off for one issue
+pan skills set mattpocock/grilling on --project myapp    # one skill in one project
+```
+
+For a pack skill, Overdeck checks the levels from narrowest to widest. At each level, a value for the skill itself beats that level's pack toggle, and the first level with any value decides. With no value anywhere, the skill is off.
+
+| Global | Project | Issue | Result |
+|--------|---------|-------|--------|
+| pack on | `mattpocock/tdd` off | — | `tdd` off (project) |
+| pack on | — | pack off | every skill off (issue pack) |
+| — | `mattpocock/grilling` on | pack off | `grilling` off (the issue level decides first) |
+| `mattpocock/grilling` on | — | — | only `grilling` on |
+| pack on | — | — | `setup-matt-pocock-skills` off (opt-in) |
+
+**Opt-in skills** are skills that change files Overdeck owns, such as `setup-matt-pocock-skills`, which edits `CLAUDE.md`/`AGENTS.md` and writes tracker docs. The pack toggle never turns them on; only a value for that skill does.
+
+## Trust and safety
+
+### Adding a pack
+
+```bash
+pan skills pack add mattpocock https://github.com/eltmon/skills --ref v1.2.3
+```
+
+Overdeck fetches the repository, resolves the ref to a commit, reads the pack, and prints a preview before it registers or enables anything (the fetch and the commit extraction do write to the pack cache):
+
+```
+Pack mattpocock
+  Source       https://github.com/eltmon/skills @ v1.2.3 (6acc160)
+  Adapter      claude-plugin
+  License      MIT
+  Skills       25 (1 opt-in: setup-matt-pocock-skills)
+  Executables  skills/engineering/diagnosing-bugs/scripts/hitl-loop.template.sh, skills/engineering/wizard/template.sh
+  Not applied  executables (2), project-mutating skills (1)
+Adding a pack trusts this commit and enables nothing. Turn it on with: pan skills set --pack mattpocock on
+```
+
+Adding a pack trusts the resolved commit and turns nothing on. In a terminal, Overdeck asks `Trust this commit? [y/N]`. Without a terminal, pass `--yes`; otherwise nothing is written. The pack id must match `[a-z0-9][a-z0-9-]*` and cannot be a core skill name. Overdeck picks the adapter itself (the known-pack default, else `claude-plugin` when the repo has `.claude-plugin/plugin.json`, otherwise `plain`); pass `--adapter plain|claude-plugin|deft-readonly|gstack-runtime` to choose. A repository cannot register a pack by committing a file; only `pan skills pack add` can.
+
+For a known pack (`mattpocock`, `pstack`, `gstack`, `deft`, `sageox`) the url is optional. `pstack` and `sageox` also have a default ref, so `pan skills pack add pstack` and `pan skills pack add sageox` are enough; the others need `--ref`.
+
+### What is not applied
+
+Overdeck mounts skill directories only. If a pack also carries hooks, MCP servers, commands, agents, context injection, git hooks, or scripts, the preview and the dashboard list them as **Not applied**, and none of them reach the agent. Scripts inside a skill directory are copied with the skill but never run by Overdeck.
+
+Runtime packs (gstack) are the exception: their scripts are mounted and run when you invoke a skill, after you trusted them at `add`.
+
+### The trust model
+
+- Adding a pack trusts one commit and turns nothing on. Without a terminal, `--yes` is required, else nothing is registered (the fetch and commit extraction still write to the pack cache before you confirm). See [Adding a pack](#adding-a-pack).
+- Every launch mounts exactly the trusted commit; `update` shows the preview again and moves the commit only after you confirm. See [Pinning, updates and forks](#pinning-updates-and-forks).
+- A repository cannot register itself; only `pan skills pack add` can.
+- Overdeck mounts skill directories only. Hooks, MCP servers, commands, agents, context injection, git hooks and scripts are **Not applied**; scripts inside a skill directory are copied but never run by Overdeck. See [What is not applied](#what-is-not-applied).
+- Runtime packs are the exception: gstack runs its pack-mode setup once per trusted commit (at add, update or sync) and its scripts when you invoke a skill; the preview lists every script before you trust it. See [gstack](#gstack).
+- SageOx is the other exception: Overdeck runs `go build` on the trusted commit (at add, update or sync) and runs the built `ox` from hooks it adds itself; the preview lists the build commands, the paths they write, and the downloads. See [SageOx](#sageox).
+- The gstack browser runtime is a second, separate consent that lists every download and path it writes.
+- Opt-in skills change files Overdeck owns or reach paid, cloud or push actions; the pack toggle never turns them on. See [How packs turn on and off](#how-packs-turn-on-and-off).
+- A launch never touches the network: it mounts from the cache or skips the pack with a warning.
+- Pack skills never land in `~/.claude/skills` or `~/.agents/skills`, so they cannot reach sessions you start outside Overdeck.
+- Disclosures: the `sageox` and `gstack` pack rows show what leaves the machine.
+  - SageOx: "SageOx records agent sessions on this machine. With uploads off (the default) Overdeck runs `ox` with the network off: nothing is sent. With uploads on for a project, redacted session transcripts and session metadata are uploaded to the SageOx cloud ledger for that repo, and `ox` may fetch team context. Overdeck builds ox from the eltmon/ox fork; see `pan doctor`."
+  - gstack: "Runs gstack's bash and bun scripts from ~/.overdeck/packs/gstack; telemetry and update checks are off. Opt-in skills can send code to OpenAI (codex) or call paid or cloud APIs. The optional browser runtime downloads npm packages and Chromium into ~/.overdeck/packs/gstack/browser."
+- Deft skills carry a host notice, and outside a Directive project Claude Code launches deny Deft's CLIs. See [Deft Directive](#deft-directive).
+- `pan skills pack remove <id>` deletes the cache, every mount that holds the pack, dangling launch links, and Codex plugin caches.
+
+## Pinning, updates and forks
+
+### Pinning and updates
+
+The registry stores the **ref** you asked for (a tag or a branch) and the **trusted commit** you approved. Every launch mounts exactly the trusted commit, even if the tag or branch moves.
+
+```bash
+pan skills pack update mattpocock            # re-resolve the ref
+pan skills pack update mattpocock --ref v1.3.0
+```
+
+`update` prints the preview again with the skills added, removed, and changed since the trusted commit, plus any capabilities that are new. It moves the trusted commit only after you confirm. `pan skills pack list` shows when the ref has moved (`update available`); `--offline` skips that network check.
+
+### Fork-first policy
+
+Known packs come from operator-controlled forks under `github.com/eltmon/`. A fork lets the operator decide when upstream changes arrive, and it is the only place Overdeck-specific changes land (gstack pack mode, the `ox` host-managed mode). No agent opens issues, pull requests or comments on an upstream repository, or pushes to one; upstreaming fork changes is the operator's call. `eltmon/plugins` is identical to `cursor/plugins` and exists only for pinning control. `eltmon/gstack` carries pack mode and drifts from upstream quickly.
+
+### Syncing a fork
+
+| Fork | Upstream | Carries changes? | Sync | Then |
+|---|---|---|---|---|
+| `eltmon/skills` | `mattpocock/skills` | No | `gh repo sync eltmon/skills`; for a tag, push the upstream tag to the fork from a fork clone (`git fetch upstream --tags`, `git push origin <tag>`) | `pan skills pack update mattpocock --ref <tag>` |
+| `eltmon/plugins` | `cursor/plugins` | No | `gh repo sync eltmon/plugins` | `pan skills pack update pstack --ref <commit>` |
+| `eltmon/directive` | `deftai/directive` | No | `gh repo sync eltmon/directive` (default branch `master`) | `pan skills pack update deft --ref <ref>`, then `pan skills deft status` |
+| `eltmon/gstack` | `garrytan/gstack` | Yes: pack mode | merge in a fork clone, see below | `pan skills pack update gstack` |
+| `eltmon/ox` | `sageox/ox` | Yes: host-managed mode | rebase `overdeck/host-managed` onto the newest upstream tag as new `-v<tag>` branches (never force-push the old ones); ledger in [docs/SAGEOX-FORK.md](https://github.com/eltmon/overdeck/blob/main/docs/SAGEOX-FORK.md) | `pan skills pack update sageox --ref <new head>` (rebuilds `ox`), `pan doctor` |
+
+Never run `gh repo sync --force` on `eltmon/gstack` or `eltmon/ox`; it hard-resets the branch and deletes the fork's own commits.
+
+### Syncing the gstack fork
+
+1. In a clone of `eltmon/gstack` with an `upstream` remote for `garrytan/gstack` (fetch only), run `git fetch upstream` and create a branch from `origin/main`.
+2. `git merge upstream/main` and resolve conflicts, keeping pack mode.
+3. Run the pack-mode tests: `bun test test/pack-mode.test.ts test/pack-browser.test.ts test/pack-browser-guards.test.ts test/pack-env.test.ts test/state-root-parity.test.ts`.
+4. Check that a render writes nothing to `HOME`: make three empty temporary directories (home, render, state), run `HOME=<home> bash setup --pack-root <render> --pack-state-root <state>` from the clone, then `ls -A <home>` must print nothing.
+5. Push the branch and open a pull request inside the fork: `gh pr create --repo eltmon/gstack --base main`. Merge it.
+6. `pan skills pack update gstack`. The preview shows added, removed and changed skills. A skill the new commit adds is not mounted until the skill map in `src/lib/skill-packs/gstack.ts` is reviewed (see [docs/SKILL-PACKS.md](https://github.com/eltmon/overdeck/blob/main/docs/SKILL-PACKS.md)).
+
+### When upstream is fine
+
+Any url works, and pinning already protects you: the trusted commit does not move until you confirm an update. Registering `mattpocock` from `https://github.com/mattpocock/skills` or `pstack` from `https://github.com/cursor/plugins` works the same way. gstack and SageOx need their forks: upstream gstack commits fail the pack-mode check, and the `sageox` pack needs the fork's host-managed mode, which Overdeck builds into its own `ox`.
+
+## Packs
+
+### Matt Pocock's skills from a fork
+
+Overdeck's default source for the `mattpocock` pack is the operator-controlled fork `eltmon/skills`, pinned to the `v1.2.3` commit. A fork lets the operator decide when upstream changes arrive: sync the fork on GitHub, then run `pan skills pack update mattpocock --ref <tag>` to preview and re-pin. Any url works here; `KNOWN_PACKS` applies the `mattpocock` defaults by pack id, not by url.
+
+`setup-matt-pocock-skills` is opt-in: turning the pack on never turns it on. Only `pan skills set mattpocock/setup-matt-pocock-skills on [--project <key>|--issue <id>]` does.
+
+```bash
+pan skills set --pack mattpocock on                              # global: on
+pan skills set --pack mattpocock off                             # global: undo
+
+pan skills set --pack mattpocock on --project <key>               # project: on
+pan skills set --pack mattpocock inherit --project <key>          # project: undo
+
+pan skills set --pack mattpocock on --issue <id>                  # issue: on
+pan skills set --pack mattpocock inherit --issue <id>              # issue: undo
+```
+
+### pstack
+
+`pstack` is poteto's (Lauren Tan's) skill pack for Cursor — `principle-*`, `unslop`, `tdd`, `architect`, `poteto-mode`, and more — mounted from the operator's fork `https://github.com/eltmon/plugins`, pinned to `ae5650f`. Overdeck mounts Cursor's generated Claude Code build at `harness/pstack/claude-code`, not the Cursor source tree; the `KNOWN_PACKS.pstack` entry carries that subfolder as its `pluginRoot`, so the manifest, skill scan, and capability probes all read from inside it. Re-pin with `pan skills pack update pstack --ref <commit-or-branch>`.
+
+```bash
+pan skills pack add pstack
+```
+
+```
+Pack pstack
+  Source       https://github.com/eltmon/plugins @ ae5650febf4320793844c12c4adaa937f417f8da (ae5650f)
+  Root         harness/pstack/claude-code
+  Adapter      claude-plugin
+  License      MIT
+  Skills       58 (7 opt-in: automate-me, create-formal-verification-skill, create-verification-skill, maintain-verification-skill, make-bot-ui, reflect, setup-pstack)
+  Not applied  agents, executables (6), project-mutating skills (7)
+Trusted pstack @ ae5650f.
+```
+
+```bash
+pan skills set --pack pstack on                              # global: on
+pan skills set --pack pstack off                             # global: undo
+
+pan skills set --pack pstack on --project <key>               # project: on
+pan skills set --pack pstack inherit --project <key>          # project: undo
+
+pan skills set --pack pstack on --issue <id>                  # issue: on
+pan skills set --pack pstack inherit --issue <id>              # issue: undo
+```
+
+Most pstack skills set `disable-model-invocation: true`, so the agent picks them up only when you invoke them directly, e.g. `/pstack:principle-laziness-protocol`.
+
+Seven skills are opt-in — turning the pack on never turns them on:
+
+- `setup-pstack` — writes `~/.claude/rules/pstack-models.md`, which every Claude Code session on the host loads, including sessions outside Overdeck.
+- `automate-me` — writes a personal mode skill, then commits and opens a PR.
+- `reflect` — copies a skill folder into a skills dir and edits it.
+- `create-verification-skill`, `create-formal-verification-skill` — write a project-local skill under `.cursor/skills/` → `.claude/skills/`, an Overdeck sync target in workspaces.
+- `maintain-verification-skill` — opens at most one PR of proven corrections.
+- `make-bot-ui` — builds a webhook UI for a Grok bot and exposes it on Tailscale.
+
+The mount also copies the plugin's `docs/` and `README.md` next to `skills/` (`KnownPack.mountExtras`), so the skills' link to the Claude Code adapter doc (`docs/harness/claude-code.md`) resolves instead of dangling.
+
+A few pstack skills name Cursor model ids (`arena`, `architect`, `setup-pstack`); the adapter doc maps e.g. `claude-opus-5-5-xhigh` to `model: "opus"` with effort `xhigh` and runs `grok-*`/`gpt-*` roles on the session model. pstack's defaults spawn subagents at `xhigh`; the opt-in `/pstack:setup-pstack` can lower the budget.
+
+`agents/` is not applied, so `poteto-mode`'s delegations to `pstack:poteto-agent` and `pstack:comment-sicko` fall back to `general-purpose`. `poteto-mode`'s shipping and babysit playbooks open and merge PRs with `gh` and run `scripts/watch-pr/watch-pr`; Overdeck never runs these scripts, and inside an Overdeck issue the pipeline owns PRs and merges.
+
+Codex receives the same Claude Code build; the fork has no Codex-specific build.
+
+### gstack
+
+[gstack](https://github.com/garrytan/gstack) is Garry Tan's skill collection. Its skills call gstack's own bash and bun scripts by absolute path and keep state in a directory of their own, so Overdeck cannot mount them like other packs, and a normal gstack install writes `~/.claude` settings, harness skill dirs and `~/.gstack`. Overdeck uses the operator's fork [eltmon/gstack](https://github.com/eltmon/gstack), which adds a **pack mode**: `bash setup --pack-root <render> --pack-state-root <state>` copies the skills and their runtime into a directory Overdeck chooses, rewrites every skill to call scripts there, keeps all gstack state in a second directory, and writes nothing else. It never runs `bun install` or a build, never writes `~/.claude` or `~/.gstack`, and never calls the network. An optional second step builds the browser runtime ([below](#browser-design-and-pdf-skills)). The `gstack-runtime` adapter runs pack mode once per trusted commit and mounts the skills from its output.
+
+#### Adding gstack
+
+gstack needs [bun](https://bun.sh) on `PATH`.
+
+```bash
+pan skills pack add gstack https://github.com/eltmon/gstack --ref main
+```
+
+Before it asks, Overdeck checks that the commit has `pack-mode.json` and that bun runs. The preview shows the command trusting runs, every script the mounted skills can run (one per line, never shortened), and the skills it will not mount. Shortened here with `…`:
+
+```
+Pack gstack
+  Source       https://github.com/eltmon/gstack @ main (541f968)
+  Adapter      gstack-runtime
+  License      MIT
+  Skills       36 (14 opt-in: autoplan, benchmark-models, captain, careful, codex, cso, document-generate, document-release, eval-plan, freeze, guard, modernize, ubicloud, unfreeze)
+  Not mounted  27: benchmark (Needs the browser runtime: pan skills pack browser gstack on); …
+  Runs         bash setup --pack-root /home/you/.overdeck/packs/gstack/render/<commit> --pack-state-root /home/you/.overdeck/packs/gstack/state
+  Executables  232 files the mounted skills can run:
+  Not applied  hooks, agents, project-mutating skills (14), requires CLI (bun)
+  Requires     bun
+                bin/gstack-config
+                bin/gstack-paths
+                …
+Adding a pack trusts this commit and enables nothing. Turn it on with: pan skills set --pack gstack on
+Trusting runs the command above once now; skills run the listed scripts when you invoke them.
+```
+
+After you confirm, Overdeck renders the commit and only then registers it. If the render fails, nothing is registered and the error shows the last lines of gstack's output. `pan skills pack update gstack` renders the new commit before it moves the trusted commit, and `pan skills pack sync gstack` renders the trusted commit again when its render is missing. A launch never renders: if the render is missing, the launch skips gstack and prints `run pan skills pack sync gstack`.
+
+#### Which skills mount
+
+Each gstack skill is in one of five classes, fixed in Overdeck's skill map (reviewed against fork commit `1b778f78`). A skill a later gstack commit adds is not mounted until the map is reviewed.
+
+| Class | Skills | Mounted |
+|-------|--------|---------|
+| default | context-restore, context-save, deslop-shared-libs, design-motion, diagram, health, investigate, ios-clean, ios-design-review, ios-fix, ios-qa, ios-sync, landing-report, learn, plan-ceo-review, plan-devex-review, plan-eng-review, retro, review, test-audit, verify, write-skill | On with the pack toggle |
+| opt-in | autoplan, benchmark-models, captain, careful, codex, cso, document-generate, document-release, eval-plan, freeze, guard, modernize, ubicloud, unfreeze | Only with a per-skill `on`: they send code to OpenAI (`codex`), call paid or cloud APIs, push, or install hooks that block tool calls |
+| browser | benchmark, browse, devex-review, make-pdf, qa, qa-only, scrape, skillify, spec | On with the pack toggle once the browser runtime is built |
+| browser-opt-in | canary, design-consultation, design-html, design-review, design-shotgun, land-and-deploy, office-hours, plan-design-review, ship | Only with the browser runtime and a per-skill `on`: they push, merge, deploy, or call paid image APIs |
+| excluded | connect-chrome, gstack-upgrade, plan-tune, setup-deploy, setup-gbrain, sync-gbrain, open-gstack-browser, pair-agent, setup-browser-cookies | Never: they upgrade the install in place, need setup's hooks, or edit `CLAUDE.md`; `open-gstack-browser` opens a visible browser that writes `~/.gstack/.auth.json`, `pair-agent` exposes the browser through an ngrok tunnel and writes `~/.codex`, and `setup-browser-cookies` reads your real browser cookies and keychain |
+
+```bash
+pan skills set --pack gstack on                           # every default skill, globally
+pan skills set --pack gstack on --project <key>           # one project
+pan skills set --pack gstack on --issue <id>              # one issue
+pan skills set gstack/codex on --project <key>            # an opt-in skill
+```
+
+The agent sees the skills as `gstack:<skill>`, for example `/gstack:test-audit`.
+
+#### Browser, design and PDF skills
+
+The `browser` and `browser-opt-in` skills call gstack's compiled `browse`, `design` and `make-pdf` binaries and a headless Chromium. Pack mode does not build them, so they need a second, separate consent that downloads them:
+
+```bash
+pan skills pack browser gstack            # or: pan skills pack browser gstack on
+pan skills pack add gstack https://github.com/eltmon/gstack --ref main --browser   # add, then the browser step, asking twice
+```
+
+Before it asks, Overdeck checks that the trusted commit is rendered, that its `pack-mode.json` has `packBrowser`, and that bun runs. The preview lists the exact command, each direct npm dependency, a summary line for their locked dependencies (`bun.lock`, from registry.npmjs.org) and one for the Playwright browsers, and every path it writes (never shortened). Shortened here with `…`:
+
+```
+  Runs         bash setup --pack-browser /home/you/.overdeck/packs/gstack/render/<commit> --pack-browser-cache /home/you/.overdeck/packs/gstack/browser
+  Downloads    direct npm dependencies, then summaries of their locked dependencies and the Playwright browsers:
+                @anthropic-ai/sdk@^0.78.0
+                …
+                playwright@^1.62.1
+                …
+                + their locked dependencies from bun.lock (registry.npmjs.org)
+                Chromium, Chromium headless shell and ffmpeg for playwright ^1.62.1 (Playwright CDN, ~115 MiB download)
+  Writes       7 paths:
+                /home/you/.overdeck/packs/gstack/render/<commit>/node_modules
+                …
+                /home/you/.overdeck/packs/gstack/browser/playwright
+  Size         about 1 GB on disk
+Trusting runs the command above once now and downloads the listed packages and Chromium.
+Trust this browser runtime? [y/N]
+```
+
+After you confirm, gstack's step runs `bun install --production --frozen-lockfile`, compiles the five binaries into the render, and downloads Chromium into `~/.overdeck/packs/gstack/browser/playwright`, with bun's package cache in `~/.overdeck/packs/gstack/browser/bun-cache`. Chromium's fontconfig and GPU caches go to `~/.overdeck/packs/gstack/browser/xdg-cache` instead of `~/.cache`, both during the build and when browse runs later. It never runs gstack's full build, which would rewrite the skills for `~/.claude`. Only when the build succeeds does Overdeck record your consent (`browser: true` in the pack's registry entry). If it fails, nothing is recorded and the error shows the last lines of gstack's output.
+
+With consent recorded, `pan skills pack update gstack` adds the browser rows to its one preview and builds the new commit's runtime before it moves the trusted commit, and `pan skills pack sync gstack` builds the runtime again when it is missing. A launch never builds: if consent is recorded but the runtime is not built, the launch mounts no browser skill and prints `gstack browser runtime not built; run pan skills pack sync gstack`.
+
+```bash
+pan skills set gstack/ship on --project <key>   # a browser-opt-in skill
+pan skills pack browser gstack off              # remove the runtime
+```
+
+`off` clears the consent, renders the trusted commit again without `node_modules` or binaries, and deletes `~/.overdeck/packs/gstack/browser/`. Older commits' renders that still hold a runtime are left to `pan skills pack gc`.
+
+#### Where gstack keeps state
+
+Each trusted commit is rendered into `~/.overdeck/packs/gstack/render/<commit>/`. gstack's state (its `config.yaml`, sessions, learnings, project reports and plans) lives in `~/.overdeck/packs/gstack/state/`, shared across commits. The render holds a marker that points gstack's scripts at that state dir, so no environment variable is needed and nothing goes to `~/.gstack`. Pack mode starts the config with `telemetry: off`, `update_check: false` and `auto_upgrade: false`. When you invoke a skill in a project, it may write `.gstack/` (temporary files and reports) in that project. Rendered skill docs name the state dir wherever gstack's prose says `~/.gstack/`.
+
+The browser skills start a browse daemon per project. It keeps its port, token and logs in the project's `.gstack/` (`browse.json`, `browse-*.log`), writes some temporary files as `/tmp/browse-*`, and exits by itself after 30 idle minutes (or on `$B stop`).
+
+#### Removing gstack
+
+```bash
+pan skills pack remove gstack
+```
+
+`remove` deletes `~/.overdeck/packs/gstack/` (renders, state, extractions and the git cache), every mount that contains gstack, the launch links that leaves dangling, and the gstack copy in every Codex agent's plugin cache. A running agent that used gstack loses its gstack skills until its next launch. `remove` does not delete the `.gstack/` or `.gstack-worktrees/` dirs that skills wrote in your projects; it prints each one it finds under a registered project, with the `rm -rf` command. `remove` and `pan skills pack browser gstack off` also print each live browse daemon in a registered project as `Browse daemon still running in <project>: pid <n> — stop with: kill -INT <n>` (a headless daemon ignores a plain `kill`); they never stop one. `pan skills pack gc` also removes renders of commits other than the trusted one once no linked launch uses them and they are older than `--max-age-days` (using a render resets its age), and the `render/`, `state/` and `browser/` dirs of packs that are no longer registered once all are older than `--max-age-days`. If `config.yaml` cannot be read or parsed, gc removes nothing and exits 1, because it cannot tell which packs are registered. If removing a mount or cache fails, `remove` names it and exits 1; run it again to retry.
+
+#### Limits
+
+- The browser step needs an eltmon/gstack commit whose `pack-mode.json` has `packBrowser`; an older commit fails that check before anything is asked.
+- Chromium comes from Playwright with no system packages or fonts (`--with-deps` is not run). On Linux, emoji may render as boxes in PDFs.
+- The design skills need `OPENAI_API_KEY` or `GEMINI_API_KEY`, or a key saved by `$D setup`, which goes to gstack's state dir.
+- Headed mode and the `pair-agent` tunnel are excluded, so their `~/.gstack/.auth.json` and ngrok config paths are never used.
+- The browse daemon writes some temporary files in `/tmp`.
+- Skills that run gstack scripts with `bun <script>` (for example the QA evidence step) let bun cache transpiled code in `~/.bun/install/cache/@t@`, because the agent's shell has no gstack environment.
+- On macOS, the binaries are re-signed the way gstack's own setup does it; this was verified on Linux only.
+- Browser skills in Codex launches are unverified: the Codex sandbox may block Chromium or `bun run`.
+- Codex launches mount the same render as Claude Code. Skills that ask Claude-only questions fall back to gstack's plain-text path in Codex.
+- Pack mode does not install setup's settings hooks (question tuning, the timeline Stop hook, auto-update, the verify gate), and gstack skills cannot upgrade themselves; update through `pan skills pack update gstack`.
+- Commits of upstream `garrytan/gstack` fail the pack-mode check until pack mode is merged there; use the eltmon fork.
+
+### Deft Directive
+
+Deft's skills depend on its engine and project files, so Overdeck mounts only a read-only subset through the `deft-readonly` adapter.
+
+[Deft Directive](https://github.com/eltmon/directive) is a process engine. `directive init` installs it by writing tracked files into a repository: an `AGENTS.md` managed section, agent hooks that call `deft-hook`, `.githooks/` with `core.hooksPath`, a `package.json` pin of `@deftai/directive`, `deft-directive-*` pointer skills, and an `xbrief/` tree. A repository with that deposit is a **Directive project**.
+
+Overdeck never runs a Deft CLI for the read-only pack. The per-issue Deft pipeline is the one exception: it runs `directive install` inside that issue's worktree and hides the result from git. It offers three levels:
+
+| Level | What you get |
+|-------|--------------|
+| Off | No Deft skills. In a Directive project, an explicit off also turns the deposit's enforcement off for Overdeck launches (the kill switch below). |
+| Methodology on | The read-only `deft` pack: seven Deft skills that need no engine, mounted per launch with a host notice. In a Directive project you can also turn on managed mode. |
+| Deft pipeline (per issue) | One issue runs on Deft's own pipeline; Overdeck merges. See [Running an issue on Deft](#running-an-issue-on-deft). |
+
+#### Adding the deft pack
+
+```bash
+pan skills pack add deft https://github.com/eltmon/directive --ref <ref>
+pan skills set --pack deft on
+```
+
+`deft` is a known pack, so Overdeck picks the `deft-readonly` adapter. The preview lists `Skills 7` and `Not applied hooks, context injection, git hooks, requires CLI (directive)`. The adapter reads `content/skills/deft-directive-<name>/SKILL.md` at the trusted commit and keeps only the read-only allowlist. Each skill is named by its stripped name, so the agent sees `deft:glossary`, never `deft:deft-directive-glossary`, and Overdeck's id is `deft/glossary`.
+
+#### Skill map
+
+Every Deft skill has one class. Only `compatible` and `translated` skills are mounted. A skill that appears at a newer pinned commit and is not in this map is excluded as unreviewed. The map is verified at eltmon/directive 48e8cbf (v0.119.10-16).
+
+| Deft skill | Class | Overdeck equivalent or reason |
+|------------|-------|-------------------------------|
+| glossary | compatible | Conversation-only; does not write `UBIQUITOUS_LANGUAGE.md` unless asked |
+| debug | translated | `task verify:investigation` is unavailable; the ledger goes to chat |
+| design-critique | translated | `task issue:ingest` is unavailable; the next step is `pan issues` or the operator |
+| gh-arch | translated | `task slice:record` is unavailable; file follow-ups in Overdeck's tracker |
+| write-skill | translated | New skills go to `<project>/.pan/skills/<name>/SKILL.md` |
+| probe | translated | Never writes `xbrief/proposed/`; results go to chat |
+| cost | translated | Reads `xbrief/PROJECT-DEFINITION.xbrief.json` only when present |
+| xbrief | conflicting | `write-xbrief` |
+| swarm | conflicting | `pan-swarm` |
+| pre-pr | conflicting | `work-complete` |
+| review-cycle | conflicting | `pan-code-review` |
+| refinement | conflicting | `pan-plan` |
+| decompose | conflicting | `write-xbrief` |
+| gh-slice | conflicting | `pan-plan` |
+| build | conflicting | `pan-start` |
+| setup | conflicting | `pan-new-project` (it runs `directive init`) |
+| sync | conflicting | `pan-sync` (it runs an npm refresh of the deposit) |
+| interview | runtime-dependent | Needs Deft interview state |
+| issue-eval | runtime-dependent | Needs Deft Stage A tooling |
+| portfolio-priority | runtime-dependent | Needs Deft triage and RFC state |
+| product-signal | runtime-dependent | Consent and upload flow owned by Deft |
+| feedback | runtime-dependent | Escalates gaps through Deft tooling |
+| article-review | runtime-dependent | Feeds Deft's improvement backlog |
+| release | excluded | Releases the Deft framework itself |
+| triage | excluded | Withdrawn upstream |
+
+#### Host notice and CLI deny
+
+The mount inserts a host notice after the frontmatter of every mounted Deft `SKILL.md`. It tells the agent not to run `directive init`, `directive update`, `directive bootstrap`, or `deft session:start`; not to install packages, change git hooks or `core.hooksPath`, edit `AGENTS.md`, or write under `xbrief/`; that Overdeck owns planning (`.pan/specs`), worktrees, review, and merge; to skip a `task` or `deft` step that is not installed and report in chat; and not to write repository files unless the operator asks. It also lists the Overdeck equivalent of each conflicting Deft skill.
+
+When a Claude Code launch mounts any `deft/*` skill in a project that is **not** a Directive project, the launch settings also deny Deft's mutating CLIs:
+
+```
+Bash(directive:*)  Bash(deft:*)  Bash(deft-hook:*)  Bash(npx @deftai/directive:*)
+Bash(npm install @deftai/directive:*)  Bash(npm i @deftai/directive:*)
+Bash(pnpm add @deftai/directive:*)  Bash(git config core.hooksPath:*)
+```
+
+In a Directive project no deny is added, because Deft is that project's own tool. Codex has no equivalent deny setting, so on Codex the host notice is the only boundary.
+
+#### What a launch does in a Directive project
+
+Each Overdeck-managed Claude Code or Codex launch detects a Directive project at the launch directory's repository root. Detection reads files only (`.deft/core/VERSION`, the `AGENTS.md` managed-section marker, or the `@deftai/directive` pin) and is never stored. **Explicit off** means the `deft` pack toggle resolves off at the issue or project level. The default (no value anywhere) is not explicit off, and the global level has no off value, so it never is.
+
+| Directive project | `deft` toggle | Managed mode | Result |
+|-------------------|---------------|--------------|--------|
+| no | any | — | Nothing exported; Claude gets the CLI deny list when deft skills are mounted |
+| yes | explicit off (issue or project) | any | Kill switch: `DEFT_DIRECTIVE_DISABLE=1`, the flag file in issue worktrees, and the deposit's `deft-directive-*` pointer skills hidden |
+| yes | on, or default | managed | `DEFT_ORCHESTRATOR=overdeck` |
+| yes | on, or default | not managed | Nothing exported; Deft runs as the project configured it |
+
+The **kill switch** is Deft's own `.deft-directive-disable` root file, honored by engines from v0.92.0 when the file is untracked. Overdeck writes it only when the launch runs in an issue worktree (`workspaces/feature-<issue>/`). The file starts with `# overdeck:deft-directive-disable`, and Overdeck adds `/.deft-directive-disable` to the repository's `.git/info/exclude` when nothing ignores it yet, so `git status` stays clean. When the toggle goes back to on or inherit, Overdeck deletes the flag only if its first line is that marker; a flag you wrote yourself is never touched, and a tracked flag is never changed. Review agents, test agents, and conversations launched at the project root get the environment variable only.
+
+A launch prints one provenance line to stderr, for example `[launcher] deft: pack master (48e8cbf0e781); project directive engine ^0.119.10; kill switch`. If anything in the Deft step fails, the launch prints `[launcher] WARNING: deft integration not applied: <message>`, removes the Deft env file, and continues with its other skill settings and packs.
+
+#### Managed mode
+
+Managed mode is a per-project decision: Deft methodology on, with Overdeck owning worktrees, review, merge, and the pipeline xBRIEF.
+
+```bash
+pan skills deft status [--project <key>] [--json]   # detection, pack, skill map, managed mode, ownership report
+pan skills deft enable --project <key> [--yes]      # print the ownership plan, then store the decision
+pan skills deft disable --project <key>             # remove the decision; project files untouched
+```
+
+`enable` refuses a project that is not a Directive project (managed mode never runs `directive init`; to run one issue on Deft in any project, see [Running an issue on Deft](#running-an-issue-on-deft)). It prints the ownership report, one owner per concern (xbrief, context, agent hooks, git hooks, worktrees, gates, task state, review, release, skills, workspace settings), and asks `Enable managed mode with this ownership plan? [y/N]`. Without a terminal, pass `--yes`; otherwise nothing is written. It stores only `projects.<key>.deft_integration: { mode: managed, plan_digest, enabled_at }` in `~/.overdeck/projects.yaml`, where `plan_digest` is the sha256 of the report text you saw. Launches in a managed project that is not off export `DEFT_ORCHESTRATOR=overdeck`.
+
+#### Environment contract
+
+Overdeck exports at most these three variables, from a per-launch env file that the launcher reads with an allowlist and never sources:
+
+| Variable | Value | Meaning to the engine |
+|----------|-------|-----------------------|
+| `DEFT_DIRECTIVE_DISABLE` | `1` | Same as an untracked root `.deft-directive-disable` |
+| `DEFT_ORCHESTRATOR` | `overdeck` | External-orchestrator mode: Deft enforcement defers to the host; Deft contributes methodology only |
+| `DEFT_RUN_SUMMARY_PATH` | `<worktree>/.overdeck/deft-run-summary.jsonl` | Deft-pipeline issues only: where Deft appends its run summary, including gate results. The env file carries only the literal token `DEFT_RUN_SUMMARY_PATH=overdeck`; the launcher supplies the path. |
+
+Both variables are a no-op until your project pins an engine that reads them ([PAN-4425](https://github.com/eltmon/overdeck/issues/4425)). The flag file works on every engine from v0.92.0.
+
+#### Limits
+
+- **Git hooks.** The deposited `.githooks/pre-commit` runs `deft verify:branch` and does not check the kill switch; whether `verify:branch` itself reads it is unverified. Feature-branch commits pass `verify:branch`. Main-branch plan-artifact commits in a Directive plan home may be refused.
+- **Workspace settings.** In a Directive project `.claude/settings.json` is a tracked Deft deposit, and Overdeck's workspace creation merges its own hooks into it, which leaves that file modified in the worktree.
+- **Scope.** Detection runs at the launch directory's repository root only, not in polyrepo sub-repositories. There is no conversation-level toggle; conversations inherit global and project toggles.
+
+#### Running an issue on Deft
+
+One issue at a time can run on Deft's own pipeline: Deft's skills, hooks, gates, and review cycle, unchanged. Overdeck hosts the run. It installs Directive into that issue's worktree, keeps the install out of the branch, and merges the PR when a person clicks Merge.
+
+```bash
+pan skills deft use <ISSUE> [--start] [--json]   # install Directive into the issue's worktree and switch its pipeline
+pan skills deft save <ISSUE>                     # commit Deft's state archive under .pan/deft/<ISSUE>/
+pan skills deft show <ISSUE> [--json]            # pipeline, install, drift, lift conflicts, merge-guard verdict
+pan skills deft back <ISSUE> [--json]            # save, remove the install exactly, switch back to Overdeck
+```
+
+**Switching.** `use` stops the issue's agents, writes `pipeline: deft` into `.pan/skill-overrides/<ISSUE>.yaml`, creates the workspace if it is missing, and installs Directive. When the issue has no plan, it writes a one-item stand-in plan, so `pan start` works. `--start` then starts the work agent. That agent gets a Deft kickoff instead of Overdeck's: build with `deft-directive-build`, run `deft-directive-pre-pr` before pushing, run `deft-directive-review-cycle` when a supported bot reviewer exists, save the state archive, use `pan sync-main` instead of a rebase, and never merge. `back` saves the archive, removes the install, restores every file the install changed, and deletes the stand-in plan. `pan start <ISSUE>` then plans the issue the Overdeck way. A project whose default branch already tracks a Directive deposit gets no install: its tracked deposit is used as it is. Overdeck decides this from the default branch's committed files, never from the worktree, because a temporary install leaves the same files on disk.
+
+**What the install writes, and how it is hidden.** npm and pnpm projects run Deft's installer, `npx --yes @deftai/directive install --yes`. Deft's installer refuses Bun projects, so for a project with `bun.lock` or `bun.lockb` Overdeck adds `@deftai/directive-runtime` with `bun add -d --exact` and then runs the runtime's own `setup` step. The deposit (pointer skills, slash wrappers, hook registrations, `.githooks/`, `AGENTS.md`, `Taskfile.yml`, `xbrief/`, `.deft/`, the `package.json` pin, and the lockfile change) stays out of git:
+
+- New paths go into a `# overdeck:deft begin` … `# overdeck:deft end` block in a per-worktree exclude file, `<git-dir>/info/overdeck-exclude`, which starts with a copy of your global excludes. SageOx keeps its own block in the same file.
+- Tracked files that the install changed, such as `package.json`, `.gitignore`, and the lockfile, get `--skip-worktree`.
+- `core.hooksPath=.githooks` is set for that worktree only, through `extensions.worktreeConfig`. The shared value and the sibling worktrees are not changed.
+
+The snapshot `.overdeck/deft-install.json` records the pre-install bytes, so `back` is exact. Hidden tracked files cannot be committed, so an edit to one (a dependency change, for example) is drift: the merge guard refuses, and Needs-you asks whether to switch back or discard the edits. `pan sync-main` and server-side rebases lift the install around the git operation and merge a moved file's new base back in. A file that cannot be merged keeps the install's version and shows under lift conflicts in `show`.
+
+**Merge guard.** A Deft PR merges only when all of these are true:
+
+- The worktree's install snapshot, `.overdeck/deft-install.json`, is present and readable (a native Directive project has none and needs none). A deleted or corrupt snapshot refuses the merge, because nothing else proves what the install hid.
+- Its diff carries no install path: none of the deposit paths, and no `AGENTS.md`, `package.json`, `Taskfile.yml`, or `.gitignore` that carries Directive's marker at the PR head.
+- No hidden tracked file has drifted.
+- `.pan/deft/<ISSUE>/` at the PR head matches what `save` would write now.
+
+The guard runs in the merge gate and in the forge-merge route. It fails closed: when it cannot read the PR's head or diff, the PR is not mergeable.
+
+Without a readable snapshot, `back` cannot undo the install exactly. It then clears the worktree hooks path, the exclude file, and the skip-worktree flags, and warns: the install's files become visible to git, so review `git status` in the workspace and discard what you do not want.
+
+**Approval and auto-merge.** No Overdeck review, test, or verification agents run for a Deft issue, because Deft runs its own. So the merge gate does not require an approval at the PR head: the person who clicks Merge is the approval. Green checks, CI tests, UAT, mergeability, and the merge guard still apply, and the issue shows as awaiting merge when they pass. Auto-merge never acts on a Deft issue whose Deft policy requires a human merge: `requireHumanMerge`, or `autoDeployOnMerge` when that key is absent. A missing or unreadable `xbrief/PROJECT-DEFINITION.xbrief.json` counts as requiring a human merge.
+
+**Network.** The install needs the npm registry for `npx`, `npm view`, and the package install.
+
+**Limits.**
+
+- Claude Code and Codex agents only.
+- No polyrepo or remote (Fly) workspaces. `use` refuses them.
+- Deft's swarm mode refuses Bun projects, so a Deft issue in a Bun project runs without Deft swarm.
+- After `back`, the runtime's own dependencies stay in a `node_modules/` that existed before the install; only `node_modules/@deftai/` is removed.
+
+**In the dashboard.** The dashboard shows Deft's own state, in Deft's own words, on the surfaces you already use. It reads the Directive files in the issue's worktree; it runs no Deft command.
+
+- **Switching.** The issue menu offers **Run on Deft** for an Overdeck issue that is not merged or closed, and **Back to Overdeck** for a Deft issue. They run `pan skills deft use <ISSUE>` and `pan skills deft back <ISSUE>`, and the activity feed reports when the switch finishes.
+- **Decisions tab.** A Deft issue's cockpit gains a Decisions tab: Deft's escalations, open first, with SLA, due time, `overdue` and `dangerous` marks and a **Resolve** control; Deft's decision records; and Deft's policy, read-only, with `requireHumanMerge` first.
+- **Needs-you.** An open escalation that needs an answer appears in Needs-you and in the question dialog, with its SLA and a `dangerous` chip. Answering it rewrites the escalation file and tells the work agent. An open `external` escalation does not block: it shows as **Deft: waiting on external**. When a Claude Code Deft agent ends its message with one of Deft's numbered menus, the question dialog offers the menu's labels verbatim and sends the exact label. Codex agents keep the menu in the terminal.
+- **Plan tab.** Plan › Tasks lists Deft's scopes by folder (In progress, Planned, Proposed, Done, Cancelled) with each item's evidence and disposition. A disposition Deft will not accept yet (no provenance, or an agent's) gets **Sign off**, which records a human sign-off in Deft's own terms. Plan › Map draws the scopes' swarm dependencies.
+- **Overview tab.** **Deft gates** lists Deft's own gate runs from its run summary. **Deft review cycle** shows Deft's review cycle for the PR: the verdict in Deft's names (`CLEAN`, `NEW_P0_P1`, `PENDING`), the five exit-predicate fields as met, unmet, or unknown, rounds with P0/P1/P2 counts and the fix commit, the review lease, and the `pr:watch` heartbeats and CLEAN records. Deft records no rounds, so the panel rebuilds them from Greptile's comments and the `fix: address Greptile review findings` commits, and says so. Greptile is the only reviewer that can end Deft's cycle: without it the panel says `No supported bot reviewer — Deft review cycle not running`.
+- **Other surfaces.** The phase rail shows `Deft: <delivery state>`. The project-tree row shows `spec drift <n>` (Deft's ledger of scope work the spec does not cover) and `install drift <n>` (hidden install files edited since the install). Changes › Files checks the changed files against Deft's approved scopes. Activity shows Deft's finish-loop progress. The agents lane lists Deft's subagents from their heartbeats, and a quiet one gets a `quiet` mark. A board card shows a `Deft` chip and its scope counts.
+
+### SageOx
+
+[SageOx](https://github.com/sageox/ox) records coding-agent sessions and syncs them to a team ledger. Overdeck offers it as the `sageox` pack, built from the operator's fork [eltmon/ox](https://github.com/eltmon/ox). The fork adds a **host-managed mode**: with `OX_HOST_MANAGED=1`, `ox` writes nothing into the repository (no `AGENTS.md`/`CLAUDE.md` markers, no `.claude/settings.json` hooks), adds no attribution to commits or PRs, never asks the agent to run `ox init`, and stays offline unless uploads are on for the project.
+
+SageOx is **off by default**, for every project and issue. It works with **Claude Code** and **Codex** launches. A project does not have to commit `.sageox/` to try it: Overdeck keeps the project's SageOx link files outside the repository and places them, hidden from git, in each checkout that has SageOx on.
+
+**What leaves the machine:**
+
+> SageOx records agent sessions on this machine. With uploads off (the default) Overdeck runs `ox` with the network off: nothing is sent. With uploads on for a project, redacted session transcripts and session metadata are uploaded to the SageOx cloud ledger for that repo, and `ox` may fetch team context. Overdeck builds ox from the eltmon/ox fork; see `pan doctor`.
+
+The Skills page shows the same text on the `sageox` pack row.
+
+#### One-time setup
+
+1. **Add the pack.** Overdeck pins the fork's head and builds `ox` itself. You need Go on `PATH`; without it, `add` stops with `pack sageox needs go on PATH (https://go.dev/dl/)`.
+
+   ```bash
+   pan skills pack add sageox
+   ```
+
+   The consent preview adds three rows before `Trust this commit? [y/N]`:
+
+   - **Builds:** the three commands, each run in the extracted commit: `go build -o <packdir>/<commit>/bin/ox ./cmd/ox`, then the same for `ox-adapter-claude-code` and `ox-adapter-codex`. Recording runs the adapter next to `ox`, so both are built.
+   - **Writes:** `<packdir>/<commit>/bin/` and `<packdir>/go/` (Go's build cache, module cache and config), where `<packdir>` is `~/.overdeck/packs/sageox`. Nothing is written to `~/.local/bin`, `~/go` or `~/.cache`.
+   - **Downloads:** the Go modules listed in `go.sum` (from `proxy.golang.org`) and, when your Go is older than the fork asks for, the Go toolchain `GOTOOLCHAIN=auto` fetches. At the pinned commit that is `Go toolchain go1.27.3 (GOTOOLCHAIN=auto)`, about 70 MB, into `<packdir>/go/mod`.
+
+   If you added `sageox` before this release, it stays on the commit you pinned then (the old `overdeck/host-managed` head). Move to the current pin with `pan skills pack update sageox --ref 0e6c7e2df8fd89638a2d40db08cc45d4cff05fdc`; your SageOx link files are kept.
+
+   The build runs after you confirm and before the pack is registered. `pan skills pack update sageox` shows the preview and builds again when the commit moves. `pan skills pack sync sageox` builds the trusted commit without asking when its build is missing. Launches never build. The repo-writing skills (`ox-cli-init`, `ox-cli-attest`, `ox-cli-skill-manager`, `ox-cli-pr-header`, `ox-cli-plan`, and the `ox-cli-cart*` skills) are opt-in: the pack toggle never turns them on.
+
+2. **Log in to SageOx once**, with the built `ox` (`pan doctor` prints its path):
+
+   ```bash
+   ~/.overdeck/packs/sageox/<commit>/bin/ox login
+   ```
+
+   Overdeck never runs `ox login` and never reads the login file.
+
+3. **Link each project** you want to try SageOx in:
+
+   ```bash
+   pan skills pack sageox link --project myapp [--team <team>]
+   ```
+
+   `link` checks that the SageOx login file exists, without reading it. It then fetches the project's default branch, creates a throwaway detached worktree of `origin/<default>` under `<packdir>/tmp/`, and runs `ox init` there in host-managed mode with the network on. `ox init` registers the repository with SageOx and writes `.sageox/`. `link` stores those files as the project's **SageOx link** in `<packdir>/bindings/<project>/`. It then waits up to 120 seconds for `ox` to clone the project's ledger, and removes the throwaway worktree. No checkout of the project changes, and nothing is committed. If the ledger is not cloned within 120 seconds, `link` still succeeds and prints `the SageOx ledger is not cloned yet; ox clones it in the background. Check with: <bin> status`. Recording needs that clone. Pass `--team` when your SageOx account has several teams. See [`pan skills pack sageox link`](/cli/skills-commands#pan-skills-pack-sageox-link).
+
+4. **Turn the pack on** for a project, an issue, or a conversation:
+
+   ```bash
+   pan skills set --pack sageox on --issue MYAPP-12
+   ```
+
+   The next launch places the link files and records the session. See [Placement](#placement-and-the-hide).
+
+5. **Optional: commit the link.** When the team wants SageOx for every checkout, open one PR that adds `.sageox/`:
+
+   ```bash
+   pan skills pack sageox commit --project myapp
+   ```
+
+   It creates a throwaway worktree on a new branch `overdeck/sageox-link` from `origin/<default>`, copies the link files into `.sageox/`, commits them as `chore(sageox): add the SageOx link files`, pushes, and opens (or reuses) the PR `Add the SageOx link files (.sageox/)`. After the PR exists, it records `sageox_binding: committed` for the project in `~/.overdeck/projects.yaml`, which lets the merge guard pass PRs that change `.sageox/`. If the default branch already tracks `.sageox/config.json`, it records the flag and prints `already committed on <default>`. Known limits: the commit runs the project's git hooks in the throwaway worktree, so a project whose hooks need `node_modules` (husky, for example) fails there (Overdeck does not pass `--no-verify`); and the local `overdeck/sageox-link` branch stays in the repository on purpose, as the only copy if the push failed. See [`pan skills pack sageox commit`](/cli/skills-commands#pan-skills-pack-sageox-commit).
+
+`pan skills pack sageox status` shows each project's link state in the `LINK` column: `committed`, `held` (a link is stored), or `none`.
+
+#### Uploads
+
+Uploads are a second, separate opt-in per project. They are off until you turn them on:
+
+```bash
+pan skills pack sageox upload on --project myapp    # writes sageox_upload: enabled in projects.yaml
+pan skills pack sageox upload off --project myapp
+pan skills pack sageox status [--project <key>] [--json]
+```
+
+`status` shows, for each project, whether the pack is on (and from which level), whether uploads are enabled, and the link state. With uploads off, Overdeck sets `OX_HOST_NETWORK=off` and `OX_SESSION_PUBLISHING=manual`, so sessions stay on this machine. With uploads on, it sets `OX_HOST_NETWORK=on` and `OX_SESSION_PUBLISHING=auto`.
+
+#### Placement and the hide
+
+When SageOx is on for a launch, Overdeck looks at `.sageox/` in the launch's git root. It has one of four states:
+
+| State | What it is | What Overdeck does |
+|---|---|---|
+| Tracked | Git tracks `.sageox/config.json` (the project committed its link) | Uses it; never writes or deletes anything there |
+| Placed | `.sageox/.overdeck-placed` exists | Owns the files the marker lists; refreshes them from the stored link |
+| Hand-made | An untracked `.sageox/` with no marker that holds a `config.json`, or a `.sageox/` symlink | Uses it; never places over it or deletes it |
+| Absent | No `.sageox/`, or an untracked `.sageox/` with neither a marker nor a `config.json` (what is left after switch-off: `ox`'s logs, cache and sessions) | Places the stored link |
+
+Placement hides `.sageox/` first, then copies each link file (a file whose bytes already match is not rewritten), then writes the marker, so a half-placed `.sageox/` never shows in `git status`. Only the checkout being launched gets a `.sageox/`; other worktrees of the project do not. If the project has no stored link, the launch continues without SageOx and prints `[launcher] WARNING: SageOx not applied: project <key> has no SageOx link; run pan skills pack sageox link --project <key>`.
+
+The hide is a `/.sageox/` pattern in an owner block (`# overdeck:sageox begin` … `# overdeck:sageox end`):
+
+- In an issue worktree (a linked worktree), the block goes into `<git-dir>/info/overdeck-exclude`, which Overdeck sets as that worktree's `core.excludesFile`. The file starts with a copy of your global excludes file and is shared with the [Deft](#running-an-issue-on-deft) hide, each in its own block. Other worktrees are not affected.
+- In the primary checkout (a conversation launched in the project root), the block goes into the repository's `info/exclude`. That file is shared by every worktree of the repository, so `.sageox/` is hidden in all of them. Every other line in it is kept.
+
+#### Switching SageOx off
+
+When SageOx resolves off for a launch, that launch looks for `.sageox/.overdeck-placed` in its working directory (the worktree or the project root). If the marker is there, it deletes each file the marker lists that git does not track, then the marker. It keeps the hide and everything `ox` wrote while running (`logs/`, `cache/`, `sessions/` and so on). Turning SageOx on again places the link again. A failure here prints one `[launcher] WARNING: SageOx placed files not removed: …` line and the launch continues.
+
+#### Merge guard
+
+Placed link files are hidden, but an agent can still add them with `git add -f`. So every merge door (the merge-ready set, the Merge button, auto-merge, the merge queue, the approval refresh, and `POST /api/issues/:id/forge-merge`) refuses a PR whose diff touches `.sageox/`, unless the project has committed its link: `sageox_binding: committed` in `projects.yaml`, or a default branch that tracks `.sageox/config.json`. The refusal reads:
+
+```text
+PR changes SageOx link files (.sageox/) but <key> has not opted in to committing them; remove them from the PR or run pan skills pack sageox commit --project <key>
+```
+
+The guard reads the PR's changed files with a local `git diff` against `origin/<default>`, fetching the PR head once when it is not local. It fails closed: when the diff cannot be read, the PR is refused with `SageOx merge guard could not read the PR's changed files: …; fetch the PR head in <dir>`. Polyrepo projects (`workspace.type: polyrepo`) are skipped. For a Deft issue, the Deft guard runs first and its refusal wins.
+
+#### What a launch gets
+
+When the pack is on, Overdeck resolves the `ox` it built for the trusted commit and checks that it answers `ox host-contract --json` within 2 seconds. Only then does it place the link. There is no fallback to an `ox` on `PATH`. When all of that holds:
+
+- **Claude Code** gets, in the launch's `--settings` JSON, the env `OX_HOST_MANAGED=1`, `OX_PROJECT_ROOT=<git root>`, `OX_HOST_NETWORK`, `OX_SESSION_PUBLISHING`, `SAGEOX_TELEMETRY=false`, `SAGEOX_FRICTION=false`, `SAGEOX_DAEMON=false`, and `OX_NO_DAEMON=1`, plus one `ox agent hook <event>` hook for each of `SessionStart`, `PreCompact`, `PostToolUse`, `Stop`, `SessionEnd`, and `UserPromptSubmit`.
+- **Codex** gets `ox agent hook <event>` for its six events (`SessionStart`, `PreToolUse`, `PostToolUse`, `UserPromptSubmit`, `Stop`, `SessionEnd`) in `hooks.json` in the agent's own `CODEX_HOME`. Codex runs such hooks only when they are trusted, so Overdeck also writes a `# overdeck:sageox-hooks:begin` … `# overdeck:sageox-hooks:end` block at the end of that `config.toml`. The block trusts exactly those six hooks, keyed by the resolved `hooks.json` path. Overdeck never uses `--dangerously-bypass-hook-trust`, which would also run a repository's own `.codex/hooks.json` unreviewed.
+- Both get the `sageox` pack skills you turned on.
+
+Every hook runs the built `ox` by absolute path with the env written inline, and does nothing if that binary is gone. These hooks come from Overdeck, not from the pack; the pack's own capabilities are still **Not applied**. If any check fails, or anything goes wrong, the launch continues without SageOx: no env, no hooks, no `sageox` skills, and one `[launcher] WARNING:` line naming the reason. When SageOx is off, a Codex launch deletes that `hooks.json` and the trust block, and every launch removes placed link files as described in [Switching SageOx off](#switching-sageox-off).
+
+#### What `pan doctor` checks
+
+When the `sageox` pack is registered, `pan doctor` adds a **SageOx (ox)** row. It is `ok` when Overdeck built `ox` for the trusted commit and that binary answers the `overdeck-host/1` contract: `built ox at <packdir>/<commit>/bin/ox; host contract overdeck-host/1, ox <version>; pack <short commit>`. It warns, with the fix `pan skills pack sync sageox`, when the build is missing (`ox not built for pack <short commit>`), when the built binary is not executable, has no host contract, prints unreadable output, or times out. Without the pack, there is no row.
+
+#### Removing SageOx
+
+`pan skills pack remove sageox` deletes the build and the cache but keeps the stored links, because recreating one needs `ox login`, the network, and a second `ox init` registration. It prints `kept SageOx link files in <packdir>/bindings/ (delete them by hand to forget every project's SageOx link)`.
+
+## Where state lives and when changes apply
+
+### Where pack state is stored
+
+| What | Stored in |
+|------|-----------|
+| Registry (url, ref, trusted commit) | `~/.overdeck/config.yaml`, under `skills.packs.<id>` |
+| Global pack toggle | `~/.overdeck/config.yaml`, under `skills.pack_overrides.<id>: true` |
+| Project pack toggle | `~/.overdeck/projects.yaml`, under `projects.<key>.skill_pack_overrides.<id>` |
+| Issue pack toggle | The issue's skill override file, under `packs.<id>` |
+| Single pack skills | The same `skills.overrides`, `skill_overrides`, and issue `skills:` maps, with `pack/skill` keys |
+| gstack runtime and state | `~/.overdeck/packs/gstack/render/<commit>/` and `~/.overdeck/packs/gstack/state/` |
+| gstack browser runtime | `~/.overdeck/packs/gstack/browser/` (bun cache, Chromium, Chromium's fontconfig and GPU caches), and `node_modules` plus binaries inside the render |
+| gstack browser consent | `~/.overdeck/config.yaml`, under `skills.packs.gstack.browser: true` |
+| SageOx build | `~/.overdeck/packs/sageox/<commit>/bin/` (`ox`, both adapters, and the build marker `.overdeck-ox-build.json`) and Go's caches in `~/.overdeck/packs/sageox/go/` |
+| SageOx links | `~/.overdeck/packs/sageox/bindings/<project>/`; `pan skills pack remove sageox` keeps them |
+| SageOx upload and committed-link flags | `~/.overdeck/projects.yaml`, under `projects.<key>.sageox_upload` and `projects.<key>.sageox_binding: committed` |
+
+The cache lives in `~/.overdeck/packs/` and can be rebuilt at any time, except the gstack `state/` dir, which holds gstack's own config, sessions and learnings: `pan skills pack sync [id]` re-fetches the cache, and `pan skills pack gc [--max-age-days <n>]` removes mounts no launch uses. `pan skills pack remove <id>` unregisters a pack, clears its global toggle and global skill values, and deletes its cache (for `sageox`, everything except the stored links in `bindings/`); project and issue values stay but do nothing until the pack is added again.
+
+### When pack changes apply
+
+Packs apply to Overdeck-managed **Claude Code** and **Codex** sessions at their next launch, like other skill changes. Claude Code receives the pack as `--plugin-dir`; Codex gets a local `overdeck-packs` plugin marketplace in the agent's own `$CODEX_HOME`. Remote (Fly) launches and other harnesses get no packs. A launch never touches the network: if the trusted commit is not cached, the launch skips that pack and prints `run pan skills pack sync <id>`. If Claude Code also has the same upstream plugin installed, the dashboard warns that its skills will appear twice.
+
+In the dashboard, packs appear above the skill list on the Skills page, in project settings, and in the issue view. The dashboard can turn packs on and off but not add them; it shows the `pan skills pack add` command instead.
+
+## Troubleshooting
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| Launch prints `[launcher] WARNING: skill pack <id> not cached; run pan skills pack sync <id>` and the pack is missing | The trusted commit is not in the cache; launches never fetch | `pan skills pack sync <id>`, then relaunch |
+| A pack skill is not visible to the agent | The pack or skill is off at the level that decides, the skill is opt-in, the harness is not Claude Code or Codex, or the launch is remote (Fly) | `pan skills list --project <key> --issue <id>`; turn on the pack (`--pack`) or the opt-in skill (`<pack>/<skill>`); packs apply only to Overdeck-managed Claude Code and Codex launches |
+| A running agent did not pick up a change | Packs resolve at launch | Restart or resume the agent; the next launch applies it |
+| The dashboard shows `also installed as a Claude plugin — skills will appear twice` | Claude Code also has the same upstream plugin installed | Uninstall the Claude Code plugin, or keep the pack off |
+| Launch prints `[launcher] WARNING: gstack browser runtime not built; run pan skills pack sync gstack` | Browser consent is recorded but the runtime for the trusted commit is missing | `pan skills pack sync gstack` |
+| `pack gstack needs bun on PATH (https://bun.sh)` | `bun` is not installed or not on `PATH` | Install bun, then repeat the command |
+| An old gstack render stays after `pan skills pack gc` | A linked mount still uses it, or it is younger than `--max-age-days` (using a mount resets its age and its render's age) | Wait until no launch uses it, or run `pan skills pack gc --max-age-days <n>` with a smaller value |
+| Launch prints `[launcher] WARNING: SageOx not applied: project <key> has no SageOx link; run pan skills pack sageox link --project <key>` | SageOx is on, but the project has neither a stored link nor a `.sageox/` in the checkout | `pan skills pack sageox link --project <key>`, then relaunch |
+| Launch prints `[launcher] WARNING: SageOx not applied: ox is not built for the sageox pack (<commit>); run pan skills pack sync sageox` | The build for the trusted commit is missing or incomplete; launches never build | `pan skills pack sync sageox` (needs Go), then relaunch |
+| A PR is not mergeable with `PR changes SageOx link files (.sageox/) but <key> has not opted in to committing them; …` | The PR adds or changes `.sageox/`, and the project has not committed its link | Remove `.sageox/` from the PR, or run `pan skills pack sageox commit --project <key>` and merge that PR first |
+| A PR is not mergeable with `SageOx merge guard could not read the PR's changed files: …` | The guard could not read the PR's diff, so it fails closed | Fetch the PR head in the named directory (`git fetch origin <branch>`), then let the gate re-check |
+
+## Terminology: skill packs and skill bundles
+
+Skill packs are the built feature described on this page. [Template Conversations](/reference/template-conversations) describes a separate, unbuilt proposal (PAN-1357, the proposed `bundle` verb) that also uses the words "skill bundle." Per-conversation skill values (PAN-4486), set in the **New conversation with options…** dialog or by `pan handoff --skill/--pack`, already cover part of that proposal: a conversation can turn on pack skills for itself. See [Template Conversations](/reference/template-conversations) and [Conversations](/features/conversations).

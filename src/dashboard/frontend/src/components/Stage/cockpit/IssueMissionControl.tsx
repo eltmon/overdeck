@@ -46,6 +46,10 @@ import type { XBriefDocument } from '../../xbrief/types'
 import { IssueTreeLane } from './IssueTreeLane'
 import { UatEnvironmentPanel } from '../../CommandDeck/UatEnvironmentPanel'
 import { ChangedFilesView } from './ChangedFilesView'
+import { DeftDecisionsTab } from '../../deft/DeftDecisionsTab'
+import { DeftScopeView } from '../../deft/DeftScopeView'
+import { DeftScopeDag } from '../../deft/DeftScopeDag'
+import { useDeftIssueSummary } from '../../deft/queries'
 import { CockpitPhaseRail } from './CockpitPhaseRail'
 import { IssueOverviewTab } from './IssueOverviewTab'
 import { PlanMapCard } from './PlanMapCard'
@@ -70,7 +74,7 @@ export interface IssueMissionControlProps {
   onOpenPane: (paneType: PaneType) => void
 }
 
-type MissionTab = 'overview' | 'session' | 'plan' | 'changes' | 'activity' | 'discussion'
+type MissionTab = 'overview' | 'session' | 'plan' | 'changes' | 'activity' | 'discussion' | 'decisions'
 type MissionSubView = 'conversation' | 'terminal' | 'tasks' | 'map' | 'prd' | 'files' | 'checks' | 'artifacts' | 'feed'
 type TabSelection = { tab: MissionTab; subView?: MissionSubView }
 
@@ -85,6 +89,8 @@ const TABS: Array<{ id: MissionTab; label: string }> = [
   { id: 'activity', label: 'Activity' },
   { id: 'discussion', label: 'Discussion' },
 ]
+/** PAN-4849: shown before Discussion only for a Deft issue. */
+const DEFT_DECISIONS_TAB: { id: MissionTab; label: string } = { id: 'decisions', label: 'Decisions' }
 
 // Legacy cockpit tab ids → { tab, subView }. Applied when reading the route/tab param.
 const LEGACY_TAB_MAP: Record<string, TabSelection> = {
@@ -110,7 +116,7 @@ function resolveTabSelection(tabId: string | null): TabSelection | null {
   if (!tabId) return null
   const legacy = LEGACY_TAB_MAP[tabId]
   if (legacy) return legacy
-  const tab = TABS.find((candidate) => candidate.id === tabId)?.id
+  const tab = [...TABS, DEFT_DECISIONS_TAB].find((candidate) => candidate.id === tabId)?.id
   return tab ? { tab, subView: DEFAULT_SUB_VIEW[tab] } : null
 }
 
@@ -443,6 +449,8 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
   const checks = useIssueCheckRunsQuery(issueId)
   const costs = useIssueCostsQuery(issueId)
   const headerActions = useIssueActions(issueId)
+  const { isDeft } = useDeftIssueSummary(issueId)
+  const tabs = isDeft ? [...TABS.slice(0, 5), DEFT_DECISIONS_TAB, ...TABS.slice(5)] : TABS
   const issueView = useIssueView(issueId, { title, branch, projectName })
   const recentActivity = useMemo<DrawerActivityItem[]>(
     () => issueView.activity.sections.map((section, index) => ({
@@ -687,10 +695,11 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
         agents={issueView.agents}
         ship={cockpitShip}
         onSelectPhase={selectPipelinePhase}
+        issueId={issueId}
       />
 
       <nav data-section="Detail Tabs" className="flex flex-nowrap gap-1 overflow-x-auto border-b border-border bg-card px-3 pt-2" aria-label="Issue cockpit tabs">
-        {TABS.map((tab) => {
+        {tabs.map((tab) => {
           const badge = tabBadge(tab.id, checks.data)
           return (
             <button
@@ -794,9 +803,9 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
                   ))}
                 </div>
                 {activeSubView === 'tasks' ? (
-                  <div data-section="TasksRail / TasksTab"><TasksPanel issueId={issueId} /></div>
+                  <><DeftScopeView issueId={issueId} /><div data-section="TasksRail / TasksTab"><TasksPanel issueId={issueId} /></div></>
                 ) : null}
-                {activeSubView === 'map' ? <PlanMapCard issueId={issueId} /> : null}
+                {activeSubView === 'map' ? <><DeftScopeDag issueId={issueId} /><PlanMapCard issueId={issueId} /></> : null}
                 {activeSubView === 'prd' ? <PrdViewer issueId={issueId} onClose={() => selectTab('plan', 'map')} /> : null}
               </div>
             )}
@@ -842,6 +851,7 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
               </div>
             )}
             {activeTab === 'discussion' && <div data-section="Plan / Activity / Discussion tabs"><DiscussionsTab issueId={issueId} /></div>}
+            {activeTab === 'decisions' && <DeftDecisionsTab issueId={issueId} />}
           </div>
         </main>
         <aside data-section="Awareness rail" className={styles.awarenessRail} aria-label="Issue awareness">

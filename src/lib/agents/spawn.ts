@@ -17,6 +17,7 @@ import { createConversation, getConversationByName, reactivateConversationForSpa
 import { startWork } from '../cv.js';
 import { generateFixedPointPrompt, checkHook, initHook } from '../hooks.js';
 import { generateLauncherScript } from '../launcher-generator.js';
+import { prepareClaudeOverdeckMcp, prepareCodexOverdeckMcp } from '../mcp/agent-injection.js';
 import { getProviderForModel, setupCredentialFileAuth, clearCredentialFileAuth } from '../providers.js';
 import { resolveHarness } from '../harness-resolve.js';
 import { prepareHarnessLaunch } from '../harness-binary.js';
@@ -105,9 +106,11 @@ import { buildRegisteredSlotPrompt, ensureRegisteredSlotWorktree } from './regis
 import { launchAndCaptureManagedKimiSession } from '../runtimes/kimi-code.js';
 import { requireManagedKimiDelivery } from './managed-kimi-delivery.js';
 import { resolveEffort } from './resolve-effort.js';
+import { assertRoleRunsOnPipeline } from '../deft/role-refusal.js';
 const execAsync = promisify(exec);
 
 export async function spawnRun(issueId: string, role: Role, options: SpawnRunOptions): Promise<AgentState> {
+  await assertRoleRunsOnPipeline(issueId, role);
   if (role !== 'work') return spawnRunWithoutConsentClaim(issueId, role, options);
 
   const startedBy = resolveAgentStartedBy(options.startedBy);
@@ -318,7 +321,7 @@ async function spawnRunWithoutConsentClaim(
     ? await getOhmypiLauncherFields(agentId, selectedModel, options.effort)
     : {};
   const codexLauncherFields = resolvedHarness === 'codex'
-    ? getCodexLauncherFields(agentId, selectedModel, workspace, role, options.effort)
+    ? getCodexLauncherFields(agentId, selectedModel, workspace, role, options.effort, await prepareCodexOverdeckMcp({ agentId, agentKind: 'agent', role, harness: resolvedHarness }))
     : {};
   const acpLauncherFields = isAcp
     ? getAcpLauncherFields(
@@ -428,6 +431,7 @@ async function spawnRunWithoutConsentClaim(
     ...kimiCodeLauncherFields,
     ...museLauncherFields,
     ...(primeLaunch?.fields ?? {}),
+    ...(await prepareClaudeOverdeckMcp({ agentId, agentKind: 'agent', role, harness: resolvedHarness })),
   });
 
   const launcherScript = join(getAgentDir(agentId), 'launcher.sh');

@@ -3,7 +3,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FlywheelDerivedStatus } from '@overdeck/contracts';
 
 vi.mock('../../components/flywheel/FlywheelConversationPane', () => ({
-  FlywheelConversationPane: () => <div data-testid="flywheel-conversation-pane" />,
+  FlywheelConversationPane: ({
+    tickTarget, onTickTargetHandled,
+  }: {
+    tickTarget?: { messageId?: string; nonce: number } | null;
+    onTickTargetHandled?: () => void;
+  }) => (
+    <div
+      data-testid="flywheel-conversation-pane"
+      data-target-id={tickTarget?.messageId ?? ''}
+      data-target-nonce={tickTarget ? String(tickTarget.nonce) : ''}
+    >
+      <button type="button" data-testid="mock-tick-handled" onClick={() => onTickTargetHandled?.()}>tick-handled</button>
+    </div>
+  ),
 }));
 vi.mock('../../components/flywheel/FlywheelOrderBookCard', () => ({ FlywheelOrderBookCard: () => null }));
 vi.mock('../../components/flywheel/PendingAutoMergesCard', () => ({ PendingAutoMergesCard: () => null }));
@@ -20,6 +33,7 @@ vi.mock('../../components/flywheel/FlywheelUatBatchesCard', () => ({
 import { FlywheelPage } from '../FlywheelPage';
 import { flywheelStatus, renderWithQuery, stubFetch } from '../../components/flywheel/__tests__/fixtures';
 import { consumePendingReveal, requestRevealNeedsYou } from '../../lib/flywheelReveal';
+import { useAskUserQuestionUiStore } from '../../lib/askUserQuestionUiStore';
 
 const config = { auto_pickup_backlog: false, require_uat_before_merge: true, merge_train_enabled: true };
 
@@ -34,7 +48,7 @@ const STATS = {
   bugs: [],
 };
 
-function setup(status: FlywheelDerivedStatus | 'unreachable') {
+function setup(status: FlywheelDerivedStatus | 'unreachable', opts: { pendingInput?: unknown[] } = {}) {
   return stubFetch((url, init) => {
     if (url === '/api/flywheel/status') {
       return status === 'unreachable' ? new Response('{}', { status: 503 }) : Response.json(status);
@@ -46,6 +60,7 @@ function setup(status: FlywheelDerivedStatus | 'unreachable') {
     if (url === '/api/flywheel/state') return Response.json({ exists: false, path: '.pan/flywheel/state.md', content: null, lastModified: null });
     if (url === '/api/flywheel/report') return Response.json({ exists: false, path: '.pan/flywheel/report.md', content: null, lastModified: null });
     if (url.startsWith('/api/flywheel/stats')) return Response.json(STATS);
+    if (url === '/api/conversations/pending-input') return Response.json(opts.pendingInput ?? []);
     return undefined;
   });
 }
@@ -53,6 +68,9 @@ function setup(status: FlywheelDerivedStatus | 'unreachable') {
 describe('FlywheelPage (PAN-3964 FR-8)', () => {
   // The reveal flag is module state: clear it so one test cannot steer the next.
   beforeEach(() => { consumePendingReveal(); });
+  beforeEach(() => {
+    useAskUserQuestionUiStore.setState({ reopenId: null, reopenNonce: 0, answeredToolUseIds: new Set() });
+  });
   afterEach(() => vi.useRealTimers());
   afterEach(() => { vi.unstubAllGlobals(); consumePendingReveal(); });
 
@@ -172,5 +190,48 @@ describe('FlywheelPage (PAN-3964 FR-8)', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'stats' }));
     expect(screen.getByRole('group', { name: 'Stats window' })).toBeInTheDocument();
     expect(screen.getByTestId('flywheel-conversation-pane')).toBeInTheDocument();
+  });
+
+  it('clicking NEEDS YOU reopens the pending question when one is open (PAN-4751 ac1)', async () => {
+    const status = flywheelStatus({
+      lastTick: { tick: 4, pick: null, phase: 'park', inFlight: [], needsYou: 'decide the scope', at: '2026-09-23T09:59:50.000Z' },
+    });
+    setup(status, { pendingInput: [{ name: 'conv-flywheel', pendingAskUserQuestion: { toolUseId: 'tu-1', askedAt: '2026-09-23T09:59:00.000Z', questions: [] } }] });
+    const { client } = renderWithQuery(<FlywheelPage />);
+    const banner = await screen.findByTestId('flywheel-needs-you');
+    await waitFor(() => expect(client.getQueryData(['conv-ask-user-question'])).toBeDefined());
+
+    fireEvent.click(banner);
+    expect(useAskUserQuestionUiStore.getState().reopenId).toBe('conv-flywheel');
+    expect(useAskUserQuestionUiStore.getState().reopenNonce).toBe(1);
+    expect(screen.getByTestId('flywheel-conversation-pane')).toHaveAttribute('data-target-id', '');
+  });
+
+  it('with no pending question, NEEDS YOU jumps to the tick message and tracks handled state (PAN-4751 ac2, ac5)', async () => {
+    const status = flywheelStatus({
+      lastTick: { tick: 4, pick: null, phase: 'park', inFlight: [], needsYou: 'decide the scope', at: '2026-09-23T09:59:50.000Z', messageId: 'msg-9' },
+    });
+    setup(status, { pendingInput: [] });
+    const { client } = renderWithQuery(<FlywheelPage />);
+    const banner = await screen.findByTestId('flywheel-needs-you');
+    await waitFor(() => expect(client.getQueryData(['conv-ask-user-question'])).toBeDefined());
+
+    fireEvent.click(banner);
+    const pane = screen.getByTestId('flywheel-conversation-pane');
+    expect(pane).toHaveAttribute('data-target-id', 'msg-9');
+    expect(pane).toHaveAttribute('data-target-nonce', '1');
+    expect(useAskUserQuestionUiStore.getState().reopenNonce).toBe(0);
+
+    fireEvent.click(banner);
+    expect(pane).toHaveAttribute('data-target-nonce', '2');
+    expect(useAskUserQuestionUiStore.getState().reopenNonce).toBe(0);
+
+    fireEvent.click(screen.getByTestId('mock-tick-handled'));
+    expect(pane).toHaveAttribute('data-target-id', '');
+    expect(pane).toHaveAttribute('data-target-nonce', '2');
+
+    fireEvent.click(banner);
+    expect(pane).toHaveAttribute('data-target-id', 'msg-9');
+    expect(pane).toHaveAttribute('data-target-nonce', '3');
   });
 });

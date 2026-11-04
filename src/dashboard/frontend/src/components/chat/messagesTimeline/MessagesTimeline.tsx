@@ -41,6 +41,7 @@ import type { MessagesTimelineProps, RoundMarker } from './types';
 import { RoundDivider } from './dividers';
 import { TimelineRowRenderer } from './TimelineRowRenderer';
 import { CiteSelectionLayer } from '../citations/CiteSelectionToolbar';
+import { CitationTargetContext } from '../../../lib/composerCitations';
 import { useConnectionPhase } from '../../../lib/connectionState';
 import { useConversationBookmarks } from '../bookmarks/ConversationBookmarks';
 import {
@@ -547,6 +548,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
 
   return (
     <ChatMarkdownSettingsProvider>
+    <CitationTargetContext.Provider value={citationsEnabled && conversationName ? conversationName : null}>
       <div style={{ position: 'relative', flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
       <div
         ref={scrollContainerRef}
@@ -840,6 +842,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
       </button>
     )}
       </div>
+    </CitationTargetContext.Provider>
     </ChatMarkdownSettingsProvider>
   );
 });

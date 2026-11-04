@@ -1,0 +1,104 @@
+{
+  "version": "1",
+  "issueId": "PAN-4925",
+  "created": "2026-11-03T20:26:03.235Z",
+  "updated": "2026-11-03T21:37:34.489Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-03T20:55Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-11-03T20:55:27.164Z"
+    }
+  ],
+  "items": {
+    "fix-smee-stop-test": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4925",
+      "claimedAt": "2026-11-03T20:26:03.235Z",
+      "doneAt": "2026-11-03T20:27:43.609Z"
+    },
+    "worker-signal-guard": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4925",
+      "claimedAt": "2026-11-03T20:28:24.115Z",
+      "doneAt": "2026-11-03T20:44:21.332Z"
+    },
+    "docs-signals-fixture-pids": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4925",
+      "claimedAt": "2026-11-03T20:44:27.812Z",
+      "doneAt": "2026-11-03T20:45:41.779Z"
+    },
+    "ci-proof": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4925",
+      "claimedAt": "2026-11-03T20:45:58.266Z",
+      "doneAt": "2026-11-03T21:36:35.464Z"
+    },
+    "fix-smee-stop-test.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T20:47:32.771Z"
+    },
+    "fix-smee-stop-test.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T20:47:55.452Z"
+    },
+    "fix-smee-stop-test.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T20:48:20.420Z"
+    },
+    "worker-signal-guard.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T20:48:45.403Z"
+    },
+    "worker-signal-guard.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T20:49:06.024Z"
+    },
+    "worker-signal-guard.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T20:49:29.131Z"
+    },
+    "worker-signal-guard.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T20:49:47.991Z"
+    },
+    "worker-signal-guard.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T20:50:07.339Z"
+    },
+    "docs-signals-fixture-pids.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T20:50:30.222Z"
+    },
+    "docs-signals-fixture-pids.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T20:50:55.479Z"
+    },
+    "docs-signals-fixture-pids.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T20:51:18.338Z"
+    },
+    "ci-proof.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T21:37:09.240Z"
+    },
+    "ci-proof.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T21:37:34.488Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-11-03T20:55:27Z",
+      "markdownBody": "VERIFICATION FAILED for PAN-4925 (attempt 1/3):\n\nFailed check: vbrief-ac\n\nAcceptance criteria check FAILED — 2/13 AC incomplete:\n\n### Prove the fix on CI and record the evidence in the PR (2/2 incomplete)\n  - [ ] Given the PR, when its description is read, then it names tests/unit/lib/smee-process.test.ts, the real SIGTERM to PID 12345, jobs 126126802200 and 126159340636, and the repro output before and after the fix\n  - [ ] Given the PR head, when test-shard (3/4) is re-run, then 5 consecutive attempts conclude success with no 'Worker exited unexpectedly' error, and the PR description lists each attempt's job ID\n\n## REQUIRED: Complete all acceptance criteria BEFORE resubmitting\n\n1. Review the incomplete AC above\n2. Implement the missing requirements and write tests\n3. Close every completed task with `pan task close` — the canonical writer publishes the close and AC statuses sync automatically; never hand-edit spec files\n4. Commit and push ALL changes\n5. ONLY THEN resubmit: pan review request PAN-4925 -m \"Completed acceptance criteria\"\n\nDo NOT resubmit until all AC are completed."
+    }
+  ]
+}

@@ -431,7 +431,7 @@ describe("AcpHost", () => {
       agentId: "agent-k27",
       provider: "kimi",
       workspace: process.cwd(),
-      model: "kimi-code/kimi-for-coding",
+      model: "kimi-code/kimi-for-coding-highspeed",
       effort: "high",
       overdeckHome,
       runtime: stub.runtime,
@@ -504,7 +504,7 @@ describe("AcpHost", () => {
     const stub = await makeStubRuntime();
     const host = new AcpHost({
       agentId: "agent-fixed-effort", provider: "kimi", workspace: process.cwd(),
-      model: "kimi-code/kimi-for-coding", overdeckHome, runtime: stub.runtime,
+      model: "kimi-code/kimi-for-coding-highspeed", overdeckHome, runtime: stub.runtime,
     });
     hosts.push(host);
     await host.start();
@@ -1303,5 +1303,12 @@ describe("AcpHost", () => {
       effort: "low",
       resumeSessionId: "persisted-session",
     });
+  });
+
+  it("parses --mcp-config into mcpConfig only when it is passed (PAN-4934)", () => {
+    const base = ["--agent", "a", "--provider", "opencode", "--workspace", "/w", "--binary-path", "/opt/opencode"];
+    expect(parseAcpHostArgs([...base, "--mcp-config", "/h/agents/a/overdeck-mcp.json"]))
+      .toMatchObject({ mcpConfig: "/h/agents/a/overdeck-mcp.json" });
+    expect(parseAcpHostArgs(base)).not.toHaveProperty("mcpConfig");
   });
 });

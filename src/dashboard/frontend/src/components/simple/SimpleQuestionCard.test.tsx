@@ -42,6 +42,28 @@ describe('SimpleQuestionCard (PAN-3090)', () => {
     expect(screen.getByText('Require the app update')).toBeInTheDocument();
   });
 
+  it('shows the decision context under the question', () => {
+    const agent = makeAgent({
+      pendingAskUserQuestion: {
+        toolUseId: 'operator-decision:q1',
+        askedAt: new Date().toISOString(),
+        questions: [{
+          question: 'Pick a path.',
+          context: '- tried A\n- tried B',
+          options: [{ label: 'Yes' }, { label: 'No' }],
+        }],
+      },
+    });
+    render(<SimpleQuestionCard agent={agent} onSend={vi.fn()} sending={false} />);
+    expect(screen.getByText(/tried A/)).toBeInTheDocument();
+    expect(screen.getByText(/tried B/)).toBeInTheDocument();
+  });
+
+  it('renders no context when the question has none', () => {
+    render(<SimpleQuestionCard agent={makeAgent()} onSend={vi.fn()} sending={false} />);
+    expect(screen.queryByText(/tried A/)).toBeNull();
+  });
+
   it('send uses the typed text, else the selected label; disabled with neither', () => {
     const onSend = vi.fn((_text: string, onSuccess: () => void) => onSuccess());
     render(<SimpleQuestionCard agent={makeAgent()} onSend={onSend} sending={false} />);

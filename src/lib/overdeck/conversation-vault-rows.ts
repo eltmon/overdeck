@@ -18,6 +18,8 @@ export interface VaultBrowseRowInput {
   title: string;
   harness: 'claude-code' | 'codex';
   ownerLabel: string;
+  /** PAN-4645: the owning machine's environment id, written to `environment_id`; absent or null leaves it null. */
+  ownerEnvironmentId?: string | null;
   cwd: string;
   model: string | null;
   createdAt: string;
@@ -55,6 +57,7 @@ interface ExistingBrowseRow {
   model: string | null;
   ended_at: number | null;
   vault_owner_label: string | null;
+  environment_id: string | null;
 }
 
 /**
@@ -66,22 +69,25 @@ export function upsertVaultBrowseRow(input: VaultBrowseRowInput): 'inserted' | '
   const db = getOverdeckDatabase();
   const name = vaultBrowseConversationName(input.vaultId);
   const endedAt = toMillisOrNow(input.updatedAt);
+  const ownerEnvironmentId = input.ownerEnvironmentId ?? null;
   const existing = db
-    .prepare(`SELECT origin, title, cwd, harness, model, ended_at, vault_owner_label FROM conversations WHERE name = ?`)
+    .prepare(`SELECT origin, title, cwd, harness, model, ended_at, vault_owner_label, environment_id FROM conversations WHERE name = ?`)
     .get(name) as ExistingBrowseRow | undefined;
   if (existing && existing.origin !== 'vault') return 'conflict';
   if (existing && existing.title === input.title && existing.cwd === input.cwd && existing.harness === input.harness
-    && existing.model === input.model && existing.ended_at === endedAt && existing.vault_owner_label === input.ownerLabel) {
+    && existing.model === input.model && existing.ended_at === endedAt && existing.vault_owner_label === input.ownerLabel
+    && existing.environment_id === ownerEnvironmentId) {
     return 'unchanged';
   }
   db.prepare(`
     INSERT INTO conversations
       (id, name, cwd, harness, model, title, title_source, created_at, archived_at, tmux_session,
-       status, ended_at, fork_retry_count, origin, vault_owner_label)
-    VALUES (?, ?, ?, ?, ?, ?, 'manual', ?, NULL, ?, 'ended', ?, 0, 'vault', ?)
+       status, ended_at, fork_retry_count, origin, vault_owner_label, environment_id)
+    VALUES (?, ?, ?, ?, ?, ?, 'manual', ?, NULL, ?, 'ended', ?, 0, 'vault', ?, ?)
     ON CONFLICT(name) DO UPDATE SET
       title = excluded.title, cwd = excluded.cwd, harness = excluded.harness, model = excluded.model,
-      ended_at = excluded.ended_at, vault_owner_label = excluded.vault_owner_label
+      ended_at = excluded.ended_at, vault_owner_label = excluded.vault_owner_label,
+      environment_id = excluded.environment_id
     WHERE conversations.origin = 'vault'
   `).run(
     randomUUID(),
@@ -94,6 +100,7 @@ export function upsertVaultBrowseRow(input: VaultBrowseRowInput): 'inserted' | '
     `conv-${name}`,
     endedAt,
     input.ownerLabel,
+    ownerEnvironmentId,
   );
   return existing ? 'updated' : 'inserted';
 }

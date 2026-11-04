@@ -10,8 +10,12 @@
  *
  * Deft (PAN-3943): the step writes a per-launch env file (Claude: `deft.env`
  * beside the plugin link; Codex: `$CODEX_HOME/overdeck-deft.env`). The
- * launcher reads it line by line and exports only two literal assignments;
- * the file is never sourced.
+ * launcher reads it line by line and exports only three literal assignments;
+ * the file is never sourced. The run-summary token (PAN-4820) is a literal
+ * that the launcher maps to `<workingDir>/.overdeck/deft-run-summary.jsonl`,
+ * quoted when the launcher is generated, so the file never carries a path.
+ * The working dir is used rather than `$PWD` because the launcher reads the
+ * file before it changes into the working dir.
  */
 import { dirname, join } from 'node:path';
 import { getOverdeckHome } from '../paths.js';
@@ -19,9 +23,13 @@ import { shellQuote } from '../shell-quote.js';
 
 const WARNING = `echo "[launcher] WARNING: skill overrides not applied" >&2`;
 
-/** Bash that exports the allowlisted Deft env lines from `file` (already shell-quoted). */
-export function deftEnvReadLine(file: string): string {
-  return `if [ -f ${file} ]; then while IFS= read -r PAN_DEFT_LINE; do case "$PAN_DEFT_LINE" in DEFT_DIRECTIVE_DISABLE=1) export DEFT_DIRECTIVE_DISABLE=1 ;; DEFT_ORCHESTRATOR=overdeck) export DEFT_ORCHESTRATOR=overdeck ;; esac; done < ${file}; fi`;
+/**
+ * Bash that exports the allowlisted Deft env lines from `file` (already
+ * shell-quoted). `workingDir` is the launch's working dir, unquoted.
+ */
+export function deftEnvReadLine(file: string, workingDir: string): string {
+  const runSummary = shellQuote(join(workingDir, '.overdeck', 'deft-run-summary.jsonl'));
+  return `if [ -f ${file} ]; then while IFS= read -r PAN_DEFT_LINE; do case "$PAN_DEFT_LINE" in DEFT_DIRECTIVE_DISABLE=1) export DEFT_DIRECTIVE_DISABLE=1 ;; DEFT_ORCHESTRATOR=overdeck) export DEFT_ORCHESTRATOR=overdeck ;; DEFT_RUN_SUMMARY_PATH=overdeck) export DEFT_RUN_SUMMARY_PATH=${runSummary} ;; esac; done < ${file}; fi`;
 }
 
 /** Bash for the launcher step that resolves overrides before the harness starts. */
@@ -48,11 +56,11 @@ export function launcherSkillOverrideLines(opts: {
     ];
     if (link && opts.pluginLink) {
       lines.push(`if [ -d ${link} ]; then PAN_SKILL_PLUGIN_DIR=${link}; else PAN_SKILL_PLUGIN_DIR=''; fi`);
-      lines.push(deftEnvReadLine(shellQuote(join(dirname(opts.pluginLink), 'deft.env'))));
+      lines.push(deftEnvReadLine(shellQuote(join(dirname(opts.pluginLink), 'deft.env')), opts.workingDir));
     }
     return lines;
   }
-  return [`${command} --codex-home "$CODEX_HOME" || ${WARNING}`, deftEnvReadLine('"$CODEX_HOME/overdeck-deft.env"')];
+  return [`${command} --codex-home "$CODEX_HOME" || ${WARNING}`, deftEnvReadLine('"$CODEX_HOME/overdeck-deft.env"', opts.workingDir)];
 }
 
 /** The Claude command suffix that passes the resolved settings, when the step was emitted. */

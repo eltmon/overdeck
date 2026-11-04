@@ -1,0 +1,239 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-02T04:57:55Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4791: PAN-4777 follow-up: CodeRabbit findings on #4789 (cleanup-promise scope in fly-provider.md, volume cleanup in recovery text)",
+    "updated": "2026-11-02T05:13:21.389Z"
+  },
+  "plan": {
+    "id": "pan-4791",
+    "title": "PAN-4777 follow-up: CodeRabbit findings on #4789 (cleanup-promise scope in fly-provider.md, volume cleanup in recovery text)",
+    "status": "running",
+    "uid": "fa51d617-02ea-4bda-a1b7-e246d0525a4c",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-02T04:57:55Z",
+    "updated": "2026-11-02T05:13:21.389Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4791",
+        "label": "PAN-4791",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/pull/4789",
+        "label": "#4789 (PAN-4777)",
+        "type": "pull_request"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4791.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "remote",
+      "fly",
+      "docs",
+      "coderabbit-followup"
+    ],
+    "narratives": {
+      "Problem": "CodeRabbit left two Minor findings on PR #4789 (PAN-4777) that merged unanswered. (1) docs/fly-provider.md promises that any failure after the Fly machine is created deletes it, but a failure while createVm waits for 'started' rejects before the rollback try block, so the machine (and a durable-tier volume) stays. The same doc states the startup wait as 120 s where the code waits 300 s. (2) When rollBackVm's delete fails, its recovery text tells the operator to destroy only the machine; on the durable tier the <vmName>-workspace volume also survives and keeps billing.",
+      "Proposal": "WI-1 rewrites docs/fly-provider.md so automatic cleanup is promised only for setup steps that run after the create step (createVm) returns, says a create-step failure such as the 300 s startup wait leaves the machine (found with fly machines list -a <app>, recovered by re-running pan workspace create --remote <issue> or destroyed by hand), says rollback only tries to delete the durable volume and tells durable operators to check fly volumes list, and corrects 120 s to 300 s. WI-2 makes rollBackVm's recovery text tier-aware via fly.getResiliencyTier(): on 'durable' it appends fly volumes list / fly volumes destroy <volume-id> --yes after the machine destroy; ephemeral text is unchanged. Each item ends by replying on its own CodeRabbit thread with the pushed fix commit SHA.",
+      "NonGoals": "- Changing createVm to delete a machine or durable volume when createMachine or the startup wait fails\n- Changing deleteVm's silent swallow of a volume-delete error\n- Writing a user-facing page for the durable resiliency tier\n- Any change to src/lib/remote/fly-provider.ts, src/lib/remote/fly-api.ts, or src/lib/anywhere/fly/\n- Changing the ephemeral-tier recovery text"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Narrow the doc promise instead of adding cleanup inside createVm.",
+        "rationale": "The issue asks to 'limit the cleanup promise'; deleting a machine that may still be pulling its image is a behavior change with its own risks and belongs in a separate issue."
+      },
+      {
+        "summary": "Recovery text adds volume steps only when fly.getResiliencyTier() === 'durable'.",
+        "rationale": "Only the durable tier attaches a <vmName>-workspace volume; telling ephemeral operators to hunt a volume that cannot exist is noise. getResiliencyTier() already exists on FlyProvider (fly-provider.ts line 115)."
+      },
+      {
+        "summary": "Correct the Fly startup wait from 120 s to 300 s at docs/fly-provider.md lines 62, 257, 447.",
+        "rationale": "The rewritten text describes the startup-wait failure; leaving a wrong figure beside it would be a new defect. Code waits 300 s for fresh and adopted machines."
+      },
+      {
+        "summary": "Thread replies cite the pushed fix commit SHA and PAN-4791 rather than the PR URL; each item replies on its own thread.",
+        "rationale": "Items must complete before pan done opens the PR, so the PR URL does not exist yet; GitHub cross-links the issue to the PR. Each CodeRabbit thread maps to exactly one item, so no extra edge is needed."
+      },
+      {
+        "summary": "Recovery after a create-step failure is re-running pan workspace create --remote <issue> (adopts the leftover machine) or fly machines destroy; never pan workspace start.",
+        "rationale": "Plan critic round 1: startCommand refuses issues with no saved metadata, and metadata is saved only after creation succeeds."
+      },
+      {
+        "summary": "Doc says rollback tries to delete the durable volume and tells operators to check fly volumes list, instead of promising deletion.",
+        "rationale": "Plan critic round 1: deleteVm swallows volume errors; changing that is a NonGoal, so the doc must not over-promise."
+      }
+    ],
+    "items": [
+      {
+        "id": "wi1-docs",
+        "title": "Bound the Fly cleanup promise in docs/fly-provider.md to post-createVm setup failures and correct the startup wait to 300 s",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T04:57:55Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4791",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/fly-provider.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "! grep -Eq '120 s|120 seconds' docs/fly-provider.md",
+            "grep -c 'fly machines list -a <app>' docs/fly-provider.md",
+            "grep -n 'Machine not started' docs/fly-provider.md",
+            "grep -n 'fly volumes destroy <volume-id> -a <app> --yes' docs/fly-provider.md"
+          ],
+          "expected_outputs": [
+            "first command exits 0 (no 120 s figure remains)",
+            "second command prints 2 or more",
+            "the Machine not started bullet contains 'pan workspace create --remote <issue>' and no 'pan workspace start'",
+            "fourth command prints at least one line in the troubleshooting section"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-2a",
+            "FR-3",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1 exactly (.pan/drafts/PAN-4791.md, including its Critique response). Edit docs/fly-provider.md: line 62 '120 s' -> '300 s'; line 67 setup bullet -> 'If a setup step after the create step fails (credential sync onward), delete the machine and try to delete its durable-tier volume before reporting the error. If the create step itself fails (for example the machine does not reach `started` within 300 s), the machine is left in place; find it with `fly machines list -a <app>`.' Never phrase the boundary as 'after the machine reaches started': createVm can still fail after the wait (getMachine). Line 257 'up to 120 seconds.' -> 'up to 300 seconds.'; lines 447-448 'Machine not started' bullet -> 300 s, the machine is not deleted, find it with fly machines list, re-run `pan workspace create --remote <issue>` to adopt and start it or destroy it by hand; remove the `pan workspace start <issue>` instruction (it refuses issues with no saved metadata). Lines 458-463: rename heading to '**Creation fails during setup**', open with any failure in a setup step after the create step returns, keep the step list and the #4748 sentence, say volume deletion is attempted (not guaranteed), and end with the machine-destroy command followed by: on the durable tier run `fly volumes list -a <app>` after any failed creation; if a `<vm-name>-workspace` volume is still listed, destroy it with `fly volumes destroy <volume-id> -a <app> --yes`. Do not touch line 281 (pan workspace start for a stopped, already-created workspace is correct there). Commit with trailer 'Item: wi1-docs', push, then post exactly one reply: gh api -X POST repos/eltmon/overdeck/pulls/4789/comments/4438995645/replies -f body='Fixed in <sha> for #4791: ...' (body text in PRD WI-1 step 6)."
+        },
+        "items": [
+          {
+            "id": "wi1-docs.ac1",
+            "title": "Given docs/fly-provider.md after the change, when `! grep -Eq '120 s|120 seconds' docs/fly-provider.md` runs, then it exits 0 and every line stating the Fly startup wait says 300 s",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-docs.ac2",
+            "title": "The setup list item (former line 67) renders a cleanup promise limited to setup steps after the create step returns and names `fly machines list -a <app>` for a machine left by a create-step failure",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-docs.ac3",
+            "title": "The 'Machine not started' troubleshooting bullet recommends `pan workspace create --remote <issue>` or `fly machines destroy` and contains no `pan workspace start` instruction",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-docs.ac4",
+            "title": "The 'Creation fails during setup' bullet states durable volume deletion is attempted and renders `fly machines destroy <machine-id> -a <app> --force` followed by `fly volumes list -a <app>` and `fly volumes destroy <volume-id> -a <app> --yes`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-docs.ac5",
+            "title": "gh api repos/eltmon/overdeck/pulls/4789/comments returns exactly one new reply with in_reply_to_id 4438995645 that names the pushed wi1-docs commit SHA and #4791",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi2-recovery-text",
+        "title": "Add durable-volume cleanup to rollBackVm's recovery text",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-02T04:57:55Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4791",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/remote-workspace.ts",
+            "tests/lib/remote-workspace.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/remote-workspace.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "tests/lib/remote-workspace.test.ts passes, including the two new rollback tests and the pre-existing 'names the VM and the destroy command when the rollback delete fails' test",
+            "typecheck completes without errors",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "FR-7",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2 exactly. In src/lib/remote-workspace.ts rollBackVm catch block (anchor 'Destroy it by hand: fly machines destroy'), compute volumeStep = fly.getResiliencyTier() === 'durable' ? `. Then destroy its volume: fly volumes list -a ${appName}, find ${vmName}-workspace, and run fly volumes destroy <volume-id> -a ${appName} --yes` : '' and append it after `--force`; extend the rollBackVm doc comment by one sentence explaining why durable needs the volume step. In tests/lib/remote-workspace.test.ts add mocks.tier (default 'ephemeral', reset in beforeEach), add getResiliencyTier: () => mocks.tier to the createFlyProviderFromConfig mock, and add the two tests named in PRD WI-2 step 3 using the existing create() fake-timer helper. Do not touch fly-provider.ts. Commit with trailer 'Item: wi2-recovery-text', push, then post exactly one reply: gh api -X POST repos/eltmon/overdeck/pulls/4789/comments/4438995647/replies -f body='Fixed in <sha> for #4791: ...' (body text in PRD WI-2 step 5)."
+        },
+        "items": [
+          {
+            "id": "wi2-recovery-text.ac1",
+            "title": "Given getResiliencyTier() returns 'durable' and deleteVm rejects with 403, when createRemoteWorkspace fails, then it rejects with a message containing in order 'fly machines destroy m1 -a overdeck-test --force', 'fly volumes list -a overdeck-test', 'pan-pan-4295-ws-workspace', and 'fly volumes destroy <volume-id> -a overdeck-test --yes'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-recovery-text.ac2",
+            "title": "Given the ephemeral tier and deleteVm rejecting, when createRemoteWorkspace fails, then the thrown message contains no 'fly volumes' text and the pre-existing regex test still passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-recovery-text.ac3",
+            "title": "git diff main -- src/lib/remote/ produces no output (fly-provider.ts and fly-api.ts are unchanged)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-recovery-text.ac4",
+            "title": "gh api repos/eltmon/overdeck/pulls/4789/comments returns exactly one new reply with in_reply_to_id 4438995647 that names the pushed wi2-recovery-text commit SHA and #4791",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [],
+    "metadata": {
+      "canonicalFilename": "2026-11-02-PAN-4791-pan-4777-follow-up-coderabbit-findings-on-4789-cleanup-promise-scope-in-fly-provider-md-volume-cleanup-in-recovery-text.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}

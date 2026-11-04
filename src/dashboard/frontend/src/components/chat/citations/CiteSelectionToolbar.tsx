@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { addCitation } from '../../../lib/composerCitations';
-import { resolveSelectionCitation } from './resolveSelectionCitation';
+import type { CitationSource, PendingCitation } from '../../../lib/citationFormat';
+import { resolveMessageSelection, type SelectionCitationResolver } from './resolveSelectionCitation';
 
 export interface CiteSnapshot {
-  messageId: string;
-  role: 'assistant' | 'user';
+  source: CitationSource;
   quotedText: string;
   rect: DOMRect;
 }
@@ -20,8 +20,13 @@ function isEditableElement(element: Element | null): boolean {
 }
 
 /** PAN-4642 WI-5: tracks the current citable text selection within `rootRef`. */
-export function useCiteSelection(rootRef: RefObject<HTMLElement | null>): { snapshot: CiteSnapshot | null; clear: () => void } {
+export function useCiteSelection(
+  rootRef: RefObject<HTMLElement | null>,
+  resolve: SelectionCitationResolver = resolveMessageSelection,
+): { snapshot: CiteSnapshot | null; clear: () => void } {
   const [snapshot, setSnapshot] = useState<CiteSnapshot | null>(null);
+  const resolveRef = useRef(resolve);
+  resolveRef.current = resolve;
 
   const updateFromSelection = useCallback(() => {
     const root = rootRef.current;
@@ -30,8 +35,17 @@ export function useCiteSelection(rootRef: RefObject<HTMLElement | null>): { snap
       setSnapshot(null);
       return;
     }
-    const resolved = resolveSelectionCitation(selection);
-    if (!resolved || !selection.anchorNode || !root.contains(selection.anchorNode)) {
+    if (
+      !selection.anchorNode ||
+      !selection.focusNode ||
+      !root.contains(selection.anchorNode) ||
+      !root.contains(selection.focusNode)
+    ) {
+      setSnapshot(null);
+      return;
+    }
+    const resolved = resolveRef.current(selection);
+    if (!resolved) {
       setSnapshot(null);
       return;
     }
@@ -73,12 +87,14 @@ export function CiteSelectionToolbar({
   isOpen,
   onOpen,
   onDone,
+  onSaved,
 }: {
   conversationName: string;
   snapshot: CiteSnapshot;
   isOpen: boolean;
   onOpen: () => void;
   onDone: () => void;
+  onSaved?: (citation: PendingCitation) => void;
 }) {
   const [comment, setComment] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -106,14 +122,15 @@ export function CiteSelectionToolbar({
   }, [isOpen]);
 
   const save = useCallback(() => {
-    addCitation(conversationName, {
-      source: { kind: 'message', messageId: snapshot.messageId, role: snapshot.role },
+    const citation = addCitation(conversationName, {
+      source: snapshot.source,
       quotedText: snapshot.quotedText,
       comment,
     });
+    if (citation) onSaved?.(citation);
     window.getSelection()?.removeAllRanges();
     onDone();
-  }, [comment, conversationName, snapshot, onDone]);
+  }, [comment, conversationName, snapshot, onDone, onSaved]);
 
   const cancel = useCallback(() => {
     onDone();
@@ -194,11 +211,15 @@ export function CiteSelectionToolbar({
 export function CiteSelectionLayer({
   conversationName,
   rootRef,
+  resolve,
+  onSaved,
 }: {
   conversationName: string;
   rootRef: RefObject<HTMLElement | null>;
+  resolve?: SelectionCitationResolver;
+  onSaved?: (citation: PendingCitation) => void;
 }) {
-  const { snapshot: liveSnapshot, clear } = useCiteSelection(rootRef);
+  const { snapshot: liveSnapshot, clear } = useCiteSelection(rootRef, resolve);
   const [frozen, setFrozen] = useState<CiteSnapshot | null>(null);
 
   // A conversation change closes the box.
@@ -219,6 +240,7 @@ export function CiteSelectionLayer({
         setFrozen(null);
         clear();
       }}
+      onSaved={onSaved}
     />
   );
 }

@@ -38,6 +38,8 @@ import {
   Clock,
 } from 'lucide-react';
 import { openNewConversationDialog } from './newConversation/newConversationDialogStore';
+import { useFleetSearchActions } from './palette-fleet-hits';
+import { anywherePaletteActions, ANYWHERE_PALETTE_GROUP } from './palette-anywhere-actions';
 import { rememberRunSession } from './workspace/WorkspaceActionBand';
 import { isAgentRunningStatus } from '../lib/pipeline-state';
 import { useDashboardStore, selectAgents, selectIssues } from '../lib/store';
@@ -194,7 +196,7 @@ const PINNED_SCOPES: Exclude<PaletteScope, 'all'>[] = ['conversations'];
 
 /** Map a result group heading to the scope chip it belongs under. */
 function groupScope(group: string): Exclude<PaletteScope, 'all'> {
-  if (group === 'Conversations') return 'conversations';
+  if (group === 'Conversations' || group.startsWith('On ')) return 'conversations';
   if (group.startsWith('Commands · ')) return 'commands';
   // PAN-1990: the workspaces-registry rail, distinct from the legacy "Active
   // Workspaces" group (running-agent issue worktrees) below.
@@ -562,6 +564,7 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
       keywords: ['agents', 'workers'],
       onSelect: () => onNavigate('agents'),
     },
+    ...anywherePaletteActions(onNavigate),
   ], [onNavigate, onNewWorkspace]);
 
   // ─── Dynamic: issues + agents ─────────────────────────────────────────────
@@ -805,14 +808,16 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
 
   // ─── Filter + group ───────────────────────────────────────────────────────
 
-  const allActions = useMemo(() => [
+  const fleetActions = useFleetSearchActions(isOpen, debouncedQuery); // PAN-4651: hits from linked machines, "On <label>"
+  const allActions = useMemo<PaletteAction[]>(() => [
     ...staticActions,
     ...commandActions,
     ...workspaceActions,
     ...issueActions,
     ...agentActions,
     ...memoryActions,
-  ], [staticActions, commandActions, workspaceActions, issueActions, agentActions, memoryActions]);
+    ...fleetActions,
+  ], [staticActions, commandActions, workspaceActions, issueActions, agentActions, memoryActions, fleetActions]);
 
   const filtered = useMemo(() => {
     const trimmed = query.trim();
@@ -844,7 +849,7 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
   const groupOrder = useMemo(() => {
     const seen = new Set(filtered.map((a) => a.group));
     const ordered: string[] = [];
-    const preferred = ['Actions', 'Orchestration', 'Navigation', 'Workspaces', 'Active Workspaces', 'Issues', 'Running Agents'];
+    const preferred = ['Actions', 'Orchestration', 'Navigation', ANYWHERE_PALETTE_GROUP, 'Workspaces', 'Active Workspaces', 'Issues', 'Running Agents'];
     for (const g of preferred) if (seen.has(g)) { ordered.push(g); seen.delete(g); }
     const commandGroups = [...seen].filter((g) => g.startsWith('Commands · ')).sort();
     for (const g of commandGroups) { ordered.push(g); seen.delete(g); }

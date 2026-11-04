@@ -4,9 +4,35 @@ import { CLIPROXY_GPT56_CONTEXT_WINDOW } from './model-context-windows.js';
 /** September 2026 additions; sources and context constraints: docs/MODEL-CONTEXT-AUDIT.md.
  * Skill scores inherit the previous family baseline until benchmarked. */
 export const AUDITED_MODEL_ADDITIONS = {
-  'muse-wonder-1.0': { model: 'muse-wonder-1.0', provider: 'meta', displayName: 'Muse Wonder 1.0', costPer1MTokens: 12, contextWindow: 1048576, effortLevels: ['low', 'medium', 'high', 'xhigh'], skills: { 'code-generation': 0, 'code-review': 0, debugging: 0, planning: 0, documentation: 0, testing: 0, security: 0, performance: 0, synthesis: 0, speed: 0, 'context-length': 100 }, notes: 'Standard data terms; released 2026-10-12. Capability scores are unranked pending evaluation.' },
-  'muse-spark-1.3': { model: 'muse-spark-1.3', provider: 'meta', displayName: 'Muse Spark 1.3 Standard', costPer1MTokens: 2.75, contextWindow: 1048576, effortLevels: ['low', 'medium', 'high', 'xhigh'], skills: { 'code-generation': 0, 'code-review': 0, debugging: 0, planning: 0, documentation: 0, testing: 0, security: 0, performance: 0, synthesis: 0, speed: 0, 'context-length': 100 }, notes: 'Standard data terms. Capability scores are unranked pending evaluation.' },
+  'muse-wonder-1.0': { model: 'muse-wonder-1.0', provider: 'meta', displayName: 'Muse Wonder 1.0', costPer1MTokens: 12, contextWindow: 1048576, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'], skills: { 'code-generation': 0, 'code-review': 0, debugging: 0, planning: 0, documentation: 0, testing: 0, security: 0, performance: 0, synthesis: 0, speed: 0, 'context-length': 100 }, notes: 'Standard data terms; released 2026-10-12. Capability scores are unranked pending evaluation. Meta reasoning docs (dev.meta.ai/docs/reasoning) list max for this model; the Muse harness row still caps launches at xhigh.' },
+  'muse-spark-1.3': { model: 'muse-spark-1.3', provider: 'meta', displayName: 'Muse Spark 1.3 Standard', costPer1MTokens: 2.75, contextWindow: 1048576, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'], skills: { 'code-generation': 0, 'code-review': 0, debugging: 0, planning: 0, documentation: 0, testing: 0, security: 0, performance: 0, synthesis: 0, speed: 0, 'context-length': 100 }, notes: 'Standard data terms. Capability scores are unranked pending evaluation. Meta reasoning docs (dev.meta.ai/docs/reasoning) list max for this model; the Muse harness row still caps launches at xhigh.' },
   'muse-spark-1.3-contributor': { model: 'muse-spark-1.3-contributor', provider: 'meta', displayName: 'Muse Spark 1.3 Contributor (training data)', costPer1MTokens: 0.15, contextWindow: 1048576, effortLevels: ['low', 'medium', 'high', 'xhigh'], skills: { 'code-generation': 0, 'code-review': 0, debugging: 0, planning: 0, documentation: 0, testing: 0, security: 0, performance: 0, synthesis: 0, speed: 0, 'context-length': 100 }, notes: 'Discounted tier: prompts and completions may train Meta models. Capability scores are unranked pending evaluation.' },
+
+  // Xiaomi MiMo V2.6 (replaces V2.5, retired 2026-10-21). Skills inherit the V2.5 line.
+  'mimo-v2.6-pro': { model: 'mimo-v2.6-pro', provider: 'mimo', displayName: 'MiMo V2.6 Pro', costPer1MTokens: 0.6525, contextWindow: 1048576, maxOutputTokens: 128000, skills: { 'code-generation': 88, 'code-review': 86, debugging: 86, planning: 84, documentation: 84, testing: 84, security: 80, performance: 82, synthesis: 88, speed: 78, 'context-length': 100 }, notes: 'Xiaomi MiMo V2.6 flagship. 1M context, 128K max output. $0.435/M in, $0.0036/M cached, $0.87/M out. Source: https://mimo.mi.com/docs/en-US/price/pay-as-you-go (V2.5 Pro and V2.5 retired 2026-10-21).' },
+  'mimo-v2.6-flash': { model: 'mimo-v2.6-flash', provider: 'mimo', displayName: 'MiMo V2.6 Flash', costPer1MTokens: 0.21, contextWindow: 1048576, maxOutputTokens: 128000, skills: { 'code-generation': 82, 'code-review': 80, debugging: 80, planning: 78, documentation: 78, testing: 78, security: 74, performance: 76, synthesis: 82, speed: 85, 'context-length': 100 }, notes: 'Xiaomi MiMo V2.6 fast multimodal model (https://mimo.mi.com/models/en-US/mimo-v2.6-flash). 1M context, 128K max output. $0.14/M in, $0.0028/M cached, $0.28/M out. Source: https://mimo.mi.com/docs/en-US/price/pay-as-you-go (V2.5 Pro and V2.5 retired 2026-10-21).' },
+  'mimo-v2.6-pro-ultraspeed': { model: 'mimo-v2.6-pro-ultraspeed', provider: 'mimo', displayName: 'MiMo V2.6 Pro UltraSpeed', costPer1MTokens: 6.525, contextWindow: 1048576, maxOutputTokens: 128000, skills: { 'code-generation': 88, 'code-review': 86, debugging: 86, planning: 84, documentation: 84, testing: 84, security: 80, performance: 82, synthesis: 88, speed: 92, 'context-length': 100 }, notes: 'Xiaomi MiMo V2.6 Pro high-speed serving. 1M context, 128K max output. $4.35/M in, $0.036/M cached, $8.70/M out. Source: https://mimo.mi.com/docs/en-US/price/pay-as-you-go (V2.5 Pro and V2.5 retired 2026-10-21).' },
+
+  // Groq gpt-oss (replace the Llama/QwQ/Gemma ids Groq shut down). Source: https://console.groq.com/docs/models
+  'openai/gpt-oss-120b': { model: 'openai/gpt-oss-120b', provider: 'groq', displayName: 'GPT OSS 120B (Groq)', costPer1MTokens: 0.375, contextWindow: 131072, maxOutputTokens: 65536, skills: { 'code-generation': 0, 'code-review': 0, debugging: 0, planning: 0, documentation: 0, testing: 0, security: 0, performance: 0, synthesis: 0, speed: 0, 'context-length': 96 }, notes: '131,072 context, 65,536 max completion. $0.15/M in, $0.60/M out. Overdeck routes this id to Groq, but omp/pi read the openai/ prefix as their own provider, so an omp/pi launch is not yet qualified for Groq. Capability scores are unranked pending evaluation.' },
+  'openai/gpt-oss-20b': { model: 'openai/gpt-oss-20b', provider: 'groq', displayName: 'GPT OSS 20B (Groq)', costPer1MTokens: 0.1875, contextWindow: 131072, maxOutputTokens: 65536, skills: { 'code-generation': 0, 'code-review': 0, debugging: 0, planning: 0, documentation: 0, testing: 0, security: 0, performance: 0, synthesis: 0, speed: 0, 'context-length': 96 }, notes: '131,072 context, 65,536 max completion. $0.075/M in, $0.30/M out. Overdeck routes this id to Groq, but omp/pi read the openai/ prefix as their own provider, so an omp/pi launch is not yet qualified for Groq. Capability scores are unranked pending evaluation.' },
+
+  // Cerebras gpt-oss-120b (replaces every Llama id Cerebras deprecated). Source: https://inference-docs.cerebras.ai/models/openai-oss
+  'gpt-oss-120b': { model: 'gpt-oss-120b', provider: 'cerebras', displayName: 'GPT OSS 120B (Cerebras)', costPer1MTokens: 0.55, contextWindow: 131072, maxOutputTokens: 40000, skills: { 'code-generation': 0, 'code-review': 0, debugging: 0, planning: 0, documentation: 0, testing: 0, security: 0, performance: 0, synthesis: 0, speed: 0, 'context-length': 96 }, notes: 'Paid tier: 131K context, 40K max output; free tier: 65K context, 32K max output. $0.35/M in, $0.75/M out. Capability scores are unranked pending evaluation.' },
+
+  'mistral-large-4-0': { model: 'mistral-large-4-0', provider: 'mistral', displayName: 'Mistral Large 4 (preview)', costPer1MTokens: 1.4, contextWindow: 1000000, skills: { 'code-generation': 0, 'code-review': 0, debugging: 0, planning: 0, documentation: 0, testing: 0, security: 0, performance: 0, synthesis: 0, speed: 0, 'context-length': 100 }, notes: 'Public Preview, released 2026-10-06; alias mistral-large-4. 1M context. $0.70/M in, $0.07/M cached, $2.10/M out. Source: https://docs.mistral.ai/models/mistral-large-4-0. Capability scores are unranked pending evaluation.' },
+
+  // xAI Grok 4.7 / 4.3. Source: https://docs.x.ai/docs/models
+  'grok-4.7': { model: 'grok-4.7', provider: 'xai', displayName: 'Grok 4.7', costPer1MTokens: 4, contextWindow: 500000, skills: { 'code-generation': 0, 'code-review': 0, debugging: 0, planning: 0, documentation: 0, testing: 0, security: 0, performance: 0, synthesis: 0, speed: 0, 'context-length': 98 }, notes: 'Flagship. $2/M in, $0.50/M cached, $6/M out; a request whose prompt reaches 200K tokens bills every token at double ($4 / $1 / $12). 500K context. Capability scores are unranked pending evaluation.' },
+  'grok-4.3': { model: 'grok-4.3', provider: 'xai', displayName: 'Grok 4.3', costPer1MTokens: 1.875, contextWindow: 1000000, skills: { 'code-generation': 0, 'code-review': 0, debugging: 0, planning: 0, documentation: 0, testing: 0, security: 0, performance: 0, synthesis: 0, speed: 0, 'context-length': 100 }, notes: '$1.25/M in, $0.20/M cached, $2.50/M out; a request whose prompt reaches 200K tokens bills every token at double ($2.50 / $0.40 / $5.00). 1M context. Capability scores are unranked pending evaluation.' },
+
+  // MiniMax M3.1 Flash. Skills inherit MiniMax-M3. Source: https://platform.minimax.io/docs/guides/pricing
+  'MiniMax-M3.1-Flash': { model: 'MiniMax-M3.1-Flash', provider: 'minimax', displayName: 'MiniMax M3.1 Flash', costPer1MTokens: 0.375, contextWindow: 1000000, skills: { 'code-generation': 93, 'code-review': 90, debugging: 90, planning: 88, documentation: 88, testing: 88, security: 82, performance: 85, synthesis: 92, speed: 80, 'context-length': 100 }, notes: 'Frontier multimodal coding model, 1M context. $0.15/M in, $0.60/M out, $0.015/M cache read at every input length (no long-context tier). Tunable thinking depth; effort levels are unverified, so none are listed.' },
+
+  'k3.1-pro': { model: 'k3.1-pro', provider: 'kimi', displayName: 'Kimi K3.1 Pro (1M)', costPer1MTokens: 6, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'], contextWindow: 1048576, skills: { 'code-generation': 95, 'code-review': 93, debugging: 93, planning: 90, documentation: 90, testing: 90, security: 85, performance: 88, synthesis: 94, speed: 70, 'context-length': 100 }, notes: 'Kimi K3.1 Pro (Oct 2026) on the Claude Code route; coding endpoint id k3.1-pro, platform id kimi-k3.1-pro. Always-thinking, 1,048,576-token context, native effort low/high/max. Skill scores inherit K3 until benchmarked. Source: https://www.kimi.ai/blog/kimi-k3-1-pro' },
+  'k3.1-pro-highspeed': { model: 'k3.1-pro-highspeed', provider: 'kimi', displayName: 'Kimi K3.1 Pro Highspeed (1M)', costPer1MTokens: 12, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'], contextWindow: 1048576, skills: { 'code-generation': 95, 'code-review': 93, debugging: 93, planning: 90, documentation: 90, testing: 90, security: 85, performance: 88, synthesis: 94, speed: 88, 'context-length': 100 }, notes: 'Kimi K3.1 Pro Highspeed (Oct 2026) on the Claude Code route; coding endpoint id k3.1-pro-highspeed, platform id kimi-k3.1-pro-highspeed. 2-3x the inference speed of K3.1 Pro at 2x the price; requires the Allegretto (Pro) plan or higher. Always-thinking, 1,048,576-token context, native effort low/high/max. Skill scores inherit K3 until benchmarked. Source: https://www.kimi.ai/blog/kimi-k3-1-pro' },
+  'kimi-code/k3.1-pro': { model: 'kimi-code/k3.1-pro', provider: 'kimi', displayName: 'Kimi K3.1 Pro (1M)', costPer1MTokens: 6, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'], contextWindow: 1048576, skills: { 'code-generation': 95, 'code-review': 93, debugging: 93, planning: 90, documentation: 90, testing: 90, security: 85, performance: 88, synthesis: 94, speed: 70, 'context-length': 100 }, notes: 'Native kimi-code harness alias (maxContextSize=1048576, supportEfforts low/high/max per `kimi provider list --json`, kimi 2.0.2, 2026-11-02). Canonical effort levels; src/lib/kimi-effort.ts translates to native low/high/max.' },
+  'kimi-code/k3.1-pro-highspeed': { model: 'kimi-code/k3.1-pro-highspeed', provider: 'kimi', displayName: 'Kimi K3.1 Pro Highspeed (1M)', costPer1MTokens: 12, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'], contextWindow: 1048576, skills: { 'code-generation': 95, 'code-review': 93, debugging: 93, planning: 90, documentation: 90, testing: 90, security: 85, performance: 88, synthesis: 94, speed: 88, 'context-length': 100 }, notes: 'Native kimi-code harness alias (maxContextSize=1048576, supportEfforts low/high/max per `kimi provider list --json`, kimi 2.0.2, 2026-11-02). Canonical effort levels; src/lib/kimi-effort.ts translates to native low/high/max.' },
 
   'claude-fable-5-1': {
     model: 'claude-fable-5-1',
@@ -118,7 +144,7 @@ export const AUDITED_MODEL_ADDITIONS = {
     model: 'gemini-3.8-flash',
     provider: 'google',
     displayName: 'Gemini 3.8 Flash',
-    costPer1MTokens: 5.25, // $1.50 in / $9 out
+    costPer1MTokens: 2.25, // $0.75 in / $3.75 out through 2026-12-31; $1.50/$7.50 from 2027-01-01
     contextWindow: 1048576,
     maxOutputTokens: 65536,
     skills: {
@@ -160,6 +186,52 @@ export const AUDITED_MODEL_ADDITIONS = {
     notes: 'Stable Google model. 1,048,576 input tokens and 65,536 maximum output tokens; verified September 2026.',
   },
 
+  'gemini-3.6-flash': {
+    model: 'gemini-3.6-flash',
+    provider: 'google',
+    displayName: 'Gemini 3.6 Flash',
+    costPer1MTokens: 2.25, // $0.75 in / $3.75 out through 2026-12-31; $1.50/$7.50 from 2027-01-01
+    contextWindow: 1048576,
+    maxOutputTokens: 65536,
+    skills: {
+      'code-generation': 80,
+      'code-review': 75,
+      debugging: 72,
+      planning: 68,
+      documentation: 76,
+      testing: 72,
+      security: 60,
+      performance: 70,
+      synthesis: 75,
+      speed: 96, // Very fast
+      'context-length': 100,
+    },
+    notes: 'Stable Google model (latest update July 2026). 1,048,576 input tokens, 65,536 output. $0.75/M input, $3.75/M output, $0.075/M cached until 2026-12-31; from 2027-01-01 $1.50/M, $7.50/M and $0.15/M. Google names it the replacement for gemini-3-flash-preview. Skill scores inherit Gemini 3 Flash until benchmarked. Verified 2026-11-02.',
+  },
+
+  'gemini-3.1-flash-lite': {
+    model: 'gemini-3.1-flash-lite',
+    provider: 'google',
+    displayName: 'Gemini 3.1 Flash Lite',
+    costPer1MTokens: 0.875,
+    contextWindow: 1048576,
+    maxOutputTokens: 65536,
+    skills: {
+      'code-generation': 72,
+      'code-review': 68,
+      debugging: 65,
+      planning: 60,
+      documentation: 70,
+      testing: 65,
+      security: 52,
+      performance: 62,
+      synthesis: 68,
+      speed: 98, // Most cost-efficient
+      'context-length': 100,
+    },
+    notes: 'Stable Google model (GA successor of gemini-3.1-flash-lite-preview). 1,048,576 input tokens, 65,536 output. $0.25/M input, $1.50/M output, $0.025/M cached (text). Google shuts it down 2027-05-07; replacement gemini-3.5-flash-lite. Verified 2026-11-02.',
+  },
+
   'glm-5.3': {
     model: 'glm-5.3',
     provider: 'zai',
@@ -190,6 +262,54 @@ export const AUDITED_MODEL_ADDITIONS = {
     notes: 'Verified September 2026: 1M context, 128K maximum output. Availability and pricing depend on provider region and account.',
   },
 
+  'glm-5.3-flash': {
+    model: 'glm-5.3-flash',
+    provider: 'zai',
+    displayName: 'GLM-5.3 Flash',
+    costPer1MTokens: 0.325,
+    contextWindow: 1000000,
+    effortLevels: ['low', 'high', 'max'],
+    supportsImages: true,
+    skills: {
+      'code-generation': 78,
+      'code-review': 74,
+      debugging: 72,
+      planning: 70,
+      documentation: 72,
+      testing: 72,
+      security: 68,
+      performance: 70,
+      synthesis: 74,
+      speed: 95,
+      'context-length': 92,
+    },
+    notes: 'Z.AI fast tier (verified 2026-11-02, docs.z.ai/guides/llm/glm-5.3-flash). 1M context, 128K output; input video/image/text/file. Reasoning always on; effort low/high/max per the chat-completion API reference. $0.15/M input, $0.03/M cached, $0.50/M output.',
+  },
+
+  'glm-5.3-flashx': {
+    model: 'glm-5.3-flashx',
+    provider: 'zai',
+    displayName: 'GLM-5.3 FlashX',
+    costPer1MTokens: 0.81,
+    contextWindow: 1000000,
+    effortLevels: ['low', 'high', 'max'],
+    supportsImages: true,
+    skills: {
+      'code-generation': 78,
+      'code-review': 74,
+      debugging: 72,
+      planning: 70,
+      documentation: 72,
+      testing: 72,
+      security: 68,
+      performance: 70,
+      synthesis: 74,
+      speed: 95,
+      'context-length': 92,
+    },
+    notes: 'Z.AI faster paid Flash tier (verified 2026-11-02, docs.z.ai/guides/llm/glm-5.3-flash). 1M context, 128K output; input video/image/text/file. Reasoning always on; effort enum from the vision-model API schema. $0.37/M input, $0.075/M cached, $1.25/M output.',
+  },
+
   'qwen3.7-plus': {
     model: 'qwen3.7-plus',
     provider: 'dashscope',
@@ -209,14 +329,14 @@ export const AUDITED_MODEL_ADDITIONS = {
       speed: 68,
       'context-length': 99,
     },
-    notes: 'Verified September 2026: 1M context, 128K maximum output. Availability and pricing depend on provider region and account.',
+    notes: 'Verified September 2026: 1M context, 128K maximum output. $0.40/M input, $1.60/M output up to 256K input ($1.20/$4.80 above), a limited-time 20% discount as of 2026-11-02.',
   },
 
   'qwen3.8-flash': {
     model: 'qwen3.8-flash',
     provider: 'dashscope',
     displayName: 'Qwen3.8 Flash',
-    costPer1MTokens: 0,
+    costPer1MTokens: 0.31,
     contextWindow: 1000000,
     skills: {
       'code-generation': 97,
@@ -231,7 +351,7 @@ export const AUDITED_MODEL_ADDITIONS = {
       speed: 68,
       'context-length': 99,
     },
-    notes: 'Verified September 2026: 1M context, 128K maximum output. Availability and pricing depend on provider region and account.',
+    notes: 'Verified September 2026: 1M context, 128K maximum output. $0.15/M input, $0.47/M output (Singapore, verified 2026-11-02).',
   },
 
   // GPT-6 Sol / Luna (2026-09-22). Codex 0.157.1 `codex debug models`: context_window 272000,
@@ -319,6 +439,31 @@ export const AUDITED_MODEL_ADDITIONS = {
       'context-length': 95,
     },
     notes: 'OpenAI GPT-6.1 workhorse tier (October 26, 2026), below gpt-6.1-sol in the slot gpt-5.6-terra fills for GPT-5.6. Pinned to the 272K billing tier (CLIPROXY_GPT56_CONTEXT_WINDOW) — >272K input is billed 2x in / 1.5x out for the full request (PAN-3388). No [372k] variant. 1.05M marketing context. Codex under ChatGPT sign-in needs CLI 0.159.0+. CLIProxy 7.3.16 does not serve it (PAN-4634).',
+  },
+
+  // GPT-6 Rosalind (life sciences, released 2026-10-30) and GPT-6 Astra for Law: prices per
+  // developers.openai.com/api/docs/pricing (checked 2026-11-02). Their model pages 404, so no
+  // native window, max output or effort set is published; the 272K pin is the Codex harness pin
+  // (runtimes/codex.ts gpt-6- branch). Skills are unranked (domain models, not benchmarked).
+  'gpt-6-rosalind': {
+    model: 'gpt-6-rosalind',
+    provider: 'openai',
+    displayName: 'GPT-6 Rosalind',
+    costPer1MTokens: 45, // $15.00 in / $75.00 out ($1.50 cached)
+    contextWindow: CLIPROXY_GPT56_CONTEXT_WINDOW,
+    effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
+    skills: { 'code-generation': 0, 'code-review': 0, debugging: 0, planning: 0, documentation: 0, testing: 0, security: 0, performance: 0, synthesis: 0, speed: 0, 'context-length': 95 },
+    notes: 'OpenAI life-sciences model (2026-10-30). API access is limited to OpenAI\'s trusted-access program; absent from the Codex 0.159.0 ChatGPT-sign-in catalog, so no Codex floor is measured. Codex harness only (not served via CLIProxy). Pinned to the 272K billing tier; >272K input bills $30/$3/$112.50. Effort levels inherited from the GPT-6 family. Capability scores are unranked pending evaluation.',
+  },
+  'gpt-6-astra-law': {
+    model: 'gpt-6-astra-law',
+    provider: 'openai',
+    displayName: 'GPT-6 Astra for Law',
+    costPer1MTokens: 30, // $10.00 in / $50.00 out ($1.00 cached), promotional through at least 2026-12-31
+    contextWindow: CLIPROXY_GPT56_CONTEXT_WINDOW,
+    effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
+    skills: { 'code-generation': 0, 'code-review': 0, debugging: 0, planning: 0, documentation: 0, testing: 0, security: 0, performance: 0, synthesis: 0, speed: 0, 'context-length': 95 },
+    notes: 'OpenAI legal model configuration of GPT-6 Astra. Promotional pricing at least through 2026-12-31. Absent from the Codex 0.159.0 ChatGPT-sign-in catalog, so no Codex floor is measured. Codex harness only (not served via CLIProxy). The 272K window is the Codex harness pin; no long-context price is listed. Effort levels inherited from the GPT-6 family. Capability scores are unranked pending evaluation.',
   },
 
   'gpt-6-luna': {
