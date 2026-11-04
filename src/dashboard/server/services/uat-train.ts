@@ -42,6 +42,7 @@ import { mergePathOwner } from './merge-path-owner.js';
 import { ensureUatStack, probeUatStack, teardownUatStack } from '../../../lib/cloister/uat-stack.js';
 import {
   promoteUatGeneration,
+  promoteStatusRefusal,
   buildPolyrepoUatPromoteGitDeps,
   buildUatPromoteGitDeps,
   type PromoteResult,
@@ -818,10 +819,20 @@ export async function postUatGenerationPromotePayload(
   firePostMerge: UatPromoteDeps['firePostMerge'],
   shipVersion?: string,
 ): Promise<PromoteResult> {
+  // PAN-4970: a stale/invalidated card's Merge batch click used to pay for a
+  // round of per-member forge reads (the memberStates loop below) before
+  // reporting the same 409 postUatGenerationPromotePayload already knew it
+  // would return. Read the generation once and refuse before any of that.
+  const stored = getUatGeneration(name);
+  const refusal = promoteStatusRefusal(name, stored);
+  if (refusal) return refusal;
+  // promoteStatusRefusal returning null guarantees stored exists and is promotable.
+  const current = stored as UatGeneration;
+
   // PAN-1696: promote into the generation's OWN project repo. Generation rows carry
   // project_root, so a MIN generation must not be merged against the Overdeck repo.
   // For a generation belonging to this repo this resolves to the same path as before.
-  const root = resolve(getUatGeneration(name)?.projectRoot ?? projectRoot());
+  const root = resolve(current.projectRoot ?? projectRoot());
   // PAN-3917: promotion used to stamp a verification verdict onto every
   // member's record. The merge itself is the evidence — the generation's own
   // rows carry the merge sha, and readiness is re-derived from each PR.
@@ -830,7 +841,7 @@ export async function postUatGenerationPromotePayload(
   // approved, green, mergeable. `uat-promote`'s gate is synchronous, so the
   // states are derived up front and the closure reads the loaded answers.
   const memberStates = new Map<string, { eligible: boolean; reason?: string }>();
-  await Promise.all((getUatGeneration(name)?.members ?? []).map(async (member) => {
+  await Promise.all(current.members.map(async (member) => {
     const issueId = member.issueId.toUpperCase();
     try {
       // #4066 review: derived `ready` applies the merge gate's approval answer
@@ -854,7 +865,7 @@ export async function postUatGenerationPromotePayload(
   // (trial-merge everything, then publish) path.
   const projectConfig = findProjectByPath(root);
   const polyrepo = projectConfig?.workspace?.type === 'polyrepo';
-  const storedRepos = polyrepo ? (getUatGeneration(name)?.repos ?? []) : [];
+  const storedRepos = polyrepo ? (current.repos ?? []) : [];
 
   // Re-check writability against CURRENT config, not the config that was live
   // at assembly: a repo can be flipped to readonly between assembly and merge,

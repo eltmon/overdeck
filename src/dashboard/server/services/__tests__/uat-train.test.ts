@@ -692,6 +692,10 @@ describe('postUatGenerationPromotePayload', () => {
   // recordVerification dependency left to wire.
 
   it('returns the exact promote result object unchanged for success and failure results', async () => {
+    // PAN-4970: postUatGenerationPromotePayload now refuses before the
+    // mocked promoteUatGeneration is ever reached unless the generation
+    // reads as promotable.
+    mocks.getUatGeneration.mockReturnValue({ status: 'ready', members: [] });
     const success: PromoteResult = {
       success: true,
       generation: 'uat/pan-cobalt-0703',
@@ -717,7 +721,7 @@ describe('postUatGenerationPromotePayload', () => {
   // the promote click runs the gate first, then derives.
   it('runs the merge gate for each member before reading its derived state', async () => {
     const order: string[] = [];
-    mocks.getUatGeneration.mockReturnValue({ members: [{ issueId: 'pan-1' }, { issueId: 'PAN-2' }] });
+    mocks.getUatGeneration.mockReturnValue({ status: 'ready', members: [{ issueId: 'pan-1' }, { issueId: 'PAN-2' }] });
     mocks.evaluateIssueMergeGate.mockImplementation(async (issueId: string) => { order.push(`gate:${issueId}`); return { ready: true }; });
     mocks.getDerivedIssueState.mockImplementation(async (issueId: string) => {
       order.push(`derive:${issueId}`);
@@ -737,6 +741,21 @@ describe('postUatGenerationPromotePayload', () => {
     expect(eligibility?.('PAN-2')).toEqual({ eligible: false, reason: 'is in-review, not ready to merge' });
   });
 
+  // promote-fast-refusal.ac2
+  it('refuses before any forge read when the generation is not promotable', async () => {
+    mocks.getUatGeneration.mockReturnValue({ status: 'invalidated', members: [{ issueId: 'PAN-1' }] });
+
+    const result = await postUatGenerationPromotePayload('uat/pan-cobalt-0703', vi.fn());
+
+    expect(result).toEqual({
+      success: false,
+      reason: 'wrong-status',
+      message: 'uat/pan-cobalt-0703 is invalidated — only a ready or superseded batch can be merged to main',
+    });
+    expect(mocks.evaluateIssueMergeGate).not.toHaveBeenCalled();
+    expect(mocks.getDerivedIssueState).not.toHaveBeenCalled();
+    expect(mocks.promoteUatGeneration).not.toHaveBeenCalled();
+  });
 });
 
 // PAN-3093: polyrepo projects used to be skipped outright by a guard in
