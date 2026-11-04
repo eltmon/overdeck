@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5046",
   "created": "2026-11-04T18:10:57.891Z",
-  "updated": "2026-11-04T18:47:09.597Z",
+  "updated": "2026-11-04T18:47:27.641Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -82,6 +82,10 @@
     "evict-owning-connection.ac2": {
       "status": "completed",
       "doneAt": "2026-11-04T18:47:09.597Z"
+    },
+    "evict-owning-connection.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:47:27.641Z"
     }
   }
 }
