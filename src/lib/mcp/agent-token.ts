@@ -13,7 +13,7 @@
  * name the agent id and token id, never the token.
  */
 import { randomUUID } from 'node:crypto';
-import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, rm, unlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import {
@@ -129,7 +129,7 @@ export async function ensureAgentMcpToken(owner: AgentTokenOwner): Promise<{ tok
   throw new Error(`agent token for ${agentId} did not persist in the access-token registry`);
 }
 
-/** Revoke every active token of the owner and unlink its token file. Never throws; returns the count revoked. */
+/** Revoke every active token of the owner, unlink its token file and delete its `secrets/` directory (PAN-4941). Never throws; returns the count revoked. */
 export async function revokeAgentMcpTokens(agentId: string, opts: { agentKind?: 'agent' | 'conversation'; dir?: string } = {}): Promise<number> {
   const agentKind = opts.agentKind ?? 'agent';
   const id = ownerId(agentId, agentKind);
@@ -141,6 +141,7 @@ export async function revokeAgentMcpTokens(agentId: string, opts: { agentKind?: 
       await unlink(agentMcpTokenPath(dir)).catch((error: NodeJS.ErrnoException) => {
         if (error.code !== 'ENOENT') throw error;
       });
+      await rm(join(dir, 'secrets'), { recursive: true, force: true });
     }
     return revoked.length;
   } catch (error) {
