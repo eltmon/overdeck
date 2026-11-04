@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "overdeck": {
+      "url": "https://YOUR-MACHINE.YOUR-TAILNET.ts.net:8443/mcp"
+    }
+  }
+}
