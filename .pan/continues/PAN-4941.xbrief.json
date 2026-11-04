@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4941",
   "created": "2026-11-04T02:31:39.368Z",
-  "updated": "2026-11-04T02:50:09.140Z",
+  "updated": "2026-11-04T02:50:10.818Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,6 +32,11 @@
       "claimedBy": "agent-pan-4941",
       "claimedAt": "2026-11-04T02:49:23.838Z",
       "doneAt": "2026-11-04T02:50:09.140Z"
+    },
+    "mcp-tools": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4941",
+      "claimedAt": "2026-11-04T02:50:10.818Z"
     }
   }
 }
