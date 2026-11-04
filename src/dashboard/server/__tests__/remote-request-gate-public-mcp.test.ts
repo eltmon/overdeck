@@ -103,9 +103,11 @@ describe('remote request gate: public MCP through Funnel (PAN-4947)', () => {
     ['POST', '/%6Dcp'],
     ['POST', '/oauth/mcp/authorize'],
     ['GET', '/.well-known/oauth-protected-resource/'],
-  ])('answers 404 to %s %s from Funnel while the switch is on', async (method, path) => {
+  ])('answers 404 to %s %s from Funnel while the switch is on, with or without a credential', async (method, path) => {
     await setPublicMcp(true);
     expect(await send(method, path)).toBe(404);
+    const { token } = await createAccessToken({ name: 'phone', scopes: ['admin'], kind: 'device' });
+    expect(await send(method, path, { ...FUNNEL, authorization: `Bearer ${token}` })).toBe(404);
   });
 
   it('answers 404 to a credentialed non-surface Funnel request', async () => {

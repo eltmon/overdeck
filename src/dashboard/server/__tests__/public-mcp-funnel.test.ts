@@ -161,6 +161,7 @@ describe('public MCP Funnel middleware (PAN-4947)', () => {
     expect(logged).not.toContain('code=');
     expect(logged).not.toContain('code_verifier');
     expect(logged).not.toContain('secret');
+    for (const [entry] of audit.mock.calls) expect(`${entry.message} ${entry.details}`).not.toContain('?');
   });
 
   it('audits the authorize page with its client_id and a message without the query', async () => {
