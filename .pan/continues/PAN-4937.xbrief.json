@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4937",
   "created": "2026-11-04T02:50:38.682Z",
-  "updated": "2026-11-04T03:37:36.379Z",
+  "updated": "2026-11-04T03:43:43.246Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -40,9 +40,10 @@
       "doneAt": "2026-11-04T03:37:29.754Z"
     },
     "worker-report-tool": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4937",
-      "claimedAt": "2026-11-04T03:37:36.378Z"
+      "claimedAt": "2026-11-04T03:37:36.378Z",
+      "doneAt": "2026-11-04T03:43:43.246Z"
     }
   }
 }
