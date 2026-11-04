@@ -1,0 +1,565 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-04T03:05:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4933: Agent MCP and bots (W-INJ2): Codex: [mcp_servers.overdeck]",
+    "updated": "2026-11-04T02:59:15.860Z"
+  },
+  "plan": {
+    "id": "pan-4933",
+    "title": "Agent MCP and bots (W-INJ2): Codex: [mcp_servers.overdeck]",
+    "status": "proposed",
+    "uid": "95c9fdad-4456-4ac9-b548-83bf280d805e",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-04T03:05:00Z",
+    "updated": "2026-11-04T02:59:15.860Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4933",
+        "label": "PAN-4933",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4927",
+        "label": "PAN-4927 (epic)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4932",
+        "label": "PAN-4932 (W-INJ1, merged)",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4933.md",
+        "label": "PRD",
+        "type": "document"
+      }
+    ],
+    "tags": [
+      "mcp",
+      "codex",
+      "agent-tokens",
+      "pan-4927"
+    ],
+    "narratives": {
+      "Problem": "Codex agents and conversations that Overdeck launches never get the overdeck MCP server: every Codex launch path (work agents, role runs, recovery, message-fallback and planning relaunches through getCodexLauncherFields, and conversations through a direct initCodexHome call) writes config.toml without an [mcp_servers.overdeck] table. Planning probes on Codex CLI 0.159.0 also showed that a plain table is not enough: Overdeck's tools carry no read-only annotations, so every model-initiated call fails under approval_policy never ('MCP tool call requires approval, but approval policy is never') and would prompt an unattended agent under on-request.",
+      "Proposal": "Add prepareCodexOverdeckMcp(owner) to src/lib/mcp/agent-injection.ts, sharing one private mint helper with prepareClaudeOverdeckMcp; it returns { overdeck: overdeckStdioServer(tokenFile) + defaultToolsApprovalMode 'approve' } or {} and never throws. Flip CODEX_CAPABILITIES.overdeckMcp to true. Give CodexMcpServerDef an optional defaultToolsApprovalMode that initCodexHome validates and writes as default_tools_approval_mode. Give getCodexLauncherFields an optional sixth parameter (a server map merged after the role's servers) so it stays synchronous, and pass await prepareCodexOverdeckMcp(...) at the five agent call sites. In spawnConversationSession, move the conversation row lookup above the harness branches and pass the conversation-owned map to initCodexHome. Update configuration/mcp.mdx, configuration/harnesses.mdx (CP-2 result) and the epic PRD revision note. CP-2 passed in planning (config parse, app-server load and direct call, codex exec call with and without the approval key), so the -c command-line fallback is not built.",
+      "NonGoals": "- ACP and opencode injection (W-INJ3) and the MCP/CLI instructions blocks (W-INJ4)\n- The legacy CodexRuntimeSync.spawnAgent codex exec path (src/lib/runtimes/codex.ts:653, used by cloister service-crash and session-rotation), src/lib/protocol-capture/record.ts, Fly launches, and the Claude-only planning continuation route (routes/misc/planning.ts)\n- Approval modes for role-declared MCP servers such as playwright\n- tool_timeout_sec or startup_timeout_sec on the overdeck table\n- A Codex CLI version floor or launch preflight\n- The -c mcp_servers.overdeck.* command-line fallback for app-server mode\n- Making getCodexLauncherFields or initCodexHome async\n- Any change to the Claude Code JSON entry written by writeClaudeOverdeckMcpConfig\n- Raising any scripts/file-size-allowlist.txt row"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Mint at each call site and pass the server map into getCodexLauncherFields as an optional sixth parameter, keeping it synchronous.",
+        "rationale": "The mint must precede initCodexHome; keeping the function synchronous leaves runtime-command-effort.test.ts and role-mcp-parser.test.ts unchanged and adds no runtime-command.ts -> agent-injection.ts import edge."
+      },
+      {
+        "summary": "Write default_tools_approval_mode = \"approve\" on the overdeck table only.",
+        "rationale": "Probe: without it every model-initiated call fails under never and prompts under on-request. It is the Codex counterpart of W-INJ1's --allowedTools=mcp__overdeck; the token's scopes and route-scopes.ts still bound every call."
+      },
+      {
+        "summary": "Do not build the epic's -c command-line fallback for app-server mode.",
+        "rationale": "The app-server probe loaded [mcp_servers.overdeck] from CODEX_HOME/config.toml, listed the scope-filtered tools and answered list_conversations."
+      },
+      {
+        "summary": "Also wire the recovery, message-fallback and planning Codex launches.",
+        "rationale": "The epic text named only work agents, role runs and conversations; without these a relaunched Codex agent loses its tools. Each is one argument on an existing line."
+      },
+      {
+        "summary": "Flip CODEX_CAPABILITIES.overdeckMcp in the helper item, not a separate item.",
+        "rationale": "The helper's tests need it, and no runtime path reads the capability for Codex until the call sites pass the map; W-INJ4 is not merged."
+      },
+      {
+        "summary": "Record CP-2 from the planning probes and leave the agent-level live check to after deploy.",
+        "rationale": "The branch code only runs in a dashboard after merge and pan reload; the unit tests pin the exact TOML the probes validated."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Nine source files plus tests and three docs, one subsystem (Codex launch injection); the five call-site edits are one-argument changes on existing lines.",
+      "canonicalFilename": "2026-11-04-PAN-4933-agent-mcp-and-bots-w-inj2-codex-mcp-servers-overdeck.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "codex-approval-mode-writer",
+        "title": "initCodexHome writes a validated default_tools_approval_mode",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T03:05:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4933",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/runtimes/codex.ts",
+            "src/lib/runtimes/__tests__/codex-overdeck-mcp.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/runtimes/__tests__/codex-overdeck-mcp.test.ts src/lib/runtimes/__tests__/codex.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "codex-overdeck-mcp.test.ts and codex.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-1. In src/lib/runtimes/codex.ts add `defaultToolsApprovalMode?: 'auto' | 'prompt' | 'writes' | 'approve'` to CodexMcpServerDef (line 66) and a `CODEX_MCP_APPROVAL_MODES` set next to hasImmutableNpxPackageSelector (line 60). In the initCodexHome MCP loop, after the env line (codex.ts:339-342), push `default_tools_approval_mode = \"<v>\"` when the value is in the set, else console.warn once naming the server and write nothing. File style has no semicolons. New test file src/lib/runtimes/__tests__/codex-overdeck-mcp.test.ts with the three cases in the PRD."
+        },
+        "items": [
+          {
+            "id": "codex-approval-mode-writer.ac1",
+            "title": "Given an overdeck entry with defaultToolsApprovalMode 'approve', when initCodexHome runs, then config.toml contains the [mcp_servers.overdeck] block whose line after the env table is default_tools_approval_mode = \"approve\", contains no odk_ text, and has mode 0600",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-approval-mode-writer.ac2",
+            "title": "Given defaultToolsApprovalMode 'bogus', when initCodexHome runs, then config.toml has no default_tools_approval_mode line and console.warn is called once with a message naming overdeck",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-approval-mode-writer.ac3",
+            "title": "Given a server without defaultToolsApprovalMode (for example playwright), when initCodexHome runs, then its table is written exactly as before with no default_tools_approval_mode line, and the existing codex.test.ts MCP cases pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "codex-overdeck-helper",
+        "title": "prepareCodexOverdeckMcp helper and Codex overdeckMcp capability",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T03:05:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4933",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "codex-work-and-role-sites",
+            "codex-relaunch-sites",
+            "codex-conversation-site"
+          ],
+          "files_scope": [
+            "src/lib/mcp/agent-injection.ts",
+            "packages/contracts/src/harness-capabilities.ts",
+            "packages/contracts/src/harness-behavior.test.ts",
+            "tests/unit/lib/mcp/agent-injection.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/mcp/agent-injection.test.ts packages/contracts/src/harness-behavior.test.ts tests/unit/lib/harness-capability-contract.test.ts tests/unit/lib/mcp/agent-injection-launch.test.ts",
+            "npm run lint:circular",
+            "npm run lint:harness-branches"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the four test files pass",
+            "lint:circular reports no cycle",
+            "lint:harness-branches reports no file above its baseline"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-5",
+            "FR-6",
+            "NFR-5",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-2. Set CODEX_CAPABILITIES.overdeckMcp to true in packages/contracts/src/harness-capabilities.ts and update the field's doc comment. In src/lib/mcp/agent-injection.ts extract the private mintOverdeckTokenFile(owner) (enabled check, owner dir, ensureAgentMcpToken) and rebuild prepareClaudeOverdeckMcp on it with no behaviour change. Add the exported type CodexOverdeckMcpServer and prepareCodexOverdeckMcp(owner): {} unless getHarnessBehavior(owner.harness).usesCodexHome; otherwise { overdeck: { ...overdeckStdioServer(tokenFile), defaultToolsApprovalMode: 'approve' } }, or {} plus one '[agent-injection] overdeck MCP skipped for <id>: <reason>' warning on failure. Do not import runtimes/codex.ts and do not compare harness name literals. Update harness-behavior.test.ts (claude-code and codex true, six false) and agent-injection.test.ts (lines 66 and 74 become true; new describe with the PRD cases)."
+        },
+        "items": [
+          {
+            "id": "codex-overdeck-helper.ac1",
+            "title": "Given an enabled codex agent owner agent-pan-9, when prepareCodexOverdeckMcp runs, then it returns exactly { overdeck } whose env.OVERDECK_MCP_TOKEN_FILE is <OVERDECK_HOME>/agents/agent-pan-9/mcp-token and whose defaultToolsApprovalMode is 'approve', the token file has mode 0600, and one active token with role work exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-overdeck-helper.ac2",
+            "title": "Given a claude-code or kimi-code owner, mcp.agents false, OVERDECK_DOCKER_WORKSPACE=1 or PAN_DOCKER=1, when prepareCodexOverdeckMcp runs, then it returns {} and listAccessTokens() shows no new record",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-overdeck-helper.ac3",
+            "title": "Given a mint failure or a conversation owner without dir, when prepareCodexOverdeckMcp runs, then it returns {} and emits exactly one warning that names the owner id and contains no odk_ text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-overdeck-helper.ac4",
+            "title": "harnessGetsOverdeckMcp('codex') returns true, getHarnessBehavior reports overdeckMcp false for ohmypi, acp, kimi-code, opencode, muse and prime-agent, and the existing prepareClaudeOverdeckMcp cases still pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "codex-launcher-fields-param",
+        "title": "getCodexLauncherFields merges a passed server map after the role's servers",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T03:05:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4933",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/runtime-command.ts",
+            "src/lib/agents/__tests__/role-mcp-parser.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/agents/__tests__/role-mcp-parser.test.ts src/lib/agents/__tests__/runtime-command-effort.test.ts",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "role-mcp-parser.test.ts and runtime-command-effort.test.ts pass",
+            "lint:file-size passes with runtime-command.ts at or under 1,000 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-3. In src/lib/agents/runtime-command.ts edit line 20 to `import { initCodexHome, type CodexMcpServerDef } from '../runtimes/codex.js';`, add the optional sixth parameter `overdeckMcpServers: Record<string, CodexMcpServerDef> = {}` to getCodexLauncherFields (line 175, in place), and change line 201 to `mcpServers: { ...(role ? parseRoleMcpServers(roleAgentDefinitionPath(role)) : {}), ...overdeckMcpServers },`. The function stays synchronous. Add one case to role-mcp-parser.test.ts (the file already sets HOME and OVERDECK_HOME to its temp dir)."
+        },
+        "items": [
+          {
+            "id": "codex-launcher-fields-param.ac1",
+            "title": "Given the test role with playwright in its frontmatter and a sixth argument { overdeck: … }, when getCodexLauncherFields runs, then the written config.toml contains both [mcp_servers.playwright] and [mcp_servers.overdeck]",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-launcher-fields-param.ac2",
+            "title": "Given five arguments and the work role, when getCodexLauncherFields runs, then config.toml contains no [mcp_servers section (the existing case passes unchanged) and runtime-command-effort.test.ts passes unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "codex-work-and-role-sites",
+        "title": "Work agents and role runs pass the overdeck map to getCodexLauncherFields",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T03:05:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4933",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/spawn-prep.ts",
+            "src/lib/agents/spawn.ts",
+            "src/lib/__tests__/agents-spawn-supervisor.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/agents-spawn-supervisor.test.ts tests/unit/lib/mcp/agent-injection-launch.test.ts",
+            "npm run lint:file-size",
+            "npm run lint:harness-branches"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "agents-spawn-supervisor.test.ts and agent-injection-launch.test.ts pass",
+            "lint:file-size passes with spawn.ts at or under 1,089 and spawn-prep.ts at or under 1,128 lines",
+            "lint:harness-branches reports no file above its baseline"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-4. Add prepareCodexOverdeckMcp to the existing agent-injection import lines (spawn-prep.ts:18, spawn.ts:20). Edit spawn-prep.ts:739 and spawn.ts:324 in place so getCodexLauncherFields gets `await prepareCodexOverdeckMcp({ agentId, agentKind: 'agent', role, harness })` with the owner fields the PRD gives. Net +0 lines in both files (spawn.ts has one line of headroom). Add two cases to agents-spawn-supervisor.test.ts, which already mocks initCodexHome and sets OVERDECK_HOME to a temp dir: a gpt-5.5 work agent via spawnAgent and a gpt-5.5 review run via spawnRun."
+        },
+        "items": [
+          {
+            "id": "codex-work-and-role-sites.ac1",
+            "title": "Given a gpt-5.5 work agent spawned through spawnAgent, when its launch is built, then the mocked initCodexHome receives mcpServers.overdeck whose env.OVERDECK_MCP_TOKEN_FILE is join(tmpHome, 'agents', <agentId>, 'mcp-token') and whose defaultToolsApprovalMode is 'approve', and one active token with role work exists for that agent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-work-and-role-sites.ac2",
+            "title": "Given a gpt-5.5 review run started through spawnRun, when its launch is built, then the mocked initCodexHome receives mcpServers.overdeck naming the review agent's own mcp-token, and one active token with role review exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-work-and-role-sites.ac3",
+            "title": "wc -l reports src/lib/agents/spawn.ts at or under 1,089 lines and src/lib/agents/spawn-prep.ts at or under 1,128 lines, and npm run lint:file-size exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "codex-relaunch-sites",
+        "title": "Recovery, message-fallback and planning Codex launches pass the overdeck map",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T03:05:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4933",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/recovery.ts",
+            "src/lib/agents/messaging.ts",
+            "src/lib/planning/spawn-planning-session.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node -e \"const f=require('os').homedir()+'/.overdeck/access-tokens.json';try{const r=JSON.parse(require('fs').readFileSync(f,'utf8'));console.log((Array.isArray(r)?r:r.tokens||[]).length)}catch{console.log(0)}\"",
+            "npm run typecheck",
+            "git grep -n \"getCodexLauncherFields(\" -- src ':!*.test.ts' ':!**/__tests__/**'",
+            "npx vitest run src/lib/agents/__tests__/recover-effort.test.ts src/lib/agents/__tests__/message-fallback-effort.test.ts tests/unit/lib/agents/message-agent.test.ts tests/unit/lib/agents/messaging-ollama-preflight.test.ts src/lib/planning/__tests__/spawn-planning-session-harness.test.ts src/lib/planning/__tests__/spawn-planning-session-backend.test.ts",
+            "npm run lint:harness-branches"
+          ],
+          "expected_outputs": [
+            "the printed record count is the same before and after the listed vitest run (no test minted into the real registry)",
+            "typecheck completes without errors",
+            "git grep prints six lines: the definition in runtime-command.ts and five calls, each containing prepareCodexOverdeckMcp(",
+            "the six listed test files pass",
+            "lint:harness-branches reports no file above its baseline"
+          ],
+          "readiness": "ready",
+          "acJustification": "These sites have no Codex launch test harness; the helper and parameter are tested in their own items, so two mechanical ACs cover this item.",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-5. Add prepareCodexOverdeckMcp to the agent-injection import lines of recovery.ts (line 12), messaging.ts (line 8) and spawn-planning-session.ts (line 47). Edit recovery.ts:818, messaging.ts:503 and spawn-planning-session.ts:568 in place to pass `await prepareCodexOverdeckMcp({ … })` as the sixth argument of getCodexLauncherFields, using the exact owner fields the Claude spread at the same site uses (recovery: normalizedId/recoveryRole/recoveryHarness; messaging: normalizedId/resumeRole/fallbackHarness; planning: sessionName/'plan'/effectiveHarness). No new test."
+        },
+        "items": [
+          {
+            "id": "codex-relaunch-sites.ac1",
+            "title": "git grep -n \"getCodexLauncherFields(\" over non-test src prints exactly six lines, and each of the five call lines (spawn-prep.ts, spawn.ts, recovery.ts, messaging.ts, spawn-planning-session.ts) contains prepareCodexOverdeckMcp( with the same agentId and role the prepareClaudeOverdeckMcp spread at that site uses",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-relaunch-sites.ac2",
+            "title": "recover-effort, message-fallback-effort, message-agent, messaging-ollama-preflight, spawn-planning-session-harness and spawn-planning-session-backend tests pass, and npm run typecheck exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "codex-conversation-site",
+        "title": "Codex conversations get the conversation-owned overdeck table",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T03:05:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4933",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-runtime.ts",
+            "src/lib/overdeck/__tests__/conversation-runtime-launch.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/overdeck/__tests__/conversation-runtime-launch.test.ts",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "conversation-runtime-launch.test.ts passes including the new Codex cases",
+            "lint:file-size passes with conversation-runtime.ts at or under 1,252 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-6. In src/lib/overdeck/conversation-runtime.ts add prepareCodexOverdeckMcp to the import on line 41; move `const tokenRow = bareContext ? null : getConversationByTmuxSession(tmuxSession);` from line 772 to directly after `const role: AgentRole = …` (line 587) with the PRD comment; in the Codex branch's initCodexHome call (lines 692-699) add `mcpServers: tokenRow ? await prepareCodexOverdeckMcp({ agentId: tokenRow.name, agentKind: 'conversation', role: conversationTokenRole(tokenRow, role, tmuxSession), harness, dir: stateDir }) : undefined,`. Net +1 line. In conversation-runtime-launch.test.ts add a file-level vi.mock spy that wraps the real initCodexHome and Codex cases inside the existing PAN-4932 describe. If the Codex branch needs more mocks, add file-level partial mocks that keep real behaviour for other callers; do not skip the case."
+        },
+        "items": [
+          {
+            "id": "codex-conversation-site.ac1",
+            "title": "Given a conversation row cx with tmuxSession conv-cx and harness codex, when spawnConversationSession launches it, then initCodexHome receives mcpServers.overdeck whose env.OVERDECK_MCP_TOKEN_FILE is <overdeckHome>/conversations/conv-cx/mcp-token with defaultToolsApprovalMode 'approve', and one active token with agentKind conversation and role conversation exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-conversation-site.ac2",
+            "title": "Given the same launch, then <overdeckHome>/agents/conv-cx/codex-home-v2/config.toml contains [mcp_servers.overdeck] and no odk_ text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-conversation-site.ac3",
+            "title": "Given a bare Codex conversation, when it launches, then initCodexHome receives mcpServers undefined and no token exists for it, and the existing Claude Code cases of the PAN-4932 describe still pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "codex-mcp-docs",
+        "title": "Document Codex injection, the approval key and the CP-2 result",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T03:05:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4933",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/mcp.mdx",
+            "configuration/harnesses.mdx",
+            ".pan/drafts/pan-4927.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -c \"Claude Code and Codex\" configuration/mcp.mdx",
+            "grep -n \"default_tools_approval_mode\" configuration/mcp.mdx configuration/harnesses.mdx .pan/drafts/pan-4927.md"
+          ],
+          "expected_outputs": [
+            "lint:docs passes",
+            "the grep -c prints 2 or more",
+            "the grep -n prints at least one line from each of the three files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-7. configuration/mcp.mdx: line 153 names Claude Code and Codex agents; add the Codex paragraph after line 166 (config.toml table, token file only in env, default_tools_approval_mode = \"approve\", role servers kept); lines 188-190 exclude 'harnesses other than Claude Code and Codex (the ACP harnesses follow)'. configuration/harnesses.mdx: line 1059 overdeckMcp row says Claude Code and Codex declare it; add the four Codex CP-2 bullets after line 1085. .pan/drafts/pan-4927.md: add the 'Revision 2 (PAN-4933 planning)' bullet under W-INJ2 with C-1 to C-5 and D-1 as written in the PRD."
+        },
+        "items": [
+          {
+            "id": "codex-mcp-docs.ac1",
+            "title": "configuration/mcp.mdx renders a paragraph stating that a Codex agent gets an [mcp_servers.overdeck] table in ~/.overdeck/agents/<id>/codex-home-v2/config.toml with default_tools_approval_mode = \"approve\", and its exclusion list reads 'harnesses other than Claude Code and Codex'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-mcp-docs.ac2",
+            "title": "configuration/harnesses.mdx shows the overdeckMcp row naming Claude Code and Codex, and the Overdeck MCP server subsection lists the four Codex CLI 0.159.0 results including the 'MCP tool call requires approval, but approval policy is never' error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-mcp-docs.ac3",
+            "title": ".pan/drafts/pan-4927.md contains a 'Revision 2 (PAN-4933 planning)' bullet under W-INJ2 that states CP-2 passed on Codex CLI 0.159.0 and that the -c fallback is not built, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "codex-overdeck-helper",
+        "to": "codex-work-and-role-sites",
+        "type": "blocks"
+      },
+      {
+        "from": "codex-launcher-fields-param",
+        "to": "codex-work-and-role-sites",
+        "type": "blocks"
+      },
+      {
+        "from": "codex-overdeck-helper",
+        "to": "codex-relaunch-sites",
+        "type": "blocks"
+      },
+      {
+        "from": "codex-launcher-fields-param",
+        "to": "codex-relaunch-sites",
+        "type": "blocks"
+      },
+      {
+        "from": "codex-overdeck-helper",
+        "to": "codex-conversation-site",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
