@@ -4,17 +4,17 @@
     "created": "2026-11-04T00:08:35Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4970: Per-PR auto-merge and UAT batch generations race on the same PRs: 30 batches invalidated in a day, Merge batch button does nothing",
-    "updated": "2026-11-04T00:19:23.803Z"
+    "updated": "2026-11-04T00:20:30.222Z"
   },
   "plan": {
     "id": "pan-4970",
     "title": "Per-PR auto-merge and UAT batch generations race on the same PRs: 30 batches invalidated in a day, Merge batch button does nothing",
-    "status": "proposed",
+    "status": "running",
     "uid": "00ab51d1-162d-4bb8-8a01-a95de6256f4f",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-04T00:08:35Z",
-    "updated": "2026-11-04T00:19:23.803Z",
+    "updated": "2026-11-04T00:20:30.222Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4970",
@@ -728,5 +728,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
