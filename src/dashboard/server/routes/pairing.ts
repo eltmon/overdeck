@@ -26,6 +26,7 @@ import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstab
 import { createAccessToken, listAccessTokens, revokeAccessToken, type PublicAccessTokenRecord } from '../../../lib/access-tokens.js';
 import { emitActivityEntry } from '../../../lib/activity-logger.js';
 import { ensureEnvironmentIdentity } from '../../../lib/environment-identity.js';
+import { capturePhoneRemoved } from '../../../lib/telemetry/anywhere.js';
 import { closeChannelsForPeer } from '../channel-listener.js';
 import { isConnectorCode } from '../connector-pairing.js';
 import { closeDeviceConnections } from '../device-connections.js';
@@ -207,6 +208,7 @@ const revokeDeviceRoute = HttpRouter.add(
     if (!revoked) return noStore(jsonResponse({ error: `no paired device with id ${id}` }, { status: 404 }));
     const closed = closeDeviceConnections(id);
     if (target.kind === 'phone' && target.phoneKey) closeChannelsForPeer(target.phoneKey);
+    if (target.kind === 'phone') capturePhoneRemoved('operator');
     emitActivityEntry({
       source: 'dashboard',
       level: 'info',
