@@ -157,6 +157,11 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   { method: 'POST', path: '/api/conversations/:name/pull-requests/sync', scope: 'tell' },
   { method: 'GET', path: '/api/pull-requests', scope: 'read:state' },
   { method: 'GET', path: '/api/pull-requests/conversations', scope: 'read:state' },
+  // PAN-4943 W-PR1 WI-6: self pull-request watch routes; the handlers also require an agent token (D-10).
+  { method: 'POST', path: '/api/self/pull-request-watches', scope: 'tell' },
+  { method: 'GET', path: '/api/self/pull-request-watches', scope: 'read:state' },
+  { method: 'DELETE', path: '/api/self/pull-request-watches/:id', scope: 'tell' },
+  { method: 'POST', path: '/api/self/pull-requests', scope: 'tell' },
   // PAN-4650 WI-9: the owner's half of Pull here (a linked machine's operator only, checked by the routes).
   { method: 'POST', path: '/api/conversations/:name/release', scope: 'operate' },
   { method: 'GET', path: '/api/conversations/:name/release/transfer/:transferId', scope: 'operate' },

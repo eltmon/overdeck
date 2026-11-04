@@ -364,6 +364,25 @@ a wait answers **404** `unknown-request`, as it does for another agent's id,
 and the agent calls `request_secret` again. The MCP tools over these routes
 are `request_secret` and `secret_wait`.
 
+Pull request watches and links (PAN-4943, W-PR1) are self routes too.
+`POST /api/self/pull-request-watches` (`tell`) takes `{ url }`, a GitHub pull
+request URL (a GitLab merge request answers **400** `invalid-url`); it answers
+**201** `{ watch, created: true, linked, linkError? }`, or **200**
+`{ watch, created: false }` for a duplicate. A failed GitHub read answers
+**502** `pr-read-failed`; an already-merged or -closed PR answers **409**
+`{ code: "pr-finished", state }`. An agent may hold 20 watches (**429**
+`too-many-watches`); 50 watches may exist in total (**429** `watch-limit`).
+`GET /api/self/pull-request-watches` (`read:state`) answers `{ watches }`, the
+caller's own rows only. `DELETE /api/self/pull-request-watches/:id` (`tell`)
+answers **200** `{ removed: true, id }`, or **404** `unknown-watch` for an
+unknown id or another owner's id. `POST /api/self/pull-requests` (`tell`)
+takes `{ ref }` and links it to the caller's own conversation when one exists
+(a conversation token always; an agent token only when a specialist
+conversation row exists for it); otherwise **404**
+`{ code: "no-conversation" }`. The MCP tools over these routes are
+`watch_pull_request`, `list_pull_request_watches`, `unwatch_pull_request` and
+`link_pull_request`.
+
 ### Agent requests (`/api/agent-requests`)
 
 The operator answers agent requests here
