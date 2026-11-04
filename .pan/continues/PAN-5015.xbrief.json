@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5015",
   "created": "2026-11-04T15:25:55.139Z",
-  "updated": "2026-11-04T15:39:23.544Z",
+  "updated": "2026-11-04T15:39:38.712Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -58,6 +58,10 @@
     "docs-pipeline-gates.ac1": {
       "status": "completed",
       "doneAt": "2026-11-04T15:39:23.544Z"
+    },
+    "docs-pipeline-gates.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:39:38.712Z"
     }
   }
 }
