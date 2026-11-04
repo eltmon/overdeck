@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5011",
   "created": "2026-11-04T11:42:07.971Z",
-  "updated": "2026-11-04T13:17:23.563Z",
+  "updated": "2026-11-04T13:17:36.105Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -66,6 +66,10 @@
     "presence-helper.ac1": {
       "status": "completed",
       "doneAt": "2026-11-04T13:17:23.563Z"
+    },
+    "presence-helper.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:17:36.105Z"
     }
   }
 }
