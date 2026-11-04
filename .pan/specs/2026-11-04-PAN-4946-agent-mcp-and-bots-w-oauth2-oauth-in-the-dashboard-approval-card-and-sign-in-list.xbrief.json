@@ -1,0 +1,580 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-04T04:40:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4946: Agent MCP and bots (W-OAUTH2): OAuth in the dashboard: approval card and sign-in list",
+    "updated": "2026-11-04T04:33:47.366Z"
+  },
+  "plan": {
+    "id": "pan-4946",
+    "title": "Agent MCP and bots (W-OAUTH2): OAuth in the dashboard: approval card and sign-in list",
+    "status": "proposed",
+    "uid": "acd6d43c-d4db-4839-acb2-4ac61eddbd4d",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-04T04:40:00Z",
+    "updated": "2026-11-04T04:33:47.366Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4946",
+        "label": "PAN-4946",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4946.md",
+        "label": "PRD PAN-4946",
+        "type": "prd"
+      },
+      {
+        "uri": ".pan/drafts/pan-4927.md",
+        "label": "Epic PRD PAN-4927 (W-OAUTH2)",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "mcp",
+      "oauth",
+      "dashboard",
+      "frontend",
+      "needs-you",
+      "access-tokens",
+      "pan-4927"
+    ],
+    "metadata": {
+      "prd": ".pan/drafts/PAN-4946.md",
+      "fileOverlapNote": "scripts/frontend-test-subset.txt is merge=union; parallel items that each append one test path do not conflict, so no edge is added for it.",
+      "canonicalFilename": "2026-11-04-PAN-4946-agent-mcp-and-bots-w-oauth2-oauth-in-the-dashboard-approval-card-and-sign-in-list.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "W-OAUTH1 (PAN-4945) shipped the OAuth 2.1 server for /mcp. A client that signs in waits on a public authorize page showing an approval code, and the operator can approve it only with `pan mcp oauth approve <code>` in a terminal. Active sign-ins are visible only through `pan mcp oauth list`, and agent tokens (one per running agent) flood the dashboard's token lists.",
+      "Proposal": "Frontend only. Add frontend OAuth types, a level mirror and fetchers to anywhereApi.ts; feed each pending approval into useDecisions as a blocking `mcpSignIn` decision (root viewers only) rendered by a new McpSignInCard in the Needs-you panel (code, redirect host, level select, Approve, Deny); add a McpSignInsList (client, level, created, last used, expires, Revoke) mounted in both Settings → Access Tokens and Settings → Anywhere → Access tokens; fold agent tokens behind 'Show agent tokens (N)' in both token lists; document it. Every call goes to the existing root-only /api/mcp-oauth/* routes.",
+      "NonGoals": "- No server route, route-scope row, no-loss row, CLI verb, config key or src/lib change; the diff stays in src/dashboard/frontend/src/, scripts/frontend-test-subset.txt and docs\n- No approving from a phone, a paired device or a linked machine's dashboard; those viewers never see the card's controls\n- No desktop, push or TTS notification for a new sign-in\n- No editing a sign-in's level after approval\n- No hiding OAuth access tokens (oauthClientId records) from the token lists; only agent tokens fold\n- No widening of PendingInputSource ('agent' | 'conversation')\n- No token, refresh token or code verifier ever reaches the browser"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Mount the Sign-ins list in both Settings → Access Tokens (AccessTokensSection) and Settings → Anywhere → Access tokens (AccessTokensPanel).",
+        "rationale": "AC-17 names Settings → Access Tokens (the separate section, settingsPageConstants.ts:64) while the epic's file list names AccessTokensPanel; the token list already appears in both on one shared query key, so mirroring that precedent satisfies both inputs."
+      },
+      {
+        "summary": "The mcpSignIn kind is blocking and labelled 'MCP sign-in waiting'.",
+        "rationale": "A person is parked on the authorize page and the request expires in 10 minutes, so it belongs with the blocking rows that sort first."
+      },
+      {
+        "summary": "The approvals query runs only for viewer kinds 'root-session' and 'internal-token'.",
+        "rationale": "The epic says root session; the internal token is also a root credential the admin routes accept. The gate only avoids a 403 poll; the server's root check is the boundary."
+      },
+      {
+        "summary": "The Sign-ins 'expires' column shows refreshExpiresAt.",
+        "rationale": "That is when the sign-in itself ends unless the client refreshes; the 30-day access token rotates on every refresh."
+      },
+      {
+        "summary": "OAuth access tokens stay visible in the token lists; only agentId records fold.",
+        "rationale": "configuration/mcp.mdx:323-325 (W-OAUTH1) already documents revoking an OAuth access token there; the epic asks only for agent tokens to be hidden."
+      },
+      {
+        "summary": "Frontend OAuth types, level labels and fetchers live in anywhereApi.ts as a mirror of src/lib/mcp/oauth-flow.ts.",
+        "rationale": "oauth-flow.ts imports node:crypto so the frontend cannot import it; anywhereApi.ts already mirrors MCP_DEFAULT_SCOPES the same way and is the epic's named file."
+      }
+    ],
+    "items": [
+      {
+        "id": "oauth-client-api",
+        "title": "Frontend OAuth types, level mirror and fetchers in anywhereApi.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T04:40:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4946",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/anywhere/anywhereApi.ts",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/mcpOAuthApi.test.ts",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/Settings/anywhere/__tests__/mcpOAuthApi.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors",
+            "mcpOAuthApi.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4",
+            "NFR-2",
+            "NFR-6",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. After MCP_DEFAULT_SCOPES (anywhereApi.ts:90) add MCP_OAUTH_LEVELS, McpOAuthLevel, MCP_OAUTH_LEVEL_LABELS (comment: mirrors LEVEL_LABELS in src/lib/mcp/oauth-flow.ts), isMcpOAuthLevel, McpSignInApproval and McpSignIn interfaces (mirrors of PendingApprovalView and SignInView in src/lib/mcp/oauth-service.ts:68-89; requestedLevel and level typed string), MCP_OAUTH_APPROVALS_QUERY_KEY = ['mcp-oauth-approvals'], MCP_SIGN_INS_QUERY_KEY = ['mcp-oauth-sign-ins'], and four fetchers: fetchMcpSignInApprovals(signal) (GET /api/mcp-oauth/approvals, [] on any failure), decideMcpSignIn(id, 'approve'|'deny', level?) (POST /api/mcp-oauth/approvals/:id, JSON body, deny sends no level key), loadMcpSignIns() (GET /api/mcp-oauth/sign-ins, AccessTokensForbiddenError on 403), revokeMcpSignIn(familyId) (DELETE). Ids are encodeURIComponent'd; mutations send await dashboardMutationJsonHeaders(). Reuse readResult/isOk/apiError. New test mcpOAuthApi.test.ts (mock ../../../../lib/wsTransport as AccessTokensPanel.test.tsx:10-12 does), listed in scripts/frontend-test-subset.txt in sorted position."
+        },
+        "items": [
+          {
+            "id": "oauth-client-api.ac1",
+            "title": "Given decideMcpSignIn('id/1','approve','operate'), when called, then it POSTs body {\"decision\":\"approve\",\"level\":\"operate\"} to /api/mcp-oauth/approvals/id%2F1 with the CSRF headers, and deny POSTs {\"decision\":\"deny\"} with no level key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "oauth-client-api.ac2",
+            "title": "Given a 403 response or a rejected fetch, fetchMcpSignInApprovals returns [] and loadMcpSignIns rejects with AccessTokensForbiddenError on 403",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "oauth-client-api.ac3",
+            "title": "revokeMcpSignIn('abc') sends DELETE /api/mcp-oauth/sign-ins/abc, and isMcpOAuthLevel accepts read, message, operate, approve and rejects 'admin'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "oauth-client-api.ac4",
+            "title": "scripts/frontend-test-subset.txt contains src/components/Settings/anywhere/__tests__/mcpOAuthApi.test.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "signin-feed",
+        "title": "useDecisions emits a blocking mcpSignIn decision for root viewers",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T04:40:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4946",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "signin-card"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/pendingInput.ts",
+            "src/dashboard/frontend/src/lib/useDecisions.ts",
+            "src/dashboard/frontend/src/components/mobile/MobileNeedsYou.tsx",
+            "src/dashboard/frontend/src/lib/__tests__/useDecisions.test.ts",
+            "src/dashboard/frontend/src/components/mobile/__tests__/MobileNeedsYou.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/lib/__tests__/useDecisions.test.ts src/lib/__tests__/useDecisions.fleet.test.tsx src/components/mobile/__tests__/MobileNeedsYou.test.tsx src/components/__tests__/DecisionsPanel.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors",
+            "useDecisions.test.ts, useDecisions.fleet.test.tsx, MobileNeedsYou.test.tsx and DecisionsPanel.test.tsx pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-6",
+            "NFR-7",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. pendingInput.ts: add kind 'mcpSignIn' after 'secretRequest' (line 25) and label 'MCP sign-in waiting' after line 39. useDecisions.ts: Decision gains `mcpSignIn?: McpSignInApproval` after agentRequest (line 126); add 'mcpSignIn' to BLOCKING_KINDS after 'secretRequest'; add exported mcpSignInDecisions(rows) mapping each row to { id: row.id, source: 'agent', label: row.clientName, kinds: ['mcpSignIn'], since: row.createdAt, blocking: true, mcpSignIn: row }. In useDecisions() after the ['agent-requests'] query (line 333) add a status query (ANYWHERE_STATUS_QUERY_KEY, loadAnywhereStatus, staleTime 60_000, retry false) and the approvals query (MCP_OAUTH_APPROVALS_QUERY_KEY, fetchMcpSignInApprovals, refetchInterval 5000, enabled only for viewer.kind 'root-session' or 'internal-token'); push mcpSignInDecisions(rows) after line 385 and add the rows to the memo deps (line 395). usePendingInputSubjects is unchanged. MobileNeedsYou.tsx ReadOnlyAction (line 147): before the agentRequest line, `if (decision.mcpSignIn) return <p ...>Approve on the desktop</p>;`. Every consumer checks decision.mcpSignIn before decision.source. Extend useDecisions.test.ts (seed ['anywhere-status'] and ['mcp-oauth-approvals']) and MobileNeedsYou.test.tsx."
+        },
+        "items": [
+          {
+            "id": "signin-feed.ac1",
+            "title": "Given anywhere-status viewer kind 'root-session' and one pending approval, useDecisions() returns one decision with kinds ['mcpSignIn'], blocking true, label equal to the client name and mcpSignIn.approvalCode set, sorted before non-blocking decisions",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "signin-feed.ac2",
+            "title": "Given viewer kind 'device', useDecisions() emits no mcpSignIn decision and a fetch spy records no request to /api/mcp-oauth/approvals",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "signin-feed.ac3",
+            "title": "describePendingInput(['mcpSignIn']) returns 'MCP sign-in waiting' and isBlockingDecision(['mcpSignIn']) returns true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "signin-feed.ac4",
+            "title": "MobileNeedsYou renders 'Approve on the desktop' and no button for a decision carrying mcpSignIn",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "signin-card",
+        "title": "McpSignInCard renders pending sign-ins in the Needs-you panel",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T04:40:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4946",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/McpSignInCard.tsx",
+            "src/dashboard/frontend/src/components/DecisionsPanel.tsx",
+            "src/dashboard/frontend/src/components/styles/decisions.module.css",
+            "src/dashboard/frontend/src/components/__tests__/McpSignInCard.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/__tests__/McpSignInCard.test.tsx src/components/__tests__/DecisionsPanel.test.tsx src/components/__tests__/AgentRequestCard.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors",
+            "McpSignInCard.test.tsx, DecisionsPanel.test.tsx and AgentRequestCard.test.tsx pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-5",
+            "NFR-6",
+            "NFR-1",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. New components/McpSignInCard.tsx (≤140 lines) copying AgentRequestCard's structure and decisions.module.css classes: root div data-testid='mcp-sign-in-card' with data-decision-id; badge describePendingInput(kinds); subject '<clientName> wants access to Overdeck'; <p data-testid='mcp-sign-in-code' className={styles.approvalCode}> with the code; prompt 'Approve only if the page you opened shows this code.'; meta with the redirect host and 'expires <relative>' (useNow + formatRelativeTime); a <select aria-label='Access level'> of the four MCP_OAUTH_LEVEL_LABELS defaulting to requestedLevel when isMcpOAuthLevel else 'read'; Approve and Deny buttons. Approve → decideMcpSignIn(id,'approve',level); Deny → decideMcpSignIn(id,'deny'); non-2xx → alert 'HTTP <status>: <apiError>'; throw → 'Could not reach the dashboard'; always invalidate MCP_OAUTH_APPROVALS_QUERY_KEY (no optimistic hide). CSS: add .approvalCode (mono font token, 20px, letter-spacing 0.08em) and .levelSelect (same border/radius/background/padding as .secretInput). DecisionsPanel Group (lines 146-147): render <McpSignInCard key={`mcp-sign-in:${d.id}`}> when d.mcpSignIn, before the agentRequest branch. New test listed in scripts/frontend-test-subset.txt."
+        },
+        "items": [
+          {
+            "id": "signin-card.ac1",
+            "title": "Given a decision with mcpSignIn (client 'Claude Desktop', host 'claude.ai', code 'KQZT-MWRB', requested 'operate'), the card renders 'Claude Desktop wants access to Overdeck', 'claude.ai', 'KQZT-MWRB' in mcp-sign-in-code, the warning sentence, four level options and the select set to 'Can operate'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "signin-card.ac2",
+            "title": "When the operator selects 'Can approve' and clicks Approve, one POST to /api/mcp-oauth/approvals/<id> carries {\"decision\":\"approve\",\"level\":\"approve\"}; clicking Deny posts {\"decision\":\"deny\"}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "signin-card.ac3",
+            "title": "Given the route answers 409 'this sign-in request was already approved', the card renders an alert with 'HTTP 409: this sign-in request was already approved'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "signin-card.ac4",
+            "title": "DecisionsPanel renders mcp-sign-in-card for an mcpSignIn decision and no 'Answer' button for it; the select defaults to 'Read only' when requestedLevel is not one of the four levels",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "signin-card.ac5",
+            "title": "scripts/frontend-test-subset.txt contains src/components/__tests__/McpSignInCard.test.tsx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "agent-token-fold",
+        "title": "Fold agent tokens behind 'Show agent tokens (N)' in both token lists",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T04:40:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4946",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/sections/accessTokensShared.ts",
+            "src/dashboard/frontend/src/components/Settings/anywhere/AccessTokensPanel.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/AccessTokensSection.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/AccessTokensPanel.test.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/__tests__/AccessTokensSection.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/Settings/anywhere/__tests__/AccessTokensPanel.test.tsx src/components/Settings/sections/__tests__/AccessTokensSection.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors",
+            "AccessTokensPanel.test.tsx and AccessTokensSection.test.tsx pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. accessTokensShared.ts: widen AccessTokenRecord with optional agentId, agentKind, role, oauthClientId, oauthFamilyId, expiresAt (the server's toPublic already sends them); add partitionAgentTokens(records) → { own, agent } where agent = records with agentId. In AccessTokensSection (table rows at lines 132-153) and AccessTokensPanel (list at line 60) render own as today; when agent.length > 0 render a toggle (data-testid='show-agent-tokens', aria-expanded) reading 'Show agent tokens (N)' / 'Hide agent tokens (N)', collapsed by default, N counting revoked agent records too; expanded shows agent records with the same row markup and Revoke. The empty-state text shows only when both groups are empty. Extend both existing tests."
+        },
+        "items": [
+          {
+            "id": "agent-token-fold.ac1",
+            "title": "Given one own token and two agent tokens (one revoked), each list renders the own token, renders neither agent token, and shows 'Show agent tokens (2)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-token-fold.ac2",
+            "title": "When the operator clicks 'Show agent tokens (2)', both agent tokens render and the toggle reads 'Hide agent tokens (2)' with aria-expanded='true'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-token-fold.ac3",
+            "title": "Given no record with agentId, neither list renders a show-agent-tokens toggle",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "signins-list",
+        "title": "McpSignInsList with Revoke in Settings → Access Tokens and Settings → Anywhere",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-04T04:40:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4946",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/anywhere/McpSignInsList.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/AccessTokensSection.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/AccessTokensPanel.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/McpSignInsList.test.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/__tests__/AccessTokensSection.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/Settings/anywhere/__tests__/McpSignInsList.test.tsx src/components/Settings/sections/__tests__/AccessTokensSection.test.tsx src/components/Settings/anywhere/__tests__/AccessTokensPanel.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors",
+            "McpSignInsList.test.tsx, AccessTokensSection.test.tsx and AccessTokensPanel.test.tsx pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-6",
+            "NFR-1",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. New components/Settings/anywhere/McpSignInsList.tsx (≤130 lines): useQuery(MCP_SIGN_INS_QUERY_KEY, loadMcpSignIns, refetchInterval 5000, retry false); wrapper data-component='mcp-sign-ins-list', h3 'Sign-ins' and the help line; states: 'Loading sign-ins…', AccessTokensForbiddenError → 'Only a browser on this machine can list sign-ins.', other error → 'Could not load sign-ins: <message>', empty → 'No sign-ins. An MCP client that signs in with OAuth appears here after you approve it.'; each <li data-family-id> shows client name, '<level label> · created <rel> · last used <rel or —> · expires <rel of refreshExpiresAt>', a 'headless' chip when headless, and a destructive Revoke. Revoke: useConfirm({ title: 'Revoke <client>?', message: 'The sign-in ends now. Its access and refresh tokens stop working, and the app must sign in again.', confirmLabel: 'Revoke', variant: 'destructive' }) → revokeMcpSignIn(familyId); failure → toast.error(apiError(result)); then invalidate MCP_SIGN_INS_QUERY_KEY and ANYWHERE_ACCESS_TOKENS_QUERY_KEY. Mount it in AccessTokensSection after the token table (before CreateAccessTokenDialog, line 157) in <div className='mt-6'> and in AccessTokensPanel after its list in <div className='mt-4'>. New test listed in scripts/frontend-test-subset.txt; add one mount assertion to AccessTokensSection.test.tsx (its mockFetch must answer /api/mcp-oauth/sign-ins)."
+        },
+        "items": [
+          {
+            "id": "signins-list.ac1",
+            "title": "Given GET /api/mcp-oauth/sign-ins returns two sign-ins (one headless, level 'message'), the list renders both client names, 'Can message', and a 'headless' chip only on the headless row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "signins-list.ac2",
+            "title": "When the operator clicks Revoke and confirms, exactly one DELETE /api/mcp-oauth/sign-ins/<familyId> is sent and the sign-ins query refetches; cancelling sends no DELETE",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "signins-list.ac3",
+            "title": "Given a 403 from the sign-ins route, the list renders 'Only a browser on this machine can list sign-ins.'; given an empty list it renders the empty-state line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "signins-list.ac4",
+            "title": "AccessTokensSection (section id 'access-tokens', Settings → Access Tokens) renders a 'Sign-ins' heading and the sign-in row returned by the route; AccessTokensPanel renders the same list",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "signins-list.ac5",
+            "title": "scripts/frontend-test-subset.txt contains src/components/Settings/anywhere/__tests__/McpSignInsList.test.tsx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "signin-docs",
+        "title": "Document the sign-in card, the Sign-ins list and the agent-token toggle",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T04:40:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4946",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/mcp.mdx",
+            "configuration/remote-access.mdx",
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            ".overdeck/context/codebase/architecture.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "lint (including lint:docs) completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. configuration/mcp.mdx 'Sign in with OAuth' steps 2-3 (lines 192-196): the Needs you panel shows a card with the app name, redirect host and approval code; pick a level (starts at the requested level), click Approve or Deny; only a browser on this machine sees the card, a phone or paired device shows 'Approve on the desktop'. 'Revoking' (lines 321-322): end a sign-in under Settings → Access Tokens → Sign-ins (also Settings → Anywhere → Access tokens) or with pan mcp oauth revoke; agent tokens fold under 'Show agent tokens (N)'. configuration/remote-access.mdx (lines 284-288): the table folds agent tokens and a Sign-ins list follows it. docs/DASHBOARD-ARCHITECTURE.md 'Awareness feed': after the held-handoff paragraph (line 1325) add 'Needs you lists MCP sign-ins (PAN-4946).' describing the root-only 5 s approvals poll, the blocking mcpSignIn kind and McpSignInCard. .overdeck/context/codebase/architecture.md: Needs-you line (~230) gains the mcpSignIn kind and McpSignInCard; MCP paragraph (~336) gains one OAuth sentence (PAN-4945 server modules + this item's dashboard pieces); keep exactly one last-verified line at the end."
+        },
+        "items": [
+          {
+            "id": "signin-docs.ac1",
+            "title": "configuration/mcp.mdx contains, under 'Sign in with OAuth', the Needs you card (approval code, level select, Approve, Deny) and the 'Approve on the desktop' line for phones, and contains 'Settings → Access Tokens → Sign-ins' under 'Revoking'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "signin-docs.ac2",
+            "title": "configuration/remote-access.mdx contains the 'Show agent tokens (N)' toggle and the Sign-ins list in its Settings → Access Tokens paragraph",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "signin-docs.ac3",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md contains a 'Needs you lists MCP sign-ins (PAN-4946)' paragraph naming the mcpSignIn kind, the root-viewer gate and McpSignInCard, and .overdeck/context/codebase/architecture.md names McpSignInCard and McpSignInsList with exactly one last-verified line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "signin-docs.ac4",
+            "title": "npm run lint exits 0 with the doc changes applied",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "oauth-client-api",
+        "to": "signin-feed",
+        "type": "blocks"
+      },
+      {
+        "from": "oauth-client-api",
+        "to": "signins-list",
+        "type": "blocks"
+      },
+      {
+        "from": "signin-feed",
+        "to": "signin-card",
+        "type": "blocks"
+      },
+      {
+        "from": "agent-token-fold",
+        "to": "signins-list",
+        "type": "blocks"
+      },
+      {
+        "from": "signin-card",
+        "to": "signin-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "signins-list",
+        "to": "signin-docs",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
