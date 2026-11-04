@@ -100,7 +100,7 @@ Links: [Remote access](/configuration/remote-access),
 or &#36;126 a year in all), billed in the same charge. When two of your machines find no direct
 path, the relay connects them, still end-to-end encrypted. It includes 50 GB of relay traffic a
 month; at 50 GB the relay stops until the next month, and an extra 50 GB is a one-time &#36;3
-purchase. There is no per-gigabyte billing.
+purchase. There is no per-gigabyte billing. The relay also carries an [Overdeck connector](/configuration/bots#run-the-overdeck-connector)'s traffic when a bot has no direct path to your machine; it relays only encrypted bytes.
 
 **Availability:** until billing ([PAN-4294](https://github.com/eltmon/overdeck/issues/4294))
 ships, the paid tiers (Anywhere and the relay add-on) are available to invite-allowlisted
@@ -183,7 +183,10 @@ to add one.
 | The phone app over Tailscale Serve: answer a question in three taps | next release | [Phone](/configuration/phone) |
 | Push notifications sent from your machine with Web Push, optional ntfy | next release | [Push notifications](/configuration/push-notifications) |
 | Webhook triggers (`pan triggers`), published through Tailscale Funnel | next release | [Webhook triggers](/configuration/triggers) |
-| The MCP server (`pan mcp serve`, **Copy MCP URL**) | next release | [MCP server](/configuration/mcp) |
+| The MCP server (`pan mcp serve`, **Copy MCP URL**), with its tools in every Claude Code, Codex, `acp` and `opencode` agent | next release | [MCP server](/configuration/mcp) |
+| OAuth sign-in for MCP clients, approved in your dashboard (`pan mcp oauth`) | next release | [MCP server](/configuration/mcp#sign-in-with-oauth) |
+| Public MCP for hosted bots through Tailscale Funnel | next release | [MCP server](/configuration/mcp#public-mcp-for-hosted-bots) |
+| Connect a bot: Hermes, OpenClaw, Grok Build, Grok Bot and the xAI API, and the Overdeck connector (`pan mcp connector`) | next release | [Connect a bot](/configuration/bots) |
 | Sign in to overdeck.ai (`pan account login`, `status`, `logout`, or **Sign in** on the dashboard Account card) | next release | [pan account](/cli/account) |
 | Pipeline agents' transcripts saved to the Session Vault automatically | next release | [Session Vault](/configuration/session-vault) |
 | Shared sessions: share a conversation by link, viewers watch it live in their own Overdeck | next release | [Shared sessions](/configuration/shared-sessions) |
