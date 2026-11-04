@@ -14,6 +14,7 @@ import { createTrackerFromConfig, createTracker } from '../tracker/factory.js';
 import type { IssueState } from '../tracker/interface.js';
 import { findProjectByPath, getIssuePrefix, resolveProjectFromIssueSync } from '../projects.js';
 import { getWorkspaceStackHealth } from '../workspace/stack-health.js';
+import { resolveIssueStackDiskHold } from '../workspace/disk-cost.js';
 import { getPrFacts } from '../cloister/pr-facts.js';
 import { generateLauncherScript } from '../launcher-generator.js';
 import { getProviderForModel, setupCredentialFileAuth, clearCredentialFileAuth } from '../providers.js';
@@ -1090,6 +1091,12 @@ export async function assertWorkspaceStackHealthyForSpawn(
     blockWork(`agent-spawn-blocked-stack-unhealthy: ${normalizedIssue}`, details);
   }
 
+  // PAN-4961: a rebuild that would breach the disk floor is held; it counts no attempt.
+  const diskHold = await resolveIssueStackDiskHold(issueId);
+  if (diskHold) {
+    if (hostFallbackEligible) { fallbackToHost(diskHold); return; }
+    throw new Error(diskHold);
+  }
   record.lastAttempt = now;
   record.attempts += 1;
   spawnStackRebuildState.set(normalizedIssue, record);
