@@ -128,7 +128,7 @@ describe('AgentState role persistence', () => {
   it('PAN-2090: review role reconstitutes its tools: allow-list via --allowedTools (no MCP)', async () => {
     const { getRoleRuntimeBaseCommand } = await import('../agents.js');
     const command = await getRoleRuntimeBaseCommand('claude-opus-4-7', 'agent-pan-1-review', 'review');
-    expect(command).toContain("--allowedTools 'Read,Grep,Glob,Bash'");
+    expect(command).toContain("--allowedTools 'Read,Grep,Glob,Bash,mcp__overdeck'");
     expect(command).not.toContain('--mcp-config'); // review.md declares no mcpServers
   });
 
@@ -137,7 +137,7 @@ describe('AgentState role persistence', () => {
     const command = await getRoleRuntimeBaseCommand('claude-opus-4-7', 'agent-pan-1-test', 'test');
     // playwright MCP wired, AND included in the allow-list so the strict list does not block it.
     expect(command).toMatch(/--mcp-config '[^']*role-prompts\/test\.mcp\.json'/);
-    expect(command).toMatch(/--allowedTools 'Read,Grep,Glob,Bash,mcp__playwright'/);
+    expect(command).toMatch(/--allowedTools 'Read,Grep,Glob,Bash,mcp__playwright,mcp__overdeck'/);
     // the generated config is valid JSON declaring the playwright stdio server.
     const m = command.match(/--mcp-config '([^']*)'/);
     const cfg = JSON.parse(readFileSync(m![1], 'utf-8'));

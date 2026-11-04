@@ -1056,6 +1056,7 @@ name. Every field is required, so a harness cannot leave a decision undeclared.
 | `answersQuestionByMessage` | The MCP `answer_question` tool may answer this harness's pending question with a composed message. It is narrower than `askAnswerDelivery`: the tool carries no tool-use id, so it cannot tell a Codex approval from a question, and only Claude Code declares it. |
 | `askAnswerDelivery` | How the dashboard delivers an answer to a conversation's pending question: `message` sends it as a message; `pi-ask-modal` drives the open ask modal with keystrokes; `codex-approval` means it is really a numbered approval prompt, answered with `answer_codex_approval` (PAN-4944), not a question. |
 | `runsOnFlyMachine` | A conversation may be started on a Fly machine (`pan machines add-fly`). Only Claude Code declares it; other harnesses on Fly are #4296. |
+| `overdeckMcp` | Launches get the `overdeck` MCP server with a per-agent token. Only Claude Code declares it; Codex and the ACP harnesses follow. |
 
 The rule for harness-specific code:
 
@@ -1066,6 +1067,22 @@ The rule for harness-specific code:
   `Record<HarnessTranscriptKind, …>` table fails `tsc` when a kind has no entry.
 - Never compare a harness name. `src/lib/harness-policy.ts` is the one
   exception: its ToS rules key on names on purpose.
+
+### Overdeck MCP server
+
+A harness that declares `overdeckMcp` gets the `overdeck` MCP server at launch
+(see [Agents get these tools](/configuration/mcp#agents-get-these-tools)).
+Claude Code 2.1.293 was checked against what the launcher emits:
+
+- Two `--mcp-config=` flags load together, so the Channels bridge and
+  `overdeck` both start.
+- An `overdeck` tool call completes with no permission prompt under
+  `--permission-mode default` with `--allowedTools=mcp__overdeck`.
+- Bash still runs with `--allowedTools=mcp__overdeck`; the flag does not narrow
+  the other tools.
+- The space form `--allowedTools <x>` reads a following prompt argument as
+  another tool name, so Overdeck always emits the equals form
+  (`--allowedTools=mcp__overdeck`, `--mcp-config=<path>`).
 
 ### The harness-branch ratchet
 
