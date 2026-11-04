@@ -367,7 +367,7 @@ export function useDecisions(): Decision[] {
     staleTime: 60_000,
     retry: false,
   });
-  const canSeeMcpSignIns = anywhereStatus?.viewer.kind === 'root-session' || anywhereStatus?.viewer.kind === 'internal-token';
+  const canSeeMcpSignIns = anywhereStatus?.viewer?.kind === 'root-session' || anywhereStatus?.viewer?.kind === 'internal-token';
   const { data: mcpSignInApprovals = [] } = useQuery({
     queryKey: MCP_OAUTH_APPROVALS_QUERY_KEY,
     queryFn: ({ signal }) => fetchMcpSignInApprovals(signal),

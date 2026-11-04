@@ -12,6 +12,8 @@ interface RenderDecisionsOptions {
   /** PAN-4946: who the dashboard sees itself answering to; defaults to this machine's own session. */
   viewerKind?: 'root-session' | 'device' | 'token' | 'internal-token' | 'machine' | null;
   mcpApprovals?: McpSignInApproval[];
+  /** PAN-4946 review: the raw `['anywhere-status']` body, overriding `viewerKind` — for a malformed/partial status. */
+  anywhereStatus?: unknown;
 }
 
 function renderDecisions(
@@ -25,7 +27,7 @@ function renderDecisions(
   queryClient.setQueryData(['conv-ask-user-question'], convRows);
   queryClient.setQueryData(['fleet-needs-you'], []); // PAN-4651: no linked machines
   queryClient.setQueryData(['agent-requests'], agentRequestRows); // PAN-4941
-  queryClient.setQueryData(['anywhere-status'], { viewer: { kind: options.viewerKind ?? 'root-session' } }); // PAN-4946
+  queryClient.setQueryData(['anywhere-status'], options.anywhereStatus ?? { viewer: { kind: options.viewerKind ?? 'root-session' } }); // PAN-4946
   queryClient.setQueryData(['mcp-oauth-approvals'], options.mcpApprovals ?? []); // PAN-4946
 
   return renderHook(() => useDecisions(), {
@@ -224,6 +226,12 @@ describe('useDecisions MCP sign-ins (PAN-4946)', () => {
     // viewer was root-session, then the viewer dropped to device within the
     // same lifetime: the cache entry is still there, but it must not surface.
     const { result } = renderDecisions([], [], { viewerKind: 'device', mcpApprovals: [approvalRow] });
+    expect(result.current.some((d) => d.kinds.includes('mcpSignIn'))).toBe(false);
+  });
+
+  it('review fix: a status body with no viewer field never throws and never surfaces an mcpSignIn row', () => {
+    expect(() => renderDecisions([], [], { anywhereStatus: {} })).not.toThrow();
+    const { result } = renderDecisions([], [], { anywhereStatus: {}, mcpApprovals: [approvalRow] });
     expect(result.current.some((d) => d.kinds.includes('mcpSignIn'))).toBe(false);
   });
 

@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AccessTokensForbiddenError } from '../../sections/accessTokensShared';
 import {
   decideMcpSignIn,
+  expiresInText,
   fetchMcpSignInApprovals,
   isMcpOAuthLevel,
   loadMcpSignIns,
@@ -75,5 +76,14 @@ describe('mcpOAuthApi (PAN-4946)', () => {
     expect(isMcpOAuthLevel('operate')).toBe(true);
     expect(isMcpOAuthLevel('approve')).toBe(true);
     expect(isMcpOAuthLevel('admin')).toBe(false);
+  });
+
+  it('expiresInText formats a future timestamp at its minute/hour/day boundaries, and a past one as "expired"', () => {
+    const now = new Date('2026-11-04T00:00:00.000Z');
+    expect(expiresInText('2026-11-03T23:59:00.000Z', now)).toBe('expired');
+    expect(expiresInText('2026-11-04T00:00:20.000Z', now)).toBe('in under a minute');
+    expect(expiresInText('2026-11-04T00:10:00.000Z', now)).toBe('in 10 minutes');
+    expect(expiresInText('2026-11-04T03:00:00.000Z', now)).toBe('in 3 hours');
+    expect(expiresInText('2027-02-02T00:00:00.000Z', now)).toBe('in 90 days');
   });
 });
