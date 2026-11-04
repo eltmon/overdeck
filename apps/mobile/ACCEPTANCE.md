@@ -438,3 +438,48 @@ The step that failed before (open the machine, and resume) now links every time.
    Settings → Anywhere (pair links are single-use).
    Pause state and muted types are unchanged and still applied (the exchange carries the
    phone's current prefs, so the machine does not need a separate sync pass to pick them up).
+
+## AC-13 on the Android emulator (PAN-4840)
+
+**Result: PASS.** Data-only FCM pushes reached the app while it was closed. The app decrypted them
+on the phone and posted them on the right channel, and a tap opened the machine screen they named.
+Run on 2026-11-04.
+
+- **App commit:** `0c04ded39bd` (`feature/pan-4840`, main merged in), a debug build with the
+  committed `google-services.json` (Firebase project `overdeck-app`). `assembleDebug` applied the
+  google-services plugin (`google_app_id` in the generated `values.xml`).
+- **Emulator:** AVD `galaxyA16b` (android-36 google_apis x86_64, Android 16, Google Play services),
+  fresh install. `galaxyA16` was not used: it boots into `RUNNING_LOCKED` with a lock credential this
+  agent does not have (see CP-3 above).
+- **Directory:** `https://connect.overdeck.ai/healthz` reported `"apns":true,"fcm":true`.
+- **Machine:** this host, `eltmon-z790` (environment `e91ffda1-431a-483d-a6e4-a72079516ea4`).
+  `GET /api/push/status` reported `native.phones: 4` and `directoryOnline: true`.
+
+| # | Step | Evidence | Result |
+| --- | --- | --- | --- |
+| 1 | Channels and sign-in | On first launch `OverdeckPush.load()` created `needs-you` (importance 4) and `updates` (importance 3) (`dumpsys notification`). The operator signed in with GitHub. Right after sign-in the app asked for `POST_NOTIFICATIONS` (`checkPermissions` → `prompt` → `requestPermissions` → `granted`), saw `OverdeckPush.status()` → `{"configured":true}`, called `register()` and received an FCM token. | pass |
+| 2 | Pair | A one-time code from `pan pair --json`, built into an `ai.overdeck.app:/pair#…` link with `buildPhonePairLink` and opened with `adb shell am start`, paired the phone. The app opened the machine's Needs you. | pass |
+| 3a | Test push, app closed | The app was swiped out of Recents (process gone, `stopped=false`, not Force stop). `POST /api/push/test` at 18:24:48.4Z. FCM started the app process, and `OverdeckMessagingService` logged `OverdeckPush: POSTED` at 18:24:48.9Z. The notification "Overdeck test notification / Push works on this device." was on `updates`, tag `<machine>:test`. | [13](acceptance/13-android-test-push.png) — pass |
+| 3b | Question, app closed | A test conversation called AskUserQuestion at 18:26:21.963Z. The phone posted "Question · Android push acceptance test setup / Tap to answer." on `needs-you` at 18:26:28.194Z (**6.2 s**, bar 10 s), tag `<machine>:auq:toolu_01PT8W4WWMMEa7V7QC4JBKFL`. The app process was started by FCM again. A second question, sent while the app was open, posted 1.0 s after it was asked. | [14](acceptance/14-android-question-push.png) — pass |
+| 4 | Directory log has no content | `npx wrangler tail overdeck-connect --format json` ran during one more test push and a question. The 12 captured events carry only `frame`, `env`, `outcome` and `client`. There was no match for the test-push title or body, the question text, "Question ·", the conversation title, a concurrent "Finished · PAN-5041" title, `"title"`, `"body"`, `"token"` or the FCM token prefix `APA91b`. | pass |
+| 5a | Cold tap | With the app's UI closed, tapping the question notification started `MainActivity` with `ai.overdeck.app:/open#v=1&e=e91ffda1-…&p=%2Fm%3Fsubject%3D20261104-8903&t=2026-11-04T18%3A26%3A28.151Z`. The app opened `eltmon-z790` at the question's card ("Which color should the Android test pick?"). "Blue" and "Send" on the phone answered it, and the conversation replied "The Android test should pick Blue." After the page reload, `getLaunchUrl()` returned the same link again, and the guard skipped it. | [15](acceptance/15-android-cold-tap.png) — pass |
+| 5b | Warm tap (CP-3) | With the app in the foreground, a second question posted. Tapping it delivered the new link (`t=…18%3A27%3A50.700Z`) through `appUrlOpen`, and the app opened `/m?subject=20261104-8903` once. After that reload, `getLaunchUrl()` returned the older cold-launch link twice, and the guard skipped both, so there was no loop. | [17](acceptance/17-android-warm-tap.png) — pass |
+| 6 | Settings | Settings → Notifications showed `On`, with the shared pause and notification-type controls. | [16](acceptance/16-android-settings-notifications.png) — pass |
+
+The test conversation (`20261104-8903`) was stopped and archived after the run.
+
+### Notes from the run
+
+- **Warm-tap card not shown.** The warm tap opened the right screen, but it showed "This question
+  was already answered." The question stayed unanswered in the conversation transcript, but the
+  machine's `GET /api/needs-you` and the conversation's pending-question field were already empty.
+  That is machine-side needs-you state, not the phone's routing. It was not investigated further
+  here.
+- **Notification grouping.** Android 16 grouped two or more Overdeck notifications under one
+  summary. Each child keeps its own tag and tap target.
+- **Debug-build logging.** In a debug build, Capacitor's bridge writes plugin return values to
+  logcat, including the FCM token and the account token. `capacitor.config.ts` sets no
+  `loggingBehavior`, so Capacitor's default (`debug`) applies, and release builds do not log the bridge.
+  `OverdeckMessagingService` itself logs only the outcome name (NFR-1).
+- **Pairing link without the dashboard UI:** `pan pair --json` gives the one-time credential, and
+  `GET /api/environment` gives `environmentId` and `machineKey` for `buildPhonePairLink`.
