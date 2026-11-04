@@ -209,8 +209,10 @@ and paired with `eltmon-z790`, app closed and phone locked, Live Activity card o
 A scratch conversation raised one AskUserQuestion at 17:07:19.5 UTC, which raised the needs-you
 count by one. The directory handed the Live Activity update to APNs (`push-activity` `pushed`)
 at 17:07:36.1 UTC, 16.6 s after the question (target: the card shows the new count within 30 s).
-The operator confirmed the card's "need you" count went up by one (answer "All good"); they did not
-report a separate display time, so 16.6 s is the server-side part, not a lock-screen measurement.
+The operator confirmed the card's "need you" count went up by one (answer "All good") and, asked
+afterwards, that the lock-screen card showed the higher count **under 10 s** after the notification
+(well within the 30 s target). Counts: before N, after N + 1 (one new needs-you question); the exact
+numbers on the card were not reported. Run date: 2026-11-04.
 
 Earlier note — **not run: APNs secrets unset (PAN-4841).** On 2026-11-03, `GET https://connect.overdeck.ai/healthz`
 answered `{"ok":true,"configured":true,"turn":true,"apns":false,"fcm":false}`. The AC-12 timing,
