@@ -126,7 +126,7 @@ These are read at build time.
 
 `OverdeckKeys` is the only native code on both platforms. It has a Swift version and a Java version.
 iOS also has the Live Activity plugin and widget extension (PAN-4839). The widget extension needs its
-own App ID, `ai.overdeck.app.widgets`, which PAN-4841 registers with the store setup.
+own App ID, `ai.overdeck.app.widgets`, registered in checklist step A1 of `RELEASE.md`.
 
 - **Client id:** a lowercase UUID v4 per install. It is the directory `clientId`, the account
   `environment_id` and the machine `clientId`.
@@ -185,10 +185,16 @@ The root `npm test` does not run these tests. The CI job `mobile-android` runs t
 web build, the Capacitor sync and `assembleDebug`, and uploads the `app-debug` APK. The `test`
 check requires it.
 
+## Release
+
+[`RELEASE.md`](RELEASE.md) holds the operator's one-time store checklist, the secrets the agent asks for,
+and the commands that build and upload the store builds. Android bundles are built and signed on this host;
+iOS builds are archived and uploaded on the Mac rig.
+
 ## What it cannot do yet
 
 - Push notifications on Android: PAN-4840.
-- Store setup and release builds: PAN-4841.
+- App Store review (beyond TestFlight) needs in-app account deletion.
 - Reaching machines that are linked through the paired one: PAN-4887.
 - Admin-only actions such as settings, the model picker, archive, share and voice. The phone token
   cannot call them, so the phone screens hide them in native shell mode.

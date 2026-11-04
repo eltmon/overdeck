@@ -60,8 +60,78 @@ into the repo at `apps/mobile/android/app/google-services.json`. The fifth Worke
 
 ## Build and upload
 
-To be written with the build scripts (`apps/mobile/scripts/build-android.sh` and
-`apps/mobile/scripts/build-ios-on-rig.sh`).
+### Build numbers
+
+Both scripts take `--build <n>`, a positive integer: the Android `versionCode` and the iOS
+`CFBundleVersion` (the app and both extensions get the same number). Each store refuses a number
+it has already seen, so use the next one; the first upload to each store is `--build 1`. The
+version name stays `1.0` unless you pass `--version-name` (Android). Nothing is committed per
+build.
+
+### Android (this host)
+
+```bash
+apps/mobile/scripts/build-android.sh --build <n> \
+  [--version-name 1.0] \
+  [--keystore ~/.overdeck/secrets/android-upload.jks] \
+  [--password-file ~/.overdeck/secrets/android-upload.password] \
+  [--alias overdeck-upload]
+```
+
+The script needs the upload keystore and its password file, `apps/mobile/android/upload-certificate.sha1`
+and `apps/mobile/android/app/google-services.json`, and stops naming the first one that is missing.
+It builds the web bundle, syncs Capacitor, runs `bundleRelease` with JDK 21, checks the signature
+with `jarsigner -verify`, and checks that the signer's SHA-1 equals the pinned certificate. The
+bundle lands in `apps/mobile/release/overdeck-<version>-<n>.aab` (ignored by git). Upload it in
+Play Console → Testing → Internal testing → Create new release.
+
+The upload key is `~/.overdeck/secrets/android-upload.jks` (PKCS12, alias `overdeck-upload`) and its
+password is in `~/.overdeck/secrets/android-upload.password` (the folder is mode 700, the files
+600). Neither is in the repo; only the certificate's SHA-1 is. Keep the password in the password
+manager and a backup of the keystore with it (step K1). If the key is lost, Play App Signing lets
+Play Console support reset the upload key, which is slow.
+
+Debug and CI builds stay unsigned: Gradle signs the release build only when
+`OVERDECK_UPLOAD_KEYSTORE` is set, which only this script does.
+
+### iOS (the Mac rig)
+
+```bash
+apps/mobile/scripts/build-ios-on-rig.sh --build <n> --rig eltmon@<rig-ip> \
+  [--team KUU2VM9GB9] [--key ~/.ssh/gauntlet_air] [--no-upload] [--dry-run]
+```
+
+The rig's address comes from DHCP, so `--rig` is required. The script builds and syncs the app on
+this host, copies `apps/mobile/ios/` and the local Capacitor Swift packages to `~/overdeck-mobile/`
+on the rig with `rsync -aL`, and writes `~/release-ios/overdeck-<n>.command` there. It opens that
+file in Terminal on the rig's desktop, because signing needs the unlocked login keychain and an SSH
+session cannot use it (`codesign` fails with `errSecInternalComponent`). The `.command` file
+archives to `~/release-ios/overdeck-<n>.xcarchive`, then exports and uploads to App Store Connect
+with `apps/mobile/ios/App/ExportOptions.plist` into `~/release-ios/overdeck-<n>-export/`. The
+script follows `~/release-ios/overdeck-<n>.log` until it ends with `== DONE ==` or
+`== FAILED: <step> ==` (60 minutes at most) and prints the archive's version and build number.
+`--no-upload` stops after the archive; `--dry-run` prints every command and the `.command` file and
+runs nothing.
+
+When it fails:
+
+- **No signing identity.** `ssh -i ~/.ssh/gauntlet_air <rig> 'security find-identity -v -p codesigning'`
+  must list an identity for team `KUU2VM9GB9`. If it does not, sign in to the Apple ID in Xcode →
+  Settings → Accounts on the rig (step A5) and run the script again.
+- **`missing Xcode-Token` during the upload.** The upload uses the Xcode Apple ID session. Sign in
+  again in Xcode → Settings → Accounts on the rig. App Store Connect API keys do not work for this
+  team.
+- **Low disk space.** The MacBook Air has little free space. Check `df -g /` on the rig and delete
+  `~/overdeck-mobile/DerivedData` when it is short.
+
+After the build is processed, answer export compliance in TestFlight (step A6). With automatic
+distribution on (step A4), the build then reaches the "Operator" group's iPhones.
+
+### Icons and splash
+
+The launcher icons and splash images are generated from the Overdeck mark
+(`src/dashboard/frontend/public/favicon.svg`) on `#202020`. After the mark changes, run
+`node apps/mobile/scripts/generate-brand-assets.mjs` and commit the PNGs it rewrites.
 
 ## Store facts
 
