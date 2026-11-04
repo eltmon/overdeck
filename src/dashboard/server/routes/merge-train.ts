@@ -102,7 +102,8 @@ export interface MergeTrainQueueEntry {
    * False = one ready feature merges directly.
    */
   holdsForUat: boolean;
-  queue: MergeQueueItem[];
+  /** PAN-4970: `mergesPerPr` marks the items the per-PR auto-merge scheduler owns, not this batch. */
+  queue: Array<MergeQueueItem & { mergesPerPr: boolean }>;
 }
 
 /** One project's UAT generation chain as served by GET /api/merge-train/generations. */
@@ -137,9 +138,17 @@ async function queueEntryForProject(
   // Imported here so the conflict-ordering module's git work is only loaded
   // when a queue is actually computed.
   const { computeMergeQueueFromCandidates } = await import('../../../lib/flywheel-merge-order.js');
-  const queue = await Effect.runPromise(
+  const rawQueue = await Effect.runPromise(
     computeMergeQueueFromCandidates(candidates, projectPath).pipe(Effect.provide(nodeServicesLayer)),
   );
+  // PAN-4970: mark the items the per-PR auto-merge scheduler already owns —
+  // this batch never claims them, and the page says so instead of promising
+  // a batch that will never assemble.
+  const { mergePathOwner } = await import('../services/merge-path-owner.js');
+  const queue = await Promise.all(rawQueue.map(async (item) => ({
+    ...item,
+    mergesPerPr: (await mergePathOwner(item.issueId, projectPath, config)) === 'per-pr',
+  })));
   // Review of #4017: a lone ready feature's hold is its own (label, then
   // project, then global), the same one the reconciler applies — the page must
   // not say "merges directly" for a feature that gets a UAT batch.
