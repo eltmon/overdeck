@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4941",
   "created": "2026-11-04T02:31:39.368Z",
-  "updated": "2026-11-04T03:26:53.485Z",
+  "updated": "2026-11-04T03:27:09.150Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -158,6 +158,10 @@
     "secret-flow-e2e.ac3": {
       "status": "completed",
       "doneAt": "2026-11-04T03:26:53.485Z"
+    },
+    "frontend-decisions.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:27:09.149Z"
     }
   }
 }
