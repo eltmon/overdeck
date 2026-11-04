@@ -669,6 +669,11 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   missing from the `✓ root <file>` list. Spy `process.kill` in any test whose code under test
   signals a fixture PID. 39 test files carry literal PIDs without a `process.kill` spy; most only
   use the PID as data, but none were audited.
+<!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4925, PAN-4929, PAN-4931, PAN-4944) -->
+<!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4925) -->
+<!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917) -->
+<!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4931) -->
+<!-- last-verified: 2026-11-03 (PAN-4905, PAN-4917, PAN-4929) -->
 - **The access-token snapshot is per process** (PAN-4930 planning) — `verifyAccessToken` and
   `listActiveRecordsOfKind` (`src/lib/access-tokens.ts`) read an in-memory snapshot that only the dashboard
   fills (`startAccessTokenRefresh`, every 5 s). A CLI process (`pan kill`, `pan start`) sees zero records

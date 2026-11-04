@@ -487,6 +487,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/machines/work/lanes/:name/reap',    kind: 'http', disposition: 'WRITE',       door: 'lanes/reap.reapLane (PAN-4638 lane work door)' },
   { surface: 'GET /api/machines/needs-you',                 kind: 'http', disposition: 'READ',        door: 'needs-you-feed.buildNeedsYou (pending-input conversations + read-model agents) (PAN-4651, closes PAN-4405)' },
   { surface: 'GET /api/fleet/needs-you',                    kind: 'http', disposition: 'AGGREGATE',   door: 'linked-needs-you-sync cache for online links (PAN-4651)' },
+  { surface: 'GET /api/needs-you',                          kind: 'http', disposition: 'READ',        door: 'needs-you-feed.buildNeedsYou + read-model agent questions and channel permission requests (PAN-4944)' },
   { surface: 'GET /api/fleet/search',                       kind: 'http', disposition: 'AGGREGATE',   door: 'linkFetch GET /api/palette/search per online link, 2.5 s each (PAN-4651)' },
   { surface: 'GET /api/machines/issue-activity',            kind: 'http', disposition: 'READ',        door: 'issue-activity.issueActivity (read-model agents + enriched conversation list) (PAN-4651)' },
   { surface: 'GET /api/fleet/issues/:id/activity',          kind: 'http', disposition: 'AGGREGATE',   door: 'issue-activity.issueActivity here + linkFetch GET /api/machines/issue-activity per online link (PAN-4651)' },

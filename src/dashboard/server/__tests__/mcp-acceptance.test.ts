@@ -52,6 +52,18 @@ const stubs = Layer.mergeAll(
   stub('GET', '/api/conversations/:id', { name: 'conv-a', harness: 'claude-code' }),
   stub('POST', '/api/conversations/:id/permission', { ok: true }),
   stub('PUT', '/api/settings', { ok: true }),
+  // PAN-4944 (PAN-4927 W-APPR1, AC-15): the fleet-wide pending list and every answer tool's route.
+  stub('GET', '/api/needs-you', { conversations: [{ name: 'conv-a', pendingPaneChoice: { signature: 'sig-1' } }], agents: [] }),
+  stub('GET', '/api/fleet/needs-you', {
+    machines: [{ environmentId: 'env-lap-2', label: 'laptop', conversations: [{ name: 'conv-z', pendingAskUserQuestion: { toolUseId: 't9' } }], agents: [] }],
+  }),
+  stub('POST', '/api/conversations/:id/pane-choice', { ok: true }),
+  stub('POST', '/api/conversations/:id/codex-approval', { ok: true }),
+  stub('POST', '/api/conversations/:id/pi-ask-answer', { ok: true }),
+  stub('POST', '/api/conversations/:name/plan-action', { ok: true }),
+  stub('POST', '/api/agents/:id/answer-question', { ok: true }),
+  stub('POST', '/api/agents/:id/plan-action', { ok: true }),
+  stub('POST', '/api/agents/:id/permissions/:requestId/respond', { ok: true }),
 );
 
 interface Sent {
@@ -193,5 +205,37 @@ describe('MCP acceptance with the default MCP scopes (PAN-4649 W-10)', () => {
     expect(refused.isError).toBe(true);
     expect(refused.text).toBe('Unknown tool answer_permission');
     expect(stubCalls).toEqual([]);
+  });
+});
+
+describe('MCP acceptance: every new answer tool through the real gate (PAN-4944 AC-15)', () => {
+  const CASES: Array<{ name: string; args: Record<string, unknown>; route: string; body: unknown }> = [
+    { name: 'answer_pane_choice', args: { conversation: 'conv-a', selectedIndex: 0, signature: 'sig-1' }, route: 'POST /api/conversations/:id/pane-choice', body: { selectedIndex: 0, signature: 'sig-1' } },
+    { name: 'answer_codex_approval', args: { conversation: 'conv-a', optionNumber: 1 }, route: 'POST /api/conversations/:id/codex-approval', body: { optionNumber: 1 } },
+    { name: 'answer_pi_ask', args: { conversation: 'conv-a', toolUseId: 't1', answers: ['Yes'] }, route: 'POST /api/conversations/:id/pi-ask-answer', body: { toolUseId: 't1', answers: ['Yes'] } },
+    { name: 'answer_plan', args: { conversation: 'conv-a', action: 'approve-auto' }, route: 'POST /api/conversations/:name/plan-action', body: { action: 'approve-auto' } },
+    { name: 'answer_agent_plan', args: { agentId: 'agent-pan-1', action: 'approve-auto' }, route: 'POST /api/agents/:id/plan-action', body: { action: 'approve-auto' } },
+    { name: 'answer_agent_permission', args: { agentId: 'agent-pan-1', requestId: 'req-1', behavior: 'allow' }, route: 'POST /api/agents/:id/permissions/:requestId/respond', body: { behavior: 'allow' } },
+    { name: 'answer_question', args: { agentId: 'agent-pan-1', answers: ['Yes'] }, route: 'POST /api/agents/:id/answer-question', body: { answers: ['Yes'] } },
+  ];
+
+  it.each(CASES)('$name is hidden without approve and reaches its route with it', async ({ name, args, route, body }) => {
+    const refused = await callTool(await mintToken([...MCP_DEFAULT_SCOPES]), name, args);
+    expect(refused.isError).toBe(true);
+    expect(refused.text).toBe(`Unknown tool ${name}`);
+    expect(stubCalls).toEqual([]);
+
+    const allowed = await callTool(await mintToken([...MCP_DEFAULT_SCOPES, 'approve']), name, args);
+    expect(allowed.isError).toBe(false);
+    expect(stubCalls).toEqual([{ route, body }]);
+  });
+
+  it('list_pending_input returns this machine plus the linked machine, with the linked conversation renamed', async () => {
+    const token = await mintToken([...MCP_DEFAULT_SCOPES]);
+    const result = await callTool(token, 'list_pending_input');
+    expect(result.isError).toBe(false);
+    const { machines } = JSON.parse(result.text) as { machines: Array<{ environmentId: string | null; conversations: Array<{ name: string }> }> };
+    expect(machines).toHaveLength(2);
+    expect(machines[1]?.conversations.map((c) => c.name)).toEqual(['@env-lap-2/conv-z']);
   });
 });
