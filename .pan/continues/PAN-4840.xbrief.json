@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4840",
   "created": "2026-11-03T20:58:06.302Z",
-  "updated": "2026-11-03T21:17:51.440Z",
+  "updated": "2026-11-04T18:13:19.779Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -62,7 +62,7 @@
       "doneAt": "2026-11-03T21:15:04.896Z"
     },
     "device-acceptance": {
-      "status": "blocked"
+      "status": "pending"
     }
   }
 }
