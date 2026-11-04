@@ -618,3 +618,9 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
 - Operator released PAN-4841 (store, Firebase, APNs, directory setup) to the pipeline, overriding the earlier "orchestrator-driven" hold. PAN-4842 (docs) is still held.
 - The operator already has Apple Developer Program membership and a Google Play developer account. Mind Your Now (`~/Projects/myn`) is the reference setup for Firebase push, the Android upload keystore (`release-secrets/android/`) and signed builds. Overdeck gets its own Firebase project, never MYN's service account.
 - Operator ran the connect and account Worker deploys (wrangler had been waiting on the D1 migration confirmation). That unblocked PAN-4950, which is started; PAN-4953/4954/4955 follow it.
+
+## 2026-11-04 — Orchestrator directives after the overnight sweep
+
+- Until PAN-4995 (PR adoption races `pan review request`) is fixed, handoff briefs must not run `pan review request` right after `gh pr create`. Opening the PR already triggers webhook adoption plus review; an immediate request-review starts verification mid-adoption and causes a false `workspace-head-mismatch` needs-you (seen on PAN-4993 / #4994). The PAN-4993 brief in this log prescribed exactly that order; don't copy it.
+- PAN-4841 belongs to the Flywheel now; the orchestrator keeps only PAN-4842 (phone docs).
+- Strike PRs (`pan strike`) bypass plan/review/test and wait for an operator merge; the merge train never schedules them. Five (#4678, #4679, #4698, #4701, #4707) sat green and unreviewed from Nov 1. Their issues were still open with no fix on main, so on the orchestrator's instruction they were updated with main and merged once fresh CI was green. Check `gh pr list --search "head:strike/"` each tick, because nothing else drains them.
