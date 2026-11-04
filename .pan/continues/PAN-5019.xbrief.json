@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5019",
   "created": "2026-11-04T13:12:00.752Z",
-  "updated": "2026-11-04T14:34:27.149Z",
+  "updated": "2026-11-04T14:34:39.632Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -104,6 +104,10 @@
     "machine-store.ac1": {
       "status": "completed",
       "doneAt": "2026-11-04T14:34:27.149Z"
+    },
+    "machine-store.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:34:39.632Z"
     }
   }
 }
