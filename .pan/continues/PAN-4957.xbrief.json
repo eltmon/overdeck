@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4957",
   "created": "2026-11-04T16:52:59.952Z",
-  "updated": "2026-11-04T16:56:34.388Z",
+  "updated": "2026-11-04T16:57:12.995Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -28,9 +28,10 @@
       "doneAt": "2026-11-04T16:56:27.377Z"
     },
     "ci-test-aggregator": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4957",
-      "claimedAt": "2026-11-04T16:56:34.388Z"
+      "claimedAt": "2026-11-04T16:56:34.388Z",
+      "doneAt": "2026-11-04T16:57:12.994Z"
     }
   }
 }
