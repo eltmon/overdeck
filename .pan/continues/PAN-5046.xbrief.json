@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5046",
   "created": "2026-11-04T18:10:57.891Z",
-  "updated": "2026-11-04T18:50:15.252Z",
+  "updated": "2026-11-04T18:50:30.421Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -130,6 +130,10 @@
     "server-ice-restart-answer.ac5": {
       "status": "completed",
       "doneAt": "2026-11-04T18:50:15.251Z"
+    },
+    "shell-link-recovery.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:50:30.421Z"
     }
   }
 }
