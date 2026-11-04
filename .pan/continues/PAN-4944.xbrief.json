@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4944",
   "created": "2026-11-04T00:25:07.459Z",
-  "updated": "2026-11-04T01:45:30.504Z",
+  "updated": "2026-11-04T01:45:56.198Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -120,6 +120,10 @@
     "list-pending-fleet.ac4": {
       "status": "completed",
       "doneAt": "2026-11-04T01:45:30.504Z"
+    },
+    "acceptance-ac15.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T01:45:56.198Z"
     }
   }
 }
