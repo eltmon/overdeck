@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5011",
   "created": "2026-11-04T11:42:07.971Z",
-  "updated": "2026-11-04T13:18:06.891Z",
+  "updated": "2026-11-04T13:18:19.470Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -78,6 +78,10 @@
     "pane-first-presence.ac1": {
       "status": "completed",
       "doneAt": "2026-11-04T13:18:06.891Z"
+    },
+    "pane-first-presence.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:18:19.470Z"
     }
   }
 }
