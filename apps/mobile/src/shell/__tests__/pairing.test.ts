@@ -141,6 +141,27 @@ describe('pairMachine', () => {
     });
   });
 
+  it('carries notificationPreferences in the exchange body and calls onPreferencesStored when the answer has the flag', async () => {
+    const h = harness([json(200, descriptor()), json(200, { v: 1, token: 'opt_phone', tokenId: 'tok-1', descriptor: descriptor(), notificationPreferencesStored: true })]);
+    const prefs = { v: 1 as const, pause: null, muted: ['failed' as const] };
+    h.deps.notificationPreferences = () => ({ revision: 3, prefs });
+    const onPreferencesStored = vi.fn();
+    h.deps.onPreferencesStored = onPreferencesStored;
+    await pairMachine(LINK, h.deps);
+    const exchange = h.requests[1]!.req;
+    expect(JSON.parse(new TextDecoder().decode(exchange.body))).toMatchObject({ notificationPreferences: prefs });
+    expect(onPreferencesStored).toHaveBeenCalledWith(ENV, 3);
+  });
+
+  it('does not call onPreferencesStored when the answer omits the flag', async () => {
+    const h = harness([json(200, descriptor()), exchangeOk()]);
+    h.deps.notificationPreferences = () => ({ revision: 1, prefs: { v: 1, pause: null, muted: [] } });
+    const onPreferencesStored = vi.fn();
+    h.deps.onPreferencesStored = onPreferencesStored;
+    await pairMachine(LINK, h.deps);
+    expect(onPreferencesStored).not.toHaveBeenCalled();
+  });
+
   it('shows the already-paired text on 409 link-key-in-use and opens no second channel', async () => {
     const h = harness([json(200, descriptor()), json(409, { error: 'in use', code: 'link-key-in-use' })]);
     await expect(pairMachine(LINK, h.deps)).rejects.toThrow('This phone is already paired with desk. Remove it on the machine, then pair again.');

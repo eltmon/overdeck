@@ -16,7 +16,7 @@
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest, type HttpServerResponse } from 'effect/unstable/http';
 
-import { parsePhoneNotificationPreferences } from '@overdeck/contracts';
+import { parsePhoneNotificationPreferences, type PhoneNotificationPreferences } from '@overdeck/contracts';
 import {
   createAccessToken,
   findActiveChannelTokenByKey,
@@ -43,6 +43,8 @@ interface PhoneExchangeBody {
   clientId: string;
   label: string;
   pushKeyHex: string;
+  /** Invalid or absent prefs are never a 400 (PAN-5019 WI-6): pairing proceeds without them. */
+  notificationPreferences: PhoneNotificationPreferences | null;
 }
 
 function parsePhoneExchangeBody(text: string): PhoneExchangeBody | string {
@@ -60,7 +62,12 @@ function parsePhoneExchangeBody(text: string): PhoneExchangeBody | string {
     return `label must be a string of 1-${MAX_LABEL_LENGTH} characters`;
   }
   if (typeof body.pushKeyHex !== 'string' || !KEY_HEX.test(body.pushKeyHex)) return 'pushKeyHex must be 64 lowercase hex characters';
-  return { clientId: body.clientId, label: body.label.trim(), pushKeyHex: body.pushKeyHex };
+  return {
+    clientId: body.clientId,
+    label: body.label.trim(),
+    pushKeyHex: body.pushKeyHex,
+    notificationPreferences: parsePhoneNotificationPreferences(body.notificationPreferences),
+  };
 }
 
 /**
@@ -101,6 +108,16 @@ export async function handlePhonesExchange(
   const replaced = listActiveRecordsOfKind('phone').filter((other) => other.clientId === body.clientId && other.id !== record.id);
   for (const other of replaced) await revokeAccessToken(other.id);
 
+  let notificationPreferencesStored = false;
+  if (body.notificationPreferences) {
+    try {
+      await setPhoneNotificationPreferences(body.clientId, body.notificationPreferences);
+      notificationPreferencesStored = true;
+    } catch (error) {
+      console.warn('[push] storing notification preferences at pairing failed:', error instanceof Error ? error.message : error);
+    }
+  }
+
   emitActivityEntry({
     source: 'dashboard',
     level: 'info',
@@ -108,7 +125,10 @@ export async function handlePhonesExchange(
     details: JSON.stringify({ tokenId: record.id, clientId: body.clientId, replaced: replaced.length }),
   });
   const descriptor = await buildEnvironmentDescriptor();
-  return jsonResponse({ v: 1, token, tokenId: record.id, descriptor }, { headers: { 'Cache-Control': 'no-store' } });
+  return jsonResponse(
+    { v: 1, token, tokenId: record.id, descriptor, ...(notificationPreferencesStored ? { notificationPreferencesStored: true } : {}) },
+    { headers: { 'Cache-Control': 'no-store' } },
+  );
 }
 
 const exchangeRoute = HttpRouter.add(

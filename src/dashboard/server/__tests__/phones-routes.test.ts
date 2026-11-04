@@ -127,6 +127,20 @@ describe('POST /api/phones/exchange (PAN-4835 WI-7)', () => {
     expect(listActiveRecordsOfKind('phone')).toHaveLength(1);
   });
 
+  it('ac-5019: an exchange carrying valid notification preferences stores them and answers notificationPreferencesStored', async () => {
+    const prefs = { v: 1, pause: null, muted: ['failed'] };
+    const { status, json } = await read(await handlePhonesExchange(body({ notificationPreferences: prefs }), PAIRING));
+    expect(status).toBe(200);
+    expect(json.notificationPreferencesStored).toBe(true);
+    expect((await loadPhoneNotificationPreferences()).get(CLIENT_ID)).toEqual(prefs);
+  });
+
+  it('ac-5019: an exchange carrying invalid notification preferences still answers 200 without the flag', async () => {
+    const { status, json } = await read(await handlePhonesExchange(body({ notificationPreferences: { v: 2 } }), PAIRING));
+    expect(status).toBe(200);
+    expect(json.notificationPreferencesStored).toBeUndefined();
+  });
+
   it('remoteGateRejection admits the exchange on a pairing marker and refuses it on a plain request', async () => {
     const { HttpServerRequest } = await import('effect/unstable/http');
     const { Option } = await import('effect');
