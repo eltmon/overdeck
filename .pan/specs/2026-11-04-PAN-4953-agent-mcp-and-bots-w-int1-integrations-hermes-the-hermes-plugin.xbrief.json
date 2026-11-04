@@ -1,0 +1,709 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-04T13:40:52Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4953: Agent MCP and bots (W-INT1): integrations/hermes/: the Hermes plugin",
+    "updated": "2026-11-04T13:45:01.632Z"
+  },
+  "plan": {
+    "id": "pan-4953",
+    "title": "Agent MCP and bots (W-INT1): integrations/hermes/: the Hermes plugin",
+    "status": "proposed",
+    "uid": "304c1158-efc1-44b3-b216-519528b97a73",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-04T13:40:52Z",
+    "updated": "2026-11-04T13:45:01.632Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4953",
+        "label": "PAN-4953",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4927",
+        "label": "PAN-4927 (epic, W-INT1)",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4953.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "mcp",
+      "integrations",
+      "hermes",
+      "python",
+      "pan-4927"
+    ],
+    "narratives": {
+      "Problem": "Overdeck's MCP tools reach outside bots through the connector, but Hermes has no Overdeck plugin: no pending-prompt summary, no /overdeck command, no bundled skill. The epic's W-INT1 text also puts the plugin's switches where Hermes never reads them (entry root instead of settings), names a skill path that a wheel or directory drop would not contain, and leaves the numbering of /overdeck answer unspecified.",
+      "Proposal": "Ship integrations/hermes/ as the Python package overdeck-hermes 0.1.0 (hatchling, entry point overdeck, plugin.yaml with config_schema). Tools come from Hermes's own MCP client (mcp_servers.overdeck); the plugin adds a rate-limited pre_llm_call summary, /overdeck status|pending|answer (answer gated by settings.allow_answers re-read per call, a per-session snapshot and an item-key re-check, routing to all eight answer tools), the bundled skill (force-included into the wheel) and 'hermes overdeck setup'. Correct the Connect a bot snippet and configuration/mcp.mdx to the settings: subtree. Record CP-9 from a throwaway Hermes v0.22.6 in docs/verification.md. Full brief: .pan/drafts/PAN-4953.md.",
+      "NonGoals": "- Publishing overdeck-hermes to PyPI or any catalog (epic D-5).\n- The httpx JSON-RPC fallback for Hermes older than 0.21.6; such a Hermes gets one warning and no registrations.\n- A Hermes approval transport (register_approval_transport) or Hermes approvals in the Overdeck dashboard.\n- Native Hermes tools that duplicate the MCP tools.\n- Any change to the connector, the MCP server, the answer tools, or integrations/shared/ (sync-skill.mjs and its target path stay as they are).\n- Persisting /overdeck snapshots across Hermes restarts.\n- CI wiring in .github/workflows/ci.yml (W-CI1, PAN-4957).\n- Touching the operator's live Hermes (~/.hermes, ~/.local/bin/hermes).\n- OpenClaw, Grok Build and Grok Bot packages."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Plugin switches live under plugins.entries.overdeck.settings and are read with ctx.get_config; the Connect a bot snippet and configuration/mcp.mdx move to that layout (C-1).",
+        "rationale": "ctx.get_config (hermes_cli/plugins.py:266) reads only settings.<key> or legacy config.<key>; the shipped snippet's entry-root keys would be silent no-ops. Using the documented API also gives the Hermes settings UI via config_schema."
+      },
+      {
+        "summary": "Minimum Hermes 0.21.6; no httpx fallback (C-2).",
+        "rationale": "ctx.call_mcp and ctx.get_config both first ship in v0.21.6; the CP-9 target v0.22.6 has both, and a fallback would also need a second config reader."
+      },
+      {
+        "summary": "hatchling build backend with force-include of skills/overdeck/SKILL.md; skill resolved from the package dir, then two levels up (C-3, D-1, D-2).",
+        "rationale": "register_skill needs a real file; W-INT0's sync path is outside the package and setuptools cannot include it. This keeps W-INT0 untouched and makes wheel, directory drop and editable installs all work."
+      },
+      {
+        "summary": "/overdeck answer routes to all eight answer tools, not only the epic's five (C-4).",
+        "rationale": "W-APPR1 added answer_plan, answer_agent_plan, answer_agent_permission and the agentId form of answer_question after the epic was written; /overdeck pending lists those prompts, so answering them must be possible."
+      },
+      {
+        "summary": "Numbers are pinned by a per-session 600 s snapshot plus an item-key re-check against a fresh list; the snapshot is dropped after a successful answer (D-6).",
+        "rationale": "A re-numbered list must never route an approval to a different prompt; answer_question by message has no server-side identity check."
+      },
+      {
+        "summary": "The summary's 300 s window counts failed calls and returns nothing on in-window turns (D-4).",
+        "rationale": "A down connector then costs one 10 s call per 5 minutes, and the model does not see the same summary every turn."
+      },
+      {
+        "summary": "/overdeck status uses list_pending_input, not list_machines (D-5).",
+        "rationale": "The connector hides list_machines (epic W-CONN2 step 7), so status must work through a tool both routes serve."
+      },
+      {
+        "summary": "CP-9 runs against a throwaway Hermes in a scratchpad venv with HERMES_HOME, reaching the local dashboard /mcp with a revoked-afterwards pan token (D-10).",
+        "rationale": "The PATH Hermes is the operator's live v0.9.0; the connector route is W-CONN2's acceptance, and the plugin code path is identical for both routes."
+      }
+    ],
+    "items": [
+      {
+        "id": "hermes-skeleton",
+        "title": "Create the overdeck-hermes package skeleton with settings and the MCP call helper",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T13:40:52Z",
+        "metadata": {
+          "issueLabel": "pan-4953",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "backend",
+          "requiresInspection": true,
+          "foundationFor": [
+            "pending-routing",
+            "summary-hook",
+            "overdeck-commands",
+            "register-plugin"
+          ],
+          "files_scope": [
+            "integrations/hermes/pyproject.toml",
+            "integrations/hermes/plugin.yaml",
+            "integrations/hermes/src/overdeck_hermes/config.py",
+            "integrations/hermes/src/overdeck_hermes/client.py",
+            "integrations/hermes/tests/conftest.py",
+            "integrations/hermes/tests/test_client.py"
+          ],
+          "verify_commands": [
+            "python3.12 -m venv integrations/hermes/.venv && integrations/hermes/.venv/bin/pip install 'pytest>=8'",
+            "cd integrations/hermes && .venv/bin/python -m pytest tests/test_client.py"
+          ],
+          "expected_outputs": [
+            "tests/test_client.py reports all tests passed and 0 failed"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1 (.pan/drafts/PAN-4953.md). Create integrations/hermes/pyproject.toml and integrations/hermes/plugin.yaml exactly as the PRD's WI-1 steps 1-2 show (hatchling>=1.27, entry point overdeck = \"overdeck_hermes\", test extra pytest>=8, wheel force-include of skills/overdeck/SKILL.md, pytest options testpaths/pythonpath/-p no:cacheprovider; plugin.yaml with config_schema server/summary/allow_answers). Create integrations/hermes/src/overdeck_hermes/config.py (Settings dataclass + read_settings(ctx) using ctx.get_config; summary on unless exactly False; allow_answers on only when exactly True; blank server falls back to 'overdeck') and integrations/hermes/src/overdeck_hermes/client.py (OverdeckCallError + call_overdeck(ctx, server, tool, arguments, timeout) that is the only caller of ctx.call_mcp, decodes the envelope's result JSON string a second time, returns a non-JSON string as is, and maps PermissionError, any other exception and ok:false to OverdeckCallError with the PRD's texts). Do NOT create integrations/hermes/src/overdeck_hermes/__init__.py (WI-5 owns it). Create integrations/hermes/tests/conftest.py with FakeCtx, the ok()/err() helpers and the 'feed' fixture described in WI-1 step 5 (build any token value at runtime, never as a literal). Write integrations/hermes/tests/test_client.py with the eight named tests. Use relative imports inside the package. Create the venv with python3.12 (ambient python3 is 3.14 without pytest); do not pip install the package itself yet (README/LICENSE land in WI-7)."
+        },
+        "items": [
+          {
+            "id": "hermes-skeleton.ac1",
+            "title": "Given call_mcp returns {\"ok\": true, \"result\": \"{\\\"machines\\\": []}\"}, when call_overdeck runs, then it returns the dict {\"machines\": []}; given ok:false with error text, it throws OverdeckCallError carrying that text.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hermes-skeleton.ac2",
+            "title": "When ctx.call_mcp raises PermissionError, call_overdeck throws OverdeckCallError whose message contains 'mcp_allowlist' and the server name.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hermes-skeleton.ac3",
+            "title": "read_settings returns allow_answers=False for the values \"true\", \"yes\" and 1, returns allow_answers=True only for the boolean True, and defaults to server 'overdeck', summary True.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hermes-skeleton.ac4",
+            "title": "plugin.yaml declares name overdeck, kind standalone, provides_hooks [pre_llm_call] and config_schema keys server, summary, allow_answers with defaults overdeck, true, false; pyproject.toml contains the entry point overdeck = \"overdeck_hermes\".",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pending-routing",
+        "title": "Flatten list_pending_input into numbered items and route each to its answer tool",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T13:40:52Z",
+        "metadata": {
+          "issueLabel": "pan-4953",
+          "inspectionDepth": "deep",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "complex",
+          "kind": "backend",
+          "requiresInspection": true,
+          "foundationFor": [
+            "summary-hook",
+            "overdeck-commands"
+          ],
+          "parallelSafeReason": "Touches only two new files (pending.py, test_pending.py) that no other item writes; it depends only on the conftest fixture from hermes-skeleton.",
+          "files_scope": [
+            "integrations/hermes/src/overdeck_hermes/pending.py",
+            "integrations/hermes/tests/test_pending.py"
+          ],
+          "verify_commands": [
+            "cd integrations/hermes && .venv/bin/python -m pytest tests/test_pending.py"
+          ],
+          "expected_outputs": [
+            "tests/test_pending.py reports all tests passed and 0 failed"
+          ],
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2 (.pan/drafts/PAN-4953.md). Create integrations/hermes/src/overdeck_hermes/pending.py with the PendingItem dataclass (key, machine, target, kind, text, hint, route), one_line(), flatten_pending(data) and build_answer(item, choice) plus AnswerRefused. Implement the PRD section 'Routing table for /overdeck answer' exactly: its item order, its item keys, the tool and argument dict per row, and the accepted choices per row (option numbers are 1-based; pane choice converts to 0-based selectedIndex; answer_question takes one answer per question separated by ' | '; reject-feedback requires text). Rows with tool 'none' produce items with route None whose hint is 'answer it in the Overdeck dashboard'. Linked conversations keep their '@<env>/<name>' name. flatten_pending raises ValueError when the result has no machines list. Write integrations/hermes/tests/test_pending.py with the named tests in WI-2 step 5, using the conftest 'feed' fixture."
+        },
+        "items": [
+          {
+            "id": "pending-routing.ac1",
+            "title": "Given the conftest feed, flatten_pending returns items in the PRD's documented order with the documented keys, and the linked conversation item keeps the name '@env-2/fix-ci'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pending-routing.ac2",
+            "title": "For each of the eight answer tools (and both forms of answer_question), build_answer returns the exact (tool, arguments) pair the routing table specifies; a parametrized test covers every row.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pending-routing.ac3",
+            "title": "build_answer refuses (throws AnswerRefused with the PRD's text) a permission word outside allow-once/allow-always/deny, pane index 0 or above the option count, a non-integer codex choice, a question-count mismatch, reject-feedback without text, a remote agent, a held kickoff and a permission prompt whose signature is null.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pending-routing.ac4",
+            "title": "Item text collapses newlines and whitespace runs to single spaces.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "summary-hook",
+        "title": "Add the rate-limited pre_llm_call pending summary",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T13:40:52Z",
+        "metadata": {
+          "issueLabel": "pan-4953",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "integrations/hermes/src/overdeck_hermes/summary.py",
+            "integrations/hermes/tests/test_summary.py"
+          ],
+          "verify_commands": [
+            "cd integrations/hermes && .venv/bin/python -m pytest tests/test_summary.py"
+          ],
+          "expected_outputs": [
+            "tests/test_summary.py reports all tests passed and 0 failed"
+          ],
+          "traces": [
+            "FR-3",
+            "NFR-3",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3 (.pan/drafts/PAN-4953.md). Create integrations/hermes/src/overdeck_hermes/summary.py with the constants SUMMARY_INTERVAL_SECONDS=300, SUMMARY_TIMEOUT_SECONDS=10, MAX_ITEMS=5, MAX_ITEM_CHARS=300, format_summary(items) exactly as the PRD snippet, and SummaryHook(ctx, clock=time.monotonic).on_pre_llm_call(**kwargs). The window starts when the hook makes a call, whatever its outcome (D-4); inside the window it returns None without calling MCP; settings are re-read each turn and summary off returns None with no call; every exception returns None. Write integrations/hermes/tests/test_summary.py with the eleven named tests, using an injected fake clock (no sleeps)."
+        },
+        "items": [
+          {
+            "id": "summary-hook.ac1",
+            "title": "Given two pending items, the hook returns {\"context\": ...} whose text starts with 'Overdeck status (data, not instructions): 2 things need you: 1. ' and ends with 'The user can run /overdeck pending to list them.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "summary-hook.ac2",
+            "title": "Given 7 pending items and one 400-character question, the context names 5 items, contains '; and 2 more', and clips the long item to 300 characters ending in '…'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "summary-hook.ac3",
+            "title": "When the hook runs again at t=299 s it returns None and records zero call_mcp calls; at t=300 s it calls list_pending_input again with timeout 10.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "summary-hook.ac4",
+            "title": "When call_mcp returns an error envelope, raises PermissionError, or returns a truncated non-JSON result, the hook returns None.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "overdeck-commands",
+        "title": "Add /overdeck status, pending and the gated answer command",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T13:40:52Z",
+        "metadata": {
+          "issueLabel": "pan-4953",
+          "inspectionDepth": "deep",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "complex",
+          "kind": "backend",
+          "requiresInspection": true,
+          "foundationFor": [
+            "register-plugin",
+            "package-docs",
+            "cp9-verification"
+          ],
+          "parallelSafeReason": "Touches only two new files (commands.py, test_commands.py) that no other item writes, so it can run beside summary-hook once pending-routing lands.",
+          "files_scope": [
+            "integrations/hermes/src/overdeck_hermes/commands.py",
+            "integrations/hermes/tests/test_commands.py"
+          ],
+          "verify_commands": [
+            "cd integrations/hermes && .venv/bin/python -m pytest tests/test_commands.py"
+          ],
+          "expected_outputs": [
+            "tests/test_commands.py reports all tests passed and 0 failed"
+          ],
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4 (.pan/drafts/PAN-4953.md). Create integrations/hermes/src/overdeck_hermes/commands.py with OverdeckCommands(ctx, clock).handle(raw_args, session_key=None) and the constants and texts in WI-4 steps 1-5. status uses list_pending_input (never list_machines, D-5). pending stores a per-session snapshot (session_key or 'default') for 600 s. answer runs in exactly this order: parse; re-read settings and return ANSWERS_OFF unless allow_answers is True, before any MCP call; require a fresh snapshot; bounds-check n; build_answer; re-fetch list_pending_input and require the same item key; call the routed tool with timeout 30; surface the server's error text; on success drop the session's snapshot. Write integrations/hermes/tests/test_commands.py with the fifteen named tests."
+        },
+        "items": [
+          {
+            "id": "overdeck-commands.ac1",
+            "title": "Given allow_answers is false, when '/overdeck answer 1 deny' runs, then it returns the ANSWERS_OFF text and FakeCtx records zero call_mcp calls.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "overdeck-commands.ac2",
+            "title": "Given allow_answers is true and a snapshot from '/overdeck pending', when the fresh list_pending_input no longer contains item 1's key, then answer returns 'Item 1 is no longer pending. Run /overdeck pending again.' and no answer tool is called.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "overdeck-commands.ac3",
+            "title": "Given a valid snapshot and a still-pending permission item, answer calls answer_permission with exactly {conversation, signature, choice}, returns 'Answered item 1 (<target>).', and a second answer without a new pending is refused with 'Run /overdeck pending first'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "overdeck-commands.ac4",
+            "title": "When the answer tool returns the error 'This token lacks the approve scope.', the reply contains that text; when allow_answers flips from true to false between two answers, the second is refused.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "overdeck-commands.ac5",
+            "title": "Snapshots are per session_key and expire after 600 s; '/overdeck pending' with nothing pending returns 'Overdeck: nothing needs you.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "register-plugin",
+        "title": "Wire register(ctx): hook, /overdeck command, bundled skill and hermes overdeck setup",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T13:40:52Z",
+        "metadata": {
+          "issueLabel": "pan-4953",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "integrations/hermes/src/overdeck_hermes/__init__.py",
+            "integrations/hermes/tests/test_register.py"
+          ],
+          "verify_commands": [
+            "cd integrations/hermes && .venv/bin/python -m pytest"
+          ],
+          "expected_outputs": [
+            "the whole pytest suite under integrations/hermes/tests reports 0 failed"
+          ],
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5 (.pan/drafts/PAN-4953.md). Create integrations/hermes/src/overdeck_hermes/__init__.py with SETUP_TEXT (exactly the WI-6 'after' output of hermesConfig for the connector reach, 14 lines, no trailing newline), skill_path() per D-2, register(ctx) as the PRD snippet shows (old Hermes without call_mcp/get_config: one warning naming 0.21.6, nothing registered; hook only when summary is on; missing skill file: warning, no failure), and _setup_cli/_run_cli for 'hermes overdeck setup'. Relative imports only. Write integrations/hermes/tests/test_register.py with the six named tests, including the directory-drop import from tmp_path (insert the module into sys.modules[spec.name] before spec.loader.exec_module(module), or the relative imports raise ImportError). Do not add the README test here (WI-7 owns it)."
+        },
+        "items": [
+          {
+            "id": "register-plugin.ac1",
+            "title": "When register(FakeCtx()) runs with default settings, FakeCtx records one pre_llm_call hook, the command 'overdeck' with args_hint '<status|pending|answer N CHOICE>', the skill 'overdeck' whose path ends with skills/overdeck/SKILL.md and exists, and the CLI command 'overdeck'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "register-plugin.ac2",
+            "title": "Given a ctx without call_mcp, register registers nothing and logs a warning containing '0.21.6'; given summary false, no hook is registered.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "register-plugin.ac3",
+            "title": "Given a copy of src/overdeck_hermes/., plugin.yaml and skills/ in tmp_path/overdeck, importing it as a directory plugin and calling register resolves the skill path inside tmp_path.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "register-plugin.ac4",
+            "title": "The setup CLI handler prints SETUP_TEXT, which contains '      settings:\\n        summary: true\\n        allow_answers: false'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "snippet-settings",
+        "title": "Move summary and allow_answers under settings in the Hermes snippet and mcp.mdx",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T13:40:52Z",
+        "metadata": {
+          "issueLabel": "pan-4953",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "frontend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/anywhere/botSnippets.ts",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/botSnippets.test.ts",
+            "configuration/mcp.mdx"
+          ],
+          "verify_commands": [
+            "npm run typecheck",
+            "cd src/dashboard/frontend && npx vitest run src/components/Settings/anywhere/__tests__/botSnippets.test.ts src/components/Settings/anywhere/__tests__/ConnectBotDialog.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "botSnippets.test.ts and ConnectBotDialog.test.tsx report 0 failed"
+          ],
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6 (.pan/drafts/PAN-4953.md), correction C-1: Hermes's ctx.get_config reads plugins.entries.overdeck.settings.<key>, so the shipped snippet's switches are no-ops. In src/dashboard/frontend/src/components/Settings/anywhere/botSnippets.ts hermesConfig replace the two lines '      summary: true' and '      allow_answers: false' with '      settings:', '        summary: true', '        allow_answers: false' (before/after in the PRD). Add the it() in src/dashboard/frontend/src/components/Settings/anywhere/__tests__/botSnippets.test.ts. Change the YAML block in configuration/mcp.mdx (around line 592-606, under 'The Hermes connector config, for example:') identically and add the one sentence after it. Change nothing else."
+        },
+        "items": [
+          {
+            "id": "snippet-settings.ac1",
+            "title": "hermesConfig returns text that contains '      settings:\\n        summary: true\\n        allow_answers: false' for both the connector and the tailscale reach, and contains no line '      summary: true' at six-space indent.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "snippet-settings.ac2",
+            "title": "The YAML block in configuration/mcp.mdx under 'The Hermes connector config' contains the same settings: subtree, and the sentence after it names integrations/hermes/README.md.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "snippet-settings.ac3",
+            "title": "When run under the frontend vitest config, botSnippets.test.ts and ConnectBotDialog.test.tsx report zero failures.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "package-docs",
+        "title": "Write the Hermes package README, PUBLISHING, CHANGELOG, LICENSE and the vitest package test",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T13:40:52Z",
+        "metadata": {
+          "issueLabel": "pan-4953",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "docs",
+          "requiresInspection": false,
+          "files_scope": [
+            "integrations/hermes/README.md",
+            "integrations/hermes/PUBLISHING.md",
+            "integrations/hermes/CHANGELOG.md",
+            "tests/unit/integrations/hermes.test.ts",
+            "integrations/hermes/tests/test_register.py"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/integrations/hermes.test.ts tests/unit/integrations/sync-skill.test.ts",
+            "cd integrations/hermes && .venv/bin/python -m pytest",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "hermes.test.ts and sync-skill.test.ts report 0 failed",
+            "the pytest suite reports 0 failed",
+            "lint completes without errors"
+          ],
+          "traces": [
+            "FR-9",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7 (.pan/drafts/PAN-4953.md). Write integrations/hermes/README.md with the sections and exact snippet rules in WI-7 step 1 (both hermesConfig outputs verbatim, install including the directory drop 'cp -r src/overdeck_hermes/. plugin.yaml skills ~/.hermes/plugins/overdeck/', minimum Hermes 0.21.6, settings table, /overdeck commands with accepted choices, the trust: untrusted warning, the optional ntfy section, security paragraph). Write PUBLISHING.md, CHANGELOG.md, and integrations/hermes/LICENSE (no extension) as a byte copy of integrations/LICENSE. Write tests/unit/integrations/hermes.test.ts per step 4 (modeled on grok-bot.test.ts). Append test_readme_contains_setup_text to integrations/hermes/tests/test_register.py."
+        },
+        "items": [
+          {
+            "id": "package-docs.ac1",
+            "title": "README.md contains hermesConfig({ reach: 'connector', url: 'http://127.0.0.1:7466/mcp' }) and hermesConfig({ reach: 'tailscale', url: 'https://YOUR-MACHINE.YOUR-TAILNET.ts.net/mcp' }) verbatim, and test_readme_contains_setup_text confirms it contains SETUP_TEXT.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "package-docs.ac2",
+            "title": "README.md contains the minimum Hermes version 0.21.6, the directory-drop cp command, the three settings with their defaults, and the accepted choices for /overdeck answer per prompt kind.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "package-docs.ac3",
+            "title": "hermes.test.ts validates plugin.yaml fields, the pyproject entry point, LICENSE byte-equality with integrations/LICENSE, the skill copy's presence, and finds no /\\bod[klr]_[0-9a-f]{16,}/ match in any file under integrations/hermes/ (skipping __pycache__, .venv, dist, build).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "package-docs.ac4",
+            "title": "PUBLISHING.md contains the sentence 'Publishing is a separate step the operator approves' and the wheel check for overdeck_hermes/skills/overdeck/SKILL.md.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cp9-verification",
+        "title": "Run CP-9 against a throwaway Hermes v0.22.6 and record it in docs/verification.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T13:40:52Z",
+        "metadata": {
+          "issueLabel": "pan-4953",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "medium",
+          "readiness": "sequential",
+          "difficulty": "complex",
+          "kind": "docs",
+          "requiresInspection": false,
+          "files_scope": [
+            "integrations/hermes/docs/verification.md",
+            ".overdeck/context/codebase/architecture.md"
+          ],
+          "verify_commands": [
+            "grep -c 'CP-9' integrations/hermes/docs/verification.md",
+            "grep -n 'overdeck-hermes' .overdeck/context/codebase/architecture.md",
+            "! grep -rE 'od[klr]_[0-9a-f]{16,}' integrations/hermes/docs"
+          ],
+          "expected_outputs": [
+            "verification.md contains CP-9 and one result row per check a-h",
+            "architecture.md names overdeck-hermes",
+            "the token grep finds no match"
+          ],
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8 (.pan/drafts/PAN-4953.md), epic AC-25. Build a throwaway Hermes in a venv in the session scratchpad (python3.12; pip install -e ~/Projects/hermes-agent -e integrations/hermes) with HERMES_HOME set to a scratch directory. NEVER use ~/.local/bin/hermes or ~/.hermes (the operator's live v0.9.0 install). Create a short-lived token with 'pan token create pan-4953-cp9 --scopes read:state,read:conversations,tell,approve --json', keep it only in OVERDECK_MCP_TOKEN, point mcp_servers.overdeck at this machine's dashboard /mcp, and run checks a-h of WI-8 step 4 (plugin loads, mcp__overdeck__* tools appear, a throwaway conversation's AskUserQuestion appears in the summary, answer refused with allow_answers false, accepted with true, refused with a token lacking approve, ntfy row). Revoke both tokens and stop the throwaway conversation afterwards. Write integrations/hermes/docs/verification.md in the grok-bot format (rows a-h, each 'Passed: ...' or 'Not run: <exact reason>', never a token). Update the integrations/ row and last-verified line in .overdeck/context/codebase/architecture.md per step 7. If ctx.call_mcp fails against Overdeck's transport, record the error verbatim and file a follow-up issue; do not build the httpx fallback."
+        },
+        "items": [
+          {
+            "id": "cp9-verification.ac1",
+            "title": "integrations/hermes/docs/verification.md records rows a-h (plugin load, mcp__overdeck__ tools, summary shows the pending prompt, answer refused with allow_answers false, answer resolves the prompt with allow_answers true and an approve token, refusal without approve, ntfy), each with 'Passed' and its evidence or 'Not run: <reason>', plus the Hermes version v0.22.6 and the date.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cp9-verification.ac2",
+            "title": "After the check, 'pan token list' shows neither CP-9 token as active, and no file under integrations/hermes/ contains a token-shaped string.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cp9-verification.ac3",
+            "title": ".overdeck/context/codebase/architecture.md contains a description of the overdeck-hermes package (entry point overdeck, summary, /overdeck answer gated by settings.allow_answers and the approve scope) and its last-verified line contains PAN-4953.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "hermes-skeleton",
+        "to": "pending-routing",
+        "type": "blocks"
+      },
+      {
+        "from": "hermes-skeleton",
+        "to": "summary-hook",
+        "type": "blocks"
+      },
+      {
+        "from": "pending-routing",
+        "to": "summary-hook",
+        "type": "blocks"
+      },
+      {
+        "from": "hermes-skeleton",
+        "to": "overdeck-commands",
+        "type": "blocks"
+      },
+      {
+        "from": "pending-routing",
+        "to": "overdeck-commands",
+        "type": "blocks"
+      },
+      {
+        "from": "summary-hook",
+        "to": "register-plugin",
+        "type": "blocks"
+      },
+      {
+        "from": "overdeck-commands",
+        "to": "register-plugin",
+        "type": "blocks"
+      },
+      {
+        "from": "register-plugin",
+        "to": "package-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "snippet-settings",
+        "to": "package-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "package-docs",
+        "to": "cp9-verification",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-04-PAN-4953-agent-mcp-and-bots-w-int1-integrations-hermes-the-hermes-plugin.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
