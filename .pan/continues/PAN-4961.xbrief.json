@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4961",
   "created": "2026-11-03T23:57:34.038Z",
-  "updated": "2026-11-04T00:31:38.072Z",
+  "updated": "2026-11-04T00:31:44.426Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -188,6 +188,11 @@
     "handoff-defers-disk-hold.ac3": {
       "status": "completed",
       "doneAt": "2026-11-04T00:31:38.071Z"
+    },
+    "planning-no-stack-test": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4961",
+      "claimedAt": "2026-11-04T00:31:44.426Z"
     }
   }
 }
