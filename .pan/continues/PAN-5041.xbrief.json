@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5041",
   "created": "2026-11-04T17:22:54.161Z",
-  "updated": "2026-11-04T17:41:00.087Z",
+  "updated": "2026-11-04T17:41:06.138Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -44,6 +44,11 @@
       "claimedBy": "agent-pan-5041",
       "claimedAt": "2026-11-04T17:37:32.594Z",
       "doneAt": "2026-11-04T17:41:00.087Z"
+    },
+    "wi7-android-plugin": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5041",
+      "claimedAt": "2026-11-04T17:41:06.138Z"
     }
   }
 }
