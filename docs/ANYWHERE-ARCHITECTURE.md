@@ -208,6 +208,11 @@ sends a fresh offer. Definitive refusals (`unknown-peer`, `pairing-refused`, `id
 `VITE_OVERDECK_DEBUG_ERRORS=1` appends the code to the on-screen text, for example
 "Could not open a secure channel to desk. (timeout)".
 
+Opening a machine reloads the page and a resume reconnects the directory socket, so a dial waits up
+to 10 s for an off or connecting socket before it reports "Not connected to overdeck.ai."
+(`DIRECTORY_WAIT_MS`). The shell's failure text over the machine view clears on the next dial that
+succeeds; before PAN-5018 one failed dial kept its text on screen while later dials worked.
+
 ## One session per connection; the same port (D-4645-3, D-4645-4)
 
 Every transport connection is one Noise session with a one-round-trip IK handshake; there
