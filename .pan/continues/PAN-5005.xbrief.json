@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5005",
   "created": "2026-11-04T11:43:00.100Z",
-  "updated": "2026-11-04T12:13:15.319Z",
+  "updated": "2026-11-04T12:13:33.769Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -52,6 +52,10 @@
     "lane-fields-module.ac5": {
       "status": "completed",
       "doneAt": "2026-11-04T12:13:15.319Z"
+    },
+    "remote-row-stamp.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T12:13:33.769Z"
     }
   }
 }
