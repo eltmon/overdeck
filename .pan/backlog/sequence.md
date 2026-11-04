@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-04T07:37:40.829810Z · model: claude-opus-5-5 · open: 870_
+_Last sequenced: 2026-11-04T07:42:55.621774Z · model: claude-opus-5-5 · open: 869_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -417,7 +417,7 @@ _Last sequenced: 2026-11-04T07:37:40.829810Z · model: claude-opus-5-5 · open: 
 | 417 | PAN-3890 | S | medium | ok |  |  | opencode provider stream errors (rate limit) are invisible in the feed and never retried; first message dies silently |
 | 418 | PAN-3822 | L | medium | ok |  |  | PRD landed (12 items, FR-1..14): link PRs to conversations via branch detection + explicit override; unblocks PAN-3920 |
 | 419 | PAN-4943 | S | medium | ok |  |  | Link and watch pull requests from an agent via MCP tools; W-SELF1 closed, now unblocked. |
-| 420 | PAN-4942 | S | medium | ok |  |  | link_machine tool: a conversation asks the operator to link a machine; request_secret closed, now unblocked. |
+| 420 | PAN-4935 | M | medium | ok |  | PAN-4943 | Instruction blocks and no-MCP fallback; only W-PR1 (PAN-4943, in review) remains before it can start. |
 | 421 | PAN-1673 | S | medium | ok |  |  | Regression: pi + gpt-5.5 fails with 'No API key for provider: openai-codex' (worked previously) |
 | 422 | PAN-1669 | S | medium | ok |  |  | restart-with-model doesn't emit a live event |
 | 423 | PAN-1668 | S | medium | ok |  |  | right-click 'restart with <model>' carries model only, never harness |
@@ -873,7 +873,6 @@ _Last sequenced: 2026-11-04T07:37:40.829810Z · model: claude-opus-5-5 · open: 
 | 905 | PAN-4954 | M | medium | ok |  | PAN-4950 | integrations/openclaw/: OpenClaw plugin with its own revocable scoped token. |
 | 906 | PAN-4955 | S | medium | ok |  | PAN-4950 | integrations/grok-build/: Grok Build plugin with its own revocable scoped token. |
 | 907 | PAN-4956 | S | low | ok |  | PAN-4947 | integrations/grok-bot/ and xAI API example; needs OAuth UI and public Funnel /mcp, not the connector. |
-| 908 | PAN-4935 | M | medium | ok |  | PAN-4942, PAN-4943 | Instruction blocks and no-MCP fallback; lands last in Part A since it documents every tool to agents. |
 | 909 | PAN-4957 | S | low | ok |  | PAN-4953, PAN-4954, PAN-4955, PAN-4956 | CI for the four integration packages; lands after all integrations exist. |
 
 ## Rationale detail
@@ -1205,10 +1204,10 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-04T07:37:40.829810Z",
+  "generatedAt": "2026-11-04T07:42:55.621774Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 870,
+  "openCount": 869,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -6394,19 +6393,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "dependsOn": [],
       "why": "Link and watch pull requests from an agent via MCP tools; W-SELF1 closed, now unblocked.",
       "rationale": "Its only dependency, W-SELF1 (PAN-4936), closed as completed, so this child is now workable and moves up from the tail into the slot band W-SELF1 held.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-4942",
-      "rank": 420,
-      "size": "S",
-      "importance": "medium",
-      "score": 40,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "link_machine tool: a conversation asks the operator to link a machine; request_secret closed, now unblocked.",
-      "rationale": "Its only dependency, request_secret (PAN-4941), closed as completed, so this child is now workable and moves from the tail into a free slot in the epic's band.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12023,17 +12009,16 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "issue": "PAN-4935",
-      "rank": 908,
+      "rank": 420,
       "size": "M",
       "importance": "medium",
-      "score": 42,
+      "score": 45,
       "condition": "ok",
       "dependsOn": [
-        "PAN-4942",
         "PAN-4943"
       ],
-      "why": "Instruction blocks and no-MCP fallback; lands last in Part A since it documents every tool to agents.",
-      "rationale": "Dependency PAN-4938 (W-DEL1 delegation and lane MCP tools) closed as completed, so it drops from dependsOn; rank unchanged while three siblings stay open.",
+      "why": "Instruction blocks and no-MCP fallback; only W-PR1 (PAN-4943, in review) remains before it can start.",
+      "rationale": "Dependency PAN-4942 (W-LINK1 link_machine) closed as completed, leaving only in-review PAN-4943, so it moves from the tail into the freed slot right after it.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13235,13 +13220,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
     },
     {
       "from": "PAN-4927",
-      "to": "PAN-4942",
-      "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4927",
       "to": "PAN-4950",
       "type": "contains",
       "source": "github-ref",
@@ -13307,13 +13285,6 @@ Rank held at 82; its dependency closed. PAN-3983 closed 2026-09-25 when PR #4066
       "from": "PAN-4927",
       "to": "PAN-4956",
       "type": "contains",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-4942",
-      "to": "PAN-4935",
-      "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
     },
