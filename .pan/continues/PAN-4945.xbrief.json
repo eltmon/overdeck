@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4945",
   "created": "2026-11-04T01:22:40.341Z",
-  "updated": "2026-11-04T02:54:02.067Z",
+  "updated": "2026-11-04T02:54:19.761Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -202,6 +202,10 @@
     "routes-discovery-register.ac1": {
       "status": "completed",
       "doneAt": "2026-11-04T02:54:02.067Z"
+    },
+    "routes-discovery-register.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T02:54:19.761Z"
     }
   }
 }
