@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4960",
   "created": "2026-11-04T10:12:59.940Z",
-  "updated": "2026-11-04T10:59:25.053Z",
+  "updated": "2026-11-04T10:59:48.128Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -112,6 +112,10 @@
     "sign-in-service.ac2": {
       "status": "completed",
       "doneAt": "2026-11-04T10:59:25.052Z"
+    },
+    "sign-in-service.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T10:59:48.127Z"
     }
   }
 }
