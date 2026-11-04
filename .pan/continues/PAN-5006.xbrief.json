@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5006",
   "created": "2026-11-04T12:27:52.516Z",
-  "updated": "2026-11-04T12:58:36.800Z",
+  "updated": "2026-11-04T12:58:55.544Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -50,6 +50,10 @@
     "fleet-target-rejections.ac3": {
       "status": "completed",
       "doneAt": "2026-11-04T12:58:36.799Z"
+    },
+    "lane-core-placement.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T12:58:55.544Z"
     }
   }
 }
