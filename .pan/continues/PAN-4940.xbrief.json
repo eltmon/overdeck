@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4940",
+  "created": "2026-11-04T04:28:29.563Z",
+  "updated": "2026-11-04T04:28:29.563Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "cli-search-facts": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4940",
+      "claimedAt": "2026-11-04T04:28:29.563Z"
+    }
+  }
+}
