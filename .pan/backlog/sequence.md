@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-04T00:09:31.206410Z · model: claude-opus-5-5 · open: 892_
+_Last sequenced: 2026-11-04T00:08:28.838530Z · model: claude-opus-5-5 · open: 893_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -871,6 +871,7 @@ _Last sequenced: 2026-11-04T00:09:31.206410Z · model: claude-opus-5-5 · open: 
 | 880 | PAN-4842 | S | medium | ok |  |  | Phone app W-DOC: phone-app.mdx and updates to Anywhere, push, tailscale and service docs; finished last. |
 | 881 | PAN-4851 | S | low | needs-refinement |  |  | Open question: opt-in Overdeck reviewer for Deft-pipeline issues; operator says low priority, do not plan or start without them |
 | 882 | PAN-4887 | M | medium | ok |  |  | Phone app: let phone credentials reach linked machines (fleet Needs-you, linked-conv proxy, /ws/linked); PAN-4835 merged. |
+| 883 | PAN-4948 | M | medium | ok |  |  | Directory gains connector clients for outside bots; no deps in epic, unblocks CONN2 and the integration plugins. |
 | 884 | PAN-4952 | S | medium | ok |  |  | Shared Overdeck skill text reused by Hermes, OpenClaw and Grok plugins; no deps, unblocks all four integrations. |
 | 885 | PAN-4958 | S | low | ok |  |  | Docs for agent MCP and bot plugins; no hard deps but best written once Part A and B surfaces have landed. |
 | 886 | PAN-4932 | M | high | ok |  | PAN-4930, PAN-4931 | Inject Overdeck MCP server into Claude Code agents, role runs and conversations; unblocks INJ2/3/4 and FUN1. |
@@ -888,7 +889,7 @@ _Last sequenced: 2026-11-04T00:09:31.206410Z · model: claude-opus-5-5 · open: 
 | 898 | PAN-4934 | S | medium | ok |  | PAN-4932 | ACP harnesses (acp, opencode) get the Overdeck MCP server injected. |
 | 899 | PAN-4942 | S | medium | ok |  | PAN-4941 | link_machine tool: a conversation asks the operator to link a machine; builds on request_secret. |
 | 900 | PAN-4946 | M | medium | ok |  | PAN-4945 | Dashboard OAuth approval card and sign-in list for /mcp clients. |
-| 901 | PAN-4950 | M | medium | ok |  | PAN-4949, PAN-4931 | pan mcp connector process bridging outside bots to /mcp; gates Hermes, OpenClaw and Grok Build plugins. |
+| 901 | PAN-4950 | M | medium | ok |  | PAN-4949, PAN-4948, PAN-4931 | pan mcp connector process bridging outside bots to /mcp; gates Hermes, OpenClaw and Grok Build plugins. |
 | 902 | PAN-4951 | M | medium | ok |  | PAN-4949 | "Connect a bot" flow in Settings > Anywhere for pairing outside bots. |
 | 903 | PAN-4947 | L | medium | ok |  | PAN-4945, PAN-4932 | Opt-in public /mcp via Tailscale Funnel, TLS ends on the user machine; no plaintext relay on overdeck.ai. |
 | 904 | PAN-4953 | M | medium | ok |  | PAN-4952, PAN-4950 | integrations/hermes/: Hermes plugin with its own revocable scoped token. |
@@ -1227,10 +1228,10 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-04T00:09:31.206410Z",
+  "generatedAt": "2026-11-04T00:08:28.838530Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 892,
+  "openCount": 893,
   "nodes": [
     {
       "issue": "PAN-4702",
@@ -11958,6 +11959,19 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "planning": "auto"
     },
     {
+      "issue": "PAN-4948",
+      "rank": 883,
+      "size": "M",
+      "importance": "medium",
+      "score": 44,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Directory gains connector clients for outside bots; no deps in epic, unblocks CONN2 and the integration plugins.",
+      "rationale": "New child W-DIR1 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-4952",
       "rank": 884,
       "size": "S",
@@ -12219,10 +12233,11 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "condition": "ok",
       "dependsOn": [
         "PAN-4949",
+        "PAN-4948",
         "PAN-4931"
       ],
       "why": "pan mcp connector process bridging outside bots to /mcp; gates Hermes, OpenClaw and Grok Build plugins.",
-      "rationale": "Dependency PAN-4948 (W-DIR1 directory connector clients) closed as completed 2026-11-04, so that edge is dropped; rank held because its remaining deps still gate it.",
+      "rationale": "New child W-CONN2 of epic PAN-4927, filed 2026-11-03 with a PRD section and ACs. Appended at the tail in build order because an incremental pass keeps existing ranks; a review pass should re-slot it near the epic.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13602,6 +13617,13 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "from": "PAN-4927",
+      "to": "PAN-4948",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4927",
       "to": "PAN-4952",
       "type": "contains",
       "source": "github-ref",
@@ -13840,6 +13862,13 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "from": "PAN-4949",
+      "to": "PAN-4950",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4948",
       "to": "PAN-4950",
       "type": "unblocks",
       "source": "github-ref",
