@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5018",
   "created": "2026-11-04T13:12:52.932Z",
-  "updated": "2026-11-04T15:08:58.934Z",
+  "updated": "2026-11-04T15:09:12.544Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -120,6 +120,10 @@
     "accept-error-mode-and-internal.ac3": {
       "status": "completed",
       "doneAt": "2026-11-04T15:08:58.934Z"
+    },
+    "listener-refusal-logging.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T15:09:12.543Z"
     }
   }
 }
