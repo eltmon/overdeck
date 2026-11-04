@@ -4,7 +4,7 @@ import { PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { presenceForPaneState, type ProjectSessionTree, type SessionNode } from '@overdeck/contracts'
 import { type ProjectFeature } from '../../CommandDeck/ProjectTree/ProjectNode'
 import { useIssueActions } from '../../IssueActionMenu/useIssueActions'
-import { useActivityQuery } from '../../CommandDeck/ZoneCOverviewTabs/queries'
+import { useActivityQuery, type ActivitySection } from '../../CommandDeck/ZoneCOverviewTabs/queries'
 import { useBackendPanes, useDerivedIssueState } from '../../../lib/store'
 import type { BackendPane, DerivedIssueState } from '../../../types'
 import { AgentsLane } from './AgentsLane'
@@ -46,7 +46,9 @@ export function paneToSession(pane: BackendPane): SessionNode | null {
   return {
     type,
     role: pane.role,
-    sessionId: pane.id,
+    // PAN-5011: Herdr's own id (e.g. 'w1JA:p3') is a backend handle, never an
+    // agent id — the composer and /api/agents/:id routes need the agent id.
+    sessionId: pane.agentId ?? pane.id,
     model: pane.model,
     harness: pane.harness,
     startedAt: new Date(0).toISOString(),
@@ -104,6 +106,28 @@ function toCockpitSession(section: {
     status: normalizedStatus,
     presence: normalizedStatus === 'running' || normalizedStatus === 'starting' ? 'active' : 'ended',
   }
+}
+
+/**
+ * Pane rows first (live, backend-owned), each enriched with `hasJsonl` from
+ * the matching activity section, then the non-pane section types activity
+ * still owns (PAN-5011 W5b — hasJsonl decides whether SessionPanel renders
+ * ConversationPanel, i.e. whether the composer appears at all).
+ */
+export function cockpitSessions(panes: readonly BackendPane[], sections: readonly ActivitySection[]): SessionNode[] {
+  const base = panes
+    .map(paneToSession)
+    .filter((session): session is SessionNode => session !== null)
+    .map((session) => {
+      const match = sections.find((section) => section.sessionId === session.sessionId)
+      return match?.hasJsonl ? { ...session, hasJsonl: true } : session
+    })
+  const paneTypes = new Set(base.map((session) => session.type))
+  for (const section of sections) {
+    const session = toCockpitSession(section)
+    if (session && !paneTypes.has(session.type)) base.push(session)
+  }
+  return base
 }
 
 const ISSUE_TREE_STATE_LABEL: Record<DerivedIssueState['state'], string> = {
@@ -208,12 +232,7 @@ export function IssueTreeLane({
   const sessions = useMemo(() => {
     // Live rows come from the backend's pane inventory; the transcript-derived
     // activity sections fill in the finished sessions the backend no longer owns.
-    const base = panes.map(paneToSession).filter((session): session is SessionNode => session !== null)
-    const paneTypes = new Set(base.map((session) => session.type))
-    for (const section of activity.data?.sections ?? []) {
-      const session = toCockpitSession(section)
-      if (session && !paneTypes.has(session.type)) base.push(session)
-    }
+    const base = cockpitSessions(panes, activity.data?.sections ?? [])
     if (actions.state.hasPlan && !base.some((session) => session.type === 'planning' || session.type === 'legacy')) {
       base.push({
         type: 'legacy',
