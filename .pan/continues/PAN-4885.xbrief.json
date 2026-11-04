@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4885",
   "created": "2026-11-04T10:36:33.533Z",
-  "updated": "2026-11-04T10:40:32.440Z",
+  "updated": "2026-11-04T10:40:46.062Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -14,6 +14,11 @@
       "claimedBy": "agent-pan-4885",
       "claimedAt": "2026-11-04T10:36:33.533Z",
       "doneAt": "2026-11-04T10:40:32.440Z"
+    },
+    "link-open-budget-tests": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4885",
+      "claimedAt": "2026-11-04T10:40:46.061Z"
     }
   }
 }
