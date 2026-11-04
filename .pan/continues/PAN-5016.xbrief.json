@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5016",
   "created": "2026-11-04T13:28:40.332Z",
-  "updated": "2026-11-04T13:57:22.213Z",
+  "updated": "2026-11-04T13:57:37.014Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -104,6 +104,10 @@
     "link-requester.ac1": {
       "status": "completed",
       "doneAt": "2026-11-04T13:57:22.213Z"
+    },
+    "link-requester.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T13:57:37.013Z"
     }
   }
 }
