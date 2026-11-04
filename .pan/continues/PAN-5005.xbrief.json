@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5005",
   "created": "2026-11-04T11:43:00.100Z",
-  "updated": "2026-11-04T12:14:30.955Z",
+  "updated": "2026-11-04T12:14:45.307Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -72,6 +72,10 @@
     "verdict-link-route.ac1": {
       "status": "completed",
       "doneAt": "2026-11-04T12:14:30.955Z"
+    },
+    "verdict-link-route.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T12:14:45.307Z"
     }
   }
 }
