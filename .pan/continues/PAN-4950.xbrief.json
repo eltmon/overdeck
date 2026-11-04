@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4950",
   "created": "2026-11-04T10:02:21.153Z",
-  "updated": "2026-11-04T11:57:09.075Z",
+  "updated": "2026-11-04T12:02:43.656Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -22,6 +22,11 @@
       "reason": "feedback",
       "note": "[2026-11-04T11:57Z] coderabbit → FINDINGS — seq 2",
       "timestamp": "2026-11-04T11:57:09.075Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-04T12:02:43.656Z"
     }
   ],
   "items": {
