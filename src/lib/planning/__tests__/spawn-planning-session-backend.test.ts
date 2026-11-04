@@ -172,6 +172,8 @@ describe('spawnPlanningSession launches through the host backend (PAN-3960)', ()
     const launcher = readFileSync(launcherScript, 'utf-8');
     if (host === 'tmux') expect(launcher).toContain('while true; do sleep 60; done');
     else expect(launcher).not.toContain('while true; do sleep 60; done');
+    // PAN-4932: the planner gets the overdeck MCP server with its own token file.
+    expect(launcher).toContain(`--mcp-config='${join(tempHome, '.overdeck', 'agents', sessionName, 'overdeck-mcp.json')}'`);
   });
 
   it('keeps the tmux-only server hygiene on tmux and skips it on Herdr', async () => {
