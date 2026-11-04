@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-4935",
+  "created": "2026-11-04T08:09:37.402Z",
+  "updated": "2026-11-04T08:09:37.402Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "instructions-text": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4935",
+      "claimedAt": "2026-11-04T08:09:37.402Z"
+    }
+  }
+}
