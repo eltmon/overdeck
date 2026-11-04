@@ -500,6 +500,19 @@ minted or the config cannot be written, the agent starts without the server and
 the log shows one `[agent-injection] overdeck MCP skipped for <id>: <reason>`
 warning. The agent can still reach Overdeck through `pan`.
 
+### What the agent is told
+
+Every Overdeck-launched agent's launch context ends with a short tools block
+(`src/lib/mcp/agent-instructions.ts`, each block at most 1,500 characters).
+An agent that gets the `overdeck` server above is told "Overdeck tools": prefer
+the MCP tools to `pan`; never poll, call `next` again when a wait tool answers
+`running` or `pending`; checklist with `task_claim`/`task_done`, finish with
+`done`; get a secret with `request_secret`; link a machine the operator names
+with `link_machine`; link a PR with `link_pull_request`/`watch_pull_request`.
+Every other agent — `kimi-code`, `ohmypi`, `muse`, `prime-agent`, any agent in
+a Docker workspace, and every agent when `mcp.agents` is `false` — is told
+"Overdeck commands" instead, with the `pan` equivalent for each of those.
+
 ## Scopes and the approve scope
 
 An MCP token is an ordinary access token. Copy MCP URL gives it `read:state`,

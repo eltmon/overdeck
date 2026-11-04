@@ -749,7 +749,7 @@ export async function buildAgentLaunchConfig(opts: {
     throw new Error('ACP launch requires the executable path resolved by preflight');
   }
   const acpLauncherFields = isAcp
-    ? getAcpLauncherFields(
+    ? await getAcpLauncherFields(
         opts.agentId,
         model,
         opts.workspace,

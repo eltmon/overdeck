@@ -733,3 +733,10 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   nothing for a work agent; PR watches therefore carry their own key and baseline.
 
 <!-- last-verified: 2026-11-04 (PAN-4905, PAN-4917, PAN-4925, PAN-4929, PAN-4930, PAN-4931, PAN-4482, PAN-4937, PAN-4945, PAN-4932, PAN-4938, PAN-4944, PAN-4970, PAN-4933, PAN-4934, PAN-4943, PAN-4940, PAN-4956) -->
+- **Launch-context tools block keys on the MCP gate** (PAN-4935 planning) — the managed launch context ends with
+  an "Overdeck tools" (MCP) or "Overdeck commands" (`pan`) block chosen by `overdeckMcpEnabledFor`, the same gate
+  `prepareClaudeOverdeckMcp`/`prepareCodexOverdeckMcp` check, computed in `claudeSystemPromptFiles`,
+  `getAcpLauncherFields` and `materializeMuseContext`. A failed token mint still gets the MCP block. Context
+  renderers must import the gate from the leaf `src/lib/mcp/overdeck-mcp-gate.ts`, never `agent-injection.ts`,
+  which pulls in the token registry graph.
+<!-- last-verified: 2026-11-04 (PAN-4482, PAN-4905, PAN-4917, PAN-4925, PAN-4929, PAN-4930, PAN-4931, PAN-4932, PAN-4933, PAN-4934, PAN-4935, PAN-4937, PAN-4938, PAN-4940, PAN-4943, PAN-4944, PAN-4945, PAN-4970) -->

@@ -1,10 +1,8 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
 
-import { Effect } from 'effect';
-
 import { emitActivityEntry } from '../activity-logger.js';
-import { listSessionNames } from '../tmux.js';
+import { listLiveAgentIds } from '../terminal-backends/inventory.js';
 import { listWorkspaces } from '../workspaces/resolver.js';
 import { pruneVerificationRunArtifacts } from './verification-artifact.js';
 
@@ -15,21 +13,26 @@ const execAsync = promisify(exec);
  *
  * Every Overdeck workspace brings up a 3-container stack: `dev` (the VS Code
  * attach target), `frontend` (Vite), and `server` (a full dashboard). The agent
- * itself runs on the HOST tmux server, not inside any of these containers — the
- * `server`/`frontend` pair is only a development-time read/UI peer for that one
+ * itself runs in a pane of the host terminal backend (Herdr or tmux), not inside
+ * any of these containers — the `server`/`frontend` pair is only a development-time read/UI peer for that one
  * workspace. They accumulate: nothing stops them when an agent is killed,
  * paused, or crashes, so dozens of idle stacks pile up (98 workspaces / 58
  * containers observed), wasting RAM + CPU and leaking Docker networks toward the
  * "all predefined address pools fully subnetted" wall.
  *
  * This patrol stops the `server`+`frontend` UI containers of any workspace whose
- * agent has been idle — no running agent and no live tmux session for the issue —
- * for the grace window. It is deliberately light-touch and fully reversible:
+ * agent has been idle — no live agent pane for the issue on the selected terminal
+ * backend — for the grace window. "In use" is read from the backend-neutral
+ * live-agent inventory (`terminal-backends/inventory.ts`), never the tmux socket
+ * directly: on a Herdr host the tmux list holds no agent sessions, so a tmux-only
+ * check read every running workspace as idle (PAN-4669). An unreadable inventory
+ * is indeterminate, so the cycle reaps nothing. It is deliberately light-touch and
+ * fully reversible:
  *
  *  - It only `docker stop`s the two UI containers. It NEVER touches the `dev`
- *    container, the worktree, the feature branch, agent state, beads, or tmux.
- *  - The agent runs on host tmux, so stopping its UI peer cannot interrupt work,
- *    a review, or a resume. Worst case a human reloads a per-workspace dashboard
+ *    container, the worktree, the feature branch, agent state, beads, or panes.
+ *  - The agent runs in a host terminal pane, so stopping its UI peer cannot
+ *    interrupt work, a review, or a resume. Worst case a human reloads a per-workspace dashboard
  *    URL and it's gone until the workspace is next spawned.
  *  - Named volumes (node_modules cache) survive, so re-spawning is cheap.
  *
@@ -128,8 +131,11 @@ export interface IdleStackReaperDeps {
   listContainerNames: () => Promise<string[]>;
   /** Running containers with their compose-project label (full-stack tier). */
   listComposeContainers: () => Promise<ComposeContainerRef[]>;
-  /** Live tmux session names (host `overdeck` socket). */
-  listSessions: () => Promise<readonly string[]>;
+  /**
+   * Live agent ids on the selected terminal backend (Herdr or tmux), or `null`
+   * when the inventory could not be read.
+   */
+  listLiveAgentIds: () => Promise<Iterable<string> | null>;
   /** Stop the given containers (light, reversible). */
   stopContainers: (names: string[]) => Promise<void>;
   /** Current epoch ms (injectable for tests). */
@@ -163,7 +169,7 @@ function defaultDeps(): IdleStackReaperDeps {
       }
       return out;
     },
-    listSessions: () => Effect.runPromise(listSessionNames()),
+    listLiveAgentIds,
     stopContainers: async (names) => {
       if (names.length === 0) return;
       await execAsync(`docker stop ${names.map(n => `"${n}"`).join(' ')}`, { timeout: 60000 });
@@ -225,14 +231,17 @@ export async function reconcileIdleWorkspaceStacks(
     if (!byIssue.has(issue)) firstIdleAt.delete(issue);
   }
 
-  const sessions = await d.listSessions().catch(() => [] as readonly string[]);
-  // Any tmux session for the issue (agent / review / test / inspect / strike)
-  // means the workspace is in use — its name embeds the lowercased issue id.
-  const sessionBlob = sessions.join('\n').toLowerCase();
+  const liveAgentIds = await d.listLiveAgentIds().catch(() => null);
+  // Indeterminate inventory: reap nothing this cycle rather than read every
+  // workspace as idle.
+  if (liveAgentIds === null) return actions;
+  // Any live agent pane for the issue (work / review / test / plan / worker /
+  // strike) means the workspace is in use — its id embeds the lowercased issue id.
+  const liveAgentBlob = [...liveAgentIds].join('\n').toLowerCase();
   const nowMs = d.now();
 
   for (const [issueLower, names] of byIssue) {
-    if (sessionBlob.includes(issueLower) || isMainWorkspaceIssue(issueLower)) {
+    if (liveAgentBlob.includes(issueLower) || isMainWorkspaceIssue(issueLower)) {
       firstIdleAt.delete(issueLower); // active, or a protected main workspace — reset the clock
       continue;
     }
@@ -249,7 +258,7 @@ export async function reconcileIdleWorkspaceStacks(
       firstIdleAt.delete(issueLower);
       const issueId = issueLower.toUpperCase();
       const idleMin = Math.round((nowMs - since) / 60000);
-      const action = `Reaped idle workspace UI stack for ${issueId} — stopped ${names.length} container(s) after ${idleMin}m idle (no agent, no tmux)`;
+      const action = `Reaped idle workspace UI stack for ${issueId} — stopped ${names.length} container(s) after ${idleMin}m idle (no live agent pane)`;
       actions.push(action);
       console.log(`[deacon] ${action}`);
       emitActivityEntry({
@@ -293,7 +302,7 @@ export async function reconcileIdleWorkspaceStacks(
 
   for (const [project, { issueLower, names }] of byProject) {
     const clockKey = `full:${project}`;
-    if (sessionBlob.includes(issueLower) || isMainWorkspaceIssue(issueLower)) {
+    if (liveAgentBlob.includes(issueLower) || isMainWorkspaceIssue(issueLower)) {
       firstIdleAt.delete(clockKey); // active, or a protected main workspace — reset the clock
       continue;
     }
@@ -316,7 +325,7 @@ export async function reconcileIdleWorkspaceStacks(
       firstIdleAt.delete(clockKey);
       const issueId = issueLower.toUpperCase();
       const idleMin = Math.round((nowMs - since) / 60000);
-      const action = `Reaped idle workspace stack for ${issueId} — stopped ${targets.length}/${names.length} container(s) in ${project} after ${idleMin}m idle (no agent, no tmux)`;
+      const action = `Reaped idle workspace stack for ${issueId} — stopped ${targets.length}/${names.length} container(s) in ${project} after ${idleMin}m idle (no live agent pane)`;
       actions.push(action);
       console.log(`[deacon] ${action}`);
       emitActivityEntry({
