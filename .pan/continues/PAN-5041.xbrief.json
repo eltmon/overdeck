@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5041",
   "created": "2026-11-04T17:22:54.161Z",
-  "updated": "2026-11-04T18:15:39.517Z",
+  "updated": "2026-11-04T18:16:00.915Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -132,6 +132,10 @@
     "wi5-shellapp-wiring.ac3": {
       "status": "completed",
       "doneAt": "2026-11-04T18:15:39.516Z"
+    },
+    "wi6-ios-plugin.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:16:00.915Z"
     }
   }
 }
