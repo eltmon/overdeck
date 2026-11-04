@@ -1,0 +1,173 @@
+{
+  "version": "1",
+  "issueId": "PAN-5000",
+  "created": "2026-11-04T11:38:38.802Z",
+  "updated": "2026-11-04T12:46:53.999Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "paired-count": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5000",
+      "claimedAt": "2026-11-04T11:38:38.802Z",
+      "doneAt": "2026-11-04T11:58:08.785Z"
+    },
+    "no-project-crumb": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5000",
+      "claimedAt": "2026-11-04T11:58:19.113Z",
+      "doneAt": "2026-11-04T12:02:53.531Z"
+    },
+    "linked-row-title": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5000",
+      "claimedAt": "2026-11-04T12:02:58.259Z",
+      "doneAt": "2026-11-04T12:07:21.709Z"
+    },
+    "derived-title-attachments": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5000",
+      "claimedAt": "2026-11-04T12:07:28.576Z",
+      "doneAt": "2026-11-04T12:10:59.535Z"
+    },
+    "preview-popover-escape": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5000",
+      "claimedAt": "2026-11-04T12:11:08.042Z",
+      "doneAt": "2026-11-04T12:14:06.529Z"
+    },
+    "settings-header-wrap": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5000",
+      "claimedAt": "2026-11-04T12:14:14.810Z",
+      "doneAt": "2026-11-04T12:17:46.365Z"
+    },
+    "push-empty-copy": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5000",
+      "claimedAt": "2026-11-04T12:17:54.574Z",
+      "doneAt": "2026-11-04T12:21:29.506Z"
+    },
+    "after-fix-screenshots": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5000",
+      "claimedAt": "2026-11-04T12:21:37.786Z",
+      "doneAt": "2026-11-04T12:36:04.834Z"
+    },
+    "paired-count.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T12:37:27.628Z"
+    },
+    "paired-count.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T12:37:51.479Z"
+    },
+    "paired-count.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T12:38:08.825Z"
+    },
+    "paired-count.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T12:38:24.474Z"
+    },
+    "no-project-crumb.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T12:38:59.551Z"
+    },
+    "no-project-crumb.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T12:39:13.352Z"
+    },
+    "no-project-crumb.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T12:39:27.214Z"
+    },
+    "no-project-crumb.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T12:39:41.576Z"
+    },
+    "linked-row-title.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T12:40:18.493Z"
+    },
+    "linked-row-title.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T12:40:35.026Z"
+    },
+    "linked-row-title.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T12:40:52.641Z"
+    },
+    "linked-row-title.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T12:41:08.505Z"
+    },
+    "derived-title-attachments.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T12:41:44.482Z"
+    },
+    "derived-title-attachments.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T12:42:00.225Z"
+    },
+    "derived-title-attachments.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T12:42:14.449Z"
+    },
+    "derived-title-attachments.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-04T12:42:28.195Z"
+    },
+    "preview-popover-escape.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T12:43:01.497Z"
+    },
+    "preview-popover-escape.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T12:43:16.287Z"
+    },
+    "preview-popover-escape.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T12:43:31.652Z"
+    },
+    "settings-header-wrap.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T12:44:08.301Z"
+    },
+    "settings-header-wrap.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T12:44:24.113Z"
+    },
+    "settings-header-wrap.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T12:44:40.011Z"
+    },
+    "push-empty-copy.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T12:45:17.283Z"
+    },
+    "push-empty-copy.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T12:45:33.021Z"
+    },
+    "push-empty-copy.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T12:45:50.370Z"
+    },
+    "after-fix-screenshots.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T12:46:24.716Z"
+    },
+    "after-fix-screenshots.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T12:46:38.800Z"
+    },
+    "after-fix-screenshots.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T12:46:53.999Z"
+    }
+  }
+}

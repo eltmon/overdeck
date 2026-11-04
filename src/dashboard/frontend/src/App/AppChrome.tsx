@@ -21,6 +21,7 @@ import { SystemHealthPill } from '../components/SystemHealthPill';
 import { StaleBuildChip } from '../components/StaleBuildChip';
 import { triggerEmergencyStop, EMERGENCY_STOP_HOTKEY_LABEL } from '../components/EmergencyStopOverlay';
 import type { Tab } from '../components/Header';
+import { projectCrumbLabel, searchButtonText } from './appChromeLabels';
 import { AddProjectDialogHost } from '../components/project/new/AddProjectDialog';
 import type { CreatedProject } from '../components/project/new/projectCreateTypes';
 import type { TrackerStatusItem } from './api';
@@ -174,7 +175,7 @@ export function AppChrome({
           {selectedProjectKey ? (
             <>
               <span className="h-3.5 w-3.5 rounded-[4px] bg-primary/40" aria-hidden="true" />
-              {selectedProjectKey}
+              {projectCrumbLabel(selectedProjectKey)}
             </>
           ) : (
             <span className="text-muted-foreground">All projects</span>
@@ -189,7 +190,7 @@ export function AppChrome({
           title="Search"
         >
           <Search className="h-4 w-4 shrink-0" aria-hidden="true" />
-          <span className="truncate">{selectedProjectKey ? `Search ${selectedProjectKey}…` : 'Search issues, conversations, commands…'}</span>
+          <span className="truncate">{searchButtonText(selectedProjectKey)}</span>
           <kbd className="ml-auto rounded border border-border px-1.5 text-[11px]">/</kbd>
         </button>
 
