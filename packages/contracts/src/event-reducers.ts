@@ -759,6 +759,9 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
           // PAN-3731: carries the "requesters went away without restarting"
           // notice. Dropping it here would silently starve the banner.
           ...(event.payload.lastOutcome === undefined ? {} : { lastOutcome: event.payload.lastOutcome }),
+          // PAN-5007: the operator restart hold. A payload without it clears
+          // the hold, so a release reaches the banner on the next publish.
+          ...(event.payload.restartHold === undefined ? {} : { restartHold: event.payload.restartHold }),
         },
       }
 

@@ -10,6 +10,7 @@ import {
   syncSnapshot,
   type DashboardSnapshot,
   type RestartGateSnapshot,
+  type RestartHold,
 } from '@overdeck/contracts';
 
 import {
@@ -283,18 +284,60 @@ describe('restart gate state machine', () => {
 describe('restart gate service', () => {
   let clock: number;
   let emitted: RestartGateSnapshot[];
+  let readHold: () => Promise<RestartHold | null>;
 
   beforeEach(() => {
     clock = T0;
     emitted = [];
+    readHold = async () => null;
   });
 
   function makeGate() {
     return createRestartGate({
       now: () => clock,
       emit: (snapshot) => emitted.push(snapshot),
+      readHold: () => readHold(),
     });
   }
+
+  it('adds the operator restart hold to the snapshot and drops it on release (PAN-5007)', async () => {
+    const hold: RestartHold = { reason: 'live check', who: 'operator', setAt: new Date(T0).toISOString() };
+    const gate = makeGate();
+    await gate.request(deployRequest('reload:22', 'pan reload'));
+    expect(emitted.at(-1)?.restartHold).toBeUndefined();
+
+    readHold = async () => hold;
+    const held = await gate.sweep();
+    expect(held.restartHold).toEqual(hold);
+    expect(emitted.at(-1)?.restartHold).toEqual(hold);
+
+    readHold = async () => null;
+    await gate.sweep();
+    expect(emitted.at(-1)?.restartHold).toBeUndefined();
+  });
+
+  it('drops an expired hold from the snapshot even before the file is re-read (PAN-5007)', async () => {
+    const until = new Date(T0 + 60_000).toISOString();
+    readHold = async () => ({ reason: 'short', who: 'operator', setAt: new Date(T0).toISOString(), until });
+    const gate = makeGate();
+    expect((await gate.read()).restartHold?.reason).toBe('short');
+
+    clock = T0 + 60_000;
+    await gate.request(deployRequest('reload:22', 'pan reload'));
+    expect(emitted.at(-1)?.restartHold).toBeUndefined();
+  });
+
+  it('keeps the last hold when reading the hold file fails (PAN-5007)', async () => {
+    const hold: RestartHold = { reason: 'live check', who: 'operator', setAt: new Date(T0).toISOString() };
+    readHold = async () => hold;
+    const gate = makeGate();
+    await gate.read();
+
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    readHold = async () => { throw new Error('EACCES'); };
+    expect((await gate.sweep()).restartHold).toEqual(hold);
+    vi.mocked(console.error).mockRestore();
+  });
 
 
 
@@ -420,6 +463,32 @@ describe('restart gate read-model exposure', () => {
     // The reducer rebuilds the projection field by field, so an unlisted field
     // is dropped silently and the banner never learns the requester died.
     expect(applied.restartGate).toEqual(projection);
+  });
+
+  it('carries the restart hold through the reducer, and clears it when a later payload omits it (PAN-5007)', () => {
+    const restartHold: RestartHold = { reason: 'live check', who: 'operator', setAt: new Date(T0).toISOString() };
+    const held: RestartGateSnapshot = { status: 'idle', pending: [], restartHold };
+    const withHold = applyEvent(INITIAL_READ_MODEL_STATE, {
+      type: 'restart_gate.changed',
+      sequence: -1,
+      timestamp: new Date(T0).toISOString(),
+      payload: held,
+    });
+    expect(withHold.restartGate).toEqual(held);
+    expect(isDomainEvent({
+      type: 'restart_gate.changed',
+      sequence: 1,
+      timestamp: new Date(T0).toISOString(),
+      payload: held,
+    })).toBe(true);
+
+    const released = applyEvent(withHold, {
+      type: 'restart_gate.changed',
+      sequence: -1,
+      timestamp: new Date(T0 + 5_000).toISOString(),
+      payload: { status: 'idle', pending: [] },
+    });
+    expect(released.restartGate).toEqual({ status: 'idle', pending: [] });
   });
 
   it('lands the gate in read-model state from an event and from a snapshot', () => {

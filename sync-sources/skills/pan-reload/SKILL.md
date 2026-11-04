@@ -29,6 +29,10 @@ pan reload --force   # explicit operator bypass of the deploy-window gate
 
 Without `--resume`/`--no-resume`, `pan reload` keeps the running dashboard's resume gate (PAN-3899). Before it restarts anything it reads the gate from `/api/health` (`bootGates`, or the server's env markers for an older server), retrying once with a longer budget, and hands it to the replacement, so a deploy keeps the resume choice of the last `pan restart`. Only a dashboard of this checkout counts. The Deacon gate is not carried: reload always boots Deacon on, and stamps the resolved gates into the new server's env, so a stray `OVERDECK_DISABLE_DEACON` in the invoking shell cannot change it. It prints `Boot gates: …` and then where the resume gate came from. When the gate cannot be read (no answer, a non-JSON body, another checkout on the port), it says why and uses the default, `resume=on`. `OVERDECK_NO_RESUME`/`OVERDECK_RESUME` in the invoking shell do not affect `pan reload`; pass `--no-resume` instead.
 
+## Operator restart hold (PAN-5007)
+
+While `pan restart hold` is active, `pan reload` refuses with exit 1 before it fetches or builds anything, and prints the hold's reason. The refused reload is not queued. **Never run `pan restart release` for a hold you did not set unless the operator asks you to**; report the refusal instead. Check with `pan restart hold --status`.
+
 ## Concurrent reloads
 
 A `pan reload` fetches and resolves `origin/main` before it takes the restart lock, records that commit in the lock, and builds exactly that commit (PAN-4888). What a second reload does depends on who holds the lock:

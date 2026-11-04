@@ -558,17 +558,32 @@ export const RestartGateOutcome = Schema.Struct({
 export type RestartGateOutcome = typeof RestartGateOutcome.Type
 
 /**
+ * The operator restart hold (PAN-5007), set by `pan restart hold` and lifted by
+ * `pan restart release` or its `until` time. While it is active every reload,
+ * restart and restart-gate approval refuses.
+ */
+export const RestartHold = Schema.Struct({
+  reason: Schema.String,
+  who: Schema.String,
+  setAt: Schema.String,
+  until: Schema.optional(Schema.String),
+})
+export type RestartHold = typeof RestartHold.Type
+
+/**
  * The operator-facing view of the restart gate — identical to the body of
  * `GET /api/restart-gate`, so the banner and the CLI read the same shape.
  *
  * `idle` no live requests; `pending` requests are waiting for approval;
  * `approved` the operator approved an epoch that nobody has claimed yet;
  * `claimed` one requester holds the exclusive right to perform the restart.
+ * `restartHold` is present while an operator restart hold is active.
  */
 export const RestartGateSnapshot = Schema.Struct({
   status: Schema.Literals(["idle", "pending", "approved", "claimed"]),
   pending: Schema.Array(RestartGateRequest),
   lastOutcome: Schema.optional(RestartGateOutcome),
+  restartHold: Schema.optional(RestartHold),
 })
 export type RestartGateSnapshot = typeof RestartGateSnapshot.Type
 

@@ -36,6 +36,7 @@ const mocks = vi.hoisted(() => ({
   repointGlobalCliToDeployment: vi.fn(),
   acquireReloadLock: vi.fn(),
   reloadSupersedeDetail: vi.fn(),
+  readRestartHold: vi.fn(),
 }));
 
 vi.mock('../../../lib/composer-commands/reload.js', () => ({ reportComposerReloadProgress: mocks.reportComposerReloadProgress }));
@@ -63,6 +64,12 @@ vi.mock('../../../lib/deploy/running-boot-gates.js', () => ({
 vi.mock('../../../lib/deploy/reload-supersede.js', () => ({
   acquireReloadLock: mocks.acquireReloadLock,
   reloadSupersedeDetail: mocks.reloadSupersedeDetail,
+}));
+
+// PAN-5007: the operator restart hold is read from ~/.overdeck; the tests set it.
+vi.mock('../../../lib/restart-hold.js', async (importActual) => ({
+  ...(await importActual<typeof import('../../../lib/restart-hold.js')>()),
+  readRestartHold: mocks.readRestartHold,
 }));
 
 vi.mock('../../../lib/restart-lock.js', () => ({
@@ -226,6 +233,7 @@ describe('reloadCommand', () => {
       release: vi.fn(() => Promise.resolve()),
     });
     mocks.readRestartLockHolder.mockResolvedValue(null);
+    mocks.readRestartHold.mockResolvedValue(null);
     mocks.acquireReloadLock.mockResolvedValue({
       kind: 'acquired',
       lock: {
@@ -369,6 +377,60 @@ describe('reloadCommand', () => {
     expect(process.exitCode).toBeUndefined();
 
     killSpy.mockRestore();
+  });
+
+  describe('operator restart hold (PAN-5007)', () => {
+    const HOLD = { reason: 'live three-machine check', who: 'operator', setAt: '2026-11-04T10:35:00.000Z' };
+
+    it('refuses with exit 1 before building, locking or waiting while a hold is active', async () => {
+      mocks.readRestartHold.mockResolvedValue(HOLD);
+
+      await reloadCommand({});
+
+      expect(process.exitCode).toBe(1);
+      expect(mocks.acquireReloadLock).not.toHaveBeenCalled();
+      expect(mocks.exec).not.toHaveBeenCalled();
+      expect(mocks.spawn).not.toHaveBeenCalled();
+      expect(mocks.waitForRestartApproval).not.toHaveBeenCalled();
+      expect(mocks.restartDashboard).not.toHaveBeenCalled();
+      const errors = vi.mocked(console.error).mock.calls.map(([message]) => String(message)).join('\n');
+      expect(errors).toContain('live three-machine check');
+      expect(errors).toContain('pan restart release');
+      expect(mocks.writeRestartStatus).toHaveBeenCalledWith(expect.objectContaining({
+        success: false,
+        error: 'restart hold active: live three-machine check',
+      }));
+    });
+
+    it('refuses the pan dev hot-restart too, without signalling it', async () => {
+      mocks.readRestartHold.mockResolvedValue(HOLD);
+      mocks.readDevSupervisorMarker.mockReturnValue({ pid: 424242, dashboardPort: 3010, apiPort: 3011 });
+      const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => true);
+
+      await reloadCommand({});
+
+      expect(process.exitCode).toBe(1);
+      expect(killSpy).not.toHaveBeenCalled();
+      expect(mocks.acquireRestartLock).not.toHaveBeenCalled();
+      killSpy.mockRestore();
+    });
+
+    it('proceeds once the hold is released', async () => {
+      mocks.readRestartHold.mockResolvedValue(HOLD);
+      await reloadCommand({});
+      expect(process.exitCode).toBe(1);
+
+      process.exitCode = undefined;
+      mocks.readRestartHold.mockResolvedValue(null);
+      mocks.acquireReloadLock.mockResolvedValue({
+        kind: 'covered',
+        holder: { pid: 555, ts: Date.now(), caller: 'pan reload', targetSha: DEFAULT_ORIGIN_MAIN_SHA, supersedable: true },
+      });
+      await reloadCommand({});
+
+      expect(mocks.acquireReloadLock).toHaveBeenCalledTimes(1);
+      expect(process.exitCode).toBeUndefined();
+    });
   });
 
   it('exits 0 without building when a covering reload is already waiting', async () => {

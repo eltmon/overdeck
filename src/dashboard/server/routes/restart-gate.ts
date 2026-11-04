@@ -5,7 +5,8 @@
  *   POST /api/restart-gate/requests  upsert + poll + TTL refresh (every 5s)
  *   POST /api/restart-gate/claim     take the exclusive right to restart
  *   POST /api/restart-gate/withdraw  leave the gate while outside an epoch (PAN-4888)
- *   POST /api/restart-gate/approve   operator approval (banner, `pan restart approve`)
+ *   POST /api/restart-gate/approve   operator approval (banner, `pan restart approve`);
+ *                                    409 while the operator restart hold is active (PAN-5007)
  *   GET  /api/restart-gate           read door for the current gate
  *
  * These handlers are deliberately thin: every state transition happens inside
@@ -22,6 +23,7 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import type { RestartGateKind } from '@overdeck/contracts';
 
+import { describeRestartHold, readRestartHold } from '../../../lib/restart-hold.js';
 import { jsonResponse } from '../http-helpers.js';
 import { getRestartGate } from '../services/restart-gate.js';
 import { httpHandler } from './http-handler.js';
@@ -109,6 +111,18 @@ const postApproveRoute = HttpRouter.add(
   '/api/restart-gate/approve',
   httpHandler(
     Effect.gen(function* () {
+      // PAN-5007: the hold is checked here, not only in the CLI, so an agent
+      // that calls this route directly cannot approve past it either.
+      const hold = yield* Effect.promise(() => readRestartHold());
+      if (hold) {
+        return jsonResponse(
+          {
+            error: `Restarts are on hold: ${describeRestartHold(hold)}. Release with \`pan restart release\`.`,
+            restartHold: hold,
+          },
+          { status: 409 },
+        );
+      }
       const result = yield* Effect.promise(() => getRestartGate().approve());
       return jsonResponse(result);
     }),
