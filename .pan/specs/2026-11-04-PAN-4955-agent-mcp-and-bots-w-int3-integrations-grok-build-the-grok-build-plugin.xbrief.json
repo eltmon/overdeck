@@ -1,0 +1,520 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-04T13:55:50Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4955: Agent MCP and bots (W-INT3): integrations/grok-build/: the Grok Build plugin",
+    "updated": "2026-11-04T14:03:35.611Z"
+  },
+  "plan": {
+    "id": "pan-4955",
+    "title": "Agent MCP and bots (W-INT3): integrations/grok-build/: the Grok Build plugin",
+    "status": "proposed",
+    "uid": "62c6ef75-e40b-4453-a773-cfaaa950a30d",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-04T13:55:50Z",
+    "updated": "2026-11-04T14:03:35.611Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4955",
+        "label": "PAN-4955",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4927",
+        "label": "PAN-4927 (epic)",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4955.md",
+        "label": "PRD",
+        "type": "document"
+      }
+    ],
+    "tags": [
+      "integrations",
+      "grok-build",
+      "mcp",
+      "plugin",
+      "pan-4927"
+    ],
+    "narratives": {
+      "Problem": "PAN-4927 W-INT3 needs a real, installable Grok Build plugin so Grok Build can use the Overdeck MCP tools, either against this computer's Overdeck (pan mcp serve) or through a paired Overdeck connector, and AC-27 requires /overdeck pending to list pending prompts in both modes. Today integrations/grok-build/ holds only the shared skill copy.",
+      "Proposal": "Ship integrations/grok-build/ modeled on ~/Projects/grok-myn-bot: identical plugin.json manifests, .mcp.json pointing at scripts/run-mcp.sh, a dispatch script that execs the paired connector (capable pan first, then npx @overdeck/core@0.74.0) or else pan mcp serve with a default token file, the shared skill extended with the /overdeck status|pending|answer rules (Grok shadows a same-named plugin command, so the skill is what runs), a pointer command file, README/PUBLISHING/CHANGELOG/LICENSE, three vitest files, a configuration/mcp.mdx paragraph, and a live AC-27 check recorded in docs/verification.md. Full detail in .pan/drafts/PAN-4955.md.",
+      "NonGoals": "- No publishing to any marketplace or npm, and no grok plugin tag release.\n- No prompt or summary hook (Grok Build discards hook stdout).\n- No fix for the Grok Build Tailscale reach and no change to the Connect a bot dialog; only a follow-up issue is filed.\n- No renaming of the shared skill, the plugin, or Overdeck's own overdeck user skill to avoid the /overdeck collision.\n- No change under src/ (botSnippets.ts, pan mcp serve, the connector) and no CI workflow change (W-CI1).\n- No Hermes, OpenClaw or Grok Bot package change beyond the regenerated skill copies.\n- The live check must not leave the overdeck plugin installed, the verify token live, or the MYN Grok plugin changed."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Connector binary: a pan on PATH whose `pan mcp --help` lists connector, else `npx -y @overdeck/core@${OVERDECK_CORE_VERSION:-0.74.0}`.",
+        "rationale": "No published version (latest 0.73.1) contains the connector (c7fb0ab36d2 is not in v0.73.1); a user with Overdeck should not download a second copy; @latest would hit the registry on every Grok start and drop the epic's pinning; 0.74.0 is the next minor release and PUBLISHING.md checks the pin is published."
+      },
+      {
+        "summary": "/overdeck status|pending|answer rules go into integrations/shared/SKILL.md; commands/overdeck.md ships but only points at that section.",
+        "rationale": "A probe install on Grok 1.0.34 showed a plugin command named like a plugin skill never loads (a uniquely named command does), and the skill copy must stay byte-identical to the shared file."
+      },
+      {
+        "summary": "On an Overdeck computer the plugin is invoked as /overdeck:overdeck; AC-27's local check uses that form and records what bare /overdeck does.",
+        "rationale": "pan sync installs Overdeck's own overdeck skill in ~/.agents/skills, which Grok reads; grok inspect marks both collidesWith with invocableAs user:overdeck and <plugin>:overdeck."
+      },
+      {
+        "summary": "run-mcp.sh defaults OVERDECK_MCP_TOKEN_FILE to $HOME/.overdeck/grok-build-mcp-token when no token env is set and the file exists.",
+        "rationale": ".mcp.json env is static and that path is exactly what the dialog's tokenSetup this-computer snippet writes, so the default reach works without a shell export."
+      },
+      {
+        "summary": "README documents This computer and Overdeck connector; Tailscale is marked not yet working and a follow-up issue is filed.",
+        "rationale": "pan mcp serve verifies the token against the local registry (src/cli/commands/mcp.ts:82-89), so a token minted on another machine is always refused."
+      },
+      {
+        "summary": "The connector half of AC-27 is an implementation checkpoint: ask the operator once for the device-flow approval, wait at most 15 minutes, else record Not run with steps.",
+        "rationale": "pan mcp connector login needs a browser approval only the operator can give; the grok-bot package (PAN-4956) used the same Not run pattern, and the dispatch is covered by tests."
+      },
+      {
+        "summary": "Tests split per item: grok-build.test.ts, grok-build-run-mcp.test.ts, grok-build-readme.test.ts.",
+        "rationale": "Items then share no test file, so manifest, run-mcp, skill-section and mcp-docs can run in parallel."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "19 files, one package. The 7-subsystem count comes from the skill-section item: it edits integrations/shared/SKILL.md and the sync script regenerates byte-identical copies under integrations/hermes, integrations/openclaw and integrations/grok-bot. Those three are generated output of one mechanical sync (node integrations/shared/sync-skill.mjs), not separate work, and splitting the skill change into a sibling issue would ship the Grok Build plugin without the /overdeck rules AC-27 depends on.",
+      "canonicalFilename": "2026-11-04-PAN-4955-agent-mcp-and-bots-w-int3-integrations-grok-build-the-grok-build-plugin.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "manifest",
+        "title": "Grok Build plugin manifests, .mcp.json, command file, LICENSE and CHANGELOG",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T13:55:50Z",
+        "metadata": {
+          "issueLabel": "pan-4955",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "simple",
+          "kind": "infra",
+          "requiresInspection": false,
+          "files_scope": [
+            "integrations/grok-build/.grok-plugin/plugin.json",
+            "integrations/grok-build/plugin.json",
+            "integrations/grok-build/.mcp.json",
+            "integrations/grok-build/commands/overdeck.md",
+            "integrations/grok-build/LICENSE*",
+            "integrations/grok-build/CHANGELOG.md",
+            "tests/unit/integrations/grok-build.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/integrations/grok-build.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "grok-build.test.ts passes with zero failures",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1 (.pan/drafts/PAN-4955.md). Create integrations/grok-build/.grok-plugin/plugin.json with exactly the JSON in WI-1 step 1 and copy it byte-for-byte to integrations/grok-build/plugin.json. Write integrations/grok-build/.mcp.json as grokBuildMcpJson() output (botSnippets.ts:85) plus one trailing newline. Write commands/overdeck.md exactly as WI-1 step 3 (its body only points at the shared skill section 'The /overdeck command'; Grok 1.0.34 shadows a command named like a plugin skill, so the skill is what runs). cp integrations/LICENSE integrations/grok-build/LICENSE. Write CHANGELOG.md exactly as WI-1 step 5. Add tests/unit/integrations/grok-build.test.ts modeled on tests/unit/integrations/grok-bot.test.ts with the five checks in WI-1 step 6; import grokBuildMcpJson from botSnippets (never readFile a .ts path: lint:source-introspection). Do not create scripts/run-mcp.sh here (that is item run-mcp)."
+        },
+        "items": [
+          {
+            "id": "manifest.ac1",
+            "title": "When grok-build.test.ts runs, then it reads integrations/grok-build/.grok-plugin/plugin.json and integrations/grok-build/plugin.json, finds them byte-equal, and both parse with name 'overdeck', version '0.1.0', license 'MIT', repository 'https://github.com/eltmon/overdeck' and author.name 'Overdeck'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "manifest.ac2",
+            "title": "When grok-build.test.ts reads integrations/grok-build/.mcp.json, its text equals grokBuildMcpJson() + '\\n' and it contains exactly one server named overdeck whose command is ${GROK_PLUGIN_ROOT}/scripts/run-mcp.sh.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "manifest.ac3",
+            "title": "integrations/grok-build/commands/overdeck.md contains the line argument-hint: \"<status|pending|answer N CHOICE>\" and the text The /overdeck command.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "manifest.ac4",
+            "title": "integrations/grok-build/LICENSE bytes equal integrations/LICENSE bytes, and npx vitest run tests/unit/integrations/grok-build.test.ts exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "run-mcp",
+        "title": "scripts/run-mcp.sh: exec the paired connector, else pan mcp serve, else exit 1",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T13:55:50Z",
+        "metadata": {
+          "issueLabel": "pan-4955",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "medium",
+          "kind": "infra",
+          "requiresInspection": true,
+          "foundationFor": [
+            "readme",
+            "live-verify"
+          ],
+          "files_scope": [
+            "integrations/grok-build/scripts/run-mcp.sh",
+            "tests/unit/integrations/grok-build-run-mcp.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/integrations/grok-build-run-mcp.test.ts",
+            "bash -n integrations/grok-build/scripts/run-mcp.sh",
+            "git ls-files -s integrations/grok-build/scripts/run-mcp.sh",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "grok-build-run-mcp.test.ts passes all dispatch cases",
+            "bash -n exits 0",
+            "git ls-files -s prints mode 100755",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2 (.pan/drafts/PAN-4955.md). Write integrations/grok-build/scripts/run-mcp.sh exactly as the script in WI-2 step 1 (decisions D-1 pin 0.74.0 with OVERDECK_CORE_VERSION override, D-2 capability probe via captured `pan mcp --help` and grep -Eq on a here-string, D-5 default token file $HOME/.overdeck/grok-build-mcp-token). chmod +x before git add so git records mode 100755. Add tests/unit/integrations/grok-build-run-mcp.test.ts per WI-2 step 2: temp HOME, stub pan/npx in a stubs dir, a sys dir holding only a grep symlink (resolve with spawnSync('bash',['-c','command -v grep']) so shell aliases do not leak), PATH = stubs:sys, run with spawnSync(<abs bash>, [script]); cover the seven cases, the exec bit, bash -n, and the pin regex /OVERDECK_CORE_VERSION:-(\\d+\\.\\d+\\.\\d+)\\}/ being an exact semver greater than 0.73.1. No network, no real pan/npx, no readFile of a .ts path."
+        },
+        "items": [
+          {
+            "id": "run-mcp.ac1",
+            "title": "Given OVERDECK_CONNECTOR_HOME/pairing.json exists (default $HOME/.overdeck-connector, or the OVERDECK_CONNECTOR_HOME override), when pan mcp --help lists a connector line the script execs `pan mcp connector serve --stdio`, and when it does not the script execs `npx -y @overdeck/core@0.74.0 mcp connector serve --stdio` (or the OVERDECK_CORE_VERSION value).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "run-mcp.ac2",
+            "title": "Given no pairing.json and pan on PATH, when neither OVERDECK_MCP_TOKEN nor OVERDECK_MCP_TOKEN_FILE is set and $HOME/.overdeck/grok-build-mcp-token exists, then the script execs `pan mcp serve` with OVERDECK_MCP_TOKEN_FILE set to that path; when OVERDECK_MCP_TOKEN is set it leaves OVERDECK_MCP_TOKEN_FILE unset.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "run-mcp.ac3",
+            "title": "Given no pairing.json, no pan and no npx on PATH, the script exits 1, writes 'Install Overdeck (npm i -g @overdeck/core) or pair a connector' to stderr, and writes nothing to stdout in every case the test covers.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "run-mcp.ac4",
+            "title": "git ls-files -s integrations/grok-build/scripts/run-mcp.sh shows mode 100755, bash -n exits 0, and npx vitest run tests/unit/integrations/grok-build-run-mcp.test.ts exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "skill-section",
+        "title": "Shared skill: add 'The /overdeck command' section and re-sync the four copies",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T13:55:50Z",
+        "metadata": {
+          "issueLabel": "pan-4955",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "simple",
+          "kind": "docs",
+          "requiresInspection": false,
+          "files_scope": [
+            "integrations/shared/SKILL.md",
+            "integrations/hermes/skills/overdeck/SKILL.md",
+            "integrations/openclaw/skills/overdeck/SKILL.md",
+            "integrations/grok-build/skills/overdeck/SKILL.md",
+            "integrations/grok-bot/skills/overdeck/SKILL.md"
+          ],
+          "verify_commands": [
+            "node integrations/shared/sync-skill.mjs --check",
+            "npx vitest run tests/unit/integrations/sync-skill.test.ts"
+          ],
+          "expected_outputs": [
+            "sync-skill --check prints '✓ 4 skill copies match integrations/shared/SKILL.md'",
+            "sync-skill.test.ts passes including the context-budget test"
+          ],
+          "traces": [
+            "FR-4",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3 (.pan/drafts/PAN-4955.md). In integrations/shared/SKILL.md insert the exact markdown block from WI-3 step 1 (heading '## The /overdeck command', bullets status/pending/answer, closing sentence) plus one blank line directly before the line '## Safety rules'. Change nothing else. Then run `node integrations/shared/sync-skill.mjs` from the repo root to rewrite integrations/{hermes,openclaw,grok-build,grok-bot}/skills/overdeck/SKILL.md; never edit a copy by hand. Result is 92 lines / about 4,329 bytes, inside the 100-line / 6,000-byte budget tested by tests/unit/integrations/sync-skill.test.ts."
+        },
+        "items": [
+          {
+            "id": "skill-section.ac1",
+            "title": "integrations/shared/SKILL.md contains '## The /overdeck command' immediately before '## Safety rules', and the section maps status to list_machines (or list_conversations when list_machines is absent), pending to list_pending_input, and answer <n> <choice> to safety rule 3.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill-section.ac2",
+            "title": "node integrations/shared/sync-skill.mjs --check exits 0 and each of the four platform copies is byte-identical to the shared file.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill-section.ac3",
+            "title": "npx vitest run tests/unit/integrations/sync-skill.test.ts exits 0, so the shared skill stays within 100 lines and 6,000 bytes with its single-line frontmatter unchanged.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "readme",
+        "title": "README and PUBLISHING for integrations/grok-build, plus the Tailscale follow-up issue",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T13:55:50Z",
+        "metadata": {
+          "issueLabel": "pan-4955",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "medium",
+          "kind": "docs",
+          "requiresInspection": false,
+          "files_scope": [
+            "integrations/grok-build/README.md",
+            "integrations/grok-build/PUBLISHING.md",
+            "tests/unit/integrations/grok-build-readme.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/integrations/grok-build-readme.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "grok-build-readme.test.ts passes with zero failures",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-5",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4 (.pan/drafts/PAN-4955.md). First file the follow-up GitHub issue in WI-4 step 1 with gh issue create (Grok Build Tailscale reach: pan mcp serve refuses a token minted on another machine; cite src/cli/commands/mcp.ts:82-89) and note its number. Generate snippet text by calling botSnippets functions (WI-4 step 2), never retype. Write integrations/grok-build/README.md with the sections listed in WI-4 step 3 in that order (Install with `grok plugin install eltmon/overdeck#integrations/grok-build --trust` and `grok plugin enable overdeck`; .mcp.json verbatim; dispatch order with @overdeck/core@0.74.0 and OVERDECK_CORE_VERSION; This computer with the tokenSetup this-computer lines verbatim; Overdeck connector with connectorCommands(serve:false) verbatim; Tailscale marked not yet working with the issue link; Using it with /overdeck:overdeck pending and the collision sentence; Access; Troubleshooting; License). Write PUBLISHING.md per WI-4 step 4. Add tests/unit/integrations/grok-build-readme.test.ts per WI-4 step 5 (import botSnippets; parse the pin from scripts/run-mcp.sh; walk the package for the secret regex with at least 10 files visited). Use <token> placeholders only."
+        },
+        "items": [
+          {
+            "id": "readme.ac1",
+            "title": "integrations/grok-build/README.md contains, verbatim, grokBuildMcpJson(), tokenSetup({ platform: 'grok-build', reach: 'this-computer', token: '<token>', origin: '' }) and connectorCommands({ version: '<version>', pairingString: '<pairing string>', serve: false }).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "readme.ac2",
+            "title": "README.md contains '/overdeck:overdeck pending', 'grok plugin install eltmon/overdeck#integrations/grok-build --trust', '@overdeck/core@' followed by the pin parsed from scripts/run-mcp.sh, and a https://github.com/eltmon/overdeck/issues/ link to the filed Tailscale follow-up issue.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "readme.ac3",
+            "title": "PUBLISHING.md contains 'Publishing is a separate step the operator approves', the `npm view @overdeck/core@<pin> version` pre-publish check, and names a Grok Build marketplace (not Grok Bot's catalog) as the destination.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "readme.ac4",
+            "title": "When grok-build-readme.test.ts walks integrations/grok-build/, it visits at least 10 files and no file matches /\\bod[klr]_[0-9a-f]{16,}/; npx vitest run tests/unit/integrations/grok-build-readme.test.ts exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mcp-docs",
+        "title": "configuration/mcp.mdx: add the Grok Build paragraph to Connect a bot",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T13:55:50Z",
+        "metadata": {
+          "issueLabel": "pan-4955",
+          "inspectionDepth": "fast",
+          "readiness": "ready",
+          "files_scope_confidence": "high",
+          "difficulty": "trivial",
+          "kind": "docs",
+          "requiresInspection": false,
+          "files_scope": [
+            "configuration/mcp.mdx"
+          ],
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs completes without errors"
+          ],
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5 (.pan/drafts/PAN-4955.md). In configuration/mcp.mdx insert the exact '**Grok Build.**' paragraph from WI-5 plus one blank line directly before the line '**Remove** in the Bots panel revokes a connector at once.' (today line 608). Change nothing else. Mintlify rules enforced by lint:docs: no pair of bare $ on a line, no bare < before a digit."
+        },
+        "items": [
+          {
+            "id": "mcp-docs.ac1",
+            "title": "configuration/mcp.mdx contains a paragraph starting '**Grok Build.**' directly before '**Remove** in the Bots panel', linking https://github.com/eltmon/overdeck/tree/main/integrations/grok-build and naming `grok plugin install eltmon/overdeck#integrations/grok-build --trust`, `grok plugin enable overdeck` and `/overdeck:overdeck pending`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-docs.ac2",
+            "title": "npm run lint:docs exits 0 after the change.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "live-verify",
+        "title": "Live AC-27 check with Grok Build and integrations/grok-build/docs/verification.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-04T13:55:50Z",
+        "metadata": {
+          "issueLabel": "pan-4955",
+          "inspectionDepth": "fast",
+          "readiness": "sequential",
+          "files_scope_confidence": "high",
+          "difficulty": "medium",
+          "kind": "test",
+          "requiresInspection": false,
+          "files_scope": [
+            "integrations/grok-build/docs/verification.md"
+          ],
+          "verify_commands": [
+            "grok plugin validate integrations/grok-build",
+            "test -f integrations/grok-build/docs/verification.md",
+            "grep -c 'AC-27' integrations/grok-build/docs/verification.md"
+          ],
+          "expected_outputs": [
+            "grok plugin validate prints 'Plugin manifest is valid.' and 'components: 1 skill dir(s), 1 command dir(s), 0 agent dir(s), MCP servers'",
+            "verification.md exists",
+            "grep finds at least two AC-27 rows"
+          ],
+          "acJustification": "Four ACs: validate output, install/inspect evidence, the two AC-27 modes recorded separately, and mandatory cleanup.",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6 (.pan/drafts/PAN-4955.md). On this host (grok 1.0.34, pan, dashboard on 127.0.0.1:3011): grok plugin validate; create a read-only token with `pan token create grok-build-verify --scopes read:state,read:conversations --json` and write it 0600 to $HOME/.overdeck/grok-build-mcp-token (never print it); `grok plugin install \"$PWD/integrations/grok-build\" --trust && grok plugin enable overdeck`; record the grok inspect --json MCP entry and the overdeck:overdeck invocableAs; record the GET /api/needs-you item count; run `grok -p \"/overdeck:overdeck pending\" --always-approve --output-format json` and once with bare /overdeck pending (checkpoint CP-A fallback in WI-6 step 5: no tmux keystroke driving). Connector check per CP-B in WI-6 step 6: ask the operator once via pan tell flywheel-orchestrator for the device-flow approval, wait at most 15 minutes in one blocking loop, else record Not run with operator steps. Always clean up (WI-6 step 7): grok plugin uninstall overdeck --confirm, pan token revoke <id>, remove the token file you created; never touch the MYN plugin. Write docs/verification.md in the shape of integrations/grok-bot/docs/verification.md with the rows listed in WI-6 step 8; never record a token or pending-prompt content."
+        },
+        "items": [
+          {
+            "id": "live-verify.ac1",
+            "title": "`grok plugin validate integrations/grok-build` prints 'Plugin manifest is valid.', 'name: overdeck', 'version: 0.1.0' and 'components: 1 skill dir(s), 1 command dir(s), 0 agent dir(s), MCP servers', and docs/verification.md records that output with the grok --version string.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-verify.ac2",
+            "title": "After install, docs/verification.md records the grok inspect --json mcpServers entry with name overdeck, transport stdio, a target ending in /scripts/run-mcp.sh and source.type plugin, plus the plugin skill's invocableAs value.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-verify.ac3",
+            "title": "docs/verification.md records a row 'AC-27 local (pan mcp serve)' and a row 'AC-27 connector', each reading 'Passed: ...' or 'Not run: <reason>' with the operator steps; the local row records the GET /api/needs-you count observed and shows the numbered list matched it (or reported nothing waits at count 0), and another row records what bare /overdeck pending did.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-verify.ac4",
+            "title": "After the item finishes, `grok plugin list` no longer shows overdeck, `pan token list` shows grok-build-verify revoked, and no file in integrations/grok-build matches /\\bod[klr]_[0-9a-f]{16,}/.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "manifest",
+        "to": "readme",
+        "type": "blocks"
+      },
+      {
+        "from": "run-mcp",
+        "to": "readme",
+        "type": "blocks"
+      },
+      {
+        "from": "manifest",
+        "to": "live-verify",
+        "type": "blocks"
+      },
+      {
+        "from": "run-mcp",
+        "to": "live-verify",
+        "type": "blocks"
+      },
+      {
+        "from": "skill-section",
+        "to": "live-verify",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
