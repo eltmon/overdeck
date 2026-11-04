@@ -1088,8 +1088,9 @@ both intents, build and run the gates, commit, push, and run
 
 - `scripts/file-size-allowlist.txt`: take main's rows, never raise a cap, and
   shrink a file that is over its cap.
-- `.overdeck/context/codebase/*.md`: keep both sides and refresh the
-  `last-verified` date.
+- `.overdeck/context/codebase/*.md`: keep both sides; on a conflicting
+  `last-verified` footer, keep one footer with the later date only, never
+  issue ids.
 - `bun.lock`: take main's version, then run `bun install`.
 - The slash-command manifest: run `npm run generate:slash-commands`.
 - `.pan/continues` and `.pan/specs`: `pan sync-main` already prefers main.
