@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4943",
   "created": "2026-11-04T04:27:55.646Z",
-  "updated": "2026-11-04T06:31:05.650Z",
+  "updated": "2026-11-04T06:31:22.067Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -102,6 +102,10 @@
     "revoke-removes-watches.ac1": {
       "status": "completed",
       "doneAt": "2026-11-04T06:31:05.650Z"
+    },
+    "revoke-removes-watches.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T06:31:22.067Z"
     }
   }
 }
