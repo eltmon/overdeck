@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5000",
   "created": "2026-11-04T11:38:38.802Z",
-  "updated": "2026-11-04T12:14:06.530Z",
+  "updated": "2026-11-04T12:14:14.811Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -38,6 +38,11 @@
       "claimedBy": "agent-pan-5000",
       "claimedAt": "2026-11-04T12:11:08.042Z",
       "doneAt": "2026-11-04T12:14:06.529Z"
+    },
+    "settings-header-wrap": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5000",
+      "claimedAt": "2026-11-04T12:14:14.810Z"
     }
   }
 }
