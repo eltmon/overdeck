@@ -155,7 +155,7 @@ export type DashboardCredential =
   | { kind: 'internal-token' }
   | { kind: 'root-session' }
   | { kind: 'device'; deviceId: string; scopes: AccessTokenScope[] }
-  | { kind: 'token'; tokenId: string; scopes: AccessTokenScope[]; agentId?: string; agentKind?: 'agent' | 'conversation'; role?: string }
+  | { kind: 'token'; tokenId: string; scopes: AccessTokenScope[]; agentId?: string; agentKind?: 'agent' | 'conversation'; role?: string; oauthClientId?: string }
   | { kind: 'machine'; tokenId: string; environmentId: string; scopes: AccessTokenScope[]; actor: LinkActor; access: MachineAccess }
   | { kind: 'phone'; tokenId: string; clientId: string; phoneKey: string; scopes: AccessTokenScope[] };
 
@@ -220,8 +220,10 @@ export function resolveDashboardCredential(headers: HeaderMap, channel: ChannelM
   if (record.kind === 'token') {
     // PAN-2351 D-9: a token authenticates only from the Bearer header.
     // PAN-4927 D-6: an agent token also names its agent; a plain token keeps the three keys.
+    // PAN-4945: an OAuth token also names its client.
     return cookieToken === undefined
-      ? { kind: 'token', tokenId: record.id, scopes: record.scopes, ...(record.agentId ? { agentId: record.agentId, agentKind: record.agentKind, role: record.role } : {}) }
+      ? { kind: 'token', tokenId: record.id, scopes: record.scopes, ...(record.agentId ? { agentId: record.agentId, agentKind: record.agentKind, role: record.role } : {}),
+          ...(record.oauthClientId ? { oauthClientId: record.oauthClientId } : {}) }
       : null;
   }
   // A record with no kind is a device (PAN-2351 FR-10).
