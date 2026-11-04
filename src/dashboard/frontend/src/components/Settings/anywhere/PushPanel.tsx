@@ -92,7 +92,7 @@ export function PushPanel() {
       ) : error ? (
         <p className="text-xs text-destructive px-4 py-3">Could not load notifications: {(error as Error).message}</p>
       ) : subscriptions.length === 0 ? (
-        <p className="text-xs text-muted-foreground px-4 py-3">No device receives notifications yet.</p>
+        <p className="text-xs text-muted-foreground px-4 py-3">No browser receives notifications yet.</p>
       ) : (
         <ul className="space-y-1">
           {subscriptions.map((row) => (
