@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4953",
   "created": "2026-11-04T13:46:40.439Z",
-  "updated": "2026-11-04T14:25:19.957Z",
+  "updated": "2026-11-04T14:25:36.389Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -92,6 +92,10 @@
     "summary-hook.ac1": {
       "status": "completed",
       "doneAt": "2026-11-04T14:25:19.956Z"
+    },
+    "summary-hook.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:25:36.389Z"
     }
   }
 }
