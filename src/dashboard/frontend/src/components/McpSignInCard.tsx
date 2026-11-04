@@ -36,12 +36,13 @@ export function McpSignInCard({ decision }: { decision: Decision }) {
   const [error, setError] = useState<string | null>(null);
 
   if (!approval) return null;
+  const approvalId = approval.id;
 
   async function decide(decision_: 'approve' | 'deny') {
     setSending(true);
     setError(null);
     try {
-      const result = await decideMcpSignIn(approval.id, decision_, decision_ === 'approve' ? level : undefined);
+      const result = await decideMcpSignIn(approvalId, decision_, decision_ === 'approve' ? level : undefined);
       if (!isOk(result)) setError(`HTTP ${result.status}: ${apiError(result)}`);
     } catch {
       setError('Could not reach the dashboard');
