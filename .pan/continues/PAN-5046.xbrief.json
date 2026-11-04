@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5046",
   "created": "2026-11-04T18:10:57.891Z",
-  "updated": "2026-11-04T18:47:58.102Z",
+  "updated": "2026-11-04T18:48:14.202Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -94,6 +94,10 @@
     "dialer-ice-restart.ac2": {
       "status": "completed",
       "doneAt": "2026-11-04T18:47:58.101Z"
+    },
+    "dialer-ice-restart.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-04T18:48:14.202Z"
     }
   }
 }
