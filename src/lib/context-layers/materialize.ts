@@ -8,6 +8,7 @@ import type { Harness } from '@overdeck/contracts';
 
 import { getOverdeckHome, isDevMode } from '../paths.js';
 import { renderManagedMemorySections } from '../memory/facts/render.js';
+import { overdeckInstructionsBlock } from '../mcp/agent-instructions.js';
 import { findProjectByPath } from '../projects.js';
 import { workspaceContextWithoutProjectLayer } from './assemble.js';
 import { renderForHarness } from './harness.js';
@@ -27,7 +28,12 @@ const SECTION_SEPARATOR = '\n\n---\n\n';
  * from leaking into Codex, OMP, ACP, or Kimi launches and avoids delivering
  * the project layer twice.
  */
-export function renderManagedLaunchContext(workspace: string, harness: Harness): string {
+export interface ManagedLaunchContextOptions {
+  /** True when the launch gets the `overdeck` MCP server (PAN-4935 D-2); absent ⇒ CLI block. */
+  overdeckMcp?: boolean;
+}
+
+export function renderManagedLaunchContext(workspace: string, harness: Harness, opts: ManagedLaunchContextOptions = {}): string {
   const sections: string[] = [renderGlobalLayer(harness, isDevMode())];
   const project = findProjectByPath(workspace);
   if (project) sections.push(renderProjectLayer(project.path, harness));
@@ -42,6 +48,9 @@ export function renderManagedLaunchContext(workspace: string, harness: Harness):
     if (body) sections.push(`## Workspace context\n\nSource: ${workspaceFile}\n\n${body}`);
   }
 
+  // PAN-4935: the tools block is always the last section.
+  sections.push(overdeckInstructionsBlock(opts.overdeckMcp === true));
+
   return sections
     .map((section) => section.trim())
     .filter((section) => section.length > 0)
@@ -54,8 +63,9 @@ export function materializeManagedLaunchContext(
   targetFile: string,
   workspace: string,
   harness: Harness,
+  opts: ManagedLaunchContextOptions = {},
 ): string {
-  const content = renderManagedLaunchContext(workspace, harness);
+  const content = renderManagedLaunchContext(workspace, harness, opts);
   mkdirSync(dirname(targetFile), { recursive: true });
   const tmp = `${targetFile}.${randomUUID()}.tmp`;
   writeFileSync(tmp, content.length > 0 ? `${content}\n` : '', { mode: 0o600 });
@@ -70,11 +80,13 @@ export function materializeManagedLaunchContext(
 export function materializeSharedManagedLaunchContext(
   workspace: string,
   harness: Harness,
+  opts: ManagedLaunchContextOptions = {},
 ): string {
   const workspaceHash = createHash('sha256').update(resolve(workspace)).digest('hex').slice(0, 16);
   return materializeManagedLaunchContext(
-    join(getOverdeckHome(), 'context', 'launch', `${harness}-${workspaceHash}.md`),
+    join(getOverdeckHome(), 'context', 'launch', `${harness}-${workspaceHash}-${opts.overdeckMcp === true ? 'mcp' : 'cli'}.md`),
     workspace,
     harness,
+    opts,
   );
 }

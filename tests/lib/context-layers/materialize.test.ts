@@ -15,6 +15,10 @@ import {
   renderManagedLaunchContext,
 } from '../../../src/lib/context-layers/materialize.js';
 import {
+  OVERDECK_CLI_INSTRUCTIONS,
+  OVERDECK_MCP_INSTRUCTIONS,
+} from '../../../src/lib/mcp/agent-instructions.js';
+import {
   globalContextFile,
   projectContextFile,
   workspaceContextFile,
@@ -84,6 +88,26 @@ describe('managed launch context composition', () => {
     const path = materializeSharedManagedLaunchContext(workspace, 'kimi-code');
     expect(path).toMatch(new RegExp(`^${overdeckHome.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/context/launch/kimi-code-`));
     expect(readFileSync(path, 'utf8')).toContain('Always global.');
+  });
+
+  it('ends with the MCP block when overdeckMcp is true', () => {
+    const rendered = renderManagedLaunchContext(workspace, 'codex', { overdeckMcp: true });
+    expect(rendered.endsWith(OVERDECK_MCP_INSTRUCTIONS)).toBe(true);
+  });
+
+  it('ends with the CLI block by default', () => {
+    const rendered = renderManagedLaunchContext(workspace, 'codex');
+    expect(rendered.endsWith(OVERDECK_CLI_INSTRUCTIONS)).toBe(true);
+    expect(rendered).not.toContain('## Overdeck tools');
+  });
+
+  it('the shared file keys on the flag', () => {
+    const mcpPath = materializeSharedManagedLaunchContext(workspace, 'claude-code', { overdeckMcp: true });
+    const cliPath = materializeSharedManagedLaunchContext(workspace, 'claude-code');
+    expect(mcpPath.endsWith('-mcp.md')).toBe(true);
+    expect(cliPath.endsWith('-cli.md')).toBe(true);
+    expect(mcpPath).not.toBe(cliPath);
+    expect(readFileSync(mcpPath, 'utf8')).not.toBe(readFileSync(cliPath, 'utf8'));
   });
 
   describe('curated memory sections (PAN-3957)', () => {

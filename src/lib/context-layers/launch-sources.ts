@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { ensureSessionContextBriefingFile } from '../briefing-freshness.js';
+import { overdeckMcpEnabledFor } from '../mcp/overdeck-mcp-gate.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { materializeSharedManagedLaunchContext } from './materialize.js';
@@ -28,7 +29,8 @@ export async function claudeSystemPromptFiles(workspace: string, harness: Runtim
   // Every managed harness receives one current-harness render of Overdeck's
   // global, project, and workspace layers. Native Kimi consumes this file via
   // its once-per-session first-user-message envelope rather than a launch flag.
-  files.push(materializeSharedManagedLaunchContext(workspace, effectiveHarness));
+  // PAN-4935: the same gate the MCP injection checks picks the tools block.
+  files.push(materializeSharedManagedLaunchContext(workspace, effectiveHarness, { overdeckMcp: await overdeckMcpEnabledFor(effectiveHarness) }));
   files.push(await ensureSessionContextBriefingFile());
 
   return files;
