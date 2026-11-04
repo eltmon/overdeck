@@ -1,10 +1,13 @@
 /**
  * Agent-only delegation tools over `/api/self/workers` (PAN-4938, PAN-4927
  * W-DEL1). The route takes the worker's issue and parent from the caller's
- * agent token; the tools never send either.
+ * agent token; the tools never send either. `task_cancel` (D-7) reads the
+ * owner-checked status route first, then stops the worker through the existing
+ * stop route: `/api/workers/<id>/stop` here, `/api/fleet/workers/<id>/stop`
+ * for a stand-in.
  */
 import { MACHINE_PROPERTY, NEEDS_PROPERTY } from './tools-write.js';
-import { optionalInteger, type OverdeckTool, requiredString, routeResult, WAIT_CHUNK_MS } from './tool.js';
+import { isOk, jsonResult, optionalInteger, type OverdeckTool, requiredString, routeErrorResult, routeResult, WAIT_CHUNK_MS } from './tool.js';
 
 const delegateTask: OverdeckTool = {
   name: 'delegate_task',
@@ -85,4 +88,26 @@ const taskStatus: OverdeckTool = {
   },
 };
 
-export const DELEGATE_TOOLS: readonly OverdeckTool[] = [delegateTask, taskWait, listWorkers, taskStatus];
+const taskCancel: OverdeckTool = {
+  name: 'task_cancel',
+  description: 'Stop one of your workers, on this machine or another. Its reports so far stay readable with task_wait.',
+  scope: 'operate',
+  audience: 'agent',
+  inputSchema: {
+    type: 'object',
+    properties: { workerId: { type: 'string', description: 'The workerId delegate_task returned.' } },
+    required: ['workerId'],
+  },
+  async run(args, ctx) {
+    const workerId = requiredString(args, 'workerId');
+    if (!workerId.ok) return workerId.error;
+    const id = encodeURIComponent(workerId.value);
+    const status = await ctx.api.request('GET', `/api/self/workers/${id}`);
+    if (!isOk(status)) return routeErrorResult(status);
+    const remote = (status.json as { remote?: unknown } | null)?.remote ?? null;
+    const stopped = await ctx.api.request('POST', remote ? `/api/fleet/workers/${id}/stop` : `/api/workers/${id}/stop`, {});
+    return isOk(stopped) ? jsonResult({ stopped: true, workerId: workerId.value }) : routeErrorResult(stopped);
+  },
+};
+
+export const DELEGATE_TOOLS: readonly OverdeckTool[] = [delegateTask, taskWait, listWorkers, taskStatus, taskCancel];

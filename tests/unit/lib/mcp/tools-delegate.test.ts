@@ -84,4 +84,42 @@ describe('MCP delegation tools (PAN-4938 W-DEL1)', () => {
     expect(DELEGATE_TOOLS.find((tool) => tool.name === 'list_workers')!.scope).toBe(requiredScopeFor('GET', '/api/self/workers'));
     expect(DELEGATE_TOOLS.find((tool) => tool.name === 'task_status')!.scope).toBe(requiredScopeFor('GET', '/api/self/workers/x'));
   });
+
+  it('task_cancel stops a local worker through /api/workers/<id>/stop after the status call', async () => {
+    const api = fakeApi({
+      'GET /api/self/workers/agent-pan-1-worker-1': { status: 200, json: { id: 'agent-pan-1-worker-1', remote: null } },
+      'POST /api/workers/agent-pan-1-worker-1/stop': { status: 200, json: { stopped: true } },
+    });
+    const client = await connectClient(api, SCOPES, true);
+    expect(resultJson(await callTool(client, 'task_cancel', { workerId: 'agent-pan-1-worker-1' }))).toEqual({ stopped: true, workerId: 'agent-pan-1-worker-1' });
+    expect(api.calls).toEqual([
+      { method: 'GET', path: '/api/self/workers/agent-pan-1-worker-1' },
+      { method: 'POST', path: '/api/workers/agent-pan-1-worker-1/stop', body: {} },
+    ]);
+  });
+
+  it('task_cancel stops a stand-in through /api/fleet/workers/<id>/stop', async () => {
+    const api = fakeApi({
+      'GET /api/self/workers/agent-pan-1-worker-2': { status: 200, json: { id: 'agent-pan-1-worker-2', remote: { environmentId: 'env-desk', label: 'desk' } } },
+      'POST /api/fleet/workers/agent-pan-1-worker-2/stop': { status: 200, json: { stopped: true } },
+    });
+    const client = await connectClient(api, SCOPES, true);
+    expect((await callTool(client, 'task_cancel', { workerId: 'agent-pan-1-worker-2' })).isError).toBeFalsy();
+    expect(api.calls.at(-1)).toEqual({ method: 'POST', path: '/api/fleet/workers/agent-pan-1-worker-2/stop', body: {} });
+  });
+
+  it('task_cancel returns a 404 status answer as an error and makes no stop call', async () => {
+    const api = fakeApi({ 'GET /api/self/workers/agent-pan-7-worker-1': { status: 404, json: { code: 'unknown-worker', error: 'no such worker' } } });
+    const client = await connectClient(api, SCOPES, true);
+    const result = await callTool(client, 'task_cancel', { workerId: 'agent-pan-7-worker-1' });
+    expect(result.isError).toBe(true);
+    expect(resultText(result)).toBe('HTTP 404: no such worker');
+    expect(api.calls).toHaveLength(1);
+  });
+
+  it('task_cancel needs the scope of both stop routes', () => {
+    const tool = DELEGATE_TOOLS.find((candidate) => candidate.name === 'task_cancel')!;
+    expect(tool.scope).toBe(requiredScopeFor('POST', '/api/workers/x/stop'));
+    expect(tool.scope).toBe(requiredScopeFor('POST', '/api/fleet/workers/x/stop'));
+  });
 });
