@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4932",
   "created": "2026-11-04T01:06:56.441Z",
-  "updated": "2026-11-04T01:28:19.767Z",
+  "updated": "2026-11-04T01:29:55.116Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -70,9 +70,10 @@
       "doneAt": "2026-11-04T01:28:18.151Z"
     },
     "planning-continuation-wiring": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4932",
-      "claimedAt": "2026-11-04T01:28:19.767Z"
+      "claimedAt": "2026-11-04T01:28:19.767Z",
+      "doneAt": "2026-11-04T01:29:55.116Z"
     }
   }
 }
