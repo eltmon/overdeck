@@ -36,6 +36,46 @@ When you launch the desktop app:
 
 The embedded server behaves identically to `pan up` — same SQLite database, same WebSocket endpoints, same REST API. The desktop app sets `OVERDECK_MODE=desktop` and `OVERDECK_NO_BROWSER=1` to suppress the CLI's own browser-open behavior.
 
+When you have chosen another machine (see [Open another machine](#open-another-machine)), the app starts no embedded server. Its windows show that machine's dashboard, and the tray polls that machine instead.
+
+---
+
+## Open another machine
+
+The desktop app can show one other machine's dashboard instead of running its own, for example your desktop's dashboard over Tailscale. The app stores at most one chosen machine.
+
+**Pair with the machine.** On that machine, create a pairing link: **Settings → Anywhere → Pair a device**, or `pan pair --url <its Tailscale address>`. In the desktop app, choose **Connect to a Machine…** (Overdeck menu or tray), paste the whole link, and click **Connect**. A bare `odp_…` credential is not enough; the link carries the machine's address. The app exchanges the one-time credential for a revocable device credential, stops its embedded server, and opens the machine's dashboard. The machine's **Settings → Anywhere → Devices** lists this computer as "Overdeck desktop on <hostname>".
+
+**Which addresses are allowed.** The app sends the device credential only over an encrypted route or this computer's loopback:
+
+1. any `https:` address;
+2. `http:` to loopback (`localhost`, `127.0.0.0/8`, `::1`), such as an SSH forward;
+3. `http:` to a Tailscale address: an IPv4 address in `100.64.0.0/10`, an IPv6 address in `fd7a:115c:a1e0::/48`, a name ending in `.ts.net`, or a name that resolves only to such addresses (a MagicDNS short name like `desk`).
+
+Any other `http:` address, such as `http://192.168.1.5:3011`, is refused. The check runs at pairing and again at every launch.
+
+**Where the credential is stored.** The machine record lives in `<userData>/remote-machine.json` (mode `0600`). The device credential in it is encrypted with Electron `safeStorage`: Keychain on macOS, DPAPI on Windows, GNOME Keyring (libsecret) or KWallet on Linux. If no secure store is available, including a Linux session that falls back to the `basic_text` backend, the app refuses to pair before it spends the pairing credential. The plaintext credential is never written to disk and never reaches a page.
+
+The dashboard windows use an in-memory Electron session (`remote-<environmentId>`, no `persist:` prefix), so the session cookie never reaches disk either. As a result the remote dashboard's browser storage (UI preferences, drafts) resets each time the app starts.
+
+**At every launch** the app checks the machine before opening it. When the check fails, the connect window opens with the reason; the app never falls back to this computer's dashboard on its own:
+
+| Failure | Message |
+|---------|---------|
+| Not reachable | "Can't reach <label> at <origin>. Check that its Overdeck is running and that this computer is on the same tailnet." |
+| A different machine now answers | "<origin> is now a different Overdeck machine (<new label>). Pair again." |
+| Credential revoked | "<label> no longer accepts this computer's credential. Pair again with a new link." |
+| Protocol mismatch | "<label> speaks Overdeck protocol <n>; this app supports 1. Update the older side." |
+| Credential store cannot decrypt | "This computer's credential store could not decrypt the saved credential. Pair again." |
+
+The connect window then offers **Open <label>** (retry), **Use this computer**, and **Forget <label>**.
+
+**Use This Computer** (Overdeck menu, tray, or connect window) keeps the pairing but starts the embedded server and shows this computer's dashboard again. **Connect to a Machine… → Open <label>** goes back.
+
+**Forget <label>** revokes this computer's device credential on the machine, then deletes the local record either way. If the machine cannot be reached, the window says so; revoke the device in that machine's **Settings → Anywhere → Devices**. Pairing with a new machine also revokes the old device first, on a best-effort basis.
+
+While a remote dashboard is shown, links to other origins open in your browser, and **Restart Dashboard** is refused: restart that dashboard on its own machine.
+
 ---
 
 ## System Tray
@@ -53,6 +93,8 @@ The tray icon changes color to indicate agent status:
 Right-clicking the tray icon shows:
 
 - **Show Dashboard** — bring the window to focus
+- **Connect to a Machine…** — open the connect window to pair with or reopen another machine
+- **Use This Computer** — leave the chosen machine and show this computer's dashboard (enabled only while another machine is shown)
 - **Start Cloister** / **Stop Cloister** — toggle autonomous orchestration
 - **Emergency Stop** — halt all running agents immediately
 - **Settings** — open the Settings page
@@ -290,6 +332,13 @@ apps/desktop/
 ├── src/
 │   ├── main.ts          # Electron main process entry
 │   ├── preload.ts       # contextBridge IPC definitions
+│   ├── boot.ts          # Boot decision: embedded server or chosen machine
+│   ├── machine-url.ts   # Pairing-link parser + transport policy
+│   ├── machine-store.ts # Chosen-machine record, safeStorage-encrypted token
+│   ├── machine-client.ts # Pairing exchange, launch preflight, self-revoke
+│   ├── connection.ts    # Active dashboard, bearer fetch, in-memory remote session
+│   ├── connect-window.ts # Connect window + its IPC guard
+│   ├── connect-preload.ts # contextBridge for the connect window
 │   ├── tray.ts          # System tray icon + polling
 │   ├── server.ts        # Embedded server spawn + health wait
 │   ├── menu.ts          # Application menu bar
@@ -301,11 +350,12 @@ apps/desktop/
 │   ├── settings.test.ts # Settings load/save/update unit tests
 │   └── protocol.test.ts # Path traversal + SPA routing unit tests
 ├── resources/
-│   └── icon.png         # App icon (512×512)
+│   ├── icon.png         # App icon (512×512)
+│   └── connect.html     # Connect window page
 ├── scripts/
 │   ├── dev-electron.mjs      # Dev watcher (restarts on dist-electron/ changes)
 │   ├── start-electron.mjs    # Production launcher
 │   └── afterPack.cjs         # electron-rebuild for node-pty post-package
-├── tsdown.config.ts     # Builds main.ts + preload.ts → dist-electron/ (CJS)
+├── tsdown.config.ts     # Builds main.ts, preload.ts, connect-preload.ts → dist-electron/ (CJS)
 └── vitest.config.ts     # Desktop-local test config
 ```

@@ -1,0 +1,263 @@
+{
+  "version": "1",
+  "issueId": "PAN-4654",
+  "created": "2026-11-01T13:26:56.845Z",
+  "updated": "2026-11-01T14:26:58.993Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "unsupported-install-detail": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4654",
+      "claimedAt": "2026-11-01T13:26:56.845Z",
+      "doneAt": "2026-11-01T13:30:09.905Z"
+    },
+    "harness-update-capabilities": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4654",
+      "claimedAt": "2026-11-01T13:30:28.784Z",
+      "doneAt": "2026-11-01T13:31:56.119Z"
+    },
+    "versions-self-report": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4654",
+      "claimedAt": "2026-11-01T13:31:57.403Z",
+      "doneAt": "2026-11-01T13:38:02.220Z"
+    },
+    "extract-dashboard-restart": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4654",
+      "claimedAt": "2026-11-01T13:38:03.344Z",
+      "doneAt": "2026-11-01T13:38:53.759Z"
+    },
+    "update-job-service": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4654",
+      "claimedAt": "2026-11-01T13:38:54.871Z",
+      "doneAt": "2026-11-01T13:43:11.021Z"
+    },
+    "update-routes-fenced": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4654",
+      "claimedAt": "2026-11-01T13:43:12.160Z",
+      "doneAt": "2026-11-01T13:45:52.693Z"
+    },
+    "fleet-routes": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4654",
+      "claimedAt": "2026-11-01T13:45:54.217Z",
+      "doneAt": "2026-11-01T13:48:52.323Z"
+    },
+    "cli-versions-update": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4654",
+      "claimedAt": "2026-11-01T13:48:53.545Z",
+      "doneAt": "2026-11-01T13:52:56.712Z"
+    },
+    "fleet-versions-panel": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4654",
+      "claimedAt": "2026-11-01T13:52:57.816Z",
+      "doneAt": "2026-11-01T13:57:44.220Z"
+    },
+    "smoke-update-all": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4654",
+      "claimedAt": "2026-11-01T13:57:45.415Z",
+      "doneAt": "2026-11-01T14:01:50.376Z"
+    },
+    "docs-fleet-versions": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4654",
+      "claimedAt": "2026-11-01T14:01:51.445Z",
+      "doneAt": "2026-11-01T14:03:13.922Z"
+    },
+    "unsupported-install-detail.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:15:47.200Z"
+    },
+    "unsupported-install-detail.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:16:01.740Z"
+    },
+    "unsupported-install-detail.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:16:15.997Z"
+    },
+    "unsupported-install-detail.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:16:29.827Z"
+    },
+    "harness-update-capabilities.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:16:44.183Z"
+    },
+    "harness-update-capabilities.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:16:58.658Z"
+    },
+    "harness-update-capabilities.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:17:13.239Z"
+    },
+    "harness-update-capabilities.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:17:28.118Z"
+    },
+    "versions-self-report.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:17:42.705Z"
+    },
+    "versions-self-report.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:17:56.746Z"
+    },
+    "versions-self-report.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:18:11.457Z"
+    },
+    "versions-self-report.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:18:25.662Z"
+    },
+    "versions-self-report.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:18:39.803Z"
+    },
+    "extract-dashboard-restart.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:18:54.763Z"
+    },
+    "extract-dashboard-restart.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:19:10.964Z"
+    },
+    "extract-dashboard-restart.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:19:24.922Z"
+    },
+    "update-job-service.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:19:42.437Z"
+    },
+    "update-job-service.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:19:57.562Z"
+    },
+    "update-job-service.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:20:11.926Z"
+    },
+    "update-job-service.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:20:26.326Z"
+    },
+    "update-job-service.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:20:41.883Z"
+    },
+    "update-routes-fenced.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:20:56.929Z"
+    },
+    "update-routes-fenced.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:21:10.892Z"
+    },
+    "update-routes-fenced.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:21:24.075Z"
+    },
+    "update-routes-fenced.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:21:37.862Z"
+    },
+    "fleet-routes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:21:52.738Z"
+    },
+    "fleet-routes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:22:06.508Z"
+    },
+    "fleet-routes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:22:20.013Z"
+    },
+    "fleet-routes.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:22:33.455Z"
+    },
+    "fleet-routes.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:22:46.753Z"
+    },
+    "cli-versions-update.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:23:00.089Z"
+    },
+    "cli-versions-update.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:23:16.836Z"
+    },
+    "cli-versions-update.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:23:34.310Z"
+    },
+    "cli-versions-update.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:23:57.388Z"
+    },
+    "fleet-versions-panel.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:24:15.011Z"
+    },
+    "fleet-versions-panel.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:24:30.023Z"
+    },
+    "fleet-versions-panel.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:24:43.611Z"
+    },
+    "fleet-versions-panel.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:25:00.008Z"
+    },
+    "smoke-update-all.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:25:16.389Z"
+    },
+    "smoke-update-all.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:25:31.544Z"
+    },
+    "smoke-update-all.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:25:45.850Z"
+    },
+    "smoke-update-all.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:26:00.724Z"
+    },
+    "docs-fleet-versions.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:26:16.369Z"
+    },
+    "docs-fleet-versions.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:26:29.605Z"
+    },
+    "docs-fleet-versions.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:26:43.177Z"
+    },
+    "docs-fleet-versions.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T14:26:58.993Z"
+    }
+  }
+}

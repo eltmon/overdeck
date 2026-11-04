@@ -37,7 +37,8 @@ const HOLD_REQUESTS_TIMEOUT_MS = 120_000;
  * reaches a server with no `request` listener and is never answered, which
  * pins one of the browser's six per-host connections until the tab closes;
  * six such requests and every reload hangs. Hold those requests and replay
- * them to the first real handler; answer 503 if none attaches in time.
+ * them to the first real handler; after the timeout, answer 503 to held and
+ * new requests until one attaches.
  * Returns the number of requests currently held.
  */
 export function holdRequestsUntilServed(
@@ -46,30 +47,34 @@ export function holdRequestsUntilServed(
 ): () => number {
   const held: Array<[IncomingMessage, ServerResponse]> = [];
   let released = false;
-  const hold: RequestListener = (req, res) => {
-    held.push([req, res]);
+  let expired = false;
+  const respondStarting = (res: ServerResponse) => {
+    if (res.headersSent) return;
+    res.writeHead(503, { 'Content-Type': 'text/plain', 'Retry-After': '5' });
+    res.end('Overdeck dashboard is still starting');
   };
-  const release = (handler: RequestListener | null) => {
+  const hold: RequestListener = (req, res) => {
+    if (expired) respondStarting(res);
+    else held.push([req, res]);
+  };
+  const release = (handler: RequestListener) => {
     if (released) return;
     released = true;
     clearTimeout(timer);
     server.off('request', hold);
     server.off('newListener', onNewListener);
-    for (const [req, res] of held.splice(0)) {
-      if (handler) {
-        handler(req, res);
-      } else {
-        res.writeHead(503, { 'Content-Type': 'text/plain', 'Retry-After': '5' });
-        res.end('Overdeck dashboard is still starting');
-      }
-    }
+    for (const [req, res] of held.splice(0)) handler(req, res);
   };
   const onNewListener = (event: string | symbol, listener: unknown) => {
     if (event !== 'request' || listener === hold) return;
     // newListener fires before the listener is added; replay once it is.
     queueMicrotask(() => release(listener as RequestListener));
   };
-  const timer = setTimeout(() => release(null), timeoutMs);
+  const timer = setTimeout(() => {
+    // Keep `hold` installed: until a real handler attaches, every request gets 503.
+    expired = true;
+    for (const [, res] of held.splice(0)) respondStarting(res);
+  }, timeoutMs);
   timer.unref();
   server.on('request', hold);
   server.on('newListener', onNewListener);

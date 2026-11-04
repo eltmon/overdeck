@@ -148,6 +148,8 @@ Measured values from the first live runs are listed below; replace the estimates
 
 A PR that diffs `roles/*.md` or `sync-sources/skills/pan-flywheel/SKILL.md` must include a `Prompt-Change:` trailer in at least one commit. The gate is enforced by [`scripts/check-prompt-change-trailer.sh`](../scripts/check-prompt-change-trailer.sh), which runs in CI via the `prompt-gate` job and is also wired into `npm run lint` as `lint:prompt-trailer`.
 
+In CI the job checks out one commit and runs the script with `--fetch`, which fetches only `main` and `HEAD`, with no blobs and no tags, and fails if the clone is still shallow or `origin/main` is missing. A full checkout (`fetch-depth: 0`) also fetched every other branch, including the ~195k-commit archived `overdeck-state` branch, and timed the job out (PAN-4917). Locally, `npm run lint:prompt-trailer` runs without `--fetch` and reads the clone's existing history.
+
 ## Model-placement suites
 
 Overdeck places models per role, but vendor benchmarks are measured at `max`/`xhigh` effort while Overdeck launches at `high`. These four suites (PAN-4362) measure the behavior each placement decision depends on, at launch effort, for any model `OVERDECK_EVAL_MODEL` names.

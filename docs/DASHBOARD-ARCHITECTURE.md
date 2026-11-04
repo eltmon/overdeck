@@ -9,6 +9,7 @@ The dashboard server uses **Effect.js** for HTTP routes and structured RPC, plus
 **Server structure** (split from old 15K-line monolith in PAN-428):
 - `src/dashboard/server/main.ts` — entry point, dual-runtime (Bun dev, Node prod)
 - `src/dashboard/server/server.ts` — Effect HTTP server, route composition, layers
+- `src/dashboard/server/server-bind.ts` — bind retry on `EADDRINUSE`, and the startup request hold: Effect's server listens before `HttpRouter.serve` attaches its handler, so `holdRequestsUntilServed` queues requests that arrive in that gap and replays them to the first real handler. If none attaches within 120 s, held and new requests get `503` with `Retry-After: 5` until one does.
 - `src/dashboard/server/ws-rpc.ts` — Effect RPC over WebSocket at `/ws/rpc`
 - `src/dashboard/server/ws-terminal.ts` — raw WebSocket terminal at `/ws/terminal`
 - `src/dashboard/server/routes/` — ~60 route modules plus domain subdirs (agents/, misc/, resources/, specialists/, workspaces/)
@@ -65,6 +66,37 @@ Origin, then session cookie or internal token — see [DASHBOARD-AUTH.md](DASHBO
   `ws.ping()` because proxies such as Cloudflare close an idle WebSocket after ~100s and treat a data
   frame as traffic more reliably than a ping frame. See `ws-terminal-heartbeat.ts` and
   `components/terminal/terminalControlFrames.ts`.
+- Color themes (PAN-4644): `XTerminal.tsx`'s xterm palette comes from the active color
+  theme — `useColorTheme((s) => s.terminalPalette(mode))`, recoloring a live terminal
+  without remounting it when the selection changes. A new tmux session's `window-style`
+  background is stamped from `resolveTerminalBackground()`
+  (`src/lib/color-themes/terminal-background.ts`), which falls back to `TERMINAL_BG`
+  on any error. Five routes under `src/dashboard/server/routes/color-themes.ts` serve
+  the feature: `GET /api/color-themes`, `PUT /api/color-themes/selection`,
+  `POST /api/color-themes/import/preview`, `POST /api/color-themes`, and
+  `PUT /api/color-themes/:id` (in-place overwrite of a user theme; built-ins refused
+  with 403). The import preview accepts a single theme `.json` or a `.vsix` package;
+  `.vsix` archives are read in memory by `src/lib/color-themes/zip-reader.ts` (stored
+  and deflated entries only) and mapped by `vsix-import.ts` (PAN-4659). See
+  [appearance.mdx](../configuration/appearance.mdx) "Color themes" for the operator-facing
+  picture.
+- Shared Sessions host side (PAN-4473): `src/dashboard/server/routes/shares.ts` serves
+  `GET /api/shares`, `POST /api/shares`, `POST /api/shares/:code/commands` and
+  `DELETE /api/shares/:code`. They delegate to `ShareManager` in `services/share-host.ts`,
+  which holds one host WebSocket per live room to the share service. The record file door and
+  the share service HTTP client live in `src/lib/sharing/`. The host token stays on the
+  server; the browser sees `ShareView`s only. See "Host side in the dashboard" in
+  [SHARED-SESSIONS.md](SHARED-SESSIONS.md). PAN-4474 adds `src/dashboard/server/sharing/` —
+  `peer-hub.ts` (one werift `RTCPeerConnection` per admitted viewer), `conversation-bridge.ts`
+  (history backfill, then live append/update from `watchConversation`) and `channel-writer.ts` —
+  wired into `ShareManager`. PAN-4475 adds the viewer side: `routes/joins.ts` (`/api/joins*`,
+  `/api/share-probe`) over `services/share-join.ts` (`JoinManager`, one join socket per short
+  code), and the frontend route `/#/shared/<code>` (`components/chat/sharing/SharedConversationView.tsx`,
+  `webrtc-viewer.ts`). PAN-4477 adds the read-only terminal: `sharing/terminal-bridge.ts` streams
+  a watching viewer's terminal from a Herdr observe stream or the tmux PTY hub, through the
+  hub-listener seam in `pty-hub.ts` (`addHubListener`, `removeHubListener`) and
+  `pty-hub-attach.ts` (`attachHubPty`, `subscribeToTmuxHub`, moved out of `ws-terminal.ts`); the
+  viewer renders it in `SharedTerminalView.tsx`.
 - Companion terminals (PAN-3974, PAN-3835): an OpenCode or Codex conversation's TERMINAL
   streams a separate `companion-<ownerSession>` tmux session running `opencode attach` or
   `codex resume --remote` against the conversation's own runtime, opened through
@@ -179,6 +211,12 @@ its own. The button therefore sends `dashboardMutationJsonHeaders()`, with no
 argument: that helper resolves a WebSocket RPC URL internally, so passing it a
 relative REST path would throw in `new URL(...)`.
 
+Every browser-side mutation follows the same contract, not only this button.
+The simple-mode actions (`src/dashboard/frontend/src/lib/simple/useSimpleActions.ts`,
+helper `postJson`) send `credentials: 'include'` and
+`await dashboardMutationJsonHeaders()`; a raw `fetch` with only `Content-Type`
+gets `403 Invalid CSRF token` (PAN-4670).
+
 The kickoff prompt never tells the conversation to read per-issue records.
 Instead the server gathers that evidence itself, before the conversation
 exists, and embeds it at `{{EVIDENCE}}` under the template's `## Record
@@ -276,7 +314,10 @@ door that does not exist; a real record read door would be a separate change.
   table (PAN-4312 — that scan cost ~9s on a 3GB embeddings DB). Successful values remain
   usable for at most five minutes during refresh failures, with a five-second retry
   backoff. Search configuration, provider availability, and runtime health are still
-  read per request.
+  read per request. The per-issue cost snapshot (`getCostsByIssue`) reads
+  `cost_issue_rollup`, a trigger-maintained table of ~3k grain rows
+  (`src/lib/overdeck/cost-issue-rollup.ts`), instead of aggregating every
+  `cost_events` row (PAN-4724: ~1.5 s → ~5 ms per refresh).
 - Agent resource costs use one grouped worker query and a 15-second shared snapshot,
   invalidated when agent membership changes. Hourly burn remains twice the sum in the
   last 30 minutes, with the inclusive cutoff and rounding to cents preserved. SQLite's
@@ -420,6 +461,32 @@ door that does not exist; a real record read door would be a separate change.
   and `pullRequest` + `pullRequests` on `GET /api/conversations/:id`. A new table
   goes in the init migration AND a `runSchemaTopUp` in `ensureRuntimeIndexesSync`,
   and bumps `OVERDECK_TABLE_COUNT`.
+- Issue links in conversations (PAN-4714): `TranscriptLink` passes tracker issue
+  URLs inside a conversation to `TranscriptIssueLink`, which resolves them with
+  `parseTrackerIssueUrl` / `resolveTrackerIssueId` (`@overdeck/contracts`)
+  against `/api/registered-projects` (`linearTeam` prefix, `githubRepo`, and the
+  `tracker` field from `tryResolveProjectTrackerType`). A plain click calls
+  `openIssue(id, 'overview')`; links outside a conversation are unchanged.
+  `TranscriptIssueLink` only intercepts the click when
+  `IssueDrawerAvailableContext` (`components/drawer/issueDrawerAvailableContext.ts`,
+  a leaf module with no component imports, to avoid a circular dependency
+  back through `IssueDetail` → `DrawerAgentSession` → `ConversationPanel` →
+  `ChatMarkdown`) is
+  `true` — provided only by the main `App.tsx` layout, which is the only host
+  that mounts `<IssueDrawer />`. The standalone pop-outs
+  (`/popout/conversation/<id>`, `/popout/flywheel-conversation`) and the
+  mobile app (`/m`) also render `ConversationPanel` but don't mount the
+  drawer, so the context defaults to `false` there and issue links keep their
+  plain new-tab behaviour (review fix after the first PAN-4714 review cycle
+  found the click otherwise went to a nonexistent drawer). PAN-4717: the
+  drawer opens even for an issue absent from the dashboard snapshot —
+  `useIssueData` subscribes `subscribeIssueEvents` regardless, and
+  `backfillIssue` (PAN-3659) loads aged-out closed issues, whose row arrives
+  as `issues.delta` on the global stream. `backfillIssue` cannot load a
+  current-cycle-filtered (backlog, canceled) or otherwise unresolvable issue,
+  so the link passes its own href as `openIssue(id, 'overview', href)`,
+  stored as `drawer.trackerUrl` (never written to the URL), and the header's
+  tracker button falls back to it when the issue row carries no `url`.
 - Conversation schedules (PAN-4640): the `conversation_schedules` table holds one
   prompt, a 5-field cron, an IANA `time_zone`, `enabled`, `next_run_at`, and the
   last run's time, status (`delivered`, `failed`, `skipped`) and error, deleted with
@@ -442,6 +509,45 @@ door that does not exist; a real record read door would be a separate change.
   deacon child would need two internal HTTP hops and could not pass a resume
   cause), and a scheduled prompt follows the operator-message rule, so the
   deacon pause toggle does not apply.
+  PAN-4657 adds the dashboard surface: `listScheduleSummariesForConversations`
+  (one grouped query per list page) returns `nextScheduledRunAt` (the earliest
+  enabled schedule's next run) and `scheduleCount`, spread into the list
+  enrichment next to triage; the frontend renders them as a next-run badge
+  (`ConversationRow.tsx`). A `conversation.schedules_changed` domain event
+  (payload `{ conversationName }`, reducer bumps `conversationsListRevision`)
+  is emitted by `emitConversationSchedulesChanged` on every successful
+  POST/PATCH/DELETE in `routes/conversation-schedules.ts` and by the sweep
+  after a delivered, failed, or skipped fire, so the list and the schedule
+  dialog refresh without polling. A delivered fire also calls
+  `clearConversationTriage` (nulls `settled_at`, `settle_reason`, and
+  `snoozed_until` together) on the delivered-to conversation — the clear-chain
+  head when the schedule's own conversation was superseded — so the run
+  resurfaces it in Inbox. The dialog itself
+  (`src/dashboard/frontend/src/components/chat/ConversationScheduleDialog.tsx`)
+  is opened via `openScheduleDialog(name)` from the row's overflow menu and the
+  tab menu (`ScheduleMenuItem`, hidden for a vault or linked row) and mounted
+  once at the app root as `ConversationScheduleDialogHost`.
+- Idle auto-settle (PAN-4655). `src/lib/overdeck/conversation-idle-settle.ts` holds
+  the sweep: it groups the operator list by display root (the Command Deck D27 rule:
+  critic → builder, else parent), keeps only roots that are not settled, not
+  snoozed past the cutoff, not reset past the cutoff (`conversations.idle_reset_at`,
+  written by unsettle and unsnooze), not released, and with no fork in progress,
+  then drops any group with a member waiting on the operator (the pending-input
+  feed) or with a live member whose transcript cannot be resolved. A member's
+  activity is the newest of `created_at`, `last_attached_at`, and
+  `readTranscriptLastActivityMs` (the file's modified time when it is older than
+  the cutoff, else the last user/assistant record time in the tail, because Claude
+  Code touches a running transcript without writing a record). When liveness or
+  the feed is unknown the sweep settles nothing. It writes only roots, through
+  `settleIdleConversation`, whose `UPDATE` re-checks settle, archive, snooze and
+  `idle_reset_at` so an operator unsettle mid-sweep wins.
+  `services/conversation-idle-settle-service.ts` runs it in the primary dashboard,
+  boot +2 min then every 15 min, non-overlapping, skipped while the Deacon is
+  frozen and with `OVERDECK_DISABLE_IDLE_SETTLE=1`, and invalidates the
+  conversation-list cache after a settle. `services/conversation-sweeps.ts` is the
+  host for PR sync, schedules, and idle-settle. The days come from app_settings
+  `conversations.auto_settle_idle_days` (default 3, `0` = off), read and written by
+  `GET/PUT /api/conversations/triage/auto-settle` and `pan conv auto-settle-idle-days`.
 - `GET /api/conversations/:name/messages` and `/message-locator` resolve registered
   rows first. A name that is a bare Claude session UUID with no row (a Cmd-K hit on an
   indexed transcript Overdeck never registered) falls back to an exact `<uuid>.jsonl`
@@ -495,9 +601,10 @@ door that does not exist; a real record read door would be a separate change.
   A pending user bubble's `deliveryState` renders one of: `pending` ("Sending…"),
   `unknown` ("Delivery not confirmed"), `accepted` ("Sent · waiting for transcript"), or
   `subagent` ("Delivered to subagent · `<description>`" — Claude Code routed the message
-  into a running subagent instead of this conversation; PAN-4247), or `held` ("Waiting:
+  into a running subagent instead of this conversation; PAN-4247), `held` ("Waiting:
   the agent needs a permission answer first"; see "Terminal permission prompts and held
-  messages" below, PAN-4278). Before pasting, the
+  messages" below, PAN-4278), or `scheduled` (a server-held message waiting for a usage
+  limit to reset; see "Scheduled messages: send when limits reset" below, PAN-4641). Before pasting, the
   composer route checks Claude Code's agent selector and switches input back to the main
   agent (PAN-4268); if that cannot be confirmed the route answers 409
   `input-target-not-main`, the toast shows the reason, and the draft stays in the editor.
@@ -537,6 +644,30 @@ door that does not exist; a real record read door would be a separate change.
   composer thumbnail and the sent-message thumbnails open one shared lightbox
   (`components/chat/ImageLightbox.tsx`, host mounted in `main.tsx`); sent-message
   thumbnails come from `extractAttachmentImageRefs()` in `messagesTimeline/helpers.ts`.
+- Composer citations (PAN-4642): `lib/citationFormat.ts` is the exact serializer
+  (`formatCitationBlock`/`composePromptWithCitations`) — client-side only, identical
+  for every harness, no server route changed. `lib/composerCitations.ts` persists
+  each conversation's pending list to `localStorage` under `conv-citations:<name>`;
+  `PendingCitation.source` is a discriminated union — `{ kind: 'message'; messageId;
+  role }` for a reply quote, or `{ kind: 'file'; path }` (an absolute path) for a
+  quote taken from the editor Preview (PAN-4658). File citations serialize as one
+  ``Notes on `<path>`:`` block per path, after the reply-notes block
+  (`fileCitationHeader`/`formatCitationBlock`). The editor Preview cites through
+  `CiteSelectionLayer`'s `resolve` prop (`fileSelectionResolver(path)`) instead of
+  the default message resolver — see `docs/MARKDOWN-EDITOR-PANE.md`'s "Citing from
+  the Preview" section. `components/chat/
+  citations/` holds the selection toolbar (`CiteSelectionToolbar.tsx`), the chips
+  strip (`CitationChips.tsx`), and the best-effort quote highlight
+  (`citationHighlight.ts`, the CSS Custom Highlight API). Rows opt in via
+  `data-cite-message-id`/`data-cite-role` (set only on settled, non-streaming rows in
+  `messagesTimeline/messageRows.tsx`), and `resolveSelectionCitation()` maps a DOM
+  selection back to one when both ends land in the same tagged row. On send the
+  pending list is consumed only after the message has committed to a delivery lane
+  (bubble, hold, offline hold, or outbox) — so a failed send keeps the citation block
+  in the retry outbox instead of losing it. `ConversationView` passes
+  `citationsEnabled` only when the composer branch of the footer chain renders
+  (`!hideComposer`, no `onResume`, not forking, no `clearedToConvId`, not a vault
+  copy) (PAN-4681).
 - Conversation timeline layout (PAN-4497): `MessagesTimeline.tsx` virtualizes all but
   the last 8 rows with `@tanstack/react-virtual`. Visible virtual rows render in normal
   flow inside one wrapper translated to the first visible row's offset, so rows cannot
@@ -628,12 +759,13 @@ The dashboard store is a Zustand 4 store, so a `useDashboardStore(selector)` cal
 - **A selector that builds an array or object keeps identity.** Use `memoizeArraySelector`, `deriveMemo`, a per-key cache like the one in `selectBackendPanes` (the last result per issue, returned while that issue's panes are the same objects in the same order), or `useShallow`. Never write `?? []` inline in a selector; use a module-level empty constant.
 - **Reducers change only the slice and entry an event is about.** Runtime events (`agent.activity_changed`, `agent.thinking_*`, `agent.message_received` and the rest) write `agentRuntimeById` only and leave `agentsById` untouched.
 - **Click handlers read the store at call time.** A component that needs a slice only to look something up when the operator clicks reads `useDashboardStore.getState()` inside the handler instead of subscribing.
-- **Streamed deltas reach only the open conversation.** A delta is a `setQueryData` on `['conversation-messages', name]`; it re-renders `ConversationPanel` and its timeline. `ComposerFooter` and `ConversationListItem` are memoized, so their props must stay identity-stable: `useStableComposerProps` gives the composer a send callback that reads the latest messages from a ref, and `useConversationMutations` returns one memoized object built from the mutations' stable `.mutate` functions. Archive-pending state is not per instance: the archive mutation carries `mutationKey: ['conversation-archive']`, every hook instance reads the pending names from the MutationCache with `useMutationState`, and the returned object changes identity only when that list changes (PAN-4584).
+- **Streamed deltas reach only the open conversation.** A delta is a `setQueryData` on `['conversation-messages', name]`; it re-renders `ConversationPanel` and its timeline. `ComposerFooter` and `ConversationListItem` are memoized, so their props must stay identity-stable: `useStableComposerProps` gives the composer a send callback that reads the latest messages from a ref, and `useConversationMutations` returns one memoized object built from the mutations' stable `.mutate` functions. Archive- and stop-pending state are not per instance: the archive and stop mutations carry `mutationKey: ['conversation-archive']` and `mutationKey: ['conversation-stop']`, every hook instance reads the pending names from the MutationCache with `useMutationState`, and the returned object changes identity only when one of those lists changes (PAN-4584). Both mutations' `onSuccess` await the `['conversations']` invalidate promise before their side effects, so pending lasts until the refetch lands, not just until the POST resolves (PAN-4626).
 - **Live-store consumers of the shell live in `AppLiveStoreHost`.** The pending-input dialogs, desktop activity notifications and the "Rebuild stack for" workspace invalidation follow agent, issue and activity changes. They render in `App/AppLiveStoreHost.tsx`, a sibling of the routed tree, so those changes do not re-render `App` and everything below it.
 - **Aggregate chrome is the exception.** `RunningAgentsPill`, `StoppedAgentsBanner`, `SystemHealthPill`, `DecisionsIndicator`, `NeedsYouIndicator`, the nav `Sidebar` and `ConversationDock` show cross-issue totals, so they may re-render when any agent or issue entry changes.
 - **The 5 s health poll still re-renders `App`.** `App` reads `dataUpdatedAt` from the `backend-health` query, and several relative-time labels advance only because of that re-render. It stays until those labels move onto a shared clock (the PAN-4560 follow-up issue).
 
-**Render-count tests.** `src/dashboard/frontend/src/test-utils/renderCounter.tsx` provides `createRenderCounter()` (a `Probe` that counts React `Profiler` commits of a subtree, mounts excluded), `applyStoreEvents(events)` (applies domain events inside `act`), `resetDashboardStore()` and `seedDashboardStore(partial)`. The tests assert render counts, never that a `memo` exists, so they stay valid when the React Compiler ([PAN-4561](https://github.com/eltmon/overdeck/issues/4561)) replaces hand-written memoization. Each fixed path has one, and all run in CI through the root `test:frontend-subset` script:
+**Render-count tests.** `src/dashboard/frontend/src/test-utils/renderCounter.tsx` provides `createRenderCounter()` (a `Probe` that counts React `Profiler` commits of a subtree, mounts excluded), `applyStoreEvents(events)` (applies domain events inside `act`), `resetDashboardStore()` and `seedDashboardStore(partial)`. The tests assert render counts, never that a `memo` exists, so they stay valid when the React Compiler ([PAN-4561](https://github.com/eltmon/overdeck/issues/4561)) replaces hand-written memoization. Each fixed path has one, and all run in CI through `npm run test:frontend-subset`,
+which runs the files listed in `scripts/frontend-test-subset.txt`:
 
 - `src/lib/__tests__/selectBackendPanes.render-count.test.tsx`
 - `src/components/IssueActionMenu/__tests__/useIssueActions.render-count.test.tsx`
@@ -800,6 +932,79 @@ One silent path remains by design: Herdr reports `agent_prompt_stalled`/`timeout
 `agent.prompt` wait as delivered, because it types the text and Enter before it watches, and
 its contract says never to re-send. The frontend's 4-minute "Not found in transcript" timer is
 the only cover for that case.
+
+## Scheduled messages: send when limits reset (PAN-4641)
+
+When a Claude Code conversation stops on a usage limit, the operator can queue a message on the
+server instead of waiting. The server holds it and sends it about a minute after the limit
+resets. Only Claude Code conversations support this; other harnesses, agents and vault browse
+copies are refused.
+
+**Reset time.** `providerErrorFromTranscriptTail` (`src/lib/overdeck/conversation-provider-error.ts`)
+sets `usageLimit` on an API-error record whose `error` is `rate_limit` or whose `apiErrorStatus`
+is 429. The reset time comes from, in order: `quotaLimits.resetsAt` (unix **seconds**, with
+`quotaLimits.rateLimitType` such as `five_hour` or `seven_day` as the window); the
+`resets 9am (America/New_York)` / `resets Oct 1, 3pm (…)` message text, parsed by
+`parseLimitResetText` (`limit-reset-text.ts`); otherwise unknown (a proxied 429).
+`readConversationUsageLimit` (`conversation-usage-limit.ts`) answers `limited` while the last
+main-chain turn is such a record and its reset is in the future or unknown.
+
+**Store.** The overdeck.db table `conversation_scheduled_messages` is read and written only by
+the door `src/lib/overdeck/conversation-scheduled-messages.ts`. A row's `not_before` is the
+reset plus a 60 s grace, `now + 15 min` when the reset is unknown, or `now` when no limit is
+active. A conversation holds at most 20 undelivered rows; text is limited to 50 000 characters,
+and `/pan` commands are refused.
+
+**Status machine.** `pending → sending → sent → delivered`. The tick
+(`tickScheduledMessages`, `src/lib/overdeck/scheduled-message-delivery.ts`) runs every 60 s and
+acts on each conversation's **head row** only (lowest id not delivered), so messages send in
+queue order and a `failed` or `unknown` head blocks the rows behind it until the operator
+dismisses it.
+
+- A due `pending` head whose conversation is still limited with a known future reset is re-armed
+  to that reset without counting an attempt.
+- Otherwise the row is claimed atomically (`pending → sending`). An ended conversation, or one
+  whose harness process is gone, is resumed first through `handleConversationResume`; a failed
+  resume puts the row back to `pending` for the next tick and counts an attempt. A blocking
+  choice menu in the pane defers the row; the pane is read through `resolveAgentPaneIo`, so the
+  check works on Herdr and tmux. A throw inside the claimed section never leaves the row in
+  `sending`: before the paste it returns to `pending`, after it the row becomes `unknown`.
+- The delivery door `handleConversationMessage` is called directly (not through the HTTP
+  receipt cache). 2xx → `sent`; 409 → back to `pending`; other 4xx → `failed`. A 5xx whose body
+  says `deliveryUnknown: false` (the terminal refused the paste, e.g. 502 `not-delivered`)
+  returns to `pending` and counts an attempt; any other 5xx or a thrown error → `unknown`. An
+  `unknown` row is never pasted again automatically.
+- A `sent` row's outcome is read from the transcript: a newer assistant reply → `delivered`; a
+  newer usage-limit error → re-armed to the new reset with `attempts + 1`; no newer assistant
+  record within the 10-minute outcome window → `delivered` with `last_error: no transcript
+  confirmation`. A re-arm past `MAX_SCHEDULED_ATTEMPTS` (24) marks the row `failed`.
+- Delivered rows are pruned after seven days. Each paste emits an `info` activity entry linked to
+  `/conv/<id>`; each re-arm, failure and unknown outcome emits a `warn` entry.
+
+**Patrol.** `src/dashboard/server/services/scheduled-message-patrol.ts` hosts the tick in the
+dashboard process, because the delivery and resume doors live there (the Deacon runs in a
+forked child). At start it marks rows a crash left in `sending` as `unknown`, then runs one tick
+and ticks every 60 s. It does not start on a peer dashboard or with
+`OVERDECK_DISABLE_SCHEDULED_MESSAGES=1`, skips ticks while the Deacon is frozen, and skips a
+tick while the previous one is still running. Archived conversations are skipped; their rows
+wait until the conversation is unarchived.
+
+**Routes.**
+
+| Route | Answer |
+| --- | --- |
+| `GET /api/conversations/:name/scheduled-messages` | 200 `{ supported, limit, messages }` (rows `pending`, `sending`, `failed`, `unknown`); 404 |
+| `POST /api/conversations/:name/scheduled-messages` `{ message }` | 201 `{ message, limit }`; 404; 422 `{ error, code }` (`empty`, `too-long`, `command-not-schedulable`, `limit-detection-unsupported`, `vault-browse-copy`); 409 `queue-full` |
+| `PATCH /api/conversations/:name/scheduled-messages/:id` `{ message }` | 200 `{ message }`; 404; 409 `not-editable` (row not `pending`); 400 |
+| `DELETE /api/conversations/:name/scheduled-messages/:id` | 200 `{ removed: true }`; 404; 409 `already-sent` (row `sending` or `sent`) |
+
+**Client.** `useScheduledMessages` (`components/chat/scheduledMessages.ts`) polls the GET every
+15 s through one shared poller per conversation. The composer offers **When limits reset** in
+the delivery selector and, while the conversation is limited, a notice with a **Send when limits
+reset** button. Queued rows render at the end of the timeline as dimmed user bubbles
+(`messagesTimeline/ScheduledMessageRow.tsx`) with the expected send time, Edit and Cancel
+(Dismiss for a failed or unconfirmed row). From a terminal: `pan tell <conv> --when-limit-resets
+"<msg>"` queues a message and `pan conv pending <conv>` lists the queue.
 
 ## Degraded mode (PAN-4279)
 
@@ -1119,6 +1324,17 @@ it sorts into Waiting. A held-only row has one **Open** button that navigates to
 `/conv/<name>`, where the held handoff view offers Start; it has no Answer
 button, because there is no dialog to reopen.
 
+**Needs you lists MCP sign-ins (PAN-4946).** `useDecisions.ts` polls
+`GET /api/mcp-oauth/approvals` every 5 s (`fetchMcpSignInApprovals`,
+`src/components/Settings/anywhere/anywhereApi.ts`), but only when
+`GET /api/anywhere/status` reports `viewer.kind` of `root-session` or
+`internal-token` — a paired device or another machine never requests the
+approvals route. Each pending approval becomes a blocking `mcpSignIn`
+decision carrying the `McpSignInApproval` record; `DecisionsPanel` renders it
+as `McpSignInCard` (approval code, a level select defaulting to the requested
+level, Approve/Deny) instead of the generic Answer button, and
+`MobileNeedsYou` shows "Approve on the desktop" for it.
+
 **All shows transitions.** A conversation card is dated by a lifecycle fact:
 `endedAt` when the conversation ended, otherwise `createdAt`, labelled `ended` or
 `started`. It is never dated by transcript activity (`lastActivityAt`), which
@@ -1166,3 +1382,142 @@ Everything above is a selector over existing rows and events; nothing is stored.
 `activity.entry` is meant for news (something shipped, failed, finished or needs
 the operator); progress telemetry belongs in `activity.detailed`. Moving the
 remaining telemetry emit sites is tracked in PAN-4306.
+
+## Needs-you push (PAN-2354)
+
+The primary dashboard pushes a notification to the operator's phone when an
+agent or conversation needs them. The machine sends Web Push itself: the
+payload is encrypted to the phone (RFC 8291 `aes128gcm`) and signed with the
+machine's own VAPID key, so neither the push service nor overdeck.ai can read
+it. ntfy is an optional second provider that gets titles only. Operator docs:
+`configuration/push-notifications.mdx`.
+
+**Detection.** `src/dashboard/server/services/needs-you-push-service.ts` feeds
+one dispatcher from four sources:
+
+1. `agent.enrichment_changed` events: agent questions (including `pan ask`
+   decisions, whose `toolUseId` starts with `operator-decision:`), plan
+   approvals and permission prompts.
+2. The conversation pending-input feed (`getConversationsPendingInputFeed`),
+   scanned every 5 s, but only while a push target exists (a Web Push
+   subscription, a ready ntfy topic, or a phone with a push key while the
+   directory is online). With no target nothing is scanned.
+3. The wake path. The AskUserQuestion PreToolUse hook's
+   `ask_user_question_blocked` heartbeat (`routes/agents/runtime-events.ts`)
+   and a waiting `conversation.permission_changed` event call
+   `wakeNeedsYouPush()`. After a 500 ms debounce it scans conversations and
+   calls `pollEnrichmentNow()` (agent-enrichment-service), so a Claude Code
+   question reaches the phone in about a second.
+4. Edge events: `agent.heartbeat_dead`, and `pipeline.journal` entries of type
+   `verification.started`, `merge.completed` (finished), `merge.failed`,
+   `review.stall-escalated` and `conflict.repair-escalated` (failed).
+
+It runs only when `isPeerDashboardProcess()` is false; a peer would send every
+push twice.
+
+**Keys and priming** (`src/lib/push/dispatcher.ts`). Each subject
+(`agent:<id>`, `conv:<name>`) keeps a set of pending keys: `auq:<toolUseId>`,
+`plan:<toolUseId>`, `perm:<signature>` (`perm:pending` without a signature). A
+key notifies on its rising edge and is forgotten when it disappears, so the
+next prompt notifies again. `auq:` and `plan:` keys are globally unique, so a
+key already active under another subject (a conversation seen both as an
+enrichment agent and as a feed row) is not sent twice. Items asked more than
+60 s before the service started are recorded silently, so a restart never
+replays old questions. Edge notifications dedup by tag for 24 h. At most 6
+notifications go out per rolling minute; the rest are counted into one
+`<N> more items need you` summary.
+
+**Closed trigger list** (`src/lib/push/classify.ts`): question
+(`pendingAskUserQuestion`), approval (`pendingProposedPlan`, a permission
+prompt), finished and failed (the edge events above). Pane choices, held
+kickoffs, rate limits, session-resume gates, `verification.failed` and plain
+`agent.stopped` never notify.
+
+**Providers for PAN-2080.** `src/lib/push/types.ts` defines `PushProvider`
+(`name`, `hasTargets()`, `send(notification)`) and `NeedsYouNotification`
+(`title` for Web Push, `publicTitle` that carries only the kind plus an issue id
+or "a conversation", `body`, `url`, `tag`). `webpush-provider.ts` and
+`ntfy-provider.ts` implement it; Slack, email and TTS plug in the same way.
+Both use a 5 s timeout and one retry after 5 s for network errors, 429 and 5xx.
+A Web Push 404/410 deletes the subscription, and a subscription whose paired
+device is revoked is deleted before sending.
+
+**Native provider (PAN-4843).** `src/lib/push/native-provider.ts` is the third
+provider, `native`, for the Overdeck phone app. For each active `phone` access
+token with a `pushKey` it seals the payload with `crypto_box_seal` to that key
+and sends a `push` frame to the overdeck.ai directory. It reaches the directory
+through a lazy `directory: () => PushDirectoryPort | null` getter
+(`currentDirectoryClient`), because `main.ts` starts the push service before
+`startAnywhere` has called `setDirectoryClient`: a captured client would stay
+`null`. The plaintext is `PhonePushPayload` (`packages/contracts/src/connect.ts`):
+`{ v, machine, kind, title, body, url, tag, issueId, ts }` with the full title,
+since only the phone can read it. It is trimmed to `PUSH_PLAINTEXT_MAX_BYTES`
+(2,256 bytes, which seal to exactly `PUSH_SEALED_MAX_CHARS` base64 characters),
+body first and then title, on code-point boundaries. Each phone's send waits up
+to 10 s for the `push-result` with its `requestId`: `ok` maps to success,
+`no_registration` and `unknown_client` to `skipped`, `rate_limited`,
+`delivery_failed`, a timeout or an offline directory to `transient`, and a
+payload that cannot fit to `rejected`.
+
+**Files under `<OVERDECK_HOME>/push/`** (directory 0700):
+
+- `vapid.json` (0600): `{ publicKey, privateKey, createdAt }`. Created once with
+  temp file plus `link()`, never overwritten: a new key would orphan every
+  subscription.
+- `subscriptions.json` (0600): at most 20 records `{ id, endpoint, keys, label,
+  credentialId, createdAt, lastSuccessAt, lastFailureAt, failureCount }`,
+  written atomically through one in-process queue. Endpoints must be `https:`
+  on Google, Mozilla, Apple or Microsoft push hosts (SSRF guard).
+
+**Routes** (`routes/push.ts`, admin scope): `GET /api/push/vapid-public-key`,
+`GET /api/push/status` (hosts and a masked ntfy topic only), `POST` and
+`DELETE /api/push/subscriptions`, `POST /api/push/test`.
+
+**The seam with PAN-2355.** There is exactly one service worker,
+`src/dashboard/frontend/public/sw.js`, always registered with
+`navigator.serviceWorker.register('/sw.js', { scope: '/' })`. PAN-2355 owns the
+manifest, the worker, registration and the `/m` phone shell; PAN-2354 owns the
+keys, the subscription store and routes, the send path and the **Turn on
+notifications** control. Second-lander rule: whichever issue lands second
+extends the existing `sw.js` and manifest, never adds a second worker or script
+URL. The payload contract is `{ title, body, url, tag }`, where `url` is a
+same-origin path: `/m?subject=<encodeURIComponent(id)>` for questions and
+approvals, `/m` for everything else. A click focuses an open window and
+navigates it to `url`, else opens one; a cross-origin `url` becomes `/m`.
+
+**The phone pipeline tab (PAN-4661).** The shell adds the routes
+`/m/pipeline` and `/m/pipeline?issue=<id>`; `App.tsx` matches those two paths
+exactly, never a `/m/` prefix. The tab reads `selectIssues`,
+`derivedIssueStateByIssueId` and `selectAgents` from the store `EventRouter`
+fills, and groups with `groupPipelineIssues` in `lib/pipeline-state.ts`,
+which the desktop `PipelineView` shares — one definition of "active issue",
+one phase order, one sort. It adds no API route and no HTTP request.
+
+## Deft pipeline routes (PAN-4849)
+
+PAN-4820 shipped the per-issue Deft pipeline as library and CLI code
+(`src/lib/deft/`, `pan skills deft use|back|save|show`).
+[PAN-4849](https://github.com/eltmon/overdeck/issues/4849) serves it to the
+dashboard from `src/dashboard/server/routes/deft.ts`. The state routes read
+the issue's worktree with `src/lib/deft/state-reader.ts`, which uses
+`fs/promises` only and never throws (a malformed file becomes an `errors`
+entry). The review-cycle route loads PR data through Overdeck's cached PR,
+check-run and discussion loaders plus one async `git log`
+(`src/lib/deft/review-cycle-load.ts`) and derives the view model with the pure
+`src/lib/deft/review-cycle.ts`. Escalation and menu answers from the question
+dialog go through `POST /api/agents/:id/answer-question`
+(`src/lib/deft/pending-answer.ts`). The frontend reads these through
+`components/deft/queries.ts`:
+
+| Route | Purpose |
+|---|---|
+| `GET /api/issues/:id/deft` | One issue's Deft state for the cockpit (scopes, escalations, gates, drift) |
+| `GET /api/issues/:id/deft/review-cycle` | Deft's review cycle for the issue's PR (verdict, exit fields, reconstructed rounds, lease) |
+| `GET /api/deft/issues` | Batched Deft state for the board, tree rows and pipeline strip |
+| `POST /api/issues/:id/pipeline` | Run on Deft / Back to Overdeck; shells `pan skills deft use|back` |
+| `POST /api/issues/:id/deft/escalations/:escId/resolve` | Answer a Deft escalation (rewrites the escalation file) |
+| `POST /api/issues/:id/deft/scopes/signoff` | Sign off a scope item's disposition as a human event |
+
+The one Deft fact already in the read model is `deftPipeline` on the derived
+issue state's facts (`src/lib/overdeck/derived-issue-state.ts`), which lets a
+Deft issue's PR derive `ready` without an Overdeck approval.

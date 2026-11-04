@@ -24,8 +24,8 @@ import {
 } from '../../lib/projects.js';
 import { mergeSkillsIntoWorkspace } from '../../lib/skills-merge.js';
 import { createWorkspace as createWorkspaceFromConfig } from '../../lib/workspace-manager.js';
+import { hasPackageJson, installCommandFor } from '../../lib/workspace-manager/dependency-install.js';
 import { createWorktree } from '../../lib/worktree.js';
-import { createRemoteWorkspace } from './workspace-remote.js';
 
 const execAsync = promisify(exec);
 
@@ -68,8 +68,30 @@ export async function createCommand(issueId: string, options: CreateOptions): Pr
 
     // Handle remote workspace creation
     if (useRemote) {
+      if (options.dryRun) {
+        spinner.info(`Dry run - would create a remote (Fly) workspace for ${issueId.toUpperCase()} on ${branchName}`);
+        return;
+      }
       spinner.text = 'Creating remote workspace...';
-      await createRemoteWorkspace(issueId, normalizedId, branchName, spinner, options);
+      try {
+        const { createRemoteWorkspace } = await import('../../lib/remote-workspace.js');
+        const metadata = await createRemoteWorkspace(issueId, { spinner });
+        spinner.succeed('Remote workspace created!');
+        console.log('');
+        console.log(chalk.bold('Workspace Details:'));
+        console.log(`  Issue:    ${chalk.green(metadata.issue)}`);
+        console.log(`  VM:       ${chalk.cyan(metadata.vmName)}`);
+        console.log(`  Branch:   ${chalk.dim(branchName)}`);
+        console.log(`  Location: ${chalk.yellow('Remote (Fly.io)')}`);
+        console.log('');
+        console.log(chalk.bold('Commands:'));
+        console.log(`  SSH:    ${chalk.dim(`pan workspace ssh ${issueId}`)}`);
+        console.log(`  Stop:   ${chalk.dim(`pan workspace stop ${issueId}`)}`);
+        console.log(`  Delete: ${chalk.dim(`pan workspace destroy ${issueId}`)}`);
+      } catch (error: any) {
+        spinner.fail(`Failed to create remote workspace: ${error.message}`);
+        return exitCli(1);
+      }
       return;
     }
 
@@ -362,13 +384,17 @@ export async function createCommand(issueId: string, options: CreateOptions): Pr
     // Install dependencies using the project's package manager.
     // Each worktree needs its own node_modules so that local workspace packages
     // (e.g., @overdeck/contracts) resolve to the worktree's code, not the main repo's.
-    const pkgManager = projectConfig?.package_manager || (existsSync(join(workspacePath, 'bun.lock')) ? 'bun' : 'npm');
-    const installCmd = pkgManager === 'bun' ? 'bun install' : `${pkgManager} install`;
-    spinner.text = `Installing dependencies (${pkgManager})...`;
-    try {
-      execSync(installCmd, { cwd: workspacePath, encoding: 'utf-8', timeout: 60000, stdio: 'pipe' });
-    } catch (installErr: any) {
-      spinner.warn(`Dependency install warning: ${installErr.message?.slice(0, 200)}`);
+    // PAN-4929: a polyrepo workspace root has no package.json; npm would walk up to an
+    // ancestor, fail, and leave a stray lockfile there.
+    if (hasPackageJson(workspacePath)) {
+      const pkgManager = projectConfig?.package_manager || (existsSync(join(workspacePath, 'bun.lock')) ? 'bun' : 'npm');
+      const installCmd = installCommandFor(pkgManager);
+      spinner.text = `Installing dependencies (${pkgManager})...`;
+      try {
+        execSync(installCmd, { cwd: workspacePath, encoding: 'utf-8', timeout: 60000, stdio: 'pipe' });
+      } catch (installErr: any) {
+        spinner.warn(`Dependency install warning: ${installErr.message?.slice(0, 200)}`);
+      }
     }
 
     // Build workspace packages so local dependencies have up-to-date dist/

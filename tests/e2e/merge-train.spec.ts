@@ -267,6 +267,7 @@ beforeAll(async () => {
             export function getTransport() { return transport; }
             export function resetTransport() { transport = new WsTransport(); }
             export function ensureDashboardSession() { return Promise.resolve(); }
+            export function rpcUrlWithPath(path) { return 'ws://127.0.0.1' + path; }
             export async function dashboardMutationJsonHeaders() { return { 'Content-Type': 'application/json' }; }
           `,
           map: null,

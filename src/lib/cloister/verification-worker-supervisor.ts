@@ -328,11 +328,12 @@ async function runSupervisedVerificationOnce(
     const existingDeadline = verificationWorkerDeadline(existing);
     // PAN-4527: join only a worker that is still verifying the requested head.
     const sameHead = await workerVerifiesHead(existing, issueId, workspacePath, headAnchor, options);
-    if (sameHead && (existingDeadline === null || Date.now() < existingDeadline)) {
+    const sameRun = sameHead && sameOptions(existing.options, options);
+    if (sameRun && (existingDeadline === null || Date.now() < existingDeadline)) {
       console.log(`[${logPrefix}] Joining live verification worker ${existing.pid} for ${issueId}`);
       return waitForResult(existing);
     }
-    const reason = sameHead ? 'past its deadline' : 'for a different workspace HEAD';
+    const reason = !sameHead ? 'for a different workspace HEAD' : !sameRun ? 'running with other options' : 'past its deadline';
     console.warn(`[${logPrefix}] Verification worker ${existing.pid} for ${issueId} is ${reason} — killing it and starting fresh`);
     if (!await killWorkerProcessGroup(existing.pid)) {
       return {

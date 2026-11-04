@@ -1,12 +1,35 @@
 import { describe, expect, it, vi } from 'vitest';
 
+// PAN-4739: the default census reads tmux and ps through child_process. tmux
+// without a UTF-8 locale (Fly's pan serve) prints -F tabs as '_'; this fake
+// answers like that unless the client passes -u.
+const LOCALE_LESS_LIST_PANES = 'conv-20261102-2889_565_0_\n';
+vi.mock('child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('child_process')>();
+  const execFile = vi.fn((cmd: string, args: string[], _opts: unknown, cb: (err: unknown, out: unknown) => void) => {
+    let stdout = '';
+    if (cmd === 'tmux' && args.includes('list-panes')) {
+      stdout = args.includes('-u') ? 'conv-20261102-2889\t565\t0\t\n' : LOCALE_LESS_LIST_PANES;
+    }
+    if (cmd === 'ps') stdout = ' 565 91 0.0 4096 bash bash\n 599 565 1.0 8192 node node\n 629 599 2.0 9000 claude claude\n';
+    cb(null, { stdout, stderr: '' });
+  });
+  return { ...actual, execFile };
+});
+vi.mock('../../../src/lib/config-yaml.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/lib/config-yaml.js')>();
+  return { ...actual, loadConfigSync: () => ({ config: { tmux: { configMode: 'inherit-user' } } }) };
+});
+
 import {
   createRuntimeCensusService,
   descendantPidsForSession,
   panePidsForSession,
   parseRuntimeProcessTable,
+  refreshRuntimeCensus,
   runtimeCensusHasHarnessProcess,
 } from '../../../src/lib/runtime-census.js';
+import { parseTmuxPaneRecords } from '../../../src/lib/tmux.js';
 
 const pane = (sessionName: string, panePid: number) => ({
   sessionName,
@@ -98,5 +121,16 @@ describe('runtime census', () => {
     expect([...descendantPidsForSession(census, 'conv-live')]).toEqual([100, 101, 102]);
     expect(runtimeCensusHasHarnessProcess(census, 'conv-live')).toBe(true);
     expect(runtimeCensusHasHarnessProcess(census, 'conv-corpse')).toBe(false);
+  });
+
+  it('keeps a live session when tmux runs without a UTF-8 locale (PAN-4739, Fly machine)', async () => {
+    // The line list-panes -a printed on the locale-less Fly serve: no tab survives.
+    expect(parseTmuxPaneRecords(LOCALE_LESS_LIST_PANES)).toEqual([]);
+
+    const census = await refreshRuntimeCensus();
+
+    expect(census.available).toBe(true);
+    expect(census.sessionNames.has('conv-20261102-2889')).toBe(true);
+    expect(runtimeCensusHasHarnessProcess(census, 'conv-20261102-2889')).toBe(true);
   });
 });

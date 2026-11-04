@@ -1,0 +1,123 @@
+{
+  "version": "1",
+  "issueId": "PAN-4672",
+  "created": "2026-11-01T06:29:18.701Z",
+  "updated": "2026-11-01T08:06:52.267Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "atomic-compose-write": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4672",
+      "claimedAt": "2026-11-01T06:29:18.701Z",
+      "doneAt": "2026-11-01T06:32:40.861Z"
+    },
+    "traefik-start-dev": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4672",
+      "claimedAt": "2026-11-01T06:33:05.871Z",
+      "doneAt": "2026-11-01T07:00:40.902Z"
+    },
+    "traefik-start-up": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4672",
+      "claimedAt": "2026-11-01T07:00:55.355Z",
+      "doneAt": "2026-11-01T07:27:05.000Z"
+    },
+    "hold-503-after-timeout": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4672",
+      "claimedAt": "2026-11-01T07:27:12.295Z",
+      "doneAt": "2026-11-01T07:48:08.587Z"
+    },
+    "docs-ipv6-claim": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4672",
+      "claimedAt": "2026-11-01T07:48:14.993Z",
+      "doneAt": "2026-11-01T07:49:23.172Z"
+    },
+    "atomic-compose-write.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:58:49.149Z"
+    },
+    "atomic-compose-write.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:59:06.187Z"
+    },
+    "atomic-compose-write.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:59:23.331Z"
+    },
+    "atomic-compose-write.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:59:45.436Z"
+    },
+    "traefik-start-dev.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:00:19.905Z"
+    },
+    "traefik-start-dev.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:00:45.714Z"
+    },
+    "traefik-start-dev.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:01:10.808Z"
+    },
+    "traefik-start-dev.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:01:32.341Z"
+    },
+    "traefik-start-up.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:01:57.549Z"
+    },
+    "traefik-start-up.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:02:16.863Z"
+    },
+    "traefik-start-up.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:02:35.733Z"
+    },
+    "traefik-start-up.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:02:56.517Z"
+    },
+    "traefik-start-up.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:03:13.097Z"
+    },
+    "hold-503-after-timeout.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:03:36.174Z"
+    },
+    "hold-503-after-timeout.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:04:05.201Z"
+    },
+    "hold-503-after-timeout.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:04:39.314Z"
+    },
+    "hold-503-after-timeout.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:05:12.615Z"
+    },
+    "docs-ipv6-claim.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:05:52.929Z"
+    },
+    "docs-ipv6-claim.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:06:23.749Z"
+    },
+    "docs-ipv6-claim.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:06:52.266Z"
+    }
+  }
+}

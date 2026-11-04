@@ -1,0 +1,199 @@
+{
+  "version": "1",
+  "issueId": "PAN-4655",
+  "created": "2026-11-02T03:52:43.700Z",
+  "updated": "2026-11-02T04:48:01.361Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "idle-clock-store": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4655",
+      "claimedAt": "2026-11-02T03:52:43.700Z",
+      "doneAt": "2026-11-02T03:56:41.776Z"
+    },
+    "auto-settle-setting": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4655",
+      "claimedAt": "2026-11-02T03:56:50.424Z",
+      "doneAt": "2026-11-02T03:59:43.237Z"
+    },
+    "idle-sweep-core": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4655",
+      "claimedAt": "2026-11-02T04:00:01.975Z",
+      "doneAt": "2026-11-02T04:02:57.297Z"
+    },
+    "auto-settle-route": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4655",
+      "claimedAt": "2026-11-02T04:03:04.594Z",
+      "doneAt": "2026-11-02T04:04:15.417Z"
+    },
+    "extract-conversation-sweeps": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4655",
+      "claimedAt": "2026-11-02T04:04:17.267Z",
+      "doneAt": "2026-11-02T04:15:32.126Z"
+    },
+    "idle-settle-patrol": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4655",
+      "claimedAt": "2026-11-02T04:15:34.384Z",
+      "doneAt": "2026-11-02T04:16:54.794Z"
+    },
+    "cli-auto-settle-verb": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4655",
+      "claimedAt": "2026-11-02T04:16:56.701Z",
+      "doneAt": "2026-11-02T04:18:38.863Z"
+    },
+    "settings-auto-settle-row": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4655",
+      "claimedAt": "2026-11-02T04:18:40.664Z",
+      "doneAt": "2026-11-02T04:19:18.044Z"
+    },
+    "docs-idle-settle": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4655",
+      "claimedAt": "2026-11-02T04:19:19.462Z",
+      "doneAt": "2026-11-02T04:19:51.785Z"
+    },
+    "idle-clock-store.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:37:48.081Z"
+    },
+    "idle-clock-store.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:38:51.032Z"
+    },
+    "idle-clock-store.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:39:09.839Z"
+    },
+    "idle-clock-store.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:39:28.723Z"
+    },
+    "auto-settle-setting.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:39:47.213Z"
+    },
+    "auto-settle-setting.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:40:04.519Z"
+    },
+    "auto-settle-setting.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:40:24.134Z"
+    },
+    "idle-sweep-core.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:40:42.532Z"
+    },
+    "idle-sweep-core.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:41:02.226Z"
+    },
+    "idle-sweep-core.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:41:24.352Z"
+    },
+    "idle-sweep-core.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:41:43.306Z"
+    },
+    "idle-sweep-core.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:42:00.483Z"
+    },
+    "auto-settle-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:42:17.711Z"
+    },
+    "auto-settle-route.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:42:36.530Z"
+    },
+    "auto-settle-route.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:42:54.172Z"
+    },
+    "auto-settle-route.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:43:10.311Z"
+    },
+    "extract-conversation-sweeps.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:43:27.890Z"
+    },
+    "extract-conversation-sweeps.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:43:50.434Z"
+    },
+    "extract-conversation-sweeps.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:44:05.850Z"
+    },
+    "idle-settle-patrol.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:44:21.294Z"
+    },
+    "idle-settle-patrol.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:44:38.053Z"
+    },
+    "idle-settle-patrol.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:44:54.667Z"
+    },
+    "idle-settle-patrol.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:45:11.762Z"
+    },
+    "settings-auto-settle-row.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:45:29.763Z"
+    },
+    "settings-auto-settle-row.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:45:47.977Z"
+    },
+    "settings-auto-settle-row.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:46:04.291Z"
+    },
+    "settings-auto-settle-row.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:46:20.029Z"
+    },
+    "cli-auto-settle-verb.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:46:39.672Z"
+    },
+    "cli-auto-settle-verb.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:46:56.849Z"
+    },
+    "cli-auto-settle-verb.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:47:12.960Z"
+    },
+    "docs-idle-settle.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:47:28.426Z"
+    },
+    "docs-idle-settle.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:47:44.542Z"
+    },
+    "docs-idle-settle.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T04:48:01.360Z"
+    }
+  }
+}

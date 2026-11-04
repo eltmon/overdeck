@@ -121,6 +121,10 @@ Every issue-action surface renders from the single executable registry in `src/d
 appears. There are no disabled rows with a reason, and no "N available now · M
 gated" count — a row the operator cannot click and cannot interpret is noise, and
 hiding it is what makes the ten-action ceiling mean anything.
+PAN-4849's pipeline switch follows the same rule: `runOnDeft` (Run on Deft) is
+listed only for an issue on Overdeck's pipeline that is not merged, done or
+cancelled, and `backToOverdeck` (Back to Overdeck) only for an issue running on
+Deft; the frontend learns "on Deft" from `GET /api/deft/issues`.
 
 `placement` is the second half of that rule. An entry marked `'contextual'` stays
 in the registry because a card or button invokes it by key, but no menu lists it:
@@ -149,8 +153,10 @@ disclosure rather than an always-open "This session" section.
 
 `src/dashboard/frontend/src/lib/__tests__/issueActions.menu-by-state.test.ts`
 pins the exact key set for ten derived states and holds every one at or under
-ten actions. It runs in CI through the root `test:frontend-subset`; add new
-must-run frontend tests there or CI will not see them.
+ten actions. It runs in CI through
+`npm run test:frontend-subset`, which reads `scripts/frontend-test-subset.txt`; add new
+must-run frontend tests to that file (one path per line, relative to `src/dashboard/frontend`)
+or CI will not see them.
 
 ### Retired keys (PAN-4198)
 
@@ -234,3 +240,5 @@ sections a given state actually produces, not on the full `GROUP_ORDER`.
 - A running issue renders no start CTA, and a failed request remains visible as an inline error.
 
 The server honors `clearGates` only for a trusted operator-origin request. It clears paused and troubled state through the same shared intervention doors used by the CLI, emits the corresponding intervention event, and refuses a gated spawn when the flag is absent. Do not clear agent state directly in a route or UI component.
+
+The simple issue page (`SimpleIssuePage`) shows its "The plan is ready" card with **Start work** only when the issue has a plan and no work agent exists: no live `work` pane, and the pipeline is not in review, ready, merged, done or canceled (`hasWorkAgent` in `src/dashboard/frontend/src/lib/simple/derive.ts`). Once a work agent exists, a planner that stays idle at its prompt after finalize is neither a plan-ready signal nor a question. A live `work` pane also outranks a derived state that is missing or still `planned` (`simplePipelineState`), so the page shows the work as running. `in_progress_work_idle` alone does not count as a work agent, because finalize commits the plan to the feature branch and that branch alone derives as `working` (PAN-4670).

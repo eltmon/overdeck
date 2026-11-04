@@ -20,6 +20,7 @@ let deliverAgentMessageMock: ReturnType<typeof vi.fn>;
 let deliverInitialPromptWithRetryMock: ReturnType<typeof vi.fn>;
 let waitForPromptReadyMock: ReturnType<typeof vi.fn>;
 let stopAgentMock: ReturnType<typeof vi.fn>;
+let initCodexHomeMock: ReturnType<typeof vi.fn>;
 let capturePaneText: string;
 let channelsMcpEnabled: boolean;
 const HEAVY_HOOK_TIMEOUT_MS = 20_000;
@@ -94,8 +95,9 @@ function mockSpawnDependencies(): void {
     getRuntimeSnapshot: vi.fn(() => Effect.succeed(null)),
     isAgentStateServiceInProcess: vi.fn(() => Effect.succeed(true)),
   }));
+  initCodexHomeMock = vi.fn();
   vi.doMock('../runtimes/codex.js', () => ({
-    initCodexHome: vi.fn(),
+    initCodexHome: initCodexHomeMock,
   }));
   vi.doMock('../codex-auth.js', () => ({
     assertCodexNativeAuthForSpawn: vi.fn(),
@@ -358,8 +360,10 @@ describe('spawnAgent PTY supervisor wiring', () => {
     expect(persisted.supervisorEnabled).toBe(true);
     expect(persisted.channelsEnabled).toBeUndefined();
     expect(launcher).toContain(`exec node '${supervisorScriptPath}' claude`);
-    expect(launcher).not.toContain('--mcp-config');
+    // The Channels bridge config is the space form; the overdeck MCP server (PAN-4932) is the equals form.
+    expect(launcher).not.toContain(`--mcp-config '${join(workspace, '.pan', 'agent-mcp.json')}'`);
     expect(launcher).not.toContain('--dangerously-load-development-channels');
+    expect(launcher).toContain(`--mcp-config='${join(agentDir, 'overdeck-mcp.json')}'`);
     expect(sendRawKeystrokeMock).not.toHaveBeenCalled();
     expect(ensureLifecycleHooksMock).toHaveBeenCalledWith('agent-pan-1405', 'claude-code');
     expect(ensureLifecycleHooksMock.mock.invocationCallOrder[0]).toBeLessThan(
@@ -571,6 +575,27 @@ describe('spawnAgent PTY supervisor wiring', () => {
     },
   );
 
+  it('gives claude-code role runs the overdeck MCP server with one allow-list (PAN-4932)', async () => {
+    writeSupervisorArtifact();
+    const { spawnRun } = await import('../agents.js');
+
+    await spawnRun('PAN-1405', 'review', { workspace, model: 'claude-sonnet-4-6' });
+    await spawnRun('PAN-1405', 'worker', { workspace, model: 'claude-sonnet-4-6', agentId: 'agent-pan-1405-worker-9', registerConversation: false });
+
+    const reviewDir = join(tmpHome, 'agents', 'agent-pan-1405-review');
+    const review = readFileSync(join(reviewDir, 'launcher.sh'), 'utf8');
+    expect(review).toContain(`--mcp-config='${join(reviewDir, 'overdeck-mcp.json')}'`);
+    const allowLists = review.match(/--allowedTools[= ]'?[^ ]*/g) ?? [];
+    expect(allowLists).toHaveLength(1);
+    expect(allowLists[0]).toContain('mcp__overdeck');
+    expect(review).not.toContain('odk_');
+
+    const workerDir = join(tmpHome, 'agents', 'agent-pan-1405-worker-9');
+    const worker = readFileSync(join(workerDir, 'launcher.sh'), 'utf8');
+    expect(worker).toContain(`--mcp-config='${join(workerDir, 'overdeck-mcp.json')}'`);
+    expect(worker).toContain('--allowedTools=mcp__overdeck');
+  });
+
   it('persists provider-default harnesses from resolveHarness for OpenAI and Kimi work agents', async () => {
     writeSupervisorArtifact();
     process.env.KIMI_API_KEY = 'test-kimi-key';
@@ -603,6 +628,43 @@ describe('spawnAgent PTY supervisor wiring', () => {
     } finally {
       delete process.env.KIMI_API_KEY;
     }
+  });
+
+  it('gives a gpt-5.5 work agent the overdeck MCP server with approve mode (PAN-4933)', async () => {
+    writeSupervisorArtifact();
+    const { spawnAgent } = await import('../agents.js');
+    const { listAccessTokens } = await import('../access-tokens.js');
+
+    const state = await spawnAgent({
+      issueId: 'PAN-4933',
+      workspace,
+      role: 'work',
+      model: 'gpt-5.5',
+    });
+
+    const call = initCodexHomeMock.mock.calls.find(([, opts]) => (opts as { mcpServers?: Record<string, unknown> })?.mcpServers?.overdeck);
+    expect(call).toBeDefined();
+    const overdeck = (call![1] as { mcpServers: Record<string, { env: Record<string, string>; defaultToolsApprovalMode: string }> }).mcpServers.overdeck;
+    expect(overdeck.env.OVERDECK_MCP_TOKEN_FILE).toBe(join(tmpHome, 'agents', state.id, 'mcp-token'));
+    expect(overdeck.defaultToolsApprovalMode).toBe('approve');
+
+    const tokens = await listAccessTokens();
+    expect(tokens.filter((t) => t.agentId === state.id && t.role === 'work' && !t.revokedAt)).toHaveLength(1);
+  });
+
+  it('gives a gpt-5.5 review run the overdeck MCP server for its own token (PAN-4933)', async () => {
+    const { spawnRun } = await import('../agents.js');
+    const { listAccessTokens } = await import('../access-tokens.js');
+
+    const state = await spawnRun('PAN-1405', 'review', { workspace, model: 'gpt-5.5' });
+
+    const call = initCodexHomeMock.mock.calls.find(([, opts]) => (opts as { mcpServers?: Record<string, unknown> })?.mcpServers?.overdeck);
+    expect(call).toBeDefined();
+    const overdeck = (call![1] as { mcpServers: Record<string, { env: Record<string, string> }> }).mcpServers.overdeck;
+    expect(overdeck.env.OVERDECK_MCP_TOKEN_FILE).toBe(join(tmpHome, 'agents', state.id, 'mcp-token'));
+
+    const tokens = await listAccessTokens();
+    expect(tokens.filter((t) => t.agentId === state.id && t.role === 'review' && !t.revokedAt)).toHaveLength(1);
   });
 
   it('persists fresh work-agent session origin when the tmux session is created', async () => {

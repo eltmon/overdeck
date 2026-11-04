@@ -28,6 +28,10 @@ services:
       context: .
       dockerfile: Dockerfile
     user: root
+    # PAN-4663: chown needs no network. Without networks: or network_mode:,
+    # Compose creates an extra <project>_default network for this service alone,
+    # which uses one of Docker's ~31 bridge subnets per workspace.
+    network_mode: none
     command: chown node:node /workspaces/overdeck/node_modules
     volumes:
       - container-node-modules:/workspaces/overdeck/node_modules

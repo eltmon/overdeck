@@ -480,6 +480,19 @@ describe('vault-service (PAN-4307 WI-4)', () => {
       expect(withoutReadBack).toEqual({ status: 'settled', result: verdict, record: null });
     });
 
+    it('settleOnQueue forwards recordTitle to settle', async () => {
+      const settleSpy = vi.fn().mockResolvedValue({ verdict: 'noop' as const, vaultId: 'v1' });
+      startVaultService({
+        readVaultConfig: vi.fn().mockResolvedValue(config),
+        openVaultContext: vi.fn().mockResolvedValue({ status: 'open', vault: FAKE_VAULT } satisfies VaultOpenResult),
+        settle: settleSpy,
+        createVaultSettlePoller: noopPoller,
+      });
+
+      await settleOnQueue('/p', 'claude-code', 'auto', { recordTitle: 'T' });
+      expect(settleSpy).toHaveBeenCalledWith(expect.objectContaining({ recordTitle: 'T' }));
+    });
+
     it('settleOnQueue runs on the vault queue', async () => {
       const order: string[] = [];
       const settleSpy = vi.fn(async () => {

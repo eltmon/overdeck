@@ -1,0 +1,95 @@
+{
+  "version": "1",
+  "issueId": "PAN-4881",
+  "created": "2026-11-03T06:05:06.618Z",
+  "updated": "2026-11-03T06:38:48.314Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "rename-test-hermetic-token": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4881",
+      "claimedAt": "2026-11-03T06:05:06.618Z",
+      "doneAt": "2026-11-03T06:11:35.135Z"
+    },
+    "setup-clears-worker-token": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4881",
+      "claimedAt": "2026-11-03T06:11:43.643Z",
+      "doneAt": "2026-11-03T06:12:56.097Z"
+    },
+    "serve-test-token-cleanup": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4881",
+      "claimedAt": "2026-11-03T06:13:01.911Z",
+      "doneAt": "2026-11-03T06:13:59.557Z"
+    },
+    "lifecycle-test-token-cleanup": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4881",
+      "claimedAt": "2026-11-03T06:14:05.083Z",
+      "doneAt": "2026-11-03T06:15:13.924Z"
+    },
+    "docs-worker-home-token": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4881",
+      "claimedAt": "2026-11-03T06:15:20.360Z",
+      "doneAt": "2026-11-03T06:16:31.989Z"
+    },
+    "rename-test-hermetic-token.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:34:02.665Z"
+    },
+    "rename-test-hermetic-token.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:34:24.138Z"
+    },
+    "rename-test-hermetic-token.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:34:43.297Z"
+    },
+    "setup-clears-worker-token.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:35:03.319Z"
+    },
+    "setup-clears-worker-token.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:35:31.310Z"
+    },
+    "setup-clears-worker-token.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:35:55.447Z"
+    },
+    "serve-test-token-cleanup.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:36:20.366Z"
+    },
+    "serve-test-token-cleanup.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:36:59.667Z"
+    },
+    "lifecycle-test-token-cleanup.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:37:28.733Z"
+    },
+    "lifecycle-test-token-cleanup.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:37:49.216Z"
+    },
+    "docs-worker-home-token.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:38:07.703Z"
+    },
+    "docs-worker-home-token.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:38:29.357Z"
+    },
+    "docs-worker-home-token.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T06:38:48.314Z"
+    }
+  }
+}

@@ -15,9 +15,17 @@ import * as Path from "node:path";
 import { app, Menu, nativeImage, Tray } from "electron";
 import type { MenuItemConstructorOptions } from "electron";
 
-import { callServerApi, serverUrl, showOrCreateWindow, dispatchMenuAction, isQuitting } from "./main.js";
+import {
+  callServerApi,
+  showOrCreateWindow,
+  dispatchMenuAction,
+  isQuitting,
+  openConnectWindowFromMenu,
+  useThisComputer,
+} from "./main.js";
 import { resolveResourcePath } from "./main.js";
 import { getDesktopSettings } from "./settings.js";
+import { dashboardFetch, getActiveDashboard } from "./connection.js";
 
 export type AgentStatus = "idle" | "working" | "attention";
 
@@ -49,11 +57,13 @@ function createTrayIcon(status: AgentStatus): Electron.NativeImage {
 
 function buildTooltip(agentCount: number, attentionCount: number, lastActivity: string | null): string {
   const settings = getDesktopSettings();
+  const active = getActiveDashboard();
+  const title = active.kind === "remote" ? `Overdeck — ${active.label}` : "Overdeck";
   if (settings.tray.tooltipDetail === "minimal") {
-    return `Overdeck — ${agentCount} agent${agentCount !== 1 ? "s" : ""}`;
+    return `${title} — ${agentCount} agent${agentCount !== 1 ? "s" : ""}`;
   }
 
-  const lines = ["Overdeck"];
+  const lines = [title];
   lines.push(`${agentCount} agent${agentCount !== 1 ? "s" : ""} running`);
   if (attentionCount > 0) {
     lines.push(`⚠ ${attentionCount} need${attentionCount !== 1 ? "" : "s"} attention`);
@@ -71,6 +81,15 @@ function buildContextMenu(): Electron.Menu {
     {
       label: "Show Dashboard",
       click: () => showOrCreateWindow(),
+    },
+    {
+      label: "Connect to a Machine…",
+      click: () => openConnectWindowFromMenu(),
+    },
+    {
+      label: "Use This Computer",
+      enabled: getActiveDashboard().kind === "remote",
+      click: () => useThisComputer(),
     },
     { type: "separator" },
     {
@@ -116,11 +135,10 @@ interface HealthResponse {
 
 async function refreshTrayStatus(): Promise<void> {
   if (!tray || isQuitting) return;
-  const url = serverUrl;
-  if (!url) return;
+  if (!getActiveDashboard().baseUrl) return;
 
   try {
-    const resp = await fetch(`${url}/api/health`, { signal: AbortSignal.timeout(3_000) });
+    const resp = await dashboardFetch("/api/health", { signal: AbortSignal.timeout(3_000) });
     if (!resp.ok) return;
 
     const data = (await resp.json()) as HealthResponse;
@@ -160,6 +178,15 @@ export function createTray(): void {
 
   // Start polling
   pollTimer = setInterval(() => void refreshTrayStatus(), 5_000);
+  void refreshTrayStatus();
+}
+
+/** Rebuild the context menu and tooltip after a switch between this computer and the chosen machine. */
+export function refreshTrayMode(): void {
+  if (!tray) return;
+  const active = getActiveDashboard();
+  tray.setToolTip(active.kind === "remote" ? `Overdeck — ${active.label}` : "Overdeck");
+  tray.setContextMenu(buildContextMenu());
   void refreshTrayStatus();
 }
 

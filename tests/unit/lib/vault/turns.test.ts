@@ -85,4 +85,16 @@ describe('vault turns: Codex', () => {
     expect(isHumanTurn(codexUser('<div>why is this centered?</div>'), 'codex')).toBe(true);
     expect(isHumanTurn(codexUser('# Files mentioned: none'), 'codex')).toBe(true);
   });
+
+  it('ignores the newer Codex injected prefixes and counts the two typed prompts', () => {
+    const lines = [
+      codexUser([{ type: 'input_text', text: '<recommended_plugins>\nHere is a list of plugins that are available but not installed.' }]),
+      codexUser([{ type: 'input_text', text: '# AGENTS.md instructions\n\n<INSTRUCTIONS>x' }]),
+      codexUser([{ type: 'input_text', text: '<turn_aborted>\nreason: user interrupted' }]),
+      codexUser([{ type: 'input_text', text: '<subagent_notification>\nsubagent finished' }]),
+      codexUser([{ type: 'input_text', text: '<task>fix the failing test</task>' }]),
+      codexUser([{ type: 'input_text', text: 'add a --json flag' }]),
+    ];
+    expect(countHumanTurns(lines, 'codex')).toBe(2);
+  });
 });

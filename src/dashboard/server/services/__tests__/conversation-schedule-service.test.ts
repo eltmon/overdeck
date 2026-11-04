@@ -12,6 +12,9 @@ const mocks = vi.hoisted(() => ({
   conversationHarnessAlive: vi.fn(),
   handleConversationResume: vi.fn(),
   handleConversationMessage: vi.fn(),
+  emitConversationSchedulesChanged: vi.fn(),
+  invalidateConversationListEnrichmentCache: vi.fn(),
+  clearConversationTriage: vi.fn(() => true),
 }));
 
 vi.mock('../../../../lib/overdeck/conversations.js', () => ({
@@ -30,10 +33,17 @@ vi.mock('../../../../lib/overdeck/conversation-message.js', () => ({
 vi.mock('../../../../lib/overdeck/conversation-reads.js', () => ({
   resolveSessionFile: vi.fn(async () => null),
 }));
+vi.mock('../../../../lib/overdeck/conversation-list.js', () => ({
+  invalidateConversationListEnrichmentCache: mocks.invalidateConversationListEnrichmentCache,
+}));
+vi.mock('../../../../lib/overdeck/conversation-triage-store.js', () => ({
+  clearConversationTriage: mocks.clearConversationTriage,
+}));
 vi.mock('../../../../lib/overdeck/conversation-schedules.js', () => ({
   listDueSchedules: vi.fn(() => []),
   claimScheduleRun: vi.fn(() => false),
   recordScheduleRunOutcome: vi.fn(),
+  emitConversationSchedulesChanged: mocks.emitConversationSchedulesChanged,
 }));
 
 const {
@@ -61,7 +71,7 @@ function due(overrides: Partial<DueSchedule> = {}): DueSchedule {
   };
 }
 
-function sweepDeps(schedules: DueSchedule[], fire = vi.fn(async () => ({ ok: true as const }))) {
+function sweepDeps(schedules: DueSchedule[], fire = vi.fn(async () => ({ ok: true as const, conversationName: 'conv-a' }))) {
   return {
     now: () => NOW,
     listDue: vi.fn(() => schedules),
@@ -69,6 +79,8 @@ function sweepDeps(schedules: DueSchedule[], fire = vi.fn(async () => ({ ok: tru
     record: vi.fn(),
     nextRunAfter: vi.fn(nextRunAfter),
     fire,
+    clearTriage: vi.fn(() => true),
+    onChanged: vi.fn(),
   };
 }
 
@@ -98,6 +110,63 @@ describe('runScheduleSweepOnce', () => {
     expect(deps.fire).toHaveBeenCalledTimes(1);
     expect(deps.record).toHaveBeenCalledWith(7, 'delivered', null);
     expect(result).toEqual({ fired: 1, failed: 0, skipped: 0 });
+  });
+
+  it('clears triage and notifies once for a delivered fire (PAN-4657 sweep-resurface.ac1)', async () => {
+    const deps = sweepDeps([due()]);
+    await runScheduleSweepOnce(deps);
+
+    expect(deps.clearTriage).toHaveBeenCalledTimes(1);
+    expect(deps.clearTriage).toHaveBeenCalledWith('conv-a');
+    expect(deps.onChanged).toHaveBeenCalledTimes(1);
+    expect(deps.onChanged).toHaveBeenCalledWith('conv-a');
+  });
+
+  it('notifies both the scheduled conversation and the delivered chain head, but clears triage only for the head (PAN-4657 sweep-resurface.ac2)', async () => {
+    const fire = vi.fn(async () => ({ ok: true as const, conversationName: 'conv-head' }));
+    const deps = sweepDeps([due({ conversationName: 'conv-a' })], fire);
+    await runScheduleSweepOnce(deps);
+
+    expect(deps.clearTriage).toHaveBeenCalledTimes(1);
+    expect(deps.clearTriage).toHaveBeenCalledWith('conv-head');
+    expect(deps.onChanged).toHaveBeenCalledTimes(2);
+    expect(deps.onChanged).toHaveBeenCalledWith('conv-a');
+    expect(deps.onChanged).toHaveBeenCalledWith('conv-head');
+  });
+
+  it('notifies once for a failed or skipped run without clearing triage, and never notifies on a lost claim (PAN-4657 sweep-resurface.ac3)', async () => {
+    const error = 'Waiting: the agent needs a permission answer first';
+    const fire = vi.fn(async () => ({ ok: false as const, error }));
+    const failedDeps = sweepDeps([due()], fire);
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    await runScheduleSweepOnce(failedDeps);
+    expect(failedDeps.clearTriage).not.toHaveBeenCalled();
+    expect(failedDeps.onChanged).toHaveBeenCalledTimes(1);
+    expect(failedDeps.onChanged).toHaveBeenCalledWith('conv-a');
+
+    const skippedDeps = sweepDeps([due({ archived: true })]);
+    await runScheduleSweepOnce(skippedDeps);
+    expect(skippedDeps.clearTriage).not.toHaveBeenCalled();
+    expect(skippedDeps.onChanged).toHaveBeenCalledTimes(1);
+    expect(skippedDeps.onChanged).toHaveBeenCalledWith('conv-a');
+
+    const lostClaimDeps = sweepDeps([due()]);
+    lostClaimDeps.claim.mockReturnValue(false);
+    await runScheduleSweepOnce(lostClaimDeps);
+    expect(lostClaimDeps.onChanged).not.toHaveBeenCalled();
+  });
+
+  it('still records delivered when clearTriage throws (PAN-4657 sweep-resurface.ac3)', async () => {
+    const deps = sweepDeps([due()]);
+    deps.clearTriage.mockImplementation(() => {
+      throw new Error('triage store unavailable');
+    });
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const result = await runScheduleSweepOnce(deps);
+
+    expect(deps.record).toHaveBeenCalledWith(7, 'delivered', null);
+    expect(result).toEqual({ fired: 1, failed: 0, skipped: 0 });
+    expect(deps.onChanged).toHaveBeenCalledWith('conv-a');
   });
 
   it('collapses missed runs into one fire and claims the first occurrence after now', async () => {
@@ -161,7 +230,7 @@ describe('fireScheduledPrompt', () => {
     mocks.handleConversationResume.mockResolvedValue(jsonResponse({ status: 'active' }));
     mocks.handleConversationMessage.mockResolvedValue(jsonResponse({ ok: true }));
 
-    expect(await fireScheduledPrompt(due())).toEqual({ ok: true });
+    expect(await fireScheduledPrompt(due())).toEqual({ ok: true, conversationName: 'conv-a' });
 
     expect(mocks.handleConversationResume).toHaveBeenCalledWith('conv-a', {}, expect.objectContaining({ resumeCause: 'message' }));
     expect(mocks.handleConversationResume.mock.invocationCallOrder[0]).toBeLessThan(
@@ -178,7 +247,7 @@ describe('fireScheduledPrompt', () => {
     mocks.conversationHarnessAlive.mockResolvedValue(true);
     mocks.handleConversationMessage.mockResolvedValue(jsonResponse({ ok: true }));
 
-    expect(await fireScheduledPrompt(due())).toEqual({ ok: true });
+    expect(await fireScheduledPrompt(due())).toEqual({ ok: true, conversationName: 'conv-a' });
     expect(mocks.handleConversationResume).not.toHaveBeenCalled();
   });
 

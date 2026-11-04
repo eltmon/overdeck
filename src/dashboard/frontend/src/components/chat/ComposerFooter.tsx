@@ -11,11 +11,12 @@
  */
 
 import { memo, useState, useRef, useCallback, useEffect } from 'react';
-import { AlertCircle, FileText, Mic, MicOff, Paperclip, Scissors, SendHorizontal, X, Loader2 } from 'lucide-react';
+import { AlertCircle, Mic, MicOff, Paperclip, Scissors, SendHorizontal, Loader2 } from 'lucide-react';
 import type { ClipboardEvent, ChangeEvent, DragEvent } from 'react';
 import { toast } from 'sonner';
 import { getHarnessBehavior } from '@overdeck/contracts';
 import { isServerWriteBlocked } from '../../lib/connectionState';
+import { isNativeShell } from '../../lib/nativeShell';
 import type { LexicalEditor } from 'lexical';
 import { $createParagraphNode, $createTextNode, $getRoot } from 'lexical';
 import { ComposerPromptEditor, loadDraft } from './ComposerPromptEditor';
@@ -26,13 +27,21 @@ import type { Harness } from '../shared/ModelPicker';
 import { getDefaultConversationModel } from './defaultConversationModel';
 import { modelSupportsImages, findModelDef } from '../Settings/modelCatalog';
 import { EffortPicker } from './EffortPicker';
+import { DeliveryModeSelect, type DeliverAs } from './DeliveryModeSelect';
+import { LimitResetNotice } from './LimitResetNotice';
+import { useScheduledMessages } from './scheduledMessages';
 import { useComposerEffort, type EffortResolution } from './useComposerEffort';
 import { ContextWindowMeter } from './ContextWindowMeter';
 import { VaultContinueDialog } from './VaultContinueDialog';
+import { conversationMachineState, isLiveMachineState, MachineReadOnlyNotice } from './ConversationMachineBanner';
 import { VaultContinuityNotice } from './VaultContinuityNotice';
 import { HandoffNotice } from './HandoffNotice';
 import { HeldKickoffConflictError, HeldKickoffNotice, kickoffUnchanged, startHeldKickoff, useHeldKickoff, useSeedHeldKickoff } from './heldKickoff';
 import { openImageLightbox, useImageLightboxStore } from './ImageLightbox';
+import { ComposerAttachmentStrip } from './ComposerAttachmentStrip';
+import { CitationChips } from './citations/CitationChips';
+import { consumeCitations, getConversationCitations, useConversationCitations } from '../../lib/composerCitations';
+import { composePromptWithCitations } from '../../lib/citationFormat';
 import { useHandoffNotice } from './continueOnDevice/handoffNoticeStore';
 import type { ContextWindowSnapshot } from '../../lib/contextWindow';
 import type { Conversation } from '../CommandDeck/ConversationList';
@@ -84,11 +93,6 @@ interface ComposerFooterProps {
   effortResolution?: EffortResolution | null;
 }
 
-type DeliverAs = 'auto' | 'steer' | 'follow_up';
-
-/** PAN-4292 D1: what Steer means for Claude Code, shown on the selector while Steer is chosen. */
-const CLAUDE_STEER_TOOLTIP = 'Steer: interrupt the current turn and send now (Claude Code Ctrl+Enter). Auto queues the message for the running turn.';
-
 function isPiConversation(conversation: Conversation): boolean {
   return conversation.harness === 'ohmypi' || conversation.harness === 'pi';
 }
@@ -105,14 +109,6 @@ function openComposerUi(
       focus,
     },
   }));
-}
-
-function formatFileSize(bytes: number): string {
-  if (bytes === 0) return '0 B';
-  const units = ['B', 'KB', 'MB', 'GB'];
-  const i = Math.min(Math.floor(Math.log10(bytes) / 3), units.length - 1);
-  const value = bytes / Math.pow(1000, i);
-  return `${value.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -148,6 +144,7 @@ function ComposerFooterInput({
   // attachments follow their conversation and survive a switch away and back.
   const sending = useConversationSending(conversation.name);
   const pendingAttachments = useConversationAttachments(conversation.name);
+  const citationCount = useConversationCitations(conversation.name).length;
   const setSendingFor = useComposerStore((s) => s.setSending);
   const enqueueAttachmentsForConversation = useComposerStore((s) => s.enqueueAttachments);
   const removeAttachmentForConversation = useComposerStore((s) => s.removeAttachment);
@@ -183,6 +180,8 @@ function ComposerFooterInput({
   const showDeliverySelector = steerKind === 'send-now-keys' || (steerKind === 'control-channel' && !agentId);
   const steerOptionLabel = navigator.platform.toLowerCase().includes('mac') ? 'Steer (⌘+Enter)' : 'Steer (Ctrl+Enter)';
   const isDisabled = !conversation.sessionAlive || sending;
+  // The phone app (PAN-4837): no model picker (admin reads) and no voice input (its own session mint).
+  const native = isNativeShell();
   const canEditModelBeforeStart = !agentId && !conversation.sessionAlive && !conversation.claudeSessionId;
   const isEmpty = text.trim() === '';
 
@@ -208,7 +207,7 @@ function ComposerFooterInput({
       const def = findModelDef(model);
       toast.warning(
         `${def?.name ?? model} can't read images — image${imageFiles.length === 1 ? '' : 's'} not attached. ` +
-        `Switch to a vision-capable model (e.g. MiMo V2.5) to send images.`,
+        `Switch to a vision-capable model to send images.`,
       );
     }
 
@@ -397,7 +396,8 @@ function ComposerFooterInput({
     }
   }, []);
 
-  const handleSubmit = useCallback(async (directMessageText?: string, deliverAsOverride?: 'steer') => {
+  const { schedule: scheduleMessage, supported: scheduleSupported, limit: usageLimit } = useScheduledMessages(conversation.name, !agentId);
+  const handleSubmit = useCallback(async (directMessageText?: string, deliverAsOverride?: 'steer', schedule?: boolean) => {
     const editor = editorRef.current;
     if (!editor) {
       console.warn('[ComposerFooter] handleSubmit: editor ref not ready');
@@ -485,20 +485,38 @@ function ComposerFooterInput({
     }
 
     const uploadedAttachments = currentPendingAttachments.filter((attachment) => attachment.serverPath);
-    if (!messageText && uploadedAttachments.length === 0) return;
+    // PAN-4642 D5: slash text (commands) never carries citations; they stay pending.
+    const citations = messageText.startsWith('/') ? [] : getConversationCitations(submitConversationName);
+    if (!messageText && uploadedAttachments.length === 0 && citations.length === 0) return;
 
     setSendingFor(submitConversationName, true);
     const attachmentPrefix = uploadedAttachments
       .map((attachment) => `@${attachment.serverPath}`)
       .join('\n');
-    const composedMessage = [attachmentPrefix, messageText].filter(Boolean).join('\n');
+    const composedMessage = [attachmentPrefix, composePromptWithCitations(messageText, citations)].filter(Boolean).join('\n');
     const isPortableCommand = /^\/pan(?:\s|$)/i.test(messageText);
     // Attachments belong to the prompt lane. Portable commands stay in the
     // control-plane lane and leave any uploaded attachments pending.
     const submissionMessage = isPortableCommand ? messageText : composedMessage;
+    // PAN-4641: queue on the server until the usage limit resets, instead of sending now.
+    if (schedule || (!deliverAsOverride && deliverAs === 'when_limit_resets')) {
+      try {
+        await scheduleMessage(submissionMessage);
+        if (!isPortableCommand) consumeAttachmentsForConversation(submitConversationName);
+        if (submitConversationName === currentConversationNameRef.current) {
+          editor.update(() => { $getRoot().clear(); });
+          setText('');
+        }
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Failed to queue the message');
+      } finally {
+        setSendingFor(submitConversationName, false);
+      }
+      return;
+    }
     const clientMessageId = crypto.randomUUID();
-    // Follow-up exists only on the Pi control channel.
-    const selectedDeliverAs = deliverAs === 'follow_up' && steerKind !== 'control-channel' ? undefined : deliverAs;
+    // Follow-up exists only on the Pi control channel; "when limits reset" never reaches the send route.
+    const selectedDeliverAs = deliverAs === 'when_limit_resets' || (deliverAs === 'follow_up' && steerKind !== 'control-channel') ? undefined : deliverAs;
     const sendDeliverAs = deliverAsOverride ?? (showDeliverySelector && selectedDeliverAs !== 'auto' ? selectedDeliverAs : undefined);
     try {
       // DISABLED 2026-06-16: a plain message-send must NEVER switch the model.
@@ -516,6 +534,10 @@ function ComposerFooterInput({
       if (submitConversationName !== currentConversationNameRef.current) {
         return;
       }
+
+      // PAN-4642 D6: the composed text now carries the citations into whichever
+      // store takes it (bubble, hold, offline hold, or outbox), so the chips go.
+      if (citations.length > 0) consumeCitations(submitConversationName);
 
       // Degraded mode (PAN-4279): while the server is unreachable a prompt is
       // held and sent on reconnect; a command needs a live round trip, so it
@@ -609,7 +631,7 @@ function ComposerFooterInput({
       // Refocus editor
       editor.focus();
     }
-  }, [addCommandResult, agentId, conversation, consumeAttachmentsForConversation, deliverAs, harness, heldKickoff, holdSend, isDisabled, model, onSend, onSendAcknowledged, onSendFailed, sending, setSendingFor, showDeliverySelector, steerKind]);
+  }, [addCommandResult, agentId, conversation, consumeAttachmentsForConversation, deliverAs, harness, heldKickoff, holdSend, isDisabled, model, onSend, onSendAcknowledged, onSendFailed, scheduleMessage, sending, setSendingFor, showDeliverySelector, steerKind]);
 
   useEffect(() => {
     const previousConversationName = previousConversationNameRef.current;
@@ -664,7 +686,7 @@ function ComposerFooterInput({
       const isMac = navigator.platform.toLowerCase().includes('mac');
       const usesModifier = isMac ? event.metaKey : event.ctrlKey;
       if (!usesModifier || !event.shiftKey || event.altKey || event.key.toLowerCase() !== 'm') return;
-      if (isDisabled) return;
+      if (isDisabled || native) return;
       event.preventDefault();
       setIsVoiceWidgetOpen(true);
       setVoiceAutoStartToken((token) => token + 1);
@@ -672,7 +694,7 @@ function ComposerFooterInput({
 
     window.addEventListener('keydown', handleVoiceShortcut);
     return () => window.removeEventListener('keydown', handleVoiceShortcut);
-  }, [isDisabled]);
+  }, [isDisabled, native]);
 
   // PAN-4493 D10: if the attachment that opened the lightbox is gone (removed
   // or finished uploading away its preview), close it — but never a lightbox
@@ -701,59 +723,18 @@ function ComposerFooterInput({
   return (
     <div className={styles.composerFooter}>
       {heldKickoff.held && <HeldKickoffNotice />}
+      {!agentId && scheduleSupported && <LimitResetNotice limit={usageLimit} disabled={isDisabled} onSchedule={() => void handleSubmit(undefined, undefined, true)} />}
       {/* Single unified container — T3Chat style */}
       <div className={styles.composerBox} onDrop={handleDrop} onDragOver={handleDragOver}>
-        {pendingAttachments.length > 0 && (
-          <div className={styles.composerImageStrip}>
-            {pendingAttachments.map((attachment) => {
-              const isUploading = !attachment.serverPath && !attachment.error;
-              const statusLabel = attachment.error
-                ? attachment.error
-                : attachment.serverPath
-                  ? 'Uploaded'
-                  : 'Uploading…';
-              return (
-                <div key={attachment.id} className={styles.composerImageCard}>
-                  {attachment.previewUrl ? (
-                    <button
-                      type="button"
-                      className={styles.composerImageThumbButton}
-                      onClick={() => {
-                        lightboxOwnerRef.current = { id: attachment.id, src: attachment.previewUrl! };
-                        openImageLightbox(attachment.previewUrl!, attachment.file.name);
-                      }}
-                      title={`View ${attachment.file.name}`}
-                    >
-                      <img src={attachment.previewUrl} alt={attachment.file.name} className={styles.composerImageThumb} />
-                    </button>
-                  ) : (
-                    <div className={`${styles.composerImageThumb} ${styles.composerFileThumb}`} title={attachment.file.name}>
-                      <FileText size={16} />
-                    </div>
-                  )}
-                  <div className={styles.composerImageMeta}>
-                    <span className={styles.composerImageName}>{attachment.file.name}</span>
-                    <span className={attachment.error ? styles.composerImageError : styles.composerImageStatus}>
-                      {isUploading ? <Loader2 size={12} className={styles.spinner} /> : null}
-                      {statusLabel}
-                      {attachment.kind === 'file' && !attachment.error && (
-                        <span className={styles.composerFileSize}>· {formatFileSize(attachment.file.size)}</span>
-                      )}
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    className={styles.composerImageRemoveButton}
-                    onClick={() => removePendingAttachment(attachment.id)}
-                    title={`Remove ${attachment.file.name}`}
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        )}
+        <CitationChips conversationName={conversation.name} />
+        <ComposerAttachmentStrip
+          attachments={pendingAttachments}
+          onOpenImage={(attachment) => {
+            lightboxOwnerRef.current = { id: attachment.id, src: attachment.previewUrl! };
+            openImageLightbox(attachment.previewUrl!, attachment.file.name);
+          }}
+          onRemove={removePendingAttachment}
+        />
 
         {subagentNotice && (
           <div
@@ -775,7 +756,7 @@ function ComposerFooterInput({
                 <button
                   type="button"
                   onClick={() => void handleSubmit()}
-                  disabled={(isEmpty && pendingAttachments.filter((attachment) => !!attachment.serverPath).length === 0) || isDisabled}
+                  disabled={(isEmpty && pendingAttachments.filter((attachment) => !!attachment.serverPath).length === 0 && citationCount === 0) || isDisabled}
                   title="Switches Claude Code back to the main agent, then sends your draft"
                 >
                   Send to main
@@ -798,15 +779,17 @@ function ComposerFooterInput({
 
         {/* Toolbar inside the box */}
         <div className={styles.composerToolbar}>
-          <ModelPicker
-            value={model}
-            onChange={handleModelChange}
-            onComboChange={handleComboChange}
-            disabled={isDisabled || !canEditModelBeforeStart}
-            harness={harness}
-            onHarnessChange={handleHarnessChange}
-            liveConversation={conversation.sessionAlive}
-          />
+          {!native && (
+            <ModelPicker
+              value={model}
+              onChange={handleModelChange}
+              onComboChange={handleComboChange}
+              disabled={isDisabled || !canEditModelBeforeStart}
+              harness={harness}
+              onHarnessChange={handleHarnessChange}
+              liveConversation={conversation.sessionAlive}
+            />
+          )}
           {/*
             Model drift indicator. The picker holds the model that the
             *next* message will be sent with; if the running session's last
@@ -827,20 +810,7 @@ function ComposerFooterInput({
           <EffortPicker chip={effortChip} pending={effortPending} title={effortTitle} value={effort} onChange={handleEffortChange} disabled={effortPending || !liveChangeEnabled} availableLevels={pickerEffortLevels(model) ?? MODEL_EFFORT_SUPPORT[model as keyof typeof MODEL_EFFORT_SUPPORT]} />
 
           {showDeliverySelector && (
-            <select
-              className={styles.deliveryMethodSelect}
-              value={deliverAs}
-              onChange={(event) => setDeliverAs(event.target.value as DeliverAs)}
-              title={steerKind === 'control-channel'
-                ? (agentBusy ? 'Pi delivery mode while busy' : 'Pi delivery mode')
-                : (deliverAs === 'steer' ? CLAUDE_STEER_TOOLTIP : 'Delivery mode')}
-              aria-label={steerKind === 'control-channel' ? 'Pi delivery mode' : 'Delivery mode'}
-              disabled={!conversation.sessionAlive}
-            >
-              <option value="auto">Auto</option>
-              <option value="steer">{steerOptionLabel}</option>
-              {steerKind === 'control-channel' && <option value="follow_up">Follow-up</option>}
-            </select>
+            <DeliveryModeSelect value={deliverAs} onChange={setDeliverAs} steerKind={steerKind} agentBusy={agentBusy} sessionAlive={conversation.sessionAlive} steerOptionLabel={steerOptionLabel} scheduleAvailable={scheduleSupported && !agentId} />
           )}
           {piConversation && !agentId && (
             <>
@@ -870,22 +840,24 @@ function ComposerFooterInput({
             <Paperclip size={16} />
           </button>
 
-          <button
-            className={isVoiceWidgetOpen ? styles.voiceToolbarButtonActive : styles.voiceToolbarButton}
-            onClick={() => setIsVoiceWidgetOpen((open) => !open)}
-            disabled={isDisabled}
-            type="button"
-            title={voiceState.error ? `Voice error: ${voiceState.error}` : voiceState.isListening ? 'Voice input listening' : 'Toggle voice input (Ctrl+Shift+M)'}
-          >
-            {voiceState.error ? <AlertCircle size={16} /> : voiceState.isListening ? <MicOff size={16} /> : <Mic size={16} />}
-          </button>
+          {!native && (
+            <button
+              className={isVoiceWidgetOpen ? styles.voiceToolbarButtonActive : styles.voiceToolbarButton}
+              onClick={() => setIsVoiceWidgetOpen((open) => !open)}
+              disabled={isDisabled}
+              type="button"
+              title={voiceState.error ? `Voice error: ${voiceState.error}` : voiceState.isListening ? 'Voice input listening' : 'Toggle voice input (Ctrl+Shift+M)'}
+            >
+              {voiceState.error ? <AlertCircle size={16} /> : voiceState.isListening ? <MicOff size={16} /> : <Mic size={16} />}
+            </button>
+          )}
 
           <ContextWindowMeter usage={contextWindowUsage} />
 
           <button
             className={styles.sendButton}
             onClick={() => void handleSubmit()}
-            disabled={(isEmpty && pendingAttachments.filter((attachment) => !!attachment.serverPath).length === 0) || isDisabled}
+            disabled={(isEmpty && pendingAttachments.filter((attachment) => !!attachment.serverPath).length === 0 && citationCount === 0) || isDisabled}
             type="button"
             title="Send message (Enter)"
           >
@@ -958,6 +930,8 @@ function VaultReadOnlyNotice({ conversation }: { conversation: Conversation }) {
 // panel, does not re-render the composer toolbar while its props are stable.
 export const ComposerFooter = memo(function ComposerFooter(props: ComposerFooterProps) {
   if (props.conversation.origin === 'vault') return <VaultReadOnlyNotice conversation={props.conversation} />;
+  // PAN-4650: an offline owner's conversation or a released copy takes no input here.
+  if (!isLiveMachineState(conversationMachineState(props.conversation))) return <MachineReadOnlyNotice conversation={props.conversation} />;
   const continuity = props.conversation.vaultContinuity;
   if (continuity) {
     return (

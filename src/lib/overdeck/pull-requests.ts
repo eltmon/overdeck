@@ -286,7 +286,9 @@ export async function fetchIssuePullRequest(
 
   const prRef = await resolveIssuePullRequestRef(issueId);
   const result = await fetchIssuePullRequestFromRef(prRef);
-  setCachedIssuePrTabResponse('pr', issueId, generation, result);
+  // PAN-4821: a failed read is not an answer. Caching it served the same
+  // failure to every later reader for a minute, so close-out read it as "no PR".
+  if (!result.error) setCachedIssuePrTabResponse('pr', issueId, generation, result);
   return result;
 }
 

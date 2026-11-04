@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { isEffortLevel, type EffortSource } from '@overdeck/contracts';
 import type { Conversation } from '../CommandDeck/ConversationList';
 import { fetchEffortDefault } from '../newConversation/newConversationApi';
+import { isNativeShell } from '../../lib/nativeShell';
 import { loadStoredEffort, type EffortLevel } from './EffortPicker';
 import { effortChipTitle, resolveEffortChip, type EffortChip } from './effortChip';
 
@@ -102,8 +103,9 @@ export function useComposerEffort({
   const issueId = conversation.issueId;
 
   // No stored effort: the launcher resolved it through the default chain, so ask the same chain.
+  // The phone app (PAN-4837) cannot read it: effort stays unset and the server default applies.
   useEffect(() => {
-    if (!needsDefault) {
+    if (!needsDefault || isNativeShell()) {
       setDefaultResolution(null);
       return;
     }

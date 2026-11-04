@@ -32,6 +32,8 @@ import { getBackendPanes } from './backend-inventory.js';
 import { cleanupUnreferencedConversationAttachments } from './conversation-attachments.js';
 import { respawnStartedAt } from './pending-respawn.js';
 import { closeCompanionTerminalForOwner } from '../../../lib/overdeck/companion-terminal/index.js';
+import { revokeAgentMcpTokens } from '../../../lib/mcp/agent-token.js';
+import { conversationStateDir } from '../../../lib/overdeck/conversation-pane-role.js';
 import { indexPanesByAgentKey, type DomainEvent } from '@overdeck/contracts';
 
 export interface AgentProjectionResult {
@@ -185,6 +187,8 @@ export interface AgentLifecycleDeps {
   readonly cleanupEndedConversation?: (conversation: LegacyConversation) => Promise<void>;
   /** Owner teardown for the conversation's companion terminal (PAN-3974). Never throws. */
   readonly closeCompanionTerminal?: (ownerSession: string) => Promise<void>;
+  /** Revoke the owner's agent MCP tokens (PAN-4927). Never throws. */
+  readonly revokeAgentMcpTokens?: (agentId: string, opts?: { agentKind?: 'agent' | 'conversation'; dir?: string }) => Promise<number>;
 }
 
 /**
@@ -273,6 +277,7 @@ export async function applyAgentLifecycleEventWithDeps(
           ...(state.sessionId ? { sessionId: state.sessionId } : {}),
         },
       });
+      void (deps.revokeAgentMcpTokens ?? revokeAgentMcpTokens)(agentId).catch(() => undefined);
       return { applied: true, status: 'stopped' };
     }
   }
@@ -369,6 +374,9 @@ async function applyConversationLifecycleEvent(
         conversation.name,
         Number.isNaN(exitedAtMs) ? undefined : exitedAtMs,
       );
+      // PAN-4927 D-11: before the early return, so a row an operator stop already ended still loses its tokens.
+      await (deps.revokeAgentMcpTokens ?? revokeAgentMcpTokens)(conversation.name, { agentKind: 'conversation', dir: conversationStateDir(conversation.tmuxSession) })
+        .catch(() => 0);
       appendActivity('stopped');
       // A row something else already ended (operator stop, the poller) had its
       // cleanup run by that writer; only the exit itself is recorded here.

@@ -71,6 +71,17 @@ describe('selectOrphanServerPids (PAN-1625)', () => {
   });
 });
 
+describe('selectOrphanServerPids parent guard (PAN-4734)', () => {
+  it('never selects the reaper\'s parent, the live server, even with no port owner', () => {
+    expect(selectOrphanServerPids({
+      servers: [{ pid: 683, ageSeconds: 600 }, { pid: 900, ageSeconds: 600 }],
+      selfPid: 700,
+      parentPid: 683,
+      portOwnerPid: null,
+    })).toEqual([900]);
+  });
+});
+
 describe('parseDashboardServerProcs (PAN-1625)', () => {
   it('matches a real node dist/dashboard/server.js invocation', () => {
     const out = '  4145437   305 /home/u/.nvm/versions/node/v22/bin/node /home/u/proj/dist/dashboard/server.js';
@@ -99,6 +110,23 @@ describe('reapOrphanedDashboardServers (PAN-1625)', () => {
   afterEach(() => {
     vi.useRealTimers();
     vi.clearAllMocks();
+  });
+
+  it('spares the live server that spawned the deacon child when lsof is missing (PAN-4734)', async () => {
+    const kill = vi.fn();
+    const promise = reapOrphanedDashboardServers({
+      selfPid: 700,
+      parentPid: 683,
+      apiPort: 3011,
+      listServers: async () => [{ pid: 683, ageSeconds: 600 }],
+      resolvePortOwner: async () => null,
+      isContainerProcess: async () => false,
+      kill,
+      graceMs: 10,
+    });
+    await vi.runAllTimersAsync();
+    await expect(promise).resolves.toEqual([]);
+    expect(kill).not.toHaveBeenCalled();
   });
 
   it('no-ops when the deacon is globally paused', async () => {

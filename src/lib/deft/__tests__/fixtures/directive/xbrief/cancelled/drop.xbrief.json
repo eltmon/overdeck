@@ -1,0 +1,9 @@
+{
+  "schemaVersion": "0.8",
+  "plan": {
+    "id": "scope-drop",
+    "title": "Dropped scope",
+    "status": "cancelled",
+    "items": []
+  }
+}

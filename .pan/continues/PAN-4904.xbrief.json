@@ -1,0 +1,67 @@
+{
+  "version": "1",
+  "issueId": "PAN-4904",
+  "created": "2026-11-03T15:44:28.853Z",
+  "updated": "2026-11-03T16:11:22.431Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "codex-injected-prefixes": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4904",
+      "claimedAt": "2026-11-03T15:44:28.853Z",
+      "doneAt": "2026-11-03T15:47:24.127Z"
+    },
+    "release-record-title": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4904",
+      "claimedAt": "2026-11-03T15:47:45.754Z",
+      "doneAt": "2026-11-03T16:04:32.450Z"
+    },
+    "docs-pull-title": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4904",
+      "claimedAt": "2026-11-03T16:04:43.436Z",
+      "doneAt": "2026-11-03T16:06:27.443Z"
+    },
+    "codex-injected-prefixes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:08:51.867Z"
+    },
+    "codex-injected-prefixes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:09:21.102Z"
+    },
+    "codex-injected-prefixes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:09:48.162Z"
+    },
+    "release-record-title.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:10:03.226Z"
+    },
+    "release-record-title.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:10:19.568Z"
+    },
+    "release-record-title.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:10:35.875Z"
+    },
+    "docs-pull-title.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:10:52.193Z"
+    },
+    "docs-pull-title.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:11:07.805Z"
+    },
+    "docs-pull-title.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T16:11:22.431Z"
+    }
+  }
+}

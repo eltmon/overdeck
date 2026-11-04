@@ -66,3 +66,52 @@ describe('reconcileStaleSiblings (PAN-1691 merge-train reconciler)', () => {
     expect(await reconcileStaleSiblings('PAN-1', deps)).toEqual([]);
   });
 });
+
+describe('reconcileStaleSiblings approval carry (PAN-4801)', () => {
+  const carry = { from: 'a'.repeat(40), to: 'b'.repeat(40), patchId: 'c'.repeat(40) };
+
+  function carryDeps(carryApproval: ReconcileDeps['carryApproval'], withCarry = true): ReconcileDeps & {
+    reDispatchVerification: ReturnType<typeof vi.fn>;
+  } {
+    return {
+      getReadySiblings: () => ['PAN-2'],
+      rebaseSibling: async () => (withCarry ? { status: 'clean', carry } : { status: 'clean' }),
+      reDispatchVerification: vi.fn(),
+      dispatchConflictResolver: vi.fn(),
+      carryApproval,
+    };
+  }
+
+  it('carries the approval instead of re-reviewing when the rebase left the patch unchanged', async () => {
+    const carryApproval = vi.fn(async () => true);
+    const deps = carryDeps(carryApproval);
+    const out = await reconcileStaleSiblings('PAN-1', deps);
+    expect(out).toEqual([{ issueId: 'PAN-2', result: 'approval-carried' }]);
+    expect(carryApproval).toHaveBeenCalledWith('PAN-2', carry);
+    expect(deps.reDispatchVerification).not.toHaveBeenCalled();
+  });
+
+  it('re-reviews when the patch changed (no carry offered)', async () => {
+    const carryApproval = vi.fn(async () => true);
+    const deps = carryDeps(carryApproval, false);
+    const out = await reconcileStaleSiblings('PAN-1', deps);
+    expect(out).toEqual([{ issueId: 'PAN-2', result: 'rebased' }]);
+    expect(carryApproval).not.toHaveBeenCalled();
+    expect(deps.reDispatchVerification).toHaveBeenCalledWith('PAN-2');
+  });
+
+  it('falls back to a re-review when the carry is refused or throws', async () => {
+    for (const carryApproval of [vi.fn(async () => false), vi.fn(async () => { throw new Error('gh down'); })]) {
+      const deps = carryDeps(carryApproval);
+      const out = await reconcileStaleSiblings('PAN-1', deps);
+      expect(out).toEqual([{ issueId: 'PAN-2', result: 'rebased' }]);
+      expect(deps.reDispatchVerification).toHaveBeenCalledWith('PAN-2');
+    }
+  });
+
+  it('re-reviews when no carry step is wired', async () => {
+    const deps = carryDeps(undefined);
+    const out = await reconcileStaleSiblings('PAN-1', deps);
+    expect(out).toEqual([{ issueId: 'PAN-2', result: 'rebased' }]);
+  });
+});

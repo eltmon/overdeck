@@ -33,6 +33,32 @@ pan doctor
 pan doctor github-quota [--json]   # GitHub API quota use per caller, active pauses, skipped projects (PAN-4264)
 ```
 
+## JSON output (PAN-4643)
+
+```bash
+pan doctor --json
+```
+
+Prints exactly one JSON object to stdout — no banner, no colour, no summary sentence (those go to stderr instead) — with the same exit code as text mode (`1` on any `error` check, or on any `warn` check with `--strict`):
+
+```json
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-11-01T04:52:00.000Z",
+  "strict": false,
+  "exitCode": 0,
+  "summary": { "ok": 40, "warn": 2, "error": 0 },
+  "checks": [
+    { "name": "Git", "status": "ok", "message": "Installed", "fix": null }
+  ],
+  "patrolBudgets": [
+    { "patrol": "example-patrol", "actions": 3, "budget": 20, "suspended": false }
+  ]
+}
+```
+
+Use it to script health checks or feed a machine-readable report into another tool (for example `pan diagnose`, which runs it out-of-process to build a diagnostic bundle).
+
 ## Health Check Workflow
 
 ### 1. Run Diagnostics

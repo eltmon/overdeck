@@ -1,0 +1,535 @@
+{
+  "version": "1",
+  "issueId": "PAN-4645",
+  "created": "2026-11-01T05:45:18.271Z",
+  "updated": "2026-11-01T12:41:55.569Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-01T12:26Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-01T12:26:54.703Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-01T12:32:33.111Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-01T12:36Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-01T12:36:40.581Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-01T12:40:32.386Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-01T12:41Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-11-01T12:41:55.569Z"
+    }
+  ],
+  "items": {
+    "wi1-machine-key": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4645",
+      "claimedAt": "2026-11-01T05:45:18.271Z",
+      "doneAt": "2026-11-01T06:01:42.368Z"
+    },
+    "wi1-machine-key.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T06:02:58.209Z"
+    },
+    "wi1-machine-key.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T06:03:15.319Z"
+    },
+    "wi1-machine-key.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T06:03:31.260Z"
+    },
+    "wi1-machine-key.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T06:03:47.559Z"
+    },
+    "wi2-secure-channel": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4645",
+      "claimedAt": "2026-11-01T06:04:22.380Z",
+      "doneAt": "2026-11-01T06:40:24.761Z"
+    },
+    "wi2-secure-channel.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T06:42:36.408Z"
+    },
+    "wi2-secure-channel.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T06:42:57.810Z"
+    },
+    "wi2-secure-channel.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T06:43:19.202Z"
+    },
+    "wi2-secure-channel.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T06:43:47.326Z"
+    },
+    "wi2-secure-channel.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T06:44:08.855Z"
+    },
+    "wi3-channel-listener": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4645",
+      "claimedAt": "2026-11-01T06:44:34.504Z",
+      "doneAt": "2026-11-01T07:04:06.162Z"
+    },
+    "wi3-channel-listener.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:18:20.647Z"
+    },
+    "wi3-channel-listener.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:18:40.528Z"
+    },
+    "wi3-channel-listener.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:19:07.357Z"
+    },
+    "wi3-channel-listener.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:19:37.050Z"
+    },
+    "wi4-machine-credential": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4645",
+      "claimedAt": "2026-11-01T07:20:18.838Z",
+      "doneAt": "2026-11-01T07:42:05.177Z"
+    },
+    "wi4-machine-credential.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:42:44.671Z"
+    },
+    "wi4-machine-credential.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:43:03.541Z"
+    },
+    "wi4-machine-credential.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:43:21.396Z"
+    },
+    "wi4-machine-credential.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:43:41.000Z"
+    },
+    "wi4-machine-credential.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:43:58.917Z"
+    },
+    "wi5-route-scope-rows": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4645",
+      "claimedAt": "2026-11-01T07:44:34.582Z",
+      "doneAt": "2026-11-01T07:49:00.200Z"
+    },
+    "wi5-route-scope-rows.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:00:04.810Z"
+    },
+    "wi5-route-scope-rows.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:00:34.074Z"
+    },
+    "wi5-route-scope-rows.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:01:00.239Z"
+    },
+    "wi6-ws-rpc-scoped": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4645",
+      "claimedAt": "2026-11-01T08:01:35.605Z",
+      "doneAt": "2026-11-01T08:36:00.583Z"
+    },
+    "wi6-ws-rpc-scoped.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:37:36.228Z"
+    },
+    "wi6-ws-rpc-scoped.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:37:59.985Z"
+    },
+    "wi6-ws-rpc-scoped.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:38:31.966Z"
+    },
+    "wi6-ws-rpc-scoped.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:39:16.310Z"
+    },
+    "wi7-ws-rpc-4401": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4645",
+      "claimedAt": "2026-11-01T08:39:44.352Z",
+      "doneAt": "2026-11-01T08:49:14.018Z"
+    },
+    "wi8-conversations-headroom": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4645",
+      "claimedAt": "2026-11-01T08:50:35.674Z",
+      "doneAt": "2026-11-01T08:54:34.797Z"
+    },
+    "wi7-ws-rpc-4401.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:52:05.168Z"
+    },
+    "wi7-ws-rpc-4401.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:52:21.990Z"
+    },
+    "wi7-ws-rpc-4401.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:52:38.100Z"
+    },
+    "wi8-conversations-headroom.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:55:11.614Z"
+    },
+    "wi8-conversations-headroom.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:55:27.928Z"
+    },
+    "wi8-conversations-headroom.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T08:55:42.558Z"
+    },
+    "wi9-conv-environment-local": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4645",
+      "claimedAt": "2026-11-01T08:55:57.537Z",
+      "doneAt": "2026-11-01T09:02:23.099Z"
+    },
+    "wi9-conv-environment-local.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:02:43.195Z"
+    },
+    "wi9-conv-environment-local.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:03:01.477Z"
+    },
+    "wi9-conv-environment-local.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:03:20.843Z"
+    },
+    "wi10-conv-environment-vault": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4645",
+      "claimedAt": "2026-11-01T09:03:36.930Z",
+      "doneAt": "2026-11-01T09:09:30.876Z"
+    },
+    "wi10-conv-environment-vault.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:09:52.272Z"
+    },
+    "wi10-conv-environment-vault.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:10:14.946Z"
+    },
+    "wi10-conv-environment-vault.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:10:45.681Z"
+    },
+    "wi11-link-store": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4645",
+      "claimedAt": "2026-11-01T09:11:12.507Z",
+      "doneAt": "2026-11-01T09:17:20.367Z"
+    },
+    "wi11-link-store.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:17:41.790Z"
+    },
+    "wi11-link-store.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:18:08.950Z"
+    },
+    "wi11-link-store.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:18:37.527Z"
+    },
+    "wi11-link-store.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:18:59.418Z"
+    },
+    "wi11-link-store.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:19:15.451Z"
+    },
+    "wi12-pairing-exchange-link": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4645",
+      "claimedAt": "2026-11-01T09:19:30.928Z"
+    },
+    "wi16-use-https-page": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4645",
+      "claimedAt": "2026-11-01T09:20:02.282Z",
+      "doneAt": "2026-11-01T09:27:26.865Z"
+    },
+    "wi16-use-https-page.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:27:45.240Z"
+    },
+    "wi16-use-https-page.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:28:02.827Z"
+    },
+    "wi16-use-https-page.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:28:20.023Z"
+    },
+    "wi12-pairing-exchange": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4645",
+      "claimedAt": "2026-11-01T09:28:35.335Z",
+      "doneAt": "2026-11-01T09:36:30.353Z"
+    },
+    "wi12-pairing-exchange.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:36:44.999Z"
+    },
+    "wi12-pairing-exchange.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:36:59.696Z"
+    },
+    "wi12-pairing-exchange.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:37:14.542Z"
+    },
+    "wi12-pairing-exchange.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:37:29.572Z"
+    },
+    "wi12-pairing-exchange.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:37:43.886Z"
+    },
+    "wi13-machines-list-unlink": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4645",
+      "claimedAt": "2026-11-01T09:38:27.915Z",
+      "doneAt": "2026-11-01T09:43:16.286Z"
+    },
+    "wi13-machines-list-unlink.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:43:34.307Z"
+    },
+    "wi13-machines-list-unlink.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:43:51.212Z"
+    },
+    "wi13-machines-list-unlink.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:44:07.912Z"
+    },
+    "wi13-machines-list-unlink.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:44:24.732Z"
+    },
+    "wi14-machines-cli": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4645",
+      "claimedAt": "2026-11-01T09:44:41.263Z"
+    },
+    "wi14-cli-machines": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4645",
+      "claimedAt": "2026-11-01T09:44:56.238Z",
+      "doneAt": "2026-11-01T09:50:00.058Z"
+    },
+    "wi14-cli-machines.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:50:18.796Z"
+    },
+    "wi14-cli-machines.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:50:35.382Z"
+    },
+    "wi14-cli-machines.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:50:51.912Z"
+    },
+    "wi14-cli-machines.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T09:51:09.415Z"
+    },
+    "wi15-token-mint-auto": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4645",
+      "claimedAt": "2026-11-01T09:51:27.575Z",
+      "doneAt": "2026-11-01T10:03:20.503Z"
+    },
+    "wi15-token-mint-auto.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T10:03:45.695Z"
+    },
+    "wi15-token-mint-auto.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T10:04:06.446Z"
+    },
+    "wi15-token-mint-auto.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T10:04:28.157Z"
+    },
+    "wi15-token-mint-auto.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T10:04:45.746Z"
+    },
+    "wi17-stall-record": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4645",
+      "claimedAt": "2026-11-01T10:05:01.881Z",
+      "doneAt": "2026-11-01T10:10:49.472Z"
+    },
+    "wi17-stall-record.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T10:11:05.778Z"
+    },
+    "wi17-stall-record.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T10:11:21.716Z"
+    },
+    "wi17-stall-record.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T10:11:35.341Z"
+    },
+    "wi18-link-supervisor": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4645",
+      "claimedAt": "2026-11-01T10:11:51.294Z",
+      "doneAt": "2026-11-01T10:26:02.324Z"
+    },
+    "wi18-link-supervisor.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T10:26:17.360Z"
+    },
+    "wi18-link-supervisor.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T10:26:30.714Z"
+    },
+    "wi18-link-supervisor.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T10:26:44.267Z"
+    },
+    "wi18-link-supervisor.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T10:26:58.269Z"
+    },
+    "wi18-link-supervisor.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T10:27:12.445Z"
+    },
+    "wi19-advertised-endpoints": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4645",
+      "claimedAt": "2026-11-01T10:27:26.314Z",
+      "doneAt": "2026-11-01T10:38:32.243Z"
+    },
+    "wi19-advertised-endpoints.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T10:38:45.691Z"
+    },
+    "wi19-advertised-endpoints.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T10:38:58.447Z"
+    },
+    "wi19-advertised-endpoints.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T10:39:11.626Z"
+    },
+    "wi19-advertised-endpoints.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T10:39:24.838Z"
+    },
+    "wi20-machines-panel": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4645",
+      "claimedAt": "2026-11-01T10:39:37.611Z",
+      "doneAt": "2026-11-01T10:51:45.185Z"
+    },
+    "wi20-machines-panel.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T10:49:10.579Z"
+    },
+    "wi20-machines-panel.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T10:49:22.596Z"
+    },
+    "wi20-machines-panel.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T10:49:34.399Z"
+    },
+    "wi20-machines-panel.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T10:49:47.102Z"
+    },
+    "wi21-two-machine-smoke": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4645",
+      "claimedAt": "2026-11-01T10:50:00.697Z",
+      "doneAt": "2026-11-01T11:18:56.807Z"
+    },
+    "wi21-two-machine-smoke.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T11:19:09.713Z"
+    },
+    "wi21-two-machine-smoke.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T11:19:21.703Z"
+    },
+    "wi21-two-machine-smoke.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T11:19:33.702Z"
+    },
+    "wi22-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4645",
+      "claimedAt": "2026-11-01T11:19:46.466Z",
+      "doneAt": "2026-11-01T11:25:23.542Z"
+    },
+    "wi22-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T11:25:38.306Z"
+    },
+    "wi22-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T11:25:52.441Z"
+    },
+    "wi22-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T11:26:06.336Z"
+    },
+    "wi22-docs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T11:26:19.132Z"
+    },
+    "wi22-docs.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T11:26:31.845Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-11-01T12:41:55Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-4645\n\n# Review — PAN-4645\n## Verdict: CHANGES REQUESTED — the desktop-packaged server cannot load `@hyperswarm/secret-stream`, and a revoked `/ws/rpc` client keeps running RPCs for up to 30 s\n\n## Context\n- Run ID: agent-pan-4645-review-9f37570f\n- Manifest: .pan/review/agent-pan-4645-review-9f37570f/context.json\n- Branch / workspace: feature/pan-4645 / workspaces/feature-pan-4645 (PR #4715)\n- HEAD reviewed: 9f37570fc141f7c9e8230023a9b461fd2b013d3e\n- Base / prior cycle SHA: origin/main merge base; I did the full read at a1985d436f15 and re-checked the deltas a1985d4..13a26b4 (settings-api fix, commit 52448581) and 13a26b4..9f37570 (one test file and plan artifacts only). No source the blockers depend on changed after a1985d4.\n\n## Blocking Findings\n\n### [correctness] Desktop packaging omits `@hyperswarm/secret-stream`, so the packaged server fails at import — `src/lib/anywhere/channel/channel-socket.ts:62`\n- Severity: !\n- Classification / requirement scope: implementation defect, in_pr_scope. D-4645-2 covers the tsdown `neverBundle` lists but says nothing about desktop packaging (a spec gap).\n- Trigger and changed-code connection: `channel-socket.ts` loads the library at module top level with `_require('@hyperswarm/secret-stream')`. tsdown inlines that as `createRequire(import.meta.url)(\"@hyperswarm/secret-stream\")` in the `dashboard-auth-*` chunk, which `server.js` imports at boot (`channel-peer.ts` → `dashboard-auth.ts`). The desktop packager (`apps/desktop/scripts/prepare-server-resources.mjs`) installs only the externals that `apps/desktop/scripts/import-closure.mjs` finds. Its regexes match `from \"x\"`, `import \"x\"`, `import(\"x\")` and `require(\"x\")`, and none of them matches `Require(import.meta.url)(\"x\")`.\n- Expected / observed / impact: Expected: the packaged server installs every runtime external. Observed: when I run the scanner on the built `dist/dashboard`, it reports `noise-handshake true` (found only through `_require(\"noise-handshake/dh\")`), `@hyperswarm/secret-stream false`, `sodium-universal false` and `sodium-native false`. `noise-handshake`'s dependencies are `b4a`, `nanoassert` and `sodium-universal`, so secret-stream is not installed transitively. The generated stub `package.json` therefore lacks it. In the packaged desktop app, `server.js` throws \"module not found\" while importing the dashboard-auth chunk, so the dashboard never boots. The npm/`pan` install path is not affected because it installs every root dependency.\n- Evidence: I ran `scanImportClosure('dist/dashboard', [server.js, deacon.js, …])` with the repo's own module on the build output. I read the inlined line `const SecretStream = createRequire(import.meta.url)(\"@hyperswarm/secret-stream\");` in `dist/dashboard/dashboard-auth-BeQqhMkJ.js`. I read the dependency lists from `node_modules/*/package.json`. Limit: I did not run a full desktop build or launch the packaged app. No PR CI job runs desktop packaging, so CI cannot catch this.\n- Fix: use one of these. (a) Import the two libraries statically (`import SecretStream from '@hyperswarm/secret-stream'` and `import Noise from 'noise-handshake'`) so the bundle emits `from \"…\"`. (b) Teach `import-closure.mjs` the `createRequire\\([^)]*\\)\\(\\s*[\"']([^\"'\\n]+)[\"']` shape. (c) Pin the four Noise packages explicitly in `prepare-server-resources.mjs`. Whichever you pick, also confirm that `sodium-native` loads under Electron, the same way the script already verifies node-pty.\n\n### [security] A revoked `/ws/rpc` connection keeps executing RPCs until the peer answers the close frame (up to 30 s) — `src/dashboard/server/ws-rpc-auth.ts:121`\n- Severity: !\n- Classification / requirement scope: implementation defect (a regression from baseline), in_pr_scope (WI-7 / D-4645-15). D-4645-15 asked for a 4401 close frame. It did not ask to drop the handler interrupt.\n- Trigger and changed-code connection: on main, `/ws/rpc` raced the RPC handler against a revocation `Deferred`, so a revoke interrupted the handler fiber at once. This PR removes that `raceFirst` (see the `ws-rpc.ts` diff). `withRpcRevocation` → `closeRpcSocketRevoked` now only calls `ws.close(4401)`. With `ws`, `close()` moves the socket to CLOSING and arms a 30 s close timer. Received messages are still emitted (`receiverOnMessage` has no state check). Effect's `fromWebSocket` removes its `message` listener only on the `close` event (`effect/dist/unstable/socket/Socket.js:367-400`).\n- Expected / observed / impact: Expected: the credential stops working the moment it is revoked, as it did on main. Observed: a client that does not answer the close frame keeps a working RPC channel with the revoked credential's scopes until ws's 30 s close timeout. Device credentials carry `admin`. A stolen device is exactly the case revocation exists for. Machine credentials are not affected, because `closeChannelsForPeer` destroys their channel sockets.\n- Evidence: in a scratch probe (`scratchpad/wsprobe/probe.cjs`, using the repo's `ws`), the server called `close(4401)` and the client paused its socket so it never answered. The server still received all 5 later messages in readyState 2, and the socket was still open after 3 s. The Effect side is a static trace, not a run of the full RPC stack. The new `ws-rpc-revoke.test.ts` checks only that a compliant client sees 4401.\n- Fix: keep both behaviours. In the revocation callback, send `ws.close(4401, 'device revoked')` and then complete a `Deferred` that `raceFirst`s the RPC handler (the main-branch shape). The handler fiber stops processing, and the 4401 frame is already queued.\n\n## Non-blocking Findings\n- `~` [spec conflict] Commit 52448581 reverts PRD WI-15 step 2. `loadSettingsApi` reports `requireTokenMint` (the enforced value) again, not `.configured`, so that the existing D-1 test passes. The PRD chose `.configured` so that the whole-document Settings save would not write an automatic `true` back to `config.yaml`. Now any Settings save while a device, link or trusted address exists persists `require_token_mint: true`. It stays on after everything is unlinked, until the operator turns the toggle off. This is safe but sticky. The deviation is not recorded against the PRD's WI-15 test (\"Settings GET reports `require_token_mint: false`\"). Decide between two fixes: keep enforced reporting and skip writing the key while it is on automatically, or restore `.configured` and amend the D-1 test.\n- `~` [must-not] `src/lib/settings-api.ts` grew from 1503 lines on main to 1504 at HEAD (one comment line from 52448581). Non-goal 9 says it must not grow. It stays under the 1508 allowlist cap, so lint stays green. Drop the extra comment line.\n- `~` [latent, downstream] `rejectUnsafeDashboardMutationRequest` (`dashboard-auth.ts:260`) still calls `resolveDashboardCredential(headers)` without the channel. On a plain resolve a machine credential returns `null`, so the guard demands Origin and CSRF headers that a linked machine never has, and answers 403. Stop, abort, lanes, send and the permission routes use `validateOrigin` and are not affected. `POST /api/workers`, which has an operate row, uses this guard, so a machine credential passes the gate and then gets 403 from the route. Use `resolveRequestCredential(request)` there and treat `machine` as a header-borne credential that skips the CSRF check, before #4651 forwards worker spawns.\n- `~` [spec deviation] The pairing credential is consumed in `takePairingById` (preamble time), not when the handshake succeeds. `PairingSecret.onSuccess` is never set (`server.ts`). The pairing id travels in the cleartext preamble, so an on-path observer, or a failure after the preamble, burns the code. The impact is a retry with a new `pan pair` link. Either consume in `onSuccess` or update the interface comment.\n- `~` `MACHINE_TOKEN_SCOPES('operator')` adds `approve`, which FR-7's list does not contain. This reconciles the PRD with PAN-4649, which moved the permission routes to `approve` after the PRD was written, and the new test pins it. Amend FR-7 to match.\n- `~` The supervisor marks a link permanently `revoked` (persisted with `markLinkRevoked`) on a single refusal `01`. On the peer, refusal `01` also happens when `access-tokens.json` is temporarily unreadable, because the snapshot is cleared. A transient corrupt file on the peer therefore forces a re-link. Consider re-probing once before persisting.\n- `~` Race: `applyDescriptor` persists `entry.link.routes` that it computed before an `await`. An Add route that lands in between can be overwritten.\n- `?` `handleMachinesExchange` trusts the `environmentId` in the request body for the D-4645-18 replace. The holder of a pairing code can therefore revoke another environment's inbound token by claiming its id. This needs a code that the operator issued, and that code is already admin-equivalent.\n- `?` `/ws/link` does not refuse Tailscale Funnel requests, unlike `authorizeDashboardUpgrade`. When Funnel is on, the pre-auth handshake surface, including the global cap of 32 pending handshakes, is reachable from the internet. Decide whether Funnel is a valid link route.\n- `?` The connection dispatcher's `socket.setTimeout(10_000, () => socket.destroy())` leaves its `once('timeout')` listener in place after `setTimeout(0)`. A later Node HTTP timeout on that socket destroys it directly. Node destroys idle keep-alive sockets anyway, so I see no current impact.\n- Performance (advisory): `ensureMachineKey()` reads `machine-key.json` from disk on every unauthenticated `GET /api/environment` and on every supervisor probe. The file is small and the read is async; caching it after the first read would be cheap.\n- Compliance note: D-4645-13 is always on. A browser on another LAN device that uses plain `http://<lan-ip>:3011` now gets the 403 \"Use HTTPS\" page. `configuration/remote-access.mdx` documents this.\n\n## Coverage\n**Changed-file ledger** (all reviewed at a1985d4; the later deltas were re-checked):\n- Reviewed, high-risk: `access-tokens.ts`, `dashboard-auth.ts`, `ws-auth.ts`, `ws-rpc-auth.ts`, `ws-rpc.ts`, `routes/access-tokens.ts`, `token.ts`, `RequireTokenMintRow.tsx`, `accessTokenScopes.ts`, `0000_overdeck_init.sql`.\n- Reviewed, channel/link core: `channel/{wire,noise,accept,open,channel-socket,channel-agent}.ts`, `channel-listener.ts`, `channel-peer.ts`, `server.ts`, `machine-key.ts`, `link-store.ts`, `routes.ts`, `endpoints.ts`, `link-actor.ts`, `link-client.ts`.\n- Reviewed, routes and services: `machines.ts`, `machines-peer.ts`, `machine-link-service.ts`, `link-supervisor.ts`, `link-heartbeat.ts`, `anywhere-boot.ts`, `event-loop-monitor.ts`, `remote-request-gate.ts`, `route-scopes.ts`, `device-connections.ts`, `pairing-credentials.ts`, `routes/pairing.ts`, `plain-http-guard.ts`, `environment.ts`, `anywhere.ts`, `dashboard-session.ts`, `events.ts`, `vault.ts`, `ws-terminal.ts`, `ws-voice.ts`, `ws-autopreso.ts`, `main.ts`, `boot-gates.ts`.\n- Reviewed, data: `infra.ts`, `conversation-environment.ts`, `conversations.ts` (size and insert site), `conversation-archive.ts` (moved listing), `conversation-vault-rows.ts`, `vault/browse.ts` (wired through `vault-browse-service.ts`), `remote-access/config.ts`, `anywhere-status.ts`, `settings-api.ts`.\n- Reviewed, CLI and UI: `machines.ts`, `pair.ts`, `dashboard-call.ts`, `MachinesPanel.tsx`, `LinkMachineDialog.tsx`, `machinesApi.ts`, `anywhereApi.ts`, `AnywhereSection.tsx`, `Toggle.tsx`.\n- Reviewed, contracts and build: `contracts/{environment,machines,index}.ts`, `package.json`, both `tsdown.config.ts` files, the desktop packager interaction (`apps/desktop/scripts/import-closure.mjs` and `prepare-server-resources.mjs`, unchanged but affected).\n- Reviewed, docs: `docs.json`, `CLAUDE.md` row, `SKILLS-CONVENTION.md`, `architecture.md`, and the superseded headers on pan-2352/2356/3513. pan-2355 carries no header because it has been rebaselined on pan-2350 r5, so the header no longer applies. `ANYWHERE-ARCHITECTURE.md`, `linked-machines.mdx`, `cli/machines.mdx`, `remote-access.mdx` and `DASHBOARD-AUTH.md` were spot-checked.\n- Tests: the security and channel suites listed under Verification, plus the names of the remaining new test files. Smoke: `scripts/anywhere/two-machine-smoke.mjs`; its deletions are limited to `.tmp/anywhere-[ab]`.\n- Not applicable: `.pan/*` artifacts, `bun.lock`, `composer-commands.generated.ts`, `harness-branches-baseline.txt`, `frontend-test-subset.txt` (I checked that the new UI test is listed).\n\n**Stub-UI findings:** all five are false positives. Every flagged state has a writer: the `setRoutesOpen` toggle, `setBusy` in the action handlers, `setLinking` in `handleLink`, and the `setLinkOpen` button.\n\n**Dimensions:** correctness, security, performance and requirements/UX are all covered, with the findings above.\n\n**AC matrix:**\n| AC | Status | Evidence |\n|---|---|---|\n| AC-1 key file and descriptor | met | `machine-key.ts` uses link-based create-once with mode 0600; `environment.ts` sets machineKey and machineLinks |\n| AC-2 channel tests | met | channel.test.ts and channel-capture.test.ts pass (run at a1985d4; code unchanged) |\n| AC-3 listener transparent; `link:` address | met | channel-listener.test.ts passes; CI clean-install smoke passed on the prior head |\n| AC-4 machine token only in its own channel | met | `resolveDashboardCredential` channel branch; machine-credential.test.ts |\n| AC-5 operate rows; 403 on admin routes | met at the gate; see the `/api/workers` CSRF advisory | route-scopes-machine.test.ts |\n| AC-6 scoped `/ws/rpc` | met | ws-rpc-auth.test.ts; restricted group via `omit` |\n| AC-7 4401 on revoke | partially met: compliant clients get 4401, but handler interruption regressed (blocker 2) | ws-rpc-revoke.test.ts and the probe |\n| AC-8 conversations.ts ≤ 1080 | met | 1028 lines |\n| AC-9 no NULL environment_id after boot and refresh | met at boot; rows that non-dashboard processes insert stay NULL until the next boot (spec as written) | conversation-environment.ts; vault wiring |\n| AC-10 link store mode 0600, atomic, corrupt ⇒ zero links | met | link-store.ts; link-store.test.ts |\n| AC-11 link/list/unlink both sides | met (live) | PR body smoke output, exit=0 |\n| AC-12 forwarded mint gets 401 with one link | met | remote-request-gate-auto-mint.test.ts |\n| AC-13 Use HTTPS page | met | plain-http-guard.ts and its test |\n| AC-14 offline/online timing; froze | met | link-supervisor.test.ts (fake timers) and the smoke |\n| AC-15 learned lan route; Closes #4403 | met | link-supervisor-routes.test.ts; PR body contains \"Closes #4403.\" |\n| AC-16 Machines UI | met | MachinesPanel.test.tsx, in the frontend subset |\n| AC-17 smoke exits 0 | met per PR body (not re-run by me) | PR description |\n| AC-18 docs and lint:docs | docs met; lint:docs unverified (CI lint-group pending) | file checks |\n\n## Verification\n- CI for 9f37570f: build, lint groups, test shards, e2e and clean-install are all **pending**, so they are unverified. The overdeck/test gate passed (typecheck and lint). The previous head failed test shard 1 on settings-api.test.ts; commit 52448581 addresses that.\n- I ran `npx vitest run` on channel, channel-capture, channel-listener, machine-credential, ws-rpc-revoke, ws-rpc-auth, route-scopes-machine, machines-exchange and link-supervisor at a1985d4: 9 files and 78 tests passed. None of those sources changed after that.\n- I ran the desktop externals scanner on the built `dist/dashboard`: secret-stream is missing (blocker 1).\n- I ran a ws close-frame probe in the scratchpad: messages are still delivered in CLOSING state (blocker 2).\n- `npm run lint:effect-diagnostics`: **unverified**. My one local attempt was killed (exit 137) before it reported, and CI lint-group (effect) is pending.\n- I did not run the full test suite (per the role rules) or the desktop build.\n\n## Scope Note\nNone.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-4645/.pan/review/agent-pan-4645-review-9f37570f/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-4645 -m \"Fixed review issues\"`"
+    }
+  ],
+  "agentModel": "claude-opus-5-5"
+}

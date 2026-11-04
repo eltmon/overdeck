@@ -1,0 +1,1188 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-01T22:40:53Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4638: Run gauntlet lanes on any linked machine: desktop, laptop and Fly VMs",
+    "updated": "2026-11-01T22:46:17.905Z"
+  },
+  "plan": {
+    "id": "pan-4638",
+    "title": "Run gauntlet lanes on any linked machine: desktop, laptop and Fly VMs",
+    "status": "running",
+    "uid": "b7631998-ca74-4b0c-8619-4ae860e39473",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-01T22:40:53Z",
+    "updated": "2026-11-01T22:46:17.905Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4638",
+        "label": "PAN-4638",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4638.md",
+        "label": "PRD",
+        "type": "document"
+      }
+    ],
+    "tags": [
+      "anywhere",
+      "gauntlet",
+      "lanes",
+      "linked-machines",
+      "fly"
+    ],
+    "metadata": {
+      "sizeJustification": "One lane-door protocol split across two machines: the owner door, the home stand-in, the follower that mirrors reports, the views, and wait/stop/reap must all exist for a single remote lane to report back to its orchestrator, so no subset ships useful behavior on its own. The issue is already one decomposed work item (W-WORK3) of epic PAN-2350; the new-VM half (--machine fly, remote.auto_fly, gauntlet.fly.max_vms) is deferred to PAN-4743. Most of the file count is the per-item test files and the six documentation pages the PRD requires.",
+      "canonicalFilename": "2026-11-01-PAN-4638-run-gauntlet-lanes-on-any-linked-machine-desktop-laptop-and-fly-vms.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "pan lane start --machine resolves a target but refuses any machine other than this one ('Lanes on other machines arrive with PAN-4638'). A gauntlet loop therefore saturates the orchestrator's machine with heavy critics even when the laptop or a linked Fly machine is idle, and the CPU-pressure refusal can only make the loop wait.",
+      "Proposal": "Split the lane door: home keeps every run rule (parent, launcher standing, run, critic link and default --at, iteration, idempotency, model/harness) and calls a new owner work door POST /api/machines/work/lanes that only creates the worktree, brief, parentless lane row stamped with home's environment, and the runtime. Home records the lane in an on-disk stand-in (~/.overdeck/remote-lanes/<name>/, never a conversations row), a follower mirrors the owner's reports and state into it, and lane views, wait, stop and reap read or forward through it. The merged conversation list stamps lane facts on the owner's linked row so the dashboard nests remote lanes under the orchestrator. Details: .pan/drafts/PAN-4638.md.",
+      "NonGoals": "- --machine fly that provisions a new Fly VM per lane, remote.auto_fly and gauntlet.fly.max_vms (owned by PAN-4743); --machine fly keeps answering 400 fly-unavailable\n- Fixing the Fly machine bugs #4738, #4739, #4740, #4741\n- Orchestrator lanes on another machine (refused with 400)\n- Forwarding pan tell conv-<name> from home to a remote lane (use pan tell @<label>/<name>)\n- Stopping remote lanes when the orchestrator conversation ends\n- A machine column on the gauntlet progress page (assets/gauntlet-index.html)\n- Harnesses other than Claude Code on Fly machines (#4296)\n- Inserting any conversations row on home for a remote lane\n- Inventing a numeric id for a remote lane\n- Changing the D-19 placement rule in src/lib/anywhere/placement.ts"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Defer --machine fly (new VM), remote.auto_fly and gauntlet.fly.max_vms to PAN-4743",
+        "rationale": "PAN-4743 already owns --machine fly across start/worker/conversations; the W-WORK3 done-when (critics on a Fly VM) is met by a Fly machine created with pan machines add-fly and chosen by label or Auto, and keeping the new-VM path out keeps this issue inside the finalize size limits."
+      },
+      {
+        "summary": "A linked Fly machine is an ordinary Auto candidate",
+        "rationale": "It is linked and already paid for; the D-19 Fly exclusion governs creating a new VM, which PAN-4743 owns. placement.ts is unchanged."
+      },
+      {
+        "summary": "Remote lanes are on-disk stand-ins, never conversations rows",
+        "rationale": "Epic D-5 keeps other machines' conversations out of conversations because rows there drive liveness, costs, lanes and the PR sweep; PAN-4651's worker stand-ins set the same precedent."
+      },
+      {
+        "summary": "Home allocates the lane's conversation name and the owner refuses an existing name",
+        "rationale": "The same name on both machines lets conv-<name> key the report store on both, so every existing report reader works on mirrored reports; createConversation would otherwise vacate a same-name row."
+      },
+      {
+        "summary": "Pairing and LaneView key on lane names; remote lanes have id null",
+        "rationale": "Remote lanes have no local rowid and FKs cannot reference stand-ins; names are unique across home and its stand-ins."
+      },
+      {
+        "summary": "A local critic of a remote builder records the link in agents/conv-<critic>/lane-link.json",
+        "rationale": "critic_of_conversation_id is an FK to local rows; a write-once sidecar next to the brief keeps the launch fact without a schema change."
+      },
+      {
+        "summary": "--reuse follows the newest lane's machine; --machine with --reuse is 400; orchestrator lanes stay home",
+        "rationale": "A reuse must happen in the existing directory, which lives on one machine; an orchestrator lane elsewhere would list its lanes only there."
+      },
+      {
+        "summary": "Remote launches skip home's CPU check and the owner runs its own",
+        "rationale": "The point of placing the lane elsewhere is to avoid home's CPU pressure; the owner is the machine that takes the load."
+      },
+      {
+        "summary": "The follower does not stop remote lanes when the orchestrator ends",
+        "rationale": "Local lanes do not cascade-stop either; matching behavior avoids surprising data loss."
+      }
+    ],
+    "items": [
+      {
+        "id": "remote-lane-store",
+        "title": "Add the remote lane stand-in store and unified lane rows",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T22:40:53Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4638",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/lib/lanes/remote-lanes.ts",
+            "src/lib/lanes/lane-rows.ts",
+            "src/lib/lanes/iteration.ts",
+            "src/lib/lanes/__tests__/remote-lanes.test.ts",
+            "src/lib/lanes/__tests__/lane-rows.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/lanes/__tests__/remote-lanes.test.ts src/lib/lanes/__tests__/lane-rows.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-4",
+            "NFR-1",
+            "NFR-3"
+          ],
+          "foundationFor": [
+            "home-remote-launch",
+            "lane-views-remote",
+            "remote-lane-follower",
+            "lane-cli-machine",
+            "conversation-list-nesting",
+            "lane-stop-reap-remote"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4638.md WI-1. Create src/lib/lanes/remote-lanes.ts (stand-in store under ~/.overdeck/remote-lanes/<name>/: lane.json write-once facts, mirror.json follower-only, archived.json write-once; critic sidecar agents/conv-<critic>/lane-link.json) and src/lib/lanes/lane-rows.ts (LaneRow type, listAllLaneRows merging listLaneConversations rows with stand-ins, cwdKey = cwd or <environmentId>:<cwd>). Re-key iteration.ts distinctLaneCwds/laneIterations on cwdKey. Exact interfaces are in WI-1 step 1-2. Files 0600 via temp+rename; never a conversations row (NFR-1). RemoteLaneMirror also carries spawnError: string|null."
+        },
+        "items": [
+          {
+            "id": "remote-lane-store.ac1",
+            "title": "Given a temp root, when writeRemoteLaneFacts runs twice for one name, then the second call rejects and lane.json keeps the first facts with file mode 0600",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remote-lane-store.ac2",
+            "title": "Given one local lane row and one stand-in for the same run, when listAllLaneRows runs, then it returns both in createdAt order with id null and cwdKey '<environmentId>:<cwd>' for the remote one",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remote-lane-store.ac3",
+            "title": "Given two builder lanes with the same cwd string on two machines, when laneIterations runs, then it returns iterations 1 and 2",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remote-lane-store.ac4",
+            "title": "Given a local critic row with no critic FK and a lane-link.json sidecar, when listAllLaneRows runs, then the row's criticOfName equals the sidecar's builder name",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remote-lane-store.ac5",
+            "title": "Given a stand-in directory with a corrupt lane.json, when listRemoteLanes runs, then it skips that directory and returns the others",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "owner-lane-executor",
+        "title": "Add the owner-side lane executor launchOwnedLane",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T22:40:53Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4638",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/lib/lanes/owner-launch.ts",
+            "src/lib/lanes/launch.ts",
+            "src/lib/overdeck/conversations.ts",
+            "src/lib/lanes/__tests__/owner-launch.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/lanes/__tests__/owner-launch.test.ts src/lib/lanes/__tests__/launch.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "owner-launch and existing launch tests pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-9"
+          ],
+          "foundationFor": [
+            "owner-lane-doors",
+            "home-remote-launch"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. createConversation gains remoteLaunch (lane without parent) and refuseExistingName (409-style refusal instead of vacating). New src/lib/lanes/owner-launch.ts launchOwnedLane(spec, { projectKey, startedBy }) where projectKey is the OWNER's key resolved by the door from the git origin (OwnerLaneSpec carries no projectKey): validate (orchestrator refused), CPU check unless force, resolveAllowedHarness, lanes root, name free, target dir (reuseCwd or laneDir by iteration), fetch origin, builder base with origin/<base> fallback, critic at-sha must exist after fetch (append the fetchBase warning to the 400 when the fetch failed), brief with header, createConversation with lane facts and no parent, markConversationStartedBy, start runtime with laneContract. Export laneDir, RUN_PATTERN, KEY_PATTERN, withProjectLock and prepareLanesRoot from launch.ts without behavior change."
+        },
+        "items": [
+          {
+            "id": "owner-lane-executor.ac1",
+            "title": "Given a builder spec and context { projectKey: 'ov', startedBy: 'env-home' }, when launchOwnedLane runs, then it creates a branch worktree and a lane row in project ov with laneKey set, parentConversationId null and startedByEnvironmentId 'env-home'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "owner-lane-executor.ac2",
+            "title": "Given a conversation with the spec's name already exists, when launchOwnedLane runs, then it rejects with status 409 and code name-taken and the existing row is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "owner-lane-executor.ac3",
+            "title": "Given a critic spec whose at commit is absent after git fetch origin, when launchOwnedLane runs, then it rejects with status 400 and a message containing 'is not on origin'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "owner-lane-executor.ac4",
+            "title": "Given role orchestrator, when launchOwnedLane runs, then it rejects with status 400 before creating any directory",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "owner-lane-executor.ac5",
+            "title": "Given a saturated CPU verdict, when launchOwnedLane runs without force, then it rejects with 429 cpu-saturated, and with force it launches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "owner-lane-doors",
+        "title": "Add the owner lane doors: launch, status and reap",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T22:40:53Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "api",
+          "issueLabel": "pan-4638",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/machines-work-lanes.ts",
+            "src/dashboard/server/server.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "src/dashboard/server/link-fence.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/__tests__/machines-work-lanes.test.ts",
+            "src/dashboard/server/__tests__/link-fence.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/machines-work-lanes.test.ts src/dashboard/server/__tests__/link-fence.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts src/dashboard/server/__tests__/route-scopes.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "all four test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-11"
+          ],
+          "foundationFor": [
+            "remote-lane-follower",
+            "lane-stop-reap-remote"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. New src/dashboard/server/routes/machines-work-lanes.ts with POST /api/machines/work/lanes (workDoorPreflight with gitOrigin only — never home's projectKey — then launchOwnedLane with the preflight-resolved local projectKey), GET /api/machines/work/lanes/:name/status?after=<seq> (provenance-checked; activity, git, cost, reports seq>after max 20, spawnError, lastAssistantMessage when stopped/idle — implementation checkpoint in WI-3 step 2), POST /api/machines/work/lanes/:name/reap (provenance-checked reapLane). Register the layer in server.ts, add route-scopes rows (operate/read:state/operate), no-loss-matrix rows, and a link-fence rule refusing agent actors on POST /api/lanes/<name>/reap."
+        },
+        "items": [
+          {
+            "id": "owner-lane-doors.ac1",
+            "title": "Given a device (non-machine) credential, when it posts /api/machines/work/lanes, then the route answers 403 machine-only",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "owner-lane-doors.ac2",
+            "title": "Given a machine credential whose git origin matches a local project registered under a different key, when it posts /api/machines/work/lanes, then the lane launches in that local project, and with no matching origin the route answers 404 project-missing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "owner-lane-doors.ac3",
+            "title": "Given a lane started by environment A, when environment B requests its status or reap door, then the route answers 404 unknown-lane",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "owner-lane-doors.ac4",
+            "title": "Given a lane with three reports, when the status door is called with after=1, then it returns reports 2 and 3 oldest first",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "owner-lane-doors.ac5",
+            "title": "Given an agent actor on a machine credential, when it posts /api/lanes/x/reap, then linkActorFence returns agent-fenced while the owner reap door passes the fence",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "home-remote-launch",
+        "title": "Teach launchLane to launch on another machine through deps.remote",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T22:40:53Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4638",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/lanes/launch.ts",
+            "src/lib/lanes/types.ts",
+            "src/lib/lanes/__tests__/launch-remote.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/lanes/__tests__/launch-remote.test.ts src/lib/lanes/__tests__/launch.test.ts src/lib/lanes/__tests__/launch-critic-link.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the three launch test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-9",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. LaneLaunchRequest gains machine and needs; LaneLaunchResult gains machine and conversation becomes {id:number|null,name,gauntletRun,laneKey,laneRole}. LaneLaunchDeps.remote {environmentId,label,reason,isFly,launch,stop}. launchLane reads rows through listAllLaneRows at every former listLaneConversations call; occupies() judges remote rows from the mirror. With deps.remote: skip home CPU check, refuse orchestrator, refuse machine+reuse, refuse non-claude-code harness on Fly, allocate a name free locally and in the store, write home brief copy and stand-in, call the owner, retry name-taken up to 3 times, remove stand-in on any other refusal. Local critic of a remote builder writes lane-link.json. Remote --replace stops through deps.remote.stop."
+        },
+        "items": [
+          {
+            "id": "home-remote-launch.ac1",
+            "title": "Given a local builder with a done report and deps.remote, when a critic launches with --for, then the owner spec carries at equal to the builder's done head and a stand-in lane.json exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-remote-launch.ac2",
+            "title": "Given the fake owner answers 404 project-missing, when launchLane runs, then it rejects with that status and no stand-in directory remains",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-remote-launch.ac3",
+            "title": "Given the fake owner answers name-taken once, when launchLane runs, then it retries with a different name and succeeds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-remote-launch.ac4",
+            "title": "Given deps.remote with isFly true and a resolved harness of codex, when launchLane runs, then it rejects with 400 naming #4296",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "home-remote-launch.ac5",
+            "title": "Given a live remote lane for the same run, key and role, when launchLane runs without --replace, then it rejects with 409, and with --replace it calls deps.remote.stop first",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "lanes-route-machine",
+        "title": "Resolve --machine in POST /api/lanes and wire the owner call",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T22:40:53Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4638",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/lanes.ts",
+            "src/dashboard/server/routes/__tests__/lanes-route.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/lanes-route.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "lanes-route tests pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-10",
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. parseLaneLaunchBody accepts machine (string) and needs (string[]). When machine is set (or a reuse targets a remote newest row): refuse secure-channel requests with 403 no-chained-hops, resolve the project's git origin, call resolveTargetMachine; self launches locally; a link builds deps.remote with linkFetch to /api/machines/work/lanes as actorForSender(x-overdeck-sender) ?? operator, 30 s timeout (503 machine-unreachable), refusals through ownerRefusal; isFly from (await listFlyMachines()). On success invalidateLaneViews and followRemoteLane(name)."
+        },
+        "items": [
+          {
+            "id": "lanes-route-machine.ac1",
+            "title": "Given a fake link labelled desk, when POST /api/lanes carries machine 'desk', then it answers 201 with machine.label 'desk' and the fake owner received the spec with gitOrigin",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lanes-route-machine.ac2",
+            "title": "Given machine equal to this machine's label, when POST /api/lanes runs, then it launches locally and calls no link",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lanes-route-machine.ac3",
+            "title": "Given the request arrived through a secure channel, when it carries machine, then the route answers 403 no-chained-hops",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lanes-route-machine.ac4",
+            "title": "Given machine 'fly', when POST /api/lanes runs, then it answers 400 fly-unavailable from resolveTargetMachine",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "lane-views-remote",
+        "title": "Include remote lanes in lane views and key pairing on names",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T22:40:53Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4638",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/lanes/views.ts",
+            "src/lib/lanes/pairing.ts",
+            "src/lib/lanes/launch.ts",
+            "src/cli/commands/lane.ts",
+            "src/dashboard/server/routes/lanes.ts",
+            "src/lib/lanes/__tests__/views-remote.test.ts",
+            "src/lib/lanes/__tests__/pairing.test.ts",
+            "src/lib/lanes/__tests__/views-pairing.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/lanes/__tests__/views-remote.test.ts src/lib/lanes/__tests__/pairing.test.ts src/lib/lanes/__tests__/views-pairing.test.ts src/lib/lanes/__tests__/views.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the four view and pairing test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. pairing.ts: PairingRow.id number|null, criticOfId -> criticOfName, maps by name, CriticSummary.id number|null, ChainStep ids -> names; update callers in views.ts, launch.ts answeredVerdict and src/cli/commands/lane.ts pairingRowsOf. views.ts builds from listAllLaneRows; LaneView.id number|null; new LaneView.machine {environmentId,label,reachable,lastSeenAt}|null; remote rows take activity/git/cost/lastActivityAt from the mirror (rules in WI-6 step 2) and never run git locally. GET /api/lanes/:name answers a stand-in when no local lane matches."
+        },
+        "items": [
+          {
+            "id": "lane-views-remote.ac1",
+            "title": "Given a local builder and a remote critic with a mirrored WOWED report, when listLaneViews runs for the run, then the critic view has id null, machine.label 'fly-abc' and verdict.value WOWED, and the builder's latestVerdict names the critic",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-views-remote.ac2",
+            "title": "Given a remote stand-in whose mirror has unreachableSince set, when listLaneViews runs, then the view keeps the last mirrored activity and machine.reachable is false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-views-remote.ac3",
+            "title": "Given a remote row, when listLaneViews runs, then the gitFacts dependency is never called for its cwd",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-views-remote.ac4",
+            "title": "Given a stand-in name, when GET /api/lanes/<name> is requested, then it answers 200 with that lane's view",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "remote-lane-follower",
+        "title": "Follow remote lanes and mirror their reports and state",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T22:40:53Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4638",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/remote-lane-follower.ts",
+            "src/dashboard/server/services/anywhere-boot.ts",
+            "src/dashboard/server/__tests__/remote-lane-follower.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/remote-lane-follower.test.ts src/dashboard/server/__tests__/remote-worker-follower.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "follower test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-4",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. New src/dashboard/server/services/remote-lane-follower.ts modelled on RemoteWorkerFollower: start() resumes unarchived, not-gone stand-ins; followRemoteLane(name) idempotent; poll every 5 s while the link is online via linkFetch GET /api/machines/work/lanes/<name>/status?after=<lastSeq> as operator (10 s timeout); mirrorRemoteReport('conv-'+name, report); write mirror; 404 -> state gone and stop; unreachable -> unreachableSince, back off with followBackoffMs (1 s doubling to 300 s, ±20 %), never give up; stop once archived.json exists. Wire in anywhere-boot.ts next to the worker follower and stop it in stopAnywhere. Tests use vi.useFakeTimers (NFR-4)."
+        },
+        "items": [
+          {
+            "id": "remote-lane-follower.ac1",
+            "title": "Given the fake owner returns two reports and activity working, when one poll runs, then reports/0001.json and 0002.json exist under agents/conv-<name> with their verdict and git fields, and mirror.json has lastSeq 2 and activity working",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remote-lane-follower.ac2",
+            "title": "Given the fake owner answers 404 unknown-lane, when a poll runs, then mirror.state becomes gone and no further poll is made after advancing fake time by 60 s",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remote-lane-follower.ac3",
+            "title": "Given three consecutive fetch failures, when fake time advances, then retries happen after about 1 s, 2 s and 4 s within ±20 % and unreachableSince is set once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remote-lane-follower.ac4",
+            "title": "Given a running stand-in on disk, when start() runs, then the follower resumes polling it, and a stand-in with archived.json is not polled",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "lane-stop-reap-remote",
+        "title": "Stop and reap remote lanes from home through the owner",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T22:40:53Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-4638",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/lanes.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/routes/__tests__/lanes-route-remote.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/lanes-route-remote.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts src/dashboard/server/__tests__/route-scopes.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the three test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. New POST /api/lanes/:name/stop (local: stop door; remote: linkFetch owner POST /api/conversations/<name>/stop with the caller's actor; 503 machine-unreachable when offline), scope operate and a no-loss row. POST /api/lanes/:name/reap for a remote lane posts the owner reap door, archives the stand-in (markRemoteLaneArchived) only on 200 and not with keep, archives with a warning on owner 404 unknown-lane, archives nothing on 503. The route also builds deps.remote.stop used by launchLane --replace."
+        },
+        "items": [
+          {
+            "id": "lane-stop-reap-remote.ac1",
+            "title": "Given a remote lane and an agent sender, when POST /api/lanes/<name>/stop runs, then the fake owner receives POST /api/conversations/<name>/stop with actor agent:<sender>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-stop-reap-remote.ac2",
+            "title": "Given the owner reap door answers 200, when POST /api/lanes/<name>/reap runs without keep, then archived.json exists, and with keep it does not",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-stop-reap-remote.ac3",
+            "title": "Given the owner link is offline, when reap runs, then the route answers 503 and archived.json is not written",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-stop-reap-remote.ac4",
+            "title": "Given the owner answers 404 unknown-lane, when reap runs, then archived.json is written and the body carries a warning naming the machine label",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "lane-cli-machine",
+        "title": "Run pan lane start/list/show/wait/stop across machines from the CLI",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T22:40:53Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4638",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/lane.ts",
+            "src/lib/lanes/wait.ts",
+            "sync-sources/skills/pan-lane/SKILL.md",
+            "packages/contracts/src/composer-commands.generated.ts",
+            "tests/unit/cli/lane-machine.test.ts",
+            "src/lib/lanes/__tests__/wait-remote.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/lane-machine.test.ts src/lib/lanes/__tests__/wait-remote.test.ts src/lib/lanes/__tests__/wait.test.ts",
+            "bash scripts/lint-skills.sh",
+            "bash scripts/lint-slash-commands.sh",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the three test files pass",
+            "lint-skills.sh and lint-slash-commands.sh exit 0",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-5",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. lane.ts: delete laneMachineRefusal and its call; send machine and needs in the body plus x-overdeck-sender; print 'Lane <run>/<key> <role> i<n>: <name> on <label> in <cwd>' and the reason on stderr; new --machine help text; resolveLaneLocally falls back to readRemoteLane (LaneRef.id number|null, spawnError from mirror.spawnError); laneStopCommand posts POST /api/lanes/<name>/stop; table ID prints name when id is null and a MACHINE column after ROLE ('-' or label, ' (offline)' when unreachable); show prints #id or name. wait.ts waitForLane judges a stand-in from its mirror (rules in WI-9 step 5). Update sync-sources/skills/pan-lane/SKILL.md and regenerate packages/contracts/src/composer-commands.generated.ts with scripts/generate-slash-commands.mjs after npm run build."
+        },
+        "items": [
+          {
+            "id": "lane-cli-machine.ac1",
+            "title": "Given a fake dashboard answering 201 with machine desk, when pan lane start --machine desk runs, then the request body carries machine 'desk' and the output contains 'on desk'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-cli-machine.ac2",
+            "title": "Given the CLI sources after this change, when grep searches src/cli/commands/lane.ts and sync-sources/skills/pan-lane/SKILL.md for 'arrive with PAN-4638', then it finds nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-cli-machine.ac3",
+            "title": "Given a list answer with one local and one remote lane, when pan lane list runs, then the header contains MACHINE and the remote row shows its name in ID and its label in MACHINE",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-cli-machine.ac4",
+            "title": "Given a stand-in with a mirrored done report, when pan lane wait <name> runs, then it exits 0 and prints the report body",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-cli-machine.ac5",
+            "title": "Given a stand-in whose mirror has unreachableSince set and no report, when pan lane wait <name> --timeout 5 runs on fake time, then it exits 3 (timeout), not 2",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conversation-list-nesting",
+        "title": "Stamp lane facts on linked rows so remote lanes nest under the orchestrator",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T22:40:53Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4638",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/linked-conversations-merge.ts",
+            "src/dashboard/server/services/conversation-list-merged.ts",
+            "tests/unit/lib/overdeck/linked-conversations-merge.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/linked-conversations-merge.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "merge tests pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10. MergeConversationRowsInput gains remoteLanes keyed '<environmentId>\\u0000<name>'. A kept linked row with a matching entry gets parentConversationId (local id of parentName), parentConversationName, gauntletRun, laneKey, laneRole and criticOfConversationId (local id, or -record.id of the linked row named criticOfName). conversation-list-merged.ts builds the map from listRemoteLanes({}) without archived stand-ins. No frontend change: buildConversationTree and gauntletRunEntries read these fields. Also set the linked row's projectKey to the stand-in's (home's) projectKey so the Awareness rail folds it into the home run card."
+        },
+        "items": [
+          {
+            "id": "conversation-list-nesting.ac1",
+            "title": "Given a linked row (env-fly, lane-a) and a stand-in entry with parentName orch and projectKey ov, when mergeConversationRows runs, then the row carries the local orch row's id as parentConversationId, projectKey ov, plus gauntletRun, laneKey and laneRole",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-list-nesting.ac2",
+            "title": "Given a remote critic whose builder is also a linked row, when mergeConversationRows runs, then the critic's criticOfConversationId equals the builder linked row's negative id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-list-nesting.ac3",
+            "title": "Given a linked row with no stand-in entry, when mergeConversationRows runs, then the row has no gauntletRun and no parentConversationId",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "two-machine-smoke-lanes",
+        "title": "Add lane-remote, lane-report, lane-nest and lane-reap steps to the two-machine smoke",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T22:40:53Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4638",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/anywhere/two-machine-smoke.mjs"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run build",
+            "node scripts/anywhere/two-machine-smoke.mjs"
+          ],
+          "expected_outputs": [
+            "the smoke exits 0 and prints the lane-remote, lane-report, lane-nest and lane-reap steps"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-11. In scripts/anywhere/two-machine-smoke.mjs after 'online': seed a throwaway repo with a local bare origin under .tmp/anywhere-origin.git into both homes; on A create a root conversation; pan lane start --role play --key smoke --run smoke --prompt hi --machine <B label> --no-wait --json on A; on B run pan lane report --stdin --status done with OVERDECK_CONVERSATION=conv-<name>; on A pan lane wait <name> --timeout 20 exits 0 and pan lane list --json shows machine.label B; GET /api/conversations on A lists @<B env>/<name> with parentConversationId equal to the root row's id (lane-nest, FR-8); pan lane reap <name> on A exits 0 and B's row is archived. Steps do not depend on the fake harness starting. Add the steps to the smoke table in docs/ANYWHERE-ARCHITECTURE.md is done in the docs item."
+        },
+        "items": [
+          {
+            "id": "two-machine-smoke-lanes.ac1",
+            "title": "Given two smoke servers A and B linked, when the lane-remote step runs, then pan lane start --machine <B> exits 0 and its JSON names B's label",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "two-machine-smoke-lanes.ac2",
+            "title": "Given B recorded a done report for the lane, when the lane-report step runs on A, then pan lane wait exits 0 within 20 s and pan lane list --json lists the lane with machine.label B",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "two-machine-smoke-lanes.ac4",
+            "title": "Given the remote lane is running on B, when the lane-nest step reads GET /api/conversations on A, then the @<B env>/<name> row carries parentConversationId equal to A's root conversation id and gauntletRun smoke",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "two-machine-smoke-lanes.ac3",
+            "title": "Given the lane-reap step runs, when pan lane reap exits 0 on A, then B's lane row has archivedAt set",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-remote-lanes",
+        "title": "Document gauntlet lanes on other machines",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T22:40:53Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-4638",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "reference/lanes.mdx",
+            "configuration/linked-machines.mdx",
+            "docs/ANYWHERE-ARCHITECTURE.md",
+            "sync-sources/skills/pan-gauntlet-loop/SKILL.md",
+            "sync-sources/skills/pan-gauntlet-loop/references/lanes.md",
+            ".overdeck/context/codebase/architecture.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'arrive with PAN-4638' reference/lanes.mdx || true",
+            "grep -n 'Gauntlet lanes across machines' docs/ANYWHERE-ARCHITECTURE.md",
+            "bash scripts/lint-skills.sh"
+          ],
+          "expected_outputs": [
+            "the first grep prints nothing",
+            "the second grep prints exactly one line",
+            "lint-skills.sh exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "FR-9",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-12. reference/lanes.mdx: replace the 'Today a lane runs only on this machine' paragraph with home/owner split, --needs, MACHINE column and id null, pan tell @<label>/<name>, builder commit must be on origin, --reuse follows the newest lane's machine, orchestrator lanes stay home, Fly machines need pan machines add-fly --project first and run Claude Code only, raise remote.fly.machine_idle_minutes for long waits. configuration/linked-machines.mdx: Gauntlet lanes subsection. docs/ANYWHERE-ARCHITECTURE.md: '## Gauntlet lanes across machines (#4638)' with D-4638-1..16, doors, stand-in files, follower, fence rule, and the three smoke steps in the smoke table. pan-gauntlet-loop SKILL.md: status.json lane/critic hold the lane name; heavy critics use --machine auto --needs docker. references/lanes.md: remote critic rules. .overdeck/context/codebase/architecture.md: remote lane modules under Work across machines, one last-verified line at the end."
+        },
+        "items": [
+          {
+            "id": "docs-remote-lanes.ac1",
+            "title": "Given reference/lanes.mdx after this change, when a reader opens the Commands section, then it states that --machine runs the lane on the named or Auto-chosen linked machine and that remote lanes are messaged with pan tell @<label>/<name>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-remote-lanes.ac2",
+            "title": "Given docs/ANYWHERE-ARCHITECTURE.md, when grep searches for 'Gauntlet lanes across machines', then it finds one heading that lists the three owner doors and the stand-in files",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-remote-lanes.ac3",
+            "title": "Given sync-sources/skills/pan-gauntlet-loop/SKILL.md, when a reader opens the status.json schema, then lane and critic are described as lane names, not conversation ids",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-remote-lanes.ac4",
+            "title": "Given reference/lanes.mdx, when grep searches for 'machine_idle_minutes' and 'add-fly', then each appears in the Fly paragraph",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "live-three-machine-run",
+        "title": "Live checkpoint: one gauntlet run across desktop, laptop and a Fly machine",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T22:40:53Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "test",
+          "issueLabel": "pan-4638",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/ANYWHERE-ARCHITECTURE.md"
+          ],
+          "files_scope_confidence": "low",
+          "verify_commands": [
+            "pan lane list --run <run> --json"
+          ],
+          "expected_outputs": [
+            "every lane of the run listed with a machine label and a done report"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-5",
+            "FR-8",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-13 (W-WORK3 done-when). Orchestrator and builders on the desktop; one critic on a Fly machine created with pan machines add-fly --project overdeck and launched with --machine fly-<id> --needs docker; one critic on the laptop (--machine <laptop label>). Every lane reports; pan lane list --run <run> on the desktop lists all with their machines; a Playwright screenshot (isolated browser profile) shows the remote critics nested under the orchestrator. Fallbacks: no laptop link -> use a second local server from the two-machine smoke; #4738 swallowing the contract -> resend with pan tell @fly-<id>/<name> and note #4738; no Fly token -> say so in the PR and leave the Fly half for operator sign-off. Paste commands, pan lane list output and the screenshot path into the PR description. Record the run's outcome (date, machines, result) in one line at the end of the '## Gauntlet lanes across machines (#4638)' section of docs/ANYWHERE-ARCHITECTURE.md."
+        },
+        "items": [
+          {
+            "id": "live-three-machine-run.ac1",
+            "title": "Given a run with builders on the desktop and critics on a Fly machine and the laptop, when every lane has reported, then pan lane list --run <run> on the desktop lists every lane with MACHINE '-', 'fly-<id>' or the laptop label and a done report",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-three-machine-run.ac2",
+            "title": "Given the same run, when the Command Deck is opened in an isolated Playwright profile, then the screenshot shows both remote critics nested under the orchestrator conversation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-three-machine-run.ac3",
+            "title": "Given the PR description, when a reviewer reads it, then it contains the launch commands, the pan lane list output and the screenshot path, or the stated fallback naming what was not available",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "remote-lane-store",
+        "to": "home-remote-launch",
+        "type": "blocks"
+      },
+      {
+        "from": "remote-lane-store",
+        "to": "lane-views-remote",
+        "type": "blocks"
+      },
+      {
+        "from": "remote-lane-store",
+        "to": "remote-lane-follower",
+        "type": "blocks"
+      },
+      {
+        "from": "remote-lane-store",
+        "to": "lane-cli-machine",
+        "type": "blocks"
+      },
+      {
+        "from": "remote-lane-store",
+        "to": "conversation-list-nesting",
+        "type": "blocks"
+      },
+      {
+        "from": "remote-lane-store",
+        "to": "lane-stop-reap-remote",
+        "type": "blocks"
+      },
+      {
+        "from": "owner-lane-executor",
+        "to": "owner-lane-doors",
+        "type": "blocks"
+      },
+      {
+        "from": "owner-lane-executor",
+        "to": "home-remote-launch",
+        "type": "blocks"
+      },
+      {
+        "from": "owner-lane-doors",
+        "to": "remote-lane-follower",
+        "type": "blocks"
+      },
+      {
+        "from": "owner-lane-doors",
+        "to": "lane-stop-reap-remote",
+        "type": "blocks"
+      },
+      {
+        "from": "home-remote-launch",
+        "to": "lanes-route-machine",
+        "type": "blocks"
+      },
+      {
+        "from": "home-remote-launch",
+        "to": "lane-views-remote",
+        "type": "blocks"
+      },
+      {
+        "from": "remote-lane-follower",
+        "to": "lanes-route-machine",
+        "type": "blocks"
+      },
+      {
+        "from": "lanes-route-machine",
+        "to": "lane-views-remote",
+        "type": "blocks"
+      },
+      {
+        "from": "lane-views-remote",
+        "to": "lane-stop-reap-remote",
+        "type": "blocks"
+      },
+      {
+        "from": "lane-views-remote",
+        "to": "lane-cli-machine",
+        "type": "blocks"
+      },
+      {
+        "from": "lane-stop-reap-remote",
+        "to": "lane-cli-machine",
+        "type": "blocks"
+      },
+      {
+        "from": "lane-cli-machine",
+        "to": "two-machine-smoke-lanes",
+        "type": "blocks"
+      },
+      {
+        "from": "conversation-list-nesting",
+        "to": "two-machine-smoke-lanes",
+        "type": "blocks"
+      },
+      {
+        "from": "two-machine-smoke-lanes",
+        "to": "live-three-machine-run",
+        "type": "blocks"
+      },
+      {
+        "from": "docs-remote-lanes",
+        "to": "live-three-machine-run",
+        "type": "blocks"
+      },
+      {
+        "from": "owner-lane-executor",
+        "to": "lane-views-remote",
+        "type": "blocks"
+      },
+      {
+        "from": "lanes-route-machine",
+        "to": "lane-stop-reap-remote",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

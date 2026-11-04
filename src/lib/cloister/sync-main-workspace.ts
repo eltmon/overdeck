@@ -1,3 +1,4 @@
+import { DeftLiftError, withDeftInstallLifted } from '../deft/lift.js';
 import { resolveWorkspaceRepoRoots } from '../project-repos.js';
 
 export interface SyncMainRepoResult {
@@ -59,7 +60,15 @@ export async function syncMainAcrossWorkspaceRepos(
       console.log(`[sync-main] [${root.repoKey}] Syncing origin/${root.targetBranch}`);
       logActivity('sync_main_repo_start', `[${root.repoKey}] Syncing origin/${root.targetBranch}`);
     }
-    const result = await syncRepo(root.dir, issueId, root.targetBranch, signal);
+    // PAN-4820: a hidden Deft install is lifted so skip-worktree files do not abort the merge.
+    const result = await withDeftInstallLifted(
+      root.dir,
+      `origin/${root.targetBranch}`,
+      () => syncRepo(root.dir, issueId, root.targetBranch, signal),
+    ).catch((error: unknown): Awaited<ReturnType<SyncRepo>> => {
+      if (error instanceof DeftLiftError) return { success: false, reason: error.message };
+      throw error;
+    });
     const prefixPaths = (paths: string[] | undefined) => root.isPolyrepo && paths
       ? paths.map(path => `${root.repoKey}/${path}`)
       : paths;

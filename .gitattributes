@@ -13,6 +13,11 @@
 # get union: it would interleave paragraphs.
 .overdeck/context/codebase/concerns.md merge=union
 
+# scripts/frontend-test-subset.txt lists the frontend tests CI runs, one path per line.
+# Concurrent PRs each add a line; union keeps both. A union merge can leave the list
+# unsorted or with a duplicate line; scripts/run-frontend-test-subset.mjs dedupes (PAN-4697).
+scripts/frontend-test-subset.txt merge=union
+
 # WARNING: The single-JSON state files under .pan/specs/, .pan/continues/, and .pan/records/
 # must NOT receive a content-merge driver like `union`. union concatenates hunks into
 # invalid JSON. These files need a take-one-whole-side strategy, not line-level merging.

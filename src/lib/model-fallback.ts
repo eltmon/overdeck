@@ -46,6 +46,8 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
   'gpt-6-luna': 'openai',
   'gpt-6.1-sol': 'openai',
   'gpt-6.1-terra': 'openai',
+  'gpt-6-rosalind': 'openai',
+  'gpt-6-astra-law': 'openai',
   'gpt-5.5': 'openai',
   'gpt-5.4': 'openai',
   'gpt-5.4-mini': 'openai',
@@ -66,10 +68,12 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
   // Google models (current)
   'gemini-4-argon': 'google',
   'gemini-3.8-flash': 'google',
+  'gemini-3.6-flash': 'google',
   'gemini-3.5-flash-lite': 'google',
   'gemini-3.1-pro-preview': 'google',
   'gemini-3-flash-preview': 'google',
   'gemini-3.1-flash-lite-preview': 'google',
+  'gemini-3.1-flash-lite': 'google',
 
   // Google legacy
   'gemini-3-pro-preview': 'google',
@@ -77,6 +81,8 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
   'gemini-2.5-flash': 'google',
 
   // Kimi models
+  'k3.1-pro': 'kimi',
+  'k3.1-pro-highspeed': 'kimi',
   'k3': 'kimi',
   'k3[1m]': 'kimi',
   'kimi-k2.7-code': 'kimi',
@@ -89,15 +95,21 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
   'minimax-m2.7': 'minimax',
   'minimax-m2.7-highspeed': 'minimax',
   'MiniMax-M3': 'minimax',
+  'MiniMax-M3.1-Flash': 'minimax',
 
   // Z.AI models
   'glm-5.3': 'zai',
+  'glm-5.3-flash': 'zai',
+  'glm-5.3-flashx': 'zai',
   'glm-5.2': 'zai',
   'glm-5.1': 'zai',
   'glm-4.7': 'zai',
   'glm-4.7-flash': 'zai',
 
   // MiMo models
+  'mimo-v2.6-pro': 'mimo',
+  'mimo-v2.6-flash': 'mimo',
+  'mimo-v2.6-pro-ultraspeed': 'mimo',
   'mimo-v2.5-pro': 'mimo',
   'mimo-v2.5': 'mimo',
 
@@ -115,6 +127,18 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
 
   // xAI models
   'grok-build-0.1': 'xai',
+  'grok-4.7': 'xai',
+  'grok-4.3': 'xai',
+
+  // Groq models
+  'openai/gpt-oss-120b': 'groq',
+  'openai/gpt-oss-20b': 'groq',
+
+  // Cerebras models
+  'gpt-oss-120b': 'cerebras',
+
+  // Mistral models
+  'mistral-large-4-0': 'mistral',
 
   // QuantumLlama models (synthetic benchmark provider, PAN-3252)
   'ql-reason-70b': 'quantumllama',
@@ -143,6 +167,8 @@ const FALLBACK_MAP: Record<string, AnthropicModel> = {
   'gpt-6-luna': 'claude-haiku-4-5', // GPT-6 fast/cheap tier → Haiku
   'gpt-6.1-sol': 'claude-sonnet-5-5', // GPT-6.1 mid tier → Sonnet
   'gpt-6.1-terra': 'claude-sonnet-5-5', // GPT-6.1 workhorse tier → Sonnet
+  'gpt-6-rosalind': 'claude-sonnet-5-5', // GPT-6 domain model → Sonnet
+  'gpt-6-astra-law': 'claude-sonnet-5-5', // GPT-6 Astra legal configuration → Sonnet
   'gpt-5.5': 'claude-sonnet-5-5', // Flagship model → Sonnet
   'gpt-5.5-pro': 'claude-sonnet-5-5', // Top-tier model → Sonnet
   'gpt-5.4': 'claude-sonnet-5-5', // Flagship model → Sonnet
@@ -164,13 +190,17 @@ const FALLBACK_MAP: Record<string, AnthropicModel> = {
   'gemini-4-argon': 'claude-sonnet-5-5', // Flagship → Sonnet
   'gemini-3.1-pro-preview': 'claude-sonnet-5-5', // Flagship → Sonnet
   'gemini-3-flash-preview': 'claude-haiku-4-5', // Fast model → Haiku
+  'gemini-3.6-flash': 'claude-haiku-4-5', // Fast model → Haiku
   'gemini-3.1-flash-lite-preview': 'claude-haiku-4-5', // Budget model → Haiku
+  'gemini-3.1-flash-lite': 'claude-haiku-4-5', // Budget model → Haiku
   // Deprecated Google IDs
   'gemini-3-pro-preview': 'claude-sonnet-5-5',
   'gemini-2.5-pro': 'claude-sonnet-5-5',
   'gemini-2.5-flash': 'claude-haiku-4-5',
 
   // Kimi → Anthropic
+  'k3.1-pro': 'claude-sonnet-5-5', // K3.1 flagship → Sonnet
+  'k3.1-pro-highspeed': 'claude-sonnet-5-5', // K3.1 flagship → Sonnet
   'k3': 'claude-sonnet-5-5', // Coding flagship → Sonnet
   'k3[1m]': 'claude-sonnet-5-5', // Long-context coding flagship → Sonnet
   'kimi-k2.7-code': 'claude-sonnet-5-5', // Coding flagship → Sonnet
@@ -183,8 +213,11 @@ const FALLBACK_MAP: Record<string, AnthropicModel> = {
   'minimax-m2.7': 'claude-sonnet-5-5', // Near-Opus performance → Sonnet
   'minimax-m2.7-highspeed': 'claude-sonnet-5-5', // Same quality, faster → Sonnet
   'MiniMax-M3': 'claude-sonnet-5-5', // Top-tier coding → Sonnet
+  'MiniMax-M3.1-Flash': 'claude-sonnet-5-5',
 
   // Z.AI → Anthropic
+  'glm-5.3-flash': 'claude-haiku-4-5', // fast tier → Haiku
+  'glm-5.3-flashx': 'claude-haiku-4-5', // fast tier → Haiku
   'glm-5.2': 'claude-sonnet-5-5', // Current GLM flagship → Sonnet
   'glm-5.1': 'claude-sonnet-5-5', // Previous GLM flagship → Sonnet
   // Deprecated Z.AI IDs — explicit targets preserve tier semantics independent of
@@ -196,6 +229,9 @@ const FALLBACK_MAP: Record<string, AnthropicModel> = {
   // MiMo → Anthropic
   'mimo-v2.5-pro': 'claude-sonnet-5-5', // Flagship reasoning → Sonnet
   'mimo-v2.5': 'claude-sonnet-5-5', // Multimodal → Sonnet
+  'mimo-v2.6-pro': 'claude-sonnet-5-5',
+  'mimo-v2.6-flash': 'claude-sonnet-5-5',
+  'mimo-v2.6-pro-ultraspeed': 'claude-sonnet-5-5',
 
   // Nous Portal → Anthropic
   'qwen/qwen3.6-plus': 'claude-sonnet-5-5',
@@ -209,6 +245,18 @@ const FALLBACK_MAP: Record<string, AnthropicModel> = {
 
   // xAI → Anthropic
   'grok-build-0.1': 'claude-sonnet-5-5', // Coding flagship → Sonnet
+  'grok-4.7': 'claude-sonnet-5-5',
+  'grok-4.3': 'claude-sonnet-5-5',
+
+  // Groq → Anthropic
+  'openai/gpt-oss-120b': 'claude-sonnet-5-5',
+  'openai/gpt-oss-20b': 'claude-haiku-4-5',
+
+  // Cerebras → Anthropic
+  'gpt-oss-120b': 'claude-sonnet-5-5',
+
+  // Mistral → Anthropic
+  'mistral-large-4-0': 'claude-sonnet-5-5',
 
   // QuantumLlama → Anthropic (synthetic benchmark provider, PAN-3252)
   'ql-reason-70b': 'claude-sonnet-5-5', // Flagship reasoning → Sonnet
@@ -230,6 +278,8 @@ const MODEL_TIER_RANK: Record<string, number> = {
   'gpt-6-luna': 1,
   'gpt-6.1-sol': 2,
   'gpt-6.1-terra': 2,
+  'gpt-6-rosalind': 3,
+  'gpt-6-astra-law': 3,
   'gpt-5.5': 2,
   'gpt-5.4': 2,
   'gpt-5.3-codex': 2,
@@ -259,8 +309,11 @@ const TIER_RANK: Record<SubscriptionPlan, number> = {
  * OpenRouter model IDs use the format "organization/model-name" (e.g., "qwen/qwen3.6-plus:free").
  * This is distinct from all other providers which use simple identifiers without slashes.
  */
+/** Groq-native ids that carry an `openai/` vendor prefix (console.groq.com/docs/models). */
+const GROQ_SLASH_MODEL_IDS = new Set(['openai/gpt-oss-120b', 'openai/gpt-oss-20b']);
+
 export function isOpenRouterModel(modelId: string): boolean {
-  return modelId.includes('/') && modelId !== 'qwen/qwen3.6-plus' && !modelId.startsWith('opencode/') && !modelId.startsWith('opencode-go/');
+  return modelId.includes('/') && modelId !== 'qwen/qwen3.6-plus' && !GROQ_SLASH_MODEL_IDS.has(modelId) && !modelId.startsWith('opencode/') && !modelId.startsWith('opencode-go/');
 }
 
 /**

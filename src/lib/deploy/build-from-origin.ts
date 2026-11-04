@@ -338,12 +338,45 @@ export async function sweepDashboardDeployments(
   }
 }
 
+/** Fetch origin/main and return its commit — the target a reload records and builds (PAN-4888). */
+export async function resolveOriginMainSha(
+  repoRoot: string,
+  runGit: BuildFromOriginDeps['runGit'] = runGitAsync,
+): Promise<string> {
+  await runGit(['fetch', 'origin', 'main'], repoRoot);
+  const sha = (await runGit(['rev-parse', 'origin/main'], repoRoot)).stdout.trim();
+  if (!sha) throw new Error('git rev-parse origin/main returned nothing');
+  return sha;
+}
+
+/** `git merge-base --is-ancestor`: true when `ancestor` is in `descendant`'s history (PAN-4888). Throws on any git error other than "not an ancestor". */
+export async function isAncestorCommit(
+  repoRoot: string,
+  ancestor: string,
+  descendant: string,
+  runGit: BuildFromOriginDeps['runGit'] = runGitAsync,
+): Promise<boolean> {
+  try {
+    await runGit(['merge-base', '--is-ancestor', ancestor, descendant], repoRoot);
+    return true;
+  } catch (error) {
+    if ((error as { code?: unknown }).code === 1) return false;
+    throw error;
+  }
+}
+
+/**
+ * Build the dashboard in a detached deployment worktree. With `targetSha` the
+ * build is pinned to that commit and fetches nothing (PAN-4888); without it,
+ * it fetches and builds the current origin/main.
+ */
 export async function buildDashboardFromOriginMain(
   repoRoot: string,
-  dependencies: Partial<BuildFromOriginDeps> = {},
+  dependencies: Partial<BuildFromOriginDeps> & { readonly targetSha?: string } = {},
 ): Promise<DashboardDeployment> {
-  const deps = { ...defaultDependencies, ...dependencies };
-  await deps.runGit(['fetch', 'origin', 'main'], repoRoot);
+  const { targetSha, ...overrides } = dependencies;
+  const deps = { ...defaultDependencies, ...overrides };
+  if (!targetSha) await deps.runGit(['fetch', 'origin', 'main'], repoRoot);
 
   const status = (await deps.runGit(['status', '--porcelain'], repoRoot)).stdout.trim();
   if (status) {
@@ -351,7 +384,7 @@ export async function buildDashboardFromOriginMain(
   }
 
   const headSha = (await deps.runGit(['rev-parse', 'HEAD'], repoRoot)).stdout.trim();
-  const originMainSha = (await deps.runGit(['rev-parse', 'origin/main'], repoRoot)).stdout.trim();
+  const originMainSha = targetSha ?? (await deps.runGit(['rev-parse', 'origin/main'], repoRoot)).stdout.trim();
   if (headSha !== originMainSha) {
     deps.note('Primary worktree HEAD differs from origin/main; only origin/main is being deployed.');
   }
@@ -363,7 +396,7 @@ export async function buildDashboardFromOriginMain(
 
   let completed = false;
   try {
-    await deps.runGit(['worktree', 'add', '--detach', deployRoot, 'origin/main'], repoRoot);
+    await deps.runGit(['worktree', 'add', '--detach', deployRoot, targetSha ?? 'origin/main'], repoRoot);
     await deps.installAndBuild(deployRoot);
     const deployment = {
       deployRoot,

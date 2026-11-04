@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "esc-20261101120000-dddddd",
+  "agentId": "impl-1",
+  "type": "approval",
+  "title": "Approve the scope",
+  "body": "Scope scope-ui is ready.",
+  "contextRefs": [],
+  "createdAt": "2026-11-01T12:00:00Z",
+  "slaHours": 4,
+  "status": "resolved",
+  "dangerous": false,
+  "resolution": {
+    "decision": "approved",
+    "resolvedAt": "2026-11-01T13:00:00Z",
+    "resolvedBy": "operator:eltmon",
+    "note": "Looks right",
+    "answer": null
+  }
+}

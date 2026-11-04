@@ -278,6 +278,8 @@ describe('settings', () => {
         'gpt-6-luna',
         'gpt-6.1-sol',
         'gpt-6.1-terra',
+        'gpt-6-rosalind',
+        'gpt-6-astra-law',
       ]);
     });
 
@@ -292,11 +294,23 @@ describe('settings', () => {
       expect(available.google).toEqual([
         'gemini-4-argon',
         'gemini-3.8-flash',
+        'gemini-3.6-flash',
         'gemini-3.5-flash-lite',
         'gemini-3.1-pro-preview',
         'gemini-3-flash-preview',
-        'gemini-3.1-flash-lite-preview',
+        'gemini-3.1-flash-lite',
       ]);
+    });
+
+    it('should return DashScope models when API key is configured', async () => {
+      const { getAvailableModels, getDefaultSettings } = await import('../../src/lib/settings.js');
+
+      const settings = getDefaultSettings();
+      settings.api_keys.dashscope = 'sk-test';
+
+      const available = getAvailableModels(settings);
+
+      expect(available.dashscope).toEqual(['qwen3.7-plus', 'qwen3.8-flash', 'qwen3.7-max', 'qwen3.8-max']);
     });
 
     it('should return MiniMax models when API key is configured', async () => {
@@ -307,7 +321,7 @@ describe('settings', () => {
 
       const available = getAvailableModels(settings);
 
-      expect(available.minimax).toEqual(['MiniMax-M3', 'minimax-m2.7', 'minimax-m2.7-highspeed']);
+      expect(available.minimax).toEqual(['MiniMax-M3', 'MiniMax-M3.1-Flash', 'minimax-m2.7', 'minimax-m2.7-highspeed']);
     });
 
     it('should return Kimi models when API key is configured', async () => {
@@ -318,7 +332,7 @@ describe('settings', () => {
 
       const available = getAvailableModels(settings);
 
-      expect(available.kimi).toEqual(['k3', 'k3[1m]', 'kimi-k2.7-code', 'kimi-k2.6', 'kimi-k2.5', 'K2.6-code-preview']);
+      expect(available.kimi).toEqual(['k3.1-pro', 'k3.1-pro-highspeed', 'k3', 'k3[1m]', 'kimi-k2.7-code', 'kimi-k2.6', 'kimi-k2.5', 'K2.6-code-preview']);
     });
 
     it('should return xAI models when XAI_API_KEY is configured', async () => {
@@ -329,7 +343,7 @@ describe('settings', () => {
 
       const available = getAvailableModels(settings);
 
-      expect(available.xai).toEqual(['grok-build-0.1']);
+      expect(available.xai).toEqual(['grok-build-0.1', 'grok-4.7', 'grok-4.3']);
     });
 
     it('should return multiple providers when multiple API keys configured', async () => {

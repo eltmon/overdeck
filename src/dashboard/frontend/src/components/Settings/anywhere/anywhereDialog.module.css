@@ -1,0 +1,210 @@
+/*
+ * Form body of the Anywhere dialogs (Link a machine, Add a Fly machine, Add an
+ * SSH machine, Add a project, Compare settings). The dialogs build on
+ * shared/Modal; this module sizes their fields, help text and buttons to the
+ * same scale as the New conversation dialog: 13px labels and help, 14px
+ * inputs, 32px buttons. Small type was unreadable at a 1600x900 viewport.
+ */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 16px 0 14px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--body-foreground, var(--foreground));
+}
+
+.hint {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted-foreground);
+}
+
+.text {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--body-foreground, var(--foreground));
+}
+
+.form code,
+.mono {
+  font-family: var(--font-mono-ui);
+  font-size: 12.5px;
+}
+
+.input,
+.select {
+  width: 100%;
+  min-width: 0;
+  height: 34px;
+  padding: 0 10px;
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--foreground);
+  background: var(--surface-overlay-field, var(--background));
+  border: 1px solid var(--border-overlay, var(--border));
+  border-radius: 6px;
+  transition: border-color 120ms, box-shadow 120ms;
+}
+
+.input.mono {
+  font-size: 13px;
+}
+
+.input:focus-visible,
+.select:focus-visible {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 20%, transparent);
+}
+
+.input:disabled,
+.select:disabled {
+  color: var(--muted-foreground);
+  cursor: not-allowed;
+}
+
+.input::placeholder {
+  color: var(--muted-foreground);
+  opacity: 1;
+}
+
+/* A radio or checkbox with a title and a one-line explanation. */
+.choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.choice input {
+  margin-top: 3px;
+  flex-shrink: 0;
+  width: 15px;
+  height: 15px;
+  accent-color: var(--primary);
+}
+
+.choiceTitle {
+  display: block;
+  font-size: 14px;
+  color: var(--foreground);
+}
+
+.choiceHint {
+  display: block;
+  margin-top: 2px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted-foreground);
+}
+
+.fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.notice {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--body-foreground, var(--foreground));
+  border: 1px solid var(--border-overlay, var(--border));
+  border-radius: 8px;
+}
+
+.notice p {
+  margin: 0;
+}
+
+.details summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--muted-foreground);
+}
+
+.details[open] summary {
+  margin-bottom: 10px;
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted-foreground);
+}
+
+.error {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--destructive);
+}
+
+.button,
+.primaryButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 14px;
+  font: 500 13px var(--font-sans, inherit);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 120ms, border-color 120ms;
+}
+
+.button {
+  color: var(--foreground);
+  background: transparent;
+  border: 1px solid var(--border-overlay, var(--border));
+}
+
+.button:hover:not(:disabled) {
+  background: var(--accent);
+}
+
+.primaryButton {
+  color: var(--primary-foreground);
+  background: var(--primary);
+  border: 1px solid var(--primary);
+}
+
+.primaryButton:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--primary) 90%, var(--foreground));
+}
+
+.button:disabled,
+.primaryButton:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.button:focus-visible,
+.primaryButton:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}

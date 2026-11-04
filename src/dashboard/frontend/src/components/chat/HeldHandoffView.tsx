@@ -9,6 +9,7 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { HeldKickoffConflictError, startHeldKickoff } from './heldKickoff';
+import { isNativeShell } from '../../lib/nativeShell';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 
 export interface HeldHandoffViewProps {
@@ -72,7 +73,7 @@ export function HeldHandoffView({
       {handoffDocPath && (
         <p className={styles.conversationEmptyStateSubtitle}>
           Handoff doc: <code>{handoffDocPath}</code>{' '}
-          <button type="button" className={styles.conversationArchiveBtnLarge} onClick={openHandoffDoc}>
+          <button type="button" className={styles.conversationArchiveBtnLarge} hidden={isNativeShell()} onClick={openHandoffDoc}>
             Open handoff doc
           </button>
         </p>

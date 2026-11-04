@@ -6,7 +6,7 @@
  * the PKCE and device flows end to end.
  */
 import { execFile } from 'node:child_process';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -37,9 +37,11 @@ let mf: Miniflare;
 let githubIdentity: { id: number; login: string } = { id: OWNER_ID, login: 'owner' };
 const unexpectedOutbound: string[] = [];
 
+/** Applies every migrations/*.sql in name order, one statement at a time. */
 async function applyMigrations(): Promise<void> {
   const db = await mf.getD1Database('DB');
-  const sql = await readFile(join(SERVICE_DIR, 'migrations/0001_init.sql'), 'utf8');
+  const files = (await readdir(join(SERVICE_DIR, 'migrations'))).filter((f) => f.endsWith('.sql')).sort();
+  const sql = (await Promise.all(files.map((f) => readFile(join(SERVICE_DIR, 'migrations', f), 'utf8')))).join('\n');
   const statements = sql
     .split('\n')
     .filter((line) => !line.trim().startsWith('--'))
@@ -183,7 +185,7 @@ describe('account service on real workerd (PAN-4293 account-miniflare-integratio
   it('after the PKCE flow no table holds the stubbed GitHub token', async () => {
     const db = await mf.getD1Database('DB');
     const tables = (await db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%'").all<{ name: string }>()).results;
-    expect(tables.length).toBe(10);
+    expect(tables.length).toBe(11); // 0001 creates ten, 0002 adds user_sessions (PAN-4959)
     let dump = '';
     for (const { name } of tables) dump += JSON.stringify((await db.prepare(`SELECT * FROM "${name}"`).all()).results);
     expect(dump).toContain('"github_login":"owner"');

@@ -1,0 +1,226 @@
+{
+  "version": "1",
+  "issueId": "PAN-4402",
+  "created": "2026-11-01T05:03:16.844Z",
+  "updated": "2026-11-01T06:11:26.878Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-01T06:11Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-11-01T06:11:26.878Z"
+    }
+  ],
+  "items": {
+    "machine-url": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4402",
+      "claimedAt": "2026-11-01T05:03:16.844Z",
+      "doneAt": "2026-11-01T05:04:43.411Z"
+    },
+    "machine-store": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4402",
+      "claimedAt": "2026-11-01T05:05:10.842Z",
+      "doneAt": "2026-11-01T05:06:25.056Z"
+    },
+    "machine-client": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4402",
+      "claimedAt": "2026-11-01T05:06:33.598Z",
+      "doneAt": "2026-11-01T05:08:48.549Z"
+    },
+    "connection": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4402",
+      "claimedAt": "2026-11-01T05:11:06.673Z",
+      "doneAt": "2026-11-01T05:11:59.581Z"
+    },
+    "connect-window": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4402",
+      "claimedAt": "2026-11-01T05:12:06.322Z",
+      "doneAt": "2026-11-01T05:13:54.738Z"
+    },
+    "boot-switching": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4402",
+      "claimedAt": "2026-11-01T05:14:11.539Z",
+      "doneAt": "2026-11-01T05:16:53.950Z"
+    },
+    "menu-tray": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4402",
+      "claimedAt": "2026-11-01T05:16:59.492Z",
+      "doneAt": "2026-11-01T05:18:21.218Z"
+    },
+    "docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4402",
+      "claimedAt": "2026-11-01T05:18:29.590Z",
+      "doneAt": "2026-11-01T05:19:27.747Z"
+    },
+    "e2e-verify": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4402",
+      "claimedAt": "2026-11-01T05:19:52.781Z",
+      "doneAt": "2026-11-01T05:28:30.299Z"
+    },
+    "machine-url.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:37:21.720Z"
+    },
+    "machine-url.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:37:37.376Z"
+    },
+    "machine-url.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:37:54.608Z"
+    },
+    "machine-url.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:38:11.387Z"
+    },
+    "machine-store.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:38:27.411Z"
+    },
+    "machine-store.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:38:44.630Z"
+    },
+    "machine-store.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:38:59.994Z"
+    },
+    "machine-store.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:39:15.227Z"
+    },
+    "machine-client.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:39:29.527Z"
+    },
+    "machine-client.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:39:44.177Z"
+    },
+    "machine-client.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:39:59.177Z"
+    },
+    "machine-client.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:40:16.855Z"
+    },
+    "machine-client.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:40:33.835Z"
+    },
+    "connection.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:40:51.365Z"
+    },
+    "connection.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:41:08.837Z"
+    },
+    "connection.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:41:26.801Z"
+    },
+    "connection.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:41:43.746Z"
+    },
+    "connect-window.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:42:00.645Z"
+    },
+    "connect-window.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:42:17.931Z"
+    },
+    "connect-window.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:42:35.460Z"
+    },
+    "connect-window.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:43:04.108Z"
+    },
+    "boot-switching.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:43:30.166Z"
+    },
+    "boot-switching.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:43:51.808Z"
+    },
+    "boot-switching.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:44:08.092Z"
+    },
+    "boot-switching.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:44:28.779Z"
+    },
+    "boot-switching.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:44:51.311Z"
+    },
+    "menu-tray.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:45:19.293Z"
+    },
+    "menu-tray.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:45:41.313Z"
+    },
+    "menu-tray.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:46:02.395Z"
+    },
+    "menu-tray.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:46:24.452Z"
+    },
+    "e2e-verify.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:46:43.439Z"
+    },
+    "e2e-verify.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:47:01.345Z"
+    },
+    "e2e-verify.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:47:23.353Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:47:46.388Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:48:05.410Z"
+    },
+    "docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T05:48:25.495Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-11-01T06:11:26Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-4402\n\n# Review — PAN-4402\n## Verdict: CHANGES REQUESTED — menu/tray \"Use This Computer\" in remote mode quits the app on Linux and Windows instead of switching to this computer\n\n## Context\n- Run ID: agent-pan-4402-review-96a5138c\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-4402/.pan/review/agent-pan-4402-review-96a5138c/context.json\n- Branch / workspace: feature/pan-4402 · /home/eltmon/Projects/overdeck/workspaces/feature-pan-4402\n- PR: https://github.com/eltmon/overdeck/pull/4665\n- HEAD reviewed: 96a5138c23c032096c9ec6d2c8b2ae1215621415\n- Base / prior cycle SHA: merge-base 333d44156a83 · no prior review cycle\n\n## Blocking Findings\n\n### [correctness] Menu/tray \"Use This Computer\" destroys the last window, which quits the app — `apps/desktop/src/main.ts:443-456`\n- Severity: ! MUST\n- Classification / requirement scope: implementation defect; in_pr_scope (FR-6, W-7)\n- Trigger and changed-code connection: the app shows a chosen machine (remote mode) and the connect window is closed — the normal state, because `openRemoteDashboard` closes the connect window on success (`main.ts:428`). The operator clicks **Use This Computer** in the Overdeck menu (`menu.ts:181-185`) or the tray (`tray.ts:89-93`). Both call `useThisComputer()` → `switchToLocal({ closeConnectWindow: true })`. That function calls `destroyDashboardWindows()` (`main.ts:450`), which `destroy()`s the main window and every terminal window. No window is left. The existing `window-all-closed` handler (`main.ts:607-612`) sets `isQuitting = true` and calls `app.quit()` on every platform except macOS.\n- Expected / observed / impact: FR-6 says **Use This Computer** \"closes remote windows and starts the embedded server, which opens the local window as today.\" Instead, on Linux and Windows the app quits. `setMachineActive(false)` already ran, so the next manual launch is local, but the click itself closes the app. The function's own comment (`main.ts:438-441`) names this hazard (\"closing it never leaves the app with no window (window-all-closed would quit)\") and avoids it only for the connect-window path, where the connect window stays open. The menu and tray paths have no window to keep. A secondary, unconfirmed effect: `before-quit` runs `stopServer()` before `switchToLocal` reaches `startLocalServer()`, so the embedded `server.js` may be spawned during quit.\n- Evidence: isolated Electron 40.10.6 probe (the workspace's own `apps/desktop/node_modules/electron`, scratch dir, `show: false` window). Calling `win.destroy()` on the only window printed, in this order: `EVENT window-all-closed fired`, `EVENT before-quit`, `after destroy (sync)`. So `destroy()` emits `window-all-closed` synchronously, before `destroy()` returns and before `startLocalServer()` can run. The W-8 verification log exercised **Use this computer** only from the connect window (step 3 and step 4), where the connect window keeps a window alive; the menu/tray path was not run. The `menu.test.ts` cases check only that the item exists and its `enabled` state; they do not click it. Limitation: not reproduced in the full app, but the probe plus the handler at `main.ts:607-612` determines the outcome.\n- Fix: keep one window alive across the switch. Two simple options: (a) in `useThisComputer()`, open the connect window first (it is already shown as the local server starts, and `closeConnectWhenLocalReady` closes it when the local window opens); or (b) add a `switchingModes` flag that the `window-all-closed` handler checks, set around `destroyDashboardWindows()` in `switchToLocal` and `openRemoteDashboard`, and cleared when the new main window exists. Add a test that calls the menu/tray handler in remote mode and asserts `app.quit` is not called.\n\n## Non-blocking Findings\n\n- **~ SHOULD — desktop tests are not in CI (pre-existing).** Root `vitest.config.ts` includes only `tests/**`, `src/**/__tests__/**` and `packages/**`; `vitest.workspace.ts` lists `apps/desktop/vitest.config.ts`, but the CI shards run `npx vitest run --configLoader runner --shard=N/4` against the root config. The five pre-existing desktop test files were already outside CI, so the six new files (`boot`, `connect-window`, `connection`, `machine-client`, `machine-store`, `machine-url`) are not exercised by the CI test job either. Checked: root vitest is 4.1.11 (workspace files are no longer loaded); `npx vitest list --configLoader runner tests/unit/lib/agents` lists `[root]` tests, while `npx vitest list --configLoader runner apps/desktop/tests/boot.test.ts` lists nothing. I ran the desktop tests locally (below). Pre-existing gap, not this author's blocker; worth a follow-up issue.\n- **? MAY — `will-redirect` is not guarded (D-9).** `guardRemoteNavigation` (`main.ts:340-352`) handles `will-navigate` and `setWindowOpenHandler`, but a server-side redirect of the main frame to another origin raises `will-redirect`, not `will-navigate`. The remote server is the operator's own paired machine, so there is no present exposure; adding `will-redirect` with the same check would make FR-10 complete.\n- **? MAY — same-origin `window.open` children get no navigation guard.** A child window allowed by `setWindowOpenHandler` inherits the partition and preload but is not passed through `guardRemoteNavigation`. Low impact for the same reason as above.\n- **≉ SHOULD NOT — `RESTART_DASHBOARD`'s inline ready callback (`main.ts:286-292`) calls `setLocalDashboard(serverUrl)` without the remote-mode guard that `onLocalServerReady` has.** A restart can only begin in local mode (remote mode throws first), and the 500 ms window before respawn is the only race, so this is bounded. Reusing `onLocalServerReady` there would remove the duplication.\n- **Pairing revokes the old device before the new record is proven to open.** `pairWithMachine` revokes the previous device (`machine-client.ts:205-212`) and saves the new record `active: true` before `openRemoteDashboard` runs its preflight. If that preflight then fails, the app is left with the new record active and the connect window showing the reason, which matches D-6 (no silent fallback). Noted only so the behavior is understood; no change requested.\n- Spec note, not a defect: the W-8 log documents that over plain loopback a revoked token still mints (loopback root mint), so the FR-5 \"revoked\" message cannot appear for a loopback base URL. This is server behavior outside NFR-2 scope; the author verified the non-loopback path with a proxy.\n\n## Coverage\n\n### Changed-file ledger\n| File | Status |\n|---|---|\n| apps/desktop/src/machine-url.ts | reviewed — parser, bracket stripping, BlockList ranges, lookup path; matches D-5 |\n| apps/desktop/src/machine-store.ts | reviewed — atomic 0o600 write, Linux backend gate, validation on load |\n| apps/desktop/src/machine-client.ts | reviewed — credential spent only at step 5; Origin header; env-id check; preflight mapping; CSRF self-revoke |\n| apps/desktop/src/connection.ts | reviewed — bearer only in remote mode; httpOnly/strict cookie; persist: guard |\n| apps/desktop/src/connect-window.ts | reviewed — sender check on every channel; explicit projection (no token) |\n| apps/desktop/src/connect-preload.ts | reviewed — fixed channels, contextIsolation + sandbox |\n| apps/desktop/resources/connect.html | reviewed — CSP default-src 'none'; all dynamic text via textContent (no XSS from a remote label) |\n| apps/desktop/src/boot.ts | reviewed |\n| apps/desktop/src/main.ts | reviewed — boot plan, openRemoteDashboard, switchToLocal (blocker), forgetMachine, navigation guard, RESTART_DASHBOARD |\n| apps/desktop/src/menu.ts | reviewed |\n| apps/desktop/src/tray.ts | reviewed |\n| apps/desktop/tsdown.config.ts | reviewed — third CJS entry, electron external |\n| apps/desktop/dist-electron/main.js, connect-preload.js (+maps) | reviewed as build output — tracked on main; contains the latest source change (`canUseThisComputer`, 3 hits); not rebuilt to avoid editing tracked files |\n| apps/desktop/tests/*.test.ts (6 new, menu.test.ts updated) | reviewed — no source-reading assertions, no skipIf/.only; win32 branch via `if` |\n| docs/DESKTOP-APP.md | reviewed — new section, tray items, architecture tree |\n| configuration/remote-access.mdx | reviewed — \"From the desktop app\"; \"environment switcher\" removed |\n| .pan/drafts/pan-4402.md, .pan/specs/…xbrief.json, .pan/continues/PAN-4402.xbrief.json | reviewed for requirements and verification log; planning artifacts, not product code |\n\n### Dimensions\n- Correctness: one blocker (above); remaining flows traced — boot remote/local, failed-preflight connect window, pair from local and from remote, Open, Forget, late local-server callback guard.\n- Security: token never sent to a renderer (getState projects label/origin only), never written in plaintext (safeStorage ciphertext; in-memory partition), sent only after transport policy + descriptor id check; connect IPC rejects foreign senders; connect page has a strict CSP and no innerHTML. Remote page keeps `overdeckBridge` by design (D-8). No server or frontend change (NFR-2 confirmed: no file under src/dashboard or src/lib changed).\n- Performance: tray polling and menu workspace fetch reuse existing intervals and timeouts; all new requests carry a 5 s timeout; DNS lookup is async. No concern.\n- Requirements/UX: see matrix.\n\n### Acceptance criteria\n| AC | Result | Evidence |\n|---|---|---|\n| AC-1 machine-url | met | machine-url.test.ts passes locally |\n| AC-2 machine-store | met | machine-store.test.ts passes (token absent from file, 0o600, basic_text refusal) |\n| AC-3 machine-client | met | machine-client.test.ts passes |\n| AC-4 connection | met | connection.test.ts passes |\n| AC-5 connect window | met | connect-window.test.ts passes; dist-electron/connect-preload.js committed |\n| AC-6 boot | met | boot.test.ts passes; `startServer(` appears at main.ts:286 (RESTART_DASHBOARD, after the remote guard) and main.ts:371 (startLocalServer, called only from the boot plan and switchToLocal) |\n| AC-7 menu/tray | met as written, but FR-6 unmet | menu.test.ts passes; `grep serverUrl` in menu.ts/tray.ts prints nothing. Clicking the item quits the app on Linux/Windows (blocker) |\n| AC-8 verification log | met | `## Verification log` present with window origin, no server.js child, no odk_ under profile, revoked message |\n| AC-9 docs | met | sections present; `grep \"environment switcher\"` prints nothing |\n| FR-6 switching | **unmet** for the menu/tray path | blocker above |\n\n## Verification\n- CI on exact HEAD 96a5138c (`gh pr checks 4665`): all checks pass — build (22), lint, lint-group core/effect/skills/state, test-shard 1–4, test, test-e2e, clean install smoke, overdeck/test verification gate. `lint:effect-diagnostics` covered by the passing lint-group (effect) job on this HEAD.\n- Local, focused: `cd apps/desktop && npx tsc --noEmit` → exit 0; `cd apps/desktop && npx vitest run --configLoader runner` → 11 files, 120 tests passed.\n- Isolated probe: Electron 40.10.6 in a scratch directory — `destroy()` of the only window emits `window-all-closed` and `before-quit` synchronously.\n- Not run: full desktop app E2E (author's W-8 log reused); dist rebuild comparison (would overwrite tracked files).\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-4402/.pan/review/agent-pan-4402-review-96a5138c/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-4402 -m \"Fixed review issues\"`"
+    }
+  ]
+}

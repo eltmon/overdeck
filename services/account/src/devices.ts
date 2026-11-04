@@ -5,7 +5,7 @@
  * only in mintDevice()'s return value. Revocation is a column write, and verification is one D1 lookup
  * with no cache in front of it, so a revoked token is refused on the very next request (FR-5).
  */
-import type { VerifyError, VerifyResult } from './contract.ts';
+import type { SignOutResult, VerifyError, VerifyResult } from './contract.ts';
 import { randomHex, sha256Hex } from './crypto.ts';
 import { entitlementFor, type Entitlement } from './entitlement.ts';
 import type { RequestContext } from './env.ts';
@@ -15,7 +15,7 @@ import { json } from './http.ts';
 export type DeviceContext = GrantsContext;
 
 export const TOKEN_RE = /^odd_[0-9a-f]{64}$/;
-export const PLATFORM_RE = /^(linux|darwin|win32)-(x64|arm64)$/;
+export const PLATFORM_RE = /^((linux|darwin|win32)-(x64|arm64)|(ios|android)-arm64|web)$/;
 export const ENVIRONMENT_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 export const LABEL_MAX_LENGTH = 64;
 /** D-18: last_used_at is written at most once per device per 5 minutes. */
@@ -56,8 +56,11 @@ export function normalizeLabel(label: unknown): string | null {
 
 /** D-17 default labels: never the hostname. */
 export function defaultLabel(platform: string): string {
+  if (platform === 'web') return 'Web browser';
   if (platform.startsWith('darwin-')) return 'macOS device';
   if (platform.startsWith('win32-')) return 'Windows device';
+  if (platform.startsWith('ios-')) return 'iPhone';
+  if (platform.startsWith('android-')) return 'Android phone';
   return 'Linux device';
 }
 
@@ -111,6 +114,7 @@ interface LookupRow {
   deleted_at: number | null;
   grant_github_id: number | null;
   storage_cap_bytes: number | null;
+  grant_entitlement: string | null;
   grant_expires_at: number | null;
 }
 
@@ -135,7 +139,7 @@ export async function lookupDevice(rc: DeviceContext, token: string): Promise<De
   const row = await rc.env.DB.prepare(
     `SELECT d.device_id, d.user_id, d.revoked_at, d.last_used_at,
             u.github_id, u.github_login, u.deleted_at,
-            g.github_id AS grant_github_id, g.storage_cap_bytes, g.expires_at AS grant_expires_at
+            g.github_id AS grant_github_id, g.storage_cap_bytes, g.entitlement AS grant_entitlement, g.expires_at AS grant_expires_at
      FROM devices d
      JOIN users u ON u.user_id = d.user_id
      LEFT JOIN grants g ON g.github_id = u.github_id
@@ -149,7 +153,9 @@ export async function lookupDevice(rc: DeviceContext, token: string): Promise<De
 
   const owner = isOwner(rc, row.github_id);
   const grantActive = row.grant_github_id !== null && (row.grant_expires_at === null || row.grant_expires_at > now);
-  const entitlement = owner ? entitlementFor(null) : entitlementFor(grantActive ? { storage_cap_bytes: row.storage_cap_bytes } : null);
+  const entitlement = owner
+    ? entitlementFor(null)
+    : entitlementFor(grantActive ? { storage_cap_bytes: row.storage_cap_bytes, entitlement: row.grant_entitlement ?? 'tester' } : null);
 
   if (row.last_used_at === null || row.last_used_at < now - LAST_USED_THROTTLE_MS) {
     await rc.env.DB.prepare('UPDATE devices SET last_used_at = ? WHERE device_id = ? AND (last_used_at IS NULL OR last_used_at < ?)')
@@ -176,8 +182,19 @@ export async function verifyDeviceToken(rc: DeviceContext, token: string): Promi
   const found = await lookupDevice(rc, token);
   if (!found.ok) return found;
   if (found.auth.grantExpired) return { ok: false, error: 'grant_expired' };
-  const { userId, githubId, deviceId, entitlement } = found.auth;
-  return { ok: true, userId, githubId, deviceId, entitlement };
+  const { userId, githubId, githubLogin, deviceId, entitlement } = found.auth;
+  return { ok: true, userId, githubId, githubLogin, deviceId, entitlement };
+}
+
+/**
+ * AccountRpc.signOutDevice (PAN-4481 FR-4): the device of a valid token revokes itself. A lapsed grant still
+ * signs out, so a browser whose grant expired can leave cleanly.
+ */
+export async function signOutDeviceToken(rc: DeviceContext, token: string): Promise<SignOutResult> {
+  const found = await lookupDevice(rc, token);
+  if (!found.ok) return found;
+  await revokeDevice(rc, found.auth.userId, found.auth.deviceId, 'user');
+  return { ok: true };
 }
 
 export type AuthenticateResult = { ok: true; auth: DeviceAuth } | { ok: false; response: Response };

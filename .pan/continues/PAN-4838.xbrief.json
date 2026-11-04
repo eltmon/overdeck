@@ -1,0 +1,241 @@
+{
+  "version": "1",
+  "issueId": "PAN-4838",
+  "created": "2026-11-03T21:01:46.602Z",
+  "updated": "2026-11-03T22:11:06.475Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-03T22:11Z] coderabbit → FINDINGS — seq 1",
+      "timestamp": "2026-11-03T22:11:06.474Z"
+    }
+  ],
+  "items": {
+    "phone-push-fixture": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4838",
+      "claimedAt": "2026-11-03T21:01:46.602Z",
+      "doneAt": "2026-11-03T21:02:05.343Z"
+    },
+    "overdeck-push-package": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4838",
+      "claimedAt": "2026-11-03T21:05:26.454Z",
+      "doneAt": "2026-11-03T21:06:11.835Z"
+    },
+    "shared-keychain": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4838",
+      "claimedAt": "2026-11-03T21:13:02.330Z",
+      "doneAt": "2026-11-03T21:13:20.645Z"
+    },
+    "push-environment": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4838",
+      "claimedAt": "2026-11-03T21:13:52.059Z",
+      "doneAt": "2026-11-03T21:14:10.662Z"
+    },
+    "nse-target": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4838",
+      "claimedAt": "2026-11-03T21:16:38.962Z",
+      "doneAt": "2026-11-03T21:17:00.321Z"
+    },
+    "push-plugin-dependency": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4838",
+      "claimedAt": "2026-11-03T21:17:11.430Z",
+      "doneAt": "2026-11-03T21:19:08.761Z"
+    },
+    "push-registration": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4838",
+      "claimedAt": "2026-11-03T21:20:51.748Z",
+      "doneAt": "2026-11-03T21:21:17.868Z"
+    },
+    "notification-tap": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4838",
+      "claimedAt": "2026-11-03T21:22:33.549Z",
+      "doneAt": "2026-11-03T21:22:57.652Z"
+    },
+    "settings-notifications-switch": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4838",
+      "claimedAt": "2026-11-03T21:23:45.791Z",
+      "doneAt": "2026-11-03T21:24:12.240Z"
+    },
+    "ios-acceptance": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4838",
+      "claimedAt": "2026-11-03T21:34:28.999Z",
+      "doneAt": "2026-11-03T21:35:10.496Z"
+    },
+    "docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4838",
+      "claimedAt": "2026-11-03T21:35:42.002Z",
+      "doneAt": "2026-11-03T21:44:26.247Z"
+    },
+    "phone-push-fixture.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T21:48:34.710Z"
+    },
+    "phone-push-fixture.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T21:48:57.504Z"
+    },
+    "phone-push-fixture.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T21:49:18.024Z"
+    },
+    "overdeck-push-package.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T21:49:45.300Z"
+    },
+    "overdeck-push-package.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T21:50:08.007Z"
+    },
+    "overdeck-push-package.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T21:50:36.414Z"
+    },
+    "overdeck-push-package.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T21:51:02.268Z"
+    },
+    "shared-keychain.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T21:51:28.867Z"
+    },
+    "shared-keychain.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T21:51:55.456Z"
+    },
+    "shared-keychain.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T21:52:14.459Z"
+    },
+    "push-environment.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T21:52:35.935Z"
+    },
+    "push-environment.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T21:53:00.557Z"
+    },
+    "nse-target.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T21:53:24.500Z"
+    },
+    "nse-target.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T21:53:46.675Z"
+    },
+    "nse-target.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T21:54:09.746Z"
+    },
+    "nse-target.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T21:54:30.618Z"
+    },
+    "push-plugin-dependency.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T21:54:51.878Z"
+    },
+    "push-plugin-dependency.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T21:55:14.952Z"
+    },
+    "push-plugin-dependency.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T21:55:39.610Z"
+    },
+    "push-registration.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T21:56:01.575Z"
+    },
+    "push-registration.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T21:56:23.955Z"
+    },
+    "push-registration.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T21:56:47.563Z"
+    },
+    "push-registration.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T21:57:06.278Z"
+    },
+    "push-registration.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T21:57:23.901Z"
+    },
+    "notification-tap.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T21:57:41.742Z"
+    },
+    "notification-tap.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T21:58:00.009Z"
+    },
+    "notification-tap.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T21:58:18.860Z"
+    },
+    "settings-notifications-switch.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T21:58:37.810Z"
+    },
+    "settings-notifications-switch.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T21:58:56.426Z"
+    },
+    "settings-notifications-switch.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T21:59:15.455Z"
+    },
+    "ios-acceptance.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T21:59:37.312Z"
+    },
+    "ios-acceptance.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T21:59:56.665Z"
+    },
+    "ios-acceptance.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:00:17.532Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:00:41.034Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:01:00.575Z"
+    },
+    "docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T22:01:21.040Z"
+    },
+    "ios-acceptance.ac2": {
+      "status": "cancelled"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "coderabbit",
+      "outcome": "findings",
+      "timestamp": "2026-11-03T22:11:06Z",
+      "markdownBody": "# CodeRabbit findings for PAN-4838 (PR #4962)\n\nCodeRabbit posted 2 inline finding(s). CodeRabbit is advisory: nothing waits for these,\nbut each one gets an answer, either a fix or a reply with your reason.\n\n- Thread 4461051500 · apps/mobile/ios/App/App/OverdeckKeysPlugin.swift:38 [Minor]: Copy an existing push key pair from the private group into the shared group.\n  https://github.com/eltmon/overdeck/pull/4962#discussion_r4461051500\n- Thread 4461051551 · apps/mobile/README.md:158 [Minor]: Mark cold-launch tap routing as unverified.\n  https://github.com/eltmon/overdeck/pull/4962#discussion_r4461051551\n\n## What to do\n\n1. Read each thread (open its link, or the code at the path and line).\n2. If you agree with a finding, fix it.\n3. If you reject a finding, reply on its thread with your reason:\n   `gh api repos/eltmon/overdeck/pulls/4962/comments/<thread id>/replies -f body=\"<reason>\"`\n4. If you changed code: run the quality gates on what you touched, commit, push, then run `pan review request PAN-4838`.\n   If you only replied, you are done.\n5. If PR #4962 has already merged when you read this, nothing more lands on it: open a follow-up issue\n   for the findings you agree with instead of pushing."
+    }
+  ]
+}

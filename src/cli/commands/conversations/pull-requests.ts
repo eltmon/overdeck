@@ -1,6 +1,7 @@
 /**
  * pan conversations link-pr / unlink-pr / prs (PAN-3822) — the agent-facing
- * door for pull requests linked to a conversation.
+ * door for pull requests linked to a conversation — plus auto-settle-on-merge
+ * and auto-settle (PAN-4653), the global setting and per-conversation override.
  *
  * <query> resolves like `pan conv move`: exact name, then a unique fuzzy title
  * match. <ref> is a PR/MR URL, `#42`, or `owner/repo#42`. The verbs call the
@@ -24,9 +25,15 @@ import {
   type PullRequestCommandResult,
 } from '../../../lib/overdeck/conversation-pull-request-commands.js';
 import {
-  isConversationsAutoArchiveOnMerge,
-  setConversationsAutoArchiveOnMerge,
+  isConversationsAutoSettleOnMerge,
+  setConversationsAutoSettleOnMerge,
 } from '../../../lib/overdeck/control-settings.js';
+import {
+  applyTriageUpdate,
+  AUTO_SETTLE_OVERRIDES,
+  getConversationTriage,
+  type AutoSettleOverride,
+} from '../../../lib/overdeck/conversation-triage-store.js';
 import { resolveConversation } from './move.js';
 
 type LinkSource = 'agent' | 'manual';
@@ -108,23 +115,49 @@ export async function unlinkPrAction(query: string, ref: string): Promise<void> 
   console.log(chalk.green(`✓ Unlinked ${link.repository}#${link.number} from ${name}`));
 }
 
-/**
- * `pan conv auto-archive-on-merge [on|off]` — read or set
- * `conversations.auto_archive_on_merge` (default off).
- */
-export async function autoArchiveOnMergeAction(value?: string): Promise<void> {
+/** `pan conv auto-settle-on-merge [on|off]` — read or set `conversations.auto_settle_on_merge` (default on). */
+export async function autoSettleOnMergeAction(value?: string): Promise<void> {
   if (value === undefined) {
-    console.log(isConversationsAutoArchiveOnMerge() ? 'on' : 'off');
+    console.log(isConversationsAutoSettleOnMerge() ? 'on' : 'off');
     return;
   }
   if (value !== 'on' && value !== 'off') {
     console.error(chalk.red(`Error: expected "on" or "off", got "${value}"`));
     return exitCli(1);
   }
-  setConversationsAutoArchiveOnMerge(value === 'on');
+  setConversationsAutoSettleOnMerge(value === 'on');
   console.log(chalk.green(value === 'on'
-    ? '✓ Operator conversations are archived once all their linked PRs are merged or closed (live sessions are never touched)'
-    : '✓ Auto-archive on merge is off'));
+    ? '✓ Conversations are settled once all their linked PRs are merged or closed (sessions keep running)'
+    : '✓ Auto-settle on merge is off'));
+}
+
+/** `pan conv auto-settle <query> [on|off|inherit]` — read or set one conversation's override. */
+export async function autoSettleOverrideAction(query: string, value?: string): Promise<void> {
+  const name = await resolveOrExit(query);
+  if (value === undefined) {
+    const override = getConversationTriage(name)?.autoSettleOverride ?? 'inherit';
+    console.log(override === 'inherit' ? `inherit (global: ${isConversationsAutoSettleOnMerge() ? 'on' : 'off'})` : override);
+    return;
+  }
+  if (!(AUTO_SETTLE_OVERRIDES as readonly string[]).includes(value)) {
+    console.error(chalk.red(`Error: expected "on", "off", or "inherit", got "${value}"`));
+    return exitCli(1);
+  }
+  const override = value as AutoSettleOverride;
+  const result = await viaDashboard<{ conversations: unknown[]; notFound: string[]; rejected: unknown[] }>(
+    '/api/conversations/triage',
+    { method: 'POST', body: JSON.stringify({ updates: [{ name, autoSettleOverride: override }] }) },
+    () => applyTriageUpdate({ name, autoSettleOverride: override })
+      ? { ok: true, status: 200, body: { conversations: [], notFound: [], rejected: [] } }
+      : { ok: false, status: 404, body: { error: 'Conversation not found', code: 'not_found' } },
+  );
+  if (!result.ok) return failWith(result.status, result.body as { error?: string });
+  const body = result.body as { notFound: string[]; rejected: unknown[] };
+  if (body.notFound.length > 0 || body.rejected.length > 0) {
+    console.error(chalk.red(`Error: auto-settle override not applied to ${name} (not found or a read-only vault copy)`));
+    return exitCli(1);
+  }
+  console.log(chalk.green(`✓ Auto-settle on merge for ${name}: ${override}`));
 }
 
 export async function prsAction(query: string, opts: { json?: boolean } = {}): Promise<void> {

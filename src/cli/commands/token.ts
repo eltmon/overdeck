@@ -108,7 +108,7 @@ export function registerTokenCommands(program: Command): void {
   token
     .command('create <name>')
     .description('Create a scoped access token and print it once')
-    .requiredOption('--scopes <list>', 'Comma-separated scopes: read:events, read:state, read:conversations, tell, operate, admin')
+    .requiredOption('--scopes <list>', 'Comma-separated scopes: read:events, read:state, read:conversations, read:costs, read:settings, tell, operate, approve, forward, admin')
     .option('--json', 'Print { id, name, scopes, token } as JSON')
     .action((name: string, options: { scopes: string; json?: boolean }) => runTokenCreate(name, options));
   token

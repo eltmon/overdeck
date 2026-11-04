@@ -13,11 +13,16 @@
  * Every merge door asks this one function: the merge-ready set
  * (`getMergeReadyIssues`), the dashboard Merge button and the auto-merge
  * executor (both through `triggerMerge`), and the per-project merge queue.
+ * PAN-4852 (AD-21): it runs the repository merge guards (Deft, SageOx) through
+ * one `evaluateRepoMergeGuards` call.
  * Nothing is stored: each input is read from the forge, `projects.yaml`, the
  * tracker's labels, or the global setting at the moment it is asked.
  */
+import { isDeftPipelineIssue } from '../deft/issue-pipeline.js';
+import { type DeftGuardVerdict, deftMergeGuardForIssue } from '../deft/merge-guard.js';
 import { getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
 import { issueHoldsForUat } from './auto-merge-eligibility.js';
+import { DEFT_NO_HEAD_REASON, evaluateRepoMergeGuards, type RepoGuardFacts, type RepoGuardVerdict } from './repo-merge-guards.js';
 import {
   evaluateMergeReadiness,
   forgeApprovalAtHead,
@@ -41,6 +46,12 @@ export interface MergeGateDeps {
   readReviews?: ReadGitHubReviews;
   /** The logins Overdeck posts as, for a review whose association alone is not trusted. */
   overdeckLogins?: () => Promise<readonly string[]>;
+  /** PAN-4820: true when the issue runs on Deft Directive's pipeline. */
+  isDeftPipeline?: (issueId: string) => Promise<boolean>;
+  /** PAN-4820: the Deft merge guard for the issue's PR at a head. */
+  deftGuard?: (issueId: string, headSha: string | null) => Promise<DeftGuardVerdict & { drifted: string[] }>;
+  /** PAN-4852: the repository merge guards; by default Deft (from the two deps above) then SageOx. */
+  repoGuards?: (issueId: string, facts: RepoGuardFacts) => Promise<RepoGuardVerdict>;
 }
 
 /**
@@ -58,6 +69,8 @@ function mergeabilityPending(facts: PrFacts): boolean {
 
 export interface MergeGateResult extends MergeReadiness {
   facts: PrFacts;
+  /** PAN-4820: Deft-hidden files edited outside any commit; the caller raises an operator decision. */
+  deftDrift?: string[];
 }
 
 /** The issue's project config, or null when no project claims the issue. */
@@ -94,6 +107,20 @@ export async function defaultUatRequired(issueId: string, deps: UatRequiredDeps 
 }
 
 /**
+ * PAN-4750: `requireApprovalAtHead` defaults to true. Only an operator-started
+ * strike merge passes `false`, which waives approval entirely: a strike PR is
+ * authored as the operator, who cannot approve their own PR. Every other check
+ * (draft, changes requested, checks, CI test job, UAT, mergeability) still applies.
+ *
+ * PAN-4820 (AD-4): a Deft issue defaults to `false` too, because no Overdeck
+ * reviewer runs for it; the person who clicks Merge is the approval. Its PR
+ * must also pass the Deft merge guard.
+ */
+export interface MergeGateOptions extends PrFactsOptions {
+  requireApprovalAtHead?: boolean;
+}
+
+/**
  * Is this issue's PR ready to merge right now? Never throws: a failed forge
  * read comes back not-ready with the lookup error as the reason.
  *
@@ -109,15 +136,17 @@ export async function defaultUatRequired(issueId: string, deps: UatRequiredDeps 
 export async function evaluateIssueMergeGate(
   issueId: string,
   deps: MergeGateDeps = {},
-  options: PrFactsOptions = {},
+  options: MergeGateOptions = {},
 ): Promise<MergeGateResult> {
+  const deft = await (deps.isDeftPipeline ?? isDeftPipelineIssue)(issueId);
+  const { requireApprovalAtHead = !deft, ...readOptions } = options;
   const getFacts = (readOptions: PrFactsOptions) => deps.getFacts
     ? deps.getFacts(issueId, readOptions)
     : getPrFacts(issueId, {}, readOptions);
-  let read = await getFacts(options);
+  let read = await getFacts(readOptions);
   if (mergeabilityPending(read)) {
     await new Promise<void>((resolve) => setTimeout(resolve, MERGEABILITY_REREAD_MS));
-    read = await getFacts({ ...options, fresh: true });
+    read = await getFacts({ ...readOptions, fresh: true });
   }
   const facts = await withForgeApprovalAtHead(read, deps.readReviews, deps.overdeckLogins);
   // #4066 review: the board's derived `ready` reads this answer (no forge read).
@@ -132,10 +161,32 @@ export async function evaluateIssueMergeGate(
       uatRequired = true;
     }
   }
-  return {
-    ...evaluateMergeReadiness(facts, { ciTestsRequired, uatRequired, requireApprovalAtHead: true }),
-    facts,
-  };
+  const readiness = evaluateMergeReadiness(facts, {
+    ciTestsRequired, uatRequired, requireApprovalAtHead, requireApproval: requireApprovalAtHead,
+  });
+  // The Deft guard runs for every Deft issue (PAN-4820); SageOx only when the
+  // PR is otherwise ready (AD-19). A non-Deft PR that is not ready runs neither.
+  if (readiness.ready || deft) {
+    const repoGuards = deps.repoGuards
+      ?? ((id: string, guardFacts: RepoGuardFacts) => evaluateRepoMergeGuards(id, guardFacts, {
+        deft: async (guardId, headSha) => {
+          if (!deft) return null;
+          // The guard judges the PR's diff at a head; with no head (a GitLab read can
+          // lack one) there is nothing to judge, so a Deft PR is refused, not waved through.
+          if (!headSha) return { ok: false, reason: DEFT_NO_HEAD_REASON };
+          return (deps.deftGuard ?? deftMergeGuardForIssue)(guardId, headSha);
+        },
+      }));
+    const verdict = await repoGuards(issueId, {
+      headSha: facts.headSha,
+      headBranch: facts.headBranch,
+      otherwiseReady: readiness.ready,
+    });
+    if (!verdict.ok) {
+      return { ...readiness, ready: false, reason: verdict.reason, facts, ...(verdict.deftDrift ? { deftDrift: verdict.deftDrift } : {}) };
+    }
+  }
+  return { ...readiness, facts };
 }
 
 export interface ConflictRepairGateResult {
@@ -158,14 +209,36 @@ export interface ConflictRepairGateResult {
  *
  * PAN-4451: CI evidence is waived. GitHub builds no merge ref for a conflicting
  * PR, so pull_request CI never runs on it; pending, absent or test-job-less
- * checks pass. Red checks still disqualify. The merge gate re-judges CI on the
- * repaired head.
+ * checks pass. Red checks still disqualify, unless every failing check was
+ * cancelled, timed out or went stale (PAN-4917). The merge gate re-judges CI
+ * on the repaired head.
  *
  * PAN-4467: a GitHub approval of an older head (the head moved since the
  * approving review) still counts here and is reported as `staleApproval`; the
  * merge gate still needs approval at the repaired head. A PR the forge does
  * not call approved at any head is not repaired.
  */
+
+/**
+ * PAN-4917: conclusions of a check that stopped before it judged the code.
+ * GitHub reports a job killed by its own timeout-minutes as CANCELLED, the same
+ * as a run a newer push superseded, so the rule is by conclusion, not cause.
+ */
+const UNFINISHED_CHECK_CONCLUSIONS = new Set(['CANCELLED', 'TIMED_OUT', 'STALE']);
+
+/**
+ * PAN-4917: why a red head is not repaired, naming each failing check, or null
+ * when every failing check is unfinished. The repair pushes a new head that CI
+ * runs again, and the merge gate judges CI there. With no per-check detail
+ * (GitLab) a red head still declines.
+ */
+function redHeadDeclineReason(facts: PrFacts): string | null {
+  const failures = facts.checkFailures ?? [];
+  if (failures.length > 0 && failures.every((check) => UNFINISHED_CHECK_CONCLUSIONS.has(check.conclusion))) return null;
+  const named = failures.map((check) => `${check.name} (${check.conclusion})`).join(', ');
+  return `CI checks failing on PR HEAD ${facts.headSha ?? 'unknown'}${named ? `: ${named}` : ''}`;
+}
+
 export async function evaluateConflictRepairGate(
   issueId: string,
   deps: MergeGateDeps = {},
@@ -179,9 +252,11 @@ export async function evaluateConflictRepairGate(
   }
   // PAN-4451: GitHub builds no merge ref for a conflicting PR, so pull_request CI
   // never runs on it and its head cannot get a test result. Only a red head
-  // disqualifies; the merge gate re-judges CI on the repaired head.
+  // disqualifies, and not one whose failing checks never finished (PAN-4917);
+  // the merge gate re-judges CI on the repaired head.
   if (facts.checks === 'red') {
-    return { conflicting: false, reason: `CI checks failing on PR HEAD ${facts.headSha ?? 'unknown'}`, facts };
+    const reason = redHeadDeclineReason(facts);
+    if (reason) return { conflicting: false, reason, facts };
   }
   let approvedAtHead = facts.approvedAtHead === true;
   if (!approvedAtHead && facts.forge === 'github') {

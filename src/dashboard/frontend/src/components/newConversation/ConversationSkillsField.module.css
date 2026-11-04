@@ -4,14 +4,30 @@
   gap: 6px;
 }
 
+.filterField {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.lead {
+  position: absolute;
+  left: 10px;
+  display: flex;
+  pointer-events: none;
+  color: var(--muted-foreground);
+}
+
 .filter {
   width: 100%;
-  padding: 6px 10px;
-  font-size: 12px;
+  height: 32px;
+  padding: 0 10px 0 31px;
+  font-size: 13px;
   font-family: inherit;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: var(--background);
+  border: 1px solid var(--border-overlay, var(--border));
+  border-radius: 6px;
+  background: var(--surface-overlay-field, var(--background));
   color: var(--foreground);
 }
 
@@ -19,38 +35,44 @@
   color: var(--muted-foreground);
 }
 
+.filter:focus-visible {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 20%, transparent);
+  outline: none;
+}
+
 .list {
-  max-height: 220px;
+  margin-top: 8px;
+  max-height: 260px;
   overflow-y: auto;
-  border: 1px solid var(--border);
-  border-radius: 4px;
+  border: 1px solid var(--border-overlay, var(--border));
+  border-radius: 6px;
+  background: var(--surface-overlay, var(--popover));
 }
 
-.group {
-  border-bottom: 1px solid var(--border);
-}
-
-.group:last-child {
-  border-bottom: none;
+.group:first-child .groupHeader {
+  border-top: 0;
 }
 
 .groupHeader {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   width: 100%;
-  padding: 6px 8px;
+  height: 32px;
+  padding: 0 10px;
   font-family: inherit;
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--foreground);
   background: transparent;
   border: none;
+  border-top: 1px solid var(--border-overlay, var(--border));
   text-align: left;
   cursor: pointer;
 }
 
 .groupHeader:hover:not(:disabled) {
-  background: var(--muted);
+  background: var(--surface-overlay-field, var(--muted));
 }
 
 .groupHeader:disabled {
@@ -78,22 +100,21 @@
 }
 
 .groupCount {
-  font-size: 11px;
+  font-family: var(--font-mono-ui);
+  font-size: 11.5px;
   color: var(--muted-foreground);
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
-  gap: 8px;
-  padding: 4px 8px;
-  border-bottom: 1px solid var(--border);
-}
-
-.row:last-child {
-  border-bottom: none;
+  gap: 12px;
+  padding: 7px 10px 7px 30px;
+  background: var(--surface-overlay-field, var(--background));
+  border-top: 1px solid color-mix(in srgb, var(--border-overlay, var(--border)) 60%, transparent);
 }
 
 .nameCell {
@@ -112,7 +133,7 @@
 }
 
 .description {
-  font-size: 11px;
+  font-size: 11.5px;
   color: var(--muted-foreground);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -127,32 +148,52 @@
 
 .choices {
   display: inline-flex;
-  border: 1px solid var(--border);
-  border-radius: 4px;
+  border: 1px solid var(--border-overlay, var(--border));
+  border-radius: 5px;
   overflow: hidden;
 }
 
 .choice {
-  padding: 2px 8px;
+  padding: 3px 8px;
   font-size: 11px;
+  font-weight: 500;
   font-family: inherit;
-  background: transparent;
+  background: var(--surface-overlay, var(--popover));
   color: var(--muted-foreground);
   border: none;
   cursor: pointer;
 }
 
-.choice:hover {
+.choice + .choice {
+  border-left: 1px solid var(--border-overlay, var(--border));
+}
+
+.choice:hover:not(.choiceSelected) {
   background: var(--muted);
 }
 
 .choiceSelected {
-  background: var(--muted);
-  color: var(--foreground);
+  background: var(--foreground);
+  color: var(--surface-overlay, var(--popover));
+}
+
+.choice:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 .note {
   font-size: 12px;
   color: var(--muted-foreground);
   padding: 4px 0;
+}
+
+@media (max-width: 600px) {
+  .row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding-left: 12px;
+  }
+  .inherited {
+    display: none;
+  }
 }

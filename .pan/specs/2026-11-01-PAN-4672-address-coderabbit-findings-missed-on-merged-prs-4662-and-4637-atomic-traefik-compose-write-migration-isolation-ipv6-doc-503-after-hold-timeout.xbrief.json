@@ -1,0 +1,451 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-01T06:16:47Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4672: Address CodeRabbit findings missed on merged PRs #4662 and #4637 (atomic Traefik compose write, migration isolation, IPv6 doc, 503 after hold timeout)",
+    "updated": "2026-11-01T06:29:06.256Z"
+  },
+  "plan": {
+    "id": "pan-4672",
+    "title": "Address CodeRabbit findings missed on merged PRs #4662 and #4637 (atomic Traefik compose write, migration isolation, IPv6 doc, 503 after hold timeout)",
+    "status": "running",
+    "uid": "98ec556e-7928-4107-a042-8b6fc08f3d62",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-01T06:16:47Z",
+    "updated": "2026-11-01T06:29:06.256Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4672",
+        "label": "PAN-4672",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/pull/4662",
+        "label": "PR #4662 (PAN-4299)",
+        "type": "pr"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/pull/4637",
+        "label": "PR #4637",
+        "type": "pr"
+      }
+    ],
+    "tags": [
+      "traefik",
+      "cli",
+      "dashboard-server",
+      "docs",
+      "coderabbit-followup"
+    ],
+    "narratives": {
+      "Problem": "CodeRabbit posted five Minor findings on PRs #4662 and #4637 after both merged. All five are still valid at d2969326eac: (1) migrateTraefikCompose writes the compose file with a plain writeFileSync, so a crash can truncate it; (2) pan dev and (3) pan up run the compose migration inside the same try as `docker compose up -d`, so a migration throw skips the Traefik start; (4) docs/DASHBOARD-AUTH.md and guides/docker-setup.mdx claim IPv6 LAN clients reach Traefik through a [::] listener, but explicit 0.0.0.0 mappings publish IPv4 only (probed on Docker 29.3.0); (5) holdRequestsUntilServed removes its request listener when its 120 s timer fires, so a request arriving after the timeout and before HttpRouter.serve attaches is never answered.",
+      "Proposal": "Make migrateTraefikCompose write via a same-directory temp file plus renameSync, preserving mode and removing the temp file on failure. Extract the CLI Traefik start into src/cli/commands/traefik-start.ts (startTraefikContainer, injectable migrate/exec/log like up-ollama.ts) with the migration in its own try/catch, and call it from pan dev (skipWhenRunning false) and pan up (skipWhenRunning true). Keep the hold's request listener installed after the timeout, answering 503 + Retry-After: 5 until a real handler attaches. Rewrite the IPv6 sentences in both docs to state IPv4-only publishing, and document the startup hold in docs/DASHBOARD-ARCHITECTURE.md. Full detail, before/after code and test names: .pan/drafts/PAN-4672.md.",
+      "NonGoals": "- Do not change src/lib/platform-lifecycle.ts or route it through the new helper (it throws StageError; different semantics).\n- Do not generate an explicit [::] IPv6 port mapping for bind = \"all\".\n- Do not recreate or touch the live overdeck-traefik container on any host.\n- Do not edit .pan/drafts/PAN-4299.md (historical draft).\n- Do not modify the existing real-socket tests in tests/unit/dashboard/server-bind.test.ts.\n- Do not make the other writeFileSync calls in src/lib/traefik.ts atomic.\n- Do not add a sync/async atomic-write helper to src/lib or a new caller of atomicWriteProjectsConfigSync.\n- Do not change pan dev's always-run `up -d` or pan up's skip-when-running-and-unchanged behaviour beyond isolating the migration."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Extract the CLI Traefik start into src/cli/commands/traefik-start.ts with injectable deps, tested in src/cli/commands/__tests__/traefik-start.test.ts.",
+        "rationale": "The issue AC needs tests for both pan dev and pan up; neither inline block is testable. up-ollama.ts/ensureOllamaForUp is the in-repo precedent. Keeping it out of src/lib/traefik.ts keeps the platform-lifecycle-traefik test mock valid and the atomic-write item on a disjoint file."
+      },
+      {
+        "summary": "One helper with a skipWhenRunning option preserves both callers' current behaviour; a thrown migration counts as migrated=false.",
+        "rationale": "pan dev always ran `up -d`; pan up skipped it only when running and unchanged. A thrown migration did not change the file, so leaving a running container alone is correct."
+      },
+      {
+        "summary": "Inline temp-file + renameSync in migrateTraefikCompose, mode preserved, no fsync.",
+        "rationale": "atomicWriteProjectsConfigSync forbids new sync callers and atomicWriteJson is JSON-only; CodeRabbit's suggested shape is the right size and the compose file is regenerable."
+      },
+      {
+        "summary": "Follow CodeRabbit's expired-flag shape for holdRequestsUntilServed; test it with fake timers and an EventEmitter double, no sockets.",
+        "rationale": "Keeping the hold listener installed is the smallest fix. The plan critic flagged a real-timer test; fake timers over an in-memory double satisfy the fake-timers rule without gating real I/O."
+      },
+      {
+        "summary": "IPv6 docs are scoped to the three managed port lines: they request no [::] listener; a port line added without a host address publishes on IPv6 too. DASHBOARD-AUTH.md keeps the stale-container caveat.",
+        "rationale": "Planning probe on Docker 29.3.0 showed explicit 0.0.0.0 gives an IPv4-only listener; the migration preserves other mappings (critic finding), so a categorical claim would be wrong."
+      },
+      {
+        "summary": "Document the startup request hold in docs/DASHBOARD-ARCHITECTURE.md as part of the server-bind item.",
+        "rationale": "The behaviour changes and the architecture doc had no mention of server-bind.ts or the hold."
+      },
+      {
+        "summary": "Keep the five findings in one issue and set plan.metadata.sizeJustification instead of splitting into sibling issues.",
+        "rationale": "The issue author scoped them together as one CodeRabbit follow-up; each fix is 10-40 lines and the items are already independent in the DAG."
+      }
+    ],
+    "items": [
+      {
+        "id": "atomic-compose-write",
+        "title": "Write the Traefik compose file atomically in migrateTraefikCompose",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T06:16:47Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4672",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/traefik.ts",
+            "tests/lib/traefik-compose-atomic.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/traefik-compose-atomic.test.ts tests/lib/traefik.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass, including the four new atomic-write tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item 1. In src/lib/traefik.ts migrateTraefikCompose, replace `writeFileSync(composePath, after, 'utf-8')` with: mode = statSync(composePath).mode & 0o777; tmpPath = `${composePath}.${process.pid}.tmp`; writeFileSync(tmpPath, after, 'utf-8'); chmodSync(tmpPath, mode) (a writeFileSync mode option is masked by the umask); renameSync(tmpPath, composePath); on any throw rmSync(tmpPath, { force: true }) and rethrow. Add renameSync, rmSync, statSync, chmodSync to the fs import and one JSDoc sentence. Create tests/lib/traefik-compose-atomic.test.ts with a hoisted fsControl { failWrite, failRename } and vi.mock('fs', importOriginal) wrappers (pattern: tests/unit/lib/workspace-manager/pretrust-directory.test.ts); the failWrite wrapper writes 'partial' to the .tmp path and then throws, like a mid-write failure. Reuse the OVERDECK_HOME/config.toml/legacyCompose setup from tests/lib/traefik.test.ts:68-102. Four tests: success leaves no .tmp; failed temp write keeps original bytes and no .tmp; failed rename keeps original bytes and no .tmp; mode 0o640 preserved under process.umask(0o077), restored in finally (vitest pool is forks, so umask is settable)."
+        },
+        "items": [
+          {
+            "id": "atomic-compose-write.ac1",
+            "title": "Given a legacy compose file and bind = \"all\", when migrateTraefikCompose runs, then it returns true, the file contains \"0.0.0.0:80:80\", and readdirSync of the directory lists no entry ending in .tmp",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "atomic-compose-write.ac2",
+            "title": "Given writeFileSync writes a partial .tmp file and then throws, when migrateTraefikCompose runs, then it rethrows 'disk full', the compose file content is byte-identical to the legacy fixture, and no .tmp entry remains",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "atomic-compose-write.ac3",
+            "title": "Given renameSync throws, when migrateTraefikCompose runs, then it rethrows 'rename blocked', the compose file content is byte-identical to the legacy fixture, and no .tmp entry remains",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "atomic-compose-write.ac4",
+            "title": "Given the compose file has mode 0o640 and the process umask is 0o077, when migrateTraefikCompose rewrites it, then statSync(file).mode & 0o777 returns 0o640",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "traefik-start-dev",
+        "title": "Add startTraefikContainer with an isolated compose migration and use it in pan dev",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T06:16:47Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4672",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/traefik-start.ts",
+            "src/cli/commands/dev.ts",
+            "src/cli/commands/__tests__/traefik-start.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/traefik-start.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "traefik-start.test.ts passes its three pan dev-shape tests",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item 2. Create src/cli/commands/traefik-start.ts exactly as in the PRD: export type TraefikStartResult = 'started' | 'already-running' | 'failed'; export interface TraefikStartDeps { migrate?, exec?(command, cwd) => Promise<{ stdout }>, log? }; export async function startTraefikContainer(traefikDir, { skipWhenRunning }, deps = {}) that calls migrate(join(traefikDir, 'docker-compose.yml')) in its own try/catch (catch logs chalk.yellow('⚠ Traefik compose migration failed: <message>') and leaves migrated = false), then, if skipWhenRunning && !migrated, runs the docker ps name filter in its own try/catch and returns 'already-running' only when that check succeeds and stdout includes 'overdeck-traefik' (a rejected check falls through); then runs 'docker compose up -d' with cwd traefikDir in a separate try and returns 'started', or 'failed' when it rejects. Default exec is promisify(exec) from child_process — no execSync. In src/cli/commands/dev.ts (lines ~292-302) replace the try/catch block with: log 'Starting Traefik...', dynamic import './traefik-start.js', `startTraefikContainer(traefikDir, { skipWhenRunning: false })`, print the yellow failure line on 'failed', else the green started line. Keep dev.ts's execSync import (still used). Tests inject vi.fn() deps and record call order."
+        },
+        "items": [
+          {
+            "id": "traefik-start-dev.ac1",
+            "title": "Given migrate throws Error('EACCES') and skipWhenRunning is false, when startTraefikContainer runs, then exec is called once with ('docker compose up -d', traefikDir), a log line contains 'Traefik compose migration failed: EACCES', and it returns 'started'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "traefik-start-dev.ac2",
+            "title": "When startTraefikContainer runs, then the recorded call order is migrate with <traefikDir>/docker-compose.yml followed by exec 'docker compose up -d'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "traefik-start-dev.ac3",
+            "title": "Given exec rejects for 'docker compose up -d', when startTraefikContainer runs, then it returns 'failed' and does not reject",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "traefik-start-dev.ac4",
+            "title": "src/cli/commands/dev.ts calls startTraefikContainer(traefikDir, { skipWhenRunning: false }) and `grep -c migrateTraefikCompose src/cli/commands/dev.ts` prints 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "traefik-start-up",
+        "title": "Use startTraefikContainer in pan up so a migration throw still starts Traefik",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T06:16:47Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4672",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/index.ts",
+            "src/cli/commands/__tests__/traefik-start.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/traefik-start.test.ts",
+            "npm run typecheck",
+            "npm run lint",
+            "grep -n 'execAsync\\|promisify\\|migrateTraefikCompose' src/cli/index.ts"
+          ],
+          "expected_outputs": [
+            "traefik-start.test.ts passes all seven tests",
+            "typecheck and lint complete without errors",
+            "the grep prints nothing"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item 3. In src/cli/index.ts (up action, lines ~720-743) replace the Traefik try/catch with: log 'Starting Traefik...', dynamic import './commands/traefik-start.js', `const result = await startTraefikContainer(traefikDir, { skipWhenRunning: true })`; on 'failed' print the two existing yellow/dim failure lines; otherwise print 'Traefik already running' when result is 'already-running', then the green started line and the dashboard URL line. That removes the only execAsync call in the action, so drop `exec` from `const { spawn, execSync, exec } = await import('child_process')` (line 570) and delete the `promisify` import and `execAsync` const (lines 571-572); keep spawn and execSync. Add four pan up-shape tests (including a rejected docker ps check that still runs `docker compose up -d`) (skipWhenRunning true) to src/cli/commands/__tests__/traefik-start.test.ts."
+        },
+        "items": [
+          {
+            "id": "traefik-start-up.ac1",
+            "title": "Given migrate throws, skipWhenRunning is true, and docker ps returns empty stdout, when startTraefikContainer runs, then exec is called with 'docker compose up -d' and it returns 'started'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "traefik-start-up.ac2",
+            "title": "Given migrate throws and docker ps returns 'overdeck-traefik', when startTraefikContainer runs with skipWhenRunning true, then it returns 'already-running' and never calls 'docker compose up -d'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "traefik-start-up.ac3",
+            "title": "Given migrate returns true, when startTraefikContainer runs with skipWhenRunning true, then it calls 'docker compose up -d', never calls docker ps, and returns 'started'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "traefik-start-up.ac5",
+            "title": "Given migrate throws and the docker ps check rejects, when startTraefikContainer runs with skipWhenRunning true, then it calls 'docker compose up -d' and returns 'started'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "traefik-start-up.ac4",
+            "title": "src/cli/index.ts calls startTraefikContainer(traefikDir, { skipWhenRunning: true }) and `grep -n 'execAsync\\|promisify\\|migrateTraefikCompose' src/cli/index.ts` returns no lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "hold-503-after-timeout",
+        "title": "Keep the startup hold answering 503 after its timeout until a real handler attaches",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T06:16:47Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4672",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/server-bind.ts",
+            "tests/unit/dashboard/server-bind.test.ts",
+            "docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/server-bind.test.ts",
+            "npm run typecheck",
+            "grep -n 'holdRequestsUntilServed' docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "server-bind.test.ts passes, including the new fake-timer after-timeout test",
+            "typecheck completes without errors",
+            "the grep prints the new Server structure bullet"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-6",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item 4. In src/dashboard/server/server-bind.ts holdRequestsUntilServed: add `let expired = false` and a respondStarting(res) helper (skip when res.headersSent; else writeHead 503 with Content-Type text/plain and Retry-After '5', end 'Overdeck dashboard is still starting'); `hold` answers respondStarting when expired, else queues; the timer sets expired = true and answers every held request with respondStarting but leaves `hold` and `onNewListener` installed; `release(handler: RequestListener)` loses its null branch and replays held requests to the handler. Update the JSDoc sentence. Add the PRD's new describe('startup hold after its timeout') at the end of tests/unit/dashboard/server-bind.test.ts: vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] }), an EventEmitter cast to Server, response doubles { headersSent, writeHead, end } — no sockets; leave queueMicrotask real and the existing socket tests unchanged. Add the PRD's server-bind.ts bullet to the Server structure list in docs/DASHBOARD-ARCHITECTURE.md (after the server.ts bullet)."
+        },
+        "items": [
+          {
+            "id": "hold-503-after-timeout.ac1",
+            "title": "Given a hold with a 1000 ms timeout on an EventEmitter server and fake timers advanced 1000 ms, when a new request is emitted, then its response receives writeHead(503, { 'Content-Type': 'text/plain', 'Retry-After': '5' }), heldCount() returns 0, and listenerCount('request') is 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hold-503-after-timeout.ac2",
+            "title": "Given the expired hold, when a handler is attached and one microtask passes, then listenerCount('request') is 1 and the next emitted request reaches the handler with no 503 written",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hold-503-after-timeout.ac3",
+            "title": "The existing socket tests 'answers a request that arrived before the handler attached' and 'answers 503 when no handler attaches in time' still pass unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hold-503-after-timeout.ac4",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md Server structure list renders a server-bind.ts bullet that names holdRequestsUntilServed, the 120 s timeout, and 503 with Retry-After: 5 until the router attaches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-ipv6-claim",
+        "title": "Correct the IPv6 binding claim in DASHBOARD-AUTH.md and docker-setup.mdx",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T06:16:47Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-4672",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DASHBOARD-AUTH.md",
+            "guides/docker-setup.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'so only the loopback binding defends against them' docs/DASHBOARD-AUTH.md",
+            "grep -c 'IPv6 LAN clients look like local traffic' guides/docker-setup.mdx",
+            "grep -c 'requests no IPv6' docs/DASHBOARD-AUTH.md guides/docker-setup.mdx",
+            "grep -c 'publishes on IPv6 as well' docs/DASHBOARD-AUTH.md guides/docker-setup.mdx"
+          ],
+          "expected_outputs": [
+            "first grep prints 0",
+            "second grep prints 0",
+            "third grep prints 1 for each file",
+            "fourth grep prints 1 for each file"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD work item 5. Replace docs/DASHBOARD-AUTH.md lines ~377-379 (the 'IPv6 LAN clients reach Traefik through the [::] docker-proxy listener…' sentence) and guides/docker-setup.mdx line 62 with the exact replacement text in the PRD, scoped to the three managed port lines: Overdeck writes the 80, 443 and 8080 lines with the IPv4 host address 0.0.0.0, which requests no IPv6 [::] listener for those ports; a port line added without a host address publishes on IPv6 as well. No categorical 'IPv6 clients cannot connect'. DASHBOARD-AUTH.md also keeps the stale-container caveat (pan restart --traefik, pan doctor Traefik port binding). Leave guides/docker-setup.mdx line 64 unchanged. Keep the phrases 'requests no IPv6' and 'publishes on IPv6 as well' each on one source line so the greps match."
+        },
+        "items": [
+          {
+            "id": "docs-ipv6-claim.ac1",
+            "title": "`grep -c 'so only the loopback binding defends against them' docs/DASHBOARD-AUTH.md` prints 0, and the file states that the 80, 443 and 8080 lines use host address 0.0.0.0, which requests no IPv6 [::] listener for those ports",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-ipv6-claim.ac2",
+            "title": "`grep -c 'IPv6 LAN clients look like local traffic' guides/docker-setup.mdx` prints 0, and line 62 states the managed lines request no IPv6 [::] listener while a port line added without a host address publishes on IPv6 as well",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-ipv6-claim.ac3",
+            "title": "docs/DASHBOARD-AUTH.md renders the added-port-line IPv6 caveat and the stale-container caveat naming `pan restart --traefik` and the pan doctor Traefik port binding check",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "traefik-start-dev",
+        "to": "traefik-start-up",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "The issue is one CodeRabbit follow-up that bundles five Minor findings from two merged PRs. The 8 'subsystems' come from 11 files across lib, CLI, dashboard server, tests and docs, but the total change is roughly 150 lines, and the items already run in parallel with one edge. Five sibling issues would each pay a full review/test/UAT cycle for a 10-40 line fix.",
+      "canonicalFilename": "2026-11-01-PAN-4672-address-coderabbit-findings-missed-on-merged-prs-4662-and-4637-atomic-traefik-compose-write-migration-isolation-ipv6-doc-503-after-hold-timeout.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}

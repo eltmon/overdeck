@@ -1,0 +1,158 @@
+{
+  "version": "1",
+  "issueId": "PAN-4626",
+  "created": "2026-11-01T05:58:08.711Z",
+  "updated": "2026-11-01T07:30:40.963Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "hook-stop-pending": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4626",
+      "claimedAt": "2026-11-01T05:58:08.711Z",
+      "doneAt": "2026-11-01T06:07:31.166Z"
+    },
+    "hook-hold-until-refetch": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4626",
+      "claimedAt": "2026-11-01T06:07:38.764Z",
+      "doneAt": "2026-11-01T06:11:22.772Z"
+    },
+    "row-leaving-css": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4626",
+      "claimedAt": "2026-11-01T06:11:57.497Z",
+      "doneAt": "2026-11-01T06:12:44.233Z"
+    },
+    "row-leaving-state": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4626",
+      "claimedAt": "2026-11-01T06:12:51.678Z",
+      "doneAt": "2026-11-01T06:21:08.615Z"
+    },
+    "row-leaving-label": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4626",
+      "claimedAt": "2026-11-01T06:21:19.267Z",
+      "doneAt": "2026-11-01T06:28:36.924Z"
+    },
+    "panel-stopping-status": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4626",
+      "claimedAt": "2026-11-01T06:28:47.837Z",
+      "doneAt": "2026-11-01T06:34:56.425Z"
+    },
+    "docs-leaving-state": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4626",
+      "claimedAt": "2026-11-01T06:35:05.491Z",
+      "doneAt": "2026-11-01T06:36:10.608Z"
+    },
+    "uat-screenshots": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4626",
+      "claimedAt": "2026-11-01T06:36:25.876Z",
+      "doneAt": "2026-11-01T06:50:11.841Z"
+    },
+    "hook-stop-pending.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T06:57:10.599Z"
+    },
+    "hook-stop-pending.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T06:58:27.669Z"
+    },
+    "hook-stop-pending.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T06:59:00.497Z"
+    },
+    "hook-stop-pending.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T06:59:28.902Z"
+    },
+    "hook-hold-until-refetch.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T06:59:52.540Z"
+    },
+    "hook-hold-until-refetch.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:00:34.013Z"
+    },
+    "hook-hold-until-refetch.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:01:05.782Z"
+    },
+    "row-leaving-css.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:01:32.863Z"
+    },
+    "row-leaving-css.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:02:21.313Z"
+    },
+    "row-leaving-css.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:02:51.966Z"
+    },
+    "row-leaving-state.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:03:11.340Z"
+    },
+    "row-leaving-state.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:03:31.838Z"
+    },
+    "row-leaving-state.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:03:54.371Z"
+    },
+    "row-leaving-state.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:04:18.666Z"
+    },
+    "row-leaving-label.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:04:53.184Z"
+    },
+    "row-leaving-label.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:05:26.566Z"
+    },
+    "row-leaving-label.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:05:58.870Z"
+    },
+    "panel-stopping-status.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:06:20.626Z"
+    },
+    "panel-stopping-status.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:06:42.208Z"
+    },
+    "panel-stopping-status.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:07:05.571Z"
+    },
+    "docs-leaving-state.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:07:21.239Z"
+    },
+    "docs-leaving-state.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:07:39.784Z"
+    },
+    "uat-screenshots.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:07:56.766Z"
+    },
+    "uat-screenshots.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T07:08:15.332Z"
+    }
+  },
+  "feedback": []
+}

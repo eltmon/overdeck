@@ -4,11 +4,12 @@
  * collapse was shipped then rejected), completion messages become structured
  * verdict cards, and the pre-existing work-log group collapse stays.
  */
-import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
-import { TurnBody } from './messageRows';
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { AssistantMessageRow, TurnBody, UserMessageRow } from './messageRows';
 import { WorkLogGroup } from './workLogRows';
-import type { SubagentSummary, WorkLogEntry } from '../chat-types';
+import type { ChatMessage, SubagentSummary, WorkLogEntry } from '../chat-types';
+import { addCitation, consumeCitations, resetCitationStore } from '../../../lib/composerCitations.js';
 
 // ChatMarkdown pulls in the syntax-highlight chain; the gate asserts budget
 // behavior, not markdown fidelity.
@@ -151,5 +152,96 @@ describe('subagent transcript action', () => {
 
     fireEvent.click(screen.getByText('Task'));
     expect(screen.queryByRole('button', { name: 'Open subagent transcript' })).not.toBeInTheDocument();
+  });
+});
+
+describe('PAN-4642 cite-row gate', () => {
+  function assistantMessage(overrides: Partial<ChatMessage> = {}): ChatMessage {
+    return { id: 'asst-1', role: 'assistant', text: 'Here is my reply.', createdAt: '2026-11-01T00:00:00Z', completedAt: '2026-11-01T00:00:01Z', ...overrides };
+  }
+  function userMessage(overrides: Partial<ChatMessage> = {}): ChatMessage {
+    return { id: 'user-1', role: 'user', text: 'My question.', createdAt: '2026-11-01T00:00:00Z', ...overrides };
+  }
+
+  it('marks a completed assistant row citable when citeConversationName is set', () => {
+    render(<AssistantMessageRow message={assistantMessage()} durationStart="2026-11-01T00:00:00Z" isStreaming={false} citeConversationName="conv-a" />);
+    expect(document.querySelector('[data-cite-message-id="asst-1"][data-cite-role="assistant"]')).toBeInTheDocument();
+  });
+
+  it('does not mark a still-streaming assistant row citable', () => {
+    render(<AssistantMessageRow message={assistantMessage({ completedAt: undefined })} durationStart="2026-11-01T00:00:00Z" isStreaming citeConversationName="conv-a" />);
+    expect(document.querySelector('[data-cite-message-id]')).not.toBeInTheDocument();
+  });
+
+  it('does not mark an assistant row citable without citeConversationName', () => {
+    render(<AssistantMessageRow message={assistantMessage()} durationStart="2026-11-01T00:00:00Z" isStreaming={false} />);
+    expect(document.querySelector('[data-cite-message-id]')).not.toBeInTheDocument();
+  });
+
+  it('marks a settled user row citable when citeConversationName is set', () => {
+    render(<UserMessageRow message={userMessage()} citeConversationName="conv-a" />);
+    expect(document.querySelector('[data-cite-message-id="user-1"][data-cite-role="user"]')).toBeInTheDocument();
+  });
+
+  it('does not mark an optimistic user row citable', () => {
+    render(<UserMessageRow message={userMessage({ id: 'optimistic-1' })} citeConversationName="conv-a" />);
+    expect(document.querySelector('[data-cite-message-id]')).not.toBeInTheDocument();
+  });
+});
+
+describe('PAN-4642 citation highlight (data-cited)', () => {
+  const SOURCE = { kind: 'message' as const, messageId: 'asst-1', role: 'assistant' as const };
+
+  function assistantMessage(): ChatMessage {
+    return { id: 'asst-1', role: 'assistant', text: 'Here is my reply.', createdAt: '2026-11-01T00:00:00Z', completedAt: '2026-11-01T00:00:01Z' };
+  }
+
+  beforeEach(() => {
+    localStorage.clear();
+    resetCitationStore();
+  });
+
+  it('renders data-cited="true" on an assistant row with a pending citation', () => {
+    addCitation('conv-a', { source: SOURCE, quotedText: 'my reply', comment: '' });
+    render(<AssistantMessageRow message={assistantMessage()} durationStart="2026-11-01T00:00:00Z" isStreaming={false} citeConversationName="conv-a" />);
+    expect(document.querySelector('[data-cite-message-id="asst-1"]')).toHaveAttribute('data-cited', 'true');
+  });
+
+  it('removes data-cited once the citation is consumed', () => {
+    addCitation('conv-a', { source: SOURCE, quotedText: 'my reply', comment: '' });
+    render(<AssistantMessageRow message={assistantMessage()} durationStart="2026-11-01T00:00:00Z" isStreaming={false} citeConversationName="conv-a" />);
+    expect(document.querySelector('[data-cite-message-id="asst-1"]')).toHaveAttribute('data-cited', 'true');
+
+    act(() => { consumeCitations('conv-a'); });
+    expect(document.querySelector('[data-cite-message-id="asst-1"]')).not.toHaveAttribute('data-cited', 'true');
+  });
+});
+
+describe('PAN-4476 shared prompt author', () => {
+  const user = (overrides: Partial<ChatMessage> = {}): ChatMessage => ({
+    id: 'user-1',
+    role: 'user',
+    text: 'Run the tests.',
+    createdAt: '2026-11-01T00:00:00Z',
+    ...overrides,
+  });
+  const alice = { login: 'alice', avatarUrl: 'https://avatars.githubusercontent.com/u/1' };
+
+  it('renders @login and the avatar on a user message with an author', () => {
+    render(<UserMessageRow message={user({ author: alice })} />);
+    const line = screen.getByTestId('user-message-author');
+    expect(line.textContent).toContain('@alice');
+    expect(line.querySelector('img')?.getAttribute('src')).toBe(alice.avatarUrl);
+  });
+
+  it('renders no author line without an author', () => {
+    render(<UserMessageRow message={user()} />);
+    expect(screen.queryByTestId('user-message-author')).toBeNull();
+  });
+
+  it('leaves an optimistic message unchanged', () => {
+    render(<UserMessageRow message={user({ id: 'optimistic-1', acknowledged: true })} />);
+    expect(screen.queryByTestId('user-message-author')).toBeNull();
+    expect(screen.getByText('Sent · waiting for transcript')).toBeTruthy();
   });
 });

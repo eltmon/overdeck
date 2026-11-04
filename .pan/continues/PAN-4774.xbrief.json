@@ -1,0 +1,421 @@
+{
+  "version": "1",
+  "issueId": "PAN-4774",
+  "created": "2026-11-02T21:00:13.410Z",
+  "updated": "2026-11-02T23:59:02.070Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "adopt-skip-saved-cwd-hook": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4774",
+      "claimedAt": "2026-11-02T21:00:13.410Z",
+      "doneAt": "2026-11-02T21:03:56.111Z"
+    },
+    "ac1-fake-claude": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4774",
+      "claimedAt": "2026-11-02T21:04:02.866Z",
+      "doneAt": "2026-11-02T21:06:01.076Z"
+    },
+    "ac1-two-dashboards": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4774",
+      "claimedAt": "2026-11-02T21:06:06.231Z",
+      "doneAt": "2026-11-02T21:07:48.199Z"
+    },
+    "ac1-ci-test": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4774",
+      "claimedAt": "2026-11-02T21:07:53.554Z",
+      "doneAt": "2026-11-02T21:14:22.370Z"
+    },
+    "ci-run-ac1-test": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4774",
+      "claimedAt": "2026-11-02T21:16:37.326Z",
+      "doneAt": "2026-11-02T21:17:17.870Z"
+    },
+    "smoke-needs-docker": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4774",
+      "claimedAt": "2026-11-02T21:17:22.995Z",
+      "doneAt": "2026-11-02T21:21:08.316Z"
+    },
+    "smoke-hold": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4774",
+      "claimedAt": "2026-11-02T21:21:09.284Z",
+      "doneAt": "2026-11-02T21:27:34.725Z"
+    },
+    "run-local-smoke": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4774",
+      "claimedAt": "2026-11-02T21:27:35.689Z",
+      "doneAt": "2026-11-02T21:33:45.166Z"
+    },
+    "run-live-claude-smoke": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4774",
+      "claimedAt": "2026-11-02T21:33:25.273Z",
+      "doneAt": "2026-11-02T21:36:26.165Z"
+    },
+    "ac13-open-preview-ui": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4774",
+      "claimedAt": "2026-11-02T21:36:27.153Z",
+      "doneAt": "2026-11-02T21:49:14.179Z"
+    },
+    "ac15-open-in-editor": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4774",
+      "claimedAt": "2026-11-02T21:49:15.106Z",
+      "doneAt": "2026-11-02T21:53:22.485Z"
+    },
+    "ac05-fly-conversation": {
+      "status": "completed",
+      "doneAt": "2026-11-02T22:12:20.138Z"
+    },
+    "ac04-fly-worker-lanes": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4774",
+      "claimedAt": "2026-11-02T22:12:21.291Z",
+      "doneAt": "2026-11-02T22:24:29.953Z"
+    },
+    "ac08-wdoc": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4774",
+      "claimedAt": "2026-11-02T22:24:37.184Z",
+      "doneAt": "2026-11-02T22:25:56.644Z"
+    },
+    "ac06-ssh-host": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4774",
+      "claimedAt": "2026-11-02T22:25:59.037Z",
+      "doneAt": "2026-11-02T22:40:31.412Z"
+    },
+    "ac03-direct-relay": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:00:14.777Z"
+    },
+    "ac03-tailscale": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4774",
+      "claimedAt": "2026-11-02T23:00:31.336Z",
+      "doneAt": "2026-11-02T23:00:46.862Z"
+    },
+    "ac07-push": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4774",
+      "claimedAt": "2026-11-02T23:01:00.932Z",
+      "doneAt": "2026-11-02T23:04:49.768Z"
+    },
+    "ac10-vps-connect": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4774",
+      "claimedAt": "2026-11-02T23:05:01.790Z",
+      "doneAt": "2026-11-02T23:22:42.664Z"
+    },
+    "ac11-webhook-inbox": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4774",
+      "claimedAt": "2026-11-02T23:22:54.158Z",
+      "doneAt": "2026-11-02T23:32:05.162Z"
+    },
+    "release-checklist-doc": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4774",
+      "claimedAt": "2026-11-02T23:32:14.572Z",
+      "doneAt": "2026-11-02T23:33:56.193Z"
+    },
+    "closing-status": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4774",
+      "claimedAt": "2026-11-02T23:33:57.146Z",
+      "doneAt": "2026-11-02T23:34:59.012Z"
+    },
+    "adopt-skip-saved-cwd-hook.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:40:58.314Z"
+    },
+    "adopt-skip-saved-cwd-hook.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:41:13.084Z"
+    },
+    "adopt-skip-saved-cwd-hook.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:41:26.823Z"
+    },
+    "ac1-fake-claude.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:41:40.787Z"
+    },
+    "ac1-fake-claude.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:41:55.621Z"
+    },
+    "ac1-fake-claude.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:42:10.642Z"
+    },
+    "ac1-two-dashboards.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:42:24.293Z"
+    },
+    "ac1-two-dashboards.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:42:38.828Z"
+    },
+    "ac1-two-dashboards.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:42:54.067Z"
+    },
+    "ac1-two-dashboards.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:43:09.830Z"
+    },
+    "ac1-ci-test.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:43:26.630Z"
+    },
+    "ac1-ci-test.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:43:42.882Z"
+    },
+    "ac1-ci-test.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:43:57.603Z"
+    },
+    "ac1-ci-test.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:44:12.099Z"
+    },
+    "ac1-ci-test.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:44:25.716Z"
+    },
+    "ci-run-ac1-test.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:44:40.809Z"
+    },
+    "ci-run-ac1-test.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:44:56.160Z"
+    },
+    "smoke-needs-docker.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:45:11.241Z"
+    },
+    "smoke-needs-docker.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:45:27.898Z"
+    },
+    "smoke-needs-docker.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:45:45.247Z"
+    },
+    "smoke-hold.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:46:02.685Z"
+    },
+    "smoke-hold.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:46:18.286Z"
+    },
+    "smoke-hold.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:46:33.165Z"
+    },
+    "run-local-smoke.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:46:47.412Z"
+    },
+    "run-local-smoke.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:47:01.673Z"
+    },
+    "run-local-smoke.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:47:18.058Z"
+    },
+    "run-local-smoke.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:47:33.744Z"
+    },
+    "run-live-claude-smoke.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:47:50.398Z"
+    },
+    "run-live-claude-smoke.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:48:07.901Z"
+    },
+    "run-live-claude-smoke.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:48:24.242Z"
+    },
+    "ac13-open-preview-ui.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:48:40.712Z"
+    },
+    "ac13-open-preview-ui.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:48:57.444Z"
+    },
+    "ac15-open-in-editor.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:49:14.174Z"
+    },
+    "ac15-open-in-editor.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:49:30.505Z"
+    },
+    "ac15-open-in-editor.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:49:47.047Z"
+    },
+    "ac05-fly-conversation.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:50:03.612Z"
+    },
+    "ac05-fly-conversation.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:50:20.945Z"
+    },
+    "ac05-fly-conversation.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:50:38.153Z"
+    },
+    "ac05-fly-conversation.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:50:54.621Z"
+    },
+    "ac04-fly-worker-lanes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:51:13.816Z"
+    },
+    "ac04-fly-worker-lanes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:51:29.338Z"
+    },
+    "ac04-fly-worker-lanes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:51:45.068Z"
+    },
+    "ac03-direct-relay.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:52:00.879Z"
+    },
+    "ac03-direct-relay.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:52:17.131Z"
+    },
+    "ac03-direct-relay.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:52:33.135Z"
+    },
+    "ac03-direct-relay.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:52:48.659Z"
+    },
+    "ac03-tailscale.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:53:03.953Z"
+    },
+    "ac03-tailscale.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:53:20.050Z"
+    },
+    "ac10-vps-connect.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:53:35.362Z"
+    },
+    "ac10-vps-connect.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:53:50.441Z"
+    },
+    "ac10-vps-connect.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:54:06.316Z"
+    },
+    "ac10-vps-connect.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:54:22.500Z"
+    },
+    "ac06-ssh-host.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:54:38.988Z"
+    },
+    "ac06-ssh-host.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:54:54.835Z"
+    },
+    "ac06-ssh-host.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:55:09.202Z"
+    },
+    "ac07-push.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:55:23.905Z"
+    },
+    "ac07-push.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:55:38.609Z"
+    },
+    "ac07-push.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:55:54.555Z"
+    },
+    "ac11-webhook-inbox.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:56:09.750Z"
+    },
+    "ac11-webhook-inbox.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:56:24.364Z"
+    },
+    "ac11-webhook-inbox.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:56:38.489Z"
+    },
+    "ac08-wdoc.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:56:53.744Z"
+    },
+    "ac08-wdoc.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:57:08.832Z"
+    },
+    "ac08-wdoc.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:57:24.628Z"
+    },
+    "release-checklist-doc.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:57:43.540Z"
+    },
+    "release-checklist-doc.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:57:58.011Z"
+    },
+    "release-checklist-doc.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:58:13.621Z"
+    },
+    "closing-status.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:58:30.613Z"
+    },
+    "closing-status.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:58:46.997Z"
+    },
+    "closing-status.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T23:59:02.069Z"
+    }
+  }
+}

@@ -18,6 +18,11 @@ const DEVICES = [
   { id: 'dev-2', name: 'Old laptop', scopes: ['admin'], createdAt: '2026-08-01T00:00:00.000Z', lastUsedAt: null, revokedAt: '2026-09-02T00:00:00.000Z' },
 ];
 
+const DEVICES_WITH_PHONE = [
+  ...DEVICES,
+  { id: 'phone-1', name: 'iris', kind: 'phone' as const, scopes: ['tell', 'operate'], createdAt: '2026-10-01T00:00:00.000Z', lastUsedAt: null, revokedAt: null },
+];
+
 let fetchMock: ReturnType<typeof vi.fn>;
 
 function jsonResponse(status: number, body: unknown): Response {
@@ -94,6 +99,48 @@ describe('DevicesPanel (PAN-4445)', () => {
     fetchMock.mockImplementation(() => Promise.resolve(jsonResponse(200, { devices: [] })));
     renderWithProviders(<DevicesPanel />);
     expect(await screen.findByText('No devices are paired yet.')).toBeInTheDocument();
+  });
+});
+
+describe('DevicesPanel phone rows (PAN-4835 WI-10)', () => {
+  beforeEach(() => {
+    fetchMock = vi.fn((input: string | URL | Request, init?: RequestInit) => {
+      const url = input.toString();
+      if (url === '/api/devices' && !init?.method) return Promise.resolve(jsonResponse(200, { devices: DEVICES_WITH_PHONE }));
+      if (url === '/api/devices/phone-1' && init?.method === 'DELETE') {
+        return Promise.resolve(jsonResponse(200, { ok: true, device: { ...DEVICES_WITH_PHONE[2], revokedAt: '2026-10-02T00:00:00.000Z' } }));
+      }
+      return Promise.resolve(jsonResponse(404, { error: 'not found' }));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('prefixes "Phone app" on a kind: phone row and leaves rows without kind unchanged', async () => {
+    renderWithProviders(<DevicesPanel />);
+
+    const phoneRow = (await screen.findByText('iris')).closest('li') as HTMLElement;
+    expect(within(phoneRow).getByText(/^Phone app · /)).toBeInTheDocument();
+
+    const deviceRow = screen.getByText('Pixel phone').closest('li') as HTMLElement;
+    expect(within(deviceRow).queryByText(/^Phone app/)).toBeNull();
+  });
+
+  it('revoking a phone row sends DELETE /api/devices/phone-1 with the phone-specific confirmation copy', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DevicesPanel />);
+
+    const phoneRow = (await screen.findByText('iris')).closest('li') as HTMLElement;
+    await user.click(within(phoneRow).getByRole('button', { name: 'Revoke' }));
+    const dialog = await screen.findByRole('alertdialog');
+    expect(within(dialog).getByText(/phone app is signed out/)).toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: 'Revoke' }));
+
+    await waitFor(() => expect(deleteCalls()).toHaveLength(1));
+    expect(deleteCalls()[0]?.[0]).toBe('/api/devices/phone-1');
   });
 });
 

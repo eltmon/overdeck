@@ -20,7 +20,12 @@ vi.mock('../../tmux.js', async (importOriginal) => ({
 // Pass-through spies: the real waiters run unless a case stubs them (PAN-4562).
 vi.mock('../../agents/runtime-command.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../agents/runtime-command.js')>();
-  return { ...actual, waitForPromptReady: vi.fn(actual.waitForPromptReady), waitForHostReady: vi.fn(actual.waitForHostReady) };
+  return {
+    ...actual,
+    waitForPromptReady: vi.fn(actual.waitForPromptReady),
+    waitForHostReady: vi.fn(actual.waitForHostReady),
+    waitForCodexAppServerReady: vi.fn(actual.waitForCodexAppServerReady),
+  };
 });
 vi.mock('../claude-readiness.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../claude-readiness.js')>();
@@ -32,7 +37,7 @@ vi.mock('../../agents.js', async (importOriginal) => {
 });
 
 const { waitForConversationRuntimeReady, waitForPiTuiReady } = await import('../conversation-runtime.js');
-const { waitForPromptReady, waitForHostReady } = await import('../../agents/runtime-command.js');
+const { waitForPromptReady, waitForHostReady, waitForCodexAppServerReady } = await import('../../agents/runtime-command.js');
 const { waitForClaudeReady } = await import('../claude-readiness.js');
 const { waitForReadySignal } = await import('../../agents.js');
 
@@ -76,6 +81,7 @@ describe('readiness dispatches on the declared readinessKind (PAN-4562)', () => 
   beforeEach(() => {
     vi.mocked(waitForPromptReady).mockClear().mockResolvedValueOnce(true);
     vi.mocked(waitForHostReady).mockClear().mockResolvedValueOnce(undefined);
+    vi.mocked(waitForCodexAppServerReady).mockClear().mockResolvedValueOnce(undefined);
     vi.mocked(waitForClaudeReady).mockClear().mockResolvedValueOnce(undefined);
     vi.mocked(waitForReadySignal).mockClear().mockResolvedValueOnce(true);
     readAgentPaneText.mockResolvedValue('❯ ');
@@ -84,10 +90,11 @@ describe('readiness dispatches on the declared readinessKind (PAN-4562)', () => 
   const waiterCalls = () => ({
     prompt: vi.mocked(waitForPromptReady).mock.calls.map((call) => call.slice(0, 3)),
     host: vi.mocked(waitForHostReady).mock.calls.map((call) => call.slice(0, 3)),
+    codexAppServer: vi.mocked(waitForCodexAppServerReady).mock.calls.map((call) => call.slice(0, 2)),
     claude: vi.mocked(waitForClaudeReady).mock.calls,
     signal: vi.mocked(waitForReadySignal).mock.calls,
   });
-  const none = { prompt: [], host: [], claude: [], signal: [] };
+  const none = { prompt: [], host: [], codexAppServer: [], claude: [], signal: [] };
 
   it.each([
     ['muse', 'spawn', { ...none, prompt: [['conv-x', 'muse', 60]] }],
@@ -95,7 +102,9 @@ describe('readiness dispatches on the declared readinessKind (PAN-4562)', () => 
     ['opencode', 'spawn', { ...none, host: [['conv-x', 'acp', 30]] }],
     ['prime-agent', 'spawn', { ...none, host: [['conv-x', 'prime-agent', 60]] }],
     ['kimi-code', 'spawn', { ...none, prompt: [['conv-x', 'kimi-code', 30]] }],
-    ['codex', 'spawn', none],
+    // PAN-4903: the default app-server transport waits for the host before the first message.
+    ['codex', 'spawn', { ...none, codexAppServer: [['conv-x', 60]] }],
+    ['codex', 'respawn', { ...none, codexAppServer: [['conv-x', 60]] }],
     ['claude-code', 'spawn', { ...none, claude: [['conv-x']] }],
     ['claude-code', 'respawn', { ...none, signal: [['conv-x', 30]] }],
   ] as const)('%s (%s) runs only its declared waiter', async (harness, mode, expected) => {

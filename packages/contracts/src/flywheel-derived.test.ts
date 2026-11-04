@@ -34,7 +34,7 @@ const running = {
       pr: { url: "https://github.com/eltmon/overdeck/pull/1", number: 1, reviewState: "review-requested", checks: "pending", mergeable: null },
       lastJournal: { at: "2026-09-23T09:59:00.000Z", type: "review.dispatched", source: "pan-done" },
     },
-    { issueId: "PAN-3920", title: null, trackerUnknown: true, state: "working", liveAgents: 0, inTick: false, lastJournal: null },
+    { issueId: "PAN-3920", title: null, trackerUnknown: true, strike: true, state: "working", liveAgents: 0, inTick: false, lastJournal: null },
   ],
   agents: [{ issueId: "PAN-3964", role: "work", harness: "claude-code", model: "claude-opus-5-5", state: "working" }],
   inFlightSource: "tick",
@@ -62,6 +62,11 @@ describe("FlywheelDerivedStatus (PAN-3964 FR-1)", () => {
 
   it("rejects a stored-run shape", () => {
     expect(() => decodeFlywheelDerivedStatus({ ...running, run: "complete" })).toThrow()
+  })
+
+  it("rejects a non-literal strike value", () => {
+    const inFlight = [{ ...running.inFlight[0], strike: "yes" }, running.inFlight[1]]
+    expect(() => decodeFlywheelDerivedStatus({ ...running, inFlight })).toThrow()
   })
 
   it("TickMarker rejects an unknown phase at the schema layer", () => {

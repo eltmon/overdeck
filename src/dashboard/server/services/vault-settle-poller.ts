@@ -1,16 +1,17 @@
 /**
- * Session Vault growth poller for active managed conversations (PAN-4307
- * WI-5, FR-1..FR-3, NFR-5).
+ * Session Vault growth poller for active managed conversations and pipeline
+ * agents inside their tracking window (PAN-4307 WI-5, PAN-4647, FR-1..FR-3,
+ * FR-5, NFR-5).
  *
  * `watchConversation` only streams while a browser has a conversation open
  * (`services/conversation/watch.ts`), so nothing settles a transcript that
  * keeps growing with no viewer attached. This poller covers that gap: every
  * `pollMs` it stats each active managed conversation's transcript, and a size
- * change (re)arms a `debounceSec` timer that settles it. A conversation that
+ * change (re)arms a `debounceSec` timer that settles it. A subject that
  * leaves the active list is settled once, forced, and forgotten (FR-2). Every
  * owned transcript of any origin is still covered by the sync cycle's own
  * `syncOnce` step 2, which stats every owned path each cycle — this poller
- * only shortens the gap for a conversation nobody is watching.
+ * only shortens the gap for a subject nobody is watching.
  *
  * Standalone: the default `settle` here calls the engine directly and is not
  * queued. `vault-service.ts` overrides it with a queued implementation so
@@ -23,15 +24,27 @@ import { readVaultConfig as readVaultConfigDefault } from '../../../lib/vault/co
 import { openVaultContext as openVaultContextDefault } from '../../../lib/vault/open.js';
 import { settle as settleDefault } from '../../../lib/vault/settle.js';
 import type { WipMode } from '../../../lib/vault/wip-capture.js';
+import { listPipelineAgentSubjects as listPipelineAgentSubjectsDefault } from './vault-agent-subjects.js';
 
 /** Matches the directory watcher's default poll period (`conversation-directory-watcher.ts`). */
 export const VAULT_POLL_MS = 15_000;
 
+/** One transcript the poller tracks: a managed conversation or a pipeline agent session (PAN-4647). */
+export interface VaultPollSubject {
+  /** Stable key; a subject that drops out of the list is force-settled once and forgotten. */
+  name: string;
+  harness?: string | null;
+  /** Pre-resolved transcript path; when set, resolvePath is never called for this subject. */
+  transcriptPath?: string;
+  /** Title for a record the first settle mints. */
+  recordTitle?: string;
+}
+
 export interface VaultSettlePollerDeps {
-  listActive?: () => LegacyConversation[];
-  resolvePath?: (conv: LegacyConversation) => Promise<string | null>;
+  listActive?: () => VaultPollSubject[] | Promise<VaultPollSubject[]>;
+  resolvePath?: (subject: VaultPollSubject) => Promise<string | null>;
   statSize?: (path: string) => Promise<number | null>;
-  settle?: (path: string, harness: string, wip: WipMode) => Promise<void>;
+  settle?: (path: string, harness: string, wip: WipMode, options?: { recordTitle?: string }) => Promise<void>;
   readConfig?: typeof readVaultConfigDefault;
   pollMs?: number;
 }
@@ -54,14 +67,18 @@ async function defaultSettle(path: string, harness: string, wip: WipMode): Promi
   await settleDefault({ nativePath: path, harness, store: opened.vault.store, keys: opened.vault.keys, config, wip });
 }
 
-function defaultListActive(): LegacyConversation[] {
+function conversationSubjects(): LegacyConversation[] {
   return listConversations().filter((conv) => conv.status === 'active' && (conv.harness === 'claude-code' || conv.harness === 'codex'));
+}
+
+async function defaultListActive(): Promise<VaultPollSubject[]> {
+  return [...conversationSubjects(), ...(await listPipelineAgentSubjectsDefault())];
 }
 
 function resolveDeps(deps: VaultSettlePollerDeps): ResolvedDeps {
   return {
     listActive: deps.listActive ?? defaultListActive,
-    resolvePath: deps.resolvePath ?? resolveSessionFile,
+    resolvePath: deps.resolvePath ?? ((subject) => resolveSessionFile(subject as LegacyConversation)),
     statSize: deps.statSize ?? defaultStatSize,
     settle: deps.settle ?? defaultSettle,
     readConfig: deps.readConfig ?? readVaultConfigDefault,
@@ -72,6 +89,7 @@ function resolveDeps(deps: VaultSettlePollerDeps): ResolvedDeps {
 interface PollState {
   path: string | null;
   harness: string;
+  recordTitle?: string;
   lastSize: number | null;
   timer: ReturnType<typeof setTimeout> | null;
 }
@@ -95,18 +113,19 @@ async function pollOnce(deps: ResolvedDeps, state: Map<string, PollState>): Prom
     return;
   }
   const debounceMs = config.debounceSec * 1000;
-  const active = deps.listActive();
-  const activeNames = new Set(active.map((conv) => conv.name));
+  const active = await deps.listActive();
+  const activeNames = new Set(active.map((subject) => subject.name));
 
-  for (const conv of active) {
-    let entry = state.get(conv.name);
+  for (const subject of active) {
+    let entry = state.get(subject.name);
     if (!entry) {
-      entry = { path: null, harness: conv.harness ?? '', lastSize: null, timer: null };
-      state.set(conv.name, entry);
+      entry = { path: null, harness: subject.harness ?? '', lastSize: null, timer: null };
+      state.set(subject.name, entry);
     }
-    entry.harness = conv.harness ?? entry.harness;
+    entry.harness = subject.harness ?? entry.harness;
+    entry.recordTitle = subject.recordTitle;
     // NFR-5: resolve the path once; re-resolve only while the cache is null.
-    if (entry.path === null) entry.path = await deps.resolvePath(conv);
+    if (entry.path === null) entry.path = subject.transcriptPath ?? await deps.resolvePath(subject);
     if (!entry.path) continue;
     const size = await deps.statSize(entry.path);
     if (size === null) continue;
@@ -119,9 +138,10 @@ async function pollOnce(deps: ResolvedDeps, state: Map<string, PollState>): Prom
     if (entry.timer) clearTimeout(entry.timer);
     const path = entry.path;
     const harness = entry.harness;
+    const titleArg = entry.recordTitle ? [{ recordTitle: entry.recordTitle }] as const : [];
     entry.timer = setTimeout(() => {
       entry!.timer = null;
-      void deps.settle(path, harness, 'auto').catch((error) => console.warn(`[vault] settle failed for ${path}:`, error));
+      void deps.settle(path, harness, 'auto', ...titleArg).catch((error) => console.warn(`[vault] settle failed for ${path}:`, error));
     }, debounceMs);
     if (typeof entry.timer.unref === 'function') entry.timer.unref();
   }
@@ -132,7 +152,8 @@ async function pollOnce(deps: ResolvedDeps, state: Map<string, PollState>): Prom
     if (entry.path) {
       const path = entry.path;
       const harness = entry.harness;
-      void deps.settle(path, harness, 'force').catch((error) => console.warn(`[vault] settle failed for ${path}:`, error));
+      const titleArg = entry.recordTitle ? [{ recordTitle: entry.recordTitle }] as const : [];
+      void deps.settle(path, harness, 'force', ...titleArg).catch((error) => console.warn(`[vault] settle failed for ${path}:`, error));
     }
     state.delete(name);
   }
@@ -157,9 +178,10 @@ async function flush(deps: ResolvedDeps, state: Map<string, PollState>, budgetMs
     }
     const path = entry.path;
     const harness = entry.harness;
+    const titleArg = entry.recordTitle ? [{ recordTitle: entry.recordTitle }] as const : [];
     let timedOut = false;
     await Promise.race([
-      deps.settle(path, harness, 'force').catch(() => undefined),
+      deps.settle(path, harness, 'force', ...titleArg).catch(() => undefined),
       new Promise<void>((resolve) => {
         const timer = setTimeout(() => {
           timedOut = true;

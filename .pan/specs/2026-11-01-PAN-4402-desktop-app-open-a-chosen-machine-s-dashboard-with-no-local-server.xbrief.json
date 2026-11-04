@@ -1,0 +1,787 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-01T04:59:50Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4402: Desktop app: open a chosen machine's dashboard with no local server",
+    "updated": "2026-11-01T05:03:00.032Z"
+  },
+  "plan": {
+    "id": "pan-4402",
+    "title": "Desktop app: open a chosen machine's dashboard with no local server",
+    "status": "running",
+    "uid": "966e6be1-1dfd-45f4-b70c-2cc37a5572aa",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-01T04:59:50Z",
+    "updated": "2026-11-01T05:03:00.032Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4402",
+        "label": "PAN-4402",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/pan-4402.md",
+        "label": "PRD draft (.pan/drafts/pan-4402.md)",
+        "type": "prd"
+      },
+      {
+        "uri": ".pan/drafts/pan-2350.md",
+        "label": "Epic PRD (W-PHONE3, D-14)",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "desktop",
+      "electron",
+      "anywhere",
+      "pairing",
+      "safeStorage",
+      "security"
+    ],
+    "narratives": {
+      "Problem": "The desktop app always spawns its embedded dashboard server and can only show this computer's dashboard. The Anywhere epic (W-PHONE3, D-14) needs the desktop app to open one chosen other machine's dashboard, for example the desktop over Tailscale, with no local server running and with that machine's device credential stored only through Electron safeStorage.",
+      "Proposal": "Pair from a pairing link in the Electron main process (POST /api/pairing/exchange with delivery 'bearer' and an Origin header), store one machine record in <userData>/remote-machine.json with the odk_ token encrypted by safeStorage, and at launch run a preflight (transport policy, descriptor environmentId and protocolVersion, session mint). On success skip startServer and load the machine's own origin in an in-memory partition 'remote-<environmentId>' with the overdeck_device cookie set by the main process, so the unchanged frontend works as a paired browser. A small local connect window handles pairing, errors, Use This Computer and Forget; menu, tray and main-process calls follow the active machine. Full design: .pan/drafts/pan-4402.md.",
+      "NonGoals": "- No machine catalog, list of several machines or environment switcher (PAN-4645, W-LINK1)\n- No Settings → Connections page or Devices panel in the desktop app\n- No version or capability gating beyond protocolVersion === 1 (W-LINK3, W-LINK7)\n- No Tailscale install or setup, relay, directory, Noise secure channel or key pinning\n- No change to src/dashboard/ or src/lib/ (server and frontend unchanged)\n- No fix for the pre-existing /api/agents/emergency-stop menu path\n- No persistent remote partition and no Set-Cookie rewriting\n- No silent fallback to local mode when the chosen machine is unreachable\n- No plaintext device token on disk, in desktop-settings.json, in any renderer, or in logs"
+    },
+    "metadata": {
+      "canonicalFilename": "2026-11-01-PAN-4402-desktop-app-open-a-chosen-machine-s-dashboard-with-no-local-server.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "autoDecisions": [
+      {
+        "summary": "The remote page authenticates with the overdeck_device cookie set by the main process in an in-memory partition (no persist: prefix).",
+        "rationale": "Cookies are what the frontend and every /ws/* upgrade already accept, so no frontend change is needed; Electron 40 has no cookie-encryption fuse configured, so an in-memory partition is the only way to keep a plaintext copy off disk. Bearer injection through webRequest is unverified for WebSocket upgrades."
+      },
+      {
+        "summary": "safeStorage is mandatory: refuse to pair when encryption is unavailable or the Linux backend is basic_text/unknown.",
+        "rationale": "The issue requires the credential to be stored with safeStorage, and the basic_text backend uses a hard-coded key, which is plaintext-equivalent."
+      },
+      {
+        "summary": "Transport policy: https any host; http only for loopback and Tailscale addresses (100.64.0.0/10, fd7a:115c:a1e0::/48, *.ts.net, or names resolving only to those).",
+        "rationale": "Epic revision 3 forbids unencrypted traffic between machines; the done-when is over Tailscale; loopback keeps SSH forwards and local UAT possible."
+      },
+      {
+        "summary": "An unreachable, revoked or changed machine at launch opens the connect window with the reason; the app never silently starts the local server.",
+        "rationale": "The operator chose not to run a server on this computer; a silent fallback would start one behind their back."
+      },
+      {
+        "summary": "Docs are updated (docs/DESKTOP-APP.md, configuration/remote-access.mdx) although the issue body says 'Docs: None'.",
+        "rationale": "The repo PRD rule requires a docs work item for new behavior, and remote-access.mdx currently describes PAN-4402 as an environment switcher, which D-14 made wrong."
+      },
+      {
+        "summary": "At most one machine record; pairing a new machine replaces it after a best-effort self-revoke of the old device.",
+        "rationale": "D-14 says the desktop app connects to one machine; the catalog belongs to PAN-4645."
+      }
+    ],
+    "items": [
+      {
+        "id": "machine-url",
+        "title": "Add machine-url.ts: pairing-link parser and transport policy",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:59:50Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4402",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/desktop/src/machine-url.ts",
+            "apps/desktop/tests/machine-url.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd apps/desktop && npx tsc --noEmit",
+            "cd apps/desktop && npx vitest run --configLoader runner tests/machine-url.test.ts"
+          ],
+          "expected_outputs": [
+            "tsc completes without errors",
+            "tests/machine-url.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3"
+          ],
+          "foundationFor": [
+            "machine-client"
+          ]
+        },
+        "narrative": {
+          "Action": "Create the pure module apps/desktop/src/machine-url.ts exactly as PRD W-1 specifies: parsePairingLink(input) reduces a `<base>/#pair=odp_…` link to { baseUrl: URL.origin, credential } and refuses bare credentials and non-links with the PRD messages; assessMachineTransport(baseUrl, lookupAll) applies D-5 (https any host; http only for loopback, 100.64.0.0/10, fd7a:115c:a1e0::/48, *.ts.net, or names whose injected DNS lookup returns only such addresses) and refuses everything else with the FR-3 text; export isTailnetAddress and isLoopbackAddress. No Electron import. Add tests/machine-url.test.ts with every case listed in PRD W-1."
+        },
+        "items": [
+          {
+            "id": "machine-url.ac1",
+            "title": "Given `http://192.168.1.5:3011`, assessMachineTransport returns ok:false with the FR-3 sentence starting 'Overdeck sends this computer's credential only over HTTPS, Tailscale or this computer's loopback'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "machine-url.ac2",
+            "title": "Given `http://100.64.0.1` or `http://desk:3011` with a lookup returning ['100.90.1.2'], assessMachineTransport returns ok:true kind 'tailnet'; with lookup ['100.90.1.2','192.168.1.5'] it refuses",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "machine-url.ac3",
+            "title": "Given `https://desk.tail1234.ts.net/foo/#pair=odp_abc`, parsePairingLink returns baseUrl 'https://desk.tail1234.ts.net' and credential 'odp_abc'; given bare 'odp_abc' it returns the 'Paste the whole pairing link' error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "machine-url.ac4",
+            "title": "Given `http://100.128.0.1`, assessMachineTransport refuses it (outside 100.64.0.0/10) and `http://127.0.0.1:3911` returns kind 'loopback'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "machine-store",
+        "title": "Add machine-store.ts: safeStorage-encrypted machine record",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:59:50Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4402",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/desktop/src/machine-store.ts",
+            "apps/desktop/tests/machine-store.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd apps/desktop && npx tsc --noEmit",
+            "cd apps/desktop && npx vitest run --configLoader runner tests/machine-store.test.ts"
+          ],
+          "expected_outputs": [
+            "tsc completes without errors",
+            "tests/machine-store.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-1"
+          ],
+          "foundationFor": [
+            "machine-client",
+            "connection",
+            "boot-switching"
+          ]
+        },
+        "narrative": {
+          "Action": "Create apps/desktop/src/machine-store.ts per PRD W-2: MachineRecord type, credentialStoreStatus() implementing D-4 (refuse when safeStorage.isEncryptionAvailable() is false, and on Linux when getSelectedStorageBackend() is basic_text or unknown), loadMachineRecord, saveMachineRecord (token encrypted with safeStorage.encryptString, base64 in tokenCiphertext, atomic temp-file + rename with mode 0o600 at <userData>/remote-machine.json), setMachineActive, readMachineToken, deleteMachineRecord. Add tests/machine-store.test.ts with a temp userData dir and a reversible safeStorage fake."
+        },
+        "items": [
+          {
+            "id": "machine-store.ac1",
+            "title": "Given a saved record, the file <userData>/remote-machine.json does not contain the plaintext token, and loadMachineRecord plus readMachineToken returns the original token",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "machine-store.ac2",
+            "title": "When safeStorage.isEncryptionAvailable() returns false, or on Linux the backend is 'basic_text', saveMachineRecord throws the FR-5 'no secure credential store' message and writes no file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "machine-store.ac3",
+            "title": "Given a malformed remote-machine.json, loadMachineRecord returns null without throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "machine-store.ac4",
+            "title": "On non-Windows platforms saveMachineRecord creates the file with mode 0o600, asserted with a plain if-branch rather than skipIf",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "machine-client",
+        "title": "Add machine-client.ts: pairing exchange, launch preflight, self-revoke",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:59:50Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4402",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/desktop/src/machine-client.ts",
+            "apps/desktop/tests/machine-client.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd apps/desktop && npx tsc --noEmit",
+            "cd apps/desktop && npx vitest run --configLoader runner tests/machine-client.test.ts"
+          ],
+          "expected_outputs": [
+            "tsc completes without errors",
+            "tests/machine-client.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-5",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Create apps/desktop/src/machine-client.ts per PRD W-3 with injected fetchImpl and lookupAll: fetchMachineDescriptor, pairWithMachine (parse link, check credential store, check transport, read descriptor, POST /api/pairing/exchange with Origin header equal to the base origin, delivery 'bearer' and label 'Overdeck desktop on <hostname>', verify environmentId and odk_ token, best-effort revoke an older record, save the new active record), preflightMachine (transport, descriptor id and protocolVersion 1, decrypt token, POST /api/dashboard/session with bearer; map failures to the reasons and FR-5 messages), and revokeOwnDevice (session mint for csrfToken, then DELETE /api/devices/:id with bearer, JSON content type and x-overdeck-csrf-token). Add tests/machine-client.test.ts."
+        },
+        "items": [
+          {
+            "id": "machine-client.ac1",
+            "title": "When pairWithMachine runs, the exchange request sends header Origin equal to the base origin and a JSON body with delivery 'bearer' and a label starting 'Overdeck desktop on '",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "machine-client.ac2",
+            "title": "Given an exchange 401 response, pairWithMachine returns 'Pairing failed: unknown or already used pairing credential' and saves no record; given a 403 'Invalid origin' it appends the trusted-addresses hint",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "machine-client.ac3",
+            "title": "Given an unavailable credential store, pairWithMachine returns the store error and sends no fetch request (the credential is not spent)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "machine-client.ac4",
+            "title": "preflightMachine returns reason 'revoked' for a session-mint 401, 'wrong-machine' for a descriptor environmentId mismatch, 'unreachable' for a rejected fetch, and ok with the token for a 200",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "machine-client.ac5",
+            "title": "revokeOwnDevice sends the x-overdeck-csrf-token header taken from the session-mint response and returns false when the mint rejects",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "connection",
+        "title": "Add connection.ts: active dashboard state, dashboardFetch, in-memory device-cookie session",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:59:50Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4402",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/desktop/src/connection.ts",
+            "apps/desktop/tests/connection.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd apps/desktop && npx tsc --noEmit",
+            "cd apps/desktop && npx vitest run --configLoader runner tests/connection.test.ts"
+          ],
+          "expected_outputs": [
+            "tsc completes without errors",
+            "tests/connection.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-1"
+          ],
+          "foundationFor": [
+            "boot-switching",
+            "menu-tray"
+          ]
+        },
+        "narrative": {
+          "Action": "Create apps/desktop/src/connection.ts per PRD W-4: the ActiveDashboard union (local with baseUrl, remote with baseUrl, partition, label, token), getters and setters, remotePartitionName(environmentId) returning 'remote-<id>' with no persist: prefix, dashboardFetch(path, init) that prefixes the active base URL and adds Authorization Bearer in remote mode, prepareRemoteSession that sets the overdeck_device cookie (httpOnly, sameSite strict, secure only for https) on session.fromPartition and throws if the partition starts with persist:, and isSameOrigin. Add tests/connection.test.ts with Electron session mocked."
+        },
+        "items": [
+          {
+            "id": "connection.ac1",
+            "title": "In remote mode dashboardFetch('/api/health') sends the request to the remote base URL with header Authorization 'Bearer odk_…'; in local mode it sends to the local URL with no Authorization header",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "connection.ac2",
+            "title": "Given an empty local base URL, dashboardFetch rejects instead of sending a relative request",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "connection.ac3",
+            "title": "prepareRemoteSession sends one cookies.set call with name 'overdeck_device', httpOnly true, sameSite 'strict', secure false for an http base and true for an https base",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "connection.ac4",
+            "title": "remotePartitionName returns a name without the 'persist:' prefix, and prepareRemoteSession throws when given a persist: partition",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "connect-window",
+        "title": "Add the connect window: connect.html, connect-preload, sender-checked IPC",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:59:50Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4402",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/desktop/resources/connect.html",
+            "apps/desktop/src/connect-preload.ts",
+            "apps/desktop/src/connect-window.ts",
+            "apps/desktop/tsdown.config.ts",
+            "apps/desktop/tests/connect-window.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd apps/desktop && npx tsc --noEmit",
+            "cd apps/desktop && npx vitest run --configLoader runner tests/connect-window.test.ts",
+            "cd apps/desktop && bun run build && test -f dist-electron/connect-preload.js"
+          ],
+          "expected_outputs": [
+            "tsc completes without errors",
+            "tests/connect-window.test.ts passes",
+            "dist-electron/connect-preload.js exists after the build"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-5",
+            "FR-6",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Create the connect window per PRD W-5: static resources/connect.html with inline CSS/JS and a strict CSP, showing the saved machine (Open, Use this computer, Forget), a pairing-link field with Connect, an error area and the 'Create the link on that machine' hint; src/connect-preload.ts exposing window.overdeckConnect over five fixed pan:connect-* channels; src/connect-window.ts with openConnectWindow(error?) (single window, sandbox true) and registerConnectIpc(handlers) whose handlers reject any event.sender other than the connect window. Add the connect-preload entry to tsdown.config.ts. Do not edit main.ts in this item."
+        },
+        "items": [
+          {
+            "id": "connect-window.ac1",
+            "title": "When a pan:connect-* handler is invoked from a webContents other than the connect window, it returns { ok: false, error: 'not allowed' } and the injected handler is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "connect-window.ac2",
+            "title": "The pan:connect-get-state response contains mode, machine label/baseUrl and error, and contains no token or tokenCiphertext key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "connect-window.ac3",
+            "title": "Calling openConnectWindow twice creates one BrowserWindow and focuses it the second time",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "connect-window.ac4",
+            "title": "`bun run build` produces dist-electron/connect-preload.js alongside main.js and preload.js",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "boot-switching",
+        "title": "Wire remote mode into main.ts: boot plan, no embedded server, window partitions, switching",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:59:50Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4402",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/desktop/src/main.ts",
+            "apps/desktop/src/boot.ts",
+            "apps/desktop/tests/boot.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd apps/desktop && npx tsc --noEmit",
+            "cd apps/desktop && npx vitest run --configLoader runner tests/boot.test.ts",
+            "cd apps/desktop && bun run build"
+          ],
+          "expected_outputs": [
+            "tsc completes without errors",
+            "tests/boot.test.ts passes",
+            "desktop build completes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-6",
+            "FR-7",
+            "FR-10",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD W-6: add pure apps/desktop/src/boot.ts planBoot(record, isDevelopment); in main.ts extract onLocalServerReady, call startServer only for a local plan, add openRemoteDashboard(record) running preflightMachine then setRemoteDashboard, prepareRemoteSession and window recreation (or openConnectWindow with the FR-5 error, never a server start), make resolveWindowUrl, createWindow and createTerminalWindow use the remote base URL and partition plus the D-9 navigation guard, make RESTART_DASHBOARD throw the FR-7 message in remote mode, route callServerApi through dashboardFetch, wire registerConnectIpc handlers (pair stops the embedded server then opens remote; useLocal clears active and starts the server; forget revokes, deletes and returns to local), and export openConnectWindowFromMenu and useThisComputer."
+        },
+        "items": [
+          {
+            "id": "boot-switching.ac1",
+            "title": "planBoot returns local for a null record, an inactive record, or development mode, and returns remote for an active record outside development mode",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "boot-switching.ac2",
+            "title": "Given an active record, the ready handler calls openRemoteDashboard and does not call startServer; every startServer call in main.ts sits in the local boot branch, the RESTART_DASHBOARD handler, or the use-this-computer path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "boot-switching.ac3",
+            "title": "When preflight fails at launch, the app opens the connect window with the FR-5 message and does not start the embedded server",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "boot-switching.ac4",
+            "title": "In remote mode the RESTART_DASHBOARD IPC rejects with 'This window shows <label>. Restart its dashboard on that machine.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "boot-switching.ac5",
+            "title": "In remote mode the app creates main and terminal windows with webPreferences.partition 'remote-<environmentId>', and will-navigate to another origin is prevented and routes the URL to shell.openExternal",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "menu-tray",
+        "title": "Make the menu and tray follow the active machine and offer Connect / Use This Computer",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:59:50Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4402",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/desktop/src/menu.ts",
+            "apps/desktop/src/tray.ts",
+            "apps/desktop/src/main.ts",
+            "apps/desktop/tests/menu.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd apps/desktop && npx tsc --noEmit",
+            "cd apps/desktop && npx vitest run --configLoader runner tests/menu.test.ts"
+          ],
+          "expected_outputs": [
+            "tsc completes without errors",
+            "tests/menu.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD W-7: replace the serverUrl imports in menu.ts and tray.ts with dashboardFetch/getActiveDashboard from connection.ts; fetchActiveWorkspaces and refreshTrayStatus use dashboardFetch; add 'Connect to a Machine…' and 'Use This Computer' (enabled only in remote mode) to the Overdeck menu and the tray context menu; show 'Showing <label>' and the tray tooltip 'Overdeck — <label>' in remote mode; export refreshApplicationMenu() and call it from main.ts after every mode switch. Update tests/menu.test.ts mocks and add the new menu assertions."
+        },
+        "items": [
+          {
+            "id": "menu-tray.ac1",
+            "title": "The built Overdeck submenu contains an item labelled 'Connect to a Machine…' that calls openConnectWindowFromMenu when clicked",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "menu-tray.ac2",
+            "title": "In local mode the 'Use This Computer' item is rendered with enabled false; in remote mode it is enabled and the submenu shows 'Showing <label>'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "menu-tray.ac3",
+            "title": "After this item, `grep -n serverUrl apps/desktop/src/menu.ts apps/desktop/src/tray.ts` prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "menu-tray.ac4",
+            "title": "In remote mode tray health polling sends GET <remote base>/api/health through dashboardFetch with the bearer header",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "e2e-verify",
+        "title": "Run the end-to-end remote-mode check and record it in the PRD verification log",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:59:50Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4402",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/drafts/pan-4402.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd apps/desktop && bun run build",
+            "grep -n '## Verification log' .pan/drafts/pan-4402.md"
+          ],
+          "expected_outputs": [
+            "desktop build completes",
+            "the PRD contains a Verification log section"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W-8 exactly: build the desktop app, start a second Overdeck server with its own OVERDECK_HOME on port 3911, pair it with `pan pair --url http://127.0.0.1:3911 --json`, launch the desktop app with an isolated --user-data-dir under DISPLAY=:1, connect with the link, then check the window origin, that no server.js child runs under the Electron process, that no odk_ string exists under the profile directory, that a relaunch reopens the machine, and that revoking the device shows the FR-5 revoked message. Append the outputs under '## Verification log' at the end of .pan/drafts/pan-4402.md and repeat them in the PR description; with no display, record 'E2E not run: no display' instead."
+        },
+        "items": [
+          {
+            "id": "e2e-verify.ac1",
+            "title": "The PRD ends with a '## Verification log' section that records the main window origin http://127.0.0.1:3911 and an empty `pgrep -P <pid> -f server.js` result, or records 'E2E not run: no display'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e2e-verify.ac2",
+            "title": "The verification log records that `grep -r odk_ <profile dir>` returns no match after pairing and one relaunch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e2e-verify.ac3",
+            "title": "The verification log records that after `pan devices revoke <id>` a relaunch shows the connect window with the FR-5 revoked sentence",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document remote mode in DESKTOP-APP.md and remote-access.mdx",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:59:50Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4402",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DESKTOP-APP.md",
+            "configuration/remote-access.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n '## Open another machine' docs/DESKTOP-APP.md",
+            "grep -n '### From the desktop app' configuration/remote-access.mdx",
+            "! grep -n 'environment switcher' configuration/remote-access.mdx"
+          ],
+          "expected_outputs": [
+            "DESKTOP-APP.md has the new section",
+            "remote-access.mdx has the desktop subsection",
+            "no stale 'environment switcher' text remains"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-6",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD W-9: in docs/DESKTOP-APP.md update 'How It Works', add a '## Open another machine' section (pairing link sources, connect window buttons, D-5 transport policy, safeStorage requirement and the Linux basic_text refusal, preflight failure messages, Use This Computer, Forget, in-memory partition and its preference-reset cost), add the two tray items, and extend the Architecture tree with the new modules; in configuration/remote-access.mdx add '### From the desktop app' under 'Pair a device' and replace the stale PAN-4402 'What comes next' bullet with the PAN-4645 machine-links bullet."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "docs/DESKTOP-APP.md contains a '## Open another machine' section that names 'Connect to a Machine…', 'Use This Computer' and 'Forget' and states that the app starts no local server while showing another machine",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "docs/DESKTOP-APP.md states that http addresses are accepted only for loopback and Tailscale and that Linux without a keyring refuses to save the credential",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "configuration/remote-access.mdx contains '### From the desktop app', and `grep -n 'environment switcher' configuration/remote-access.mdx` prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "machine-url",
+        "to": "machine-client",
+        "type": "blocks"
+      },
+      {
+        "from": "machine-store",
+        "to": "machine-client",
+        "type": "blocks"
+      },
+      {
+        "from": "machine-store",
+        "to": "connection",
+        "type": "blocks"
+      },
+      {
+        "from": "machine-client",
+        "to": "boot-switching",
+        "type": "blocks"
+      },
+      {
+        "from": "connection",
+        "to": "boot-switching",
+        "type": "blocks"
+      },
+      {
+        "from": "connect-window",
+        "to": "boot-switching",
+        "type": "blocks"
+      },
+      {
+        "from": "connection",
+        "to": "menu-tray",
+        "type": "blocks"
+      },
+      {
+        "from": "boot-switching",
+        "to": "menu-tray",
+        "type": "blocks"
+      },
+      {
+        "from": "boot-switching",
+        "to": "e2e-verify",
+        "type": "blocks"
+      },
+      {
+        "from": "menu-tray",
+        "to": "e2e-verify",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

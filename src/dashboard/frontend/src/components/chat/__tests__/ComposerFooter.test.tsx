@@ -249,9 +249,9 @@ describe('ComposerFooter attachments', () => {
       mode: 'handoff',
       focus: 'make it fast',
     });
-    // PAN-4499: the held-kickoff poll (GET …/kickoff) fires on every mount
-    // regardless of the slash command; only a send-type fetch would be a bug here.
-    expect(vi.mocked(fetch).mock.calls.filter(([url]) => !String(url).includes('/kickoff'))).toEqual([]);
+    // PAN-4499 / PAN-4641: the held-kickoff and scheduled-messages polls fire on every
+    // mount regardless of the slash command; only a send-type fetch would be a bug here.
+    expect(vi.mocked(fetch).mock.calls.filter(([url]) => !/\/(kickoff|scheduled-messages)$/.test(String(url)))).toEqual([]);
     expect(onSend).not.toHaveBeenCalled();
     window.removeEventListener('overdeck:open-fork-modal', openModal);
   });
@@ -1336,7 +1336,7 @@ describe('ComposerFooter attachments', () => {
     });
 
     vi.mocked(modelSupportsImages).mockReturnValue(false);
-    vi.mocked(findModelDef).mockReturnValue({ name: 'MiMo V2.5 Pro' } as ReturnType<typeof findModelDef>);
+    vi.mocked(findModelDef).mockReturnValue({ name: 'GLM-5.3' } as ReturnType<typeof findModelDef>);
 
     render(<ComposerFooter conversation={conversation} />);
 
@@ -1349,7 +1349,7 @@ describe('ComposerFooter attachments', () => {
 
     await waitFor(() => {
       expect(mockToastWarning).toHaveBeenCalledWith(
-        "MiMo V2.5 Pro can't read images — image not attached. Switch to a vision-capable model (e.g. MiMo V2.5) to send images.",
+        "GLM-5.3 can't read images — image not attached. Switch to a vision-capable model to send images.",
       );
     });
 
@@ -1377,7 +1377,7 @@ describe('ComposerFooter attachments', () => {
     });
 
     vi.mocked(modelSupportsImages).mockReturnValue(false);
-    vi.mocked(findModelDef).mockReturnValue({ name: 'MiMo V2.5 Pro' } as ReturnType<typeof findModelDef>);
+    vi.mocked(findModelDef).mockReturnValue({ name: 'GLM-5.3' } as ReturnType<typeof findModelDef>);
 
     render(<ComposerFooter conversation={conversation} />);
 
@@ -1389,7 +1389,7 @@ describe('ComposerFooter attachments', () => {
 
     await waitFor(() => {
       expect(mockToastWarning).toHaveBeenCalledWith(
-        "MiMo V2.5 Pro can't read images — image not attached. Switch to a vision-capable model (e.g. MiMo V2.5) to send images.",
+        "GLM-5.3 can't read images — image not attached. Switch to a vision-capable model to send images.",
       );
     });
 

@@ -24,6 +24,7 @@ import { isPeerDashboardProcess } from '../boot-gates.js';
 import type { ProjectConfig } from '../projects.js';
 import { packageRoot, getOverdeckHome } from '../paths.js';
 import { sessionExists as tmuxSessionExists, killSession as tmuxKillSession, getAgentSessions } from '../tmux.js';
+import { ensureCostIssueRollup } from './cost-issue-rollup.js';
 import { getOverdeckDatabasePath, OVERDECK_MIGRATION_PATH } from './paths.js';
 
 export const overdeckEvents = sqliteTable('events', {
@@ -102,6 +103,8 @@ function ensureRuntimeIndexesSync(db: SqliteDatabase): void {
   runSchemaTopUp(db, 'CREATE INDEX IF NOT EXISTS `cost_session_id_idx` ON `cost_events` (`session_id`)');
   runSchemaTopUp(db, 'CREATE INDEX IF NOT EXISTS `idx_cost_agent_id` ON `cost_events` (`agent_id`, `ts`)');
   runSchemaTopUp(db, 'CREATE INDEX IF NOT EXISTS `idx_cost_issue_upper` ON `cost_events` (UPPER(`issue_id`))');
+  // PAN-4724: trigger-maintained per-issue cost rollup (installed once, atomically with its backfill).
+  ensureCostIssueRollup(db);
   runSchemaTopUp(db, 'CREATE TABLE IF NOT EXISTS `cost_reconcile_file_state` (`path` text PRIMARY KEY NOT NULL, `mtime_ms` integer NOT NULL, `size` integer NOT NULL, `verdict` text NOT NULL)');
   ensureWorkspaceTablesSync(db);
   // PAN-1577: explicit project assignment override for moving a conversation
@@ -126,6 +129,12 @@ function ensureRuntimeIndexesSync(db: SqliteDatabase): void {
   runSchemaTopUp(db, 'CREATE INDEX IF NOT EXISTS `idx_conversation_pull_requests_key` ON `conversation_pull_requests` (`host`, `repository`, `number`)');
   // PAN-4498: operator bookmarks on transcript messages. Mirrors the init migration.
   runSchemaTopUp(db, 'CREATE TABLE IF NOT EXISTS `conversation_bookmarks` (`conversation_id` text NOT NULL, `message_id` text NOT NULL, `label` text NOT NULL, `message_created_at` text, `created_at` integer NOT NULL, `updated_at` integer NOT NULL, PRIMARY KEY(`conversation_id`, `message_id`), FOREIGN KEY (`conversation_id`) REFERENCES `conversations`(`id`) ON UPDATE no action ON DELETE cascade)');
+  // PAN-4641: operator messages held until a usage limit resets. Mirrors the init migration.
+  runSchemaTopUp(db, 'CREATE TABLE IF NOT EXISTS `conversation_scheduled_messages` (`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL, `conversation_id` text NOT NULL, `text` text NOT NULL, `status` text NOT NULL, `not_before` integer NOT NULL, `reset_source` text, `limit_window` text, `attempts` integer DEFAULT 0 NOT NULL, `last_error` text, `created_at` integer NOT NULL, `updated_at` integer NOT NULL, `sent_at` integer, `delivered_at` integer, FOREIGN KEY (`conversation_id`) REFERENCES `conversations`(`id`) ON UPDATE no action ON DELETE cascade)');
+  runSchemaTopUp(db, 'CREATE INDEX IF NOT EXISTS `idx_conversation_scheduled_messages_status` ON `conversation_scheduled_messages` (`status`, `not_before`)');
+  // PAN-4650 D-4650-1: linked machines' shared conversation lists. Mirrors the init migration.
+  runSchemaTopUp(db, 'CREATE TABLE IF NOT EXISTS `linked_conversations` (`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL, `environment_id` text NOT NULL, `name` text NOT NULL, `row_json` text NOT NULL, `native_session_id` text, `cached_at` text NOT NULL, `list_hash` text NOT NULL, UNIQUE(`environment_id`, `name`))');
+  runSchemaTopUp(db, 'CREATE INDEX IF NOT EXISTS `linked_conversations_session_idx` ON `linked_conversations` (`native_session_id`)');
   // PAN-4640: recurring scheduled prompts on conversations. Mirrors the init migration.
   runSchemaTopUp(db, 'CREATE TABLE IF NOT EXISTS `conversation_schedules` (`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL, `conversation_id` text NOT NULL, `prompt` text NOT NULL, `cron` text NOT NULL, `time_zone` text NOT NULL, `enabled` integer NOT NULL DEFAULT 1, `next_run_at` integer, `last_run_at` integer, `last_run_status` text, `last_run_error` text, `created_at` integer NOT NULL, `updated_at` integer NOT NULL, FOREIGN KEY (`conversation_id`) REFERENCES `conversations`(`id`) ON UPDATE no action ON DELETE cascade)');
   runSchemaTopUp(db, 'CREATE INDEX IF NOT EXISTS `idx_conversation_schedules_due` ON `conversation_schedules` (`enabled`, `next_run_at`)');
@@ -143,6 +152,24 @@ function ensureRuntimeIndexesSync(db: SqliteDatabase): void {
   // PAN-4436: Session Vault browse copies (`vault-<vaultId>` rows) are origin 'vault'.
   runSchemaTopUp(db, "ALTER TABLE `conversations` ADD COLUMN `origin` text NOT NULL DEFAULT 'local'");
   runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `vault_owner_label` text');
+  // PAN-4645 D-4645-19: the owner machine of every row (environment id) and the
+  // machine a row was released to (#4650 Pull here). Nullable top-ups; local rows
+  // are backfilled at boot by `bootConversationEnvironment`.
+  runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `environment_id` text');
+  runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `released_to` text');
+  // PAN-4650 D-4650-14: where a pulled conversation came from (JSON), so a push back archives the old copy.
+  runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `pulled_from` text');
+  runSchemaTopUp(db, 'CREATE INDEX IF NOT EXISTS `conversations_environment_idx` ON `conversations` (`environment_id`)');
+  // PAN-4639: operator triage state (settle / snooze) for the conversation list.
+  runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `settled_at` integer');
+  runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `settle_reason` text');
+  runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `snoozed_until` integer');
+  // PAN-4653: per-conversation auto-settle-on-merge override ('on' | 'off'; NULL = inherit the global setting).
+  runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `auto_settle_override` text');
+  // PAN-4655: the idle clock restart point (unsettle / unsnooze), read by the idle-settle sweep.
+  runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `idle_reset_at` integer');
+  // PAN-4651 D-4651-1: the linked machine (environment id) that started this row through a work door; null = started here.
+  runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `started_by_environment_id` text');
 }
 
 /** `app_settings` key recording that the pipeline-mirror drop already ran. */

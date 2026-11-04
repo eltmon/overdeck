@@ -118,6 +118,8 @@ describe('recoverAgent re-applies the persisted effort (PAN-4253)', () => {
 
     expect(result).not.toBeNull();
     expect(readLauncher(agentId)).toContain('--effort max');
+    // PAN-4932 FR-7: the relaunch keeps the overdeck MCP server.
+    expect(readLauncher(agentId)).toContain(`--mcp-config='${join(getAgentDir(agentId), 'overdeck-mcp.json')}'`);
   });
 
   it('resolves legacy state (no persisted effort) to the role default', async () => {

@@ -1,0 +1,64 @@
+{
+  "version": "1",
+  "issueId": "PAN-4732",
+  "created": "2026-11-01T18:35:44.841Z",
+  "updated": "2026-11-01T19:07:04.566Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-01T19:07Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-01T19:07:04.566Z"
+    }
+  ],
+  "items": {
+    "quarantine-title-bar-spec": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4732",
+      "claimedAt": "2026-11-01T18:35:44.841Z",
+      "doneAt": "2026-11-01T18:43:54.493Z"
+    },
+    "title-bar-component-test": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4732",
+      "claimedAt": "2026-11-01T18:43:59.989Z",
+      "doneAt": "2026-11-01T18:55:52.336Z"
+    },
+    "quarantine-title-bar-spec.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:57:22.230Z"
+    },
+    "quarantine-title-bar-spec.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:57:39.502Z"
+    },
+    "quarantine-title-bar-spec.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:57:56.680Z"
+    },
+    "title-bar-component-test.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:58:11.691Z"
+    },
+    "title-bar-component-test.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:58:27.347Z"
+    },
+    "title-bar-component-test.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-01T18:58:43.792Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-01T19:07:04Z",
+      "markdownBody": "# CI Failure Feedback for PAN-4732\n\nPull request: https://github.com/eltmon/overdeck/pull/4736 (head `6c3f870f`)\n\nSource: check_run:test-shard (4/4)\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\n## Failing checks (1)\n\n### test-shard (4/4)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/124946024750/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/41339405397/job/124946024750  \n```\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/e2e/styleguide-conformance.spec.ts\u001b[2m > \u001b[22mstyleguide rendered surface conformance\u001b[2m > \u001b[22mrenders shared primitives on Pipeline, Board, Command Deck, and Agents routes\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/e2e/styleguide-conformance.spec.ts\u001b[2m > \u001b[22mstyleguide rendered surface conformance\u001b[2m > \u001b[22mrenders shared primitives on Pipeline, Board, Command Deck, and Agents routes\n\u001b[31m\u001b[1mError\u001b[22m: Test timed out in 45000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\u001b[39m\n\u001b[36m \u001b[2m❯\u001b[22m tests/e2e/styleguide-conformance.spec.ts:\u001b[2m417:3\u001b[22m\u001b[39m\n    \u001b[90m415|\u001b[39m\n    \u001b[90m416|\u001b[39m \u001b[34mdescribe\u001b[39m(\u001b[32m'styleguide rendered surface conformance'\u001b[39m\u001b[33m,\u001b[39m () \u001b[33m=>\u001b[39m {\n\n    \u001b[90m417|\u001b[39m   it('renders shared primitives on Pipeline, Board, Command Deck, and …\n    \u001b[90m   |\u001b[39m   \u001b[31m^\u001b[39m\n    \u001b[90m418|\u001b[39m     \u001b[35mconst\u001b[39m pipeline \u001b[33m=\u001b[39m \u001b[35mawait\u001b[39m \u001b[34mopenRoute\u001b[39m(\u001b[32m'/pipeline'\u001b[39m)\u001b[33m;\u001b[39m\n    \u001b[90m419|\u001b[39m     await expect.poll(() => pipeline.page.locator('[data-component=\"to…\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\u001b[22m\u001b[39m\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m1 failed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[1m\u001b[32m529 passed\u001b[39m\u001b[22m\u001b[90m (530)\u001b[39m\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    }
+  ]
+}

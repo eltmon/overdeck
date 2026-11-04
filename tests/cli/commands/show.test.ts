@@ -528,3 +528,16 @@ describe('summarizePipelineEntry — workspace adoption (PAN-4605)', () => {
     })).toBe('head-moved — origin moved');
   });
 });
+
+describe('summarizePipelineEntry — PR-head sync (PAN-4810)', () => {
+  it('summarizes workspace.synced-to-pr-head', () => {
+    expect(summarizePipelineEntry({
+      at: '2026-11-02T10:00:00.000Z', type: 'workspace.synced-to-pr-head', issueId: 'PAN-1',
+      data: { branch: 'feature/pan-1', from: 'aaaaaaaa1111', to: 'bbbbbbbb2222', mode: 'reset' },
+    })).toBe('aaaaaaaa → PR head bbbbbbbb (reset)');
+    expect(summarizePipelineEntry({
+      at: '2026-11-02T10:00:00.000Z', type: 'workspace.synced-to-pr-head', issueId: 'PAN-1',
+      data: { branch: 'feature/pan-1', from: 'aaaaaaaa1111', to: 'bbbbbbbb2222', mode: 'fast-forward', repo: 'api' },
+    })).toBe('api: aaaaaaaa → PR head bbbbbbbb (fast-forward)');
+  });
+});

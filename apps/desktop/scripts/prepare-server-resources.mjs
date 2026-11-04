@@ -369,6 +369,24 @@ try {
   console.warn("[prepare-server] electron binary not resolvable here — skipping the ABI load check");
 }
 
+// The secure-channel stack (PAN-4645 D-4645-2) reaches sodium-native's Node-API
+// prebuilds through require-addon; load it under Electron the same way so a
+// missing platform prebuild fails packaging, not the first machine link.
+try {
+  const electronBinary = desktopRequire("electron");
+  execSync(
+    `"${electronBinary}" -e "require('sodium-native'); require('noise-handshake'); require('@hyperswarm/secret-stream')"`,
+    { cwd: serverDir, stdio: "inherit", env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" } },
+  );
+  console.log("[prepare-server] Verified: the Noise channel stack (sodium-native) loads under Electron");
+} catch (error) {
+  if (error?.status) {
+    console.error("[prepare-server] sodium-native / noise-handshake / @hyperswarm/secret-stream failed to load under Electron.");
+    process.exit(1);
+  }
+  console.warn("[prepare-server] electron binary not resolvable here — skipping the Noise stack load check");
+}
+
 // ─── Stage the pan CLI runtime (PAN-2768) ────────────────────────────────────
 
 const distCli = join(distRoot, "cli");

@@ -45,6 +45,7 @@ vi.mock('@tanstack/react-query', async (importOriginal) => {
   };
 });
 
+vi.mock('../../deft/queries', () => ({ useDeftIssueSummary: () => ({ isDeft: false, summary: null, isLoading: false }) }));
 vi.mock('../../shared/ModelPicker/ModelPicker', () => ({
   useAvailableModels: () => ({ groups: [] }),
 }));
@@ -362,6 +363,8 @@ describe('FeatureItem', () => {
     const chip = await screen.findByRole('link', { name: 'B11 · book · Active campaign' });
     const issueId = screen.getByText('PAN-821');
     expect(chip).toHaveAttribute('href', '/orders');
+    expect(chip).toHaveTextContent('B11 · book');
+    expect(chip).not.toHaveTextContent('Active campaign');
     expect(chip.compareDocumentPosition(issueId) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(container.querySelector('[data-section="OrderBookIssueChip"]')).toBe(chip);
   });

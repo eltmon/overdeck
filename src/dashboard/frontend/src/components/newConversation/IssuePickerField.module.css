@@ -1,20 +1,38 @@
 .picker {
   position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.lead {
+  position: absolute;
+  left: 10px;
+  display: flex;
+  pointer-events: none;
+  color: var(--muted-foreground);
 }
 
 .input {
   width: 100%;
-  padding: 6px 10px;
-  font-size: 12px;
+  height: 32px;
+  padding: 0 10px 0 31px;
+  font-size: 13px;
   font-family: inherit;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: var(--background);
+  border: 1px solid var(--border-overlay, var(--border));
+  border-radius: 6px;
+  background: var(--surface-overlay-field, var(--background));
   color: var(--foreground);
 }
 
 .input::placeholder {
   color: var(--muted-foreground);
+  opacity: 1;
+}
+
+.input:focus-visible {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 20%, transparent);
+  outline: none;
 }
 
 .list {
@@ -28,9 +46,10 @@
   margin: 0;
   padding: 2px 0;
   list-style: none;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: var(--popover, var(--background));
+  border: 1px solid var(--border-overlay, var(--border));
+  border-radius: 6px;
+  background: var(--surface-overlay, var(--popover));
+  box-shadow: var(--shadow-floating);
 }
 
 .option {
@@ -62,10 +81,12 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 10px;
-  font-size: 12px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
+  height: 32px;
+  padding: 0 10px;
+  font-size: 13px;
+  border: 1px solid var(--border-overlay, var(--border));
+  border-radius: 6px;
+  background: var(--surface-overlay-field, var(--background));
   color: var(--foreground);
 }
 

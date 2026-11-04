@@ -62,3 +62,39 @@ export const OpenInEditorInput = Schema.Struct({
   reveal: Schema.optional(Schema.Boolean),
 })
 export type OpenInEditorInput = typeof OpenInEditorInput.Type
+
+// Browsers the dashboard can open a local file in (PAN-4762). Kept apart from
+// EDITORS: the preferred-editor fallback and PanOpenInPicker list EDITORS, so a
+// browser there would become someone's "editor".
+// linuxCommands: binaries tried in order on Linux. macApp: the /Applications
+// app name on macOS. default-browser uses the platform opener instead.
+export const BROWSERS = [
+  { id: "default-browser", label: "browser", linuxCommands: [], macApp: null },
+  { id: "chrome", label: "Google Chrome", linuxCommands: ["google-chrome"], macApp: "Google Chrome" },
+  { id: "chromium", label: "Chromium", linuxCommands: ["chromium", "chromium-browser"], macApp: "Chromium" },
+  { id: "firefox", label: "Firefox", linuxCommands: ["firefox"], macApp: "Firefox" },
+  { id: "brave", label: "Brave", linuxCommands: ["brave-browser"], macApp: "Brave Browser" },
+  { id: "edge", label: "Microsoft Edge", linuxCommands: ["microsoft-edge"], macApp: "Microsoft Edge" },
+  { id: "vivaldi", label: "Vivaldi", linuxCommands: ["vivaldi"], macApp: "Vivaldi" },
+] as const
+
+export type BrowserEntry = (typeof BROWSERS)[number]
+export type BrowserId = BrowserEntry["id"]
+
+const BROWSER_IDS: [BrowserId, ...BrowserId[]] = [
+  "default-browser",
+  "chrome",
+  "chromium",
+  "firefox",
+  "brave",
+  "edge",
+  "vivaldi",
+]
+export const BrowserIdSchema = Schema.Literals(BROWSER_IDS)
+
+export const OpenInBrowserInput = Schema.Struct({
+  // Absolute path of the file to open; the server turns it into a file:// URL.
+  path: Schema.String,
+  browser: BrowserIdSchema,
+})
+export type OpenInBrowserInput = typeof OpenInBrowserInput.Type

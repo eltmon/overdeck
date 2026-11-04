@@ -371,6 +371,7 @@ beforeAll(async () => {
             export function getTransport() { return transport; }
             export function resetTransport() { transport = new WsTransport(); }
             export function ensureDashboardSession() { return Promise.resolve(); }
+            export function rpcUrlWithPath(path) { return 'ws://127.0.0.1' + path; }
             export async function dashboardMutationJsonHeaders() { return { 'Content-Type': 'application/json' }; }
             export function subscribeFlywheelStatus() { return () => undefined; }
           `,
@@ -413,33 +414,43 @@ afterAll(async () => {
 });
 
 describe('styleguide rendered surface conformance', () => {
-  it('renders shared primitives on Pipeline, Board, Command Deck, and Agents routes', async () => {
+  it('renders shared primitives on the Pipeline route', async () => {
     const pipeline = await openRoute('/pipeline');
     await expect.poll(() => pipeline.page.locator('[data-component="top-bar"]').count(), renderPoll).toBeGreaterThan(0);
     await expect.poll(() => pipeline.page.locator('[data-component="phase-header"]').count(), renderPoll).toBeGreaterThan(0);
     await expect.poll(() => pipeline.page.locator('[data-component="issue-row"][data-issue-id="PAN-1148"]').count(), renderPoll).toBe(1);
     await expect.poll(() => pipeline.page.locator('[data-component="verb-badge"]').count(), renderPoll).toBeGreaterThan(0);
     await pipeline.context.close();
+  }, 45_000);
 
+  it('renders shared primitives on the Board route', async () => {
     const board = await openRoute('/board');
     await expect.poll(() => board.page.locator('[data-component="issue-card"][data-issue-id="PAN-1148"]').count(), renderPoll).toBe(1);
     await expect.poll(() => board.page.locator('[data-component="verb-badge"]').count(), renderPoll).toBeGreaterThan(0);
     await board.context.close();
+  }, 45_000);
 
+  it('renders shared primitives on the Command Deck route', async () => {
     const commandDeck = await openRoute('/command-deck');
     await commandDeck.page.getByText('Overdeck', { exact: true }).nth(1).click();
     // CommandDeck uses FeatureItem (not IssueRow) since the ProjectTree remodel
     await expect.poll(() => commandDeck.page.locator('[data-component="feature-item"][data-issue-id="PAN-1148"]').count(), renderPoll).toBe(1);
     await commandDeck.context.close();
+  }, 45_000);
 
+  it('renders shared primitives on the Agents Live route', async () => {
     const agents = await openRoute('/agents');
     await expect.poll(() => agents.page.locator('[data-component="agents-live-row"][data-entry-id="agent-pan-1148"]').count(), renderPoll).toBe(1);
     await agents.context.close();
+  }, 45_000);
 
+  it('renders shared primitives on the Agents History route', async () => {
     const directory = await openRoute('/agents?view=history');
     await expect.poll(() => directory.page.locator('[data-component="directory-row"][data-entry-id="agent-pan-1148"]').count(), renderPoll).toBe(1);
     await directory.context.close();
+  }, 45_000);
 
+  it('renders the issue drawer action bar on the Pipeline route', async () => {
     const drawer = await openRoute('/pipeline?issue=PAN-1148&tab=overview');
     await expect.poll(() => drawer.page.locator('[data-component="drawer-action-bar"]').count(), renderPoll).toBe(1);
     const drawerActionBar = drawer.page.locator('[data-component="drawer-action-bar"]');

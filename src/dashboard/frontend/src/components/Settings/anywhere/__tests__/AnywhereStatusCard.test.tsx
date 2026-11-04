@@ -17,6 +17,7 @@ function baseStatus(overrides: Partial<AnywhereStatus> = {}): AnywhereStatus {
     devices: { active: 2 },
     vault: { state: 'ready', backend: 'git@example.com:me/vault.git' },
     problems: [],
+    tailscale: { nextStep: 'not-installed', serveUrl: null, magicDnsName: null },
     viewer: { kind: 'root-session' },
     ...overrides,
   };
@@ -106,5 +107,80 @@ describe('AnywhereStatusCard (PAN-4445)', () => {
   it('shows an unreadable identity', async () => {
     renderCard(baseStatus({ machine: null }));
     expect(await screen.findByText('Identity unreadable')).toBeInTheDocument();
+  });
+
+  it('shows a ready Tailscale row with the Serve URL (PAN-1254)', async () => {
+    renderCard(baseStatus({ tailscale: { nextStep: 'ready', serveUrl: 'https://desk.tailnet.ts.net', magicDnsName: 'desk.tailnet.ts.net' } }));
+    expect(await screen.findByTestId('anywhere-tailscale')).toHaveTextContent('Ready (https://desk.tailnet.ts.net)');
+  });
+
+  it('shows Not installed, Signed out and Needs HTTPS for the earlier steps', async () => {
+    const { unmount } = renderCard(baseStatus());
+    expect(await screen.findByTestId('anywhere-tailscale')).toHaveTextContent('Not installed');
+    unmount();
+    const second = renderCard(baseStatus({ tailscale: { nextStep: 'login', serveUrl: null, magicDnsName: null } }));
+    expect(await screen.findByTestId('anywhere-tailscale')).toHaveTextContent('Signed out');
+    second.unmount();
+    renderCard(baseStatus({ tailscale: { nextStep: 'enable-https', serveUrl: null, magicDnsName: 'desk.tailnet.ts.net' } }));
+    expect(await screen.findByTestId('anywhere-tailscale')).toHaveTextContent('Needs HTTPS');
+  });
+
+  it('renders Protect the dashboard for unprotected Tailscale Serve', async () => {
+    const user = userEvent.setup();
+    const { onAction } = renderCard(baseStatus({
+      tailscale: { nextStep: 'protect', serveUrl: 'https://desk.tailnet.ts.net', magicDnsName: 'desk.tailnet.ts.net' },
+      problems: [{
+        code: 'tailscale-serve-unprotected',
+        message: 'Tailscale Serve sends tailnet visitors to this dashboard, but a token is not required to sign in.',
+        action: { kind: 'tailscale-setup' },
+      }],
+    }));
+    expect(await screen.findByTestId('anywhere-tailscale')).toHaveTextContent('Set up unfinished');
+    await user.click(screen.getByRole('button', { name: 'Protect the dashboard' }));
+    expect(onAction).toHaveBeenCalledWith({ kind: 'tailscale-setup' });
+  });
+});
+
+describe('AnywhereStatusCard relay and directory (PAN-2356 WI-18)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('shows Using relay and this month\'s traffic', async () => {
+    renderCard(baseStatus({
+      directory: { state: 'online', plan: 'tester', url: 'https://connect.overdeck.ai', refusal: null },
+      relay: { using: true, bytesUsed: 12_345_000_000, capBytes: 50_000_000_000, stopped: false },
+    }));
+    const relay = await screen.findByTestId('anywhere-relay');
+    expect(relay).toHaveTextContent('Using relay');
+    expect(relay).toHaveTextContent('12.3 of 50 GB relay traffic this month');
+  });
+
+  it('shows the cap message and an Add 50 GB link once the allowance is used', async () => {
+    renderCard(baseStatus({
+      directory: { state: 'online', plan: 'tester', url: 'https://connect.overdeck.ai', refusal: null },
+      relay: { using: false, bytesUsed: 50_000_000_000, capBytes: 50_000_000_000, stopped: true },
+    }));
+    const cap = await screen.findByTestId('anywhere-relay-cap');
+    expect(cap).toHaveTextContent('Relay allowance used; install Tailscale or add 50 GB');
+    const link = within(cap).getByRole('link', { name: 'Add 50 GB' });
+    expect(link).toHaveAttribute('href', 'https://overdeck.ai/anywhere');
+    expect(link).toHaveAttribute('target', '_blank');
+  });
+
+  it('shows no relay text without a relay status', async () => {
+    renderCard(baseStatus({ directory: null, relay: null }));
+    await screen.findByText('desk');
+    expect(screen.queryByTestId('anywhere-relay')).toBeNull();
+    expect(screen.queryByTestId('anywhere-relay-cap')).toBeNull();
+    expect(document.body.textContent).not.toMatch(/relay/i);
+  });
+
+  it('shows a refused directory as a problem line', async () => {
+    renderCard(baseStatus({
+      directory: { state: 'refused', plan: 'free', url: 'https://connect.overdeck.ai', refusal: 'The free account includes 3 machines' },
+      relay: null,
+    }));
+    expect(await screen.findByTestId('anywhere-directory-refusal')).toHaveTextContent('The free account includes 3 machines');
   });
 });

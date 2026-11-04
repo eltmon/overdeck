@@ -1,0 +1,211 @@
+{
+  "version": "1",
+  "issueId": "PAN-4660",
+  "created": "2026-11-02T06:14:17.395Z",
+  "updated": "2026-11-02T07:38:22.806Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "w1-store-update": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4660",
+      "claimedAt": "2026-11-02T06:14:17.395Z",
+      "doneAt": "2026-11-02T06:18:00.114Z"
+    },
+    "w2-route-put": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4660",
+      "claimedAt": "2026-11-02T06:18:07.641Z",
+      "doneAt": "2026-11-02T06:22:43.430Z"
+    },
+    "w3-ui-token-styles": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4660",
+      "claimedAt": "2026-11-02T06:22:50.654Z",
+      "doneAt": "2026-11-02T06:26:52.039Z"
+    },
+    "w4-update-theme-action": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4660",
+      "claimedAt": "2026-11-02T06:26:59.195Z",
+      "doneAt": "2026-11-02T06:29:00.115Z"
+    },
+    "w5-editor-model": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4660",
+      "claimedAt": "2026-11-02T06:31:49.404Z",
+      "doneAt": "2026-11-02T06:34:16.926Z"
+    },
+    "w6-editor-preview": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4660",
+      "claimedAt": "2026-11-02T06:34:22.751Z",
+      "doneAt": "2026-11-02T06:37:43.801Z"
+    },
+    "w7-editor-form": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4660",
+      "claimedAt": "2026-11-02T06:37:48.533Z",
+      "doneAt": "2026-11-02T06:40:15.007Z"
+    },
+    "w8-section-entry-points": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4660",
+      "claimedAt": "2026-11-02T06:40:20.909Z",
+      "doneAt": "2026-11-02T06:43:11.028Z"
+    },
+    "w9-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4660",
+      "claimedAt": "2026-11-02T06:43:17.003Z",
+      "doneAt": "2026-11-02T06:44:17.597Z"
+    },
+    "w1-store-update.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T07:26:04.127Z"
+    },
+    "w1-store-update.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T07:26:25.666Z"
+    },
+    "w1-store-update.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T07:26:45.977Z"
+    },
+    "w1-store-update.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T07:27:05.898Z"
+    },
+    "w2-route-put.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T07:27:29.311Z"
+    },
+    "w2-route-put.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T07:27:49.831Z"
+    },
+    "w2-route-put.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T07:28:10.117Z"
+    },
+    "w2-route-put.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T07:28:29.820Z"
+    },
+    "w2-route-put.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-02T07:28:49.595Z"
+    },
+    "w3-ui-token-styles.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T07:29:12.976Z"
+    },
+    "w3-ui-token-styles.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T07:29:32.932Z"
+    },
+    "w3-ui-token-styles.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T07:29:52.466Z"
+    },
+    "w3-ui-token-styles.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T07:30:12.380Z"
+    },
+    "w4-update-theme-action.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T07:30:36.209Z"
+    },
+    "w4-update-theme-action.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T07:30:56.255Z"
+    },
+    "w4-update-theme-action.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T07:31:16.652Z"
+    },
+    "w5-editor-model.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T07:31:39.689Z"
+    },
+    "w5-editor-model.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T07:31:59.471Z"
+    },
+    "w5-editor-model.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T07:32:19.674Z"
+    },
+    "w5-editor-model.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T07:32:39.800Z"
+    },
+    "w5-editor-model.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-02T07:32:59.402Z"
+    },
+    "w6-editor-preview.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T07:33:22.184Z"
+    },
+    "w6-editor-preview.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T07:33:42.217Z"
+    },
+    "w6-editor-preview.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T07:34:02.282Z"
+    },
+    "w7-editor-form.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T07:34:25.341Z"
+    },
+    "w7-editor-form.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T07:34:46.467Z"
+    },
+    "w7-editor-form.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T07:35:07.306Z"
+    },
+    "w7-editor-form.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T07:35:29.026Z"
+    },
+    "w8-section-entry-points.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T07:35:53.091Z"
+    },
+    "w8-section-entry-points.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T07:36:15.021Z"
+    },
+    "w8-section-entry-points.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T07:36:36.538Z"
+    },
+    "w8-section-entry-points.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T07:36:57.597Z"
+    },
+    "w8-section-entry-points.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-02T07:37:18.646Z"
+    },
+    "w9-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T07:37:42.284Z"
+    },
+    "w9-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T07:38:02.521Z"
+    },
+    "w9-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T07:38:22.806Z"
+    }
+  }
+}

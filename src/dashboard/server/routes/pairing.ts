@@ -10,13 +10,15 @@
  *   (browsers) or in the body (`delivery: 'bearer'`, desktop clients). It is
  *   unauthenticated by design and rate limited on failures.
  *
- * - `GET /api/devices` lists paired devices (never their token hashes).
- * - `DELETE /api/devices/:id` revokes one and closes its live WebSocket and
- *   SSE connections. A device may revoke itself but not another device, an
- *   access token may revoke none, and the internal token and root session may
- *   revoke any.
+ * - `GET /api/devices` lists paired devices and paired phones (PAN-4835),
+ *   never their token hashes or key material.
+ * - `DELETE /api/devices/:id` revokes one and closes its live WebSocket, SSE
+ *   and (for a phone) secure-channel connections. A device may revoke itself
+ *   but not another device, an access token may revoke none, and the internal
+ *   token and root session may revoke any.
  *
  * No pairing response is cacheable, and none ever contains the internal token.
+ * A code issued for an Overdeck connector never pairs a browser (PAN-4927 W-CONN1).
  */
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
@@ -24,6 +26,8 @@ import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstab
 import { createAccessToken, listAccessTokens, revokeAccessToken, type PublicAccessTokenRecord } from '../../../lib/access-tokens.js';
 import { emitActivityEntry } from '../../../lib/activity-logger.js';
 import { ensureEnvironmentIdentity } from '../../../lib/environment-identity.js';
+import { closeChannelsForPeer } from '../channel-listener.js';
+import { isConnectorCode } from '../connector-pairing.js';
 import { closeDeviceConnections } from '../device-connections.js';
 import { jsonResponse } from '../http-helpers.js';
 import {
@@ -37,10 +41,11 @@ import {
   dashboardDeviceCookieHeader,
   rejectUnauthorizedDashboardRequest,
   rejectUnsafeDashboardMutationRequest,
-  resolveDashboardCredential,
+  resolveRequestCredential,
 } from './dashboard-auth.js';
 import { isHttpsRequest } from './dashboard-session.js';
-import { validateOrigin, type HeaderMap } from './origin-validation.js';
+import { isRemotePlainHttpBrowser } from '../plain-http-guard.js';
+import { validateOrigin } from './origin-validation.js';
 
 const MAX_LABEL_LENGTH = 200;
 
@@ -71,7 +76,7 @@ const issuePairingCredentialRoute = HttpRouter.add(
     const authError = rejectUnsafeDashboardMutationRequest(request);
     if (authError) return noStore(authError);
     // PAN-2351 D-11: only root credentials mint new devices.
-    const issuer = resolveDashboardCredential(request.headers as HeaderMap)?.kind;
+    const issuer = resolveRequestCredential(request)?.kind;
     if (issuer !== 'internal-token' && issuer !== 'root-session') {
       return noStore(jsonResponse({ error: 'only the internal token or the root session can issue pairing credentials' }, { status: 403 }));
     }
@@ -112,6 +117,19 @@ const exchangePairingCredentialRoute = HttpRouter.add(
       return noStore(jsonResponse({ error: `body must be { credential: string, label: string (at most ${MAX_LABEL_LENGTH} characters), delivery: 'cookie' | 'bearer' }` }, { status: 400 }));
     }
 
+    // PAN-4645 D-4645-13: a cookie over plain LAN HTTP was never safe. Checked
+    // before the credential is consumed, so the code survives for an HTTPS retry.
+    if (delivery === 'cookie' && isRemotePlainHttpBrowser(request)) {
+      return noStore(jsonResponse({ error: 'use-https' }, { status: 403 }));
+    }
+
+    // PAN-4927 W-CONN1: a connector's code must never pair a browser as an admin device. Checked before
+    // the code is consumed, so a mistaken paste still lets the connector pair.
+    if (isConnectorCode(credential)) {
+      recordPairingExchangeFailure();
+      return noStore(jsonResponse({ error: 'this pairing code is for an Overdeck connector; run pan mcp connector pair with it', code: 'connector-code' }, { status: 403 }));
+    }
+
     const outcome = consumePairingCredential(credential);
     if (outcome !== 'ok') {
       recordPairingExchangeFailure();
@@ -143,6 +161,7 @@ function deviceView(record: PublicAccessTokenRecord) {
   return {
     id: record.id,
     name: record.name,
+    kind: record.kind === 'phone' ? ('phone' as const) : ('device' as const),
     scopes: [...record.scopes],
     createdAt: record.createdAt,
     lastUsedAt: record.lastUsedAt,
@@ -158,7 +177,7 @@ const listDevicesRoute = HttpRouter.add(
     const authError = rejectUnauthorizedDashboardRequest(request);
     if (authError) return noStore(authError);
     const records = yield* Effect.promise(() => listAccessTokens());
-    return noStore(jsonResponse({ devices: records.filter((record) => record.kind === 'device').map(deviceView) }));
+    return noStore(jsonResponse({ devices: records.filter((record) => record.kind === 'device' || record.kind === 'phone').map(deviceView) }));
   }),
 );
 
@@ -170,14 +189,14 @@ const revokeDeviceRoute = HttpRouter.add(
     const authError = rejectUnsafeDashboardMutationRequest(request);
     if (authError) return noStore(authError);
     const id = (yield* HttpRouter.params)['id'] ?? '';
-    const credential = resolveDashboardCredential(request.headers as HeaderMap);
+    const credential = resolveRequestCredential(request);
     // PAN-2351 D-11: checked before the lookup, so a token cannot probe device ids.
     if (credential?.kind === 'token') {
       return noStore(jsonResponse({ error: 'an access token cannot revoke devices' }, { status: 403 }));
     }
 
     const records = yield* Effect.promise(() => listAccessTokens());
-    const target = records.find((record) => record.id === id && record.kind === 'device');
+    const target = records.find((record) => record.id === id && (record.kind === 'device' || record.kind === 'phone'));
     if (!target) return noStore(jsonResponse({ error: `no paired device with id ${id}` }, { status: 404 }));
 
     if (credential?.kind === 'device' && credential.deviceId !== id) {
@@ -187,10 +206,11 @@ const revokeDeviceRoute = HttpRouter.add(
     const revoked = yield* Effect.promise(() => revokeAccessToken(id));
     if (!revoked) return noStore(jsonResponse({ error: `no paired device with id ${id}` }, { status: 404 }));
     const closed = closeDeviceConnections(id);
+    if (target.kind === 'phone' && target.phoneKey) closeChannelsForPeer(target.phoneKey);
     emitActivityEntry({
       source: 'dashboard',
       level: 'info',
-      message: `Revoked device "${revoked.name}"`,
+      message: target.kind === 'phone' ? `Revoked phone "${revoked.name}"` : `Revoked device "${revoked.name}"`,
       details: JSON.stringify({ deviceId: id, closedConnections: closed }),
     });
     return noStore(jsonResponse({ ok: true, device: deviceView(revoked) }));

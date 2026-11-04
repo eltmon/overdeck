@@ -29,6 +29,24 @@ describe('model capabilities', () => {
     },
   );
 
+  // 2026-11-02 official OpenAI pricing: blend = (input + output) / 2.
+  it.each([
+    ['gpt-5.6-sol', 12],
+    ['gpt-5.6-sol[372k]', 12],
+    ['gpt-5.6-terra', 7],
+    ['gpt-5.6-luna', 0.7],
+    ['gpt-5.5', 17.5],
+    ['gpt-5.5-pro', 105],
+    ['gpt-5.2', 7.875],
+    ['gpt-5.4-mini', 2.625],
+  ] as const)('blends %s at %s $/1M', (model, blend) => {
+    expect(MODEL_CAPABILITIES[model].costPer1MTokens).toBe(blend);
+  });
+
+  it('records gpt-5.2 at its official 400K window', () => {
+    expect(MODEL_CAPABILITIES['gpt-5.2'].contextWindow).toBe(400_000);
+  });
+
   it.each(['gpt-5.6-sol[372k]', 'gpt-5.6-terra[372k]', 'gpt-5.6-luna[372k]'] as const)(
     'locks %s contextWindow to the long-context ceiling',
     (model) => {
@@ -60,6 +78,15 @@ describe('model capabilities', () => {
       expect(policy.autoCompactWindow).toBe(MODEL_CAPABILITIES[model].contextWindow);
     },
   );
+
+  // PAN-4826 D1: contextWindow is the launched window. Claude Code runs bare
+  // claude-opus-4-6 / claude-sonnet-4-6 at 200K; raising it to the 1M API window
+  // would rescore the context meter and Deacon high-water against 1M (PAN-3057).
+  it.each(['claude-opus-4-6', 'claude-sonnet-4-6'] as const)('keeps %s at the 200K Claude Code window', async (model) => {
+    const { getClaudeCodeContextPolicyForModel } = await import('../agents/provider-env.js');
+    expect(MODEL_CAPABILITIES[model].contextWindow).toBe(200_000);
+    expect(getClaudeCodeContextPolicyForModel(model)).toEqual({ autoCompactWindow: 200_000 });
+  });
 
   // PAN-3388: the [372k] suffix is Overdeck-side only — the launch door must
   // hand every harness CLI the base API id.
@@ -125,10 +152,25 @@ describe('model capabilities', () => {
 
   // No [372k] opt-in variant ships for the GPT-6 family: the 372K pin was
   // measured on gpt-5.6-sol only. Guard against adding the id without measuring.
-  it.each(['gpt-6-astra', 'gpt-6-sol', 'gpt-6-luna', 'gpt-6.1-sol', 'gpt-6.1-terra'])('does not surface a %s[372k] variant', async (model) => {
+  it.each(['gpt-6-astra', 'gpt-6-sol', 'gpt-6-luna', 'gpt-6.1-sol', 'gpt-6.1-terra', 'gpt-6-rosalind', 'gpt-6-astra-law'])('does not surface a %s[372k] variant', async (model) => {
     const { GPT56_LONG_CONTEXT_VARIANTS } = await import('../model-context-windows.js');
     expect(Object.keys(GPT56_LONG_CONTEXT_VARIANTS)).not.toContain(`${model}[372k]`);
     expect((MODEL_CAPABILITIES as Record<string, unknown>)[`${model}[372k]`]).toBeUndefined();
+  });
+
+  it.each([
+    ['gpt-6-rosalind', 'GPT-6 Rosalind', 45],
+    ['gpt-6-astra-law', 'GPT-6 Astra for Law', 30],
+  ] as const)('registers %s as an unranked, API-key-only OpenAI domain model on the 272K pin', async (model, displayName, blend) => {
+    const { getProviderForModel } = await import('../providers.js');
+    expect(getProviderForModel(model).name).toBe('openai');
+    const capability = MODEL_CAPABILITIES[model];
+    expect(capability.displayName).toBe(displayName);
+    expect(capability.costPer1MTokens).toBe(blend);
+    expect(capability.contextWindow).toBe(CLIPROXY_GPT56_CONTEXT_WINDOW);
+    expect(capability.minTier).toBeUndefined();
+    expect(capability.skills['code-generation']).toBe(0);
+    expect(capabilityClassOf(model)).toBe('frontier');
   });
 
   it('exposes QuantumLlama capabilities with spec display names and windows (PAN-3252)', () => {

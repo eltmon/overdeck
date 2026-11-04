@@ -223,6 +223,63 @@ describe('createVaultSettlePoller (PAN-4307 WI-5)', () => {
     poller.stop();
   });
 
+  it('an agent subject with transcriptPath settles that path with its recordTitle and never calls resolvePath', async () => {
+    const sizes: Record<string, number> = { '/p/a.jsonl': 100 };
+    const resolvePath = vi.fn().mockResolvedValue('/should-not-be-used');
+    const subject = { name: 'agent:a1:/p/a.jsonl', harness: 'claude-code', transcriptPath: '/p/a.jsonl', recordTitle: 'PAN-1 work agent (a1)' };
+    const { deps, settle } = makeDeps({
+      listActive: () => [subject],
+      resolvePath,
+      statSize: vi.fn(async (path: string) => sizes[path] ?? null),
+    });
+    const poller = createVaultSettlePoller(deps);
+    poller.start();
+    await vi.advanceTimersByTimeAsync(0);
+    sizes['/p/a.jsonl'] = 150;
+    await vi.advanceTimersByTimeAsync(VAULT_POLL_MS);
+    await vi.advanceTimersByTimeAsync(DEBOUNCE_SEC * 1000);
+    expect(settle).toHaveBeenCalledWith('/p/a.jsonl', 'claude-code', 'auto', { recordTitle: 'PAN-1 work agent (a1)' });
+    expect(resolvePath).not.toHaveBeenCalled();
+    poller.stop();
+  });
+
+  it('an agent subject whose path changes force-settles the old path once', async () => {
+    let active = [{ name: 'agent:a1:/p/a.jsonl', harness: 'claude-code', transcriptPath: '/p/a.jsonl', recordTitle: 'PAN-1 work agent (a1)' }];
+    const { deps, settle } = makeDeps({
+      listActive: () => active,
+      statSize: vi.fn().mockResolvedValue(100),
+    });
+    const poller = createVaultSettlePoller(deps);
+    poller.start();
+    await vi.advanceTimersByTimeAsync(0);
+    active = [{ name: 'agent:a1:/p/b.jsonl', harness: 'claude-code', transcriptPath: '/p/b.jsonl', recordTitle: 'PAN-1 work agent (a1)' }];
+    await vi.advanceTimersByTimeAsync(VAULT_POLL_MS);
+    expect(settle).toHaveBeenCalledTimes(1);
+    expect(settle).toHaveBeenCalledWith('/p/a.jsonl', 'claude-code', 'force', { recordTitle: 'PAN-1 work agent (a1)' });
+
+    // Forgotten: further polls never settle the old path again.
+    await vi.advanceTimersByTimeAsync(VAULT_POLL_MS * 3);
+    expect(settle).toHaveBeenCalledTimes(1);
+    poller.stop();
+  });
+
+  it('an async listActive is awaited', async () => {
+    const sizes: Record<string, number> = { '/p/a.jsonl': 100 };
+    const { deps, settle } = makeDeps({
+      listActive: () => Promise.resolve([conv('a')]),
+      resolvePath: vi.fn().mockResolvedValue('/p/a.jsonl'),
+      statSize: vi.fn(async (path: string) => sizes[path] ?? null),
+    });
+    const poller = createVaultSettlePoller(deps);
+    poller.start();
+    await vi.advanceTimersByTimeAsync(0);
+    sizes['/p/a.jsonl'] = 150;
+    await vi.advanceTimersByTimeAsync(VAULT_POLL_MS);
+    await vi.advanceTimersByTimeAsync(DEBOUNCE_SEC * 1000);
+    expect(settle).toHaveBeenCalledWith('/p/a.jsonl', 'claude-code', 'auto');
+    poller.stop();
+  });
+
   it('stop() cancels the interval and every pending debounce timer', async () => {
     const sizes: Record<string, number> = { '/p/a.jsonl': 100 };
     const { deps, settle } = makeDeps({

@@ -1,0 +1,459 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-01T04:55:23Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4647: Auto-save pipeline agent transcripts to the Session Vault",
+    "updated": "2026-11-01T04:58:08.745Z"
+  },
+  "plan": {
+    "id": "pan-4647",
+    "title": "Auto-save pipeline agent transcripts to the Session Vault",
+    "status": "running",
+    "uid": "70ee9b84-e8e9-4036-9fa5-82d5ddbc74a5",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-01T04:55:23Z",
+    "updated": "2026-11-01T04:58:08.745Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4647",
+        "label": "PAN-4647",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4647.md",
+        "label": "PRD draft (.pan/drafts/PAN-4647.md)",
+        "type": "prd"
+      },
+      {
+        "uri": ".pan/drafts/pan-2350.md",
+        "label": "Parent PRD (Overdeck Anywhere rev 5, W-CONV6)",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "session-vault",
+      "anywhere",
+      "w-conv6",
+      "dashboard",
+      "pipeline-agents"
+    ],
+    "narratives": {
+      "Problem": "Session Vault saves managed conversations automatically, but not pipeline agents (work, review, test, plan and the other Overdeck agents). The dashboard settle poller lists only active conversations, the sync cycle re-settles only transcripts that were already settled once, and the Claude Stop hook is opt-in and Claude-only. When the owner machine is offline, another machine has no saved copy of its agent work, so PAN-2350 FR-6/FR-9 cannot show it. A pipeline transcript also begins with the orchestration kickoff, so a minted record title would be unreadable.",
+      "Proposal": "Reuse the existing settle and sync path. A new dashboard module (vault-agent-subjects.ts) lists every agent with a state.json inside a tracking window (running/starting, or stopped less than 30 minutes ago), resolves its current transcript through resolveAgentTranscriptCandidate, keeps only Claude Code and Codex transcripts, and names each record '<ISSUE> <role> agent (<agentId>)'. The settle poller accepts these as poll subjects next to conversations: they arrive with a pre-resolved transcriptPath and a recordTitle, and the subject name embeds the path so a new session force-settles the old file. settle() gains an optional recordTitle used only when it mints a record, and settleOnQueue forwards it. The other machine needs no change: one sync pulls the record and the browse service shows it as a read-only copy.",
+      "NonGoals": "- Backfilling agents that stopped more than 30 minutes before the dashboard saw them\n- Discovering Codex managed-agent homes in `pan vault save --all` (discover.ts)\n- Saving transcripts of harnesses other than Claude Code and Codex (ohmypi, pi, kimi, acp, muse, opencode, prime-agent)\n- Saving remote (Fly) agents' transcripts\n- Filtering, grouping or relabeling agent copies in the other machine's conversation list (PAN-4650 W-CONV2) or per-issue agent views across machines (PAN-4651)\n- Adding a structured agent-provenance field to SessionRecord or any other record-format change\n- Changing the secret scan or the existing hook-plus-poller first-mint race\n- Any change under src/lib/vault/ other than the recordTitle option in settle.ts"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Feed pipeline agents into the existing settle poller rather than adding a sweep to the sync cycle.",
+        "rationale": "The issue says to reuse the existing settle and sync path; the poller already gives debounced auto settles, a force settle on leave, the shutdown flush and the one queued settle path (PAN-4455 D-6)."
+      },
+      {
+        "summary": "Track every agent role with a state.json, but only Claude Code and Codex transcripts.",
+        "rationale": "The issue names work, review, test and other pipeline agents; a role allowlist would silently miss new roles. The vault can browse and resume only Claude Code and Codex, matching the conversation filter."
+      },
+      {
+        "summary": "Tracking window is running/starting or stopped less than 30 minutes ago; no backfill.",
+        "rationale": "The 30-minute tail covers dashboard restarts (pan reload after every merge) while bounding the first-enable cost; conversations have no automatic backfill either."
+      },
+      {
+        "summary": "Record title '<ISSUE> <role> agent (<agentId>)' via a new optional settle() recordTitle, applied only on mint.",
+        "rationale": "The kickoff prompt makes the default title unreadable (verified on agent-pan-4630 transcripts); the title is an existing record field, so the format and the vault import guard are unchanged."
+      },
+      {
+        "summary": "Agent copies appear as ordinary read-only browse rows on other machines; no filtering in this issue.",
+        "rationale": "This is the existing browse path the issue says to reuse and it makes agent work readable in the dashboard; list merging and grouping are owned by PAN-4650 and PAN-4651."
+      },
+      {
+        "summary": "Cache the agent state scan for 60 s and re-resolve transcript paths each poll only for agents in the window.",
+        "rationale": "listAgentStatesAsync reads about 900 state.json files on the operator's machine; scanning every 15 s would add avoidable dashboard load (the operator has hit dashboard stalls from repeated scans before)."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Five items, ten files, two subsystems (vault engine settle option and the dashboard vault services).",
+      "canonicalFilename": "2026-11-01-PAN-4647-auto-save-pipeline-agent-transcripts-to-the-session-vault.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "settle-record-title",
+        "title": "settle() accepts an optional recordTitle for newly minted records",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T04:55:23Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4647",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/vault/settle.ts",
+            "tests/unit/lib/vault/settle.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/vault/settle.test.ts tests/unit/lib/vault/import-graph.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "settle.test.ts passes including the two new recordTitle tests",
+            "import-graph.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. In src/lib/vault/settle.ts add `recordTitle?: string` to SettleOptions (after `wip?: WipMode;`) with the doc comment from the PRD. In the mint branch replace `title: facts.title ?? basename(nativePath),` with `title: options.recordTitle ?? facts.title ?? basename(nativePath),`. Leave the P-6 fork title and the append branch unchanged. Add the two tests named in PRD WI-1 to tests/unit/lib/vault/settle.test.ts."
+        },
+        "items": [
+          {
+            "id": "settle-record-title.ac1",
+            "title": "Given a transcript never settled before, when settle() runs with recordTitle 'PAN-1 work agent (agent-pan-1)', then the decrypted minted record's title equals that string",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settle-record-title.ac2",
+            "title": "Given a record already minted with its first-human-text title, when a later settle appends lines with recordTitle 'other', then the record title is preserved unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settle-record-title.ac3",
+            "title": "Given settle() is called without recordTitle, when it mints a record, then the title defaults to the first human text as before and the existing settle tests pass unmodified",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "agent-subject-lister",
+        "title": "Pipeline-agent subject lister module for the vault poller",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T04:55:23Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4647",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "poller-agent-wiring",
+            "two-machine-agent-e2e"
+          ],
+          "files_scope": [
+            "src/dashboard/server/services/vault-agent-subjects.ts",
+            "tests/unit/dashboard/server/services/vault-agent-subjects.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/server/services/vault-agent-subjects.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "vault-agent-subjects.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-5",
+            "NFR-1",
+            "NFR-3",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Create src/dashboard/server/services/vault-agent-subjects.ts exactly to the shape in the PRD: exports AGENT_TRACK_AFTER_STOP_MS (30 min), AGENT_LIST_TTL_MS (60 s), PipelineAgentSubject {name 'agent:<agentId>:<transcriptPath>', harness 'claude-code'|'codex', transcriptPath, recordTitle, agentId}, pipelineAgentRecordTitle, isInTrackingWindow, createPipelineAgentSubjectLister(deps) and listPipelineAgentSubjects. Default listStates = listAgentStatesAsync({ skip: name starts with 'conv-' or 'ext-' }) imported from src/lib/agents/agent-state-read.js; default resolveTranscript = resolveAgentTranscriptCandidate from src/lib/agents/transcript-resolver.js. Cache the scan for ttlMs; map candidate kind 'claude' to 'claude-code' and 'codex' to 'codex', skip every other kind and null; a rejecting scan or resolve logs '[vault] agent subjects: <message>' once per distinct message and drops only the affected agent (or returns [] on a scan failure). Async fs only. Write the unit tests listed in PRD WI-2 with injected deps and no timers."
+        },
+        "items": [
+          {
+            "id": "agent-subject-lister.ac1",
+            "title": "Given a running work agent agent-pan-1 for PAN-1 whose resolved candidate is claude at /t/a.jsonl, when the lister runs, then it returns one subject named 'agent:agent-pan-1:/t/a.jsonl' with harness 'claude-code' and recordTitle 'PAN-1 work agent (agent-pan-1)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-subject-lister.ac2",
+            "title": "Given agents stopped 29 minutes and 31 minutes ago, an error agent with lastActivity 5 minutes ago, and a stopped agent with no timestamps, when the lister runs, then it returns subjects for the 29-minute and error agents only",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-subject-lister.ac3",
+            "title": "Given candidates of kind codex, pi and null, when the lister runs, then the codex agent maps to harness 'codex' and the pi and null agents produce no subject",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-subject-lister.ac4",
+            "title": "Given an injected clock, when the lister is called at 0 s and 59 s and 61 s, then listStates is called exactly twice",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-subject-lister.ac5",
+            "title": "Given resolveTranscript rejects for one agent twice with the same message, when the lister runs twice, then the other agents still return subjects and console.warn is emitted once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "poller-agent-wiring",
+        "title": "Settle poller tracks agent subjects and forwards recordTitle through settleOnQueue",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T04:55:23Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4647",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/vault-settle-poller.ts",
+            "src/dashboard/server/services/vault-service.ts",
+            "tests/unit/dashboard/server/services/vault-settle-poller.test.ts",
+            "tests/unit/dashboard/server/services/vault-service.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/server/services/vault-settle-poller.test.ts tests/unit/dashboard/server/services/vault-service.test.ts tests/unit/dashboard/server/services/vault-handoff.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "all three test files pass with every pre-existing test unmodified",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-5",
+            "FR-6",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3 steps 1-7. In vault-settle-poller.ts export VaultPollSubject {name, harness?, transcriptPath?, recordTitle?} (do not use field names path or title); change deps to listActive returning VaultPollSubject[] or a Promise of it, resolvePath(subject), and settle(path, harness, wip, options?: {recordTitle?}); default resolvePath casts to LegacyConversation for resolveSessionFile; default listActive returns active claude-code/codex conversations plus await listPipelineAgentSubjects(); PollState stores recordTitle refreshed each poll; await listActive; path = subject.transcriptPath ?? await resolvePath(subject); every settle call (debounce, leave, flush) appends { recordTitle } only when set. Update the module header. In vault-service.ts add recordTitle to settleOnQueue options and forward it into deps.settle only when set; queuedSettle accepts and forwards options. Use fake timers in the new poller tests (repo rule). Add the poller and vault-service tests named in PRD WI-3."
+        },
+        "items": [
+          {
+            "id": "poller-agent-wiring.ac1",
+            "title": "Given listActive returns an agent subject with transcriptPath '/p/a.jsonl' and recordTitle 'PAN-1 work agent (a1)', when the file grows and debounceSec passes under fake timers, then settle is called with ('/p/a.jsonl', 'claude-code', 'auto', { recordTitle: 'PAN-1 work agent (a1)' }) and resolvePath is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "poller-agent-wiring.ac2",
+            "title": "Given an agent subject tracked at '/p/a.jsonl', when the next listActive returns the same agent at '/p/b.jsonl', then settle is called exactly once with ('/p/a.jsonl', 'claude-code', 'force', { recordTitle }) and '/p/b.jsonl' is tracked from its first observed size",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "poller-agent-wiring.ac3",
+            "title": "Given conversation subjects only, when the existing poller tests run, then they pass unmodified and settle is still called with exactly three arguments",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "poller-agent-wiring.ac4",
+            "title": "Given an injected engine settle mock, when settleOnQueue('/p', 'claude-code', 'auto', { recordTitle: 'T' }) runs, then the engine receives an options object containing recordTitle 'T'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "two-machine-agent-e2e",
+        "title": "Two-machine test: a finished work agent is a saved copy on the other machine after one sync",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-01T04:55:23Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4647",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/dashboard/server/services/vault-agent-autosave.e2e.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/server/services/vault-agent-autosave.e2e.test.ts"
+          ],
+          "expected_outputs": [
+            "vault-agent-autosave.e2e.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4 steps 1-7. Follow the machine-switching pattern of tests/unit/dashboard/server/services/vault-handoff.e2e.test.ts (HOME and OVERDECK_HOME per machine, one dir: backend, setupVault on A with passphrase mode none, joinVault on B with the recovery phrase). On A write a 3-line Claude transcript whose first user text starts with '<pasted_content id=\"x\">' in a non-git cwd, plus agents/agent-pan-9999/state.json (role work, issueId PAN-9999, status stopped, stoppedAt one minute ago, harness claude-code; read parseAgentState in src/lib/agents/agent-state-read.ts for required fields) and sessions.json with the absolute transcript path. Run createPipelineAgentSubjectLister()(), then settleOnQueue with the subject's recordTitle. On B run one syncOnce, then readListCache and refreshBrowseCache. Use no timers and no vi.useFakeTimers."
+        },
+        "items": [
+          {
+            "id": "two-machine-agent-e2e.ac1",
+            "title": "Given the agent fixture on machine A, when the real lister runs, then it returns exactly one subject with recordTitle 'PAN-9999 work agent (agent-pan-9999)' and settleOnQueue returns status 'settled' with verdict 'append'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "two-machine-agent-e2e.ac2",
+            "title": "Given machine B joined the same vault, when it runs one syncOnce, then readListCache returns a row with that vaultId, title 'PAN-9999 work agent (agent-pan-9999)', harness 'claude-code' and ownerIsHere false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "two-machine-agent-e2e.ac3",
+            "title": "Given that sync on machine B, when refreshBrowseCache runs, then it returns a copy for that vaultId whose file contains exactly the 3 settled transcript lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-agent-autosave",
+        "title": "Document automatic saving of pipeline agent transcripts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-01T04:55:23Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4647",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/session-vault.mdx",
+            "docs/SESSION-VAULT.md",
+            "features/conversations.mdx",
+            ".overdeck/context/codebase/architecture.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n '30 minutes' configuration/session-vault.mdx",
+            "grep -n 'vault-agent-subjects.ts' docs/SESSION-VAULT.md .overdeck/context/codebase/architecture.md",
+            "grep -c 'last-verified' .overdeck/context/codebase/architecture.md"
+          ],
+          "expected_outputs": [
+            "session-vault.mdx line matches '30 minutes'",
+            "both files match vault-agent-subjects.ts",
+            "architecture.md has exactly 1 last-verified line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. configuration/session-vault.mdx, 'Save and sync' paragraph starting 'With the dashboard running, conversations started from it are saved automatically': add that pipeline agents (work, review, test, planning and other Overdeck agents on Claude Code or Codex) are saved automatically while they run and up to 30 minutes after they stop, titled '<issue> <role> agent (<agent id>)' with the example 'PAN-4630 work agent (agent-pan-4630)', shown on another machine as a read-only 'from <machine>' copy after its next sync; older agents are not saved automatically (pan vault save --all covers older Claude Code transcripts, not Codex agents); pan vault exclude --path <workspace> opts a project's agents out. docs/SESSION-VAULT.md: extend the Auto-settle bullet (tracking window, 60 s scan cache, agent:<agentId>:<path> subject name and session-change force settle, recordTitle) and add the vault-agent-subjects.ts row to the module table. features/conversations.mdx 'Conversations from your other machines': one sentence that pipeline agents saved on another machine appear there with that title. .overdeck/context/codebase/architecture.md Session Vault section: one sentence naming vault-agent-subjects.ts (PAN-4647); keep exactly one last-verified line, at the end, dated the edit day."
+        },
+        "items": [
+          {
+            "id": "docs-agent-autosave.ac1",
+            "title": "configuration/session-vault.mdx Save and sync section states that pipeline agents are saved while running and up to 30 minutes after they stop, and shows the example title 'PAN-4630 work agent (agent-pan-4630)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-agent-autosave.ac2",
+            "title": "Given a reader opens configuration/session-vault.mdx, when they read Save and sync, then the page renders a sentence that agents stopped earlier are not saved automatically and names pan vault save --all and pan vault exclude --path as the manual controls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-agent-autosave.ac3",
+            "title": "docs/SESSION-VAULT.md Auto-settle bullet describes the tracking window and recordTitle, and its module table contains a vault-agent-subjects.ts row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-agent-autosave.ac4",
+            "title": "features/conversations.mdx 'Conversations from your other machines' renders a sentence that pipeline agents from another machine appear there, and architecture.md names vault-agent-subjects.ts with exactly one last-verified line at the end",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "settle-record-title",
+        "to": "poller-agent-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "agent-subject-lister",
+        "to": "poller-agent-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "poller-agent-wiring",
+        "to": "two-machine-agent-e2e",
+        "type": "blocks"
+      },
+      {
+        "from": "agent-subject-lister",
+        "to": "two-machine-agent-e2e",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

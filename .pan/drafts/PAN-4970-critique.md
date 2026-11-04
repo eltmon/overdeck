@@ -1,0 +1,17 @@
+plan-digest: 8e9f0f204d4a48fec0c76aa4009c9f83a0ca3222471e50ecde9a5461a9d4ec72
+
+## blocks-the-design: A pending row can have no running per-PR path
+
+Decision 2 and `owner-rule.ac1` assign a `pending` or `merging` row to `per-pr` before checking the kill switch or UAT hold. But [auto-merge-executor.ts](/home/eltmon/Projects/overdeck/workspaces/feature-pan-4970/src/dashboard/server/services/auto-merge-executor.ts), lines 339–347, does not start when `OVERDECK_DISABLE_AUTO_MERGE=1`. Its eligibility check at lines 204–209 blocks a row whose issue becomes held for UAT; [auto-merge-eligibility.ts](/home/eltmon/Projects/overdeck/workspaces/feature-pan-4970/src/lib/cloister/auto-merge-eligibility.ts), lines 153–170, confirms that hold. The planned reconciler removes the feature from its ready set, so a pending row under the kill switch has no executor and cannot enter a batch; a newly held feature waits for the executor to block the row before it can enter a batch. Specify a safe handoff for pending rows when the per-PR path is disabled or becomes ineligible, including how the row is cancelled or suspended before batch ownership so re-enabling auto-merge cannot race an existing batch. Test both transitions.
+
+## blocks-the-design: Failed auto-merge at the same head is assigned to a path that cannot schedule it
+
+Decision 2 rule 8 and `owner-rule.ac3` assign every `failed` row to `per-pr`. [auto-merge-scheduler.ts](/home/eltmon/Projects/overdeck/workspaces/feature-pan-4970/src/dashboard/server/services/auto-merge-scheduler.ts), lines 153–179 and 306–309, refuses to re-arm a failed row for the same PR head. Its existing test at [auto-merge-scheduler.test.ts](/home/eltmon/Projects/overdeck/workspaces/feature-pan-4970/src/dashboard/server/services/__tests__/auto-merge-scheduler.test.ts), lines 429–433, verifies this. The reconciler would exclude that ready feature indefinitely, and the queue would describe it as auto-merging. Make ownership account for the current PR head: a failed row that the scheduler cannot re-arm must be batch-owned, while a changed head may be per-PR-owned. Reuse `latestAutoMergeAllowsSchedule` or its exact decision, and test same-head, changed-head, and headless legacy rows.
+
+## blocks-the-design: The specified rejection handler misses synchronous throws
+
+PRD item 2 says a throwing `mergesPerPr` counts as `false`, then prescribes `Promise.resolve(deps.mergesPerPr?.(feature)).catch(() => false)`. JavaScript evaluates `deps.mergesPerPr?.(feature)` before calling `Promise.resolve`, so a synchronous throw escapes and aborts the reconciler tick at [uat-reconciler.ts](/home/eltmon/Projects/overdeck/workspaces/feature-pan-4970/src/lib/cloister/uat-reconciler.ts), line 221, before stale generations are checked or cleaned up. Specify `try/catch` or `Promise.resolve().then(() => deps.mergesPerPr?.(feature)).catch(() => false)`, and test a synchronous throw as well as a rejected promise.
+
+## sharpens-framing: The documentation says only held features batch while auto-merge is on
+
+PRD item 9 and `docs.ac2` require that sentence, but Decision 2 assigns a cancelled row and a Deft hold to `batch` even when auto-merge is on. [auto-merge-scheduler.ts](/home/eltmon/Projects/overdeck/workspaces/feature-pan-4970/src/dashboard/server/services/auto-merge-scheduler.ts), lines 270–289, confirms those skips. Change the documentation criterion to describe every batch-owned case in the owner rule, so the shipped documentation does not contradict the behavior.

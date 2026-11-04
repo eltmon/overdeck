@@ -50,10 +50,12 @@ export function buildKimiAcpSpawnInput(
  * its own registry ids (see `kimi provider list --json`), which carry the
  * managed-provider prefix:
  *
+ *   kimi-code/k3.1-pro                   K3.1 Pro, 1,048,576-token context
+ *   kimi-code/k3.1-pro-highspeed         K3.1 Pro Highspeed, 1,048,576-token context
  *   kimi-code/k3                         K3, 1,048,576-token context
  *   kimi-code/k3-256k                    K3, 262,144-token context
- *   kimi-code/kimi-for-coding            K2.7 Coding, 262,144-token context
- *   kimi-code/kimi-for-coding-highspeed  K2.7 Coding Highspeed
+ *   kimi-code/kimi-for-coding            K2.8 Preview, 1,048,576-token context
+ *   kimi-code/kimi-for-coding-highspeed  K2.7 Code Highspeed, 262,144-token context
  *
  * Overdeck's catalog ids (`k3` = 256K, `k3[1m]` = 1M — see
  * src/lib/model-capabilities.ts) must be translated at this boundary or the
@@ -67,6 +69,8 @@ export function buildKimiAcpSpawnInput(
  * __tests__/kimi.test.ts locks the two together.
  */
 const KIMI_ACP_MODEL_IDS: Record<string, string> = {
+  "k3.1-pro": "kimi-code/k3.1-pro",
+  "k3.1-pro-highspeed": "kimi-code/k3.1-pro-highspeed",
   "k3": "kimi-code/k3-256k",
   "k3-256k": "kimi-code/k3-256k",
   "k3[1m]": "kimi-code/k3",

@@ -40,6 +40,8 @@ import styles from '../../CommandDeck/styles/command-deck.module.css';
 import type { MessagesTimelineProps, RoundMarker } from './types';
 import { RoundDivider } from './dividers';
 import { TimelineRowRenderer } from './TimelineRowRenderer';
+import { CiteSelectionLayer } from '../citations/CiteSelectionToolbar';
+import { CitationTargetContext } from '../../../lib/composerCitations';
 import { useConnectionPhase } from '../../../lib/connectionState';
 import { useConversationBookmarks } from '../bookmarks/ConversationBookmarks';
 import {
@@ -88,6 +90,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   targetMessageNonce,
   onTargetMessageHandled,
   bookmarksEnabled = false,
+  citationsEnabled = false,
   history,
   onLoadOlder,
   onLoadOlderUntil,
@@ -545,6 +548,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
 
   return (
     <ChatMarkdownSettingsProvider>
+    <CitationTargetContext.Provider value={citationsEnabled && conversationName ? conversationName : null}>
       <div style={{ position: 'relative', flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
       <div
         ref={scrollContainerRef}
@@ -607,6 +611,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
                       onOpenTerminal={onOpenTerminal}
                       onPaneChoiceAnswered={onPaneChoiceAnswered}
                       bookmarkable={bookmarksEnabled}
+                      citeConversationName={citationsEnabled ? conversationName : undefined}
                     />
                     {markersForRow?.map((marker) => (
                       <RoundDivider
@@ -651,6 +656,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
                 onOpenTerminal={onOpenTerminal}
                 onPaneChoiceAnswered={onPaneChoiceAnswered}
                 bookmarkable={bookmarksEnabled}
+                citeConversationName={citationsEnabled ? conversationName : undefined}
               />
               {markersForRow?.map((marker) => (
                 <RoundDivider
@@ -663,6 +669,10 @@ export const MessagesTimeline = memo(function MessagesTimeline({
         })}
       </div>
     </div>
+
+    {citationsEnabled && conversationName && (
+      <CiteSelectionLayer conversationName={conversationName} rootRef={scrollContainerRef} />
+    )}
 
     {searchOpen && (
       <div
@@ -832,6 +842,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
       </button>
     )}
       </div>
+    </CitationTargetContext.Provider>
     </ChatMarkdownSettingsProvider>
   );
 });

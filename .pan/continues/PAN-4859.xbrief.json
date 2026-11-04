@@ -1,0 +1,103 @@
+{
+  "version": "1",
+  "issueId": "PAN-4859",
+  "created": "2026-11-02T23:46:32.176Z",
+  "updated": "2026-11-03T00:14:48.601Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "parse-destination": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4859",
+      "claimedAt": "2026-11-02T23:46:32.176Z",
+      "doneAt": "2026-11-02T23:59:38.260Z"
+    },
+    "remote-authority": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4859",
+      "claimedAt": "2026-11-02T23:59:57.595Z",
+      "doneAt": "2026-11-03T00:02:46.983Z"
+    },
+    "resolver-uses-destination": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4859",
+      "claimedAt": "2026-11-03T00:02:54.632Z",
+      "doneAt": "2026-11-03T00:05:46.160Z"
+    },
+    "route-ssh-lookup": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4859",
+      "claimedAt": "2026-11-03T00:05:52.735Z",
+      "doneAt": "2026-11-03T00:08:49.528Z"
+    },
+    "docs-open-in-editor": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4859",
+      "claimedAt": "2026-11-03T00:08:56.889Z",
+      "doneAt": "2026-11-03T00:09:37.681Z"
+    },
+    "parse-destination.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T00:11:31.081Z"
+    },
+    "parse-destination.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T00:11:46.247Z"
+    },
+    "parse-destination.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T00:12:02.017Z"
+    },
+    "remote-authority.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T00:12:15.929Z"
+    },
+    "remote-authority.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T00:12:29.819Z"
+    },
+    "remote-authority.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T00:12:43.597Z"
+    },
+    "resolver-uses-destination.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T00:12:57.872Z"
+    },
+    "resolver-uses-destination.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T00:13:11.172Z"
+    },
+    "resolver-uses-destination.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T00:13:23.585Z"
+    },
+    "resolver-uses-destination.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T00:13:36.669Z"
+    },
+    "route-ssh-lookup.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T00:13:50.421Z"
+    },
+    "route-ssh-lookup.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T00:14:05.024Z"
+    },
+    "route-ssh-lookup.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T00:14:20.106Z"
+    },
+    "docs-open-in-editor.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T00:14:34.272Z"
+    },
+    "docs-open-in-editor.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T00:14:48.600Z"
+    }
+  }
+}

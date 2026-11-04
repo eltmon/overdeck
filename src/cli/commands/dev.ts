@@ -291,14 +291,13 @@ export async function devCommand(options: { skipTraefik?: boolean; deacon?: bool
 
     const traefikDir = join(process.env.HOME || '', '.overdeck', 'traefik');
     if (existsSync(traefikDir)) {
-      try {
-        console.log(chalk.dim('Starting Traefik...'));
-        // PAN-4299: ports on the configured bind address; `up -d` recreates the container on change.
-        (await import('../../lib/traefik.js')).migrateTraefikCompose(join(traefikDir, 'docker-compose.yml'));
-        execSync('docker compose up -d', { cwd: traefikDir, stdio: 'pipe' });
-        console.log(chalk.green('✓ Traefik started'));
-      } catch {
+      console.log(chalk.dim('Starting Traefik...'));
+      // PAN-4299: ports on the configured bind address; `up -d` recreates the container on change.
+      const { startTraefikContainer } = await import('./traefik-start.js');
+      if ((await startTraefikContainer(traefikDir, { skipWhenRunning: false })) === 'failed') {
         console.log(chalk.yellow('⚠ Failed to start Traefik (continuing anyway)'));
+      } else {
+        console.log(chalk.green('✓ Traefik started'));
       }
     }
   }

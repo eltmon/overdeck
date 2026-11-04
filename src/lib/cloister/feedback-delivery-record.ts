@@ -31,11 +31,13 @@ import {
   type PipelineJournalEntry,
 } from './pipeline-journal.js';
 
-export type VerdictFeedbackKind = 'review' | 'uat';
+/** PAN-4773: `coderabbit` findings are keyed per review and have no passing verdict. */
+export type VerdictFeedbackKind = 'review' | 'uat' | 'coderabbit';
 
 function isPassingVerdict(entry: PipelineJournalEntry, kind: VerdictFeedbackKind): boolean {
   if (kind === 'review') return entry.type === 'review.verdict' && entry.data?.verdict === 'APPROVED';
-  return entry.type === 'uat.verdict' && entry.data?.status === 'passed';
+  if (kind === 'uat') return entry.type === 'uat.verdict' && entry.data?.status === 'passed';
+  return false;
 }
 
 /** How many passing verdicts of this kind the issue's journal holds. */

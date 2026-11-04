@@ -24,6 +24,29 @@ resolve_merge_base() {
   git merge-base "$BASE_REF" HEAD
 }
 
+# PAN-4917: CI checks out one commit. Fetch the history the check reads, which
+# is the base branch and HEAD, without blobs or tags. fetch-depth: 0 also pulls
+# every other branch; the archived overdeck-state branch alone is ~195k commits,
+# and that checkout timed the job out.
+fetch_history() {
+  local remote="${BASE_REF%%/*}" branch="${BASE_REF#*/}"
+  local deepen=()
+  if [[ "$(git rev-parse --is-shallow-repository)" == true ]]; then
+    deepen=(--unshallow)
+  fi
+  # The script runs under set -e; test the fetch so a failure prints our message.
+  if ! git fetch --no-tags --filter=blob:none ${deepen[@]+"${deepen[@]}"} "$remote" \
+    "+refs/heads/$branch:refs/remotes/$remote/$branch" "$(git rev-parse HEAD)"; then
+    fail "history fetch failed from $remote"
+    exit 1
+  fi
+  if [[ "$(git rev-parse --is-shallow-repository)" != false ]] \
+    || ! git rev-parse --verify --quiet "$BASE_REF" >/dev/null; then
+    fail "history fetch left the clone shallow or without $BASE_REF"
+    exit 1
+  fi
+}
+
 # List prompt files changed between the merge base and HEAD.
 changed_prompt_files() {
   local merge_base="$1"
@@ -107,6 +130,7 @@ self_test() {
     echo '# prompt' >roles/flywheel.md
     git add roles/flywheel.md
     git commit -q -m "update flywheel prompt"
+    git branch no-trailer
     if PROMPT_CHANGE_ROOT="$tmp" PROMPT_CHANGE_BASE_REF=main bash "$ROOT/scripts/check-prompt-change-trailer.sh"; then
       echo "self-test failed: prompt change without trailer should fail" >&2
       exit 1
@@ -122,6 +146,38 @@ Prompt-Change: clarified auto_pickup_backlog semantics"
       echo "self-test failed: prompt change with trailer should pass" >&2
       exit 1
     fi
+
+    # PAN-4917: --fetch completes a shallow clone, as CI checks out one commit.
+    git checkout -q main
+    git config uploadpack.allowFilter true
+    git config uploadpack.allowReachableSHA1InWant true
+    for case in no-trailer:fail topic:pass main:pass; do
+      branch="${case%%:*}" want="${case##*:}"
+      git clone -q --depth 1 --branch "$branch" "file://$tmp" "$tmp/clone-$branch"
+      if [[ "$(git -C "$tmp/clone-$branch" rev-parse --is-shallow-repository)" != true ]]; then
+        echo "self-test failed: the $branch clone is not shallow" >&2
+        exit 1
+      fi
+      if PROMPT_CHANGE_ROOT="$tmp/clone-$branch" bash "$ROOT/scripts/check-prompt-change-trailer.sh" --fetch; then got=pass; else got=fail; fi
+      if [[ "$got" != "$want" ]]; then
+        echo "self-test failed: --fetch on $branch should $want" >&2
+        exit 1
+      fi
+      if [[ "$(git -C "$tmp/clone-$branch" rev-parse --is-shallow-repository)" != false ]]; then
+        echo "self-test failed: --fetch left the $branch clone shallow" >&2
+        exit 1
+      fi
+    done
+
+    # PAN-4917: a fetch that fails exits 1 with a prompt-trailer error.
+    git clone -q --depth 1 --branch topic "file://$tmp" "$tmp/clone-broken"
+    git -C "$tmp/clone-broken" remote set-url origin "file://$tmp/missing"
+    status=0
+    out="$(PROMPT_CHANGE_ROOT="$tmp/clone-broken" bash "$ROOT/scripts/check-prompt-change-trailer.sh" --fetch 2>&1)" || status=$?
+    if [[ "$status" != 1 || "$out" != *"prompt-trailer: history fetch failed"* ]]; then
+      echo "self-test failed: --fetch from a missing remote should exit 1 with a prompt-trailer error" >&2
+      exit 1
+    fi
   )
   rm -rf "$tmp"
   log "self-test passed"
@@ -130,6 +186,10 @@ Prompt-Change: clarified auto_pickup_backlog semantics"
 if [[ "${1:-}" == "--self-test" ]]; then
   self_test
   exit 0
+fi
+
+if [[ "${1:-}" == "--fetch" ]]; then
+  fetch_history
 fi
 
 check

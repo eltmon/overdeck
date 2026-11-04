@@ -11,15 +11,32 @@ terminal backend (Herdr by default, tmux when `terminal.backend: tmux`).
 | `src/cli/` | Commander-based CLI. `index.ts` declares all verbs/flags; `commands/` holds per-verb modules (doctor, install, memory, task…). |
 | `src/lib/` | Core domain logic shared by CLI and server. The big ones below. |
 | `src/dashboard/server/` | Effect.js HTTP server + raw WebSocket terminal streaming. Entry `main.ts`, routes in `routes/`, services in `services/`. Runs ONLY as built `dist/dashboard/server.js` under Node 22. |
+| `src/dashboard/server/sharing/` | Shared Sessions host WebRTC (PAN-4474): `peer-hub.ts` (one werift peer per host-admitted viewer, five channels, reads only `control`), `conversation-bridge.ts`, `terminal-bridge.ts` (PAN-4477: a watching viewer's read-only terminal from a Herdr observe stream or a tmux hub listener), `channel-writer.ts`; owned by `ShareManager` in `services/share-host.ts`. Viewer side: `services/share-join.ts` + frontend `components/chat/sharing/` (`SharedTerminalView.tsx` for the terminal). Terminal PTYs: `pty-hub.ts` (tmux, one PTY per session, many `/ws/terminal` clients plus read-only listeners) and `pty-hub-attach.ts` (hub PTY start, `subscribeToTmuxHub`) vs per-client Herdr bridges in `ws-terminal.ts`. See `docs/SHARED-SESSIONS.md`. |
 | `src/dashboard/frontend/` | React + Zustand + Vite SPA. Components under `src/components/`. |
 | `packages/contracts/` | Shared types/schemas (`@overdeck/contracts`) used by server + frontend (e.g. `Harness` union at `src/types.ts:49`). |
+| `packages/anywhere-channel/` | `@overdeck/anywhere-channel` (PAN-4833): the secure-channel protocol (`noise.ts`, `wire.ts`, `initiator.ts`) for server and phone, behind a crypto port. Entries `.` (core), `./node` (`nodeCrypto`), `./web` (`webCrypto`, `openSecureChannel`, `RtcDuplexWeb`, `DirectoryWebClient`, `createMachineDialer`, `createChannelPool`, `ChannelWebSocket`, `installChannelShims`). Source exports, bundled into the server; own `typecheck:anywhere-channel` lane; CP-1 harness under `cp1/`. See its `README.md`. |
+| `apps/mobile/` | `@overdeck/mobile` (PAN-4837): the Capacitor 8 phone app (`ai.overdeck.app`). A Vite web build that renders the frontend's `/m` screens over `@overdeck/anywhere-channel/web` shims; shell screens in `src/shell/`, the `OverdeckKeys` native plugin in `android/` and `ios/`, push registration in `src/native/push.ts`; on iOS the `NotificationService` extension (`ios/App/NotificationService/`) decrypts notifications through the shared `OverdeckPush` Swift package (`ios/OverdeckPush/`, PAN-4838). Own `typecheck:mobile` lane and Vitest config; CI job `mobile-android`. See its `README.md`. |
 | `sync-sources/skills/` | Bundled wrapper skills for `pan` verbs, one `<name>/SKILL.md` each (lint-enforced vs `--help` by `scripts/lint-skills.sh`). Exception: `okf/` is canonical in `eltmon/okf` (since 2026-09-29; the old subtree mirror was deleted in `abaeeab9647`) and is vendored here from a release tag — never edit it in place (PAN-4408). |
 | `roles/` | Prompt sources for pipeline roles (plan/work/review/test + review sub-roles). |
 | `sync-sources/rules/` | Bundled context rules distributed by `pan sync`. |
 | `services/account/` | The overdeck.ai account service: a Cloudflare Worker (D1) for GitHub sign-in, device tokens, the invite-only allowlist and its admin screen. Own Bun workspace and `typecheck:account` lane; Web APIs only; unit tests on a `node:sqlite` D1 shim, one Miniflare integration test. Deploy is operator-only. See `docs/ACCOUNT-SERVICE.md`. |
+| `services/connect/` | The overdeck.ai directory (PAN-2356): a Cloudflare Worker with one `AccountDirectory` SQLite Durable Object per account (machine presence and the free 3-machine limit, phone clients (5 per account) and connector clients (10 per account, `platform: node`), neither counted as machines, bearer-subprotocol auth), WebRTC signalling, two-screen approval requests, relay TURN credentials and monthly metering, the sealed webhook inbox), checking device tokens through `AccountRpc`. Own `typecheck:connect` lane; tests under `tests/{unit,integration}/services/connect/`; `scripts/anywhere/directory-smoke.mjs` runs it end to end. See `docs/CONNECT-SERVICE.md`. |
+| `services/share/` | Shared Sessions rendezvous: a Cloudflare Worker with one `ShareRoom` Durable Object per room (hibernating sockets, WebRTC signalling, Cloudflare Realtime TURN credentials), checking device tokens through the `ACCOUNT` service binding (`AccountRpc`). It also hosts the browser join page (PAN-4481): a GitHub sign-in it runs as the OAuth client into a sealed `__Host-ods_session` cookie, the cookie-and-Origin-authenticated `/v1/rooms/:code/web-join` socket, and the plain-DOM viewer in `services/share/web/`, bundled by esbuild into `public/viewer/` and served through the `ASSETS` binding. Own `typecheck:share` lane (also checks `web/tsconfig.json`); tests under `tests/{unit,integration}/services/share/`. See `docs/SHARED-SESSIONS.md`. |
 
 ## Key src/lib modules
 
+- `anywhere/` (PAN-4645) — machine links: the X25519 machine key (`machine-key.ts`), the Noise
+  secure channel (`channel/`: `open.ts`/`accept.ts`, `ChannelSocket`; the Noise and wire code —
+  `noise.ts`, `wire.ts`, the shared initiator — lives in `@overdeck/anywhere-channel` and the
+  server passes it the Node crypto port, `nodeCrypto`), route parsing and ranking (`routes.ts`), the link store (`link-store.ts`,
+  `machine-links.json`) and `linkFetch` pooling (`link-client.ts`). The supervisor and boot live in
+  `src/dashboard/server/services/{link-supervisor,anywhere-boot}.ts`. PAN-2356 adds the WebRTC
+  transport (`channel/rtc-transport.ts`, `rtc-duplex.ts`), approval mode `03`, `sealed-box.ts` and
+  `directory-config.ts`; the directory client, approvals, relay meter and inbox client are
+  `src/dashboard/server/services/{directory-*,relay-client,inbox-client}.ts`. See `docs/ANYWHERE-ARCHITECTURE.md`.
+  `connect-runtime.ts` owns the `pan connect` runtime (`ensureDurableRuntime`,
+  `isRuntimePackageRoot`); `update-manager.ts` installs updates into it when the dashboard
+  runs from it (PAN-4722).
 - `agents.ts` is now a thin barrel over `src/lib/agents/` — `spawn.ts` (`spawnAgent`,
   `spawnRun`), `spawn-prep.ts` (`buildAgentLaunchConfig`, tier spawn params),
   `staffing.ts` (the single staffing resolver, PAN-2397), `resolve-tier.ts` +
@@ -51,6 +68,20 @@ terminal backend (Herdr by default, tmux when `terminal.backend: tmux`).
   `model-fallback.ts` `MODEL_PROVIDERS`, `providers.ts`, `cost.ts` and the dashboard pickers.
   OpenAI ids may also need a ChatGPT-sign-in Codex floor (`codex/model-floors.ts`), and they
   join `GPT_56_MODELS` (`agents/provider-env.ts`) only when the pinned CLIProxy serves them.
+  Kimi ids on the Claude Code route get their wire id from `getClaudeCodeLaunchModel`
+  (`kimi-claude-routing.ts`, a narrow id set) and `resolveKimiModelForEndpoint` (`providers.ts`,
+  coding vs platform endpoint); native `kimi-code/*` aliases need rows in both
+  `KIMI_LEGACY_MODEL_TO_NATIVE_ALIAS` and `acp/kimi.ts` `KIMI_ACP_MODEL_IDS` (a lockstep test).
+  Retiring an id: a `MODEL_DEPRECATIONS` row, out of `PROVIDERS.<p>.models`/available lists/pickers, but
+  capability (`(deprecated)` displayName), cost and `getProviderForModel` lookup-list rows stay.
+  `tierModels`/`haikuModel` become Claude Code tier env vars, so they must never name a retired id;
+  `tier-table.ts` validates tiered-execution ids against `provider.models`. `getPricing` prefix-matches
+  in table order, so a longer id's cost row goes above its prefix. Google/DashScope also need
+  `ohmypi-models.ts` registry rows (their default harness is ohmypi).
+  `MODEL_CAPABILITIES` is `Record<ModelId, …>`: a retired id stays in its type union and
+  routing list (only `models`/`tierModels`/pickers drop it). A provider-native id containing `/`
+  (Nous `qwen/qwen3.6-plus`) needs a carve-out before the OpenRouter slash catch-all in
+  `getProviderForModel` and `isOpenRouterModel`. Effort = model ∩ harness row (`effort-support.ts`).
 - `config-yaml.ts` — `~/.overdeck/*.yaml` settings: `RoleConfig` (model/harness/effort
   per role), `providerHarnesses`, workhorses, normalization + defaults.
 - `settings-api.ts` — settings GET/PUT payload mapping between YAML and dashboard.
@@ -92,7 +123,9 @@ terminal backend (Herdr by default, tmux when `terminal.backend: tmux`).
   claude-code, `ohmypi-parser.ts`, `codex-parser.ts`, legacy `pi-parser.ts`),
   `cost.ts` (pricing table, `getPricing`), `overdeck/cost.ts` (the two-door
   CostWriter: `record()` dedupes by requestId/sourceFile → append-only archive →
-  `cost_events` SQLite; `reconcile({source})` sweeps per-agent session dirs).
+  `cost_events` SQLite; `reconcile({source})` sweeps per-agent session dirs),
+  `overdeck/cost-issue-rollup.ts` (trigger-maintained `cost_issue_rollup` table read by
+  `getCostsByIssue`, PAN-4724).
   Live triggers: claude via WAL/transcript sync, ohmypi via
   `cloister/pi-cost-reconciler.ts` (gated on a running ohmypi agent), plus
   `POST /api/costs/reconcile` (`dashboard/server/routes/costs.ts`).
@@ -112,6 +145,9 @@ CI test-job classification (`verification.tests: ci`, PAN-3965) lives in
 (`cloister/pr-facts.ts`), the default-branch baseline
 (`cloister/ci-default-branch-tests.ts`) and the `check_run`/`status` webhooks
 (`webhook-handlers.ts` → `cloister/ci-failure-feedback.ts`) all filter through it.
+Per-check failures on a PR head (`listFailedChecks`, `listFailedTestChecks`,
+`FailedCheck`) live in `cloister/check-failures.ts` and are re-exported from
+`pr-facts.ts` (PAN-4917).
 
 ## Spawn sites (harness decision points)
 
@@ -157,14 +193,29 @@ There is no per-issue pipeline record since the Cut (PAN-3917).
 
 ## Remote (Fly.io) work agents
 
-Work agents can run on Fly.io VMs (`src/lib/remote/remote-agents.ts`,
-`fly-provider.ts`). State lives at
+Work agents can run on Fly.io VMs. State lives at
 `~/.overdeck/agents/agent-<issue>/remote-state.json` (`location: 'remote'`,
-`vmName`, `status`). The dashboard surfaces them via
-`listActiveRemoteAgentStates()` in `services/resource-discovery.ts` (issue chip
-+ aggregate status, PAN-1676) and session-row synthesis in
-`routes/projects.ts` `collectSessionTreeNodes()` (PAN-1775). Remote agents have
-no local tmux session — never assume tmux discovery covers them.
+`vmName`, `status`), scanned by `listActiveRemoteAgentStates()`
+(`remote-agents.ts`). Since PAN-4734, `pan start --remote` (and `--machine fly`)
+goes through `src/cli/commands/start-remote.ts` → `POST /api/remote/work-agents`
+→ `services/fly-work-agent-service.ts`: the agent runs as a **conversation** on a
+PAN-4652 Fly machine (VMs that run `pan serve`, linked from home:
+`src/lib/anywhere/fly/`, `services/fly-machine-service.ts`, `pan machines add-fly`),
+in the worktree `/workspace/<project>/workspaces/feature-<issue>`. Its remote-state
+carries `linked: true` plus the VM tmux target (`tmuxSession: conv-<name>`,
+`tmuxSocket: overdeck`) that every remote tmux helper resolves through
+`remoteTmuxTarget()`. The issue tree shows it as a linked conversation row
+(`resourceDetails.conversations`, `origin: 'linked'`), not a `SessionNode`. Legacy
+raw-tmux VMs (`src/lib/remote-workspace.ts` `createRemoteWorkspace`, no Overdeck
+server) remain only for workspaces created before PAN-4734; the dashboard helper
+`handleRemoteAgentSpawn` still spawns on them and writes `state.json`. Remote agents
+have no local tmux session — never assume tmux discovery covers them. The reap is
+`remote-completion.ts` (deacon-lite, behind the freeze, keyed on
+`/workspace/.pan/REMOTE_DONE`); for a linked agent it destroys the Fly machine
+through `destroyAndForgetFlyMachine` (`fly-machine-loops.ts`). The default
+image is `registry.fly.io/<app>:latest` (`defaultFlyImage()` in `fly-provider.ts`,
+used by both `FlyProvider` and `provisionFlyMachine`), because the Fly registry is
+app-scoped (PAN-4682).
 
 ## Dashboard Agents page (`/agents`)
 
@@ -176,7 +227,7 @@ Directory as `?view=history`.
 
 ## Awareness rail (Command Deck right column)
 
-`components/sessionFeed/SessionFeedSidebar.tsx`: Needs you = `DecisionsPanel`, fed by `lib/useDecisions.ts` (agent rows with non-empty `pendingInputKinds` from the 10 s enrichment poller `services/agent-enrichment-service.ts` → `computeAgentEnrichment` in `src/lib/agent-enrichment.ts`, which also surfaces an open `pan ask` decision from the workspace pipeline journal via `src/lib/cloister/operator-decision.ts` (PAN-4383), plus a 5 s poll of `/api/conversations/pending-input`, which also returns every unarchived held handoff with `heldKickoff: { since, focus? }`, shown as the non-blocking `heldKickoff` kind (PAN-4596)); agent answers go to `POST /api/agents/:id/answer-question` (`routes/agents/permissions.ts`); Project/Global merge conversations (`GET /api/conversations`), `activity.entry` (`recentActivity`, capped at 50) and memory observations in `useMergedFeed.ts`, with All / Chats / Activity tabs. All dates conversations by `createdAt`/`endedAt` in a 24 h window; Chats by recency. Lanes fold into one run card per `(projectKey, gauntletRun)` (`gauntletRunEntries.ts`); D10 lane activity is `laneActivityOf` in `@overdeck/contracts` (PAN-4301). PAN-4306 moves telemetry to `activity.detailed`. Details: `docs/DASHBOARD-ARCHITECTURE.md` "Awareness feed".
+`components/sessionFeed/SessionFeedSidebar.tsx`: Needs you = `DecisionsPanel`, fed by `lib/useDecisions.ts` (agent rows with non-empty `pendingInputKinds` from the 10 s enrichment poller `services/agent-enrichment-service.ts` → `computeAgentEnrichment` in `src/lib/agent-enrichment.ts`, which also surfaces an open `pan ask` decision from the workspace pipeline journal via `src/lib/cloister/operator-decision.ts` (PAN-4383), plus a 5 s poll of `/api/conversations/pending-input`, which also returns every unarchived held handoff with `heldKickoff: { since, focus? }`, shown as the non-blocking `heldKickoff` kind (PAN-4596), plus a root-viewer-only 5 s poll of `/api/mcp-oauth/approvals` surfaced as the blocking `mcpSignIn` kind, rendered by `components/McpSignInCard.tsx` (PAN-4946)); agent answers go to `POST /api/agents/:id/answer-question` (`routes/agents/permissions.ts`); Project/Global merge conversations (`GET /api/conversations`), `activity.entry` (`recentActivity`, capped at 50) and memory observations in `useMergedFeed.ts`, with All / Chats / Activity tabs. All dates conversations by `createdAt`/`endedAt` in a 24 h window; Chats by recency. Lanes fold into one run card per `(projectKey, gauntletRun)` (`gauntletRunEntries.ts`); D10 lane activity is `laneActivityOf` in `@overdeck/contracts` (PAN-4301). PAN-4306 moves telemetry to `activity.detailed`. Details: `docs/DASHBOARD-ARCHITECTURE.md` "Awareness feed".
 
 ## Flywheel (PAN-3964, derived view)
 
@@ -189,11 +240,13 @@ injectable dep: the lib defaults serve the CLI; the route must inject the server
 facts (IssueDataService tracker rows, `getBackendPanes()`), because `src/lib` never
 imports server code. Contract: `packages/contracts/src/flywheel-derived.ts`.
 
-Skills: `pan sync` copies `sync-sources/skills` → `~/.overdeck/skills` → `~/.claude/skills` + `~/.agents/skills`; workspaces get a copy in `.claude/skills` (`skills-merge.ts`); Codex agents copy into a per-agent `CODEX_HOME/skills`. Per-skill on/off (global `config.yaml` `skills.overrides`, project `projects.yaml` `skill_overrides`, issue `<planHome>/.pan/skill-overrides/<ISSUE>.yaml`, conversation (`conversations.skill_overrides`, `pan skills launch-settings --conversation`, PAN-4486; `pan handoff --skill/--pack` writes it for the successor, PAN-4499)) lives in `src/lib/skill-overrides/`; launchers hide off skills by name at launch through `pan skills launch-settings` (Claude `--settings` `skillOverrides`, Codex `[[skills.config]] enabled=false`) — PAN-3942. `launcher-lines.ts` is a leaf so `launcher-generator.ts` never reaches the store. Skill packs (PAN-4334, `src/lib/skill-packs/`): third-party skill repos registered with `pan skills pack add` (registry `config.yaml` `skills.packs.<id>`, pinned to a trusted commit, cache `~/.overdeck/packs/`), off unless toggled on per level (`pack_overrides`/`skill_pack_overrides`/issue `packs:`); the same launch step mounts enabled pack skills as a generated plugin (Claude `--plugin-dir` per-launch link, Codex `overdeck-packs` local marketplace in per-agent `CODEX_HOME`), shown to agents as `pack:skill`. `KNOWN_PACKS` (`adapters.ts`) carries per-id defaults such as opt-in skills. Deft Directive (PAN-3943): the `deft` known pack uses the `deft-readonly` adapter (`skill-packs/deft.ts` skill map, allowlist, and host notice the mount inserts); `src/lib/deft/` holds read-only Directive detection, the ownership report, the managed-mode decision (`projects.<key>.deft_integration`), and the per-launch plan the same launch step applies (env file read by an allowlist in the launcher, marked `.deft-directive-disable` flag in issue worktrees only, Claude `permissions.deny` outside Directive projects).
+Skills: `pan sync` copies `sync-sources/skills` → `~/.overdeck/skills` → `~/.claude/skills` + `~/.agents/skills`; workspaces get a copy in `.claude/skills` (`skills-merge.ts`); Codex agents copy into a per-agent `CODEX_HOME/skills`. Per-skill on/off (global `config.yaml` `skills.overrides`, project `projects.yaml` `skill_overrides`, issue `<planHome>/.pan/skill-overrides/<ISSUE>.yaml`, conversation (`conversations.skill_overrides`, `pan skills launch-settings --conversation`, PAN-4486; `pan handoff --skill/--pack` writes it for the successor, PAN-4499)) lives in `src/lib/skill-overrides/`; launchers hide off skills by name at launch through `pan skills launch-settings` (Claude `--settings` `skillOverrides`, Codex `[[skills.config]] enabled=false`) — PAN-3942. `launcher-lines.ts` is a leaf so `launcher-generator.ts` never reaches the store. Skill packs (PAN-4334, `src/lib/skill-packs/`): third-party skill repos registered with `pan skills pack add` (registry `config.yaml` `skills.packs.<id>`, pinned to a trusted commit, cache `~/.overdeck/packs/`), off unless toggled on per level (`pack_overrides`/`skill_pack_overrides`/issue `packs:`); the same launch step mounts enabled pack skills as a generated plugin (Claude `--plugin-dir` per-launch link, Codex `overdeck-packs` local marketplace in per-agent `CODEX_HOME`), shown to agents as `pack:skill`. `KNOWN_PACKS` (`adapters.ts`) carries per-id defaults such as opt-in skills, a default ref, a `pluginRoot` for packs whose plugin sits in a subfolder (pstack: `harness/pstack/claude-code`, PAN-4728) and `mountExtras` the mount copies next to `skills/`. Deft Directive (PAN-3943): the `deft` known pack uses the `deft-readonly` adapter (`skill-packs/deft.ts` skill map, allowlist, and host notice the mount inserts); `src/lib/deft/` holds read-only Directive detection, the ownership report, the managed-mode decision (`projects.<key>.deft_integration`), and the per-launch plan the same launch step applies (env file read by an allowlist in the launcher, marked `.deft-directive-disable` flag in issue worktrees only, Claude `permissions.deny` outside Directive projects). Per-issue Deft pipeline (PAN-4820): the issue file's `pipeline: deft` key (`deft/issue-pipeline.ts`) switches one issue onto Deft's own pipeline; `deft/install.ts`, `uninstall.ts`, `lift.ts` install Directive into that worktree hidden from git (exclude file, skip-worktree, worktree `core.hooksPath`) and undo it exactly; `archive.ts` (state archive), `merge-guard.ts`, `policy.ts` (auto-merge hold), `role-refusal.ts`, `kickoff.ts` and `switch.ts` wire it into the merge gate, review dispatch, launches and `pan skills deft use|back|save|show`. The dashboard reads Deft's state (PAN-4849) through the fs-only `deft/state-reader.ts` and `review-cycle.ts`, served by `src/dashboard/server/routes/deft.ts` and rendered by `components/deft/`; Deft escalations and menus join pending questions through `deft/pending.ts`. Developer guide: `docs/SKILL-PACKS.md`.
 
 Held kickoff (PAN-4499): `pan handoff --hold` launches the successor's session without delivering its kickoff; the text sits on `conversations.held_kickoff` (`src/lib/overdeck/conversation-kickoff-store.ts`) until `GET`/`POST /api/conversations/:name/kickoff` (`src/lib/overdeck/conversation-kickoff.ts`) claims and sends it exactly once — the only path that does. An ended held conversation renders `HeldHandoffView.tsx` (focus, cwd, handoff doc, Start, Archive, no Resume) instead of "no saved history"; Start POSTs the door, which relaunches the session (PAN-4596). Full mechanism: `docs/FORKS.md`.
 
-SageOx (PAN-2444): the `sageox` skill pack (sourced from the `eltmon/ox` fork, off by default) is also the opt-in for session capture. `src/lib/sageox/launch.ts` runs inside `pan skills launch-settings` for Claude Code only: when the pack resolves on, the git root has `.sageox/`, and `ox host-contract --json` answers `overdeck-host/1` (`probe.ts`), it merges the host-managed env and six `ox agent hook` entries into the `--settings` JSON; otherwise it warns once and excludes the pack from the mount. Uploads are a per-project `sageox_upload` flag in `projects.yaml` (`config.ts`); `pan doctor` reports the probe (`doctor-sageox.ts`). Fork contract and ledger: `docs/SAGEOX-FORK.md`.
+SageOx (PAN-2444, PAN-4852): the `sageox` skill pack (sourced from the `eltmon/ox` fork, off by default) is also the opt-in for session capture. `pan skills pack add|update|sync sageox` builds `ox` and its Claude Code and Codex adapters into `<packdir>/<commit>/bin/` (`src/lib/skill-packs/ox-build.ts`); launches, hooks and doctor resolve only that binary (`binary.ts`). `src/lib/sageox/launch.ts` runs inside `pan skills launch-settings` for Claude Code and Codex: when the pack resolves on and the built `ox` answers `ox host-contract --json` with `overdeck-host/1` (`probe.ts`), it places the project's stored binding (`binding.ts`, created by `pan skills pack sageox link`, `link.ts`) into the git root's `.sageox/` and hides it through `src/lib/git/worktree-exclude.ts` (`placement.ts`), then merges the host-managed env and six `ox agent hook` entries into the `--settings` JSON, or writes six pre-trusted hooks into the agent's `CODEX_HOME` (`codex-hooks.ts`); otherwise it warns once and excludes the pack from the mount. When the pack resolves off, the launch removes a placed binding. Every merge door runs `evaluateRepoMergeGuards` (`src/lib/cloister/repo-merge-guards.ts`), which refuses a PR touching `.sageox/` unless the project committed its binding (`merge-guard.ts`; `pan skills pack sageox commit`, `commit.ts`). Uploads are a per-project `sageox_upload` flag in `projects.yaml` (`config.ts`); `pan doctor` reports the built binary (`doctor-sageox.ts`). Fork contract and ledger: `docs/SAGEOX-FORK.md`.
+
+gstack (PAN-4727): the `gstack` known pack uses the `gstack-runtime` adapter. `skill-packs/gstack.ts` is the skill map (classes, unknown names excluded as unreviewed); `skill-packs/render.ts` runs the `eltmon/gstack` fork's pack mode (`bash setup --pack-root <render> --pack-state-root <state>`) only in the CLI write paths (`add`/`update`/`sync`), never at launch. Mounts copy skills from `~/.overdeck/packs/gstack/render/<commit>/`; gstack state lives in `packs/gstack/state/` via a marker file, not launch env. `pan skills pack remove` sweeps mounts, launch links and Codex plugin caches (`mount.ts` `removePackFromMounts`). The optional browser runtime (PAN-4730): `skill-packs/browser.ts` runs the fork's `bash setup --pack-browser <render> --pack-browser-cache <packs/gstack/browser>` after a second consent (`pan skills pack browser gstack on`, recorded as `browser: true` in the registry); the catalog derives readiness from `<render>/.gstack-pack-browser.json`, and the `browser`/`browser-opt-in` skills mount only when it is ready. Launches never build; they warn when consent is recorded but the runtime is missing.
 
 ## Session Vault (PAN-2609, standalone)
 
@@ -207,6 +260,8 @@ terminal backends (`tests/unit/lib/vault/import-graph.test.ts`). PAN-4329 adds
 resolves config/key/store into a tagged state and prints nothing; `src/dashboard/server/services/vault-service.ts`
 runs every dashboard vault operation through one queue (`enqueueVaultOperation`) plus the sync loop
 (primary dashboard only, or `OVERDECK_VAULT_IN_PEER=1`); `routes/vault.ts` + Settings → Session Vault.
+PAN-4647: `vault-agent-subjects.ts` also lists pipeline agents inside their tracking window, so
+the settle poller auto-saves work/review/test/plan transcripts, not just managed conversations.
 
 ## Pull requests on conversations and issue rows (PAN-3822, PAN-4457)
 
@@ -229,8 +284,71 @@ conversations belongs in a dashboard service like the PR sync sweep. PAN-4640
 added `conversation_schedules` and `services/conversation-schedule-service.ts`
 on that pattern.
 
-## Dashboard auth (verified 2026-09-30)
+## Scheduled messages (PAN-4641)
 
-No per-route auth middleware; two global gates plus opt-in route checks (`rejectUnauthorizedDashboardRequest`, `rejectUnsafeDashboardMutationRequest` in `routes/dashboard-auth.ts`). `resolveDashboardCredential` is the one credential check: internal token, the root-derived `overdeck_session` cookie, or an `odk_` registry credential from `src/lib/access-tokens.ts` (`~/.overdeck/access-tokens.json`; PAN-3762 paired devices, `kind: 'device'`). `remote-request-gate.ts` is a global middleware requiring a credential on `/api/*` and `/events/*` unless allowlisted or a loopback peer; `ws-auth.ts` `authorizeDashboardUpgrade` gates every `/ws/*` upgrade. The session mint alone trusts `isLoopbackPeer` (off under `dashboard.require_token_mint`, read by `src/lib/remote-access/config.ts`). The server binds `0.0.0.0`. PAN-2351 adds scoped `kind: 'token'` credentials enforced at both gates from one route-scope table (`route-scopes.ts`, default `admin`). Machine identity is `src/lib/environment-identity.ts`. See `docs/DASHBOARD-AUTH.md`.
+`conversation_scheduled_messages` (overdeck.db) holds operator messages that wait
+for a Claude Code usage limit to reset; door
+`src/lib/overdeck/conversation-scheduled-messages.ts`. The tick
+`src/lib/overdeck/scheduled-message-delivery.ts` acts on each conversation's head
+row (resume if ended, defer on a choice menu, paste through
+`handleConversationMessage`, then confirm or re-arm from the transcript). It is
+hosted by `services/scheduled-message-patrol.ts` in the dashboard process, not the
+Deacon child, because the delivery and resume doors live there (60 s, skips peer
+dashboards, a frozen Deacon and `OVERDECK_DISABLE_SCHEDULED_MESSAGES=1`). Reset
+times come from `conversation-usage-limit.ts` and `limit-reset-text.ts`.
 
-<!-- last-verified: 2026-11-01 -->
+## Conversation triage: settle and snooze (PAN-4639)
+
+`conversations.settled_at` / `settle_reason` (`manual` | `merge` | `idle`) /
+`snoozed_until` (epoch ms) are read and written only through
+`src/lib/overdeck/conversation-triage-store.ts`; the write route is
+`POST /api/conversations/triage` (`routes/conversation-triage.ts`). Settling is
+display-only: the session keeps running. An expired snooze is not cleared
+server-side; the client derives Inbox from `snoozed_until <= now`. Sections
+(Needs you / Inbox / Snoozed / Settled) are a pure client rule decided on the
+tree root (`CommandDeck/conversation-triage.ts` `sectionOf`, nesting from
+`conversation-tree.ts` `displayParentId`). Automatic settling: on merge is
+PAN-4653; on idle is PAN-4655 (`src/lib/overdeck/conversation-idle-settle.ts`,
+run by `services/conversation-idle-settle-service.ts`; unsettle and unsnooze
+write `idle_reset_at` to restart the clock; setting
+`conversations.auto_settle_idle_days`, default 3).
+
+## Dashboard auth (verified 2026-11-01)
+
+No per-route auth middleware; two global gates plus opt-in route checks (`rejectUnauthorizedDashboardRequest`, `rejectUnsafeDashboardMutationRequest` in `routes/dashboard-auth.ts`). `resolveDashboardCredential` is the one credential check: internal token, the root-derived `overdeck_session` cookie, or an `odk_` registry credential from `src/lib/access-tokens.ts` (`~/.overdeck/access-tokens.json`; PAN-3762 paired devices, `kind: 'device'`; PAN-4645 linked machines, `kind: 'machine'`, which resolve only inside a secure channel whose proved key matches the record: `resolveDashboardCredential(headers, channel)`, channel marker from `channel-peer.ts`). `remote-request-gate.ts` is a global middleware requiring a credential on `/api/*` and `/events/*` unless allowlisted or a loopback peer; `ws-auth.ts` `authorizeDashboardUpgrade` gates every `/ws/*` upgrade. The session mint alone trusts `isLoopbackPeer` (off under `dashboard.require_token_mint`, read by `src/lib/remote-access/config.ts`). The server binds `0.0.0.0`. PAN-2351 adds scoped `kind: 'token'` credentials enforced at both gates from one route-scope table (`route-scopes.ts`, default `admin`). PAN-4645 adds the secure channel: `channel-listener.ts` demuxes a `0x00` first byte on the dashboard port (and `/ws/link`) into a Noise channel handed to the HTTP server; `channel` requests are never loopback; `/ws/rpc` gets a scope-restricted RPC group for non-admin credentials (`ws-rpc-auth.ts`); `require_token_mint` is on whenever remote access exists (`remote-access/config.ts`). Machine identity is `src/lib/environment-identity.ts`. See `docs/DASHBOARD-AUTH.md`.
+
+## Agent MCP tokens and self routes (PAN-4927 epic)
+
+Agent tokens are `kind: 'token'` access-token records with `agentId`, `agentKind` (`agent` | `conversation`) and `role` (W-TOK1, `src/lib/mcp/agent-token.ts`; scopes per role in `AGENT_TOKEN_SCOPES`: work/worker/plan/flywheel get `operate`, review/test/ship stop at `tell`, conversations add `approve`; never `admin`). `src/lib/mcp/server.ts` `visibleTools` lists a tool only when the token holds its `scope`, and `audience: 'agent'` tools only to agent tokens (W-MCP1). Self routes live under `/api/self/` in top-level route files: `src/dashboard/server/self-caller.ts` turns the credential into a `SelfCaller` (403 `not-an-agent-token`, 404 `agent-gone`); `services/self-job-argv.ts` is the closed `pan` verb table and the only argv builder; `services/self-jobs.ts` runs jobs with `execFile` in the caller's workspace with only the caller's identity env and holds them in memory; `routes/self-jobs.ts` serves `GET /api/self/jobs/:id[/wait]` (waits cap at `WAIT_CHUNK_MS` = 50 s and answer `running` + `next`). W-SELF2 (PAN-4937) adds `routes/self-workflow.ts` (`POST /api/self/tasks/{claim,done,block}`, `/api/self/done`, `/api/self/handoff`, `/api/self/worker-report`). Agent-only tools are `src/lib/mcp/tools-self.ts` `SELF_TOOLS`. Docs: `docs/DASHBOARD-AUTH.md` "`/api/self/*`", `configuration/mcp.mdx` "Agent-only tools".
+
+## Webhook triggers (PAN-4648)
+
+`src/lib/triggers/`: `store.ts` is the door for `~/.overdeck/triggers.json` (0600; URL secrets kept as SHA-256 only), `signatures.ts` checks GitHub/Stripe HMACs over raw bytes, `envelope.ts` wraps the body as nonce-fenced external data (44 KiB inline), and `deliver.ts` runs secret → signature → rate limit → CPU hold → pending-input hold → message or create door through injected deps. `POST /hooks/:id/:secret` (`routes/trigger-hooks.ts`) is outside `/api`, so the gate passes it by path; `/api/triggers` (`routes/triggers.ts`) manages triggers; `pan triggers` writes the store directly. A request carrying `Tailscale-Funnel-Request` reaches only `POST /hooks/*`, plus the nine public MCP surfaces in `PUBLIC_MCP_SURFACES` (`src/lib/mcp/public-mcp.ts`) while `mcp.public.enabled` is on (PAN-4947; rate limit and audit in `public-mcp-funnel.ts`, switch routes in `routes/mcp-public.ts`): the gate 404s everything else, the mint and `/ws/*` refuse it. Docs: `configuration/triggers.mdx`, `docs/DASHBOARD-AUTH.md`.
+
+## Conversations across machines (PAN-4650)
+
+Owner side: `src/lib/anywhere/shared-conversations.ts` builds the shared list (`GET /api/machines/conversations`, switch in `anywhere-settings.ts` / `anywhere.json`); `routes/conversation-pull.ts` + `services/conversation-release-service.ts` release a conversation (settle into a transfer store via `src/lib/vault/transfer-pack.ts`, `settle({ index })`), undo and reclaim; `src/lib/overdeck/conversation-release.ts` is the `released_to` / `pulled_from` door and the 409 write refusal every write door calls; `link-fence.ts` refuses agent actors; `ws-forward.ts` + `forward-ports.ts` serve port forwards; `routes/conversation-preview-ports.ts`. Viewer side: `src/lib/overdeck/linked-conversations.ts` (the `linked_conversations` cache door), `services/linked-conversations-sync.ts` (connect + heartbeat hash), `linked-conversations-merge.ts` + `services/conversation-list-merged.ts` (the merged list), `linked-conversation-proxy.ts` (`/api/conversations/@<machine>/…`), `ws-linked.ts` (`/ws/linked/<env>/rpc|terminal`), `services/conversation-pull.ts` (the Pull here job), `services/port-forwards.ts`, `routes/linked-open.ts` + `services/open-remote.ts` (remote-SSH editor). Frontend: `lib/linkedConversation.ts`, `chat/ConversationMachineBanner.tsx`, `chat/PullHereDialog.tsx`, `chat/OpenPreviewPopover.tsx`, `CommandDeck/LinkedConversationRow.tsx`. CLI: `pan conv pull|reclaim`, `pan tell @<machine>/<conv>`, `pan machines forward`. Docs: `configuration/linked-machines.mdx`, `docs/ANYWHERE-ARCHITECTURE.md`.
+
+## Work across machines (PAN-4651)
+
+Owner side: `routes/machines-work.ts` (the `/api/machines/work/*` doors: conversations, workers, issue start, projects; machine credential only, matched by git origin slug), `routes/agents/spawn-issue.ts` (the extracted `POST /api/agents` body), `src/lib/overdeck/conversation-provenance.ts` (`started_by_environment_id`, read by `link-fence.ts`), `routes/workers.ts` status/stop, `routes/machines-projects.ts` + `src/lib/projects/ignored-files.ts` (project source and git-ignored files), `services/machine-load.ts` + `src/lib/anywhere/machine-capabilities.ts` (load and tags in the heartbeat), `services/needs-you-feed.ts`, `services/issue-activity.ts`, `src/lib/costs/request-digest.ts` + `routes/costs-digest.ts`, `src/lib/settings-resolved.ts` + `routes/settings-resolved.ts`. Viewer side: `src/lib/anywhere/placement.ts` (pure D-19 rule) + `services/fleet-target.ts` (`fly` calls `services/fleet-fly-target.ts`'s `startFlyTarget` when the route passes a spawn context; without one, 400 `fly-unavailable`; `auto` falls back to it too when `remote.auto_fly` is on and nothing else fits — PAN-4743), `routes/fleet-work.ts` (`/api/fleet/placement|conversations|workers|issues/:id/start|machines`), `src/lib/agents/worker/remote-standin.ts` + `services/remote-worker-follower.ts` (stand-ins), `src/lib/anywhere/project-origin.ts` + `services/linked-projects-sync.ts` + `routes/fleet-projects.ts` + `services/fleet-add-project.ts`, `services/linked-needs-you-sync.ts` + `routes/fleet-awareness.ts` (Needs-You, search, issue activity), `routes/needs-you.ts` (this machine's Needs-You for tokens, PAN-4944), `services/fleet-usage-cache.ts` + `routes/fleet-usage.ts`, `routes/fleet-settings.ts` (Compare settings). CLI: `cli/commands/worker-remote.ts`, `delegation-push-check.ts`, `start-machine.ts`, `machines-who.ts`, `machines-add-project.ts`, `config-set.ts`. Frontend: `newConversation/MachineField.tsx`, `sidebar/OtherMachineProjects.tsx`, `sidebar/AddProjectToMachineDialog.tsx`, `palette-fleet-hits.tsx`, `costs/FleetUsagePanel.tsx`, `Settings/anywhere/CompareSettingsDialog.tsx`. MCP: `src/lib/mcp/tools-{read,write,approve}.ts` use the fleet routes. Docs: `configuration/linked-machines.mdx`, `docs/ANYWHERE-ARCHITECTURE.md` "Work across machines".
+
+Gauntlet lanes across machines (PAN-4638): home keeps the run rules in `src/lib/lanes/launch.ts` (`deps.remote` / `resolveMachine`) over `src/lib/lanes/lane-rows.ts` (`listAllLaneRows`: local lane rows plus stand-ins, cwd key `<environmentId>:<cwd>`) and `src/lib/lanes/remote-lanes.ts` (the stand-in store `~/.overdeck/remote-lanes/<name>/{lane,mirror,archived}.json` and the `lane-link.json` critic sidecar); `routes/lanes.ts` resolves `machine` and adds `POST /api/lanes/:name/stop` and the remote reap; `services/remote-lane-follower.ts` mirrors the owner's status and reports. Owner side: `routes/machines-work-lanes.ts` (`/api/machines/work/lanes`, `…/:name/status`, `…/:name/reap`) runs `src/lib/lanes/owner-launch.ts` (`launchOwnedLane`). Views, pairing (by name) and waits: `src/lib/lanes/views.ts`, `pairing.ts`, `wait.ts`; nesting: `src/lib/overdeck/linked-conversations-merge.ts` (`remoteLanes`). CLI: `cli/commands/lane.ts`. Docs: `reference/lanes.mdx` "Lanes on other machines", `docs/ANYWHERE-ARCHITECTURE.md` "Gauntlet lanes across machines".
+
+## Agent MCP: agent tokens and self routes (PAN-4927: W-TOK1, W-MCP1, W-SELF1)
+
+The MCP tool module is `src/lib/mcp/` (`server.ts` `ALL_TOOLS` = read, write, schedule, approve, self tools; `visibleTools` filters by each tool's `scope` and `audience`). An agent token is a `kind: 'token'` access-token record with `agentId`/`agentKind`/`role`, minted and revoked by `src/lib/mcp/agent-token.ts` (`ensureAgentMcpToken`, `revokeAgentMcpTokens(agentId, { agentKind, dir })`; plaintext only in `<owner dir>/mcp-token`, 0600; no launch path calls the mint until W-INJ1, PAN-4932). Self routes live under `/api/self/` in top-level `routes/self-*.ts` files; `src/dashboard/server/self-caller.ts` (`selfCallerFromCredential`) turns the token into the caller (403 `not-an-agent-token`, 404 `agent-gone`). CLI-backed operations run as in-memory jobs (`services/self-jobs.ts`, closed verbs in `services/self-job-argv.ts`) awaited in 50 s chunks (`WAIT_CHUNK_MS`, `routes/self-jobs.ts` `parseWaitTimeoutMs`). OAuth 2.1 sign-in for `/mcp` (PAN-4945): `src/lib/mcp/oauth-flow.ts` (levels, PKCE, authorize-request validation) and `oauth-service.ts` (approvals, codes, refresh rotation) back `routes/mcp-oauth.ts` and `routes/mcp-oauth-admin.ts`; the dashboard's Needs-you card and the Settings → Access Tokens → Sign-ins list (PAN-4946) are `components/McpSignInCard.tsx` and `Settings/anywhere/McpSignInsList.tsx`, fed by `anywhereApi.ts`'s `fetchMcpSignInApprovals`/`loadMcpSignIns`/`decideMcpSignIn`/`revokeMcpSignIn`. Docs: `configuration/mcp.mdx`, `docs/DASHBOARD-AUTH.md` "`/api/self/*`".
+
+Secret requests (PAN-4941, W-SEC1): `services/agent-requests.ts` is the in-memory agent request store (kinds `secret` and, from W-LINK1, `machine-link`; lazy expiry, owner-only waits) plus `writeAgentSecretFile` (`<owner dir>/secrets/<NAME>`, 0600 in 0700). `routes/self-requests.ts` serves the agent side (`POST /api/self/secret-requests`, `GET …/:id/wait`; MCP tools `request_secret`/`secret_wait` in `src/lib/mcp/tools-self.ts`); `routes/agent-requests.ts` serves the operator side (`GET /api/agent-requests`; root-only `POST …/:id/secret` and `…/decline`, no scope row). `revokeAgentMcpTokens` deletes `secrets/`. Frontend: `useDecisions` (`secretRequest` kind) and `components/AgentRequestCard.tsx`.
+
+Machine-link requests (PAN-4942, W-LINK1): the same store's `createMachineLink` (24 h expiry, same-hint dedupe, the shared limit of 20; `result.machine`). Agent side in `routes/self-requests.ts` (`POST /api/self/machine-link-requests`, `GET …/:id/wait`; each wait route answers only its own kind) with MCP tools `link_machine`/`link_machine_wait` in `src/lib/mcp/tools-self.ts`; operator side adds root-only `POST /api/agent-requests/:id/linked` (reads only `environmentId`, finds the active link via `src/lib/anywhere/link-store.ts` `listLinks`, label from the link record) and `…/decline` for either kind. Frontend: `useDecisions` `machineLink` kind, `AgentRequestCard` `MachineLinkRequestBody`, and `Settings/anywhere/anywhereDialogStore.ts` `agentRequestId`, which `AnywhereDialogHost` hands to `LinkMachineDialog` to post the resolve (`machinesApi.markAgentRequestLinked`).
+
+## Color themes (PAN-4644, PAN-4659, PAN-4660)
+
+Model and built-ins (`overdeck-dark`, `overdeck-light`; read-only, full terminal palette, no `ui`/`syntax`) live in `packages/contracts/src/color-theme.ts` (`normalizeColorTheme`, `effectiveTerminalPalette`, `slugifyThemeId`, `RESERVED_COLOR_THEME_IDS`). User themes are `~/.overdeck/themes/<id>.json` via `src/lib/color-themes/store.ts` (read fresh on every list; `saveColorTheme` is create-only — `claimThemeFile` uses `link()` and suffixes `-2`, never overwrites; `updateColorTheme` is the in-place counterpart — temp file + `rename()`, refuses built-in/reserved ids). Selection is `ui.color_theme.{light,dark}` in `config.yaml` (`selection.ts` read, `selection-write.ts` write door); `terminal-background.ts` feeds the tmux `window-style` stamp for new sessions only. VS Code import: `vscode-import.ts` maps one theme JSON(C); `.vsix` packages (PAN-4659) are read in memory by `zip-reader.ts` and every contributed theme is mapped by `vsix-import.ts`; the preview route returns a `themes[]` array and writes nothing. Routes: `src/dashboard/server/routes/color-themes.ts` (`GET /api/color-themes`, `PUT …/selection`, `POST …/import/preview`, `POST /api/color-themes`, `PUT /api/color-themes/:id`). Frontend: `hooks/useColorTheme.ts` (zustand; `applyUiTokens` writes the `ui` subset as inline styles on `<html>`, never signal/state tokens; `reconcileFromServer` refetches and re-applies; `updateTheme` PUTs then reconciles), `lib/uiTokenStyles.ts` (pure `uiTokenStyles(theme)`, shared by `applyUiTokens` and the editor preview), `lib/colorThemeEditor.ts` (pure draft model: `createDraft`/`setEdit`/`revertEdit`/`draftToFile`/`pickerValue`), `lib/syntaxTheme.ts` (content-hashed Shiki theme names), consumers `XTerminal.tsx`, `chat/ChatMarkdown.tsx`, `chat/MarkdownFileLink.tsx`; UI in `Settings/sections/ColorThemeSection.tsx` (theme list, Duplicate-and-edit/Edit entry points) + `ColorThemeImportPreview.tsx` + `ColorThemeEditor.tsx` + `ColorThemeEditorPreview.tsx`. Docs: `configuration/appearance.mdx` "Color themes".
+
+## Shared Sessions in the dashboard (PAN-4473, PAN-4474, PAN-4475, PAN-4476, PAN-4477)
+
+Host: `src/dashboard/server/services/share-host.ts` (`ShareManager`: rooms, host socket, the 0600 record door `src/lib/sharing/share-record.ts`) and `routes/shares.ts` (`/api/shares*`); one `PeerHub` per live share in `src/dashboard/server/sharing/peer-hub.ts` (werift peers, five channels, the host-admitted content gate) with `conversation-bridge.ts` (Claude JSONL → `SharedMessage`) and `channel-writer.ts` (backpressure); slice 5 (PAN-4476) adds `draft-board.ts` (per-author LWW drafts, 200 ms relay) and `submit-queue.ts` (strict-FIFO prompts, one per agent turn, through the `handleConversationMessage` door); `POST /api/shares/:code/prompts` queues host sends. Slice 6 (PAN-4477) adds `terminal-bridge.ts` (a watching viewer's read-only terminal from a Herdr observe stream or a tmux PTY hub listener, via `pty-hub-attach.ts`). Viewer: `services/share-join.ts` + `routes/joins.ts` (join socket, SSE to the browser); browser peer and page in `frontend/src/components/chat/sharing/` (`webrtc-viewer.ts`, `useSharedJoin.ts`, `SharedConversationView.tsx`, `ShareDialog.tsx`, `SharingLobbyPanel.tsx`, `SuggestionList.tsx`, `SharedTerminalView.tsx`). Wire types in `packages/contracts/src/sharing.ts` (type-only, import-free), runtime helpers in `sharing-wire.ts`. Docs: `docs/SHARED-SESSIONS.md`, `configuration/shared-sessions.mdx`.
+
+<!-- last-verified: 2026-11-04 (PAN-4947, PAN-4946, PAN-4945, PAN-4942, PAN-4937, PAN-4941, PAN-4936, PAN-4931, PAN-4930, PAN-4838, PAN-4481, PAN-4477, PAN-4476, PAN-4834, PAN-4852, PAN-4829, PAN-4833, PAN-4849, PAN-4820, PAN-4827, PAN-4825, PAN-4813, PAN-4728, PAN-4651, PAN-4730, PAN-4638, PAN-4759, PAN-4682, PAN-4655, PAN-4644, PAN-4659, PAN-4660, PAN-4743, PAN-4722) -->

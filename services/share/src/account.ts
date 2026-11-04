@@ -12,8 +12,17 @@ export type AccountVerifyResult =
   | { ok: true; userId: string; githubId: number; githubLogin?: string; deviceId: string }
   | { ok: false; error: 'invalid_token' | 'device_revoked' | 'grant_expired' | 'account_deleted' };
 
+/** AccountRpc.redeemWebCode result (PAN-4481 FR-3); mirrors the account Worker's RedeemResult. */
+export type AccountRedeemResult =
+  | { ok: true; accessToken: string; deviceId: string; label: string }
+  | { ok: false; error: 'invalid_request' | 'invalid_grant' | 'access_denied' };
+
 export interface AccountBinding {
   verifyDevice(token: string): Promise<AccountVerifyResult>;
+  /** Exchanges a code issued to this Worker's `/auth/callback` for a `web` device token. */
+  redeemWebCode(input: { code: string; codeVerifier: string; redirectUri: string }): Promise<AccountRedeemResult>;
+  /** Revokes the device of a valid token. */
+  signOutDevice(token: string): Promise<{ ok: true } | { ok: false; error: string }>;
 }
 
 export type VerifyIdentityResult =
@@ -25,13 +34,18 @@ const DEVICE_BEARER_RE = /^Bearer (odd_[0-9a-f]{64})$/;
 
 export const GITHUB_AVATAR_BASE = 'https://avatars.githubusercontent.com/u/';
 
+/** `Authorization: Bearer odd_…` → the verified identity. */
 export async function verifyIdentity(env: Env, authorization: string | null): Promise<VerifyIdentityResult> {
   const match = DEVICE_BEARER_RE.exec(authorization ?? '');
   if (!match) return { ok: false, status: 401, error: 'invalid_token' };
+  return verifyDeviceIdentity(env, match[1] as string);
+}
 
+/** A raw device token (from a bearer header or the sealed web session) → the verified identity. */
+export async function verifyDeviceIdentity(env: Env, token: string): Promise<VerifyIdentityResult> {
   let result: AccountVerifyResult;
   try {
-    result = await env.ACCOUNT.verifyDevice(match[1] as string);
+    result = await env.ACCOUNT.verifyDevice(token);
   } catch {
     return { ok: false, status: 503, error: 'account_unavailable' };
   }

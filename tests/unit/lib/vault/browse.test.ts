@@ -112,6 +112,30 @@ describe('vault browse cache: refreshBrowseCache', () => {
     expect(readFileSync(join(vaultBrowseDir(), `${vaultId}.jsonl`), 'utf8')).toBe(await logContent(vaultId));
   });
 
+  it('PAN-4645 WI-10: copies carry the owner environment id, and an entry without one is refreshed once', async () => {
+    const { vaultId } = await saveClaude();
+    const record = await readRecord(vaultId);
+    const row = await rowFor(vaultId);
+    const first = await refreshBrowseCache({ store, keys, rows: [row] });
+    expect(first.copies).toEqual([expect.objectContaining({ vaultId, ownerEnvironmentId: record.owner.environmentId })]);
+
+    // A manifest written before the column existed: strip the id, as an older build would have left it.
+    const manifestPath = join(vaultBrowseDir(), 'manifest.json');
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as { entries: Record<string, Record<string, unknown>> };
+    delete manifest.entries[vaultId]!.ownerEnvironmentId;
+    writeFileSync(manifestPath, JSON.stringify(manifest));
+
+    const readRef = vi.spyOn(store, 'readRef');
+    const second = await refreshBrowseCache({ store, keys, rows: [row] });
+    expect(readRef).toHaveBeenCalled();
+    expect(second.copies).toEqual([expect.objectContaining({ vaultId, ownerEnvironmentId: record.owner.environmentId })]);
+    expect(second.copies.every((copy) => typeof copy.ownerEnvironmentId === 'string')).toBe(true);
+
+    readRef.mockClear();
+    await refreshBrowseCache({ store, keys, rows: [row] });
+    expect(readRef).not.toHaveBeenCalled();
+  });
+
   it('an unchanged row reads no record', async () => {
     const { vaultId } = await saveClaude();
     const row = await rowFor(vaultId);

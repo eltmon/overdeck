@@ -46,7 +46,7 @@ import {
   type Settlement,
 } from './format.js';
 import type { VaultSubkeys } from './identity.js';
-import { getOwned, setOwnedTail } from './local-index.js';
+import { getOwned, setOwnedTail, type OwnedEntry } from './local-index.js';
 import { scanNewLines, type SecretHit } from './secrets.js';
 import { VaultOfflineError, type VaultStore } from './store/types.js';
 import { countHumanTurns, isHumanTurn, type TurnHarness } from './turns.js';
@@ -66,7 +66,23 @@ export interface SettleOptions {
   now?: () => Date;
   /** WIP code-snapshot capture mode (PAN-4329 D-1). Default `'auto'`. */
   wip?: WipMode;
+  /** Title for a record this settle mints (PAN-4647); ignored when the record already exists or is forked. */
+  recordTitle?: string;
+  /**
+   * Where the settled tail of `nativePath` is read and written. Default: the
+   * machine-local vault index. A Pull here transfer (PAN-4650) settles into a
+   * fresh store with an empty in-memory index, so it carries the whole
+   * transcript and never moves the real vault's tail.
+   */
+  index?: SettleIndex;
 }
+
+export interface SettleIndex {
+  getOwned(nativePath: string): Promise<OwnedEntry | null>;
+  setOwnedTail(nativePath: string, entry: OwnedEntry): Promise<void>;
+}
+
+const LOCAL_INDEX: SettleIndex = { getOwned, setOwnedTail };
 
 export type SettleResult =
   | { verdict: 'noop'; vaultId: string; wip?: WipCaptureResult }
@@ -208,7 +224,8 @@ export async function settle(options: SettleOptions): Promise<SettleResult> {
   const { nativePath, harness, store, keys } = options;
   const wipMode = options.wip ?? 'auto';
 
-  const owned = await getOwned(nativePath);
+  const index = options.index ?? LOCAL_INDEX;
+  const owned = await index.getOwned(nativePath);
   const bytes = await readFile(nativePath);
   const { lines, consumedBytes } = splitSettleableLines(bytes);
   const facts = transcriptFacts(lines, harness);
@@ -287,7 +304,7 @@ export async function settle(options: SettleOptions): Promise<SettleResult> {
           owner: { environmentId: me.environmentId, label: me.label },
           harness,
           nativeSessionId,
-          title: facts.title ?? basename(nativePath),
+          title: options.recordTitle ?? facts.title ?? basename(nativePath),
           model: facts.model,
           project: cwd ? basename(cwd) : null,
           cwd: cwd ?? '',
@@ -372,7 +389,7 @@ export async function settle(options: SettleOptions): Promise<SettleResult> {
         && mine.tail.byteOffset === newTail.byteOffset
         && mine.tail.lastHashes.join(',') === newTail.lastHashes.join(',');
       if (landed.record && sameTail && landed.record.owner.environmentId === me.environmentId) {
-        await setOwnedTail(nativePath, { vaultId: target.vaultId, harness, tail: newTail });
+        await index.setOwnedTail(nativePath, { vaultId: target.vaultId, harness, tail: newTail });
         const landedVersion = (landed.record.settlementsArchive?.length ?? 0) + landed.record.settlements.length;
         return {
           verdict: 'append',
@@ -388,7 +405,7 @@ export async function settle(options: SettleOptions): Promise<SettleResult> {
       // as divergence so the next run re-reads and forks if needed.
       return { verdict: 'diverged', vaultId: target.vaultId, reason: 'record changed on the backend during settlement' };
     }
-    await setOwnedTail(nativePath, { vaultId: target.vaultId, harness, tail: newTail });
+    await index.setOwnedTail(nativePath, { vaultId: target.vaultId, harness, tail: newTail });
     const version = (record.settlementsArchive?.length ?? 0) + record.settlements.length;
     return {
       verdict: 'append',

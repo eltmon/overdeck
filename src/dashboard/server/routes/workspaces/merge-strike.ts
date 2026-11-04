@@ -14,6 +14,8 @@ import {
 } from '../../../../lib/agents/agent-state.js';
 import { getWorkAgentLifecycleState } from '../../../../lib/work-agent-lifecycle.js';
 import { evaluateIssueMergeGate } from '../../../../lib/cloister/merge-gate.js';
+import { raiseDeftDriftDecision } from '../../../../lib/deft/merge-guard.js';
+import { getIssueWorkspacePath } from '../../../../lib/overdeck/issue-projects.js';
 import type { MergeReadiness } from '../../../../lib/cloister/pr-facts.js';
 import type { VerificationRunnerOptions } from '../../../../lib/cloister/verification-types.js';
 import type { DerivedIssueState } from '@overdeck/contracts';
@@ -26,6 +28,10 @@ const execFileAsync = promisify(execFile);
 
 export interface StrikeMergeRequest {
   kind: 'strike'; markerHead: string; workspacePath: string; branchName: string; recoveryTarget: string;
+  /** Automatic strike merge (PAN-4753 WI-6): the approved head the executor scheduled. */
+  expectedHeadSha?: string;
+  /** PAN-4750: the operator clicked Merge; the only merge that skips head approval. */
+  operatorStarted?: true;
 }
 /**
  * `expectedHeadSha` (#3983): the auto-merge executor's scheduled head, which
@@ -37,10 +43,47 @@ export interface StrikeMergeRequest {
  */
 export type TriggerMergeRequest = { kind: 'normal'; expectedHeadSha?: string } | StrikeMergeRequest;
 
-/** The approved head an automatic merge is bound to, or null for a manual merge or a strike. */
+/** The approved head an automatic merge is bound to, or null for a manual merge. */
 export function automaticMergeHead(request: TriggerMergeRequest): string | null {
-  return request.kind === 'normal' && request.expectedHeadSha ? request.expectedHeadSha : null;
+  return request.expectedHeadSha || null;
 }
+
+/**
+ * PAN-4750: head approval is required unless the operator started a strike
+ * merge. A strike PR is authored as the operator, who cannot approve it, so
+ * their click is the approval. An automatic merge always needs it.
+ */
+export function requiresHeadApproval(request: TriggerMergeRequest): boolean {
+  return !(request.kind === 'strike' && request.operatorStarted === true && !request.expectedHeadSha);
+}
+
+/**
+ * Another issue's merge holds the project slot. The queue replays an entry as a
+ * plain `triggerMerge(issueId)`, so only a manual normal merge may wait on it.
+ * #4066 review: an automatic merge would start with none of its pin or policy
+ * checks; the executor retries with every check. PAN-4750: a strike would be
+ * replayed as a feature merge and dropped, so the operator retries instead.
+ */
+export function busyMergeRefusal(
+  request: TriggerMergeRequest,
+  currentlyMerging: string | null | undefined,
+  issueId: string,
+): TriggerMergeResult | null {
+  if (!currentlyMerging || currentlyMerging === issueId) return null;
+  if (automaticMergeHead(request)) {
+    return { success: false, statusCode: 409, error: `Another merge (${currentlyMerging}) is in progress; the automatic merge retries on the executor's next tick`, deferred: true, outcome: 'queued' };
+  }
+  if (request.kind === 'strike') {
+    return { success: false, statusCode: 409, error: `Another merge (${currentlyMerging}) is in progress; merge the strike again when it finishes` };
+  }
+  return null;
+}
+
+/** The merge gate as the strike/normal merge doors call it. */
+export type MergeGateCall = (
+  issueId: string,
+  options?: { preferBranch?: string; requireApprovalAtHead?: boolean },
+) => Promise<MergeGateVerdict>;
 
 export function mergeVerificationOptions(
   request: TriggerMergeRequest,
@@ -141,6 +184,8 @@ export interface MergeQueueAdvanceDeps {
 /** What `evaluateIssueMergeGate` answers, narrowed to what the merge doors read. */
 export interface MergeGateVerdict extends MergeReadiness {
   facts?: { headBranch: string | null; headSha?: string | null; url?: string | null };
+  /** PAN-4820: Deft-hidden files edited outside any commit. */
+  deftDrift?: string[];
 }
 
 /**
@@ -209,20 +254,34 @@ export async function advanceMergeQueue(
 export async function forgeMergeGate(
   issueId: string,
   request: TriggerMergeRequest = { kind: 'normal' },
-  gate: (issueId: string, options?: { preferBranch?: string }) => Promise<MergeGateVerdict>
-    = (id, options) => evaluateIssueMergeGate(id, {}, options),
+  gate: MergeGateCall = (id, options) => evaluateIssueMergeGate(id, {}, options),
 ): Promise<{ refusal: MergeEligibilityResult | null; facts?: MergeGateVerdict['facts'] }> {
   const expectedBranch = request.kind === 'strike' ? request.branchName : `feature/${issueId.toLowerCase()}`;
-  const verdict = await gate(issueId, { preferBranch: expectedBranch });
+  const verdict = await gate(issueId, {
+    preferBranch: expectedBranch,
+    ...(requiresHeadApproval(request) ? {} : { requireApprovalAtHead: false }),
+  });
+  if (verdict.deftDrift?.length) raiseDriftDecision(issueId, verdict.deftDrift);
   const refusal = mergeGateRefusal(verdict, expectedBranch, automaticMergeHead(request) ?? undefined);
   return refusal ? { refusal } : { refusal: null, facts: verdict.facts };
+}
+
+/** PAN-4820 (AD-18): surface Deft drift in Needs-you. A journal failure never blocks the gate's answer. */
+function raiseDriftDecision(issueId: string, paths: string[]): void {
+  const workspacePath = getIssueWorkspacePath(issueId);
+  if (!workspacePath) return;
+  try {
+    raiseDeftDriftDecision(workspacePath, issueId, paths);
+  } catch (err) {
+    console.warn(`[merge] Could not raise the Deft drift decision for ${issueId}: ${err instanceof Error ? err.message : String(err)}`);
+  }
 }
 
 /** {@link forgeMergeGate}'s refusal alone, for the doors that do not merge. */
 export async function forgeMergeGateRefusal(
   issueId: string,
   request: TriggerMergeRequest = { kind: 'normal' },
-  gate?: (issueId: string, options?: { preferBranch?: string }) => Promise<MergeGateVerdict>,
+  gate?: MergeGateCall,
 ): Promise<MergeEligibilityResult | null> {
   return (await forgeMergeGate(issueId, request, gate)).refusal;
 }
@@ -272,28 +331,30 @@ export function automaticMergePin(
  * train, the queue) is pinned to the head the server merges: the head the
  * merge gate passed, or the commit the merge's own rebase or `.planning/`
  * strip produced. A push that lands after that fails the merge instead of
- * landing code the gate never saw. A strike landing is not pinned.
+ * landing code the gate never saw. PAN-4750 review: an operator-started strike
+ * merge is pinned the same way.
  */
 export function mergeHeadPin(
   request: TriggerMergeRequest,
   head?: string | null,
 ): { matchHeadCommit?: string } {
   if (automaticMergeHead(request)) return automaticMergePin(request, head);
-  return request.kind === 'normal' && head ? { matchHeadCommit: head } : {};
+  return head ? { matchHeadCommit: head } : {};
 }
 
 /**
  * #4066 review: a manual merge about to land the PR's live head as it is (the
  * direct path, or a branch already up to date) refuses when that head is not
  * the one the merge gate passed: a push landed in between. Null when the heads
- * agree, either is unknown, or the merge is automatic or a strike.
+ * agree, either is unknown, or the merge is automatic. PAN-4750 review: a
+ * manual strike merge is checked too.
  */
 export function manualMergeHeadMoved(
   request: TriggerMergeRequest,
   gatedHead: string | null | undefined,
   liveHead: string | null | undefined,
 ): string | null {
-  if (request.kind !== 'normal' || automaticMergeHead(request) || !gatedHead || !liveHead) return null;
+  if (automaticMergeHead(request) || !gatedHead || !liveHead) return null;
   if (sameCommit(liveHead, gatedHead)) return null;
   return `Cannot merge: the PR head moved to ${liveHead.slice(0, 12)} after the merge gate passed ${gatedHead.slice(0, 12)}; merge again to check the new head`;
 }

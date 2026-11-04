@@ -37,6 +37,7 @@ vi.mock('../../IssueActionMenu/useIssueActions', () => ({
   useIssueActions: () => ({ all: [] }),
 }))
 
+vi.mock('../../deft/DeftSubagentRows', () => ({ DeftSubagentRows: () => null }))
 vi.mock('../../issue-view/AgentStepRow', () => ({
   AgentStepRow: ({ session, onClick }: { session: { sessionId: string; role?: string; type: string; model: string; duration: number | null }; onClick?: () => void }) => (
     <button type="button" data-testid={`agent-step-${session.sessionId}`} onClick={onClick}>

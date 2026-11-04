@@ -205,6 +205,18 @@ describe('review verification join rule (PAN-4527)', () => {
     expect(state?.headAnchor).toBe(headB);
   });
 
+  it('kills a worker running with other options and starts a fresh one for the same head (PAN-4786)', async () => {
+    const headA = commit('a');
+    registerLiveWorker(headA, { logPrefix: 'request-review', options: {} });
+
+    const outcome = await runSupervisedVerification('PAN-1', mocks.workspace, { isRemote: false }, 'request-review', { skipPlanChecklist: true });
+
+    expect(outcome).toEqual({ outcome: 'passed' });
+    expect(signalled).toEqual([{ pid: -LIVE_PID, signal: 'SIGTERM' }]);
+    expect(mocks.launches).toHaveLength(1);
+    expect(readVerificationWorkerState('PAN-1')?.options?.skipPlanChecklist).toBe(true);
+  });
+
   it("still joins a worker whose only HEAD change is its own target-branch sync merge", async () => {
     const headA = commit('a');
     const liveResult = registerLiveWorker(headA);
@@ -225,7 +237,9 @@ describe('review verification join rule (PAN-4527)', () => {
 
   it('merge verification joins only on the exact launch anchor', async () => {
     const headA = commit('a');
-    const liveResult = registerLiveWorker(headA);
+    // PAN-4786: a live worker always records the options it launched with, so
+    // the fixture names the same ones the request below will be compared against.
+    const liveResult = registerLiveWorker(headA, { options: { syncTargetBranch: false } });
 
     const outcome = await joinAndFinish(liveResult, () => runSupervisedVerification('PAN-1', mocks.workspace, { isRemote: false }, 'test', { syncTargetBranch: false }));
 

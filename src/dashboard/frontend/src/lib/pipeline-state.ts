@@ -100,3 +100,64 @@ export function getPipelineIssuePhase(
   if (derived.state === 'backlog' && issue && isPipelineReady(issue)) return 'ready';
   return PHASE_BY_DERIVED_STATE[derived.state];
 }
+
+/** The lanes the pipeline board renders, in order. 'todo' (raw backlog) is never shown (PAN-1966). */
+export const PIPELINE_BOARD_PHASES = ['ship', 'review', 'work', 'plan', 'ready'] as const satisfies readonly PipelineIssuePhase[];
+
+export function derivedForIssue(
+  derivedByIssueId: Record<string, DerivedIssueState>,
+  issue: Pick<Issue, 'identifier'>,
+): DerivedIssueState | undefined {
+  return derivedByIssueId[issue.identifier] ?? derivedByIssueId[issue.identifier.toUpperCase()];
+}
+
+function priorityRank(priority: number) {
+  return 5 - priority;
+}
+
+export function comparePipelineIssues(a: Issue, b: Issue): number {
+  const priorityDelta = priorityRank(b.priority) - priorityRank(a.priority);
+  if (priorityDelta !== 0) return priorityDelta;
+  return b.updatedAt.localeCompare(a.updatedAt);
+}
+
+export function isClosedIssue(issue: Issue): boolean {
+  const state = issue.state ?? issue.status;
+  return issue.stateType === 'completed' || issue.stateType === 'canceled'
+    || state === 'done' || state === 'canceled' || state === 'Canceled'
+    || state === 'Closed' || state === 'Completed' || state === 'completed';
+}
+
+export function isOutsidePipeline(issue: Issue): boolean {
+  return issue.pipelineMembership?.available !== false && issue.pipelineMembership
+    ? issue.pipelineMembership.inPipeline !== true
+    : isClosedIssue(issue);
+}
+
+/** First agent per issue, keyed by lowercase issue id — the row's agent on every pipeline surface. */
+export function firstAgentByIssueId(agents: readonly Agent[]): Map<string, Agent> {
+  const map = new Map<string, Agent>();
+  for (const agent of agents) {
+    const key = agent.issueId?.toLowerCase();
+    if (key && !map.has(key)) {
+      map.set(key, agent);
+    }
+  }
+  return map;
+}
+
+/** Active issues grouped by board phase, each group sorted by comparePipelineIssues. */
+export function groupPipelineIssues(
+  issues: readonly Issue[],
+  derivedByIssueId: Record<string, DerivedIssueState>,
+): Record<(typeof PIPELINE_BOARD_PHASES)[number], Issue[]> {
+  const groups = { ship: [], review: [], work: [], plan: [], ready: [] } as Record<(typeof PIPELINE_BOARD_PHASES)[number], Issue[]>;
+  for (const issue of issues) {
+    if (isOutsidePipeline(issue)) continue;
+    const phase = getPipelineIssuePhase(derivedForIssue(derivedByIssueId, issue), issue);
+    if (phase === 'todo') continue;
+    groups[phase].push(issue);
+  }
+  for (const phase of PIPELINE_BOARD_PHASES) groups[phase].sort(comparePipelineIssues);
+  return groups;
+}

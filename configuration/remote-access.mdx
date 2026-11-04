@@ -40,17 +40,33 @@ Do not expose a dashboard on a network until `GET /api/environment` reports
 (terminals, RPC, voice) requires a credential.
 </Warning>
 
+## Reach this machine with Tailscale
+
+Another device first needs an address that reaches this machine. Tailscale is
+the recommended route: it puts your machines and phone on one private network
+and serves the dashboard over HTTPS at the machine's tailnet name, such as
+`https://desk.tailnet-1234.ts.net`.
+
+**Settings → Anywhere → Set up Tailscale** (or `pan tailscale setup`) installs
+Tailscale, signs this machine in, turns on Tailscale Serve HTTPS for the
+dashboard, trusts the new address, and turns on token sign-in. It then lists
+the other Overdeck machines on your tailnet. See
+[Tailscale](/configuration/tailscale) for each step.
+
 ## Pair a device
 
 ### From the dashboard
 
-1. On the machine, open **Settings → Anywhere** and click **Pair a device**.
+1. On the machine, open **Settings → Anywhere** (or click **Machines** in the sidebar)
+   and click **Pair a device**.
 2. Pick the address the other device opens, for example your Tailscale name.
    If it is not in the list, choose **Another address…**, type it, and click
    **Add to trusted addresses**. It is trusted at once, with no restart.
    **Use this machine only** makes a link that works only on this machine.
 3. Click **Create pairing link**. Scan the QR code with the other device, or
    copy the link and open it there. The dialog names the device when it pairs.
+
+The command palette's **Pair a device** opens the same dialog from any page.
 
 Only a browser on the machine itself can create pairing links or add
 addresses. A paired device that opens the dialog sees an explanation instead
@@ -83,9 +99,34 @@ Without `--url`, `pan pair` uses this machine's own dashboard address. When
 that address is `localhost` (or `127.0.0.1`, `::1`, `*.localhost`), the URL only
 works on this machine, and `pan pair` says so.
 
-`pan pair` talks to a dashboard started by `pan up`, which shares this
-machine's internal token. A paired device cannot create more pairing
+`pan pair` talks to the running dashboard with this machine's internal
+token, read from `~/.overdeck/internal-token`. Dashboards started by
+`pan up` and by `npx @overdeck/core` both use that file. If `pan pair`
+reports that the dashboard rejected the token, the dashboard was started
+with a different `OVERDECK_HOME` or before the file existed: restart it
+and run `pan pair` again. A paired device cannot create more pairing
 credentials.
+
+### From the desktop app
+
+The desktop app can show one other machine's dashboard instead of running its
+own, for example your desktop's dashboard from a laptop over Tailscale.
+
+1. On the machine, create a pairing link from **Settings → Anywhere → Pair a
+   device**, or with `pan pair --url <its Tailscale address>`.
+2. In the desktop app, choose **Connect to a Machine…** from the Overdeck menu
+   or the tray, paste the whole link, and click **Connect**.
+
+The app stores the machine's address and a revocable device credential in
+`remote-machine.json` in its user-data folder, with the credential encrypted by
+the operating system's credential store (Keychain, Windows credential
+protection, GNOME Keyring or KWallet). It refuses to pair when no such store is
+available. While it shows the other machine, the desktop app runs no local
+server; **Use This Computer** switches back. It sends the credential only over
+HTTPS, a Tailscale address, or this computer's loopback, and refuses any other
+`http:` address. See
+[Open another machine](https://github.com/eltmon/overdeck/blob/main/docs/DESKTOP-APP.md#open-another-machine)
+for the launch checks, **Forget**, and the error messages.
 
 ### Open one conversation on another screen
 
@@ -163,6 +204,8 @@ appears in **Settings → Anywhere** and on the **Health** page, and shows:
 - **Reachable at:** the trusted addresses another device can open, or "Only
   this machine".
 - **Paired devices:** how many device sessions are active (not revoked).
+- **Tailscale:** "Not installed", "Signed out", "Needs HTTPS", "Ready" with the
+  Serve address, or "Set up unfinished". See [Tailscale](/configuration/tailscale).
 - **Session Vault:** "Not set up", "Locked on this machine", "Key rotation
   unfinished", or "Ready" with its backend. **Set up** opens Settings → Session
   Vault, which shows the `pan vault setup <git-url>` command to run in a
@@ -174,6 +217,7 @@ Below that, the card lists each problem with its fix:
 
 | Problem | Fix |
 | --- | --- |
+| Tailscale Serve sends tailnet visitors to this dashboard, but a token is not required to sign in. | **Protect the dashboard** opens Set up Tailscale, which turns on token sign-in. |
 | No address another device can reach is trusted yet. | **Add an address** opens the pair dialog, where you can add one. |
 | Session Vault is set up, but this machine cannot open it. | **Open Session Vault** goes to Settings → Session Vault, which shows the command to run in a terminal on this machine: `pan vault join <backend>`, then the vault passphrase or the recovery phrase. Unlocking from the dashboard is planned: [PAN-4446](https://github.com/eltmon/overdeck/issues/4446). |
 | A vault key rotation started on this machine has not finished. | **How to fix** links to [Session Vault](/configuration/session-vault). Finish the rotation on this machine before syncing again. |
@@ -206,9 +250,10 @@ The scopes:
 | --- | --- |
 | `read:events` | The live event stream (`GET /events/stream`) and `GET /events/version`. |
 | `read:state` | Issue, agent, agent-directory, Flywheel and pipeline reads. |
-| `read:conversations` | Conversation lists, one conversation, its messages and its summary. |
-| `tell` | Sending a message to an agent or a conversation. |
-| `operate` | Everything `tell` allows, plus terminal WebSockets (`/ws/terminal`). |
+| `read:conversations` | Conversation lists, one conversation, its messages and its summary, conversation search, and a conversation's scheduled messages and schedules. |
+| `tell` | Sending a message to an agent or a conversation, and creating, changing and deleting a conversation's scheduled messages and schedules. |
+| `operate` | Everything `tell` allows, plus terminal WebSockets (`/ws/terminal`) and starting a conversation or a worker. |
+| `approve` | Answering blocking prompts: permission prompts, menus, pi asks, Codex approvals, plan approvals and agent questions. Off unless you add it. |
 | `admin` | Everything, like a paired device. |
 
 Anything not in the table needs `admin`. A request whose token lacks the scope
@@ -240,7 +285,11 @@ You can also manage tokens in **Settings → Access Tokens**: the table shows
 each token's name, scopes, created, last used and revoked times; **Create
 token** shows the plaintext once with a Copy button; **Revoke** asks for
 confirmation. A browser signed in as a paired device can see the list but
-cannot create or revoke tokens; the section explains why.
+cannot create or revoke tokens; the section explains why. The table folds the
+one access token each running agent holds behind a collapsed **Show agent
+tokens (N)** toggle, and a **Sign-ins** list follows it with every MCP OAuth
+client currently signed in — its access level, timestamps and a Revoke button
+that ends the sign-in at once.
 
 ## What the LAN can reach
 
@@ -295,12 +344,79 @@ applies at once. A hand edit of `config.yaml` needs a dashboard restart. The key
 is read only from the global `~/.overdeck/config.yaml`, never from a project
 `.pan.yaml`.
 
+**Set up Tailscale** turns this setting on automatically when it enables
+Tailscale Serve, before Serve starts forwarding. While Serve forwards to the
+dashboard, a Settings save that turns it off keeps it on; turn Serve off first
+(`tailscale serve --https=443 off`). See
+[Serve HTTPS and token sign-in](/configuration/tailscale#serve-https-and-token-sign-in).
+
+### On automatically
+
+Since v0.73.0 `require_token_mint` is on by itself whenever this machine has any
+remote access: a trusted address that is not loopback, an active paired device, or
+a [machine link](/configuration/linked-machines) in either direction. The toggle in
+Settings then shows **On automatically because this machine has …** and cannot be
+turned off. A `false` in `config.yaml` cannot turn it off either while remote access
+exists; the effective value can only be widened, never narrowed. Remove the last
+trusted address, device or link and the YAML value applies again.
+
+### Use HTTPS
+
+A browser on another device that opens the dashboard over plain `http://` gets a
+**Use HTTPS** page (status 403) instead of the app, and a pairing exchange that would
+set the session cookie over plain HTTP is refused the same way. Cookies and tokens
+never cross the network in the clear; open the dashboard through an HTTPS address
+(Tailscale Serve, a reverse proxy with a certificate). Browsers on the machine itself
+and linked machines (whose traffic is already inside the secure channel) are not affected.
+
+## Find your machines through overdeck.ai
+
+A machine signed in with `pan account login` registers in your account's **directory** at
+overdeck.ai and keeps one connection to it. From any signed-in machine you can then see all of
+your machines, link two of them without a pairing code, and reach a linked machine with no
+Tailscale. A machine that is not signed in opens no connection and nothing else changes.
+
+- **What the directory stores:** each machine's environment id, label, public machine key,
+  fingerprint, whether it is online (with the time it was last seen) and the LAN and Tailscale
+  addresses it advertises. It also passes the short connection setup messages between two of
+  your machines. It never carries your conversations and never vouches for a key.
+- **See your machines:** **Settings → Anywhere → Directory**, or `pan machines directory`.
+- **Link two machines (approval):** on the new machine, click **Link** on the other machine's
+  row (or run `pan machines join`). The other machine shows the request; click **Review** there
+  (or run `pan machines approve <id>`). Both screens now show the same six-digit code and the
+  other machine's fingerprint. Approve on one machine and accept on the other **only if the two
+  codes match**. A different code means something sits between them; reject it. Links made this
+  way are operator-level both ways.
+- **Direct connections:** once linked, the two machines open a peer-to-peer WebRTC path
+  through the directory's introduction when no LAN or Tailscale route answers. The link shows
+  the route as `direct` (`rtc://…`). The secure channel runs over it, so only ciphertext
+  crosses the network.
+- **The free account includes 3 machines.** A fourth machine is refused with "The free account
+  includes 3 machines". **Remove from directory** (or `pan machines forget`) frees a slot.
+- **The relay plan.** When no direct path exists (for example strict firewalls on both sides),
+  a relay plan connects the two machines through a Cloudflare TURN relay, still carrying the
+  same secure channel. Without it, the link says "No direct path; install Tailscale or use the
+  relay plan". Relay traffic counts against a 50 GB monthly allowance per account (UTC calendar
+  month). While a relay route is in use the Anywhere card shows **Using relay** and this
+  month's traffic; at 50 GB the relay stops until the next month, the card shows "Relay
+  allowance used; install Tailscale or add 50 GB" and an **Add 50 GB** button that opens
+  overdeck.ai.
+- **Self-hosting the directory:** run `services/connect` yourself and point
+  `anywhere.directory_url` in `~/.overdeck/config.yaml` at it:
+
+  ```yaml
+  anywhere:
+    directory_url: https://connect.example.org   # default https://connect.overdeck.ai
+  ```
+
+  It must be `https:`, or `http:` to a loopback host. It is read at every directory
+  (re)connect.
+
 ## What pairing is not
 
-- **The relay is optional reachability.** The Overdeck relay
-  ([PAN-2356](https://github.com/eltmon/overdeck/issues/2356)) is one way to
-  reach a machine. It is not where multi-machine state lives: each machine
-  keeps its own.
+- **The relay is optional reachability.** The overdeck.ai relay (see
+  [Find your machines through overdeck.ai](#find-your-machines-through-overdeck-ai)) is one way
+  to reach a machine. It is not where multi-machine state lives: each machine keeps its own.
 - **Moving a conversation to another machine is Session Vault.** Pairing lets a
   device use a machine's dashboard. To resume a conversation on a different
   machine, use [Session Vault](/configuration/session-vault).
@@ -309,7 +425,9 @@ is read only from the global `~/.overdeck/config.yaml`, never from a project
 
 - A desktop connection list, environment switcher and version gating:
   [PAN-4402](https://github.com/eltmon/overdeck/issues/4402).
-- Discovered HTTPS and Tailscale endpoints and advertised origins:
-  [PAN-4403](https://github.com/eltmon/overdeck/issues/4403).
+- Discovered LAN and Tailscale endpoints shipped with machine links in v0.73.0
+  ([PAN-4403](https://github.com/eltmon/overdeck/issues/4403),
+  [PAN-4645](https://github.com/eltmon/overdeck/issues/4645)); see
+  [Linked machines](/configuration/linked-machines).
 - Launching Overdeck on an SSH host from the desktop app:
   [PAN-4404](https://github.com/eltmon/overdeck/issues/4404).

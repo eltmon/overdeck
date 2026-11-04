@@ -99,4 +99,17 @@ describe('user-prompt-submit-hook bare conversations (PAN-4185)', () => {
     expect(events).toContain('"kind":"message_received"')
     expect(events).toContain('"kind":"thinking_start"')
   })
+
+  it('prefers the token file over a stale env token', async () => {
+    writeFileSync(join(tempDir, 'internal-token'), 'file-token\n', 'utf-8')
+    const { code } = await runHook(tempDir, input, {
+      ...baseEnv(),
+      OVERDECK_HOME: tempDir,
+      OVERDECK_INTERNAL_TOKEN: 'stale-token',
+    })
+    expect(code).toBe(0)
+    const curlArgs = readFileSync(curlLog, 'utf-8')
+    expect(curlArgs).toContain('file-token')
+    expect(curlArgs).not.toContain('stale-token')
+  })
 })

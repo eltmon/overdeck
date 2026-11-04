@@ -47,6 +47,8 @@ import { postVerificationCheckRun } from './verification-check-run.js';
 import { writeFeedbackFile } from './feedback-writer.js';
 import { appendPipelineEntry } from './pipeline-journal.js';
 import { resolveIssueFeedbackTarget } from './feedback-target.js';
+import { isAdoptedWorkspaceWithoutPlan, withAdoptedPlanChecklistSkip } from './adopted-plan-checklist.js';
+import { syncSingleRepo, syncWorkspaceRootsToPrHead, type SyncResult } from './workspace-pr-head-sync.js';
 import { messageAgent } from '../agents.js';
 import { findProjectByPath, resolveProjectFromIssueSync } from '../projects.js';
 import { resolveWorkspaceRepoRoots } from '../project-repos.js';
@@ -69,17 +71,6 @@ export {
 } from './verification-escalation.js';
 
 export type { VerificationRunnerOptions, VerificationRunnerOutcome, WorkspaceInfo } from './verification-types.js';
-
-interface SyncResult {
-  repoDir: string;
-  repoName: string;
-  targetBranch: string;
-  success: boolean;
-  alreadyUpToDate?: boolean;
-  hasConflicts?: boolean;
-  conflictLines?: string;
-  errorOutput?: string;
-}
 
 /**
  * Tell the work agent that verification passed (PAN-3705).
@@ -108,38 +99,6 @@ export async function deliverVerificationPass(
       : `[${logPrefix}] Could not tell ${target.agentId} that verification passed for ${issueId}: ${outcome.reason ?? 'delivery was not accepted'}`);
   } catch (err) {
     console.log(`[${logPrefix}] Could not tell the work agent that verification passed for ${issueId}: ${err instanceof Error ? err.message : String(err)}`);
-  }
-}
-
-async function syncSingleRepo(gitDir: string, targetBranch: string): Promise<SyncResult> {
-  const repoName = basename(gitDir);
-  try {
-    await execAsync(`git fetch origin ${targetBranch}`, { cwd: gitDir, encoding: 'utf-8', timeout: 30000 });
-    const mergeResult = await execAsync(`git merge origin/${targetBranch} --no-edit`, {
-      cwd: gitDir,
-      encoding: 'utf-8',
-      timeout: 60000,
-    });
-    const mergeOut = (mergeResult.stdout || '') + (mergeResult.stderr || '');
-    const alreadyUpToDate = mergeOut.includes('Already up to date') || mergeOut.includes('Already up-to-date');
-    return { repoDir: gitDir, repoName, targetBranch, success: true, alreadyUpToDate };
-  } catch (mergeErr: any) {
-    const mergeOut = (mergeErr.stdout || '') + (mergeErr.stderr || '');
-    const hasConflicts = mergeOut.includes('CONFLICT') || mergeOut.includes('Merge conflict');
-
-    if (hasConflicts) {
-      try { await execAsync('git merge --abort', { cwd: gitDir, encoding: 'utf-8' }); } catch {}
-      const conflictLines = mergeOut
-        .split('\n')
-        .filter((line: string) => line.startsWith('CONFLICT'))
-        .map((line: string) => line.replace(/^CONFLICT \([^)]+\): /, '').replace(/Merge conflict in /, ''))
-        .join('\n  - ');
-      return { repoDir: gitDir, repoName, targetBranch, success: false, hasConflicts: true, conflictLines };
-    }
-
-    const rawOutput = mergeOut || mergeErr.message || '(no output)';
-    const errorOutput = rawOutput.length > 3000 ? rawOutput.slice(0, 3000) + '\n...(truncated)' : rawOutput;
-    return { repoDir: gitDir, repoName, targetBranch, success: false, errorOutput };
   }
 }
 
@@ -296,6 +255,9 @@ export async function runVerificationForIssueInProcess(
   const mergedOutcome = await skipMergedVerification(issueId, logPrefix);
   if (mergedOutcome) return mergedOutcome;
 
+  // PAN-4810: verify the PR head; a refused move fails the sync check below.
+  const prHeadFailures = options.syncTargetBranch === false ? [] : await syncWorkspaceRootsToPrHead(issueId, workspacePath, logPrefix);
+
   // PAN-3917: how many failed runs are already recorded against this exact
   // HEAD. A new commit resets the breaker by construction.
   const headShort = await readWorkspaceHeadShort(workspacePath);
@@ -346,8 +308,9 @@ export async function runVerificationForIssueInProcess(
       if (repoRoots.length === 0) {
         console.log(`[${logPrefix}] No git directories found in workspace ${workspacePath} — skipping sync`);
       } else {
-        const syncResults: SyncResult[] = [];
+        const syncResults: SyncResult[] = [...prHeadFailures];
         for (const root of repoRoots) {
+          if (prHeadFailures.some(f => f.repoDir === root.dir)) continue;
           const repoName = isPolyrepo ? root.repoKey : undefined;
           const displayName = repoName || basename(workspacePath);
           console.log(`[${logPrefix}] Syncing ${root.targetBranch} into ${displayName} for ${issueId}...`);
@@ -813,7 +776,8 @@ export async function runVerificationForIssueInProcess(
       return failedOutcome(failedCheck, newCycleCount);
     }
 
-    const taskBlockers = options.skipPlanChecklist
+    // PAN-4810: decided again here; adoption may journal its entry after this run was dispatched.
+    const taskBlockers = options.skipPlanChecklist || await isAdoptedWorkspaceWithoutPlan(workspacePath)
       ? []
       : await checkIncompletePlanItems(workspacePath, issueId);
     const postChecklistMergedOutcome = await skipMergedVerification(issueId, logPrefix);
@@ -988,7 +952,10 @@ export function runVerificationForIssue(
   logPrefix: string,
   options: VerificationRunnerOptions = {},
 ): Effect.Effect<VerificationRunnerOutcome> {
-  return process.env.OVERDECK_VERIFICATION_WORKER === '1'
-    ? Effect.promise(() => runVerificationForIssueInProcess(issueId, workspacePath, workspaceInfo, logPrefix, options))
-    : Effect.promise(() => runSupervisedVerification(issueId, workspacePath, workspaceInfo, logPrefix, options));
+  return Effect.promise(async () => {
+    const resolved = await withAdoptedPlanChecklistSkip(workspacePath, options);
+    return process.env.OVERDECK_VERIFICATION_WORKER === '1'
+      ? runVerificationForIssueInProcess(issueId, workspacePath, workspaceInfo, logPrefix, resolved)
+      : runSupervisedVerification(issueId, workspacePath, workspaceInfo, logPrefix, resolved);
+  });
 }

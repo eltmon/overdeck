@@ -17,7 +17,14 @@ const { overdeckHome } = await vi.hoisted(async () => {
 });
 
 import { invalidateProjectsConfigCache } from '../../projects.js';
-import { listSageoxUploads, readSageoxUpload, SageoxConfigError, setSageoxUpload } from '../config.js';
+import {
+  listSageoxUploads,
+  readSageoxBindingCommitted,
+  readSageoxUpload,
+  SageoxConfigError,
+  setSageoxBindingCommitted,
+  setSageoxUpload,
+} from '../config.js';
 
 const projectsPath = join(overdeckHome, 'projects.yaml');
 
@@ -83,5 +90,25 @@ describe('sageox upload flag', () => {
       { projectKey: 'oss', upload: false },
       { projectKey: 'work', upload: true },
     ]);
+  });
+});
+
+describe('sageox committed-binding flag', () => {
+  it('writes sageox_binding: committed once and is idempotent', async () => {
+    expect(await readSageoxBindingCommitted('oss')).toBe(false);
+    expect(await setSageoxBindingCommitted('oss')).toEqual({ changed: true });
+    invalidateProjectsConfigCache();
+    expect(await setSageoxBindingCommitted('oss')).toEqual({ changed: false });
+    invalidateProjectsConfigCache();
+    expect(await readSageoxBindingCommitted('oss')).toBe(true);
+    const written = parseYaml(readFileSync(projectsPath, 'utf8')) as {
+      projects: Record<string, Record<string, unknown>>;
+    };
+    expect(written.projects['oss']).toMatchObject({ name: 'OSS', sageox_binding: 'committed' });
+    expect(written.projects['work']).not.toHaveProperty('sageox_binding');
+  });
+
+  it('refuses an unknown project', async () => {
+    await expect(setSageoxBindingCommitted('missing')).rejects.toBeInstanceOf(SageoxConfigError);
   });
 });

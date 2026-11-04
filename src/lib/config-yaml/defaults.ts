@@ -9,6 +9,8 @@ import type { NormalizedConfig } from './schema.js';
 import { DEFAULT_NORMALIZED_OLLAMA } from './ollama.js';
 import { DEFAULT_NORMALIZED_JEV } from './jev.js';
 import { DEFAULT_NORMALIZED_SECURITY } from './semgrep.js';
+import { defaultPushConfig } from './push-config.js';
+import { defaultMcpConfig } from './mcp-config.js';
 
 /**
  * PAN-2500: default deacon memory-governor reserves as fractions of total RAM,
@@ -218,6 +220,8 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
     utteranceTemplates: {},
     mutedIssues: [],
   },
+  push: defaultPushConfig(),
+  mcp: defaultMcpConfig(),
   ttsSummarizer: {
     enabled: false,
     model: 'gpt-5.4-mini',
@@ -263,6 +267,7 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
   ui: {
     openInEditorCommand: null,
     theme: 'broadsheet',
+    colorTheme: { light: null, dark: null },
   },
   experimental: {
     experimentalFeatures: false,

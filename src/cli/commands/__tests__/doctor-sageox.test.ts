@@ -1,49 +1,70 @@
 /**
- * PAN-2444 O5: `pan doctor` SageOx row from an injected pack commit and probe.
+ * PAN-4852 WI-8: `pan doctor` SageOx row from an injected built-binary
+ * resolution and probe.
  */
 import { describe, expect, it } from 'vitest';
 import { checkSageox, type SageoxDoctorDeps } from '../doctor-sageox.js';
+import { resolveOxBinary, type OxBinary } from '../../../lib/sageox/binary.js';
 import type { OxProbeResult } from '../../../lib/sageox/probe.js';
+import type { PackRegistryEntry } from '../../../lib/skill-packs/sources.js';
 
 const PACK = 'a'.repeat(40);
+const BIN = `/home/u/.overdeck/packs/sageox/${PACK}/bin/ox`;
+const BUILT: OxBinary = { ok: true, bin: BIN, binDir: `/home/u/.overdeck/packs/sageox/${PACK}/bin`, commit: PACK };
 
-function deps(packCommit: string | null, probe: OxProbeResult): SageoxDoctorDeps {
-  return { packCommit: async () => packCommit, probe: async () => probe };
+function deps(binary: OxBinary, probe: OxProbeResult, probed: string[] = []): SageoxDoctorDeps {
+  return {
+    resolveBinary: async () => binary,
+    probe: async (bin) => { probed.push(bin); return probe; },
+  };
 }
 
 describe('checkSageox', () => {
   it('adds no row when the sageox pack is not registered', async () => {
-    let probed = false;
-    const result = await checkSageox({ packCommit: async () => null, probe: async () => { probed = true; return { ok: false, reason: 'missing' }; } });
-    expect(result).toEqual([]);
-    expect(probed).toBe(false);
+    const probed: string[] = [];
+    const binary: OxBinary = { ok: false, reason: 'not-registered', message: 'not registered' };
+    expect(await checkSageox(deps(binary, { ok: false, reason: 'missing' }, probed))).toEqual([]);
+    expect(probed).toEqual([]);
   });
 
-  it('is ok when the contract binary was built from the pack commit', async () => {
-    expect(await checkSageox(deps(PACK, { ok: true, version: '0.19.0', commit: PACK }))).toEqual([{
-      name: 'SageOx (ox)',
-      status: 'ok',
-      message: 'host contract overdeck-host/1, ox 0.19.0; commit matches pack',
-    }]);
-  });
-
-  it('warns when the binary commit differs from the pack commit', async () => {
-    const [row] = await checkSageox(deps(PACK, { ok: true, version: '0.19.0', commit: 'b'.repeat(40) }));
-    expect(row).toMatchObject({ status: 'warn', message: expect.stringContaining('commit bbbbbbb differs from pack aaaaaaa') });
-    expect(row?.fix).toContain('go build -o ~/.local/bin/ox ./cmd/ox');
-  });
-
-  it('warns with fix text for upstream ox without the host contract', async () => {
-    expect(await checkSageox(deps(PACK, { ok: false, reason: 'no-contract' }))).toEqual([{
+  it('warns with the sync fix when ox is not built for the pack commit', async () => {
+    const probed: string[] = [];
+    const binary = await resolveOxBinary({
+      getPack: async () => ({ commit: PACK } as PackRegistryEntry),
+      isReady: async () => false,
+    });
+    expect(await checkSageox(deps(binary, { ok: true, version: '0.25.0', commit: '' }, probed))).toEqual([{
       name: 'SageOx (ox)',
       status: 'warn',
-      message: 'upstream ox, no host contract',
-      fix: 'build ox from the eltmon/ox commit trusted by the sageox pack: go build -o ~/.local/bin/ox ./cmd/ox',
+      message: 'ox not built for pack aaaaaaa',
+      fix: 'pan skills pack sync sageox',
     }]);
+    expect(probed).toEqual([]);
   });
 
-  it('warns when ox is not on PATH', async () => {
-    const [row] = await checkSageox(deps(PACK, { ok: false, reason: 'missing' }));
-    expect(row).toMatchObject({ status: 'warn', message: 'ox not found on PATH' });
+  it('warns when the built ox is not executable, probing the built path', async () => {
+    const probed: string[] = [];
+    expect(await checkSageox(deps(BUILT, { ok: false, reason: 'missing' }, probed))).toEqual([{
+      name: 'SageOx (ox)',
+      status: 'warn',
+      message: 'built ox not executable',
+      fix: 'pan skills pack sync sageox',
+    }]);
+    expect(probed).toEqual([BIN]);
+  });
+
+  it('warns when the built ox lacks the host contract', async () => {
+    const [row] = await checkSageox(deps(BUILT, { ok: false, reason: 'no-contract' }));
+    expect(row).toMatchObject({ status: 'warn', message: 'upstream ox, no host contract', fix: 'pan skills pack sync sageox' });
+  });
+
+  it('is ok when the built ox answers the host contract, even with an empty build commit', async () => {
+    const probed: string[] = [];
+    expect(await checkSageox(deps(BUILT, { ok: true, version: '0.25.0', commit: '' }, probed))).toEqual([{
+      name: 'SageOx (ox)',
+      status: 'ok',
+      message: `built ox at ${BIN}; host contract overdeck-host/1, ox 0.25.0; pack aaaaaaa`,
+    }]);
+    expect(probed).toEqual([BIN]);
   });
 });

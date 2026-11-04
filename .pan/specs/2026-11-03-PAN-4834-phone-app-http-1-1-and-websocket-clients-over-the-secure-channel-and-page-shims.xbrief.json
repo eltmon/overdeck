@@ -1,0 +1,747 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-03T14:15:22Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4834: Phone app: HTTP/1.1 and WebSocket clients over the secure channel, and page shims",
+    "updated": "2026-11-03T14:27:24.083Z"
+  },
+  "plan": {
+    "id": "pan-4834",
+    "title": "Phone app: HTTP/1.1 and WebSocket clients over the secure channel, and page shims",
+    "status": "running",
+    "uid": "8f55c275-9d5d-48f1-99d7-e509bf3c3dc3",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-03T14:15:22Z",
+    "updated": "2026-11-03T14:27:24.083Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4834",
+        "label": "PAN-4834",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4823",
+        "label": "PAN-4823 (epic)",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4834.md",
+        "label": "PRD",
+        "type": "document"
+      },
+      {
+        "uri": ".pan/drafts/pan-4823.md",
+        "label": "Epic PRD (W-WEB2, AC-6, CP-2)",
+        "type": "document"
+      }
+    ],
+    "tags": [
+      "anywhere",
+      "phone-app",
+      "secure-channel",
+      "http",
+      "websocket",
+      "frontend"
+    ],
+    "narratives": {
+      "Problem": "Inside a secure channel a machine speaks plain HTTP/1.1, handed to its Node HTTP server by installChannelListener. A phone WebView cannot point fetch or WebSocket at a custom byte stream, so the phone app (epic PAN-4823) has no way to send the existing frontend's /api/* requests and /ws/rpc socket through the channel. Separately, elements that load their own URL (img src) bypass fetch entirely (checkpoint CP-2).",
+      "Proposal": "Add to @overdeck/anywhere-channel/web: a pure HTTP/1.1 serializer and response parser (http1.ts); requestOnChannel and a keep-alive pool of at most 4 channels per machine with 4 s idle close and one stale resend for GET/HEAD/OPTIONS, mirroring LinkAgent (http-client.ts); pure RFC 6455 framing (ws-frames.ts); ChannelWebSocket, the browser WebSocket interface over a dedicated channel (ws-client.ts); and installChannelShims({ currentMachine }) that replaces fetch and WebSocket and routes relative or same-protocol-and-host /api/ and /ws/ URLs to the current machine with its phone token (shims.ts). Resolve CP-2 by loading chat attachment thumbnails and the lightbox image through fetch into object URLs when isNativeShell(). Prove it with an integration test against the real installChannelListener. Details: .pan/drafts/PAN-4834.md.",
+      "NonGoals": "- The Capacitor app, calling installChannelShims from apps/mobile, composing dial from createMachineDialer, route choice and reconnects (PAN-4837)\n- Native-shell branches in wsTransport.ts or MobileApp.tsx (skip ensureDashboardSession, service worker, install prompt): PAN-4837; this issue only creates lib/nativeShell.ts\n- Any server change: phone credentials, scopes, /api/phones routes (PAN-4835) or the directory client role (PAN-4829)\n- Streaming response bodies, EventSource, sendBeacon, following redirects, request timeouts beyond AbortSignal\n- permessage-deflate or any WebSocket extension, Blob sends over a channel WebSocket, a meaningful bufferedAmount\n- Making GodView's files link or the streaming readers in DeepWipeDialog, PlanDialog and useResetIssue work in the app (desktop-only screens)\n- Widening CryptoPort, changing wire bytes, NOISE_LINK_PROTOCOL or CONNECT_PROTOCOL_VERSION\n- User-facing Mintlify pages (pan-4823 W-DOC owns configuration/phone-app.mdx)\n- Sending the phone token to any non-routed URL\n- Raising any row in scripts/file-size-allowlist.txt"
+    },
+    "autoDecisions": [
+      {
+        "summary": "installChannelShims takes { currentMachine: () => ShimMachine | null } where ShimMachine = { environmentId, bearerToken, dial }, instead of the epic sketch's separate bearerToken option.",
+        "rationale": "Each paired machine mints its own phone token, so the token belongs to the machine; a getter read on every call is required for machine switching (epic FR-10), and an injected dial keeps the package transport-agnostic for PAN-4837."
+      },
+      {
+        "summary": "Routing compares URL protocol and host (plus ws:/wss: on the same host for WebSockets), never URL.origin.",
+        "rationale": "Verified in Node 22: new URL('/api/x', 'capacitor://localhost/m').origin is 'null', so an origin rule would route nothing on iOS; wsTransport builds ws(s)://<page host>/ws/rpc."
+      },
+      {
+        "summary": "Add the PAN-4740 stale-channel resend (one retry for GET/HEAD/OPTIONS on a reused channel before any response byte) and the Keep-Alive timeout hint rule to the phone pool, though the epic step lists only 4 channels / 4 s idle.",
+        "rationale": "The machine's HTTP server closes idle channels at 5 s, the same race LinkAgent fixed in PAN-4740; the phone would otherwise show intermittent failures."
+      },
+      {
+        "summary": "Response bodies are buffered (request() resolves with the whole body); 64 KiB head cap, 32 MiB body and WebSocket message cap.",
+        "rationale": "The epic's request() signature returns body: Uint8Array; no mobile screen streams a response (CP-2 grep); 32 MiB matches LINK_FORWARD_MAX_BYTES."
+      },
+      {
+        "summary": "SHA-1 for Sec-WebSocket-Accept comes from @noble/hashes/legacy.js inside ws-frames.ts; CryptoPort is not widened.",
+        "rationale": "CryptoPort is golden-vectored by PAN-4833 for the protocol; @noble/hashes 2.4.0 is already a package dependency and is pure JS for both runtimes."
+      },
+      {
+        "summary": "ChannelWebSocket follows browser semantics where callers can tell: binaryType defaults to 'blob', send in CONNECTING throws InvalidStateError, close codes limited to 1000/3000-4999, abnormal end fires error then close 1006; Blob sends throw TypeError and bufferedAmount is 0.",
+        "rationale": "Drop-in replacement for globalThis.WebSocket; Effect's Socket reads Blob data via arrayBuffer() and sends only strings/bytes, so the unsupported pieces have no caller."
+      },
+      {
+        "summary": "CP-2 takes the primary path (fetch into an object URL) for the two phone-reachable hits, gated on isNativeShell(); this issue creates src/dashboard/frontend/src/lib/nativeShell.ts with the exact one-liner from pan-4823 W-APP1 step 5.",
+        "rationale": "The grep found exactly two reachable hits (attachment thumbnail and lightbox) and the primary path keeps images visible; the epic names isNativeShell for this gate, and PAN-4837 reuses the same file."
+      },
+      {
+        "summary": "No user-facing Mintlify doc in this issue; docs go to the package README, docs/ANYWHERE-ARCHITECTURE.md and the codebase map.",
+        "rationale": "The phone app is not released; pan-4823 W-DOC owns configuration/phone-app.mdx."
+      },
+      {
+        "summary": "Proceed although the epic says not to start before PAN-4774 passes.",
+        "rationale": "PAN-4774 (Anywhere release acceptance run) is CLOSED as of 2026-11-03, and the prerequisite PAN-4833 has merged."
+      }
+    ],
+    "items": [
+      {
+        "id": "http-wire",
+        "title": "Add the pure HTTP/1.1 request serializer and incremental response parser (http1.ts)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:15:22Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4834",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/anywhere-channel/src/http1.ts",
+            "packages/anywhere-channel/src/__tests__/http1.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run packages/anywhere-channel/src/__tests__/http1.test.ts",
+            "npm run typecheck:anywhere-channel"
+          ],
+          "expected_outputs": [
+            "http1.test.ts passes",
+            "typecheck:anywhere-channel completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-4834.md WI-1 (exact types, constants and parser rules are there). Create packages/anywhere-channel/src/http1.ts exporting HeaderPairs, HttpRequest, HttpResponseHead, HttpResponse, HttpParseError(code: bad-status-line|bad-header|headers-too-large|body-too-large|bad-chunk|truncated), CHANNEL_HOST='link.invalid', MAX_RESPONSE_HEAD_BYTES=64 KiB, MAX_RESPONSE_BODY_BYTES=32 MiB, serializeHead(method, path, headers) (validates method /^[A-Z]+$/, path starts with / and has no space/CR/LF, token header names, values without CR/LF/NUL; else TypeError), serializeRequest(req) (Host: link.invalid, Connection: keep-alive, Accept-Encoding: identity, caller headers minus host/connection/content-length/transfer-encoding/keep-alive/upgrade/accept-encoding/origin/cookie, Content-Length when a body exists or 0 for bodiless POST/PUT/PATCH/DELETE) and class ResponseParser({method,maxHeadBytes?,maxBodyBytes?}) with push(chunk) -> {state:'more'} | {state:'done', response, keepAlive, keepAliveTimeoutMs, leftover}, end(), and responded. Parser: discard 1xx except 101; 101 is done at end of head with leftover; no body for HEAD/204/304; chunked (last coding) with extensions ignored and trailers discarded; else content-length (repeated values must match); else read until end(). keepAlive per HTTP version and Connection header, false for read-to-close and 101; keepAliveTimeoutMs = N*1000 from 'keep-alive: timeout=N'. No node:*, no require(, no global Buffer: use TextEncoder/TextDecoder and b4a. Tests feed bytes in 1-byte slices and in one chunk."
+        },
+        "items": [
+          {
+            "id": "http-wire.ac1",
+            "title": "Given a GET request with caller headers Origin, Cookie and Host, when serializeRequest runs, then the output bytes equal the exact head with Host: link.invalid, Connection: keep-alive, Accept-Encoding: identity and none of the caller's Origin, Cookie or Host values",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "http-wire.ac2",
+            "title": "Given a chunked response with a chunk extension and a trailer fed one byte at a time, when ResponseParser.push consumes it, then it returns state 'done' with the concatenated body and an empty leftover",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "http-wire.ac3",
+            "title": "Given a 101 response followed by 3 extra bytes, when the parser consumes it, then it returns done with an empty body, keepAlive false and those 3 bytes as leftover",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "http-wire.ac4",
+            "title": "Given a content-length body cut short, when end() is called, then it throws HttpParseError with code 'truncated', and a body larger than maxBodyBytes throws code 'body-too-large'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "channel-pool",
+        "title": "Add requestOnChannel and createChannelPool: keep-alive pool of at most 4 channels per machine with idle close and stale resend (http-client.ts)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:15:22Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4834",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/anywhere-channel/src/http-client.ts",
+            "packages/anywhere-channel/src/__tests__/http-client.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run packages/anywhere-channel/src/__tests__/http-client.test.ts",
+            "npm run typecheck:anywhere-channel"
+          ],
+          "expected_outputs": [
+            "http-client.test.ts passes",
+            "typecheck:anywhere-channel completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-2",
+            "NFR-3"
+          ],
+          "foundationFor": [
+            "shims",
+            "phone-channel-integration"
+          ],
+          "parallelSafeReason": "Touches only http-client.ts and its test; depends on http1.ts (WI-1) through its exports only."
+        },
+        "narrative": {
+          "Action": "PRD WI-2 and D-10. Create packages/anywhere-channel/src/http-client.ts exporting ChannelStream (write/end/destroy/destroyed/on/off), ChannelDial, ChannelHttpError(code: channel-closed|parse|dial-failed|pool-closed, responded), CHANNEL_POOL_MAX=4, CHANNEL_POOL_IDLE_MS=4000, requestOnChannel(stream, req, {signal}) -> {response, reusable, keepAliveTimeoutMs}, and createChannelPool({dial, max, idleMs}) -> {request(req,{signal}), close(), size, idleCount}. requestOnChannel writes serializeRequest(req), feeds data to ResponseParser, removes ALL its listeners on every settle path (H-2), reusable = keepAlive && leftover empty && !destroyed; end/close before done -> parser.end() or ChannelHttpError('channel-closed', parser.responded). Pool: reuse the most recently idled channel, dial when size < max, else FIFO queue; idle timer = idleMs, or hint-1000 when 0 < hint-1000 < idleMs (Keep-Alive: timeout hint, Node Agent rule); expiry ends+destroys; idle channel close/end removes it; non-reusable responses destroy the channel; stale resend: a GET/HEAD/OPTIONS that failed with channel-closed and responded=false on a channel that served an earlier request drops every idle channel and retries once on a fresh dial; abort destroys the in-flight channel (frees the slot, H-5) and rejects with signal.reason or DOMException AbortError; aborted queued requests leave the queue; close() destroys all and rejects queued/later requests with pool-closed; a dial rejection fails only its request with dial-failed. Tests: real http.createServer fed with server.emit('connection', duplexPairEnd) for request/reuse/concurrency cases WITHOUT fake timers; scripted duplexPair fake channels WITH vi.useFakeTimers() + advanceTimersByTimeAsync for idle, hint, stale, abort cases (H-6). Package source must not import node:*; tests may."
+        },
+        "items": [
+          {
+            "id": "channel-pool.ac1",
+            "title": "Given a real HTTP server and a pool with max 4, when five GETs are issued concurrently, then dial is called exactly 4 times and all five requests resolve with status 200",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "channel-pool.ac2",
+            "title": "Given an idle pooled channel under vi.useFakeTimers, when timers advance 3999 ms the channel is still open, and when they advance to 4000 ms the pool destroys it and size returns 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "channel-pool.ac3",
+            "title": "Given a pooled channel whose peer closed it before replying, when a GET is sent on it, then the pool resends once on a freshly dialled channel and resolves, while a POST in the same state rejects with ChannelHttpError code 'channel-closed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "channel-pool.ac4",
+            "title": "Given an in-flight request, when its AbortSignal aborts, then the request rejects with name 'AbortError', its channel is destroyed and a queued request acquires the freed slot",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ws-framing",
+        "title": "Add pure RFC 6455 framing: masked client frames, frame decoder, close payloads and the accept key (ws-frames.ts)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:15:22Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4834",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/anywhere-channel/src/ws-frames.ts",
+            "packages/anywhere-channel/src/__tests__/ws-frames.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run packages/anywhere-channel/src/__tests__/ws-frames.test.ts",
+            "npm run typecheck:anywhere-channel"
+          ],
+          "expected_outputs": [
+            "ws-frames.test.ts passes",
+            "typecheck:anywhere-channel completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3 and D-7. Create packages/anywhere-channel/src/ws-frames.ts exporting WS_GUID, OPCODES, MAX_WS_MESSAGE_BYTES=32 MiB, websocketKey(crypto: CryptoPort) (base64 of 16 random bytes), acceptFor(key) = base64(sha1(utf8(key+WS_GUID))) with sha1 imported from '@noble/hashes/legacy.js' (do NOT add sha1 to CryptoPort), encodeClientFrame(opcode, payload, mask4, fin=true) (7/16/64-bit lengths, mask bit, masked payload), encodeClosePayload(code?, reason=''), decodeClosePayload(payload) (empty -> {code:1005, reason:''}; length 1 or invalid code -> WsProtocolError 1002), class WsProtocolError(closeCode: 1002|1007|1009), class FrameDecoder({maxMessageBytes}) with push(chunk) -> WsEvent[] (text|binary|ping|pong|close) reassembling continuations and throwing WsProtocolError for masked server frames, RSV bits, unknown opcodes, control frames >125 bytes or fragmented, bad continuation sequencing, 64-bit length with top bit set (all 1002), invalid UTF-8 via TextDecoder fatal (1007), message over the cap (1009). Base64 via b4a."
+        },
+        "items": [
+          {
+            "id": "ws-framing.ac1",
+            "title": "Given the RFC 6455 section 1.3 key 'dGhlIHNhbXBsZSBub25jZQ==', when acceptFor runs, then it returns 's3pPLMBiTxaQ9kYGzzhZRbK+xOo='",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ws-framing.ac2",
+            "title": "Given payloads of 5, 126 and 70000 bytes, when encodeClientFrame encodes them with a mask, then the frame has the mask bit set and the 7-bit, 16-bit and 64-bit length forms, and the test's unmasking recovers the payload",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ws-framing.ac3",
+            "title": "Given a text message split across three frames with a ping between the first two, when FrameDecoder.push consumes them, then it emits the ping first and then one text event with the joined string",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ws-framing.ac4",
+            "title": "Given a masked server frame, invalid UTF-8 text, or a message over maxMessageBytes, when FrameDecoder.push consumes it, then it throws WsProtocolError with closeCode 1002, 1007 or 1009 respectively",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ws-client",
+        "title": "Add ChannelWebSocket: the browser WebSocket interface over a dedicated channel (ws-client.ts)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:15:22Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4834",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/anywhere-channel/src/ws-client.ts",
+            "packages/anywhere-channel/src/__tests__/ws-client.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run packages/anywhere-channel/src/__tests__/ws-client.test.ts",
+            "npm run typecheck:anywhere-channel"
+          ],
+          "expected_outputs": [
+            "ws-client.test.ts passes",
+            "typecheck:anywhere-channel completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1",
+            "NFR-3",
+            "NFR-4"
+          ],
+          "foundationFor": [
+            "shims",
+            "phone-channel-integration"
+          ],
+          "parallelSafeReason": "Touches only ws-client.ts and its test; consumes http1.ts and ws-frames.ts exports only."
+        },
+        "narrative": {
+          "Action": "PRD WI-4, D-4, D-8, D-9 and Fact 6 (exact Effect usage: addEventListener with {once:true}, removeEventListener, readyState !== 1, send, close(code, reason), event.data / event.code / event.reason). Create packages/anywhere-channel/src/ws-client.ts exporting ChannelWebSocketOptions {dial, bearerToken, crypto? = webCrypto, closeTimeoutMs? = 5000}, ChannelMessageEvent extends Event {data, origin:''}, ChannelCloseEvent extends Event {code, reason, wasClean} (Node 22 has no global CloseEvent), and class ChannelWebSocket extends EventTarget with static+instance CONNECTING=0/OPEN=1/CLOSING=2/CLOSED=3, url, readyState, protocol, extensions '', bufferedAmount 0, binaryType ('blob' default, 'arraybuffer'), onopen/onmessage/onclose/onerror properties, send, close. Constructor requires an absolute url (relative or unparsable -> DOMException SyntaxError; the shim resolves relative URLs first) and validates protocols (DOMException SyntaxError), then async: dial() (never the HTTP pool), write serializeHead('GET', pathname+search, Host link.invalid, Upgrade websocket, Connection Upgrade, Sec-WebSocket-Key, Sec-WebSocket-Version 13, Authorization Bearer, optional Sec-WebSocket-Protocol), parse the 101 with ResponseParser; accept only when status 101, upgrade=websocket, connection has 'upgrade', accept == acceptFor(key), protocol absent-or-offered, no extensions; then OPEN, dispatch open, feed leftover to FrameDecoder (H-1). Failure anywhere before open: destroy channel, dispatch error then close {1006, wasClean:false}. Messages: text -> string; binary -> Blob or ArrayBuffer per binaryType; ping -> masked pong; server close -> echo close (empty for 1005), end+destroy, close event with the server's code/reason, wasClean true; WsProtocolError -> send close with its code, destroy, error then close 1006. send: CONNECTING throws DOMException InvalidStateError; CLOSING/CLOSED drops; string/ArrayBuffer/ArrayBufferView one frame with a fresh mask; Blob throws TypeError('Blob payloads are not supported over the channel'). close(code?, reason?): only 1000 or 3000-4999 (else InvalidAccessError), reason <= 123 UTF-8 bytes (else SyntaxError); OPEN -> send close, CLOSING, closeTimeoutMs timer -> destroy + close 1006 wasClean false. Unexpected channel end -> error then close 1006. close fires exactly once. Tests use a scripted server on a duplexPair end built with ws-frames helpers; timer case uses vi.useFakeTimers."
+        },
+        "items": [
+          {
+            "id": "ws-client.ac1",
+            "title": "Given a scripted server that answers the upgrade correctly, when a ChannelWebSocket opens, then the server saw 'Authorization: Bearer t' and 'Host: link.invalid' and no Origin header, readyState becomes 1 and an open listener registered with {once:true} runs once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ws-client.ac2",
+            "title": "Given an open socket, when the server sends a close frame with code 4401 and reason 'revoked', then the client echoes a close frame and dispatches a close event with code 4401, reason 'revoked' and wasClean true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ws-client.ac3",
+            "title": "Given a server whose Sec-WebSocket-Accept is wrong or whose status is 403, when the socket connects, then it dispatches error and then close with code 1006 and wasClean false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ws-client.ac4",
+            "title": "Given an open socket with binaryType 'arraybuffer', when the server sends a binary frame and a ping, then a message event carries an ArrayBuffer with those bytes and the client replies with a masked pong carrying the ping payload",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ws-client.ac5",
+            "title": "Given an open socket under vi.useFakeTimers, when close(1000) is called and the server never echoes, then after advancing 5000 ms the socket dispatches close with code 1006 and wasClean false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "shims",
+        "title": "Add installChannelShims (fetch and WebSocket routing to the current machine) and export the new modules from ./web",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:15:22Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-4834",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "packages/anywhere-channel/src/shims.ts",
+            "packages/anywhere-channel/src/__tests__/shims.test.ts",
+            "packages/anywhere-channel/src/web.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run packages/anywhere-channel/src/__tests__/shims.test.ts",
+            "npm run typecheck:anywhere-channel",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "shims.test.ts passes",
+            "typecheck:anywhere-channel completes without errors",
+            "lint:circular reports no new cycles"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "NFR-4",
+            "NFR-5"
+          ],
+          "foundationFor": [
+            "phone-channel-integration",
+            "docs"
+          ],
+          "acJustification": "Six ACs: the shim is the single token-routing surface (security boundary), so routing, token attachment, passthrough, no-machine, Request-input normalisation and uninstall each need their own check.",
+          "parallelSafeReason": "Owns shims.ts, its test and web.ts; no other item edits these files."
+        },
+        "narrative": {
+          "Action": "PRD WI-5, D-2, D-3, D-5, D-11, D-13, Fact 8. Create packages/anywhere-channel/src/shims.ts exporting ShimMachine {environmentId, bearerToken, dial}, ShimLocation {protocol, host, href}, ShimTarget {fetch, WebSocket}, ChannelShimOptions {currentMachine: () => ShimMachine | null, target?, location?}, channelPathFor(input, location, kind:'fetch'|'websocket') and installChannelShims(options) returning an uninstall function. Routing: parse new URL(input, location.href) (error -> null); pathname must start with /api/ or /ws/; host === location.host AND protocol === location.protocol, or for websocket also protocol ws:/wss:; return pathname+search; NEVER compare URL.origin (it is 'null' for capacitor:). fetch shim is async: non-routed -> saved original fetch(input, init) unchanged (never add Authorization); routed -> currentMachine() (null -> TypeError('Failed to fetch', {cause: Error('No machine is selected')})), normalise per D-5: a Request input is used directly (or new Request(input, init) when init is given), never passed as the init dictionary of another Request (WebKit rejects a stream body without duplex:'half'); only string/URL inputs get new Request('http://link.invalid'+path, init), set Authorization: Bearer <machine.bearerToken>, body from request.arrayBuffer(), pool(environmentId).request(..., {signal}); build Response with statusText, minus transfer-encoding/connection/keep-alive headers, null body for 101/103/204/205/304, other status outside 200-599 -> TypeError; AbortError passes through; other errors -> TypeError('Failed to fetch', {cause}). One createChannelPool per environment id; its dial re-reads currentMachine() and rejects if null or a different environment. WebSocket shim class: constructor returns new original(url, protocols) when not routed, else new ChannelWebSocket(new URL(String(url), location.href).href, protocols, {dial, bearerToken}) (always an absolute URL) (no machine -> dial rejects -> error + close 1006); copy the four state constants. Install saves and replaces target.fetch/target.WebSocket; a second install on the same target throws Error('Channel shims are already installed'); uninstall restores originals and closes every pool. Append NAMED exports to web.ts for http1.ts, http-client.ts, ws-client.ts and shims.ts as listed in PRD WI-5 step 7 (this item is the only one that edits web.ts). Tests: channelPathFor table for capacitor: and https: locations; fake target + http.createServer via server.emit('connection') for routed fetch, FormData multipart, 204 null body, a Request input with a POST body, a relative new target.WebSocket('/ws/echo'), no-machine rejection, machine switching, passthrough, uninstall, double install."
+        },
+        "items": [
+          {
+            "id": "shims.ac1",
+            "title": "Given location capacitor://localhost/m, when channelPathFor('/api/x?a=1', loc, 'fetch') and channelPathFor('ws://localhost/ws/rpc', loc, 'websocket') run, then they return '/api/x?a=1' and '/ws/rpc', while 'wss://connect.overdeck.ai/v1/directory', 'https://localhost/api/x', '/apix' and '/m/needs-you' return null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "shims.ac2",
+            "title": "Given installed shims with a current machine, when target.fetch('/api/echo', {method:'POST', body}) runs, then the machine's HTTP server receives 'authorization: Bearer phone-token', 'host: link.invalid' and no origin header, and the shim resolves to a Response with the server's status and body",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "shims.ac3",
+            "title": "Given installed shims, when target.fetch('https://connect.overdeck.ai/healthz') runs or target.WebSocket is constructed for 'wss://connect.overdeck.ai/v1/directory', then the saved original fetch and WebSocket receive the call with no Authorization header added",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "shims.ac4",
+            "title": "Given currentMachine returns null, when a routed fetch runs, then it rejects with a TypeError whose cause message is 'No machine is selected'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "shims.ac5",
+            "title": "Given installed shims, when uninstall() is called, then target.fetch and target.WebSocket are the saved originals again and every pool is closed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "shims.ac6",
+            "title": "Given installed shims, when target.fetch receives new Request('capacitor://localhost/api/echo', {method:'POST', body:'abc'}), then the machine's server receives the body 'abc' and the shim resolves to its Response",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cp2-attachment-images",
+        "title": "CP-2: load chat attachment thumbnails and the image lightbox through fetch in the native shell",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:15:22Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-4834",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/nativeShell.ts",
+            "src/dashboard/frontend/src/lib/useChannelMediaSrc.ts",
+            "src/dashboard/frontend/src/lib/__tests__/useChannelMediaSrc.test.tsx",
+            "src/dashboard/frontend/src/components/chat/messagesTimeline/messageRows.tsx",
+            "src/dashboard/frontend/src/components/chat/ImageLightbox.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ImageLightbox.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/lib/__tests__/useChannelMediaSrc.test.tsx src/components/chat/__tests__/ImageLightbox.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "both frontend test files pass",
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6, D-12, Fact 13 (the CP-2 grep result: the only phone-reachable /api URL loads that bypass fetch are AttachmentThumbnails in messageRows.tsx line 66 and ImageLightboxHost in ImageLightbox.tsx line 56). Create src/dashboard/frontend/src/lib/nativeShell.ts with exactly: export const isNativeShell = () => (globalThis as { __OVERDECK_NATIVE__?: boolean }).__OVERDECK_NATIVE__ === true; (plus the one-line doc comment from the PRD). Create lib/useChannelMediaSrc.ts: useChannelMediaSrc(url) -> nullish/empty: undefined; not native or not starting with '/api/': url unchanged with no fetch; native /api/: undefined while loading, then URL.createObjectURL(blob from global fetch); non-OK or rejection: the original url; revoke the object URL on url change and unmount; ignore late results. messageRows.tsx: extract a local AttachmentThumbnail({attachment, onFailed}) component that calls the hook and renders the same button/img markup with src from the hook; the button still opens the lightbox with the original /api URL; keep data-testid 'user-message-attachments' and classes. ImageLightbox.tsx: call useChannelMediaSrc(image?.src) in ImageLightboxHost before the early return and render src from it. Tests with renderHook / render; stub fetch and URL.createObjectURL/revokeObjectURL; set and delete globalThis.__OVERDECK_NATIVE__ in beforeEach/afterEach. Do not touch wsTransport.ts or MobileApp.tsx (PAN-4837)."
+        },
+        "items": [
+          {
+            "id": "cp2-attachment-images.ac1",
+            "title": "Given __OVERDECK_NATIVE__ is unset, when useChannelMediaSrc('/api/x.png') renders, then it returns '/api/x.png' and fetch is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cp2-attachment-images.ac2",
+            "title": "Given __OVERDECK_NATIVE__ is true and fetch resolves a 200 blob, when useChannelMediaSrc('/api/x.png') renders, then it returns undefined first and then the stubbed object URL, and unmount calls URL.revokeObjectURL with that URL",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cp2-attachment-images.ac3",
+            "title": "Given __OVERDECK_NATIVE__ is true and fetch resolves 404, when useChannelMediaSrc('/api/x.png') renders, then it returns '/api/x.png' so the img onError path runs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cp2-attachment-images.ac4",
+            "title": "Given __OVERDECK_NATIVE__ is true, when openImageLightbox('/api/conversations/c/attachments/a.png', 'a') opens the lightbox, then the rendered img src becomes the stubbed object URL",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "phone-channel-integration",
+        "title": "AC-6: integration test of the pool, ChannelWebSocket and shims against the real channel listener",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:15:22Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-4834",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/integration/anywhere/phone-channel.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/integration/anywhere/phone-channel.test.ts"
+          ],
+          "expected_outputs": [
+            "phone-channel.test.ts passes with every case green"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7 (pan-4823 AC-6). Create tests/integration/anywhere/phone-channel.test.ts reusing the scaffolding of tests/integration/anywhere/web-channel-handshake.test.ts (createRequire('noise-handshake/dh').generateKeyPair(); never import streamx or b4a from tests/, H-7). Server: http.createServer with GET /api/hello, GET /api/chunked (three res.write calls), POST /api/echo (JSON {method, bytes, authorization, contentType}), GET /api/hold (a promise gate that answers once two requests arrived, no timers), GET /api/empty (204); ws WebSocketServer({noServer:true}) on 'upgrade' for /ws/echo echoing text/binary and closing with ws.close(4401, 'revoked') on the text 'close-me'. installChannelListener(server, {primary:true, localKey: async()=>serverKey, isPinnedPeer: k=>k===webKeyHex, takePairing: ()=>'unknown', onPairingFailure: ()=>{}, log: ()=>{}}) from src/dashboard/server/channel-listener.ts; call server.listen(0, '127.0.0.1') like channel-listener.test.ts so server.close() runs closeAllChannels(); requests still enter via acceptRawChannel. dial: duplexPair with close propagated both ways, void acceptRawChannel(a), return (await openSecureChannel(b, {mode:'link', localKey: webKey, remoteKeyHex: serverKeyHex})).stream; count dials. Cases per PRD WI-7 step 4: content-length GET, chunked GET, 64 KiB POST, two concurrent held GETs (2 dials, liveChannelCount()===2), three sequential GETs (1 dial), ChannelWebSocket text echo, binary echo with binaryType 'arraybuffer', server close 4401 'revoked' wasClean true, and installChannelShims on a fake target with location capacitor://localhost/m routing fetch and WebSocket through the channel with 'Bearer phone-token' while https://connect.overdeck.ai/healthz hits the fake original. afterEach closes pools/sockets, _resetChannelListenerForTests(), server.close(). No sleeps."
+        },
+        "items": [
+          {
+            "id": "phone-channel-integration.ac1",
+            "title": "Given the real installChannelListener and link-mode channels from openSecureChannel, when the pool sends a content-length GET, a chunked GET and a 64 KiB POST, then it returns 'hello', the joined chunks and bytes 65536 respectively",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "phone-channel-integration.ac2",
+            "title": "Given two concurrent GETs to /api/hold, when both are in flight, then dial was called twice and liveChannelCount() returns 2, and three sequential GETs afterwards on a fresh pool dial once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "phone-channel-integration.ac3",
+            "title": "Given a ChannelWebSocket to /ws/echo over a channel, when it sends text, binary and then 'close-me', then it receives both echoes and a close event with code 4401, reason 'revoked' and wasClean true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "phone-channel-integration.ac4",
+            "title": "Given installChannelShims on a fake target with location capacitor://localhost/m, when target.fetch('/api/echo', POST) runs, then the JSON response shows authorization 'Bearer phone-token', and target.fetch('https://connect.overdeck.ai/healthz') calls the fake original fetch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document the HTTP/WebSocket clients, the page shims and the CP-2 result",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-03T14:15:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4834",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/anywhere-channel/README.md",
+            "docs/ANYWHERE-ARCHITECTURE.md",
+            ".overdeck/context/codebase/architecture.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n installChannelShims packages/anywhere-channel/README.md docs/ANYWHERE-ARCHITECTURE.md .overdeck/context/codebase/architecture.md",
+            "grep -c last-verified .overdeck/context/codebase/architecture.md",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "each of the three files prints a matching line",
+            "the last-verified count prints 1",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. packages/anywhere-channel/README.md: extend the ./web row of the Entry points table with the new exports; add sections 'HTTP and WebSocket over the channel (PAN-4834)' (one channel = one HTTP/1.1 connection; Host link.invalid, Accept-Encoding identity, no Origin/Cookie; pool of 4, 4 s idle, Keep-Alive hint rule, FIFO queue, one stale resend for GET/HEAD/OPTIONS; 64 KiB head and 32 MiB body/message caps; a WebSocket takes its own channel; binaryType defaults to 'blob'; the D-9 unsupported list), 'Page shims' (installChannelShims({currentMachine}), the routing rule incl. why URL.origin is never compared, the token only goes to routed requests, uninstall) and 'CP-2: direct URL loads' (the grep commands and hit list from PRD Fact 13: attachment thumbnail and lightbox use useChannelMediaSrc; GodView files link and the streaming readers in DeepWipeDialog, PlanDialog, useResetIssue are desktop-only and do not work in the app). docs/ANYWHERE-ARCHITECTURE.md: retitle '### Phone side (PAN-4833)' to '### Phone side (PAN-4833, PAN-4834)' and add the paragraph from PRD WI-8 step 2. .overdeck/context/codebase/architecture.md: add createChannelPool, ChannelWebSocket and installChannelShims to the ./web list in the packages/anywhere-channel/ row; keep exactly one last-verified line at the end, dated the day of the change. No Mintlify page changes (pan-4823 W-DOC owns configuration/phone-app.mdx)."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "Given the change, when packages/anywhere-channel/README.md is read, then it contains the headings 'HTTP and WebSocket over the channel (PAN-4834)', 'Page shims' and 'CP-2: direct URL loads', and the CP-2 section names messageRows.tsx and ImageLightbox.tsx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "Given the change, when docs/ANYWHERE-ARCHITECTURE.md is read, then the heading reads 'Phone side (PAN-4833, PAN-4834)' and its new paragraph names createChannelPool, ChannelWebSocket and installChannelShims",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "Given the change, when grep -c last-verified runs on .overdeck/context/codebase/architecture.md, then it prints 1 and the packages/anywhere-channel row names installChannelShims",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "http-wire",
+        "to": "channel-pool",
+        "type": "blocks"
+      },
+      {
+        "from": "http-wire",
+        "to": "ws-client",
+        "type": "blocks"
+      },
+      {
+        "from": "ws-framing",
+        "to": "ws-client",
+        "type": "blocks"
+      },
+      {
+        "from": "channel-pool",
+        "to": "shims",
+        "type": "blocks"
+      },
+      {
+        "from": "ws-client",
+        "to": "shims",
+        "type": "blocks"
+      },
+      {
+        "from": "shims",
+        "to": "phone-channel-integration",
+        "type": "blocks"
+      },
+      {
+        "from": "shims",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "cp2-attachment-images",
+        "to": "docs",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-03-PAN-4834-phone-app-http-1-1-and-websocket-clients-over-the-secure-channel-and-page-shims.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}

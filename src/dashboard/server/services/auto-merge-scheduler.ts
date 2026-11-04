@@ -29,15 +29,24 @@
  *     lands during the pass is never overwritten.
  *
  * GitLab projects are skipped with a log line: their MRs are not listed here.
+ *
+ * PAN-4772: when the gate refuses a PR whose approval is stale (approved at an
+ * older head), the pass re-requests review once per head
+ * (`stale-approval-rereview.ts`). Every completed pass's skip reasons are kept
+ * (`auto-merge-skip-reasons.ts`) and served as `notScheduled` on
+ * `GET /api/merge-train/auto-merge/pending`; a reason is logged only when it
+ * changes.
  */
 import { resolve } from 'node:path';
 import type { ProjectConfig } from '../../../lib/projects.js';
 import type { PendingAutoMerge } from '../../../lib/overdeck/merge-sync.js';
 import type { MergeReadiness, PrFacts } from '../../../lib/cloister/pr-facts.js';
 import type { listRepoPullRequests } from './derived-issue-state.js';
+import { recordSchedulerOutcomes } from './auto-merge-skip-reasons.js';
+import type { StaleApprovalFacts } from './stale-approval-rereview.js';
 
 type DoorResult = { status: number; body: unknown };
-type GateAnswer = MergeReadiness & { facts: Pick<PrFacts, 'url' | 'headSha'> };
+type GateAnswer = MergeReadiness & { facts: Pick<PrFacts, 'url' | 'headSha'> & StaleApprovalFacts };
 /** The re-arm rule, asked again with the latest row inside the insert transaction. */
 type CanSchedule = (latest: PendingAutoMerge) => boolean;
 type ListedPr = Awaited<ReturnType<typeof listRepoPullRequests>>[number];
@@ -51,10 +60,20 @@ export interface AutoMergeSchedulerDeps {
   listCandidates?: (projectPath: string) => Promise<readonly string[]>;
   /** The door's forge-free policy check; `autoMergePolicyRefusal` by default. */
   policyRefusal?: (issueId: string) => DoorResult | null;
+  /** PAN-4820: the Deft human-merge hold; `deftAutoMergeHold` by default. */
+  deftHold?: (issueId: string) => Promise<string | null>;
   latestAutoMerge?: (issueId: string) => PendingAutoMerge | null;
   mergeGate?: (issueId: string) => Promise<GateAnswer>;
   /** The schedule door; `postAutoMergeSchedulePayload` with a guarded insert by default. */
   schedule?: (issueId: string, canSchedule: CanSchedule) => Promise<DoorResult>;
+  /**
+   * PAN-4772: asked when the gate refuses. Re-requests review once per head
+   * for a stale approval and answers a clause for the skip reason, or null.
+   * `rereviewStaleApproval` by default.
+   */
+  rereview?: (issueId: string, facts: GateAnswer['facts']) => Promise<string | null>;
+  /** Clock for the recorded skip reasons; `Date.now` by default. */
+  now?: () => number;
   log?: (message: string) => void;
   /** Read for the `OVERDECK_DISABLE_AUTO_MERGE=1` kill switch; `process.env` by default. */
   env?: NodeJS.ProcessEnv;
@@ -72,6 +91,10 @@ export interface AutoMergeScheduleOutcome {
   scheduled: boolean;
   /** Why the issue was not scheduled. */
   reason?: string;
+  /** PAN-4772: the PR head the merge gate read, when the pass got that far. */
+  head?: string;
+  /** Skipped only because a pending or merging row already exists. */
+  alreadyScheduled?: boolean;
 }
 
 function errorMessage(error: unknown): string {
@@ -119,46 +142,21 @@ async function defaultForgeOf(): Promise<(projectPath: string) => 'github' | 'gi
   return forgeForProject;
 }
 
-/** True when two SHAs (full or abbreviated) name the same commit. */
-function sameCommit(a: string, b: string): boolean {
-  const x = a.toLowerCase();
-  const y = b.toLowerCase();
-  return x.startsWith(y) || y.startsWith(x);
-}
-
-/**
- * Whether the issue's latest auto-merge row lets the scheduler write a new one
- * for this PR head. Asked only once the merge gate has passed.
- *
- *   - none, or `merged`: yes;
- *   - `pending` / `merging`: no, it is already scheduled;
- *   - `cancelled`: no, for the whole issue, whatever PR or head it now has. An
- *     operator's cancel means stop; only the operator re-schedules it (the
- *     schedule endpoint), which writes a newer row;
- *   - `blocked` / `failed` for another PR, or for this PR at another head: yes,
- *     the new push re-arms it;
- *   - `blocked` / `failed` without a recorded head (written before heads were
- *     tracked): no, a new head cannot be told apart from the old one;
- *   - the same head: `failed` (a merge was attempted) stays; `blocked` (the
- *     executor's pre-merge refusal) re-arms, because the gate passing now means
- *     the block's reason has cleared.
- */
-export function latestAutoMergeAllowsSchedule(
-  latest: PendingAutoMerge | null,
-  pr: Pick<PrFacts, 'url' | 'headSha'>,
-): boolean {
-  if (!latest || latest.status === 'merged') return true;
-  if (latest.status === 'pending' || latest.status === 'merging' || latest.status === 'cancelled') return false;
-  const samePr = !pr.url || latest.prUrl.replace(/\/+$/, '').toLowerCase() === pr.url.replace(/\/+$/, '').toLowerCase();
-  if (!samePr) return true;
-  if (!latest.headSha) return false;
-  if (pr.headSha && !sameCommit(latest.headSha, pr.headSha)) return true;
-  return latest.status === 'blocked';
-}
+// PAN-4970: moved to lib/cloister/auto-merge-rearm.js to break an import
+// cycle through routes/merge-train.js, services/uat-train.js and
+// services/merge-path-owner.js. Re-exported so existing importers keep
+// resolving it from here.
+import { latestAutoMergeAllowsSchedule } from '../../../lib/cloister/auto-merge-rearm.js';
+export { latestAutoMergeAllowsSchedule };
 
 async function defaultMergeGate(issueId: string): Promise<GateAnswer> {
   const { evaluateIssueMergeGate } = await import('../../../lib/cloister/merge-gate.js');
   return evaluateIssueMergeGate(issueId);
+}
+
+async function defaultRereview(issueId: string, facts: GateAnswer['facts']): Promise<string | null> {
+  const { rereviewStaleApproval } = await import('./stale-approval-rereview.js');
+  return rereviewStaleApproval(issueId, facts);
 }
 
 async function defaultPolicyRefusal(): Promise<(issueId: string) => DoorResult | null> {
@@ -205,8 +203,10 @@ export async function scheduleReadyAutoMerges(deps: AutoMergeSchedulerDeps = {})
   const forgeOf = deps.forgeOf ?? await defaultForgeOf();
   const listCandidates = deps.listCandidates ?? ((projectPath: string) => listScheduleCandidates(projectPath));
   const policyRefusal = deps.policyRefusal ?? await defaultPolicyRefusal();
+  const deftHold = deps.deftHold ?? (await import('../../../lib/deft/policy.js')).deftAutoMergeHold;
   const mergeGate = deps.mergeGate ?? defaultMergeGate;
   const schedule = deps.schedule ?? defaultSchedule;
+  const rereview = deps.rereview ?? defaultRereview;
   const isCurrent = deps.isCurrent ?? (() => true);
 
   const outcomes: AutoMergeScheduleOutcome[] = [];
@@ -233,7 +233,9 @@ export async function scheduleReadyAutoMerges(deps: AutoMergeSchedulerDeps = {})
     for (const rawIssueId of candidates) {
       if (!isCurrent()) return outcomes;
       const issueId = rawIssueId.toUpperCase();
-      const skip = (reason: string) => outcomes.push({ projectKey: key, issueId, scheduled: false, reason });
+      let head: string | undefined;
+      const skip = (reason: string, extra: { alreadyScheduled?: true } = {}) =>
+        outcomes.push({ projectKey: key, issueId, scheduled: false, reason, ...(head ? { head } : {}), ...extra });
       try {
         // Free checks first: a held or already-scheduled issue costs no forge read.
         const refusal = policyRefusal(issueId);
@@ -241,9 +243,14 @@ export async function scheduleReadyAutoMerges(deps: AutoMergeSchedulerDeps = {})
           skip(refusalReason(refusal));
           continue;
         }
+        const hold = await deftHold(issueId);
+        if (hold) {
+          skip(hold);
+          continue;
+        }
         const latest = latestAutoMerge(issueId);
         if (latest?.status === 'pending' || latest?.status === 'merging') {
-          skip(`auto-merge already ${latest.status}`);
+          skip(`auto-merge already ${latest.status}`, { alreadyScheduled: true });
           continue;
         }
         if (latest?.status === 'cancelled') {
@@ -252,8 +259,18 @@ export async function scheduleReadyAutoMerges(deps: AutoMergeSchedulerDeps = {})
         }
 
         const gate = await mergeGate(issueId);
+        head = gate.facts.headSha ?? undefined;
         if (!gate.ready) {
-          skip(gate.reason ?? 'merge gate says not ready');
+          const reason = gate.reason ?? 'merge gate says not ready';
+          let stale: string | null = null;
+          if (isCurrent()) {
+            try {
+              stale = await rereview(issueId, gate.facts);
+            } catch (error) {
+              stale = `stale-approval re-review failed: ${errorMessage(error)}`;
+            }
+          }
+          skip(stale ? `${reason}; ${stale}` : reason);
           continue;
         }
         if (!latestAutoMergeAllowsSchedule(latest, gate.facts)) {
@@ -322,6 +339,11 @@ export function runAutoMergeSchedulerTick(
     timer.unref?.();
   });
   const pass: Promise<AutoMergeScheduleOutcome[]> = Promise.race([scheduleReadyAutoMerges({ ...deps, isCurrent }), timedOut])
+    .then((outcomes) => {
+      // PAN-4772: only a pass that ran to completion replaces the visible skips.
+      if (isCurrent()) recordSchedulerOutcomes(outcomes, { log, ...(deps.now ? { now: deps.now } : {}) });
+      return outcomes;
+    })
     .finally(() => {
       clearTimeout(timer);
       if (activePass === pass) activePass = null;

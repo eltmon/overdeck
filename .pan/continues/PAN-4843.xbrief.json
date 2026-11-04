@@ -1,0 +1,143 @@
+{
+  "version": "1",
+  "issueId": "PAN-4843",
+  "created": "2026-11-03T14:22:31.106Z",
+  "updated": "2026-11-03T14:54:06.726Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "seal-helper": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4843",
+      "claimedAt": "2026-11-03T14:22:31.106Z",
+      "doneAt": "2026-11-03T14:23:41.509Z"
+    },
+    "payload-contract": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4843",
+      "claimedAt": "2026-11-03T14:23:51.826Z",
+      "doneAt": "2026-11-03T14:29:28.126Z"
+    },
+    "payload-builder": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4843",
+      "claimedAt": "2026-11-03T14:29:35.604Z",
+      "doneAt": "2026-11-03T14:31:03.380Z"
+    },
+    "provider-send": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4843",
+      "claimedAt": "2026-11-03T14:31:10.099Z",
+      "doneAt": "2026-11-03T14:33:26.177Z"
+    },
+    "service-wiring": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4843",
+      "claimedAt": "2026-11-03T14:33:30.465Z",
+      "doneAt": "2026-11-03T14:35:14.722Z"
+    },
+    "settings-line": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4843",
+      "claimedAt": "2026-11-03T14:35:20.259Z",
+      "doneAt": "2026-11-03T14:36:39.695Z"
+    },
+    "docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4843",
+      "claimedAt": "2026-11-03T14:36:44.881Z",
+      "doneAt": "2026-11-03T14:45:45.244Z"
+    },
+    "seal-helper.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:48:46.181Z"
+    },
+    "seal-helper.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:49:00.386Z"
+    },
+    "seal-helper.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:49:15.786Z"
+    },
+    "payload-contract.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:49:30.806Z"
+    },
+    "payload-contract.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:49:45.274Z"
+    },
+    "payload-builder.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:49:58.915Z"
+    },
+    "payload-builder.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:50:16.317Z"
+    },
+    "payload-builder.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:50:32.564Z"
+    },
+    "payload-builder.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:50:48.252Z"
+    },
+    "provider-send.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:51:04.358Z"
+    },
+    "provider-send.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:51:21.592Z"
+    },
+    "provider-send.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:51:37.364Z"
+    },
+    "provider-send.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:51:53.717Z"
+    },
+    "provider-send.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:52:09.664Z"
+    },
+    "service-wiring.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:52:26.037Z"
+    },
+    "service-wiring.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:52:41.125Z"
+    },
+    "service-wiring.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:52:56.200Z"
+    },
+    "settings-line.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:53:10.539Z"
+    },
+    "settings-line.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:53:24.896Z"
+    },
+    "settings-line.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:53:39.053Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:53:52.804Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-03T14:54:06.726Z"
+    }
+  }
+}

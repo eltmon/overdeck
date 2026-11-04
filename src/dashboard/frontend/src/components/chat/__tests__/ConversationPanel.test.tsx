@@ -160,6 +160,10 @@ function defaultConversationResponse(method: string, url: string): Response | un
   if (method === 'GET' && /^\/api\/conversations\/[^/]+\/bookmarks$/.test(url)) {
     return Response.json({ bookmarks: [] });
   }
+  // PAN-4641 — the timeline polls the conversation's scheduled messages.
+  if (method === 'GET' && /^\/api\/conversations\/[^/]+\/scheduled-messages$/.test(url)) {
+    return Response.json({ supported: true, limit: null, messages: [] });
+  }
   return undefined;
 }
 
@@ -722,6 +726,61 @@ describe('ConversationPanel resume message control', () => {
     rerender(tree(dead));
     expect(screen.getByRole('button', { name: 'Resume Session' })).toBeInTheDocument();
     expect(screen.queryByTestId('composer-footer')).toBeNull();
+  });
+});
+
+describe('ConversationPanel citation gate (PAN-4681)', () => {
+  // workLog-only fixture keeps the pane off the isOrphaned/isFirstMessage empty
+  // states so MessagesTimeline (and its citationsEnabled prop) actually renders.
+  const gateWorkLog = [{
+    id: 'call_1',
+    createdAt: '2024-01-01T00:30:00Z',
+    label: 'Bash',
+    tone: 'tool' as const,
+    toolTitle: 'Bash',
+    detail: 'git status',
+  }];
+  const gateMessagesData = { messages: [], workLog: gateWorkLog, streaming: false };
+
+  beforeEach(() => {
+    queryClients = [];
+    fetchControl = installStrictFetchMock(({ method, url }) => defaultConversationResponse(method, url));
+    vi.clearAllMocks();
+    localStorage.clear();
+  });
+
+  afterEach(async () => {
+    cleanup();
+    await Promise.all(queryClients.map((client) => client.cancelQueries()));
+    queryClients.forEach((client) => client.clear());
+    await fetchControl.assertNoUnexpectedRequests();
+    localStorage.clear();
+    vi.clearAllMocks();
+  });
+
+  it('disables citations while the resume bar is shown for an ended conversation', async () => {
+    const dead = { ...mockConversation, status: 'ended' as const, sessionAlive: false, endedAt: '2024-01-01T01:00:01Z' };
+    renderPanel(dead, {}, gateMessagesData);
+
+    await screen.findByRole('button', { name: 'Resume Session' });
+    expect(timelineMock.props.mock.calls.at(-1)?.[0]).toMatchObject({ citationsEnabled: false });
+  });
+
+  it('disables citations for a read-only vault copy', async () => {
+    const vaultCopy = { ...mockConversation, origin: 'vault' as const };
+    renderPanel(vaultCopy, {}, gateMessagesData);
+
+    await screen.findByTestId('composer-footer');
+    expect(timelineMock.props.mock.calls.at(-1)?.[0]).toMatchObject({ citationsEnabled: false });
+  });
+
+  it('enables citations for a live conversation with a mounted composer', async () => {
+    const active = { ...mockConversation, sessionAlive: true, status: 'active' as const, endedAt: null };
+    renderPanel(active, {}, gateMessagesData);
+
+    await screen.findByTestId('composer-footer');
+    expect(screen.queryByRole('button', { name: 'Resume Session' })).toBeNull();
+    expect(timelineMock.props.mock.calls.at(-1)?.[0]).toMatchObject({ citationsEnabled: true });
   });
 });
 
@@ -1330,10 +1389,29 @@ describe('ConversationPanel archive (PAN-4584)', () => {
 
     openArchiveMenu();
 
-    expect(await screen.findByRole('status')).toHaveTextContent('Archiving…');
+    expect(await screen.findByRole('status', { name: 'Archiving conversation' })).toHaveTextContent('Archiving…');
 
     resolveArchive?.(Response.json({ success: true }));
-    await waitFor(() => expect(screen.queryByRole('status')).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole('status', { name: 'Archiving conversation' })).not.toBeInTheDocument());
+  });
+
+  it('shows a Stopping… status in the header while the stop request is unresolved', async () => {
+    let resolveStop: ((response: Response) => void) | null = null;
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      if (method === 'POST' && url === '/api/conversations/test-conv/stop') {
+        return new Promise<Response>((resolve) => { resolveStop = resolve; });
+      }
+      return defaultConversationResponse(method, url);
+    });
+    renderPanel({ ...mockConversation, sessionAlive: true });
+
+    fireEvent.click(screen.getByRole('button', { name: 'More conversation actions' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Stop agent' }));
+
+    expect(await screen.findByRole('status', { name: 'Stopping conversation' })).toHaveTextContent('Stopping…');
+
+    resolveStop?.(Response.json({ success: true }));
+    await waitFor(() => expect(screen.queryByRole('status', { name: 'Stopping conversation' })).not.toBeInTheDocument());
   });
 });
 

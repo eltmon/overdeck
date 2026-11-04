@@ -1,0 +1,16 @@
+{
+  "name": "overdeck-connect",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-01",
+  "routes": [{ "pattern": "connect.overdeck.ai", "custom_domain": true }],
+  "durable_objects": { "bindings": [{ "name": "DIRECTORY", "class_name": "AccountDirectory" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["AccountDirectory"] }],
+  "services": [{ "binding": "ACCOUNT", "service": "overdeck-account", "entrypoint": "AccountRpc" }],
+  "ratelimits": [
+    { "name": "INBOX_LIMIT", "namespace_id": "1101", "simple": { "limit": 120, "period": 60 } },
+    { "name": "CONNECT_LIMIT", "namespace_id": "1102", "simple": { "limit": 30, "period": 60 } }
+  ],
+  "vars": { "PUBLIC_BASE_URL": "https://connect.overdeck.ai", "STUN_URLS": "stun:stun.cloudflare.com:3478" }
+  // TURN_KEY_ID, TURN_KEY_API_TOKEN: Worker secrets set by the operator (docs/CONNECT-SERVICE.md "Deploy").
+  // APNS_KEY_P8, APNS_KEY_ID, APNS_TEAM_ID, FCM_SERVICE_ACCOUNT_JSON, FCM_PROJECT_ID: Worker secrets for phone push (PAN-4830).
+}

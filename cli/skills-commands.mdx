@@ -1,0 +1,385 @@
+---
+title: Skills Commands
+description: List skills, set on/off overrides, and manage skill packs
+---
+
+# Skills Commands
+
+`pan skills` lists skills and sets per-level on/off overrides for native
+skills and skill packs. See [Skills](/features/skills) for the on/off
+levels and [Skill Packs](/features/skill-packs) for what a pack is, the
+pack catalog, and the trust model.
+
+## pan skills list
+
+```bash
+pan skills list [--project <key>] [--issue <id>] [--json]
+```
+
+Lists skills with their effective on/off state and the level that decided
+it, then skill packs and their skills. This is the default command: `pan
+skills` alone runs it.
+
+| Flag | Effect |
+| --- | --- |
+| `--project <key>` | Resolve for a project |
+| `--issue <id>` | Resolve for an issue |
+| `--json` | Output as JSON (only the skill array; packs and pack skills are not included) |
+
+```bash
+pan skills list --project myapp
+```
+
+Exits 1 if the override files cannot be read.
+
+## pan skills set
+
+```bash
+pan skills set <skill> <state>
+pan skills set --pack <id> <state>
+```
+
+Sets a native skill, a pack skill (`<pack>/<skill>`), or a whole pack to
+`on`, `off`, or `inherit`, at the global, project, or issue level.
+
+| Flag | Effect |
+| --- | --- |
+| `--project <key>` | Project override |
+| `--issue <id>` | Issue override |
+| `--pack <id>` | Set a whole skill pack instead of one skill |
+
+```bash
+pan skills set mattpocock/grilling on --project myapp
+```
+
+Takes exactly one positional (the state) with `--pack`, two (the skill and
+the state) without it. Exits 1 on the wrong positional count, a state that
+is not `on`, `off`, or `inherit`, passing `--project` and `--issue`
+together, or an unreadable override file.
+
+## pan skills pack add
+
+```bash
+pan skills pack add <id> [url] [--ref <ref>] [--adapter <adapter>] [--browser] [--yes]
+```
+
+Registers a git skill pack at the commit a ref resolves to and trusts it;
+enables nothing. Known packs (`mattpocock`, `pstack`, `gstack`, `deft`,
+`sageox`) default the url and, for `pstack` and `sageox`, the ref. For
+`sageox`, the preview also lists the `go build` commands, the paths they
+write and the downloads, and trusting the commit builds `ox` and its two
+adapters before the pack is registered.
+
+| Flag | Effect |
+| --- | --- |
+| `--ref <ref>` | Tag, branch or commit to pin (default: the known pack ref) |
+| `--adapter <adapter>` | `plain`, `claude-plugin`, `deft-readonly`, or `gstack-runtime` |
+| `--browser` | Also build the browser runtime (gstack; asks separately) |
+| `--yes` | Trust the resolved commit without asking; with `--browser`, also accepts the browser runtime's consent |
+
+```bash
+pan skills pack add mattpocock --ref v1.2.3
+```
+
+Exits 1 on an unknown `--adapter` value, a pack with no default url or ref
+when none is given, a pack source error, or when the commit was not
+trusted (declined, or not written without a terminal and `--yes`). For
+`sageox`, a missing Go (`pack sageox needs go on PATH (https://go.dev/dl/)`)
+or a failed build is a pack source error. With
+`--browser`, the pack is registered as soon as the commit is trusted; a
+declined or failed browser-runtime step then exits 1 with the pack already
+registered. Finish it with `pan skills pack browser <id>` rather than
+retrying `pack add`.
+
+## pan skills pack update
+
+```bash
+pan skills pack update <id> [--ref <ref>] [--yes]
+```
+
+Moves a pack to the commit its ref (or `--ref`) now resolves to, after
+showing the preview again. For `sageox`, a moved commit is built after you
+confirm.
+
+| Flag | Effect |
+| --- | --- |
+| `--ref <ref>` | Switch to a different tag or branch |
+| `--yes` | Trust the new commit without asking |
+
+```bash
+pan skills pack update mattpocock --ref v1.3.0
+```
+
+Exits 1 on a pack source error, or when the new commit was not trusted.
+
+## pan skills pack list
+
+```bash
+pan skills pack list [--json] [--offline]
+```
+
+Lists registered skill packs with their source, cache state, license,
+skill count, and what is not applied.
+
+| Flag | Effect |
+| --- | --- |
+| `--json` | Output as JSON |
+| `--offline` | Skip the update check (no network) |
+
+```bash
+pan skills pack list
+```
+
+## pan skills pack remove
+
+```bash
+pan skills pack remove <id>
+```
+
+Unregisters a pack, clears its global toggles, and deletes its cache,
+every mount that contains it, and dangling launch links, and Codex
+plugin caches. For `sageox`, it keeps the stored SageOx links and prints
+`kept SageOx link files in <packdir>/bindings/ (delete them by hand to
+forget every project's SageOx link)`.
+
+```bash
+pan skills pack remove gstack
+```
+
+Exits 1 if the pack is not registered, or if removing a mount or cache
+failed (rerun to retry). The unregister step runs before the cache and
+mount sweep, so a retry after a failed sweep still exits 1 with "pack is
+not registered" even when that retry's sweep itself succeeds; that exit
+does not by itself mean the cleanup failed.
+
+## pan skills pack sync
+
+```bash
+pan skills pack sync [id]
+```
+
+Re-fetches a pack and extracts its trusted commit, or every registered
+pack when `id` is omitted. For `sageox`, it also builds `ox` for the
+trusted commit when that build is missing, without asking (the commit is
+already trusted).
+
+```bash
+pan skills pack sync gstack
+```
+
+Exits 1 if any pack fails to sync.
+
+## pan skills pack gc
+
+```bash
+pan skills pack gc [--max-age-days <n>]
+```
+
+Removes unused skill pack mounts, dangling launch links, stale renders,
+and orphaned pack state for packs that are no longer registered.
+
+| Flag | Effect |
+| --- | --- |
+| `--max-age-days <n>` | Keep unused mounts younger than this (default: `7`) |
+
+```bash
+pan skills pack gc --max-age-days 14
+```
+
+Exits 1 if `--max-age-days` is not a number of days of 0 or more, or if
+the global config cannot be read or parsed (gc then removes nothing).
+
+## pan skills pack browser
+
+```bash
+pan skills pack browser <id> [state] [--yes]
+```
+
+Turns a runtime pack's browser runtime on or off (gstack only). `state`
+defaults to `on`.
+
+| Flag | Effect |
+| --- | --- |
+| `--yes` | Trust without asking |
+
+```bash
+pan skills pack browser gstack on
+```
+
+Exits 1 if `state` is not `on` or `off`, on a pack source error, or when
+the browser runtime was not trusted.
+
+## pan skills pack sageox status
+
+```bash
+pan skills pack sageox status [--project <key>] [--json]
+```
+
+Shows, per project, whether the `sageox` pack is on, whether uploads are
+enabled, and the SageOx link state in the `LINK` column: `committed` (the
+project committed `.sageox/`, or has `sageox_binding: committed`), `held`
+(a link is stored for it), or `none`. `--json` adds a `"link"` field with
+the same values.
+
+| Flag | Effect |
+| --- | --- |
+| `--project <key>` | Only this project |
+| `--json` | Output as JSON |
+
+```bash
+pan skills pack sageox status --project myapp
+```
+
+Exits 1 if `--project` names a project Overdeck does not know.
+
+## pan skills pack sageox upload
+
+```bash
+pan skills pack sageox upload <state> --project <key>
+```
+
+Turns SageOx uploads on or off for a project. Uploads are off by default.
+
+| Flag | Effect |
+| --- | --- |
+| `--project <key>` | Project key (required) |
+
+```bash
+pan skills pack sageox upload on --project myapp
+```
+
+Exits 1 if `state` is not `on` or `off`, or on a SageOx config error.
+
+## pan skills pack sageox link
+
+```bash
+pan skills pack sageox link --project <key> [--team <team>]
+```
+
+Creates the project's SageOx link without changing any of its checkouts.
+It checks that the SageOx login file exists (it never reads it), fetches
+the default branch, and runs the Overdeck-built `ox init` in a throwaway
+detached worktree of `origin/<default>` under
+`~/.overdeck/packs/sageox/tmp/`, in host-managed mode with the network on.
+The untracked files `ox init` writes under `.sageox/` are stored in
+`~/.overdeck/packs/sageox/bindings/<key>/`. It then waits up to 120 seconds
+for `ox` to clone the project's ledger, and removes the throwaway worktree.
+
+| Flag | Effect |
+| --- | --- |
+| `--project <key>` | Project key (required) |
+| `--team <team>` | SageOx team (name, slug or id), passed to `ox init`; needed when your account has several teams |
+
+```bash
+pan skills pack sageox link --project myapp
+```
+
+Run `<built ox> login` once before the first `link`. When the default
+branch already tracks `.sageox/`, `link` changes nothing and says that the
+committed link is used. When a link is already stored, it prints
+`already linked: <dir>`. When the ledger is not cloned within 120 seconds,
+it prints `the SageOx ledger is not cloned yet; ox clones it in the
+background. Check with: <bin> status` and still exits 0.
+
+Exits 1 on an unknown project, when `ox` is not built
+(`pan skills pack sync sageox`), when the login file is missing
+(`SageOx login not found. Run: <bin> login`), when the fetch fails, when
+`ox init` fails (the last 20 lines of its output are printed), or when
+`ox init` writes outside `.sageox/` even in the fresh-clone fallback.
+
+## pan skills pack sageox commit
+
+```bash
+pan skills pack sageox commit --project <key>
+```
+
+Opens one PR that adds the project's stored SageOx link files as
+`.sageox/`, then records `sageox_binding: committed` for the project in
+`~/.overdeck/projects.yaml`. The commit is made in a throwaway worktree on
+the branch `overdeck/sageox-link` from `origin/<default>`; no project
+checkout changes. Re-running it reuses the branch and an open PR. The
+flag is written only after the PR exists, so a failed run records
+nothing.
+
+| Flag | Effect |
+| --- | --- |
+| `--project <key>` | Project key (required) |
+
+```bash
+pan skills pack sageox commit --project myapp
+```
+
+Prints `opened <url>` or `reused <url>`, then
+`recorded sageox_binding: committed for <key>`. When the default branch
+already tracks `.sageox/config.json`, it records the flag and prints
+`already committed on <default>`.
+
+The commit runs the project's git hooks in the throwaway worktree, so a
+project whose hooks need `node_modules` (husky, for example) fails there;
+`--no-verify` is not used. The local `overdeck/sageox-link` branch stays
+in the repository.
+
+Exits 1 on an unknown project, when the project has no stored link
+(`run pan skills pack sageox link --project <key>`), when the fetch,
+worktree, commit or push fails, or when the forge returns no PR URL.
+
+## pan skills deft status
+
+```bash
+pan skills deft status [--project <key>] [--json]
+```
+
+Shows Directive detection, the `deft` pack, the skill map, managed mode,
+and the ownership report for a project (the current repository when
+`--project` is omitted).
+
+| Flag | Effect |
+| --- | --- |
+| `--project <key>` | Registered project (default: the current repo) |
+| `--json` | Output as JSON |
+
+```bash
+pan skills deft status --project myapp
+```
+
+Exits 1 if `--project` names a project Overdeck does not know.
+
+## pan skills deft enable
+
+```bash
+pan skills deft enable --project <key> [--yes]
+```
+
+Prints the ownership plan for a Directive project and, once accepted,
+stores the decision to enable managed mode.
+
+| Flag | Effect |
+| --- | --- |
+| `--project <key>` | Registered project (required) |
+| `--yes` | Accept the printed plan without asking |
+
+```bash
+pan skills deft enable --project myapp --yes
+```
+
+Exits 1 if `--project` names an unknown project, the project is not a
+Directive project, or the plan was not accepted.
+
+## pan skills deft disable
+
+```bash
+pan skills deft disable --project <key>
+```
+
+Removes the managed-mode decision for a project. Project files are
+untouched.
+
+| Flag | Effect |
+| --- | --- |
+| `--project <key>` | Registered project (required) |
+
+```bash
+pan skills deft disable --project myapp
+```
+
+Exits 1 if `--project` names a project Overdeck does not know.

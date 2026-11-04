@@ -7,6 +7,7 @@ import { Bookmark, Pencil, X } from 'lucide-react';
 import styles from '../../CommandDeck/styles/command-deck.module.css';
 import { formatTimestamp } from '../messagesTimeline/helpers';
 import { useConversationBookmarks } from './ConversationBookmarks';
+import { isNativeShell } from '../../../lib/nativeShell';
 
 export function BookmarksToggle() {
   const ctx = useConversationBookmarks();
@@ -34,6 +35,8 @@ function BookmarkRow({ messageId, label, messageCreatedAt, createdAt }: {
   createdAt: string;
 }) {
   const ctx = useConversationBookmarks();
+  // The phone app (PAN-4837) reads bookmarks but cannot rename or remove them.
+  const native = isNativeShell();
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(label);
   if (!ctx) return null;
@@ -72,7 +75,7 @@ function BookmarkRow({ messageId, label, messageCreatedAt, createdAt }: {
           </button>
         )}
         <span className="text-muted-foreground">{formatTimestamp(messageCreatedAt ?? createdAt)}</span>
-        {!editing && (
+        {!editing && !native && (
           <button
             type="button"
             aria-label="Rename bookmark"
@@ -82,14 +85,16 @@ function BookmarkRow({ messageId, label, messageCreatedAt, createdAt }: {
             <Pencil size={12} />
           </button>
         )}
-        <button
-          type="button"
-          aria-label="Remove bookmark"
-          className="shrink-0 border-0 bg-transparent p-0 text-muted-foreground hover:text-foreground"
-          onClick={() => void ctx.remove(messageId)}
-        >
-          <X size={12} />
-        </button>
+        {!native && (
+          <button
+            type="button"
+            aria-label="Remove bookmark"
+            className="shrink-0 border-0 bg-transparent p-0 text-muted-foreground hover:text-foreground"
+            onClick={() => void ctx.remove(messageId)}
+          >
+            <X size={12} />
+          </button>
+        )}
       </div>
       {ctx.missingMessageId === messageId && (
         <div className="text-[11px] text-muted-foreground">This message is not in the loaded transcript.</div>

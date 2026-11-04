@@ -36,13 +36,14 @@ export type PipelineJournalEntryType =
   | 'review.verdict-refused' | 'review.aborted' | 'review.synthesis-gave-up'
   | 'review.verdict-deferred' | 'review.verdict-replay-gave-up'
   | 'review.stalled' | 'review.stall-escalated' | 'review.dispatch-failed'
+  | 'review.approval-carried' | 'review.stale-approval-rerequested'
   | 'uat.verdict' | 'feedback.delivered' | 'feedback.skipped'
   | 'merge.attempted' | 'merge.completed' | 'merge.failed'
   | 'strike.landed'
   | 'conflict.repair-requested' | 'conflict.repair-escalated'
   | 'blocked.declared' | 'blocked.woken'
   | 'handoff.deferred' | 'handoff.retried' | 'handoff.started' | 'handoff.abandoned'
-  | 'workspace.adopted' | 'workspace.adoption-failed'
+  | 'workspace.adopted' | 'workspace.adoption-failed' | 'workspace.synced-to-pr-head'
   | 'operator.decision-requested' | 'operator.decision-answered' | 'operator.decision-withdrawn';
 
 export interface PipelineJournalEntry {
@@ -50,7 +51,7 @@ export interface PipelineJournalEntry {
   at: string;
   type: PipelineJournalEntryType;
   issueId: string;
-  /** Who acted, e.g. 'pan-done' | 'pan-review-request' | 'webhook' | 'deacon-lite' | 'merge-button' | 'complete-planning'. */
+  /** Who acted, e.g. 'pan-done' | 'pan-review-request' | 'webhook' | 'deacon-lite' | 'remote-reap' | 'merge-button' | 'complete-planning'. */
   source?: string;
   data?: Record<string, unknown>;
 }

@@ -1,0 +1,53 @@
+{
+  "version": "1",
+  "issueId": "PAN-4767",
+  "created": "2026-11-02T02:20:34.096Z",
+  "updated": "2026-11-02T02:51:08.050Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "split-styleguide-route-its": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4767",
+      "claimedAt": "2026-11-02T02:20:34.096Z",
+      "doneAt": "2026-11-02T02:34:48.505Z"
+    },
+    "docs-browser-spec-page-load-budget": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4767",
+      "claimedAt": "2026-11-02T02:34:53.812Z",
+      "doneAt": "2026-11-02T02:35:51.796Z"
+    },
+    "split-styleguide-route-its.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:49:20.192Z"
+    },
+    "split-styleguide-route-its.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:49:36.811Z"
+    },
+    "split-styleguide-route-its.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:49:53.482Z"
+    },
+    "split-styleguide-route-its.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:50:10.886Z"
+    },
+    "split-styleguide-route-its.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:50:32.558Z"
+    },
+    "docs-browser-spec-page-load-budget.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:50:50.295Z"
+    },
+    "docs-browser-spec-page-load-budget.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-02T02:51:08.050Z"
+    }
+  }
+}

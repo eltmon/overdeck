@@ -1,0 +1,9 @@
+plan-digest: 70f00526166bc8db23164bbe8f957ddd943777291bc589634a8f9329c0321817
+
+## blocks-the-design: Union merge does not clear GitHub's conflict gate
+
+The PRD's FR-4 (.pan/drafts/PAN-4697.md:148-149) promises that two branches adding different lines merge without conflict, but WI-4 proves only local `git merge-tree`. The PRD itself says GitHub's `mergeable` result may ignore `merge=union` (.pan/drafts/PAN-4697.md:81-85). That distinction matters here: `src/dashboard/server/services/auto-merge-scheduler.ts:110-112` skips PRs GitHub calls `CONFLICTING`, and `src/lib/cloister/conflict-gate.ts:328-338` treats the forge result as a blocker. `docs/MERGE-WORKFLOW.md:305-313` records the same limitation for the existing union-merged files, and [GitHub's community discussion](https://github.com/orgs/community/discussions/9288) reports that PR conflict checks ignore this attribute. Two test paths sorted into the same gap can therefore still trigger the agent repair cycle that this issue aims to remove. Smallest change: make a real GitHub same-gap PR mergeability check an explicit implementation checkpoint. If it reports `CONFLICTING`, either revise the design to avoid shared-file conflicts at that gate or narrow FR-4 and the issue's claimed outcome to local Git merges, with the remaining GitHub conflicts stated as a known limitation.
+
+## sharpens-framing: Update the union-merge workflow doc
+
+WI-5 lists only three documentation files (.pan/drafts/PAN-4697.md:331-352), while `docs/MERGE-WORKFLOW.md:305-306` explicitly says **two** files use `merge=union` and names both. Adding the proposed third rule makes that current workflow guidance false. Smallest change: include `docs/MERGE-WORKFLOW.md` in WI-5 and AC-5, naming the new list file and keeping its GitHub mergeability caveat accurate.

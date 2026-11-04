@@ -79,7 +79,7 @@ describe('lanes routes (PAN-4223 WI-5)', () => {
 
     launchMock.mockResolvedValueOnce({ conversation: { id: 9, name: 'lane-1' }, cwd: '/l', branch: null, iteration: 1, warnings: [] });
     expect((await call('POST', '/api/lanes', { body: { ...BODY, force: true } })).status).toBe(201);
-    expect(launchMock).toHaveBeenLastCalledWith({ ...BODY, force: true });
+    expect(launchMock).toHaveBeenLastCalledWith({ ...BODY, force: true }, { resolveMachine: expect.any(Function) });
   });
 
   it('passes a LaneLaunchError status and message through', async () => {
@@ -93,7 +93,7 @@ describe('lanes routes (PAN-4223 WI-5)', () => {
     launchMock.mockResolvedValue(result);
     const res = await call('POST', '/api/lanes', { body: { ...BODY, replace: true } });
     expect(res).toEqual({ status: 201, json: result });
-    expect(launchMock).toHaveBeenCalledWith({ ...BODY, replace: true });
+    expect(launchMock).toHaveBeenCalledWith({ ...BODY, replace: true }, { resolveMachine: expect.any(Function) });
     expect(invalidateMock).toHaveBeenCalledTimes(1);
   });
 
