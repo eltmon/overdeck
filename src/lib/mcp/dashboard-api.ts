@@ -16,19 +16,27 @@ export interface DashboardApiResponse {
   json: unknown;
 }
 
-export interface DashboardApi {
-  request(method: 'GET' | 'POST', path: string, body?: unknown): Promise<DashboardApiResponse>;
+/** The HTTP methods tools may use (PAN-4927 W-MCP1). */
+export type DashboardApiMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+
+export interface DashboardRequestInit {
+  /** Aborts the request; wait tools pass one so a cancelled call stops at once. */
+  signal?: AbortSignal;
 }
 
-/** fetch-based client: `${baseUrl}${path}` with `Authorization: Bearer <token>`; JSON body and Content-Type on POST. */
+export interface DashboardApi {
+  request(method: DashboardApiMethod, path: string, body?: unknown, init?: DashboardRequestInit): Promise<DashboardApiResponse>;
+}
+
+/** fetch-based client: `${baseUrl}${path}` with `Authorization: Bearer <token>`; JSON body and Content-Type on POST, PUT and PATCH. */
 export function createFetchDashboardApi(input: { baseUrl: string; token: string; fetchImpl?: typeof fetch }): DashboardApi {
   const baseUrl = input.baseUrl.replace(/\/+$/, '');
   const fetchImpl = input.fetchImpl ?? fetch;
   return {
-    async request(method, path, body) {
+    async request(method, path, body, options) {
       const headers: Record<string, string> = { Authorization: `Bearer ${input.token}`, Accept: 'application/json' };
-      const init: RequestInit = { method, headers };
-      if (method === 'POST') {
+      const init: RequestInit = { method, headers, ...(options?.signal ? { signal: options.signal } : {}) };
+      if (method !== 'GET' && method !== 'DELETE') {
         headers['Content-Type'] = 'application/json';
         init.body = JSON.stringify(body ?? {});
       }
@@ -36,6 +44,7 @@ export function createFetchDashboardApi(input: { baseUrl: string; token: string;
       try {
         response = await fetchImpl(`${baseUrl}${path}`, init);
       } catch (error: unknown) {
+        if (options?.signal?.aborted) throw error;
         const message = error instanceof Error ? error.message : String(error);
         throw new Error(`Overdeck dashboard unreachable at ${baseUrl}: ${message}`);
       }

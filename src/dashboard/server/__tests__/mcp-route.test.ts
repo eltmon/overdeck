@@ -116,7 +116,7 @@ describe('/mcp route (PAN-4649 W-8)', () => {
     }
   });
 
-  it('lists every tool for a valid MCP token, then refuses the token after revocation', async () => {
+  it('lists its visible tools for a valid MCP token, then refuses the token after revocation', async () => {
     const { token, record } = await createAccessToken({ name: 'mcp', scopes: ['read:state', 'read:conversations', 'operate'], kind: 'token' });
     const headers = { ...MCP_HEADERS, ...bearer(token) };
 
@@ -125,7 +125,7 @@ describe('/mcp route (PAN-4649 W-8)', () => {
     expect(listed.headers['cache-control']).toBe('no-store');
     expect(listed.headers['mcp-session-id']).toBeUndefined();
     const result = (listed.json as { result: { tools: Array<{ name: string }> } }).result;
-    expect(result.tools.map((tool) => tool.name)).toEqual(ALL_TOOLS.map((tool) => tool.name));
+    expect(result.tools.map((tool) => tool.name)).toEqual(ALL_TOOLS.filter((tool) => tool.scope !== 'approve').map((tool) => tool.name));
 
     await revokeAccessToken(record.id);
     expect((await send('POST', headers, TOOLS_LIST)).status).toBe(401);

@@ -36,7 +36,13 @@ There is no second path to any operation.
 No tool pairs devices, creates or revokes tokens, reads or writes settings, or
 touches the session vault.
 
-When a token lacks a scope, the tool returns an error such as
+`tools/list` shows only the tools whose scope the token holds, so a
+`read:state` token sees only `list_machines`. Calling a tool the token cannot
+see answers `Unknown tool <name>`. Tools for managed agents are listed only to
+agent tokens.
+
+A tool the token's scopes hide answers `Unknown tool <name>`. A route can
+still refuse a listed tool, for example a linked machine's ceiling, with
 `HTTP 403: insufficient_scope (missingScope: approve)`.
 
 ## Over HTTP
@@ -91,17 +97,26 @@ addresses. The Vite dev server (`pan dev`) does not proxy it.
 ## Over stdio
 
 `pan mcp serve` serves the same tools over stdin and stdout. It reads the token
-from the `OVERDECK_MCP_TOKEN` environment variable only, because a command-line
-flag would show in `ps`. Create a token first:
+from the `OVERDECK_MCP_TOKEN` environment variable, or, when that is unset,
+from the file named by `OVERDECK_MCP_TOKEN_FILE`; a command-line flag would
+show in `ps`. Create a token first:
 
 ```bash
 pan token create mcp --scopes read:state,read:conversations,operate
 OVERDECK_MCP_TOKEN=odk_… pan mcp serve
 ```
 
-The command checks the token before it serves. It exits 1 when the variable is
-unset, or when the token is unknown, revoked, a paired-device credential, or
-carries `admin`. Its stdout carries only JSON-RPC; every message goes to stderr.
+Or from a file, which must be mode 0600:
+
+```bash
+chmod 600 ~/.overdeck/mcp-token
+OVERDECK_MCP_TOKEN_FILE=~/.overdeck/mcp-token pan mcp serve
+```
+
+The command checks the token before it serves. It exits 1 when neither is set,
+when the token is unknown, revoked, a paired-device credential, or carries
+`admin`, or when the file is unreadable, empty, or readable by group or
+others. Its stdout carries only JSON-RPC; every message goes to stderr.
 
 A Claude Desktop config:
 

@@ -7,11 +7,11 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 
-import type { DashboardApi, DashboardApiResponse } from '../../../../src/lib/mcp/dashboard-api.js';
-import { createOverdeckMcpServer } from '../../../../src/lib/mcp/server.js';
+import type { DashboardApi, DashboardApiMethod, DashboardApiResponse } from '../../../../src/lib/mcp/dashboard-api.js';
+import { createOverdeckMcpServer, type OverdeckTool } from '../../../../src/lib/mcp/server.js';
 
 export interface RecordedCall {
-  method: 'GET' | 'POST';
+  method: DashboardApiMethod;
   path: string;
   body?: unknown;
 }
@@ -32,8 +32,13 @@ export function fakeApi(routes: Record<string, DashboardApiResponse>): FakeApi {
   };
 }
 
-export async function connectClient(api: DashboardApi, scopes: readonly string[]): Promise<Client> {
-  const server = createOverdeckMcpServer({ api, scopes });
+export async function connectClient(
+  api: DashboardApi,
+  scopes: readonly string[],
+  isAgent = false,
+  tools?: readonly OverdeckTool[],
+): Promise<Client> {
+  const server = createOverdeckMcpServer({ api, scopes, isAgent }, tools);
   const client = new Client({ name: 'test', version: '0.0.0' });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   await server.connect(serverTransport);
