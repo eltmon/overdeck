@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4933",
   "created": "2026-11-04T03:01:37.295Z",
-  "updated": "2026-11-04T03:49:16.114Z",
+  "updated": "2026-11-04T03:49:35.495Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -98,6 +98,10 @@
     "codex-work-and-role-sites.ac3": {
       "status": "completed",
       "doneAt": "2026-11-04T03:49:16.114Z"
+    },
+    "codex-relaunch-sites.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T03:49:35.494Z"
     }
   }
 }
