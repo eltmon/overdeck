@@ -33,6 +33,27 @@ function issueIdFromAgentDir(entryName: string): string | null {
 
 const DEVNET_CLOSURE_CHECK_CONCURRENCY = 4;
 
+/**
+ * PAN-5001: residue reaping keeps `agent-<issue>` directories (close-out
+ * prunes caches, never state), so a closed issue stays in the passive scans
+ * forever. Each scan asked the tracker again, and 400+ closed issues spent the
+ * whole GitHub App REST quota. The passive scans skip an issue whose residue
+ * this process reaped within this window; the running-agent loops still check
+ * every tick, so a reopened issue's new agents are never touched.
+ */
+export const REAPED_RESIDUE_RECHECK_MS = 6 * 60 * 60 * 1000;
+const residueReapedAt = new Map<string, number>();
+
+/** Forget every reaped-residue mark. Tests call this between cases. */
+export function clearReapedResidueMemo(): void {
+  residueReapedAt.clear();
+}
+
+function residueRecentlyReaped(issueId: string): boolean {
+  const reapedAt = residueReapedAt.get(issueId);
+  return reapedAt !== undefined && Date.now() - reapedAt < REAPED_RESIDUE_RECHECK_MS;
+}
+
 async function isClosedIssue(
   issueId: string,
   closedChecks: Map<string, Promise<boolean>>,
@@ -55,6 +76,7 @@ async function reapClosedIssueResidue(
   if (reapedIssueKeys.has(key)) return;
   reapedIssueKeys.add(key);
   actions.push(...await reapIssueResidue(projectPath, issueId));
+  residueReapedAt.set(issueId, Date.now());
 }
 
 async function reapResolvedIssueResidue(
@@ -202,7 +224,7 @@ async function reconcileClosedIssueAgentsMetered(): Promise<string[]> {
     const workspacesDir = join(project.path, 'workspaces');
     for (const entryName of listDirectoryNames(workspacesDir)) {
       const issueId = issueIdFromFeatureWorkspace(entryName);
-      if (!issueId) continue;
+      if (!issueId || residueRecentlyReaped(issueId)) continue;
       if (!await isClosedIssue(issueId, closedChecks)) continue;
       await reapClosedIssueResidue(project.path, issueId, actions, reapedIssueKeys);
     }
@@ -210,7 +232,7 @@ async function reconcileClosedIssueAgentsMetered(): Promise<string[]> {
 
   for (const entryName of listDirectoryNames(AGENTS_DIR)) {
     const issueId = issueIdFromAgentDir(entryName);
-    if (!issueId) continue;
+    if (!issueId || residueRecentlyReaped(issueId)) continue;
     if (!await isClosedIssue(issueId, closedChecks)) continue;
     await reapResolvedIssueResidue(issueId, actions, reapedIssueKeys);
   }
@@ -218,7 +240,8 @@ async function reconcileClosedIssueAgentsMetered(): Promise<string[]> {
   // PAN-3917 FR-11: the reaper's trigger is the tracker saying "closed". The
   // merged-PR half of the devnet sweep is host hygiene on a Docker resource and
   // runs on its own interval in hygiene-scheduler.ts (merged-docker-reconcile.ts).
-  const devnetIssueIds = await listFeatureDevnetIssueIds();
+  const devnetIssueIds = (await listFeatureDevnetIssueIds())
+    ?.filter((issueId) => !residueRecentlyReaped(issueId));
   if (devnetIssueIds) {
     for (let offset = 0; offset < devnetIssueIds.length; offset += DEVNET_CLOSURE_CHECK_CONCURRENCY) {
       const batch = devnetIssueIds.slice(offset, offset + DEVNET_CLOSURE_CHECK_CONCURRENCY);
