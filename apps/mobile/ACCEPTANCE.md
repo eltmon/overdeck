@@ -251,6 +251,39 @@ answered:
   READY_FOR_BETA_TESTING; in the internal group "Operator" (automatic distribution on), whose
   tester (the operator) is INVITED.
 
+### Simulator check before the device run (2026-11-04)
+
+The operator asked for every fix to be proven on the Mac rig before more phone tests. Run on
+the rig's iOS Simulator (`overdeck-5018`, iPhone 17 Pro, iOS 26.5), 16:42–16:55 UTC, with this
+branch after merging `main` (PAN-5018, PAN-5019, PAN-5016), i.e. TestFlight 1.0 (2)'s code:
+
+- **Stack:** the PAN-5018 local overdeck.ai stand-in (the real `services/connect` Worker in
+  Miniflare with an `AccountRpc` stub, a stub account service for sign-in, an SSH reverse tunnel to
+  the rig), and a test machine (`pan5018-test`) running this branch's `dist/` stamped 0.74.0. A
+  Debug app built with `VITE_OVERDECK_DEBUG_ERRORS=1` and the stand-in URLs, installed fresh.
+- **Sign-in, pairing:** sign-in through the stub worked; pairing through a Safari pair link
+  succeeded on the machine (device record created, `rtc session … connected`).
+- **Link:** opening the machine ×4 and background/foreground ×2 each logged a new
+  `rtc session … connected` on the machine, and the phone showed "Nothing needs you." with no
+  failure text every time.
+- **Tap from closed:** with the app terminated on the machine list, a sealed test push
+  (`tests/fixtures/phone-push/seal-apns.mjs`, with the `machine` and `url` keys the Notification
+  Service Extension adds, since `simctl push` does not run the extension) showed a banner; tapping
+  it cold-launched the app into `pan5018-test`'s Needs-you screen, and the machine logged a new
+  link. The banner shows the placeholder text on the Simulator by design.
+- **Live Activity:** the card started on the lock screen and in the Dynamic Island ("– need you ·
+  – running"); counts need push updates, which this stand-in stack cannot send, so the update
+  timing stays a device check.
+- **PAN-5019 controls:** Settings shows "Pause notifications" (1 hour, until tomorrow 8:00) and a
+  switch per type (agent questions, plan approvals, permission prompts, finished work, failures,
+  agent stopped responding).
+- **Bug found and fixed:** after pairing through a pair link, the app stayed on the Pair screen
+  with the used link prefilled (PAN-5018's run saw the same). On iOS `App.getLaunchUrl()` answers
+  with a URL that arrived through `appUrlOpen`, and only `getLaunchUrl()` URLs were recorded as
+  handled, so the reload after pairing replayed the link. Fixed in `ShellApp.tsx` with a
+  regression test; rerun on the Simulator at 16:54 UTC, pairing went straight to the machine's
+  Needs-you screen. Ships in 1.0 (3).
+
 ## PAN-5018 link after a long machine uptime
 
 Evidence for PRD WI-8 (`.pan/drafts/pan-5018.md`). Run on 2026-11-04, 14:23–14:45 UTC.
