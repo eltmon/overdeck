@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4953",
   "created": "2026-11-04T13:46:40.439Z",
-  "updated": "2026-11-04T14:29:02.359Z",
+  "updated": "2026-11-04T14:29:17.379Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -152,6 +152,10 @@
     "snippet-settings.ac3": {
       "status": "completed",
       "doneAt": "2026-11-04T14:29:02.359Z"
+    },
+    "package-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-04T14:29:17.379Z"
     }
   }
 }
