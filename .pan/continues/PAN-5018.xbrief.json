@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5018",
   "created": "2026-11-04T13:12:52.932Z",
-  "updated": "2026-11-04T13:24:13.403Z",
+  "updated": "2026-11-04T13:24:17.220Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -44,6 +44,11 @@
       "claimedBy": "agent-pan-5018",
       "claimedAt": "2026-11-04T13:18:06.582Z",
       "doneAt": "2026-11-04T13:24:13.403Z"
+    },
+    "directory-client-transition-logging": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5018",
+      "claimedAt": "2026-11-04T13:24:17.220Z"
     }
   }
 }
