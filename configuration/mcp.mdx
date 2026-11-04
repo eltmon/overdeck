@@ -180,6 +180,64 @@ A Claude Desktop config:
 
 The dashboard must be running: each tool calls it.
 
+## Sign in with OAuth
+
+A hosted MCP client (a Claude Desktop connector, a chat bot) cannot be handed a
+token file. It signs in through the MCP authorization flow instead: point it at
+`<dashboard URL>/mcp` and it finds the sign-in server by itself. The discovery
+document is at `<dashboard URL>/.well-known/oauth-protected-resource/mcp`, and
+an unauthenticated `POST /mcp` answers 401 with a `WWW-Authenticate` header that
+names it.
+
+1. Your app opens a sign-in page in your browser. The page shows the app's
+   name, where it will send you back, and an approval code such as `KQZT-MWRB`.
+2. You open the Overdeck dashboard on this machine, or run `pan mcp oauth pending`.
+3. You check that the dashboard shows the same code, and pick an access level.
+4. The page sends you back to your app, and your app is signed in.
+
+The page itself can never approve anything, because anyone who can reach the
+port can open it. Approve only a sign-in whose code matches the page you opened.
+
+| Level | Label | Scopes |
+| --- | --- | --- |
+| `read` | Read only | `read:state`, `read:conversations` |
+| `message` | Can message | `read:state`, `read:conversations`, `tell` |
+| `operate` | Can operate | `read:state`, `read:conversations`, `tell`, `operate` |
+| `approve` | Can approve | `read:state`, `read:conversations`, `tell`, `operate`, `approve` |
+
+An OAuth sign-in never gets `admin`, `forward`, `read:settings`, `read:costs` or
+`read:events`. The level the app asks for is only a suggestion: a stock MCP
+client asks for every level, so Overdeck offers the lowest one it named, and you
+choose the real level when you approve.
+
+Each sign-in gets an access token that lasts 30 days and a refresh token that
+lasts 90 days. Each refresh replaces both. A refresh token is single use: if an
+old one is presented again, Overdeck treats it as stolen and ends the sign-in.
+After 90 days the app must sign in again. A sign-in waiting for approval expires
+after 10 minutes, and every waiting sign-in is lost when the dashboard restarts;
+start it again from the app.
+
+Manage sign-ins from the terminal:
+
+```bash
+pan mcp oauth pending                            # sign-ins waiting for you
+pan mcp oauth approve KQZT-MWRB --level operate  # approve the one showing that code
+pan mcp oauth deny KQZT-MWRB                     # refuse it
+pan mcp oauth list                               # active sign-ins
+pan mcp oauth revoke <sign-in id>                # end one
+pan mcp oauth issue --name xAI --level message   # tokens for a client that cannot open a browser
+```
+
+`issue` creates a sign-in at once and prints its access and refresh tokens. They
+are shown once; store them in the client. Use it for an API caller such as the
+xAI API, which takes a token but cannot show you a browser page. The approval
+code is case-insensitive and the dash is optional.
+
+The sign-in endpoints answer on this machine, the LAN, the tailnet (Tailscale
+Serve) and the dashboard's other trusted addresses. The discovery documents are
+built from the address the client used, so a request for an address Overdeck
+does not trust gets 400. A Tailscale Funnel request gets 404.
+
 ## Agents get these tools
 
 Every Claude Code, Codex, Kimi Code ACP (`acp`) and OpenCode (`opencode`) agent
@@ -271,6 +329,12 @@ Revoke an MCP token under **Settings → Anywhere → Access tokens**, under
 through the dashboard fails its next request at once. A token revoked by
 another process (for example `pan token revoke` while the dashboard is
 unreachable) fails within 5 seconds, when the dashboard rereads its token list.
+
+End an OAuth sign-in with `pan mcp oauth revoke <sign-in id>` (ids from
+`pan mcp oauth list`); its access and refresh tokens stop working at once.
+Revoking an OAuth access token under **Settings → Access Tokens** or with
+`pan token revoke` stops that access token at once and ends its sign-in at its
+next refresh.
 
 ## Fleet reach
 
