@@ -12,6 +12,8 @@ import { HttpServerResponse } from 'effect/unstable/http';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../../lib/activity-logger.js', () => ({ emitActivityEntry: vi.fn() }));
+const telemetry = vi.hoisted(() => ({ captureLinkApproved: vi.fn(), captureLinkFailed: vi.fn() }));
+vi.mock('../../../lib/telemetry/anywhere.js', () => telemetry);
 
 const { _resetAccessTokensForTests, _settleAccessTokenWritesForTests, listActiveRecordsOfKind, MACHINE_TOKEN_SCOPES, verifyAccessToken } = await import('../../../lib/access-tokens.js');
 const { _resetLinkStoreForTests, _settleLinkStoreWritesForTests, listLinks } = await import('../../../lib/anywhere/link-store.js');
@@ -49,6 +51,8 @@ beforeEach(async () => {
   _resetAccessTokensForTests();
   _resetLinkStoreForTests();
   _resetPairingCredentialsForTests();
+  telemetry.captureLinkApproved.mockClear();
+  telemetry.captureLinkFailed.mockClear();
 });
 
 afterEach(async () => {
@@ -114,6 +118,29 @@ describe('POST /api/machines/exchange (PAN-4645 WI-12)', () => {
     expect((await read(await handleMachinesExchange(body({ access: 'root' }), PAIRING))).status).toBe(400);
     expect((await read(await handleMachinesExchange(body({ reverse: { token: 'nope', endpoints: [] } }), PAIRING))).status).toBe(400);
     expect(listActiveRecordsOfKind('machine')).toEqual([]);
+  });
+});
+
+describe('POST /api/machines/exchange approver telemetry (PAN-5016 WI-4)', () => {
+  it('a successful exchange records approved(pairing_code, approver) once', async () => {
+    expect((await read(await handleMachinesExchange(body(), PAIRING))).status).toBe(200);
+    expect(telemetry.captureLinkApproved.mock.calls).toEqual([['pairing_code', 'approver']]);
+    expect(telemetry.captureLinkFailed).not.toHaveBeenCalled();
+  });
+
+  it('a refused grant records failed(pairing_code, approver, grant_refused) and answers 400', async () => {
+    const response = await read(await handleMachinesExchange(body({ reverse: { token: `odk_${'f'.repeat(64)}`, endpoints: [{ kind: 'lan', url: 'not a url' }] } }), PAIRING));
+    expect(response.status).toBe(400);
+    expect(telemetry.captureLinkFailed.mock.calls).toEqual([['pairing_code', 'approver', 'grant_refused']]);
+    expect(telemetry.captureLinkApproved).not.toHaveBeenCalled();
+  });
+
+  it('a refused channel or a malformed body records nothing', async () => {
+    expect((await read(await handleMachinesExchange(body(), null))).status).toBe(403);
+    expect((await read(await handleMachinesExchange(body(), LINK))).status).toBe(403);
+    expect((await read(await handleMachinesExchange('nope', PAIRING))).status).toBe(400);
+    expect(telemetry.captureLinkApproved).not.toHaveBeenCalled();
+    expect(telemetry.captureLinkFailed).not.toHaveBeenCalled();
   });
 });
 
