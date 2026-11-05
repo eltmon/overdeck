@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2652",
   "created": "2026-11-05T21:12:48.966Z",
-  "updated": "2026-11-05T22:09:10.733Z",
+  "updated": "2026-11-05T22:09:25.476Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -156,6 +156,10 @@
     "w6-stream-follows-session.ac4": {
       "status": "completed",
       "doneAt": "2026-11-05T22:09:10.733Z"
+    },
+    "w7-adopt-forks-session-index.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-05T22:09:25.476Z"
     }
   }
 }
