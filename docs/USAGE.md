@@ -61,6 +61,18 @@ npm install -g @overdeck/core && pan install && pan up
    pan up
    ```
 
+### From a source checkout
+
+```bash
+git clone https://github.com/eltmon/overdeck.git
+cd overdeck
+bun install
+npm run build
+npm link   # or: node dist/cli/index.js install, then export PATH="$HOME/.overdeck/cli-bin:$PATH"
+```
+
+`npm link` is the usual path once the build exists. Without it, `node dist/cli/index.js install` (or `pan sync`) writes a `pan`/`overdeck` shim to `~/.overdeck/cli-bin`; add that directory to your shell profile's PATH to get `pan` in operator shells too. Agents launched by Overdeck get `pan` from `~/.overdeck/cli-bin` automatically — every non-remote launcher writes this shim at spawn time (PAN-2630), so this step is only for your own shell.
+
 ---
 
 ## Requirements
