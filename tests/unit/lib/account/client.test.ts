@@ -255,3 +255,59 @@ describe('revokeDevice', () => {
     expect(await revokeDevice(BASE_URL, TOKEN, 'device-1', { fetch: fetchMock })).toEqual({ ok: false, detail: 'offline' });
   });
 });
+
+describe('describeError via revokeDevice (PAN-5068)', () => {
+  it('appends the cause code and message', async () => {
+    const fetchMock = vi.fn().mockRejectedValueOnce(new TypeError('fetch failed', { cause: { code: 'ECONNRESET', message: 'socket hang up' } }));
+    expect(await revokeDevice(BASE_URL, TOKEN, 'device-1', { fetch: fetchMock })).toEqual({
+      ok: false,
+      detail: 'fetch failed (ECONNRESET: socket hang up)',
+    });
+  });
+
+  it('appends only the code when the cause has no message', async () => {
+    const fetchMock = vi.fn().mockRejectedValueOnce(new TypeError('fetch failed', { cause: { code: 'UND_ERR_CONNECT_TIMEOUT' } }));
+    expect(await revokeDevice(BASE_URL, TOKEN, 'device-1', { fetch: fetchMock })).toEqual({
+      ok: false,
+      detail: 'fetch failed (UND_ERR_CONNECT_TIMEOUT)',
+    });
+  });
+
+  it('appends only the message when the cause has no code', async () => {
+    const fetchMock = vi.fn().mockRejectedValueOnce(new TypeError('fetch failed', { cause: { message: 'socket hang up' } }));
+    expect(await revokeDevice(BASE_URL, TOKEN, 'device-1', { fetch: fetchMock })).toEqual({
+      ok: false,
+      detail: 'fetch failed (socket hang up)',
+    });
+  });
+
+  it('drops an unusable cause (no string code, empty message)', async () => {
+    const fetchMock = vi.fn().mockRejectedValueOnce(new TypeError('fetch failed', { cause: { code: 42, message: '' } }));
+    expect(await revokeDevice(BASE_URL, TOKEN, 'device-1', { fetch: fetchMock })).toEqual({ ok: false, detail: 'fetch failed' });
+  });
+
+  it('leaves the message bare when there is no cause', async () => {
+    const fetchMock = vi.fn().mockRejectedValueOnce(new TypeError('fetch failed'));
+    expect(await revokeDevice(BASE_URL, TOKEN, 'device-1', { fetch: fetchMock })).toEqual({ ok: false, detail: 'fetch failed' });
+  });
+
+  it('redacts the authorization code and PKCE verifier in exchangeAuthorizationCode, and the device token in revokeDevice', async () => {
+    const input = { code: 'odc_code', codeVerifier: 'v'.repeat(43), redirectUri: 'http://127.0.0.1:3011/oauth/account/callback' };
+    const codeFetch = vi.fn().mockRejectedValueOnce(
+      new TypeError('fetch failed', {
+        cause: { code: 'ECONNRESET', message: `request for ${input.code} with ${input.codeVerifier}` },
+      }),
+    );
+    const codeResult = await exchangeAuthorizationCode(BASE_URL, input, { fetch: codeFetch });
+    expect(codeResult.ok).toBe(false);
+    expect((codeResult as { detail: string }).detail).toContain('ECONNRESET');
+    expect((codeResult as { detail: string }).detail).toContain('[redacted]');
+    expect((codeResult as { detail: string }).detail).not.toContain(input.code);
+    expect((codeResult as { detail: string }).detail).not.toContain(input.codeVerifier);
+
+    const tokenFetch = vi.fn().mockRejectedValueOnce(new TypeError('fetch failed', { cause: { message: `rejected TOKEN ${TOKEN}` } }));
+    const tokenResult = await revokeDevice(BASE_URL, TOKEN, 'device-1', { fetch: tokenFetch });
+    expect(tokenResult).toEqual({ ok: false, detail: expect.stringContaining('[redacted]') });
+    expect((tokenResult as { detail: string }).detail).not.toContain(TOKEN);
+  });
+});
