@@ -1,5 +1,5 @@
 /** PAN-2652 W7/W8: the lifecycle poll adopts lineage-verified Claude Code forks. */
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -25,6 +25,7 @@ let adopted: Array<[string, string]>;
 let logs: string[];
 let owned: Set<string>;
 let opened: string[];
+let dirReads: string[];
 
 function deps(): ForkAdoptionDeps {
   return {
@@ -36,6 +37,10 @@ function deps(): ForkAdoptionDeps {
     openLines: (path) => {
       opened.push(path);
       return defaultForkAdoptionDeps.openLines(path);
+    },
+    readDir: (path) => {
+      dirReads.push(path);
+      return defaultForkAdoptionDeps.readDir(path);
     },
   };
 }
@@ -85,6 +90,7 @@ beforeEach(async () => {
   logs = [];
   owned = new Set();
   opened = [];
+  dirReads = [];
   resetForkAdoptionCachesForTest();
 });
 
@@ -202,5 +208,87 @@ describe('adoptForkedClaudeSessions — session index (PAN-2652 W7)', () => {
     expect(warn).toHaveBeenCalledTimes(1);
     expect(adopted).toEqual([['conv-a2', B]]);
     warn.mockRestore();
+  });
+});
+
+describe('adoptForkedClaudeSessions — backgrounding marker (PAN-2652 W8)', () => {
+  const MARKER = 'fdff6afa-e108-4a1e-8106-34756795aadf';
+  const marker = JSON.stringify({
+    type: 'system',
+    subtype: 'informational',
+    content: 'Backgrounding after the current tool finishes…',
+    uuid: MARKER,
+    sessionId: A,
+  });
+  /** The marker 5 entries before the end, as in the real fork pair. */
+  const markedCurrent = [...currentLines, marker, ...['u6', 'u7', 'u8', 'u9', 'u10'].map((u) => entry(u))];
+
+  async function writeCurrent(): Promise<string> {
+    const path = await writeJsonl(projectDir, A, markedCurrent);
+    const old = new Date(Date.now() - 60_000);
+    await utimes(path, old, old);
+    return path;
+  }
+
+  it('ac1: adopts a newer project-dir file that copied the marker entry, with no session-index entry', async () => {
+    await writeCurrent();
+    await writeJsonl(projectDir, B, [...forkHead(), entry('u4'), marker, entry('f1', 'after fork')]);
+
+    await adoptForkedClaudeSessions([conv()], deps());
+
+    expect(adopted).toEqual([['conv-a', B]]);
+    expect(logs).toEqual([`[conversation-lifecycle] adopted forked Claude session ${B} for conv-a (was ${A})`]);
+  });
+
+  it('ac2: does not adopt a newer file without the marker uuid', async () => {
+    await writeCurrent();
+    await writeJsonl(projectDir, B, [...forkHead(), entry('x1'), entry('x2')]);
+
+    await adoptForkedClaudeSessions([conv()], deps());
+
+    expect(adopted).toEqual([]);
+  });
+
+  it('ac2: ignores a subagent transcript under <id>/subagents/ that contains the marker uuid', async () => {
+    await writeCurrent();
+    await writeJsonl(join(projectDir, C, 'subagents'), 'agent-1', [entry('s1'), marker]);
+
+    await adoptForkedClaudeSessions([conv()], deps());
+
+    expect(adopted).toEqual([]);
+  });
+
+  it('ac3: does not rescan the project dir while its mtime is unchanged', async () => {
+    await writeCurrent();
+    await writeJsonl(projectDir, B, [...forkHead(), entry('x1')]);
+
+    await adoptForkedClaudeSessions([conv()], deps());
+    expect(dirReads).toHaveLength(1);
+
+    await adoptForkedClaudeSessions([conv()], deps());
+    expect(dirReads).toHaveLength(1);
+    expect(adopted).toEqual([]);
+  });
+
+  it('does not scan when the marker is not in the current file', async () => {
+    await writeJsonl(projectDir, A, currentLines);
+    await writeJsonl(projectDir, B, [...forkHead(), marker]);
+
+    await adoptForkedClaudeSessions([conv()], deps());
+
+    expect(dirReads).toEqual([]);
+    expect(adopted).toEqual([]);
+  });
+
+  it('finds the marker across 64 KiB chunk boundaries', async () => {
+    const bulky = (u: string) => entry(u, 'x'.repeat(40_000));
+    const path = await writeJsonl(projectDir, A, [...currentLines, marker, bulky('b1'), bulky('b2'), bulky('b3'), bulky('b4')]);
+    const old = new Date(Date.now() - 60_000);
+    await utimes(path, old, old);
+    await writeJsonl(projectDir, B, [...forkHead(), marker]);
+
+    await adoptForkedClaudeSessions([conv()], deps());
+
+    expect(adopted).toEqual([['conv-a', B]]);
   });
 });

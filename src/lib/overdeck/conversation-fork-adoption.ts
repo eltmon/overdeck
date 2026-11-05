@@ -12,13 +12,16 @@
  * A candidate is adopted only when it shares at least one copied entry uuid with
  * the current file (lineage), lives directly in the conversation's Claude project
  * dir, does not start with the /clear sentinel, and is not already a locator of
- * any conversation. Lineage is what keeps a post-/clear session and nested
+ * any conversation. Candidates come from two sources: the conversation's session
+ * index (sessions recorded after the current one), and, when that adopts nothing,
+ * the backgrounding marker near the end of the current file plus a scan of the
+ * project dir for a newer file that copied the marker entry. Lineage is what keeps a post-/clear session and nested
  * `claude` runs in the same terminal session from being adopted. Copied entries
  * predate the fork, so a lineage verdict for a (current, candidate) pair never
  * changes and is cached for the life of the process.
  */
 import { createReadStream } from 'node:fs';
-import { readFile, stat } from 'node:fs/promises';
+import { open, readdir, readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 
@@ -44,6 +47,8 @@ export interface ForkAdoptionDeps {
   log: (message: string) => void;
   /** Lines of a file, streamed; breaking out of the loop closes the file. */
   openLines: (path: string) => AsyncIterable<string>;
+  /** Entry names of a directory (the backgrounding-marker scan). */
+  readDir: (path: string) => Promise<string[]>;
 }
 
 async function* streamLines(path: string): AsyncGenerator<string> {
@@ -64,6 +69,7 @@ export const defaultForkAdoptionDeps: ForkAdoptionDeps = {
   adopt: (conversationName, sessionId) => setConversationClaudeSessionId(conversationName, sessionId),
   log: (message) => console.log(message),
   openLines: streamLines,
+  readDir: (path) => readdir(path),
 };
 
 const HEAD_UUID_LIMIT = 20;
@@ -225,6 +231,102 @@ async function adoptFromSessionIndex(
   return null;
 }
 
+const BACKGROUNDING_PREFIX = 'Backgrounding after the current tool finishes';
+const TAIL_CHUNK_BYTES = 64 * 1024;
+const TAIL_MAX_BYTES = 1024 * 1024;
+const TAIL_ENTRY_LIMIT = 20;
+/** `${current id}\u0000${marker uuid}` → project dir mtime at the last marker scan. */
+const markerScanDirMtime = new Map<string, number>();
+
+/**
+ * The last parseable entries of a JSONL, newest first, read backward in 64 KiB
+ * chunks until 20 entries are collected or 1 MiB has been read.
+ */
+async function readTailEntries(path: string): Promise<unknown[]> {
+  const handle = await open(path, 'r');
+  try {
+    const { size } = await handle.stat();
+    const entries: unknown[] = [];
+    let position = size;
+    let carry: Buffer = Buffer.alloc(0);
+    while (position > 0 && size - position < TAIL_MAX_BYTES && entries.length < TAIL_ENTRY_LIMIT) {
+      const length = Math.min(TAIL_CHUNK_BYTES, position);
+      position -= length;
+      const chunk = Buffer.alloc(length);
+      await handle.read(chunk, 0, length, position);
+      let buffer = Buffer.concat([chunk, carry]);
+      // The bytes before the first newline may continue in the previous chunk.
+      if (position > 0) {
+        const firstNewline = buffer.indexOf(0x0a);
+        if (firstNewline < 0) { carry = buffer; continue; }
+        carry = buffer.subarray(0, firstNewline);
+        buffer = buffer.subarray(firstNewline + 1);
+      }
+      const lines = buffer.toString('utf8').split('\n');
+      for (let i = lines.length - 1; i >= 0 && entries.length < TAIL_ENTRY_LIMIT; i--) {
+        const trimmed = lines[i]!.trim();
+        if (!trimmed) continue;
+        try { entries.push(JSON.parse(trimmed)); } catch { /* a torn or non-JSON line */ }
+      }
+    }
+    return entries;
+  } finally {
+    await handle.close();
+  }
+}
+
+/** The uuid of a backgrounding system entry among the current file's last entries. */
+async function backgroundingMarkerUuid(currentPath: string): Promise<string | null> {
+  for (const entry of await readTailEntries(currentPath)) {
+    const { type, content, uuid } = (entry ?? {}) as { type?: unknown; content?: unknown; uuid?: unknown };
+    if (type === 'system' && typeof content === 'string' && content.startsWith(BACKGROUNDING_PREFIX)
+      && typeof uuid === 'string' && uuid) return uuid;
+  }
+  return null;
+}
+
+/**
+ * Source B: the current file's tail carries the backgrounding marker, so the fork
+ * is a newer top-level JSONL in the same project dir that copied the marker entry.
+ * Rescans only when the project dir's mtime changed since the last scan for the
+ * same marker. Never descends into `<id>/subagents/`.
+ */
+async function adoptFromBackgroundingMarker(
+  conv: EligibleConversation,
+  currentPath: string,
+  deps: ForkAdoptionDeps,
+): Promise<string | null> {
+  const markerUuid = await backgroundingMarkerUuid(currentPath);
+  if (!markerUuid) return null;
+  const projectDir = deps.claudeProjectDir(conv.cwd);
+  const gateKey = `${conv.claudeSessionId}\u0000${markerUuid}`;
+  const dirMtime = (await stat(projectDir)).mtimeMs;
+  if (markerScanDirMtime.get(gateKey) === dirMtime) return null;
+  if (markerScanDirMtime.size >= LINEAGE_CACHE_LIMIT) {
+    const oldest = markerScanDirMtime.keys().next().value;
+    if (oldest !== undefined) markerScanDirMtime.delete(oldest);
+  }
+  markerScanDirMtime.set(gateKey, dirMtime);
+
+  const currentMtime = (await stat(currentPath)).mtimeMs;
+  const candidates: Array<{ id: string; path: string; mtimeMs: number }> = [];
+  for (const filename of await deps.readDir(projectDir)) {
+    if (!filename.endsWith('.jsonl')) continue;
+    const id = filename.slice(0, -'.jsonl'.length);
+    if (id === conv.claudeSessionId || deps.isLocatorOwned(id)) continue;
+    const path = join(projectDir, filename);
+    const info = await stat(path).catch(() => null);
+    if (info?.isFile() && info.mtimeMs > currentMtime) candidates.push({ id, path, mtimeMs: info.mtimeMs });
+  }
+  candidates.sort((a, b) => b.mtimeMs - a.mtimeMs);
+  for (const candidate of candidates) {
+    if (!(await fileContainsAnyUuid(candidate.path, [markerUuid], deps))) continue;
+    if ((await readFirstClearTimestamp(candidate.path)).clearTs !== null) continue;
+    return candidate.id;
+  }
+  return null;
+}
+
 /** Adopt lineage-verified Claude Code forks as the current session of eligible conversations. */
 export async function adoptForkedClaudeSessions(
   activeConvs: readonly LegacyConversation[],
@@ -235,7 +337,8 @@ export async function adoptForkedClaudeSessions(
     try {
       const currentPath = join(deps.claudeProjectDir(conv.cwd), `${conv.claudeSessionId}.jsonl`);
       if (!(await fileExists(currentPath))) continue;
-      const adopted = await adoptFromSessionIndex(conv, currentPath, deps);
+      const adopted = await adoptFromSessionIndex(conv, currentPath, deps)
+        ?? await adoptFromBackgroundingMarker(conv, currentPath, deps);
       if (!adopted) continue;
       deps.adopt(conv.name, adopted);
       deps.log(`[conversation-lifecycle] adopted forked Claude session ${adopted} for ${conv.name} (was ${conv.claudeSessionId})`);
@@ -245,7 +348,8 @@ export async function adoptForkedClaudeSessions(
   }
 }
 
-/** Test hook: forget cached lineage verdicts. */
+/** Test hook: forget cached lineage verdicts and marker-scan gates. */
 export function resetForkAdoptionCachesForTest(): void {
   lineageCache.clear();
+  markerScanDirMtime.clear();
 }
