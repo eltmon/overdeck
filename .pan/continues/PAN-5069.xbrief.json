@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5069",
   "created": "2026-11-05T23:26:20.599Z",
-  "updated": "2026-11-05T23:29:01.283Z",
+  "updated": "2026-11-05T23:29:44.974Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -22,9 +22,10 @@
       "doneAt": "2026-11-05T23:28:59.571Z"
     },
     "a3-device-code-names": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5069",
-      "claimedAt": "2026-11-05T23:29:01.283Z"
+      "claimedAt": "2026-11-05T23:29:01.283Z",
+      "doneAt": "2026-11-05T23:29:44.974Z"
     }
   }
 }
