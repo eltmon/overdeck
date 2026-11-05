@@ -128,6 +128,7 @@ projects:
         template: |
           COMPOSE_PROJECT_NAME={{COMPOSE_PROJECT}}
           FRONTEND_URL=https://{{FEATURE_FOLDER}}.{{DOMAIN}}
+        load: false  # true also exports this .env into agent shells and host quality gates
 ```
 
 ## Dependency installs in polyrepo workspaces
@@ -141,6 +142,7 @@ Leave `package_manager` unset on a repo when a devcontainer installs that repo's
 | Placeholder | Example | Description |
 |------------|---------|-------------|
 | `{{FEATURE_NAME}}` | `min-123` | Normalized issue ID |
+| `{{FEATURE_IDENT}}` | `min_123` | FEATURE_NAME as an unquoted SQL identifier |
 | `{{FEATURE_FOLDER}}` | `feature-min-123` | Workspace folder name |
 | `{{BRANCH_NAME}}` | `feature/min-123` | Git branch name |
 | `{{COMPOSE_PROJECT}}` | `myapp-feature-min-123` | Docker Compose project |
