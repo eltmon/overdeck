@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5069",
   "created": "2026-11-05T23:26:20.599Z",
-  "updated": "2026-11-05T23:57:48.840Z",
+  "updated": "2026-11-05T23:58:01.976Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -111,6 +111,10 @@
     "a2-connectors-self-route.ac4": {
       "status": "completed",
       "doneAt": "2026-11-05T23:57:48.839Z"
+    },
+    "a3-device-code-names.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:58:01.976Z"
     }
   }
 }
