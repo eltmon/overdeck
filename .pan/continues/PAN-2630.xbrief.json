@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2630",
   "created": "2026-11-05T21:09:00.725Z",
-  "updated": "2026-11-05T22:03:57.218Z",
+  "updated": "2026-11-05T22:12:39.863Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -40,9 +40,10 @@
       "doneAt": "2026-11-05T22:03:53.456Z"
     },
     "postinstall-pan-hint": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-2630",
-      "claimedAt": "2026-11-05T22:03:57.217Z"
+      "claimedAt": "2026-11-05T22:03:57.217Z",
+      "doneAt": "2026-11-05T22:12:39.863Z"
     }
   }
 }
