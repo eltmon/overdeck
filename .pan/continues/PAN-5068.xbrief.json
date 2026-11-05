@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5068",
   "created": "2026-11-05T23:10:23.659Z",
-  "updated": "2026-11-05T23:38:55.403Z",
+  "updated": "2026-11-05T23:39:14.471Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -64,6 +64,10 @@
     "device-code-retry.ac3": {
       "status": "completed",
       "doneAt": "2026-11-05T23:38:55.403Z"
+    },
+    "device-code-retry.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:39:14.471Z"
     }
   }
 }
