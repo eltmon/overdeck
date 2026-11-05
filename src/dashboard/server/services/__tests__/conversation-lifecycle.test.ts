@@ -58,6 +58,12 @@ vi.mock('../../../../lib/overdeck/conversations.js', () => ({
   setClearedToConvId: mockSetClearedToConvId,
 }));
 
+// PAN-2652: fork adoption has its own suite; keep the real /clear sentinel reader.
+vi.mock('../../../../lib/overdeck/conversation-fork-adoption.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../lib/overdeck/conversation-fork-adoption.js')>()),
+  adoptForkedClaudeSessions: vi.fn(async () => undefined),
+}));
+
 vi.mock('../conversation-attachments.js', () => ({
   cleanupUnreferencedConversationAttachments: mockCleanupUnreferencedConversationAttachments,
   runInBatches: async (
