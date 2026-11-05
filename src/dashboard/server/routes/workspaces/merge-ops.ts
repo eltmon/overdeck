@@ -33,6 +33,7 @@ import { sessionExists } from '../../../../lib/tmux.js';
 import { resolveIssueWorkspaceSyncTarget } from '../../../../lib/workspaces/resolver.js';
 import { appendPipelineEntry } from '../../../../lib/cloister/pipeline-journal.js';
 import { getIssueWorkspacePath } from '../../../../lib/overdeck/issue-projects.js';
+import { toFeatureIdent } from '../../../../lib/workspace-config.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { EventStoreService } from '../../services/domain-services.js';
 import { clearMergeRun, getMergeRun, listMergeRuns, setMergeRun, setMergeQueueAdvanceHandler, type MergeRunPatch } from '../../services/merge-queue-service.js';
@@ -648,6 +649,7 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
       const featureFolder = basename(workspacePath);
       const gatePlaceholders = {
         FEATURE_NAME: featureFolder.replace(/^feature-/, ''),
+        FEATURE_IDENT: toFeatureIdent(featureFolder.replace(/^feature-/, '')),
         FEATURE_FOLDER: featureFolder,
         BRANCH_NAME: `feature/${featureFolder.replace(/^feature-/, '')}`,
         COMPOSE_PROJECT: `${basename(projectPath)}-${featureFolder}`,

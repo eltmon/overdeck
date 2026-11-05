@@ -34,6 +34,7 @@ import { basename, dirname, join } from 'path';
 import { homedir } from 'os';
 import {
   replacePlaceholders,
+  toFeatureIdent,
   type ProjectConfig,
   type TemplatePlaceholders,
 } from '../workspace-config.js';
@@ -61,6 +62,7 @@ export function createWorkspacePlaceholders(
 
   return {
     FEATURE_NAME: featureName,
+    FEATURE_IDENT: toFeatureIdent(featureName),
     FEATURE_FOLDER: featureFolder,
     BRANCH_NAME: `feature/${featureName}`,
     COMPOSE_PROJECT: `${basename(projectConfig.path)}-${featureFolder}`,
