@@ -1,0 +1,350 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-05T23:01:06Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5068: Account sign-in: retry the device-code request once a network error hits, and show fetch's real cause",
+    "updated": "2026-11-05T23:09:09.878Z"
+  },
+  "plan": {
+    "id": "pan-5068",
+    "title": "Account sign-in: retry the device-code request once a network error hits, and show fetch's real cause",
+    "status": "proposed",
+    "uid": "c8d14343-3225-424b-a683-ebae7d500854",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-05T23:01:06Z",
+    "updated": "2026-11-05T23:09:09.878Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5068",
+        "label": "PAN-5068",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5068.md",
+        "label": "PRD PAN-5068",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "account",
+      "device-flow",
+      "network",
+      "retry",
+      "error-messages"
+    ],
+    "narratives": {
+      "Problem": "requestDeviceCode in src/lib/account/client.ts makes a single POST /oauth/device/code attempt, so one transient network failure (cold DNS, reset TLS connection, Happy Eyeballs miss) fails `pan mcp connector login` and `pan account login`. describeError returns only error.message, which for Node's fetch is always 'fetch failed'; the real reason in error.cause (ECONNRESET, ENOTFOUND, UND_ERR_CONNECT_TIMEOUT) is thrown away.",
+      "Proposal": "Retry requestDeviceCode on any thrown fetch error: 3 attempts, waiting 1000 ms then 2000 ms via the existing setTimeout-based sleep helper; never retry a returned Response (any status). Make describeError append '(code: message)' from error.cause when the cause is an object with a string code and/or non-empty string message, and redact the calling request's secrets (device code, authorization code, PKCE verifier, device token) from the whole result. Cover both with fake-timer unit tests in tests/unit/lib/account/client.test.ts, add one connector-level test proving a transient device-code failure no longer fails runConnectorLogin, and update cli/account.mdx and docs/ACCOUNT-SERVICE.md to describe the retry and the cause suffix. Full detail, before/after snippets and exact test cases are in .pan/drafts/PAN-5068.md.",
+      "NonGoals": "- No retry for exchangeAuthorizationCode, getMe or revokeDevice.\n- No retry of any HTTP error response from the device-code request, including 5xx and 429; no Retry-After handling on that request.\n- No progress or 'retrying' output during the backoff.\n- No change to pollForToken's failure counting or wait logic.\n- No caller changes in src/lib/mcp/connector/account.ts or src/cli/commands/account/login.ts.\n- No change to the unrelated describeError in src/lib/deploy/running-boot-gates.ts.\n- No reading of nested cause.cause chains.\n- No real wall-clock waits in any test."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Retry on any value thrown by fetch, not only TypeError.",
+        "rationale": "Only the fetch call sits inside the try, so every thrown value is a transport failure; injected test fetches and other runtimes may throw other types."
+      },
+      {
+        "summary": "Do not retry HTTP 5xx (or any Response) from the device-code request.",
+        "rationale": "The issue says 'Do not retry an HTTP error response'; a 503 is an HTTP error response. pollForToken's different 5xx handling is out of scope."
+      },
+      {
+        "summary": "The final 'Cannot reach' message describes the last thrown error, not the first.",
+        "rationale": "The last failure is the most current diagnosis and makes the test mechanically checkable (ENOTFOUND, ENOTFOUND, ECONNRESET -> message names ECONNRESET only)."
+      },
+      {
+        "summary": "describeError reads one level of cause only, formatted 'code: message', 'code', or 'message'; non-object or unusable causes leave the output unchanged.",
+        "rationale": "Undici puts the useful reason at one level; pinning the format prevents two different diffs from both looking done."
+      },
+      {
+        "summary": "The shared describeError change also enriches pollForToken, exchangeAuthorizationCode, getMe and revokeDevice detail strings.",
+        "rationale": "Same helper, same benefit; existing tests use plain Errors with no cause, so their expected strings do not change."
+      },
+      {
+        "summary": "Retry silently; no progress line during the backoff.",
+        "rationale": "Worst-case extra delay is 3 s; the issue asks for no output change beyond the cause suffix."
+      },
+      {
+        "summary": "Update cli/account.mdx and docs/ACCOUNT-SERVICE.md instead of declaring no documented surface changes.",
+        "rationale": "The issue says no docs change, but cli/account.mdx line 69 documents the 'Cannot reach <baseUrl>: <reason>' line only for the polling phase; a one-sentence correction is more accurate than a justification."
+      },
+      {
+        "summary": "Plan critique accepted: describeError takes the request's secrets (device code, authorization code, PKCE verifier, device token) and replaces them with '[redacted]' in its whole result.",
+        "rationale": "An injected or future fetch could put request values into cause.message; redaction keeps the client.ts secret invariant mechanically true while keeping the cause suffix on the poll's unreachable detail, the most common place users meet a network error."
+      }
+    ],
+    "items": [
+      {
+        "id": "describe-error-cause",
+        "title": "describeError appends fetch's error.cause and redacts the request's secrets",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-05T23:01:06Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5068",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/account/client.ts",
+            "tests/unit/lib/account/client.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/account/client.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tests/unit/lib/account/client.test.ts passes, including the new describeError-via-revokeDevice cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/account/client.ts replace describeError (line 90, grep 'function describeError(error: unknown): string {') with the PRD W-1 'After' snippet: add an unexported describeCause(cause: unknown): string | null that returns null unless cause is a non-null object, collects a string `code` and a non-empty string `message`, and joins the present parts with ': '; describeError(error, secrets: readonly string[] = []) builds String(error) for non-Errors, error.message when describeCause returns null, else `${error.message} (${suffix})`, then replaces every occurrence of each non-empty secret in that whole string with '[redacted]' (String.prototype.replaceAll). Pass secrets at the four secret-bearing call sites: pollForToken line 172 -> [code.deviceCode]; exchangeAuthorizationCode line 238 -> [input.code, input.codeVerifier]; getMe line 260 -> [token]; revokeDevice line 283 -> [token]. requestDeviceCode keeps describeError(error). Update the module header sentence 'No error message or thrown value ever includes the device token.' to the PRD W-1 wording naming device token, device code, authorization code and PKCE verifier and saying describeError redacts them. Keep describeError unexported and add no imports. In tests/unit/lib/account/client.test.ts add describe('describeError via revokeDevice (PAN-5068)') with the six cases from PRD W-1 (code+message, code only, message only, unusable cause {code: 42, message: ''}, no cause, redaction via exchangeAuthorizationCode and revokeDevice). Do not change existing tests."
+        },
+        "items": [
+          {
+            "id": "describe-error-cause.ac1",
+            "title": "Given revokeDevice's fetch rejects with new TypeError('fetch failed', { cause: { code: 'ECONNRESET', message: 'socket hang up' } }), when revokeDevice runs, then it returns { ok: false, detail: 'fetch failed (ECONNRESET: socket hang up)' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "describe-error-cause.ac2",
+            "title": "Given a cause with only code 'UND_ERR_CONNECT_TIMEOUT', the detail returns 'fetch failed (UND_ERR_CONNECT_TIMEOUT)'; given a cause with only message 'socket hang up', the detail returns 'fetch failed (socket hang up)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "describe-error-cause.ac3",
+            "title": "Given a TypeError('fetch failed') with no cause, or with cause { code: 42, message: '' }, the detail returns exactly 'fetch failed' with no parentheses",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "describe-error-cause.ac4",
+            "title": "The pre-existing tests in tests/unit/lib/account/client.test.ts that expect detail 'network down', 'ECONNREFUSED' and 'offline' pass unchanged, and npm run typecheck exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "describe-error-cause.ac5",
+            "title": "Given exchangeAuthorizationCode's fetch rejects with a cause whose message contains input.code and input.codeVerifier, and revokeDevice's fetch rejects with a cause whose message contains the device token, then each returned detail contains '[redacted]' and 'ECONNRESET' where given, and contains none of the code, verifier or token",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "device-code-retry",
+        "title": "requestDeviceCode retries a thrown fetch error with 1 s then 2 s backoff",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-05T23:01:06Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5068",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/account/client.ts",
+            "tests/unit/lib/account/client.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/account/client.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "tests/unit/lib/account/client.test.ts passes, including the four new requestDeviceCode retry cases",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/account/client.ts add `const DEVICE_CODE_RETRY_DELAYS_MS = [1_000, 2_000];` near PLATFORM_ARCH_RE, and replace the single try/catch in requestDeviceCode (lines 108-114, grep 'throw new AccountClientError(`Cannot reach ${baseUrl}: ${describeError(error)}`);') with the PRD W-2 loop: build the URLSearchParams once; for attempt 0,1,2 call postForm; on success break; on a thrown value, look up DEVICE_CODE_RETRY_DELAYS_MS[attempt]; if undefined throw AccountClientError(`Cannot reach ${baseUrl}: ${describeError(error)}`) with the LAST error, else await sleep(delay). Leave the `if (!res.ok)` HTTP branch unchanged so no Response is ever retried. If TS reports `res` used before assignment, declare it `Response | undefined` without restructuring the rest. Update the module header line 'Every poll wait is a `setTimeout` promise' to 'Every poll wait and device-code retry wait is a `setTimeout` promise'. In tests/unit/lib/account/client.test.ts import requestDeviceCode and add describe('requestDeviceCode retry (PAN-5068)') with its own beforeEach vi.useFakeTimers() / afterEach vi.useRealTimers(), helpers deviceCodeResponse() and fetchFailed(code), and the four cases in PRD W-2. Attach rejection assertions (const settled = expect(promise).rejects...) before advancing timers, then await settled."
+        },
+        "items": [
+          {
+            "id": "device-code-retry.ac1",
+            "title": "Given fetch rejects once with fetchFailed('ECONNRESET') then resolves a device-code 200, when requestDeviceCode runs under fake timers, then fetch is called once until 999 ms elapse, a second time at 1000 ms, and the promise resolves to the mapped DeviceCode",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "device-code-retry.ac2",
+            "title": "Given fetch rejects twice then resolves, when the clock advances, then the third fetch call is not issued 1999 ms after the second and is issued at 2000 ms, and the promise resolves",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "device-code-retry.ac3",
+            "title": "Given fetch rejects with ENOTFOUND, ENOTFOUND, ECONNRESET causes, when 3000 ms elapse, then requestDeviceCode rejects with AccountClientError message 'Cannot reach https://account.test: fetch failed (ECONNRESET: socket hang up)' that does not contain 'ENOTFOUND', after exactly 3 fetch calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "device-code-retry.ac4",
+            "title": "Given fetch resolves new Response('', { status: 503 }), when requestDeviceCode runs and 5000 ms of fake time elapse, then it rejects with 'Cannot start sign-in at https://account.test: HTTP 503' after exactly 1 fetch call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "connector-login-transient-test",
+        "title": "Connector login test: one transient device-code failure still signs in",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-05T23:01:06Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-5068",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/lib/mcp/connector/account.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/mcp/connector/account.test.ts"
+          ],
+          "expected_outputs": [
+            "tests/unit/lib/mcp/connector/account.test.ts passes, including 'signs in after one transient device-code network failure (PAN-5068)'"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Test-only; no source change. In tests/unit/lib/mcp/connector/account.test.ts, inside describe('runConnectorLogin'), add it('signs in after one transient device-code network failure (PAN-5068)'). Use vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] }) like the neighbouring tests. Wrap accountFetch(() => json(200, { access_token: DEVICE_TOKEN, device_id: 'dev-1', label: 'brave-otter' }), calls) so the first call whose URL ends with '/oauth/device/code' records itself in `calls` and throws new TypeError('fetch failed', { cause: { code: 'ECONNRESET', message: 'socket hang up' } }); every later call delegates. Run runConnectorLogin with the same options as the 'runs the device flow' test and settle(done) (its 1 s clock steps drive the 1 s backoff). Do not modify tests/unit/cli/account/login.test.ts: pan account login calls the same requestDeviceCode, already covered by device-code-retry."
+        },
+        "items": [
+          {
+            "id": "connector-login-transient-test.ac1",
+            "title": "Given the first /oauth/device/code fetch throws TypeError('fetch failed') with an ECONNRESET cause, when runConnectorLogin runs, then it returns exit code 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "connector-login-transient-test.ac2",
+            "title": "In that test, exactly two /oauth/device/code calls are recorded, readAccount(home) returns accessToken DEVICE_TOKEN, and no io line starts with 'Cannot reach'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-retry-and-cause",
+        "title": "Document the device-code retry and the cause suffix in cli/account.mdx and docs/ACCOUNT-SERVICE.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-05T23:01:06Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5068",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/account.mdx",
+            "docs/ACCOUNT-SERVICE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'fetch failed (ECONNRESET: socket hang up)' cli/account.mdx",
+            "grep -n 'retried after 1 s and 2 s' cli/account.mdx",
+            "grep -n 'an HTTP error response is not retried' docs/ACCOUNT-SERVICE.md"
+          ],
+          "expected_outputs": [
+            "each grep prints one matching line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply the two text edits in PRD W-4 verbatim. (1) cli/account.mdx line 69: replace '`Cannot reach <baseUrl>: <reason>` after the service is unreachable for several consecutive polls;' with the PRD sentence saying the first request is retried after 1 s and 2 s on a network error, the polling case is unchanged, and <reason> names the cause, e.g. `fetch failed (ECONNRESET: socket hang up)`. (2) docs/ACCOUNT-SERVICE.md line 227, the `login` bullet under '## Client': append the PRD sentence stating 3 attempts waiting 1 s then 2 s, that an HTTP error response is not retried, and that network-error messages from client.ts append fetch's cause code and message. Touch nothing else in either file."
+        },
+        "items": [
+          {
+            "id": "docs-retry-and-cause.ac1",
+            "title": "cli/account.mdx renders a failure sentence that contains 'retried after 1 s and 2 s' and the example 'fetch failed (ECONNRESET: socket hang up)', and still mentions the several-consecutive-polls case",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-retry-and-cause.ac2",
+            "title": "The login bullet in docs/ACCOUNT-SERVICE.md contains the phrase 'an HTTP error response is not retried' and names the 1 s then 2 s waits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "describe-error-cause",
+        "to": "device-code-retry",
+        "type": "blocks"
+      },
+      {
+        "from": "device-code-retry",
+        "to": "connector-login-transient-test",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-05-PAN-5068-account-sign-in-retry-the-device-code-request-once-a-network-error-hits-and-show-fetch-s-real-cause.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
