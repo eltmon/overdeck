@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2652",
   "created": "2026-11-05T21:12:48.966Z",
-  "updated": "2026-11-05T21:25:23.430Z",
+  "updated": "2026-11-05T21:25:28.192Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -44,6 +44,11 @@
       "claimedBy": "agent-pan-2652",
       "claimedAt": "2026-11-05T21:21:20.227Z",
       "doneAt": "2026-11-05T21:25:23.429Z"
+    },
+    "w7-adopt-forks-session-index": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-2652",
+      "claimedAt": "2026-11-05T21:25:28.192Z"
     }
   }
 }
