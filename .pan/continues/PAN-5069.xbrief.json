@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5069",
   "created": "2026-11-05T23:26:20.599Z",
-  "updated": "2026-11-05T23:53:02.072Z",
+  "updated": "2026-11-05T23:56:17.048Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -79,6 +79,10 @@
       "claimedBy": "agent-pan-5069",
       "claimedAt": "2026-11-05T23:52:03.258Z",
       "doneAt": "2026-11-05T23:53:02.072Z"
+    },
+    "a1-pair-link-machine-name.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:56:17.048Z"
     }
   }
 }
