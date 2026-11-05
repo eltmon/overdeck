@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5069",
   "created": "2026-11-05T23:26:20.599Z",
-  "updated": "2026-11-05T23:39:46.311Z",
+  "updated": "2026-11-05T23:39:51.905Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -44,6 +44,11 @@
       "claimedBy": "agent-pan-5069",
       "claimedAt": "2026-11-05T23:38:08.187Z",
       "doneAt": "2026-11-05T23:39:46.310Z"
+    },
+    "a7b-link-error-code": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5069",
+      "claimedAt": "2026-11-05T23:39:51.904Z"
     }
   }
 }
