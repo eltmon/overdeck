@@ -815,7 +815,7 @@ export async function recoverAgent(
   }
 
   const recoveryCodexFields = recoveryHarness === 'codex'
-    ? getCodexLauncherFields(normalizedId, state.model, state.workspace, recoveryRole, relaunchEffort.effort, await prepareCodexOverdeckMcp({ agentId: normalizedId, agentKind: 'agent', role: recoveryRole, harness: recoveryHarness }))
+    ? getCodexLauncherFields(normalizedId, state.model, state.workspace, recoveryRole, relaunchEffort.effort, await prepareCodexOverdeckMcp({ agentId: normalizedId, agentKind: 'agent', role: recoveryRole, harness: recoveryHarness, cwd: state.workspace, issueId: state.issueId }))
     : {};
   const recoveryLauncherContent = generateLauncherScript({
     role: recoveryRole,
@@ -831,7 +831,7 @@ export async function recoverAgent(
     useSupervisor: recoverySupervisorLaunch.useSupervisor,
     supervisorScriptPath: recoverySupervisorLaunch.supervisorScriptPath,
     ...recoveryCodexFields,
-    ...(await prepareClaudeOverdeckMcp({ agentId: normalizedId, agentKind: 'agent', role: recoveryRole, harness: recoveryHarness })),
+    ...(await prepareClaudeOverdeckMcp({ agentId: normalizedId, agentKind: 'agent', role: recoveryRole, harness: recoveryHarness, cwd: state.workspace, issueId: state.issueId })),
   });
   const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
   await writeLauncherScriptAtomic(launcherScript, recoveryLauncherContent);

@@ -78,8 +78,8 @@ export interface OverdeckMcpLaunchOwner {
   harness: RuntimeName;
   /** Required for a conversation (its state dir); an agent defaults to its agent dir (D-5). */
   dir?: string;
-  /** PAN-5061: the launch cwd; resolves the launch project. Required after WI-7. */
-  cwd?: string;
+  /** PAN-5061: the launch cwd; resolves the launch project. */
+  cwd: string;
   /** PAN-5061: the launch's issue, when it has one; resolves the launch project first. */
   issueId?: string;
 }

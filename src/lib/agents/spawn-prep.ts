@@ -721,7 +721,7 @@ export async function buildAgentLaunchConfig(opts: {
   // A resumed review/test/ship run loads the wrong frontmatter (and wrong
   // tool permissions) if it always points at roles/work.md.
   const launchRole: Role = opts.isPlanning ? 'plan' : opts.role;
-  const overdeckMcp = await prepareClaudeOverdeckMcp({ agentId: opts.agentId, agentKind: 'agent', role: launchRole, harness: opts.harness ?? 'claude-code' });
+  const overdeckMcp = await prepareClaudeOverdeckMcp({ agentId: opts.agentId, agentKind: 'agent', role: launchRole, harness: opts.harness ?? 'claude-code', cwd: opts.workspace });
 
   // PAN-1055: ohmypi harness needs --session-dir + fifo redirect threaded into
   // the launcher; getOhmypiLauncherFields() resolves them from the agent state
@@ -731,7 +731,7 @@ export async function buildAgentLaunchConfig(opts: {
     ? await getOhmypiLauncherFields(opts.agentId, model, opts.effort)
     : {};
   const codexLauncherFields = behavior.usesCodexHome
-    ? getCodexLauncherFields(opts.agentId, model, opts.workspace, launchRole, opts.effort, await prepareCodexOverdeckMcp({ agentId: opts.agentId, agentKind: 'agent', role: launchRole, harness: opts.harness ?? 'claude-code' }))
+    ? getCodexLauncherFields(opts.agentId, model, opts.workspace, launchRole, opts.effort, await prepareCodexOverdeckMcp({ agentId: opts.agentId, agentKind: 'agent', role: launchRole, harness: opts.harness ?? 'claude-code', cwd: opts.workspace }))
     : {};
   const museLauncherFields = opts.harness === 'muse' ? await getMuseLauncherFields({
     agentId: opts.agentId, model, workspace: opts.workspace, role: launchRole, effort: opts.effort,

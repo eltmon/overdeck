@@ -500,7 +500,7 @@ export async function messageAgent(
       ? await getOhmypiLauncherFields(normalizedId, resumeModel, relaunchEffort.effort)
       : {};
     const fallbackCodexFields = fallbackHarness === 'codex'
-      ? getCodexLauncherFields(normalizedId, resumeModel, agentState.workspace, resumeRole, relaunchEffort.effort, await prepareCodexOverdeckMcp({ agentId: normalizedId, agentKind: 'agent', role: resumeRole, harness: fallbackHarness }))
+      ? getCodexLauncherFields(normalizedId, resumeModel, agentState.workspace, resumeRole, relaunchEffort.effort, await prepareCodexOverdeckMcp({ agentId: normalizedId, agentKind: 'agent', role: resumeRole, harness: fallbackHarness, cwd: agentState.workspace, issueId: agentState.issueId }))
       : {};
     const fallbackSupervisorLaunch = await prepareSupervisorForRelaunch(normalizedId, agentState, resumeModel, fallbackHarness);
     const fallbackContent = generateLauncherScript({
@@ -529,7 +529,7 @@ export async function messageAgent(
       supervisorScriptPath: fallbackSupervisorLaunch.supervisorScriptPath,
       ...fallbackPiFields,
       ...fallbackCodexFields,
-      ...(await prepareClaudeOverdeckMcp({ agentId: normalizedId, agentKind: 'agent', role: resumeRole, harness: fallbackHarness })),
+      ...(await prepareClaudeOverdeckMcp({ agentId: normalizedId, agentKind: 'agent', role: resumeRole, harness: fallbackHarness, cwd: agentState.workspace, issueId: agentState.issueId })),
     });
     writeFileSync(fallbackLauncher, fallbackContent, { mode: 0o755 });
     // PAN-3960: relaunch on the backend the host selects now, stamped like a spawn.
