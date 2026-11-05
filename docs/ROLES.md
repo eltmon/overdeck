@@ -130,7 +130,9 @@ Overdeck renders this declaration for each harness:
 - **Claude Code** gets a generated `--mcp-config` JSON file and an `mcp__<name>` entry in `--allowedTools` (PAN-2090).
 - **Codex** gets `[mcp_servers.<name>]` entries in the agent's `codex-home/config.toml`. Overdeck rewrites the entries on spawn, resume, and recovery so relaunching a role preserves its tools (PAN-2698).
 - **ohmypi** cannot provision role MCP servers. Overdeck logs a spawn-time warning that names every unavailable server.
-- **ACP harnesses** (`acp`, `opencode`) get only the `overdeck` server (PAN-4934); role-declared servers are not provisioned for them.
+- **ACP harnesses** (`acp`, `opencode`) get the `overdeck` server (PAN-4934) plus the launch project's stdio servers (PAN-5061); role-declared servers are not provisioned for them.
+
+A project's `mcp_servers` (PAN-5061) merge into the same launch: the launch MCP file for Claude Code and ACP, the `[mcp_servers]` map for Codex. When a role server and a project server share a name, the role's server wins and the project entry is skipped with a warning. See `configuration/mcp.mdx`, "Project MCP servers".
 
 ### Agent token scopes (PAN-4927)
 
