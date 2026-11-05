@@ -336,8 +336,16 @@ describe('resolveClaudeSessionFile', () => {
     expect(await resolveClaudeSessionFile('conv-a')).toBeNull();
   });
 
-  it('prefers the launcher-pinned session id', async () => {
-    mocks.runDashboardDbJob.mockResolvedValue(conversation());
+  // PAN-2652 W5: the current locator wins; the launcher pin is the fallback for a row with no locator.
+  it('prefers the current locator over the launcher-pinned session id', async () => {
+    mocks.runDashboardDbJob.mockResolvedValue(conversation({ claudeSessionId: 'current-id' }));
+    mocks.readLauncherPinnedSessionId.mockResolvedValue('pinned-id');
+    expect(await resolveClaudeSessionFile('conv-a')).toBe(join(dir, 'current-id.jsonl'));
+    expect(mocks.sessionFilePath).toHaveBeenCalledWith('/home/user/project', 'current-id');
+  });
+
+  it('falls back to the launcher-pinned session id without a locator', async () => {
+    mocks.runDashboardDbJob.mockResolvedValue(conversation({ claudeSessionId: null }));
     mocks.readLauncherPinnedSessionId.mockResolvedValue('pinned-id');
     await resolveClaudeSessionFile('conv-a');
     expect(mocks.readLauncherPinnedSessionId).toHaveBeenCalledWith('conv-a-tmux');

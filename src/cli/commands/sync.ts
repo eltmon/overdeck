@@ -46,9 +46,24 @@ import { checkSyncSourceFreshness } from '../../lib/sync-source-freshness.js';
 import { pruneDanglingGitHookLinks } from '../../lib/git-hooks.js';
 import { migrateTraefikCompose } from '../../lib/traefik.js';
 import { runOperatorMemorySyncStep } from './memory-sync.js';
+import { writePanCliShims } from '../../lib/pan-cli-shim.js';
 
 // Bundled git hooks distributed to registered projects (PAN-1201: sync-sources/).
 const BUNDLED_GIT_HOOKS_DIR = SYNC_SOURCES.gitHooks;
+
+/** PAN-2630: writes the pan/overdeck PATH shim. A failure never fails the sync. */
+export async function syncPanCliShimStep(deps: {
+  write: typeof writePanCliShims;
+  log: (line: string) => void;
+}): Promise<void> {
+  const result = await deps.write();
+  if (result.status === 'written') {
+    deps.log(chalk.dim(`pan shim → ${result.dir}`));
+    return;
+  }
+  const reason = result.status === 'missing-bundle' ? `CLI bundle missing at ${result.bundle}` : result.message;
+  deps.log(chalk.yellow(`pan shim not written: ${reason}`));
+}
 
 // Helper to check if a command exists
 function checkCommand(cmd: string): boolean {
@@ -538,6 +553,10 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
   if (!checkCommand('jq')) {
     console.log(chalk.yellow('\n  ⚠ jq not found — statusline and other features need it'));
     console.log(chalk.dim('    Install without sudo: curl -fsSL https://overdeck.ai/install | sh\n'));
+  }
+
+  if (!options.dryRun) {
+    await timeAsync('sync-pan-shim', () => syncPanCliShimStep({ write: writePanCliShims, log: (line) => console.log(line) }));
   }
 
   // Sync statusline to all runtimes

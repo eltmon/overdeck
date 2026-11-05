@@ -790,4 +790,11 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   `done` is a finished turn with the harness alive, never an exit; only `exited` (or no pane) ends a session. Other
   code still treating `done` as not-live: PAN-4666 (Flywheel `paneIsLive`), PAN-5013 (derived issue state, parked
   route, read-model `activityForPaneState`).
+- A human conversation's Claude session is its current (newest) `conversation_files` locator, not the launcher
+  pin (PAN-2652). Resolve it through `resolveConversationClaudeSessionId` (`conversation-claude-session.ts`), never
+  `pinned ?? conv.claudeSessionId`; the pin is only the fallback for a chain head with no locator. Change the
+  locator only through `setConversationClaudeSessionId`: `conversation_files` has no unique index and the cost
+  ledger sums every matching row, so a raw INSERT double-counts cost, and the write door is what the open
+  Conversation tab follows. The live process keeps its launched id after fork adoption, so process matching must
+  include the launcher pin (`conversationRuntimeRootPids` extra ids).
 <!-- last-verified: 2026-11-04 -->

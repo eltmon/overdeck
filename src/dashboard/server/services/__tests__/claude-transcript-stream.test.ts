@@ -143,4 +143,25 @@ describe('streamClaudeTranscript (PAN-4558)', () => {
     expect(rowCount(first!)).toBe(75);
     expect(first!.window?.transcript).toBe(TRANSCRIPT);
   });
+
+  // PAN-2652 W6: a switch to a forked session replaces the view, but an empty file never wipes it.
+  it('marks the first snapshot reset when opened with { reset: true } and no resume', async () => {
+    mocks.initialParse.mockResolvedValue(parse(10));
+    const events = await Effect.runPromise(
+      streamClaudeTranscript(sessionFile, 'conv', null, undefined, undefined, { reset: true }).pipe(Stream.take(1), Stream.runCollect),
+    );
+    const first = [...events][0] as MessagesEvent;
+    expect(first.snapshot).toBe(true);
+    expect(first.reset).toBe(true);
+  });
+
+  it('does not mark an empty first snapshot reset even when opened with { reset: true }', async () => {
+    mocks.initialParse.mockResolvedValue(parse(0, 0));
+    const events = await Effect.runPromise(
+      streamClaudeTranscript(sessionFile, 'conv', null, undefined, undefined, { reset: true }).pipe(Stream.take(1), Stream.runCollect),
+    );
+    const first = [...events][0] as MessagesEvent;
+    expect(first.snapshot).toBe(true);
+    expect(first.reset).toBeUndefined();
+  });
 });

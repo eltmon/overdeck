@@ -1,0 +1,573 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-05T21:02:20Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2630: pan binary not on PATH for operator shells or spawned work agents; pan doctor can't be run to diagnose it",
+    "updated": "2026-11-05T21:08:43.653Z"
+  },
+  "plan": {
+    "id": "pan-2630",
+    "title": "pan binary not on PATH for operator shells or spawned work agents; pan doctor can't be run to diagnose it",
+    "status": "running",
+    "uid": "a8fac534-3501-40dc-855c-d5b7dad4585a",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-05T21:02:20Z",
+    "updated": "2026-11-05T21:08:43.653Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2630",
+        "label": "PAN-2630",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-2630.md",
+        "label": "PRD",
+        "type": "document"
+      }
+    ],
+    "tags": [
+      "cli",
+      "launcher",
+      "doctor",
+      "install",
+      "path"
+    ],
+    "narratives": {
+      "Problem": "On a source-checkout machine nothing puts `pan` on PATH. npm bin links exist only after `npm install -g` or `npm link`; postinstall and `pan install` never create one. Spawned agents get only the harness binary directory on PATH (src/lib/agents/spawn.ts lines 405-409), so they cannot run `pan done`, `pan task done` or `pan doctor` from their shell. `pan doctor` has no presence check (describeCliGenerationDrift reports ok with 'no global CLI link on this machine'), and the operator cannot run it anyway because `pan` is the missing command.",
+      "Proposal": "Add a leaf module src/lib/pan-cli-shim.ts that renders a `/bin/sh` exec shim (`exec '<process.execPath>' '<packageRoot>/dist/cli/index.js' \"$@\"`, built from panCliInvocation(), plus `export ELECTRON_RUN_AS_NODE=1` under Electron) into `<OVERDECK_HOME>/cli-bin/{pan,overdeck}`. Every non-remote launcher writes the shim atomically at launch time and prepends that directory to PATH after its extraEnvExports (one line in generateLauncherScript). `pan install` and `pan sync` write the same shim through an async writer, and `pan install` prints the PATH line when `pan` is missing. `pan doctor` gains a `pan on PATH` warn row with three remedies. The source-checkout postinstall prints a one-line hint. The docs cover source-checkout install, the `pan: command not found` bootstrap (`node <checkout>/dist/cli/index.js doctor`) and the launcher PATH line. Full detail: .pan/drafts/PAN-2630.md.",
+      "NonGoals": "- No `pan doctor --fix`; doctor only reports.\n- No automatic `npm link` or `npm install -g` from any Overdeck command.\n- No edits to operator shell rc or profile files.\n- No change to src/lib/deploy/global-cli-link.ts repoint semantics (PAN-3538).\n- Remote (Fly, spawnMode 'remote') launchers must produce the same script as before.\n- No edits to src/lib/agents/spawn.ts, including the knowledge-role $HOME/.overdeck/bin PATH line.\n- No allowlist cap raise in scripts/file-size-allowlist.txt.\n- No shim for the packaged desktop layout where <packageRoot>/dist/cli/index.js does not exist."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Use one shared shim directory <OVERDECK_HOME>/cli-bin, rewritten by every launcher at launch time.",
+        "rationale": "The operator's 2026-11-05 issue comment names this location and asks for spawn-time regeneration, so the shim follows the live reload generation. Per-agent directories need an id some launchers lack and give operators no stable directory to add to PATH."
+      },
+      {
+        "summary": "Prepend the shim directory after all extraEnvExports, so it precedes the harness binary directory.",
+        "rationale": "The issue comment says 'after the harness PATH line'. Agents then run the same CLI build as the process that launched them, which also removes PAN-3538-style drift for agents. The directory holds only pan and overdeck, so it shadows nothing else."
+      },
+      {
+        "summary": "Emit the shim through a single line in generateLauncherScript, not in spawn.ts or each caller.",
+        "rationale": "All 15 launcher callers pass through the generator. spawn.ts has 1 line of file-size headroom, and launcher-generator.ts has 3."
+      },
+      {
+        "summary": "Exec shim with an absolute node path, not a symlink to dist/cli/index.js.",
+        "rationale": "The bundle's `#!/usr/bin/env node` shebang depends on whichever node is on PATH, and a symlink cannot carry the Electron flag."
+      },
+      {
+        "summary": "Bake `export ELECTRON_RUN_AS_NODE=1` into the shim when process.versions.electron is set or the generating process has ELECTRON_RUN_AS_NODE=1 at render time.",
+        "rationale": "In the desktop app process.execPath is Electron. Without the flag the shim relaunches the desktop app (PAN-2559 fork-bomb). A Herdr pane does not inherit the server's env."
+      },
+      {
+        "summary": "Atomic best-effort shim writes (tmp file with $$, chmod, mv -f), guarded by [ -f <bundle> ]; on failure skip the PATH export and never exit.",
+        "rationale": "Many launchers write the shared file concurrently, and a launcher must never die because of a convenience shim."
+      },
+      {
+        "summary": "Skip the shim for spawnMode 'remote'.",
+        "rationale": "Fly VMs have their own install and the host's absolute paths are invalid there."
+      },
+      {
+        "summary": "The doctor `pan on PATH` row is warn, not error, and lists npm install -g, npm link, and the cli-bin PATH line.",
+        "rationale": "Agents no longer depend on the operator's PATH. The comment asks for a warning with the npm install -g / npm link fix text; the cli-bin line is the third remedy the shim makes possible."
+      },
+      {
+        "summary": "Add a one-line postinstall hint, only in source checkouts (<PACKAGE_ROOT>/src exists) and only when no pan is on PATH.",
+        "rationale": "`bun install` is the first command a source-checkout operator runs, which breaks the 'diagnosis tool is the missing tool' circularity. Published installs ship no src/, so npm install -g stays silent."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Seven small vertical items across one new module, the launcher generator, three CLI commands, a script and docs. All belong to one PATH guarantee and none ships value alone.",
+      "canonicalFilename": "2026-11-05-PAN-2630-pan-binary-not-on-path-for-operator-shells-or-spawned-work-agents-pan-doctor-can-t-be-run-to-diagnose-it.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "pan-cli-shim-module",
+        "title": "Add src/lib/pan-cli-shim.ts: shim renderer, launcher lines, async writer, PATH lookup",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-05T21:02:20Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2630",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "launcher-emits-shim",
+            "install-writes-shim",
+            "sync-writes-shim",
+            "doctor-pan-on-path"
+          ],
+          "files_scope": [
+            "src/lib/pan-cli-shim.ts",
+            "tests/unit/lib/pan-cli-shim.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/pan-cli-shim.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "pan-cli-shim.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create the new leaf module src/lib/pan-cli-shim.ts beside src/lib/pan-cli-invocation.ts, exactly as PRD WI-1 specifies. It imports only node:path, node:fs, node:fs/promises, ./paths.js (getOverdeckHome), ./shell-quote.js (shellQuote) and ./pan-cli-invocation.js (panCliInvocation). Export PanCliShimRuntime {nodePath?, root?, electron?, dir?} and these functions: panCliShimDir() = join(getOverdeckHome(), 'cli-bin'), read at call time; panCliBundlePath(runtime) = panCliInvocation([], {nodePath, root}).args[0]; renderPanCliShim(runtime), which returns exactly \"#!/bin/sh\\n\" + (electron ? \"export ELECTRON_RUN_AS_NODE=1\\n\" : \"\") + \"exec <shellQuote(node)> <shellQuote(bundle)> \\\"$@\\\"\\n\", with electron defaulting to Boolean(process.versions.electron) || process.env.ELECTRON_RUN_AS_NODE === '1'; panCliShimLauncherLines(runtime), which returns bash lines that, only when `[ -f <bundle> ]`, mkdir -p the dir, write the renderPanCliShim() content through a quoted heredoc (delimiter OVERDECK_PAN_SHIM) to <dir>/pan.tmp.$$, chmod 0755, copy it to <dir>/overdeck.tmp.$$, mv -f both into place, then `export PATH=<shellQuote(dir)>:\"$PATH\"`. Any failure skips the export, the tmp files are removed on every path, and the whole block is one compound `if` that never exits the launcher. Also export writePanCliShims(runtime): Promise<{status:'written',dir}|{status:'missing-bundle',bundle}|{status:'error',message}>. It is async fs/promises, checks the bundle exists, writes each file to a randomUUID tmp with mode 0o755, renames it, and never throws. Finally export findExecutableOnPath(name, pathEnv, deps?): a pure split of pathEnv on ':' that skips empty segments and returns the first join(segment,name) where deps.isExecutableFile (default: statSync().isFile() plus accessSync X_OK in a try/catch) is true, else null. Add a header comment naming PAN-2630 and the D-1/D-3/D-4/D-6 reasoning. Write tests/unit/lib/pan-cli-shim.test.ts with the five cases listed in PRD WI-1. Use mkdtemp fixtures, and use spawnSync('bash', ['-c', ...]) to execute the launcher lines against a fake bundle that prints JSON.stringify(process.argv.slice(2))."
+        },
+        "items": [
+          {
+            "id": "pan-cli-shim-module.ac1",
+            "title": "Given nodePath '/n/node' and root '/r', renderPanCliShim returns exactly \"#!/bin/sh\\nexec '/n/node' '/r/dist/cli/index.js' \\\"$@\\\"\\n\", and with electron: true it emits `export ELECTRON_RUN_AS_NODE=1` as line 2",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-cli-shim-module.ac2",
+            "title": "Given a temp root with a fake dist/cli/index.js, when bash executes panCliShimLauncherLines() followed by `command -v pan; pan a \"b c\"`, then it exits 0, prints <dir>/pan, prints [\"a\",\"b c\"], and leaves no *.tmp.* file in the dir",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-cli-shim-module.ac3",
+            "title": "Given a root without dist/cli/index.js, when bash executes the launcher lines, then it exits 0, creates no pan file, and the printed PATH does not contain the shim dir",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-cli-shim-module.ac4",
+            "title": "writePanCliShims() creates pan and overdeck with mode 0o755 and content equal to renderPanCliShim(), and returns {status:'missing-bundle'} and writes nothing when the bundle is absent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-cli-shim-module.ac5",
+            "title": "findExecutableOnPath('pan', '/a::/b', {isExecutableFile: p => p === '/b/pan'}) returns '/b/pan', and returns null for no match and for an undefined PATH",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "launcher-emits-shim",
+        "title": "Emit the pan shim block in generateLauncherScript after extraEnvExports for non-remote launchers",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-05T21:02:20Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2630",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/launcher-generator.ts",
+            "src/lib/__tests__/launcher-generator.test.ts",
+            "tests/unit/lib/launcher-generator-pan-shim.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/launcher-generator.test.ts tests/unit/lib/launcher-generator-pan-shim.test.ts tests/unit/lib/launcher-generator-prime-agent.test.ts tests/unit/lib/launcher-generator-overdeck-mcp.test.ts",
+            "wc -l src/lib/launcher-generator.ts",
+            "bash scripts/lint-file-size.sh",
+            "git diff --stat origin/main -- src/lib/agents/spawn.ts"
+          ],
+          "expected_outputs": [
+            "all four launcher test files pass",
+            "wc prints 1000 or fewer lines",
+            "file-size guard passed",
+            "git diff --stat prints nothing for spawn.ts"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/launcher-generator.ts add exactly two lines (the file is 997 of 1000 lines, so add no blank line and no comment). First, `import { panCliShimLauncherLines } from './pan-cli-shim.js';` among the './' imports. Second, directly after the closing brace of the `// Extra env exports` block (`if (config.extraEnvExports) { for (const expr of config.extraEnvExports) { lines.push(expr); } }`, lines 392-397), add `if (config.spawnMode !== 'remote') lines.push(...panCliShimLauncherLines());`. Do not touch src/lib/agents/spawn.ts. In src/lib/__tests__/launcher-generator.test.ts add a local normalize(script) helper that replaces tempHome with '<OVERDECK_HOME>', process.execPath with '<NODE>', and packageRoot (import from '../paths.js') with '<PACKAGE_ROOT>'. Use it in place of every `script.replaceAll(tempHome, '<OVERDECK_HOME>')`, then regenerate the inline snapshots with `npx vitest run src/lib/__tests__/launcher-generator.test.ts -u` and confirm each non-remote snapshot shows the shim block after the extra env exports. Create tests/unit/lib/launcher-generator-pan-shim.test.ts. In it, vi.mock the pan-cli-invocation module so that panCliInvocation(args) returns {command: process.execPath, args: [<tmp>/dist/cli/index.js, ...args]} for a fake bundle, set OVERDECK_HOME to a temp dir, and generate a launcher with extraEnvExports [\"export PATH='/harness/bin':\\\"$PATH\\\"\"] and baseCommand 'printenv PATH; command -v pan'. Write it to disk, run it with spawnSync('bash', [path]), and assert the PATH order and pan resolution. Add a second case: a spawnMode 'remote' launcher contains no 'cli-bin'."
+        },
+        "items": [
+          {
+            "id": "launcher-emits-shim.ac1",
+            "title": "Given a launcher generated with a harness PATH export, when bash runs it, then the printed PATH's first segment is <OVERDECK_HOME>/cli-bin and its second is /harness/bin, and `command -v pan` prints <OVERDECK_HOME>/cli-bin/pan",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launcher-emits-shim.ac2",
+            "title": "A launcher generated with spawnMode 'remote' produces a script that contains no 'cli-bin' substring",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launcher-emits-shim.ac3",
+            "title": "`wc -l src/lib/launcher-generator.ts` reports 1000 or fewer lines, scripts/lint-file-size.sh passes, and `git diff origin/main -- src/lib/agents/spawn.ts` is empty",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launcher-emits-shim.ac4",
+            "title": "src/lib/__tests__/launcher-generator.test.ts passes with machine-independent inline snapshots: they contain the tokens '<NODE>' and '<PACKAGE_ROOT>' and never the literal process.execPath",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "install-writes-shim",
+        "title": "pan install writes the pan shim and prints the PATH line when pan is missing",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-05T21:02:20Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2630",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/install.ts",
+            "tests/unit/cli/install-pan-shim.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/install-pan-shim.test.ts tests/unit/cli/install-prereqs.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both install test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/cli/commands/install.ts export `async function installPanCliShimStep(deps: { write: typeof writePanCliShims; find: typeof findExecutableOnPath; pathEnv: string | undefined; log: (line: string) => void }): Promise<void>`. It calls deps.write(). On {status:'written', dir} it logs a green `✓ pan shim written to <dir>`; then, if deps.find('pan', deps.pathEnv) returns null, it logs a yellow `pan is not on your PATH. Add this to your shell profile: export PATH=\"<dir>:$PATH\"`. On 'missing-bundle' or 'error' it logs a yellow warning with the reason and returns normally (never exits non-zero, never throws). In installCommand, directly after `await setupHooksCommand();` (line 284), call `await installPanCliShimStep({ write: writePanCliShims, find: findExecutableOnPath, pathEnv: process.env.PATH, log: (l) => console.log(l) })`. Write tests/unit/cli/install-pan-shim.test.ts covering written+missing, written+present and error, with injected fakes."
+        },
+        "items": [
+          {
+            "id": "install-writes-shim.ac1",
+            "title": "Given write returns {status:'written', dir:'/d'} and find returns null, installPanCliShimStep logs a line containing `export PATH=\"/d:$PATH\"`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "install-writes-shim.ac2",
+            "title": "Given write returns written and find returns '/usr/bin/pan', installPanCliShimStep logs no line containing 'export PATH'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "install-writes-shim.ac3",
+            "title": "Given write returns {status:'error', message:'EACCES'}, installPanCliShimStep resolves without throwing and logs a warning containing 'EACCES'; installCommand calls the step right after setupHooksCommand()",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sync-writes-shim",
+        "title": "pan sync writes the pan shim (skipped under --dry-run)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-05T21:02:20Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2630",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/sync.ts",
+            "tests/unit/cli/sync-pan-shim.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/sync-pan-shim.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "sync-pan-shim.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/cli/commands/sync.ts export `async function syncPanCliShimStep(deps: { write: typeof writePanCliShims; log: (line: string) => void }): Promise<void>`. It logs exactly one line: dim `pan shim → <dir>` on written, yellow `pan shim not written: bundle missing at <bundle>` on missing-bundle, and yellow `pan shim not written: <message>` on error. It never throws. In syncCommand, just before the `// Sync statusline to all runtimes` block (around line 543), add `if (!options.dryRun) await timeAsync('sync-pan-shim', () => syncPanCliShimStep({ write: writePanCliShims, log: (l) => console.log(l) }));`. Write tests/unit/cli/sync-pan-shim.test.ts covering the three statuses with an injected writer."
+        },
+        "items": [
+          {
+            "id": "sync-writes-shim.ac1",
+            "title": "Given write returns {status:'written', dir:'/d'}, syncPanCliShimStep logs exactly one line, and it contains '/d'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sync-writes-shim.ac2",
+            "title": "Given write returns missing-bundle or error, syncPanCliShimStep resolves without throwing and logs exactly one line starting with 'pan shim not written'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sync-writes-shim.ac3",
+            "title": "syncCommand calls syncPanCliShimStep only when options.dryRun is falsy, so `pan sync --dry-run` writes no shim",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "doctor-pan-on-path",
+        "title": "pan doctor reports a 'pan on PATH' row (warn with three remedies when missing)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-05T21:02:20Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2630",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/doctor-pan-path.ts",
+            "src/cli/commands/doctor.ts",
+            "tests/unit/cli/doctor-pan-path.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/doctor-pan-path.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "doctor-pan-path.test.ts passes",
+            "typecheck completes without errors",
+            "file-size guard passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/cli/commands/doctor-pan-path.ts shaped like src/cli/commands/doctor-cli-generation.ts, and re-declare CheckResult locally to avoid the module cycle. Export `checkPanOnPath(deps: { pathEnv?: string; find?: typeof findExecutableOnPath; shimDir?: string } = {}): CheckResult`. Defaults: process.env.PATH, findExecutableOnPath, panCliShimDir(). When pan is found, return {name:'pan on PATH', status:'ok', message:<resolved path>}, and append ' (Overdeck shim)' when the path equals join(shimDir,'pan'). When it is missing, return {name:'pan on PATH', status:'warn', message:`pan is not on PATH in this shell (agents get it from ${shimDir})`, fix:`Run npm install -g @overdeck/core, or npm link inside your Overdeck checkout after npm run build, or add export PATH=\"${shimDir}:$PATH\" to your shell profile (pan sync writes that shim)`}. Spawn no child process and call no execSync. Register it in src/cli/commands/doctor.ts with one import line beside `import { checkCliGenerationLink } from './doctor-cli-generation.js';` (line 25), and by changing line 787 to `checks.push(await checkCliGenerationLink(), checkPanOnPath());`. Do not change describeCliGenerationDrift in src/lib/deploy/global-cli-link.ts. Write tests/unit/cli/doctor-pan-path.test.ts with injected find and pathEnv."
+        },
+        "items": [
+          {
+            "id": "doctor-pan-on-path.ac1",
+            "title": "Given find returns null, checkPanOnPath returns status 'warn' whose fix contains 'npm install -g @overdeck/core', 'npm link' and 'export PATH=\"<shimDir>:$PATH\"'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-pan-on-path.ac2",
+            "title": "Given find returns <shimDir>/pan, checkPanOnPath returns status 'ok' with a message ending in '(Overdeck shim)'; given find returns '/usr/local/bin/pan', the message equals '/usr/local/bin/pan'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-pan-on-path.ac3",
+            "title": "doctor.ts pushes checkPanOnPath() in the same checks.push call as checkCliGenerationLink(), so `pan doctor` output renders a 'pan on PATH' row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "postinstall-pan-hint",
+        "title": "Source-checkout postinstall prints a hint when pan is not on PATH",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-11-05T21:02:20Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-2630",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/postinstall.mjs",
+            "tests/unit/scripts/postinstall-pan-hint.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/scripts/postinstall-pan-hint.test.ts"
+          ],
+          "expected_outputs": [
+            "postinstall-pan-hint.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "In scripts/postinstall.mjs add `function hintMissingPan()` and call it before `syncHooksIfInitialized();`. It returns immediately unless existsSync(join(PACKAGE_ROOT, 'src')) holds, which is the source-checkout signal; published tarballs ship no src/. Otherwise it scans (process.env.PATH || '').split(':') and skips empty segments. For each segment it tests join(segment, 'pan') with statSync(...).isFile() plus accessSync(..., constants.X_OK) inside a try/catch, with no child process. If none matches it prints exactly one line: `Overdeck: pan is not on your PATH. After npm run build, run npm link in this checkout, or add ~/.overdeck/cli-bin to PATH after pan install. Until then: node dist/cli/index.js doctor`. Keep the existing behavior and the `|| true` exit semantics in package.json. Write tests/unit/scripts/postinstall-pan-hint.test.ts. Run spawnSync(process.execPath, [join(process.cwd(),'scripts','postinstall.mjs')]) with env HOME=<temp dir> (so ~/.overdeck is absent) and PATH=<dirname(process.execPath)>, and assert stdout contains 'pan is not on your PATH'. Then rerun with PATH=<temp dir holding an executable `pan` file>:<dirname(process.execPath)> and assert it does not."
+        },
+        "items": [
+          {
+            "id": "postinstall-pan-hint.ac1",
+            "title": "Given HOME is a temp dir and PATH contains only the node directory, when scripts/postinstall.mjs runs, then stdout contains 'pan is not on your PATH' and the process exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "postinstall-pan-hint.ac2",
+            "title": "Given PATH also contains a directory with an executable `pan`, when scripts/postinstall.mjs runs, then stdout does not contain 'pan is not on your PATH'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-pan-on-path",
+        "title": "Document source-checkout install, the pan: command not found bootstrap, and the launcher pan shim",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-05T21:02:20Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2630",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/USAGE.md",
+            "docs/BUILD.md",
+            "reference/troubleshooting.mdx",
+            "docs/TERMINAL-BACKENDS.md",
+            ".overdeck/context/codebase/architecture.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'From a source checkout' docs/USAGE.md",
+            "grep -n 'Running the CLI from a checkout' docs/BUILD.md",
+            "grep -n 'pan: command not found' reference/troubleshooting.mdx",
+            "grep -n 'cli-bin' docs/USAGE.md docs/BUILD.md reference/troubleshooting.mdx docs/TERMINAL-BACKENDS.md .overdeck/context/codebase/architecture.md"
+          ],
+          "expected_outputs": [
+            "grep prints the new ### From a source checkout heading",
+            "grep prints the new ## Running the CLI from a checkout heading",
+            "grep prints the new ## pan: command not found heading",
+            "each of the five files has at least one cli-bin line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Edit exactly the files in PRD WI-7. (1) docs/USAGE.md: under `## Installation` add `### From a source checkout` with the steps git clone, bun install, npm run build, then npm link, or alternatively `node dist/cli/index.js install` followed by adding `export PATH=\"$HOME/.overdeck/cli-bin:$PATH\"` to the shell profile. State that agents launched by Overdeck get pan from ~/.overdeck/cli-bin automatically. (2) docs/BUILD.md: add `## Running the CLI from a checkout` after the Build Commands table, describing the pan/overdeck exec shim in ~/.overdeck/cli-bin, what writes it (every non-remote launcher, pan install, pan sync), and that it runs the writer's node binary by absolute path. (3) reference/troubleshooting.mdx: add `## pan: command not found` before `## WSL2 Stability Issues (Windows Users)`. Give the bootstrap command `node <your-checkout>/dist/cli/index.js doctor`, explain the 'pan on PATH' doctor row, and list the three remedies (npm install -g @overdeck/core; npm link in the checkout after npm run build; export PATH=\"$HOME/.overdeck/cli-bin:$PATH\"). (4) docs/TERMINAL-BACKENDS.md: next to the sentence 'The launcher exports `OVERDECK_AGENT_ID` on Herdr' (around line 337), add one sentence: every non-remote launcher writes the pan shim to ~/.overdeck/cli-bin and puts that directory first on PATH (PAN-2630). (5) .overdeck/context/codebase/architecture.md: add a bullet after the `agent-tmpdir.ts` bullet: `pan-cli-shim.ts` — the pan/overdeck exec shim in <OVERDECK_HOME>/cli-bin that every non-remote launcher writes and puts first on PATH; pan install and pan sync write it too (PAN-2630). Leave its last-verified line unchanged. Follow the repo's plain STE writing style."
+        },
+        "items": [
+          {
+            "id": "docs-pan-on-path.ac1",
+            "title": "reference/troubleshooting.mdx renders a '## pan: command not found' section that shows `node <your-checkout>/dist/cli/index.js doctor` and the three remedies, including `export PATH=\"$HOME/.overdeck/cli-bin:$PATH\"`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-pan-on-path.ac2",
+            "title": "docs/USAGE.md contains a '### From a source checkout' section listing bun install, npm run build and npm link, and stating that agents get pan from ~/.overdeck/cli-bin",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-pan-on-path.ac3",
+            "title": "Given grep -n cli-bin runs on docs/BUILD.md, docs/TERMINAL-BACKENDS.md and .overdeck/context/codebase/architecture.md, then each file contains a line naming ~/.overdeck/cli-bin (or <OVERDECK_HOME>/cli-bin) as the directory the launcher puts first on PATH",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "pan-cli-shim-module",
+        "to": "launcher-emits-shim",
+        "type": "blocks"
+      },
+      {
+        "from": "pan-cli-shim-module",
+        "to": "install-writes-shim",
+        "type": "blocks"
+      },
+      {
+        "from": "pan-cli-shim-module",
+        "to": "sync-writes-shim",
+        "type": "blocks"
+      },
+      {
+        "from": "pan-cli-shim-module",
+        "to": "doctor-pan-on-path",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

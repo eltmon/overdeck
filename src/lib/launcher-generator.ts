@@ -17,6 +17,7 @@ import { resolveKimiNativeEffort } from './kimi-effort.js';
 import { getClaudeCodeLaunchModel } from './kimi-claude-routing.js';
 import { harnessLaunchLines } from './launcher-job-control.js';
 import { workspaceEnvLauncherLines } from './workspace-env.js';
+import { panCliShimLauncherLines } from './pan-cli-shim.js';
 
 export type LauncherSpawnMode = 'conversation' | 'remote' | 'resume';
 
@@ -392,11 +393,8 @@ export function generateLauncherScript(config: LauncherConfig): string {
   else if (config.overdeckEnv?.agentId) lines.push(...buildGitGuardLines(config.overdeckEnv.agentId, config.workingDir, config.gitGuardMode ?? 'default'));
 
   // Extra env exports
-  if (config.extraEnvExports) {
-    for (const expr of config.extraEnvExports) {
-      lines.push(expr);
-    }
-  }
+  lines.push(...(config.extraEnvExports ?? []));
+  if (config.spawnMode !== 'remote') lines.push(...panCliShimLauncherLines());
 
   for (const file of preparedContext.sources) {
     lines.push(`if [ ! -f ${shellQuote(file)} ] || [ ! -r ${shellQuote(file)} ]; then printf '%s\\n' ${shellQuote(`Required launch context is unreadable: ${file}`)} >&2; exit 1; fi`);

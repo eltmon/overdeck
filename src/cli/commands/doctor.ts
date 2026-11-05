@@ -23,6 +23,7 @@ import { checkSageox } from './doctor-sageox.js';
 import { checkDeployedHooksDrift } from './doctor-hooks-drift.js';
 import { checkSyncSourceCheckout } from './doctor-sync-source-freshness.js';
 import { checkCliGenerationLink } from './doctor-cli-generation.js';
+import { checkPanOnPath } from './doctor-pan-path.js';
 import { checkInotify } from './doctor-inotify.js';
 import { checkAgentTmp } from './doctor-agent-tmp.js';
 import { checkTraefikPortBinding } from './doctor-traefik.js';
@@ -784,7 +785,7 @@ export async function collectDoctorChecks(options: DoctorOptions = {}): Promise<
   }
 
   checks.push(checkDeployedHooksDrift(), await checkSyncSourceCheckout(), (await import('./doctor-okf-skill.js')).checkOkfSkillVersion()); // PAN-3327, PAN-3881, PAN-4408
-  checks.push(await checkCliGenerationLink());
+  checks.push(await checkCliGenerationLink(), checkPanOnPath());
 
   // Check environment variables
   const envFile = join(homedir(), '.overdeck.env');

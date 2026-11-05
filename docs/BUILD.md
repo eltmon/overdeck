@@ -16,6 +16,10 @@ How Overdeck's TypeScript source is built into distributable artifacts.
 | `npm run dev` | Development mode via tsx watch (runs from source, no build needed) |
 | `npm run lint:dist-externals` | Verify every bare import left external in `dist/` is a declared runtime dependency |
 
+## Running the CLI from a checkout
+
+A source checkout has no npm-managed bin link for `pan`/`overdeck`, unlike an `npm install -g` install. `src/lib/pan-cli-shim.ts` (PAN-2630) renders an exec shim for both names into `~/.overdeck/cli-bin`, run as the generating process's own `node` by absolute path (never a `#!/usr/bin/env node` shebang, so it can't pick up a missing or stale `node` from PATH). Every non-remote launcher, `pan install`, and `pan sync` (re)write it — the launcher at spawn time, so agents always run the same CLI build as the process that spawned them.
+
 ## Build Gates
 
 ### Externalized imports must be declared dependencies (PAN-3209)

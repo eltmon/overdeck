@@ -19,8 +19,7 @@
  */
 
 import { readFile, readdir, stat, open } from 'fs/promises';
-import { createReadStream, existsSync } from 'fs';
-import { createInterface } from 'readline';
+import { existsSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
 import {
@@ -35,6 +34,7 @@ import {
 } from '../../../lib/overdeck/conversations.js';
 import { closeCompanionTerminalForOwner } from '../../../lib/overdeck/companion-terminal/index.js';
 import { conversationLaunchContext } from '../../../lib/overdeck/conversation-launch-context.js';
+import { adoptForkedClaudeSessions, readFirstClearTimestamp } from '../../../lib/overdeck/conversation-fork-adoption.js';
 import {
   getRuntimeCensus,
   refreshRuntimeCensus,
@@ -426,6 +426,11 @@ export async function pollConversations(): Promise<void> {
     // Reuses the conversations list already fetched above — do not re-query.
     // Active rows only (PAN-2215): ended conversations must not widen the cwd
     // scan set, and parent attribution is defined over active convs.
+    // PAN-2652: adopt in-process Claude Code forks first, so a fork is owned
+    // before the /clear scan sees it. A failure never skips the /clear scan.
+    await adoptForkedClaudeSessions(conversations.filter((c) => c.status === 'active')).catch((err: unknown) => {
+      console.error('[conversation-lifecycle] Fork adoption error:', err);
+    });
     await detectOrphanedClaudeCodeSessions(conversations.filter((c) => c.status === 'active'));
   } catch (err: unknown) {
     // Don't crash the server on poll errors
@@ -627,55 +632,6 @@ async function detectOrphanedClaudeCodeSessions(activeConvs: Conversation[]): Pr
       console.log(`[conversation-lifecycle] Adopted post-/clear orphan ${sessionId} → conv/${sibling.id} (parent: conv/${parent.id} "${parent.name}")`);
     }
   }
-}
-
-/**
- * Read the first ~5 lines of a JSONL and return the timestamp (ms since epoch) of
- * the first user-message whose content contains the literal `/clear` command
- * sentinel that Claude Code writes when the user clears the session. Returns
- * `null` if no such message is found in the early lines — i.e., this is not a
- * post-`/clear` orphan.
- *
- * Uses a streaming line reader bounded at 5 lines so a multi-megabyte snapshot
- * line at the head of the file doesn't load the whole transcript into memory.
- *
- * `definitive` is true when a null verdict can never change: the full 5-line
- * window was scanned (proven by seeing a 6th line). A shorter file may still
- * be growing, so its null verdict is provisional and must not be cached.
- */
-async function readFirstClearTimestamp(
-  jsonlPath: string,
-): Promise<{ clearTs: number | null; definitive: boolean }> {
-  const stream = createReadStream(jsonlPath, { encoding: 'utf-8' });
-  const rl = createInterface({ input: stream, crlfDelay: Infinity });
-  let lineCount = 0;
-  try {
-    for await (const line of rl) {
-      lineCount++;
-      if (lineCount > 5) break;
-      const trimmed = line.trim();
-      if (!trimmed) continue;
-      let obj: any;
-      try {
-        obj = JSON.parse(trimmed);
-      } catch {
-        continue;
-      }
-      if (obj?.type !== 'user') continue;
-      const content = obj?.message?.content;
-      if (typeof content !== 'string') continue;
-      if (!content.includes('<command-name>/clear</command-name>')) continue;
-      const ts = obj?.timestamp;
-      if (typeof ts !== 'string') continue;
-      const ms = new Date(ts).getTime();
-      if (Number.isNaN(ms)) continue;
-      return { clearTs: ms, definitive: true };
-    }
-  } finally {
-    rl.close();
-    stream.destroy();
-  }
-  return { clearTs: null, definitive: lineCount > 5 };
 }
 
 /**
