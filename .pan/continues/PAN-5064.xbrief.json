@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5064",
   "created": "2026-11-05T22:52:07.107Z",
-  "updated": "2026-11-05T22:53:19.653Z",
+  "updated": "2026-11-05T22:53:23.475Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -14,6 +14,11 @@
       "claimedBy": "agent-pan-5064",
       "claimedAt": "2026-11-05T22:52:07.107Z",
       "doneAt": "2026-11-05T22:53:19.653Z"
+    },
+    "skill-packs-page-fixes": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5064",
+      "claimedAt": "2026-11-05T22:53:23.475Z"
     }
   }
 }
