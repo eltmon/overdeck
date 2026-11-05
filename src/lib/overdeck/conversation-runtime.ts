@@ -77,7 +77,7 @@ import { jsonResponse } from '../../dashboard/server/http-helpers.js';
 import { getEventStore } from '../../dashboard/server/event-store.js';
 import { markRespawnPending } from '../../dashboard/server/services/pending-respawn.js';
 import { cleanupConversationAttachments, cleanupUnreferencedConversationAttachments } from '../../dashboard/server/services/conversation-attachments.js';
-import { resolveCodexRolloutPath } from '../agents/transcript-resolver.js';
+import { readLauncherPinnedSessionId, resolveCodexRolloutPath } from '../agents/transcript-resolver.js';
 import { closeCompanionTerminalForOwner } from './companion-terminal/index.js';
 import { sendConversationControlCommand, isPiControlChannelHarness, resolveConversationDeliveryMethod } from './conversation-delivery.js';
 import {
@@ -164,10 +164,10 @@ async function terminatePids(pids: number[]): Promise<void> {
     }
   }
 }
-export function conversationRuntimeRootPids(conv: Conversation, rows: ProcessTableRow[]): number[] {
+export function conversationRuntimeRootPids(conv: Conversation, rows: ProcessTableRow[], extraSessionIds: readonly string[] = []): number[] {
   const launcherScript = join(getOverdeckHome(), 'conversations', conv.tmuxSession, 'launcher.sh');
-  const sessionId = conv.claudeSessionId?.trim();
-  const sessionNeedles = sessionId ? [`--resume ${sessionId}`, `--session-id ${sessionId}`] : [];
+  const sessionIds = new Set([conv.claudeSessionId, ...extraSessionIds].map((id) => id?.trim()).filter((id): id is string => !!id));
+  const sessionNeedles = [...sessionIds].flatMap((id) => [`--resume ${id}`, `--session-id ${id}`]);
   const serverPid = findManagedServerPid();
   return rows
     .filter((row) => {
@@ -180,8 +180,8 @@ export function conversationRuntimeRootPids(conv: Conversation, rows: ProcessTab
 }
 async function killConversationRuntimeProcesses(conv: Conversation): Promise<void> {
   const rows = await readProcessTable();
-  const rootPids = conversationRuntimeRootPids(conv, rows);
-  const pids = collectProcessTree(rootPids, rows);
+  const pinned = await readLauncherPinnedSessionId(conv.tmuxSession); // PAN-2652: the cmdline keeps the launched id after fork adoption
+  const pids = collectProcessTree(conversationRuntimeRootPids(conv, rows, pinned ? [pinned] : []), rows);
   await terminatePids(pids);
 }
 export async function stopConversationRuntime(conv: Conversation, name: string): Promise<void> {
