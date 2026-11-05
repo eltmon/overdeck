@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2630",
   "created": "2026-11-05T21:09:00.725Z",
-  "updated": "2026-11-05T21:55:15.178Z",
+  "updated": "2026-11-05T22:03:53.457Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,9 +34,10 @@
       "doneAt": "2026-11-05T21:55:11.293Z"
     },
     "doctor-pan-on-path": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-2630",
-      "claimedAt": "2026-11-05T21:55:15.178Z"
+      "claimedAt": "2026-11-05T21:55:15.178Z",
+      "doneAt": "2026-11-05T22:03:53.456Z"
     }
   }
 }
