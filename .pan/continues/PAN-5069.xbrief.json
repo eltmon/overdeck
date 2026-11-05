@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5069",
   "created": "2026-11-05T23:26:20.599Z",
-  "updated": "2026-11-05T23:59:07.968Z",
+  "updated": "2026-11-05T23:59:20.861Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -135,6 +135,10 @@
     "a4-pending-signin-record.ac3": {
       "status": "completed",
       "doneAt": "2026-11-05T23:59:07.967Z"
+    },
+    "a5-pair-outcome.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:59:20.860Z"
     }
   }
 }
