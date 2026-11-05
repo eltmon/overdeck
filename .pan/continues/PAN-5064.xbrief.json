@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5064",
   "created": "2026-11-05T22:52:07.107Z",
-  "updated": "2026-11-05T23:36:38.835Z",
+  "updated": "2026-11-05T23:36:55.496Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -228,6 +228,10 @@
     "skill-creator-skill-update.ac2": {
       "status": "completed",
       "doneAt": "2026-11-05T23:36:38.835Z"
+    },
+    "skill-bundle-term-alignment.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:36:55.495Z"
     }
   }
 }
