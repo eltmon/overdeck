@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5069",
   "created": "2026-11-05T23:26:20.599Z",
-  "updated": "2026-11-05T23:57:08.685Z",
+  "updated": "2026-11-05T23:57:21.781Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -99,6 +99,10 @@
     "a2-connectors-self-route.ac1": {
       "status": "completed",
       "doneAt": "2026-11-05T23:57:08.685Z"
+    },
+    "a2-connectors-self-route.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:57:21.781Z"
     }
   }
 }
