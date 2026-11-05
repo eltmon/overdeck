@@ -1,0 +1,847 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-05T22:45:22Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5064: Skill packs and project skills: fix stale docs, add pack authoring guide and config reference",
+    "updated": "2026-11-05T22:47:43.536Z"
+  },
+  "plan": {
+    "id": "pan-5064",
+    "title": "Skill packs and project skills: fix stale docs, add pack authoring guide and config reference",
+    "status": "proposed",
+    "uid": "c9059c74-63c8-41cf-a43f-33c3b8643fde",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-05T22:45:22Z",
+    "updated": "2026-11-05T22:47:43.536Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5064",
+        "label": "PAN-5064",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4769",
+        "label": "PAN-4769",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "docs",
+      "skills",
+      "skill-packs",
+      "cli-help"
+    ],
+    "metadata": {
+      "sizeJustification": "Documentation sweep across independent doc pages: the subsystem counter treats every top-level doc file (features/x.mdx, cli/x.mdx, guides/x.mdx, …) as its own subsystem, so a one-issue docs fix spanning 12 pages and 3 skills exceeds 6 'subsystems' while touching 17 files and only one source line. Each item owns a disjoint file set; splitting into sibling issues would add pipeline overhead with no review benefit.",
+      "canonicalFilename": "2026-11-05-PAN-5064-skill-packs-and-project-skills-fix-stale-docs-add-pack-authoring-guide-and-config-reference.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Skill packs work, but features/skills.mdx, docs/SKILL-PACKS.md, cli/skills-commands.mdx and docs/USAGE.md contain 17 verified mismatches with the code; there is no pack authoring guide, no config-key reference, no statement of which harnesses receive packs and project skills, and the pan handoff --pack help text omits that opt-in skills are skipped. Three skills use 'skill bundle' with conflicting meanings.",
+      "Proposal": "Fix each mismatch in the page that holds it (one item per page), add guides/skill-pack-authoring.mdx and configuration/skills.mdx and list them in docs.json, correct the --pack help string and regenerate the composer manifest, update pan-skill-installer, pan-skill-creator and pan-sync, and make 'skill bundle' mean skill pack only. All facts and exact wording are in the PRD .pan/drafts/PAN-5064.md (F-1..F-24, decisions D-1..D-8).",
+      "NonGoals": "- Changing any skill, pack, launcher or override behavior; the only src/ change is the --pack help string in src/cli/index.ts\n- Fixing the code defects found during research (project-skill copy gaps, issue-file overwrite on bad YAML, license detection gaps, stale comments, no-op multi-tool-sync); they are documented as current behavior and tracked as follow-up issues\n- Adding a runtime warning when Pi receives --pack or --skill\n- Editing changelog.mdx or .pan/drafts/PAN-4499.md, which contain the old help string as history\n- Renaming the adjective 'bundled' or the phrase 'bundled resources'\n- Renaming the Template Conversations proposal's `pan bundle` command or `skill-bundles/` path identifiers\n- Letting custom packs declare opt-in skills, a plugin root or a skills root\n- Restructuring features/skill-packs.mdx beyond the listed edits"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Scope is docs plus the one --pack help string; code defects found in research are documented as current behavior and filed as follow-ups",
+        "rationale": "The issue's acceptance criteria are documentation outcomes plus the help-text fix; widening into behavior changes would mix review concerns and violate the issue scope."
+      },
+      {
+        "summary": "Authoring guide at guides/skill-pack-authoring.mdx (Guides nav); config reference at configuration/skills.mdx (Configuration nav, after context-layers)",
+        "rationale": "The issue calls the authoring page operator-facing how-to content, which matches the Guides tab; the issue asks for the config reference 'in configuration/'."
+      },
+      {
+        "summary": "The noun 'skill bundle' means skill pack only; pan-sync uses 'skill directories', pan-skill-installer drops the 'bundle this plugin' trigger, and the Template Conversations proposal calls its group a 'skill set'",
+        "rationale": "features/skill-packs.mdx and template-conversations.mdx already define skill bundle as the operator synonym for skill pack, so aligning the other uses to it is the smallest change that yields one meaning."
+      },
+      {
+        "summary": "Mismatch 17 wording: committed in the plan home on its checked-out branch (normally main) and pushed to that branch's upstream; push failure prints 'push pending: <reason>'",
+        "rationale": "commitPlanArtifacts commits on the plan home's current branch and pushPlanArtifacts pushes to its upstream (src/lib/overdeck/plan-artifact-commit.ts); skillsSetCommand prints the push-pending reason."
+      },
+      {
+        "summary": "No mismatch is rejected; all 17 were confirmed against the code",
+        "rationale": "Each claim was verified by direct reads and two research passes; only the issue's directory for catalog.ts/store.ts etc. was wrong (they live in src/lib/skill-overrides/), which does not change the fixes."
+      },
+      {
+        "summary": "Set plan.metadata.sizeJustification instead of splitting into sibling issues",
+        "rationale": "The quality lint counts each top-level doc file as a subsystem; the change is 17 files with disjoint ownership and one source line, so siblings would add overhead without reviewability gains."
+      },
+      {
+        "summary": "Absorb PAN-4769 (two wording gaps in features/skill-packs.mdx) into skill-packs-page-fixes; PR closes #4769",
+        "rationale": "Both gaps are verified, sit in the same file this issue edits, and one is the same conversation-level gap as mismatch 15; separate PRs would conflict on the same lines."
+      }
+    ],
+    "items": [
+      {
+        "id": "skills-page-fixes",
+        "title": "Fix features/skills.mdx distribution, sync and issue-file text, add Project skills section",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-05T22:45:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5064",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/skills.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node scripts/lint-docs.js",
+            "grep -c 'skills-only' features/skills.mdx"
+          ],
+          "expected_outputs": [
+            "lint-docs.js prints 'docs lint passed' and exits 0",
+            "grep prints 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "See PRD .pan/drafts/PAN-5064.md WI-1. In the Skill Distribution list change only items 1, 3 and 4 (project skills in .pan/skills; skill packs + /guides/skill-pack-authoring link instead of npm/GitHub; bundled sync-sources) and leave item 2 (~/.overdeck/skills) unchanged; delete the `pan sync --skills-only` line; add a `### Project skills` subsection stating PRD facts F-17, F-18, F-19 (copied once into <workspace>/.claude/skills when the workspace manager creates an issue workspace; nothing copied by the `pan workspace create` fallback without a workspace: block or for existing workspaces; a same-name bundled skill wins; Claude Code in the issue workspace only, not Codex or Pi); replace the Issue storage row with decision D-4 wording; extend 'When changes apply' with the Pi sentence and a /configuration/skills link. All <placeholders> inside backticks."
+        },
+        "items": [
+          {
+            "id": "skills-page-fixes.ac1",
+            "title": "Given features/skills.mdx, when `grep -c '\\.overdeck/skills/` in your repo' features/skills.mdx` and `grep -c 'skills-only' features/skills.mdx` run, then each prints 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skills-page-fixes.ac2",
+            "title": "Given features/skills.mdx, when `grep -c 'via npm' features/skills.mdx` and `grep -c 'on `main` as' features/skills.mdx` run, then each prints 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skills-page-fixes.ac3",
+            "title": "Given features/skills.mdx, when `grep -c '### Project skills' features/skills.mdx` runs, then it prints 1 and the section states that Codex and Pi agents do not receive project skills",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skills-page-fixes.ac4",
+            "title": "Given features/skills.mdx, when `grep -c '/guides/skill-pack-authoring' features/skills.mdx` runs, then it prints at least 1, and `node scripts/lint-docs.js` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "skill-packs-page-fixes",
+        "title": "Fix features/skill-packs.mdx conversation level, update-available claim, Pi coverage and terminology",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-05T22:45:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5064",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "features/skill-packs.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node scripts/lint-docs.js",
+            "grep -c '### For one conversation' features/skill-packs.mdx"
+          ],
+          "expected_outputs": [
+            "lint-docs.js prints 'docs lint passed' and exits 0",
+            "grep prints 1"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "See PRD .pan/drafts/PAN-5064.md WI-2. Line 51 'same three levels' -> four levels; add `### For one conversation` covering the New conversation with options… dialog (Skills, Customize, Inherit / On / Off, no whole-pack toggle), `pan handoff --pack/--skill`, the creation-time snapshot (F-16) and Claude Code/Codex-only coverage with Pi silently storing values (F-13, F-14); line 131 state packUpdateAvailable never reports for 40-hex refs, so pstack and sageox never show update available; line 667 add 'Pi gets no packs…'; link /guides/skill-pack-authoring near line 92 and /configuration/skills under 'Where state lives'; rewrite the Terminology section (687-689) per decision D-3. Also absorb PAN-4769 (PRD WI-2 steps 7-8): add that a conversation value for a pack skill wins first and whole-pack toggles have no conversation level (line 59); reword 'Removing gstack' to: remove deletes the mounts a running agent is using, and the next launch has no gstack skills either; run `pan skills pack add gstack --ref main` again. PR body: Closes #4769."
+        },
+        "items": [
+          {
+            "id": "skill-packs-page-fixes.ac1",
+            "title": "Given features/skill-packs.mdx, when `grep -c 'same three levels' features/skill-packs.mdx` runs, then it prints 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill-packs-page-fixes.ac2",
+            "title": "Given features/skill-packs.mdx, when `grep -c '### For one conversation' features/skill-packs.mdx` runs, then it prints 1 and that section names both the New conversation with options… dialog and `pan handoff --pack`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill-packs-page-fixes.ac3",
+            "title": "Given features/skill-packs.mdx, when `grep -c 'packUpdateAvailable' features/skill-packs.mdx` and `grep -c 'Pi gets no packs' features/skill-packs.mdx` run, then each prints at least 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill-packs-page-fixes.ac4",
+            "title": "Given the Terminology section, when read, then it states that 'skill bundle' means skill pack and that the adjective 'bundled' means shipped in sync-sources/, and `node scripts/lint-docs.js` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill-packs-page-fixes.ac5",
+            "title": "Given features/skill-packs.mdx, when `grep -c 'loses its gstack skills until its next launch' features/skill-packs.mdx` runs, then it prints 0, and `grep -c 'Whole-pack toggles have no conversation level' features/skill-packs.mdx` prints 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "skill-packs-dev-guide-fixes",
+        "title": "Fix docs/SKILL-PACKS.md launch-step citation, gstack manifest source, optIn, ADD_COMMAND and data flows",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-05T22:45:22Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5064",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/SKILL-PACKS.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node scripts/lint-docs.js",
+            "grep -c 'buildPackOx' docs/SKILL-PACKS.md"
+          ],
+          "expected_outputs": [
+            "lint-docs.js prints 'docs lint passed' and exits 0",
+            "grep prints a count of 1 or more"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "See PRD .pan/drafts/PAN-5064.md WI-3. Mismatch 5: cite registerSkillsCommands/skillsLaunchSettingsCommand by symbol, note exit 2 for other harnesses; 6: gstack-runtime manifest read from the extraction, only the mount uses the render; 7: KnownPack optIn row excludes gstack and points at GSTACK_OPT_IN_SKILLS/GSTACK_BROWSER_OPT_IN_SKILLS, fix 'Adding a known pack' step 3; 8: step 7 names the single ADD_COMMAND empty-state constant; 9: add sageox oxBuildPreview/buildPackOx to the add flow and add Update (updatePack), Sync (syncPack) and Browser (enablePackBrowser/disablePackBrowser) flows; link the two new pages in Overview. File must end with a newline."
+        },
+        "items": [
+          {
+            "id": "skill-packs-dev-guide-fixes.ac1",
+            "title": "Given docs/SKILL-PACKS.md, when `grep -c 'skills.ts:632-637' docs/SKILL-PACKS.md` and `grep -c 'reads from the render' docs/SKILL-PACKS.md` run, then each prints 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill-packs-dev-guide-fixes.ac2",
+            "title": "Given docs/SKILL-PACKS.md, when `grep -c 'GSTACK_OPT_IN_SKILLS' docs/SKILL-PACKS.md` runs, then it prints at least 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill-packs-dev-guide-fixes.ac3",
+            "title": "Given docs/SKILL-PACKS.md, when `grep -c 'ADD_COMMAND` literal' docs/SKILL-PACKS.md` runs, then it prints 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill-packs-dev-guide-fixes.ac4",
+            "title": "Given docs/SKILL-PACKS.md, when `grep -c 'buildPackOx' docs/SKILL-PACKS.md` and `grep -c 'syncPack' docs/SKILL-PACKS.md` run, then each prints at least 1, and `node scripts/lint-docs.js` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "skills-cli-ref-fixes",
+        "title": "Fix cli/skills-commands.mdx exit codes and runtime builds, add deft use/back/save/show",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-05T22:45:22Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5064",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/skills-commands.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node scripts/lint-docs.js",
+            "grep -c '^## pan skills deft' cli/skills-commands.mdx"
+          ],
+          "expected_outputs": [
+            "lint-docs.js prints 'docs lint passed' and exits 0",
+            "grep prints 7 (status, enable, disable plus four new)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "See PRD .pan/drafts/PAN-5064.md WI-4. list: exit 1 only for unknown --project or an --issue no project owns; bad issue YAML reads as empty. set: add the store error messages that exit 1 (core skill, unknown skill, unknown pack, pack not cached, unknown project, unowned issue, cannot parse config.yaml, could not commit) and the --issue commit/push output. update/sync: add gstack render and browser-runtime build. Add `## pan skills deft use|back|save|show` sections from skills-deft-pipeline.ts registerSkillsDeftPipelineCommands."
+        },
+        "items": [
+          {
+            "id": "skills-cli-ref-fixes.ac1",
+            "title": "Given cli/skills-commands.mdx, when `grep -c 'cannot be read' cli/skills-commands.mdx` runs, then it prints 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skills-cli-ref-fixes.ac2",
+            "title": "Given cli/skills-commands.mdx, when `grep -c 'core skill cannot be overridden' cli/skills-commands.mdx` runs, then it prints 1 and the set section shows the `push pending` output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skills-cli-ref-fixes.ac3",
+            "title": "Given cli/skills-commands.mdx, when `grep -c '^## pan skills deft \\(use\\|back\\|save\\|show\\)' cli/skills-commands.mdx` runs, then it prints 4",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skills-cli-ref-fixes.ac4",
+            "title": "Given the pack update and pack sync sections, when read, then each names the gstack render and the browser-runtime build, and `node scripts/lint-docs.js` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "usage-md-fixes",
+        "title": "Fix docs/USAGE.md pack add signature and add deft pipeline verbs",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-05T22:45:22Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5064",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/USAGE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node scripts/lint-docs.js",
+            "grep -c 'pan skills deft use <issue>' docs/USAGE.md"
+          ],
+          "expected_outputs": [
+            "lint-docs.js prints 'docs lint passed' and exits 0",
+            "grep prints 1"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "See PRD .pan/drafts/PAN-5064.md WI-5. Line 401 becomes `pan skills pack add <id> [url] [--ref <ref>] …` with the known-pack default comment; drop the url from the two gstack examples; add the four `pan skills deft use|back|save|show` lines after line 414. Keep the trailing newline."
+        },
+        "items": [
+          {
+            "id": "usage-md-fixes.ac1",
+            "title": "Given docs/USAGE.md, when `grep -c 'pack add <id> <url> --ref <ref>' docs/USAGE.md` runs, then it prints 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "usage-md-fixes.ac2",
+            "title": "Given docs/USAGE.md, when `grep -c 'pan skills deft use <issue>' docs/USAGE.md` runs, then it prints 1, and `node scripts/lint-docs.js` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "handoff-pack-help-text",
+        "title": "Correct pan handoff --pack help text and regenerate the composer manifest",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-05T22:45:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5064",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/index.ts",
+            "packages/contracts/src/composer-commands.generated.ts",
+            "features/conversations.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run build:cli",
+            "npm run lint:slash-commands",
+            "npm run typecheck",
+            "node scripts/lint-docs.js"
+          ],
+          "expected_outputs": [
+            "lint:slash-commands prints the ✓ manifest line",
+            "typecheck completes without errors",
+            "lint-docs.js prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "See PRD .pan/drafts/PAN-5064.md WI-6. Change the --pack option description in src/cli/index.ts to 'Turn on every non-opt-in skill of this cached skill pack for the new conversation only (repeatable)' (decision D-5). Run `npm run build:cli` then `npm run generate:slash-commands`; commit the regenerated packages/contracts/src/composer-commands.generated.ts with it, never hand-edit it. In features/conversations.mdx append Claude Code and Codex only / Pi stores but never applies / snapshot at creation to the --pack row, and Claude Code and Codex only to the --skill row."
+        },
+        "items": [
+          {
+            "id": "handoff-pack-help-text.ac1",
+            "title": "Given the built CLI, when `node dist/cli/index.js handoff --help` runs, then its --pack line contains 'non-opt-in'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-pack-help-text.ac2",
+            "title": "Given src/cli/index.ts and the generated manifest, when `grep -c 'Turn every skill of this cached' src/cli/index.ts packages/contracts/src/composer-commands.generated.ts` runs, then it prints 0 for both files",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-pack-help-text.ac3",
+            "title": "Given the regenerated manifest, when `npm run lint:slash-commands` runs, then it prints '✓ composer-command manifest matches the CLI registry' and `npm run typecheck` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "handoff-pack-help-text.ac4",
+            "title": "Given features/conversations.mdx, when the --pack row is read, then it states Pi stores the values but never applies them",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pack-authoring-guide",
+        "title": "Add guides/skill-pack-authoring.mdx operator guide with a minimal example pack",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-05T22:45:22Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5064",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "guides/skill-pack-authoring.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "test -f guides/skill-pack-authoring.mdx",
+            "grep -c 'plugin.json' guides/skill-pack-authoring.mdx"
+          ],
+          "expected_outputs": [
+            "file exists",
+            "grep prints 3 or more"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "See PRD .pan/drafts/PAN-5064.md WI-7. New page, sections 1-9 in PRD order: what Overdeck reads; plain vs claude-plugin layouts with plugin.json skills string/array/absent forms and detection order (F-1..F-3); SKILL.md frontmatter and the ^[a-z0-9][a-z0-9-]*$ name rule with a Warning that invalid and duplicate names are dropped silently (F-4, F-5, four-level depth); license detection (F-6); copy rules: symlinks left out, scripts copied never run, Not applied table (F-7, F-8); what a custom pack cannot declare and the --ref rule (F-9, F-10); harness coverage table Claude Code / Codex / Pi and remote (F-11..F-14); the minimal example pack tree, SKILL.md and commands plus the plugin.json variant; check-before-publish. Every <placeholder> inside backticks or code fences; no bare $ in prose."
+        },
+        "items": [
+          {
+            "id": "pack-authoring-guide.ac1",
+            "title": "Given the repo, when `test -f guides/skill-pack-authoring.mdx` runs, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pack-authoring-guide.ac2",
+            "title": "Given the page, when `grep -cF '^[a-z0-9][a-z0-9-]*$' guides/skill-pack-authoring.mdx` runs, then it prints at least 1 and a Warning states invalid or duplicate names are dropped silently",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pack-authoring-guide.ac3",
+            "title": "Given the page, when `grep -c 'plugin.json' guides/skill-pack-authoring.mdx` runs, then it prints at least 3, and `grep -ci 'symlink'` prints at least 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pack-authoring-guide.ac4",
+            "title": "Given the page, when `grep -c 'overdeck-packs' guides/skill-pack-authoring.mdx` runs, then it prints at least 1 and the harness table states Pi and remote launches get no packs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pack-authoring-guide.ac5",
+            "title": "Given the page, when read, then it renders a minimal example pack with a skills/hello-world/SKILL.md tree and the `pan skills pack add` and `pan skills set --pack` commands",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "skill-config-reference",
+        "title": "Add configuration/skills.mdx config-key reference",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-05T22:45:22Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5064",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/skills.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "test -f configuration/skills.mdx",
+            "grep -c 'deft_integration' configuration/skills.mdx"
+          ],
+          "expected_outputs": [
+            "file exists",
+            "grep prints 1 or more"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "See PRD .pan/drafts/PAN-5064.md WI-8. New page: levels and where each is stored with precedence and the no-schema note (F-24); skills.packs.<id> field table url/ref/commit/adapter/browser with types, defaults, writers and a YAML example (F-20); skills.pack_overrides and skills.overrides with a pack/skill example (F-21); project keys skill_overrides, skill_pack_overrides, sageox_upload, sageox_binding, deft_integration with values, defaults and writer verbs (F-22); the issue file keys, D-4 commit wording, and bad-YAML-reads-as-empty behavior (F-23); Related links. All <placeholders> inside backticks."
+        },
+        "items": [
+          {
+            "id": "skill-config-reference.ac1",
+            "title": "Given the repo, when `test -f configuration/skills.mdx` runs, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill-config-reference.ac2",
+            "title": "Given the page, when `for k in skills.packs pack_overrides skill_pack_overrides skill_overrides sageox_upload sageox_binding deft_integration; do grep -q \"$k\" configuration/skills.mdx || echo MISSING $k; done` runs, then it prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill-config-reference.ac3",
+            "title": "Given the issue-file section, when read, then it states the file is committed on the plan home's checked-out branch (normally main), pushed to its upstream, and that bad YAML reads as empty",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-nav-entries",
+        "title": "Add the two new pages to docs.json nav",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-05T22:45:22Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5064",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node scripts/lint-docs.js"
+          ],
+          "expected_outputs": [
+            "lint-docs.js prints 'docs lint passed' and exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "See PRD .pan/drafts/PAN-5064.md WI-9. Add \"guides/skill-pack-authoring\" after \"guides/legacy-codebases\" in the Guides group and \"configuration/skills\" after \"configuration/context-layers\" in the Configuration group. Change nothing else."
+        },
+        "items": [
+          {
+            "id": "docs-nav-entries.ac1",
+            "title": "Given docs.json, when `node -e \"const p=JSON.stringify(require('./docs.json').navigation);process.exit(p.includes('guides/skill-pack-authoring')&&p.includes('configuration/skills')?0:1)\"` runs, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-nav-entries.ac2",
+            "title": "Given both new pages exist, when `node scripts/lint-docs.js` runs, then it prints 'docs lint passed' and exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "skill-installer-skill-update",
+        "title": "Point pan-skill-installer at skill packs and drop the 'bundle this plugin' trigger",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-05T22:45:22Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5064",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/dev-skills/pan-skill-installer/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'pan skills pack add' sync-sources/dev-skills/pan-skill-installer/SKILL.md"
+          ],
+          "expected_outputs": [
+            "grep prints 1 or more"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "See PRD .pan/drafts/PAN-5064.md WI-10. Replace trigger 'bundle this plugin' with 'ship this plugin with overdeck'; add the use-vs-distribute paragraph and a table row for third-party repos via `pan skills pack add`, linking features/skill-packs.mdx and guides/skill-pack-authoring.mdx; Related line says 'distributes bundled skills'."
+        },
+        "items": [
+          {
+            "id": "skill-installer-skill-update.ac1",
+            "title": "Given the skill, when `grep -c 'bundle this plugin' sync-sources/dev-skills/pan-skill-installer/SKILL.md` runs, then it prints 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill-installer-skill-update.ac2",
+            "title": "Given the skill, when `grep -c 'pan skills pack add' sync-sources/dev-skills/pan-skill-installer/SKILL.md` runs, then it prints at least 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "skill-creator-skill-update",
+        "title": "Add 'Where the skill goes' to pan-skill-creator covering .pan/skills and skill packs",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-05T22:45:22Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5064",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/skills/pan-skill-creator/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run build:cli",
+            "npm run lint:skills"
+          ],
+          "expected_outputs": [
+            "lint:skills exits 0 with no skill errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "See PRD .pan/drafts/PAN-5064.md WI-11. Add a `## Where the skill goes` section after Skill Anatomy listing sync-sources/skills (via /pan-skill-installer), <projectRoot>/.pan/skills/<name>/ (Claude Code in new issue workspaces only), ~/.claude/skills or ~/.agents/skills, and a skill pack repo (see guides/skill-pack-authoring.mdx; name rule). Frontmatter unchanged."
+        },
+        "items": [
+          {
+            "id": "skill-creator-skill-update.ac1",
+            "title": "Given the skill, when `grep -c '\\.pan/skills' sync-sources/skills/pan-skill-creator/SKILL.md` runs, then it prints at least 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill-creator-skill-update.ac2",
+            "title": "Given the skill, when `grep -c 'skill pack' sync-sources/skills/pan-skill-creator/SKILL.md` runs, then it prints at least 1, and `npm run build:cli && npm run lint:skills` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "skill-bundle-term-alignment",
+        "title": "Give 'skill bundle' one meaning in pan-sync and the Template Conversations cross-references",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-05T22:45:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5064",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/skills/pan-sync/SKILL.md",
+            "reference/template-conversations.mdx",
+            "docs/HARNESSES.md",
+            "reference/harness-landscape.mdx",
+            "configuration/harnesses.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:skills",
+            "node scripts/lint-docs.js",
+            "grep -rni 'skill bundle' sync-sources/ docs/ features/ cli/ configuration/ guides/ reference/"
+          ],
+          "expected_outputs": [
+            "lint:skills exits 0",
+            "lint-docs.js prints 'docs lint passed' and exits 0",
+            "only the two allowed files appear"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "See PRD .pan/drafts/PAN-5064.md WI-12. pan-sync SKILL.md lines 19 and 47: 'skill bundles' -> 'skill directories' (no command lines change). template-conversations.mdx: description, line 29 and line 176 noun 'skill bundle' -> 'skill set', add the Note sentence about the proposal's `pan bundle`/`skill-bundles/` identifiers, keep line 9. Change 'loading curated skill bundles into a single conversation' to 'loading a curated skill set into a single conversation' in docs/HARNESSES.md:11, reference/harness-landscape.mdx:607, configuration/harnesses.mdx:1236."
+        },
+        "items": [
+          {
+            "id": "skill-bundle-term-alignment.ac1",
+            "title": "Given the docs and skills, when `grep -rni 'skill bundle' sync-sources/ docs/ features/ cli/ configuration/ guides/ reference/` runs, then it prints lines only from features/skill-packs.mdx and reference/template-conversations.mdx line 9",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill-bundle-term-alignment.ac2",
+            "title": "Given the pan-sync skill, when `npm run build:cli && npm run lint:skills` runs, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill-bundle-term-alignment.ac3",
+            "title": "Given reference/template-conversations.mdx, when `node scripts/lint-docs.js` runs, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "pack-authoring-guide",
+        "to": "docs-nav-entries",
+        "type": "blocks"
+      },
+      {
+        "from": "skill-config-reference",
+        "to": "docs-nav-entries",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
