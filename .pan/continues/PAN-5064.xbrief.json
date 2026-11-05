@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-5064",
+  "created": "2026-11-05T22:52:07.107Z",
+  "updated": "2026-11-05T22:52:07.107Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "skills-page-fixes": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5064",
+      "claimedAt": "2026-11-05T22:52:07.107Z"
+    }
+  }
+}
