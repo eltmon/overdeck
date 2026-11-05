@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5064",
   "created": "2026-11-05T22:52:07.107Z",
-  "updated": "2026-11-05T23:33:44.183Z",
+  "updated": "2026-11-05T23:33:59.647Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -184,6 +184,10 @@
     "pack-authoring-guide.ac3": {
       "status": "completed",
       "doneAt": "2026-11-05T23:33:44.183Z"
+    },
+    "pack-authoring-guide.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:33:59.646Z"
     }
   }
 }
