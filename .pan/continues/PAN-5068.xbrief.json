@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5068",
   "created": "2026-11-05T23:10:23.659Z",
-  "updated": "2026-11-05T23:39:14.471Z",
+  "updated": "2026-11-05T23:39:33.360Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -68,6 +68,10 @@
     "device-code-retry.ac4": {
       "status": "completed",
       "doneAt": "2026-11-05T23:39:14.471Z"
+    },
+    "connector-login-transient-test.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:39:33.359Z"
     }
   }
 }
