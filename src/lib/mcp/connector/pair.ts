@@ -9,16 +9,21 @@
  * success the new link key, `pairing.json` and (when absent) `local-token` are written; the
  * local token survives a re-pair so bot configs keep working. No token is ever printed.
  *
+ * `pairWithMachine` is the core: it returns a typed outcome with a stable failure code
+ * (PAN-5069 FR-4, FR-7) that `connect` maps to its status line; `runConnectorPair` prints it.
+ * A pairing code the machine refuses on the direct dial is not retried on the relay: the code
+ * is gone either way.
+ *
  * `logout` (FR-9, D-18) undoes it in order, each remote step best effort: `DELETE
  * /api/connectors/self` over a link channel, `forget-client` to the directory, revoke the
- * overdeck.ai device, then delete the four home files. A failed step prints one line and never
+ * overdeck.ai device, then delete the five home files. A failed step prints one line and never
  * stops the next; the exit code is 0 once the files are gone.
  */
 import { request as httpRequest } from 'node:http';
 import { hostname } from 'node:os';
 import { join } from 'node:path';
 
-import { generateStaticKeyPair } from '@overdeck/anywhere-channel';
+import { ChannelOpenError, generateStaticKeyPair } from '@overdeck/anywhere-channel';
 import { revokeDevice } from '../../account/client.js';
 import { clientLabel, type DirectoryWebClient } from '@overdeck/anywhere-channel/web';
 import { parseConnectorPairLink } from '@overdeck/contracts';
@@ -53,6 +58,16 @@ export const LOGOUT_CONNECT_TIMEOUT_MS = 15_000;
 export const LOGOUT_REQUEST_TIMEOUT_MS = 5_000;
 
 export const KEY_MISMATCH_MESSAGE = "The machine's key does not match the pairing string; ask for a new one in Connect a bot.";
+const PAIRING_CODE_REFUSED_MESSAGE = 'The machine refused the pairing code (it may have expired); ask for a new one in Connect a bot.';
+
+export type PairFailureCode =
+  | 'bad-pairing-string' | 'not-signed-in' | 'home-unreadable' | 'directory-refused' | 'network'
+  | 'machine-not-in-account' | 'machine-offline' | 'relay-plan-needed'
+  | 'machine-unreachable' | 'pairing-code-refused' | 'key-mismatch' | 'pairing-failed';
+
+export type PairOutcome =
+  | { ok: true; machineLabel: string; environmentId: string; scopes: string[] }
+  | { ok: false; code: PairFailureCode; message: string };
 
 export interface ConnectorDeps {
   createDirectory(input: { account: ConnectorAccount; identity: ConnectorIdentity; label: string; appVersion: string }): DirectoryWebClient;
@@ -148,7 +163,7 @@ function exchangeRefusal(status: number, json: unknown): string {
   if (status === 403 && body.code === 'not-a-connector-code') {
     return 'This pairing code was not issued for a connector, or it was already used; ask for a new one in Connect a bot.';
   }
-  if (status === 403) return 'The machine refused the pairing code (it may have expired); ask for a new one in Connect a bot.';
+  if (status === 403) return PAIRING_CODE_REFUSED_MESSAGE;
   if (status === 409 && body.code === 'link-key-in-use') return 'This link key is already paired; run pair again.';
   return `Pairing failed: HTTP ${status} ${typeof body.error === 'string' ? body.error : ''}`.trimEnd();
 }
@@ -165,29 +180,31 @@ function nextSteps(appVersion: string, home: string): string[] {
   ];
 }
 
-export async function runConnectorPair(
+function failed(code: PairFailureCode, message: string): PairOutcome {
+  return { ok: false, code, message };
+}
+
+/** The responder refused the pairing id: the code is unknown, expired or used. */
+function pairingRefused(error: unknown): boolean {
+  return error instanceof ChannelOpenError && error.code === 'pairing-refused';
+}
+
+/** Pair with the machine the string names. Writes the home files only on success. */
+export async function pairWithMachine(
   opts: { pairingString: string; label?: string; home: string; appVersion: string },
-  io: ConnectorIo,
   deps: ConnectorDeps = defaultConnectorDeps(),
-): Promise<number> {
+): Promise<PairOutcome> {
   const link = parseConnectorPairLink(opts.pairingString);
-  if (!link) {
-    io.err('That is not an Overdeck connector pairing string; copy it again from Connect a bot.');
-    return 1;
-  }
+  if (!link) return failed('bad-pairing-string', 'That is not an Overdeck connector pairing string; copy it again from Connect a bot.');
 
   let account: ConnectorAccount | null;
   let identity: ConnectorIdentity;
   try {
     account = await readAccount(opts.home);
-    if (!account) {
-      io.err('Sign in first: pan mcp connector login');
-      return 1;
-    }
+    if (!account) return failed('not-signed-in', 'Sign in first: pan mcp connector login');
     identity = await ensureIdentity(opts.home);
   } catch (error) {
-    io.err(errorText(error));
-    return 1;
+    return failed('home-unreadable', errorText(error));
   }
 
   const label = connectorLabel(opts.label, identity.clientId);
@@ -195,12 +212,16 @@ export async function runConnectorPair(
   let rtc: ConnectorRtc | null = null;
   let channel: ChannelSocket | null = null;
   try {
-    await directory.start();
-    await waitDirectoryOnline(directory);
+    try {
+      await directory.start();
+      await waitDirectoryOnline(directory);
+    } catch (error) {
+      return failed(directory.state === 'refused' ? 'directory-refused' : 'network', errorText(error));
+    }
     const found = machineInDirectory(directory, link.environmentId);
     if (!found.ok) {
-      io.err(found.error);
-      return 1;
+      const listed = directory.machines.some((machine) => machine.environmentId === link.environmentId);
+      return failed(listed ? 'machine-offline' : 'machine-not-in-account', found.error);
     }
     rtc = deps.createRtc(directory);
     setRtcDialer(rtc.dialer);
@@ -210,38 +231,28 @@ export async function runConnectorPair(
     try {
       channel = await deps.openPairingChannel(`rtc://${link.environmentId}`, pairingOpts);
     } catch (directError) {
-      if (rtc.relayRefusal() !== null) {
-        io.err(noDirectPathMessage(found.machine.label));
-        return 1;
-      }
+      if (pairingRefused(directError)) return failed('pairing-code-refused', PAIRING_CODE_REFUSED_MESSAGE);
+      if (rtc.relayRefusal() !== null) return failed('relay-plan-needed', noDirectPathMessage(found.machine.label));
       try {
         channel = await deps.openPairingChannel(`rtc+turn://${link.environmentId}`, pairingOpts);
       } catch (relayError) {
-        io.err(`Could not reach ${found.machine.label}: ${errorText(relayError)} (direct: ${errorText(directError)})`);
-        return 1;
+        return failed(
+          pairingRefused(relayError) ? 'pairing-code-refused' : 'machine-unreachable',
+          `Could not reach ${found.machine.label}: ${errorText(relayError)} (direct: ${errorText(directError)})`,
+        );
       }
     }
 
     // D-16: the handshake proved the machine's static key; it must be the one in the string.
-    if (channel.channel.remoteKeyHex !== link.machineKeyHex) {
-      io.err(KEY_MISMATCH_MESSAGE);
-      return 1;
-    }
+    if (channel.channel.remoteKeyHex !== link.machineKeyHex) return failed('key-mismatch', KEY_MISMATCH_MESSAGE);
 
     const answer = await postOverChannel(channel, '/api/connectors/exchange', { v: 1, clientId: identity.clientId, label });
     if (answer.status !== 200) {
-      io.err(exchangeRefusal(answer.status, answer.json));
-      return 1;
+      return failed(answer.status === 403 ? 'pairing-code-refused' : 'pairing-failed', exchangeRefusal(answer.status, answer.json));
     }
     const exchanged = parseExchangeAnswer(answer.json);
-    if (!exchanged) {
-      io.err('Pairing failed: the machine sent an unexpected answer');
-      return 1;
-    }
-    if (exchanged.descriptor.machineKey !== link.machineKeyHex) {
-      io.err(KEY_MISMATCH_MESSAGE);
-      return 1;
-    }
+    if (!exchanged) return failed('pairing-failed', 'Pairing failed: the machine sent an unexpected answer');
+    if (exchanged.descriptor.machineKey !== link.machineKeyHex) return failed('key-mismatch', KEY_MISMATCH_MESSAGE);
 
     await replaceLinkKey(opts.home, identity, linkKey);
     await writePairing(opts.home, {
@@ -255,19 +266,30 @@ export async function runConnectorPair(
       pairedAt: deps.now().toISOString(),
     });
     await ensureLocalToken(opts.home);
-
-    io.out(`Paired with ${exchanged.descriptor.label} (${link.environmentId}) with scopes ${exchanged.scopes.join(', ')}.`);
-    for (const line of nextSteps(opts.appVersion, opts.home)) io.out(line);
-    return 0;
+    return { ok: true, machineLabel: exchanged.descriptor.label, environmentId: link.environmentId, scopes: exchanged.scopes };
   } catch (error) {
-    io.err(errorText(error));
-    return 1;
+    return failed('pairing-failed', errorText(error));
   } finally {
     channel?.destroy();
     setRtcDialer(null);
     rtc?.stop();
     directory.stop();
   }
+}
+
+export async function runConnectorPair(
+  opts: { pairingString: string; label?: string; home: string; appVersion: string },
+  io: ConnectorIo,
+  deps: ConnectorDeps = defaultConnectorDeps(),
+): Promise<number> {
+  const outcome = await pairWithMachine(opts, deps);
+  if (!outcome.ok) {
+    io.err(outcome.message);
+    return 1;
+  }
+  io.out(`Paired with ${outcome.machineLabel} (${outcome.environmentId}) with scopes ${outcome.scopes.join(', ')}.`);
+  for (const line of nextSteps(opts.appVersion, opts.home)) io.out(line);
+  return 0;
 }
 
 /** Resolves with the promise's value, or with `fallback` after `ms`. */
