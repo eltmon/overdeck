@@ -4,17 +4,17 @@
     "created": "2026-11-05T22:35:51Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5062: dbt projects: placeholders in gate env, identifier-safe feature placeholder, per-workspace dev target",
-    "updated": "2026-11-05T22:38:18.249Z"
+    "updated": "2026-11-05T22:39:15.386Z"
   },
   "plan": {
     "id": "pan-5062",
     "title": "dbt projects: placeholders in gate env, identifier-safe feature placeholder, per-workspace dev target",
-    "status": "proposed",
+    "status": "running",
     "uid": "b681e54e-6462-462f-aaa2-515f45d544e4",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-05T22:35:51Z",
-    "updated": "2026-11-05T22:38:18.249Z",
+    "updated": "2026-11-05T22:39:15.386Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5062",
@@ -582,5 +582,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
