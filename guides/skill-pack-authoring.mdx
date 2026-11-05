@@ -1,0 +1,202 @@
+---
+title: Authoring a Skill Pack
+description: What makes a git repository a valid Overdeck skill pack
+---
+
+# Authoring a Skill Pack
+
+A skill pack is a plain git repository. Overdeck reads it, trusts one
+commit, and mounts the skills it finds into Overdeck-managed Claude Code
+and Codex launches. This guide covers what makes a repository readable as
+a pack, so you can author one and publish it for others to add with
+`pan skills pack add`. For the operator-facing feature — the quickstart,
+the pack catalog, and the trust model — see [Skill Packs](/features/skill-packs).
+For every config key, see the [Skill settings reference](/configuration/skills).
+
+## What Overdeck reads
+
+Overdeck mounts skill directories only. Nothing else in your repository
+reaches the agent: see [What is not
+applied](/features/skill-packs#what-is-not-applied) for the full list
+(hooks, MCP servers, commands, agents, context injection, git hooks, and
+more).
+
+## Two layouts
+
+A pack is either a **plain** repository or a **Claude Code plugin**.
+Overdeck detects which one yours is; detection never fails.
+
+### Plain
+
+```
+my-pack/
+└── skills/
+    └── my-skill/
+        └── SKILL.md
+```
+
+Overdeck scans `skills/` (or `KnownPack.skillsRoot` for a known pack), up
+to four directory levels deep — the deepest skill it can find is
+`skills/a/b/c/d/SKILL.md`. A skill is a directory with a regular-file
+`SKILL.md`. The walk does not descend into a skill once it finds one, so a
+skill nested inside another skill is never found. Symlinked directories
+are skipped, and directories are walked in sorted order.
+
+### Claude Code plugin
+
+```
+my-pack/
+└── .claude-plugin/
+    └── plugin.json
+```
+
+A regular file at `.claude-plugin/plugin.json` makes the repository a
+`claude-plugin` pack. Its `skills` field controls what gets scanned:
+
+- **Absent, or any other type** — scan `skills/`, with the same four-level
+  rule as a plain repository.
+- **A string** — scan from that path instead, with the same rule.
+- **An array** — each string names one skill directory, with no scanning
+  at all. An entry that is not a string, does not exist, or escapes the
+  plugin root is dropped silently. An entry with no `SKILL.md` is dropped
+  too.
+
+Paths resolve against the plugin root. Absolute paths, `.`, `..`, and
+paths that start `../` are rejected. An invalid `plugin.json` makes the
+whole pack fail to read, with the error `invalid .claude-plugin/plugin.json: …`;
+the `plain` adapter ignores a bad `plugin.json` instead, because it never
+reads one. The mounted plugin is named after the pack id you chose at
+`pan skills pack add`, never after `plugin.json`'s own `name` field.
+
+### Detection order
+
+Overdeck picks the adapter in this order: the `--adapter` flag or a
+registry value you set explicitly, then the pack's `KnownPack` default (if
+it is a known pack), then detection — `claude-plugin` when
+`.claude-plugin/plugin.json` exists as a regular file, otherwise `plain`.
+Detection never fails; an empty repository is a valid, empty `plain` pack.
+
+## Skill directories and names
+
+A skill's `SKILL.md` carries YAML frontmatter, read between two `---`
+lines starting on line 1. Overdeck reads only `name` and `description`
+from it, and keeps only the first line of `description`. Missing or
+unparseable frontmatter still keeps the skill, under its directory name
+with an empty description.
+
+The skill's name is the frontmatter `name:`, or the leaf directory name
+when `name:` is absent. The name must match `^[a-z0-9][a-z0-9-]*$`.
+
+<Warning>
+A name that fails that pattern is dropped silently — Overdeck does not
+fall back to the directory name. `name: My Skill` in `my-skill/SKILL.md`
+drops the skill entirely. A duplicate name is also dropped silently (the
+first one in sorted order wins). Neither case shows up in the `pan skills
+pack add` preview, so check your names before you publish.
+</Warning>
+
+Remember the depth rule from the two layouts above: four directory levels
+under the scan root, and no skill nested inside another skill.
+
+## License
+
+Overdeck looks for a license in this order: the `plugin.json` `license`
+string, as written, when one is set; otherwise the first non-blank line of
+`LICENSE`, then `LICENSE.md`, at the plugin root. It checks that line for
+one of four case-sensitive tokens — `MIT`, `Apache`, `BSD`, `GPL` — and
+stores only the matching token. With no match, the `pan skills pack add`
+preview shows `License unknown`. `LICENSE.txt` and `COPYING` are not read.
+
+Recommend either a `license` string in `plugin.json`, or a `LICENSE` whose
+first line contains one of the four tokens.
+
+## What is copied and what is not
+
+Every symlink, at any depth, is left out of the mount — the mount's copy
+filter skips anything `lstat` reports as a symbolic link. Every other file
+is copied as is, including hidden files, with no size limit. Scripts
+inside a skill directory are copied with it, so the agent can still run
+them; Overdeck itself never runs them (except for a runtime pack like
+gstack, which is not a layout you can get from a plain repository or a
+plugin — see [What is not
+applied](/features/skill-packs#what-is-not-applied) for the full table of
+things that do not reach the agent: hooks, MCP servers, commands, agents,
+context injection, git hooks, executables, and project-mutating skills).
+
+## What a custom pack cannot declare
+
+A custom pack (any pack id not in Overdeck's `KNOWN_PACKS`) can set only
+its adapter. Everything else is fixed:
+
+- **No opt-in skills.** Every skill in a custom pack turns on with the
+  pack's toggle. Opt-in skills — ones the pack toggle never turns on by
+  itself — are a `KNOWN_PACKS`-only option.
+- **Plugin at the repo root.** A custom pack's plugin root is always the
+  repository root.
+- **Scan root is always `skills/`.** A custom pack cannot point the plain
+  scan at a different directory.
+- **`--ref` is required.** A custom pack needs both a url and `--ref`; a
+  known pack can default one or both.
+
+If you want opt-in skills, a non-root plugin, or a different scan root for
+your pack, it needs a `KNOWN_PACKS` entry in Overdeck's own source — see
+the developer guide, `docs/SKILL-PACKS.md`, for how that works. A pack
+registered under a known id inherits that id's options even when you pass
+a different url.
+
+## Harness coverage
+
+| Harness | Receives the pack? |
+| --- | --- |
+| Claude Code | Yes — as `--plugin-dir` pointing into the mount, on local launches. |
+| Codex | Yes — a local `overdeck-packs` plugin marketplace block in `$CODEX_HOME/config.toml`, on local launches. |
+| Pi | No. Pi accepts `pan handoff --pack`/`--skill` and the dialog's Skills choices without a warning, and stores them on the conversation row, but a Pi launch never reads or applies them. |
+| Remote (Fly) launches | No, for any harness. |
+
+## Minimal example pack
+
+Plain layout:
+
+```
+my-pack/
+├── LICENSE                  # first line: MIT License
+└── skills/
+    └── hello-world/
+        └── SKILL.md
+```
+
+`SKILL.md`:
+
+```
+---
+name: hello-world
+description: Say hello and list the files in the current directory
+---
+
+# Hello world
+
+1. Print "Hello from my-pack".
+2. Run `ls` and summarize what you see.
+```
+
+Registering and using it:
+
+```bash
+pan skills pack add my-pack https://github.com/<you>/my-pack --ref main
+pan skills set --pack my-pack on --project <key>
+# in an agent or conversation in that project: /my-pack:hello-world
+```
+
+The same pack as a Claude Code plugin instead: add
+`.claude-plugin/plugin.json` at the repo root with
+`{ "name": "my-pack", "license": "MIT", "skills": "skills" }`, and keep
+the same `skills/hello-world/SKILL.md`.
+
+## Check before you publish
+
+Run `pan skills pack add` yourself and read the preview before telling
+anyone else to add your pack. The `Skills` count must equal the number of
+skill directories you actually have, and `License` must not read
+`unknown`. Both silently drop skills (an invalid or duplicate name) or
+miss a license (a token the matcher does not recognize) without an error,
+so the preview is the only check you get.
