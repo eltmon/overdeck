@@ -293,7 +293,7 @@ export async function runConnectorPair(
 }
 
 /** Resolves with the promise's value, or with `fallback` after `ms`. */
-function within<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+export function within<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<T>((resolve) => {
     timer = setTimeout(() => resolve(fallback), ms);
