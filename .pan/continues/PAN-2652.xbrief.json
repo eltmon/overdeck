@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2652",
   "created": "2026-11-05T21:12:48.966Z",
-  "updated": "2026-11-05T22:05:18.033Z",
+  "updated": "2026-11-05T22:05:37.189Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -92,6 +92,10 @@
     "w1-current-locator-door.ac3": {
       "status": "completed",
       "doneAt": "2026-11-05T22:05:18.032Z"
+    },
+    "w1-current-locator-door.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-05T22:05:37.189Z"
     }
   }
 }
