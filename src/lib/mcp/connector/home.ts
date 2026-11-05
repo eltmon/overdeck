@@ -2,7 +2,7 @@
  * The Overdeck connector's home directory (PAN-4927 W-CONN2, PAN-4950 FR-1, NFR-1).
  *
  * All connector state lives in `$OVERDECK_CONNECTOR_HOME` (default
- * `~/.overdeck-connector`), mode 0700, in four files, each mode 0600 and written
+ * `~/.overdeck-connector`), mode 0700, in five files, each mode 0600 and written
  * atomically (temp file in the same directory, then rename):
  *
  *  - `account.json`: the overdeck.ai device token and both service URLs.
@@ -10,6 +10,8 @@
  *    key pairs (64 lowercase hex each).
  *  - `pairing.json`: the paired machine and the `odk_` connector token.
  *  - `local-token`: the `odl_` bearer a bot sends to the loopback endpoint.
+ *  - `pending-signin.json`: a device sign-in `connect` started and a later run
+ *    resumes (PAN-5069 FR-3); present only while that sign-in waits.
  *
  * Readers return `null` for an absent file and throw for a malformed file or one
  * that group or other users may read, so a leaked or corrupt secret is never
@@ -32,6 +34,7 @@ export const ACCOUNT_FILE = 'account.json';
 export const IDENTITY_FILE = 'identity.json';
 export const PAIRING_FILE = 'pairing.json';
 export const LOCAL_TOKEN_FILE = 'local-token';
+export const PENDING_SIGNIN_FILE = 'pending-signin.json';
 
 const KEY_HEX = /^[0-9a-f]{64}$/;
 const UUID_V4_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -66,6 +69,20 @@ export interface ConnectorPairing {
   tokenId: string;
   scopes: string[];
   pairedAt: string;
+}
+
+/** A device sign-in waiting for the user to authorize it (PAN-5069 FR-3). */
+export interface ConnectorPendingSignIn {
+  v: 1;
+  baseUrl: string;
+  directoryUrl: string;
+  deviceCode: string;
+  userCode: string;
+  verificationUriComplete: string;
+  /** Seconds, from the device-code answer. */
+  interval: number;
+  /** ISO time the device code expires. */
+  expiresAt: string;
 }
 
 /** The connector home: `$OVERDECK_CONNECTOR_HOME`, else `~/.overdeck-connector`. */
@@ -179,6 +196,23 @@ function isConnectorPairing(value: unknown): value is ConnectorPairing {
   );
 }
 
+function isConnectorPendingSignIn(value: unknown): value is ConnectorPendingSignIn {
+  return (
+    isObject(value) &&
+    value.v === 1 &&
+    isNonEmptyString(value.baseUrl) &&
+    isNonEmptyString(value.directoryUrl) &&
+    isNonEmptyString(value.deviceCode) &&
+    isNonEmptyString(value.userCode) &&
+    isNonEmptyString(value.verificationUriComplete) &&
+    typeof value.interval === 'number' &&
+    Number.isFinite(value.interval) &&
+    value.interval > 0 &&
+    typeof value.expiresAt === 'string' &&
+    !Number.isNaN(Date.parse(value.expiresAt))
+  );
+}
+
 export function readAccount(home: string): Promise<ConnectorAccount | null> {
   return readRecord(home, ACCOUNT_FILE, isConnectorAccount);
 }
@@ -191,6 +225,10 @@ export function readPairing(home: string): Promise<ConnectorPairing | null> {
   return readRecord(home, PAIRING_FILE, isConnectorPairing);
 }
 
+export function readPendingSignIn(home: string): Promise<ConnectorPendingSignIn | null> {
+  return readRecord(home, PENDING_SIGNIN_FILE, isConnectorPendingSignIn);
+}
+
 function writeRecord(home: string, name: string, record: object): Promise<void> {
   return writeSecretFile(home, name, `${JSON.stringify(record, null, 2)}\n`);
 }
@@ -201,6 +239,21 @@ export function writeAccount(home: string, account: ConnectorAccount): Promise<v
 
 export function writePairing(home: string, pairing: ConnectorPairing): Promise<void> {
   return writeRecord(home, PAIRING_FILE, pairing);
+}
+
+export function writePendingSignIn(home: string, pending: ConnectorPendingSignIn): Promise<void> {
+  return writeRecord(home, PENDING_SIGNIN_FILE, pending);
+}
+
+/** Deletes `pending-signin.json`; an absent file is fine. */
+export async function removePendingSignIn(home: string): Promise<void> {
+  await unlinkIfPresent(join(home, PENDING_SIGNIN_FILE));
+}
+
+async function unlinkIfPresent(path: string): Promise<void> {
+  await unlink(path).catch((error: NodeJS.ErrnoException) => {
+    if (error.code !== 'ENOENT') throw error;
+  });
 }
 
 const hex = (bytes: Uint8Array): string => Buffer.from(bytes).toString('hex');
@@ -246,11 +299,9 @@ export async function ensureLocalToken(home: string): Promise<string> {
   return token;
 }
 
-/** Deletes the four connector files; absent files are fine. The directory stays. */
+/** Deletes the five connector files; absent files are fine. The directory stays. */
 export async function removeConnectorFiles(home: string): Promise<void> {
-  for (const name of [PAIRING_FILE, LOCAL_TOKEN_FILE, IDENTITY_FILE, ACCOUNT_FILE]) {
-    await unlink(join(home, name)).catch((error: NodeJS.ErrnoException) => {
-      if (error.code !== 'ENOENT') throw error;
-    });
+  for (const name of [PENDING_SIGNIN_FILE, PAIRING_FILE, LOCAL_TOKEN_FILE, IDENTITY_FILE, ACCOUNT_FILE]) {
+    await unlinkIfPresent(join(home, name));
   }
 }
