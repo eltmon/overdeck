@@ -1,0 +1,137 @@
+---
+title: Skill Settings
+description: Every config key for skills, skill packs, SageOx and Deft
+---
+
+# Skill Settings
+
+This page lists every config key that controls skill and skill-pack
+on/off state, skill-pack registration, and the SageOx and Deft
+integrations. For the on/off model itself, see [Skills](/features/skills)
+and [Skill Packs](/features/skill-packs). For what makes a repository a
+valid pack, see [Authoring a skill pack](/guides/skill-pack-authoring).
+
+No schema validates any of these keys — each reader parses its own file
+by hand, and a malformed value is simply ignored rather than rejected.
+Prefer the CLI (`pan skills set`, `pan skills pack …`) to hand-editing
+these files; a hand edit that breaks the YAML is read as if the file were
+empty, silently.
+
+## Where settings live
+
+| Level | File |
+| --- | --- |
+| Global | `~/.overdeck/config.yaml` |
+| Project | `~/.overdeck/projects.yaml` |
+| Issue | `<planHome>/.pan/skill-overrides/<ISSUE>.yaml` |
+| Conversation | the `conversations.skill_overrides` column in `~/.overdeck/overdeck.db`, set only when the conversation is created |
+
+Precedence, narrowest first: **conversation > issue > project > global >
+default**. A native skill with no value anywhere defaults to **on**. A
+pack skill with no value anywhere defaults to **off**. See [Turning
+skills on and off](/features/skills#turning-skills-on-and-off) for the
+full resolution walk-through, including pack skills.
+
+## `skills.packs.<id>` (global)
+
+The pack registry, in `~/.overdeck/config.yaml`:
+
+```yaml
+skills:
+  packs:
+    mattpocock:
+      url: https://github.com/eltmon/skills
+      ref: v1.2.3
+      commit: 6acc160279f9...   # 40 lowercase hex characters
+    gstack:
+      url: https://github.com/eltmon/gstack
+      ref: main
+      commit: ab12cd34...
+      browser: true
+```
+
+| Field | Type | Default | Writer |
+| --- | --- | --- | --- |
+| `url` | non-empty string | none; required unless the pack id is known | `pan skills pack add` |
+| `ref` | non-empty string (tag, branch, or SHA) | none; `pstack` and `sageox` default it | `pan skills pack add\|update` |
+| `commit` | 40 lowercase hex characters | the commit the ref resolved to | `pan skills pack add\|update\|sync` |
+| `adapter` | one of `plain`, `claude-plugin`, `deft-readonly`, `gstack-runtime` | unset — resolved from `KNOWN_PACKS` or detection when absent | `pan skills pack add --adapter` only |
+| `browser` | `true` only | unset (no consent recorded) | `pan skills pack browser <id> on\|off` |
+
+A malformed entry is ignored, and a `config.yaml` that fails to parse
+yields no packs at all. `pan skills pack sync` re-fetches a pack but never
+moves its `commit`.
+
+## `skills.pack_overrides` and `skills.overrides` (global)
+
+```yaml
+skills:
+  pack_overrides:
+    mattpocock: true        # the whole pack is on globally
+  overrides:
+    grilling: false          # a native skill is off globally
+    mattpocock/tdd: false    # one pack skill, off globally, overriding the pack toggle
+```
+
+`skills.pack_overrides.<id>: true` turns a pack on globally; it is two-state, so off is stored as no key at all. `skills.overrides.<skill>: false` turns a skill off globally; on is stored as no key. A `<pack>/<skill>` key under `overrides` stores only a difference from that skill's resting state (on by default, or off when it is opt-in). Core skills cannot be set at any level. Writers: `pan skills set` and the dashboard (`PUT /api/skills/overrides`).
+
+## Project keys (`~/.overdeck/projects.yaml`, under `projects.<key>`)
+
+```yaml
+projects:
+  myapp:
+    skill_overrides:
+      grilling: true
+      mattpocock/tdd: false
+    skill_pack_overrides:
+      mattpocock: true
+    sageox_upload: enabled
+    sageox_binding: committed
+    deft_integration:
+      mode: managed
+      plan_digest: 3f29ac...
+      enabled_at: "2026-10-01T00:00:00Z"
+```
+
+| Key | Values | Default | Writer |
+| --- | --- | --- | --- |
+| `skill_overrides` | map of skill or `pack/skill` to boolean; three-state (missing key means inherit) | no keys | `pan skills set --project` |
+| `skill_pack_overrides` | map of pack id to boolean; three-state | no keys | `pan skills set --pack --project` |
+| `sageox_upload` | `enabled` \| `disabled` | disabled (unset, or any other value) | `pan skills pack sageox upload on\|off --project <key>` |
+| `sageox_binding` | `committed` (only value that means anything) | unset | `pan skills pack sageox commit --project <key>` |
+| `deft_integration` | `{ mode: managed, plan_digest, enabled_at }` | off (absent) | `pan skills deft enable\|disable --project <key>` |
+
+## The issue file
+
+`<planHome>/.pan/skill-overrides/<ISSUE>.yaml`:
+
+```yaml
+issue: PAN-1234
+skills:
+  grilling: false
+  mattpocock/tdd: true
+packs:
+  mattpocock: true
+pipeline: deft
+```
+
+Every write is committed in the plan home on its checked-out branch
+(normally `main`) as `chore(workspace): skill overrides for <ISSUE>` (or
+`chore(workspace): pipeline for <ISSUE>`) and pushed to that branch's
+upstream. When the push fails, the commit stays local and `pan skills set`
+prints `push pending: <reason>`.
+
+An issue file whose YAML fails to parse is read as empty, and the next
+`pan skills set --issue` rewrites the whole file with only the new value —
+it does not merge with whatever was unparseable. That is the current
+behavior; a follow-up issue tracks fixing it. Writers: `pan skills set …
+--issue`, the dashboard, and `pan skills deft use|back`.
+
+## Related
+
+- [Skills](/features/skills) — the on/off model and where overrides apply.
+- [Skill Packs](/features/skill-packs) — the pack catalog and trust model.
+- [Authoring a skill pack](/guides/skill-pack-authoring) — what makes a
+  repository a valid pack.
+- [Skills Commands](/cli/skills-commands) — every CLI flag that writes
+  these keys.
