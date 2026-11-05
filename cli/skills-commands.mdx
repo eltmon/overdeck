@@ -30,7 +30,9 @@ skills` alone runs it.
 pan skills list --project myapp
 ```
 
-Exits 1 if the override files cannot be read.
+Exits 1 for an unknown `--project`, or for an `--issue` that no registered
+project owns. An issue file whose YAML does not parse is read as empty, and
+no error is shown.
 
 ## pan skills set
 
@@ -54,8 +56,21 @@ pan skills set mattpocock/grilling on --project myapp
 
 Takes exactly one positional (the state) with `--pack`, two (the skill and
 the state) without it. Exits 1 on the wrong positional count, a state that
-is not `on`, `off`, or `inherit`, passing `--project` and `--issue`
-together, or an unreadable override file.
+is not `on`, `off`, or `inherit`, or passing `--project` and `--issue`
+together.
+
+It also exits 1 on any of these store errors, each with its own message:
+
+- `core skill cannot be overridden: <skill>`
+- `unknown skill: <id>`
+- `unknown pack: <id>`
+- `pack <id> is not cached; run pan skills pack sync <id>`
+- `unknown project: <key>`
+- `no registered project owns issue <ISSUE>`
+- `cannot parse <path>: …` (the global `config.yaml`)
+- `could not commit <path>: …`
+
+With `--issue`, `set` writes `<planHome>/.pan/skill-overrides/<ISSUE>.yaml`, committed in the plan home on its checked-out branch (normally `main`) and pushed to that branch's upstream, and prints `(committed <sha>, pushed)` or `(committed <sha>, push pending: <reason>)`.
 
 ## pan skills pack add
 
@@ -98,8 +113,10 @@ pan skills pack update <id> [--ref <ref>] [--yes]
 ```
 
 Moves a pack to the commit its ref (or `--ref`) now resolves to, after
-showing the preview again. For `sageox`, a moved commit is built after you
-confirm.
+showing the preview again. For `gstack`, a moved commit is also rendered
+(pack-mode setup) after you confirm; with browser consent recorded, the
+browser runtime is built for the new commit too, and the commit moves only
+when both succeed. For `sageox`, a moved commit is built after you confirm.
 
 | Flag | Effect |
 | --- | --- |
@@ -159,9 +176,11 @@ pan skills pack sync [id]
 ```
 
 Re-fetches a pack and extracts its trusted commit, or every registered
-pack when `id` is omitted. For `sageox`, it also builds `ox` for the
-trusted commit when that build is missing, without asking (the commit is
-already trusted).
+pack when `id` is omitted; it never moves the commit. For `gstack`, it
+also re-renders the trusted commit and builds a missing browser runtime
+without asking when consent is recorded. For `sageox`, it also builds
+`ox` for the trusted commit when that build is missing, without asking
+(the commit is already trusted).
 
 ```bash
 pan skills pack sync gstack
@@ -186,8 +205,8 @@ and orphaned pack state for packs that are no longer registered.
 pan skills pack gc --max-age-days 14
 ```
 
-Exits 1 if `--max-age-days` is not a number of days of 0 or more, or if
-the global config cannot be read or parsed (gc then removes nothing).
+Exits 1 if `--max-age-days` is not a number of days of 0 or more, or if the
+global config fails to parse (gc then removes nothing).
 
 ## pan skills pack browser
 
@@ -383,3 +402,54 @@ pan skills deft disable --project myapp
 ```
 
 Exits 1 if `--project` names a project Overdeck does not know.
+
+## pan skills deft use
+
+```bash
+pan skills deft use <issue> [--start] [--json]
+```
+
+Run an issue on Deft Directive's pipeline: install Directive into its
+workspace, hidden from git. See [Running an issue on
+Deft](/features/skill-packs#running-an-issue-on-deft).
+
+| Flag | Effect |
+| --- | --- |
+| `--start` | Start the work agent afterwards (`pan start`) |
+| `--json` | Output as JSON |
+
+## pan skills deft back
+
+```bash
+pan skills deft back <issue> [--json]
+```
+
+Switch an issue back to Overdeck's pipeline: save the Deft state, then
+remove the install. See [Running an issue on
+Deft](/features/skill-packs#running-an-issue-on-deft).
+
+| Flag | Effect |
+| --- | --- |
+| `--json` | Output as JSON |
+
+## pan skills deft save
+
+```bash
+pan skills deft save <issue>
+```
+
+Commit the issue's Deft state archive under `.pan/deft/<ISSUE>/`. See
+[Running an issue on Deft](/features/skill-packs#running-an-issue-on-deft).
+
+## pan skills deft show
+
+```bash
+pan skills deft show <issue> [--json]
+```
+
+Show an issue's pipeline, Deft install, drift, and merge-guard verdict. See
+[Running an issue on Deft](/features/skill-packs#running-an-issue-on-deft).
+
+| Flag | Effect |
+| --- | --- |
+| `--json` | Output as JSON |
