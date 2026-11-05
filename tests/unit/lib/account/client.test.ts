@@ -6,6 +6,7 @@ import {
   getMe,
   platformString,
   pollForToken,
+  requestDeviceCode,
   resolveBaseUrl,
   revokeDevice,
   type DeviceCode,
@@ -309,5 +310,101 @@ describe('describeError via revokeDevice (PAN-5068)', () => {
     const tokenResult = await revokeDevice(BASE_URL, TOKEN, 'device-1', { fetch: tokenFetch });
     expect(tokenResult).toEqual({ ok: false, detail: expect.stringContaining('[redacted]') });
     expect((tokenResult as { detail: string }).detail).not.toContain(TOKEN);
+  });
+});
+
+describe('requestDeviceCode retry (PAN-5068)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function deviceCodeResponse(): Response {
+    return new Response(
+      JSON.stringify({
+        device_code: 'oddc_code',
+        user_code: 'ABCD-EFGH',
+        verification_uri: `${BASE_URL}/activate`,
+        verification_uri_complete: `${BASE_URL}/activate?user_code=ABCDEFGH`,
+        expires_in: 900,
+        interval: 5,
+      }),
+      { status: 200 },
+    );
+  }
+
+  function fetchFailed(code: string): TypeError {
+    return new TypeError('fetch failed', { cause: { code, message: 'socket hang up' } });
+  }
+
+  it('recovers after one failure', async () => {
+    const fetchMock = vi.fn().mockRejectedValueOnce(fetchFailed('ECONNRESET')).mockResolvedValueOnce(deviceCodeResponse());
+    const promise = requestDeviceCode(BASE_URL, { platform: 'linux-x64', environmentId: 'env-1' }, { fetch: fetchMock });
+
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(999);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    await expect(promise).resolves.toEqual({
+      deviceCode: 'oddc_code',
+      userCode: 'ABCD-EFGH',
+      verificationUri: `${BASE_URL}/activate`,
+      verificationUriComplete: `${BASE_URL}/activate?user_code=ABCDEFGH`,
+      expiresIn: 900,
+      interval: 5,
+    });
+  });
+
+  it('backs off 1 s then 2 s', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValueOnce(fetchFailed('ECONNRESET'))
+      .mockRejectedValueOnce(fetchFailed('ECONNRESET'))
+      .mockResolvedValueOnce(deviceCodeResponse());
+    const promise = requestDeviceCode(BASE_URL, { platform: 'linux-x64', environmentId: 'env-1' }, { fetch: fetchMock });
+
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(1999);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+
+    await expect(promise).resolves.toBeDefined();
+  });
+
+  it('throws with the last cause after three failures', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValueOnce(fetchFailed('ENOTFOUND'))
+      .mockRejectedValueOnce(fetchFailed('ENOTFOUND'))
+      .mockRejectedValueOnce(fetchFailed('ECONNRESET'));
+    const promise = requestDeviceCode(BASE_URL, { platform: 'linux-x64', environmentId: 'env-1' }, { fetch: fetchMock });
+
+    const settled = expect(promise).rejects.toThrow(AccountClientError);
+    await vi.advanceTimersByTimeAsync(3000);
+    await settled;
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    const error = await promise.catch((err: unknown) => err as Error);
+    expect(error.message).toBe('Cannot reach https://account.test: fetch failed (ECONNRESET: socket hang up)');
+    expect(error.message).not.toContain('ENOTFOUND');
+  });
+
+  it('does not retry an HTTP 503', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(new Response('', { status: 503 }));
+    const promise = requestDeviceCode(BASE_URL, { platform: 'linux-x64', environmentId: 'env-1' }, { fetch: fetchMock });
+
+    const settled = expect(promise).rejects.toThrow('Cannot start sign-in at https://account.test: HTTP 503');
+    await vi.advanceTimersByTimeAsync(5000);
+    await settled;
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

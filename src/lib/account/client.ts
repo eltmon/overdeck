@@ -3,17 +3,20 @@
  * flow, the PKCE authorization-code exchange (PAN-4960), `/v1/me` and device revocation
  * (PRD PAN-4330 W-3, D-2, D-3, D-5).
  *
- * Every poll wait is a `setTimeout` promise so fake timers in tests drive them; nothing here
- * waits on real wall-clock time. No error message or thrown value ever includes the device
- * token, device code, authorization code or PKCE verifier: `describeError` redacts them,
- * fetch's cause included. This module imports only Node built-ins so the standalone
- * `pan account` CLI can load it without the dashboard or Effect runtime layers.
+ * Every poll wait and device-code retry wait is a `setTimeout` promise so fake timers in tests
+ * drive them; nothing here waits on real wall-clock time. No error message or thrown value ever
+ * includes the device token, device code, authorization code or PKCE verifier: `describeError`
+ * redacts them, fetch's cause included. This module imports only Node built-ins so the
+ * standalone `pan account` CLI can load it without the dashboard or Effect runtime layers.
  */
 
 export const DEFAULT_ACCOUNT_BASE_URL = 'https://account.overdeck.ai';
 
 const PLATFORM_ARCH_RE = /^(linux|darwin|win32)-(x64|arm64)$/;
 const LOCAL_HTTP_HOSTS = new Set(['127.0.0.1', 'localhost', '[::1]']);
+
+/** Waits between device-code attempts after a thrown (network) error: 3 attempts in all. */
+const DEVICE_CODE_RETRY_DELAYS_MS = [1_000, 2_000];
 
 export class AccountClientError extends Error {}
 
@@ -124,11 +127,17 @@ export async function requestDeviceCode(
   opts: ClientOptions = {},
 ): Promise<DeviceCode> {
   const doFetch = opts.fetch ?? fetch;
-  let res: Response;
-  try {
-    res = await postForm(baseUrl, '/oauth/device/code', new URLSearchParams({ platform: input.platform, environment_id: input.environmentId }), doFetch);
-  } catch (error) {
-    throw new AccountClientError(`Cannot reach ${baseUrl}: ${describeError(error)}`);
+  const form = new URLSearchParams({ platform: input.platform, environment_id: input.environmentId });
+  let res: Response | undefined;
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      res = await postForm(baseUrl, '/oauth/device/code', form, doFetch);
+      break;
+    } catch (error) {
+      const delayMs = DEVICE_CODE_RETRY_DELAYS_MS[attempt];
+      if (delayMs === undefined) throw new AccountClientError(`Cannot reach ${baseUrl}: ${describeError(error)}`);
+      await sleep(delayMs);
+    }
   }
   if (!res.ok) {
     throw new AccountClientError(`Cannot start sign-in at ${baseUrl}: HTTP ${res.status}`);
