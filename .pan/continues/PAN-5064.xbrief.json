@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5064",
   "created": "2026-11-05T22:52:07.107Z",
-  "updated": "2026-11-05T23:34:31.374Z",
+  "updated": "2026-11-05T23:34:46.016Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -196,6 +196,10 @@
     "skill-config-reference.ac1": {
       "status": "completed",
       "doneAt": "2026-11-05T23:34:31.374Z"
+    },
+    "skill-config-reference.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:34:46.016Z"
     }
   }
 }
