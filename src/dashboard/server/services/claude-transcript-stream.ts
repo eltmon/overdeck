@@ -15,7 +15,8 @@ import { parseStateFromSnapshot, sharedTranscriptParser } from './shared-transcr
  * PAN-4558: the first event is a windowed snapshot (newest rows plus a
  * `window` cursor), or, when the client's `resume` still matches the file,
  * only the rows it lacks. Every later snapshot is windowed and every delta is
- * wire-projected.
+ * wire-projected. With `opts.reset` (a switch to a forked session, PAN-2652)
+ * a non-empty first snapshot carries `reset: true`.
  */
 
 async function transcriptIdAt(sessionFile: string): Promise<string | undefined> {
@@ -30,6 +31,7 @@ export function streamClaudeTranscript(
   model: string | null,
   agentId?: string,
   resume?: ConversationResume,
+  opts: { reset?: boolean } = {},
 ): Stream.Stream<ConversationEvent, PanRpcError> {
   return Stream.callback<ConversationEvent, PanRpcError>((queue) =>
     Effect.acquireRelease(
@@ -62,8 +64,10 @@ export function streamClaudeTranscript(
             ...selectInitialWindow(rows, transcript),
             ...initialMetadata,
             snapshot: true,
-            // An empty fallback never wipes what the client already shows.
-            ...(resume && rows.messages.length + rows.workLog.length > 0 ? { reset: true } : {}),
+            // An empty fallback never wipes what the client already shows. A
+            // followed session switch (PAN-2652) replaces the view: a fork can be
+            // shorter than the file it came from.
+            ...((opts.reset || !!resume) && rows.messages.length + rows.workLog.length > 0 ? { reset: true } : {}),
           });
         }
         let pendingSubagentToolUseIds = new Set(initial.pendingToolUse.keys());

@@ -21,11 +21,9 @@ import { TerminalService } from './services/terminal-service.js';
 import { shouldBroadcastDashboardEvent, streamAgentOutput } from './services/agent-output-stream.js';
 import type { LegacyConversation } from '../../lib/overdeck/conversations.js';
 import type { ParseResult } from './services/conversation-service.js';
-import { isPiSessionFile } from './services/pi-conversation-parser.js';
 import {
   listAgentTranscriptCandidates,
   listAgentTranscriptWatchRoots,
-  readLauncherPinnedSessionId,
   resolveAcpTranscriptPath,
   resolveAgentTranscriptCandidate,
   resolveCodexRolloutPath,
@@ -33,7 +31,6 @@ import {
   resolvePiSessionPath,
 } from '../../lib/agents/transcript-resolver.js';
 import { getOverdeckHome } from '../../lib/paths.js';
-import { sessionFilePath } from '../../lib/runtimes/storage/claude-code.js';
 import type { TranscriptCandidate } from '../../lib/session-history.js';
 import { getRuntimeCensus } from '../../lib/runtime-census.js';
 import { listProjectsSync } from '../../lib/projects.js';
@@ -59,6 +56,7 @@ import { subagentTranscriptPath } from './services/conversation/subagents.js';
 
 import { sharedTranscriptParser } from './services/shared-transcript-parser.js';
 import { streamClaudeTranscript } from './services/claude-transcript-stream.js';
+import { followConversationSession, resolveConversationTranscriptFile } from './services/conversation-session-follow.js';
 import { streamResolvedFullParseSnapshots } from './services/full-parse-stream.js';
 export { streamResolvedFullParseSnapshots } from './services/full-parse-stream.js';
 
@@ -824,30 +822,17 @@ const PanRpcLayer = PanRpcGroup.toLayer(
               return conversationDiscoveringStream();
             }
 
-            // Prefer the launcher's pinned live session; the oldest stored locator
-            // can point at a stale file when singleton conversations re-run (PAN-1866).
-            const launcherTmuxSession = conv.tmuxSession;
-            const pinnedSessionId = launcherTmuxSession
-              ? yield* Effect.promise(() => readLauncherPinnedSessionId(launcherTmuxSession))
-              : null;
-            const resolvedSessionId = pinnedSessionId ?? conv.claudeSessionId;
-            const parentSessionFile = resolvedSessionId ? sessionFilePath(conv.cwd, resolvedSessionId) : null;
-            const sessionFile = parentSessionFile && input.agentId ? subagentTranscriptPath(parentSessionFile, input.agentId) : parentSessionFile;
-            const model = conv.model ?? null;
-
-            if (!sessionFile) {
-              // Session file not yet discovered — keep the subscription alive
-              // without causing the client to reconnect in a tight loop.
-              return conversationDiscoveringStream();
-            }
-
-            if (isPiSessionFile(sessionFile)) {
-              // Pi session files use a different JSONL schema and must not be
-              // routed through the Claude-only incremental watcher.
-              return conversationDiscoveringStream();
-            }
-
-            return streamClaudeTranscript(sessionFile, input.conversationName, model, input.agentId, input.resume);
+            // Follow the conversation's current session (PAN-2652): a fork the write door
+            // records switches the stream to the new file with a reset snapshot. A file
+            // not yet discovered keeps the subscription alive without a reconnect loop.
+            return followConversationSession(input.conversationName, (switched) => Stream.unwrap(Effect.promise(async () => {
+              const row = await runDashboardDbJob<LegacyConversation | null>('getConversationByName', input.conversationName);
+              const sessionFile = row ? await resolveConversationTranscriptFile(row, input.agentId) : null;
+              const resume = switched ? undefined : input.resume;
+              return sessionFile
+                ? streamClaudeTranscript(sessionFile, input.conversationName, row?.model ?? null, input.agentId, resume, { reset: switched })
+                : conversationDiscoveringStream();
+            })));
           }),
         ),
 
