@@ -10,7 +10,7 @@
  */
 
 import { existsSync, readFileSync } from 'fs';
-import { dirname, join, resolve } from 'path';
+import { dirname, join } from 'path';
 import { shellQuote } from './shell-quote.js';
 import type { ProjectConfig } from './workspace-config.js';
 import { findProjectByPath } from './projects.js';
@@ -73,10 +73,13 @@ export function loadWorkspaceEnvForProject(
  * exists in that range, or when `workingDir` is the project checkout itself.
  */
 function resolveWorkspaceEnvDir(workingDir: string, project: ProjectConfig | null): string | null {
-  let dir = resolve(workingDir);
+  // PAN-5062 review fix: projects.yaml keeps paths as written (e.g. `~/Projects/x`,
+  // or a symlinked root). Comparing un-canonicalized paths let the walk climb past
+  // a `~/…` project root to the filesystem root and pick up an unrelated .env.
+  let dir = canonicalPath(workingDir);
   if (existsSync(join(dir, '.env'))) return dir;
   if (!project) return null;
-  const projectRoot = resolve(project.path);
+  const projectRoot = canonicalPath(project.path);
   if (dir === projectRoot) return null; // never load the project checkout's own .env
   for (;;) {
     const parent = dirname(dir);

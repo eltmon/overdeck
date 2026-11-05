@@ -8,6 +8,13 @@ import { promisify } from 'node:util';
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
+
+const homedirMock = vi.hoisted(() => ({ current: '' }));
+vi.mock('node:os', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:os')>();
+  return { ...actual, homedir: () => homedirMock.current || actual.homedir() };
+});
+
 import {
   loadWorkspaceEnvForProject,
   parseWorkspaceEnv,
@@ -34,6 +41,7 @@ function projectConfig(overrides: Partial<ProjectConfig> = {}): ProjectConfig {
 }
 
 afterEach(() => {
+  homedirMock.current = '';
   for (const dir of tempDirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
 
@@ -125,6 +133,19 @@ describe('workspaceEnvLauncherLines', () => {
     const lines = workspaceEnvLauncherLines(subdir, findProject);
 
     expect(lines).toContain("export DBT_SCHEMA='dev_pan_1'");
+  });
+
+  it('never climbs past a `~/…` project path to an unrelated ancestor .env', () => {
+    const outer = makeTempDir();
+    writeFileSync(join(outer, '.env'), 'STRAY=from_outside_project\n');
+    const projectPath = join(outer, 'proj');
+    const subdir = join(projectPath, 'workspaces', 'feature-pan-1', 'frontend');
+    mkdirSync(subdir, { recursive: true });
+    homedirMock.current = outer;
+    const project = projectConfig({ path: '~/proj', workspace: { env: { load: true } } });
+    const findProject = vi.fn(() => project);
+
+    expect(workspaceEnvLauncherLines(subdir, findProject)).toEqual([]);
   });
 
   it('never climbs into the project checkout\'s own .env', () => {
