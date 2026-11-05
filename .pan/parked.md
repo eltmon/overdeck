@@ -1,2 +1,3 @@
 - PAN-4886 (live relay check): parked 2026-11-04 by the orchestrator until an approver with a connected browser is present to approve device codes; do not start.
 - PAN-5058 (hosted-bot TLS passthrough relay): parked 2026-11-05 by the operator, who wants to think the approach over; planning was stopped before it finished. Do not start.
+- PAN-5078 (Grok Build CLI harness): parked 2026-11-05 by the operator; filed but do not start until the operator says so.
