@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5069",
   "created": "2026-11-05T23:26:20.599Z",
-  "updated": "2026-11-05T23:30:59.071Z",
+  "updated": "2026-11-05T23:38:06.768Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,9 +34,10 @@
       "doneAt": "2026-11-05T23:30:57.509Z"
     },
     "a5-pair-outcome": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5069",
-      "claimedAt": "2026-11-05T23:30:59.071Z"
+      "claimedAt": "2026-11-05T23:30:59.071Z",
+      "doneAt": "2026-11-05T23:38:06.768Z"
     }
   }
 }
