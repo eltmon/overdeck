@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5062",
   "created": "2026-11-05T22:39:32.195Z",
-  "updated": "2026-11-05T22:50:01.057Z",
+  "updated": "2026-11-05T22:53:08.793Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -16,9 +16,10 @@
       "doneAt": "2026-11-05T22:49:39.246Z"
     },
     "gate-env-placeholders": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5062",
-      "claimedAt": "2026-11-05T22:50:01.057Z"
+      "claimedAt": "2026-11-05T22:50:01.057Z",
+      "doneAt": "2026-11-05T22:53:08.792Z"
     }
   }
 }
