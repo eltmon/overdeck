@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5061",
   "created": "2026-11-05T22:48:30.946Z",
-  "updated": "2026-11-05T22:50:22.304Z",
+  "updated": "2026-11-05T22:52:09.245Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -16,9 +16,10 @@
       "doneAt": "2026-11-05T22:50:13.107Z"
     },
     "wi2-launch-env": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5061",
-      "claimedAt": "2026-11-05T22:50:22.304Z"
+      "claimedAt": "2026-11-05T22:50:22.304Z",
+      "doneAt": "2026-11-05T22:52:09.245Z"
     }
   }
 }
