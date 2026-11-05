@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5068",
   "created": "2026-11-05T23:10:23.659Z",
-  "updated": "2026-11-05T23:27:45.318Z",
+  "updated": "2026-11-05T23:32:42.123Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -22,9 +22,10 @@
       "doneAt": "2026-11-05T23:27:36.672Z"
     },
     "connector-login-transient-test": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5068",
-      "claimedAt": "2026-11-05T23:27:45.318Z"
+      "claimedAt": "2026-11-05T23:27:45.318Z",
+      "doneAt": "2026-11-05T23:32:42.122Z"
     }
   }
 }
