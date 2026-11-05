@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2652",
   "created": "2026-11-05T21:12:48.966Z",
-  "updated": "2026-11-05T22:11:39.967Z",
+  "updated": "2026-11-05T22:11:54.095Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -196,6 +196,10 @@
     "w10-native-compact-restart.ac1": {
       "status": "completed",
       "doneAt": "2026-11-05T22:11:39.966Z"
+    },
+    "w10-native-compact-restart.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-05T22:11:54.094Z"
     }
   }
 }
