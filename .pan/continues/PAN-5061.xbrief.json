@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5061",
   "created": "2026-11-05T22:48:30.946Z",
-  "updated": "2026-11-05T23:02:33.368Z",
+  "updated": "2026-11-05T23:02:39.717Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -56,6 +56,11 @@
       "claimedBy": "agent-pan-5061",
       "claimedAt": "2026-11-05T23:01:24.984Z",
       "doneAt": "2026-11-05T23:02:33.368Z"
+    },
+    "wi9-gate-secrets": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5061",
+      "claimedAt": "2026-11-05T23:02:39.716Z"
     }
   }
 }
