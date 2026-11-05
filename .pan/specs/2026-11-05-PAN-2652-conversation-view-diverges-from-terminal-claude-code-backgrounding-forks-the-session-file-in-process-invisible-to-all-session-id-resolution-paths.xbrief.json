@@ -1,0 +1,864 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-05T21:04:51Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2652: Conversation view diverges from Terminal: Claude Code backgrounding forks the session file in-process, invisible to all session-id resolution paths",
+    "updated": "2026-11-05T21:11:41.998Z"
+  },
+  "plan": {
+    "id": "pan-2652",
+    "title": "Conversation view diverges from Terminal: Claude Code backgrounding forks the session file in-process, invisible to all session-id resolution paths",
+    "status": "proposed",
+    "uid": "3476ad0c-8a07-4794-9116-70f02e2e9c88",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-05T21:04:51Z",
+    "updated": "2026-11-05T21:11:41.998Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2652",
+        "label": "PAN-2652",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2672",
+        "label": "PAN-2672",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "conversations",
+      "transcripts",
+      "claude-code",
+      "session-resolution",
+      "bugfix"
+    ],
+    "metadata": {
+      "sizeJustification": "One bug with five coupled failure points: the read/write door, one precedence helper routed through four pin-first sites, adoption, and stream follow. Shipping any subset leaves the Conversation and Terminal views disagreeing in a new way (e.g. a real write door without native-compact restart or stream follow). 24 files, mostly tests.",
+      "canonicalFilename": "2026-11-05-PAN-2652-conversation-view-diverges-from-terminal-claude-code-backgrounding-forks-the-session-file-in-process-invisible-to-all-session-id-resolution-paths.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Claude Code can move a running conversation to a new session file in-process (backgrounding a turn copies the history into a new session id). The launcher pin, the oldest-locator read door, the /clear-only orphan scanner and the agents-only live-id lookup all keep the old id, and the write door setConversationClaudeSessionId is a no-op under oldest-wins. The Conversation tab freezes while the Terminal advances; resume returns to the stale session; delivery receipts and cost ledger miss the fork.",
+      "Proposal": "Make the newest conversation_files locator the conversation's current session and make the write door re-point it (with a change notification). Route the four pin-first sites through one helper (human head: locator then pin; superseded /clear row: own locator; agents unchanged). Adopt forks in the 10 s lifecycle poll from the session index and from the backgrounding marker, both behind a shared-uuid lineage check. Let the open transcript stream switch files on the notification with a reset snapshot. Keep teardown matching the launched id, and restart the runtime on the fork after native /compact.",
+      "NonGoals": "- Fixing #2672's 'parent never stays ended' reconciler bug or its DB split-brain claim\n- Changing session resolution for agent conversations (agent-, planning-, specialist-)\n- Changing any non-Claude harness resolver (Pi, Codex, ACP, Kimi, Muse, Prime)\n- Rewriting launcher.sh for a live process; the next resume regenerates it\n- Live session switching for Shared Sessions viewers\n- Changing the origin-locator listing queries (sessions feed, archive, title search, batch lookup)\n- Any frontend change; following happens server-side on the existing subscription\n- Distinguishing an in-process fork from an outside 'claude --resume --fork-session' run whose session lands in the same session index\n- Adding a unique index or migration to conversation_files"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Lineage is matched on entry uuids copied into the fork (first 20 head uuids; the backgrounding uuid for the marker path), not on the first user-message uuid",
+        "rationale": "The issue comment (same author, later) corrects the body: a real fork on 2026-08-18 copied only part of the history; verified on this machine (myn 091805a1 -> 37d23b52, 1,536 of 12,384 entries copied, bg uuid shared)."
+      },
+      {
+        "summary": "Ship both candidate sources (session index and backgrounding marker) instead of gating the marker scan on a manual reproduction checkpoint",
+        "rationale": "Hook recording of the fork id is unverified (no managed fork exists on this machine), the marker path is cheap and bounded, and an interactive reproduction is not reliable for a work agent."
+      },
+      {
+        "summary": "Every adoption candidate must pass a shared-uuid lineage check",
+        "rationale": "conv-20260920-d73c's sessions.json contains sessions of other Claude processes in the same terminal session; the post-/clear session is also recorded there; lineage rejects both."
+      },
+      {
+        "summary": "Native /compact restarts the runtime on the compacted fork",
+        "rationale": "Once the write door is real the native-compact locator would otherwise make the view diverge from the live process, recreating this bug class."
+      },
+      {
+        "summary": "The write door upserts instead of inserting duplicates",
+        "rationale": "conversation_files has no unique index and the cost ledger sums every matching row, so duplicates double-count cost."
+      },
+      {
+        "summary": "The open stream follows via an in-process notifier fired by the write door, not a new event-store event",
+        "rationale": "Adoption and the stream run in the same dashboard process; no wire-contract change and no frontend change are needed."
+      }
+    ],
+    "items": [
+      {
+        "id": "w1-current-locator-door",
+        "title": "Read door returns the newest locator and the write door re-points it",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-05T21:04:51Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2652",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversations.ts",
+            "src/lib/overdeck/conversation-session-events.ts",
+            "tests/unit/lib/overdeck/conversation-current-locator.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/conversation-current-locator.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversation-current-locator.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-10",
+            "NFR-3"
+          ],
+          "foundationFor": [
+            "w6-stream-follows-session",
+            "w10-native-compact-restart",
+            "w11-resume-adopted-fork-test"
+          ]
+        },
+        "narrative": {
+          "Action": "Read .pan/drafts/PAN-2652.md section W1. Create the leaf notifier module src/lib/overdeck/conversation-session-events.ts exactly as in the PRD. Flip ONLY the LEGACY_CONVERSATION_SELECT subquery at conversations.ts:409 to 'cf.created_at DESC, cf.id DESC' (keep the claude-code harness preference). Replace setConversationClaudeSessionId with the PRD's transactional no-op/UPDATE/INSERT version that calls notifyConversationSessionChanged only when the current locator changed. Rewrite the resolveLiveSessionId doc comment; add no filesystem read for human rows."
+        },
+        "items": [
+          {
+            "id": "w1-current-locator-door.ac1",
+            "title": "Given a conversation created with locator a, when setConversationClaudeSessionId(name, b) runs, then getConversationByName(name).claudeSessionId returns b",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1-current-locator-door.ac2",
+            "title": "Given the write door is called twice with b, when conversation_files is queried, then exactly one row has locator b and the onConversationSessionChanged listener fired once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1-current-locator-door.ac3",
+            "title": "Given locators a then b, when the write door re-points to a, then claudeSessionId returns a and each locator still has exactly one row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1-current-locator-door.ac4",
+            "title": "Given cost_events rows for sessions a and b, when getConversationLedgerCosts() runs, then the conversation total equals the sum of both rows counted once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w2-session-id-helper",
+        "title": "Add resolveConversationClaudeSessionId with the D3 precedence",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-05T21:04:51Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2652",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-claude-session.ts",
+            "tests/unit/lib/overdeck/conversation-claude-session.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/conversation-claude-session.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "conversation-claude-session.test.ts passes",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "NFR-4"
+          ],
+          "foundationFor": [
+            "w3-route-conversation-reads",
+            "w4-route-fork-source",
+            "w5-route-share-bridge",
+            "w6-stream-follows-session"
+          ]
+        },
+        "narrative": {
+          "Action": "Read .pan/drafts/PAN-2652.md section W2. New leaf module with the exact function from the PRD: superseded row -> own claudeSessionId (pin never read); agent name -> pin ?? claudeSessionId; human chain head -> claudeSessionId ?? pin. readPin is injectable for tests."
+        },
+        "items": [
+          {
+            "id": "w2-session-id-helper.ac1",
+            "title": "Given a human chain head whose locator is b and launcher pin is a, when resolveConversationClaudeSessionId runs, then it returns b",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2-session-id-helper.ac2",
+            "title": "Given a human chain head with a null locator and launcher pin a, when the helper runs, then it returns a",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2-session-id-helper.ac3",
+            "title": "Given a superseded row (clearedToConvId set) with locator a and pin c, when the helper runs, then it returns a and the injected readPin is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2-session-id-helper.ac4",
+            "title": "Given an agent-prefixed conversation with locator b and pin a, when the helper runs, then it returns a",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w3-route-conversation-reads",
+        "title": "Route resolveSessionFile through the session-id helper",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-05T21:04:51Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2652",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-reads.ts",
+            "tests/unit/lib/overdeck/conversation-reads-session-file.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/conversation-reads-session-file.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversation-reads-session-file.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Read .pan/drafts/PAN-2652.md section W3. Replace the pin-first lines at conversation-reads.ts:158-159 with 'const sessionId = await resolveConversationClaudeSessionId(conv);', update the comment, drop the now-unused import. Add the two tests from the PRD, including the #2672 parent/head shape."
+        },
+        "items": [
+          {
+            "id": "w3-route-conversation-reads.ac1",
+            "title": "Given a human conversation whose launcher pins a and whose current locator is b, when resolveSessionFile runs, then it returns the path ending b.jsonl",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w3-route-conversation-reads.ac2",
+            "title": "Given a superseded parent with locator a and its chain head with locator c sharing one launcher that pins a, when resolveSessionFile runs for each, then the parent returns a.jsonl and the head returns c.jsonl",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w3-route-conversation-reads.ac3",
+            "title": "Given the change, when git grep 'pinned ?? conv.claudeSessionId' runs on conversation-reads.ts, then it returns no match",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w4-route-fork-source",
+        "title": "Route resolveForkSourceSessionFile through the session-id helper",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-05T21:04:51Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2652",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/fork-source-session.ts",
+            "tests/unit/lib/overdeck/fork-source-session.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/fork-source-session.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "fork-source-session.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Read .pan/drafts/PAN-2652.md section W4. Same before/after as W3 at fork-source-session.ts:83-84; new test file."
+        },
+        "items": [
+          {
+            "id": "w4-route-fork-source.ac1",
+            "title": "Given a human conversation with launcher pin a and current locator b where both JSONL files exist, when resolveForkSourceSessionFile runs, then it returns the b.jsonl path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w4-route-fork-source.ac2",
+            "title": "Given the change, when git grep 'pinned ?? conv.claudeSessionId' runs on fork-source-session.ts, then it returns no match",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w5-route-share-bridge",
+        "title": "Route the shared-session bridge through the session-id helper",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-05T21:04:51Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2652",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/sharing/conversation-bridge.ts",
+            "src/dashboard/server/sharing/__tests__/conversation-bridge.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/sharing/__tests__/conversation-bridge.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversation-bridge.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Read .pan/drafts/PAN-2652.md section W5. Replace conversation-bridge.ts:233-234 with 'const sessionId = await resolveConversationClaudeSessionId(conv);'. Live switching for share viewers is a NonGoal."
+        },
+        "items": [
+          {
+            "id": "w5-route-share-bridge.ac1",
+            "title": "Given a conversation with launcher pin a and current locator b, when resolveClaudeSessionFile runs, then it returns sessionFilePath(cwd, b)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w5-route-share-bridge.ac2",
+            "title": "Given the change, when git grep 'pinned ?? conv.claudeSessionId' runs on conversation-bridge.ts, then it returns no match",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w6-stream-follows-session",
+        "title": "Open Conversation tab switches to the new transcript when the current session changes",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-05T21:04:51Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2652",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/ws-rpc.ts",
+            "src/dashboard/server/services/conversation-session-follow.ts",
+            "src/dashboard/server/services/claude-transcript-stream.ts",
+            "src/dashboard/server/services/__tests__/conversation-session-follow.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/conversation-session-follow.test.ts src/dashboard/server/services/__tests__/claude-transcript-stream.test.ts",
+            "npm run typecheck",
+            "wc -l src/dashboard/server/ws-rpc.ts"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors",
+            "ws-rpc.ts has at most 1143 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Read .pan/drafts/PAN-2652.md section W6. Add the reset option to streamClaudeTranscript (reset only when (opts.reset || resume) AND the snapshot is non-empty), create followConversationSession (Stream.concat(Stream.make(false), changes) piped to Stream.switchMap(open)), and replace the pin block at ws-rpc.ts:826-850 with a follow call that re-reads the row, resolves the id with resolveConversationClaudeSessionId, keeps the agentId subagent path and isPiSessionFile guard, and passes resume only on the first open. Net ws-rpc.ts line change must be <= 0."
+        },
+        "items": [
+          {
+            "id": "w6-stream-follows-session.ac1",
+            "title": "Given a follow stream is open, when notifyConversationSessionChanged fires for that conversation, then open is called again with switched=true and the previous inner stream is interrupted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w6-stream-follows-session.ac2",
+            "title": "Given the follow stream is interrupted, when listeners are counted, then no onConversationSessionChanged listener remains for that conversation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w6-stream-follows-session.ac3",
+            "title": "Given streamClaudeTranscript is opened with { reset: true } and no resume, when it emits its first event for a non-empty file, then the event is a snapshot with reset: true, and for an empty file the snapshot carries no reset",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w6-stream-follows-session.ac4",
+            "title": "Given the change, when git grep 'pinnedSessionId ?? conv.claudeSessionId' runs on ws-rpc.ts, then it returns no match and wc -l reports at most 1143 lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w7-adopt-forks-session-index",
+        "title": "Lifecycle poll adopts lineage-verified forks recorded in the session index",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-05T21:04:51Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2652",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-fork-adoption.ts",
+            "src/dashboard/server/services/conversation-lifecycle.ts",
+            "tests/unit/lib/overdeck/conversation-fork-adoption.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/conversation-fork-adoption.test.ts src/dashboard/server/services/__tests__/conversation-lifecycle.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-7",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Read .pan/drafts/PAN-2652.md section W7. New module exporting adoptForkedClaudeSessions(activeConvs, deps) with the eligibility, candidate (file = sessionFilePath(conv.cwd, entry.sessionId) must exist; never compare dirname(entry.path)), /clear-sentinel, lineage (first 20 head uuids vs streamed current file, cached per (current id, candidate path), capped 2000) and adoption rules exactly as in the PRD. Move readFirstClearTimestamp from conversation-lifecycle.ts into the new module and import it back. Call adoption in the poll immediately before detectOrphanedClaudeCodeSessions, wrapped so a throw is logged and the /clear scan still runs. Async fs only."
+        },
+        "items": [
+          {
+            "id": "w7-adopt-forks-session-index.ac1",
+            "title": "Given an eligible conversation whose sessions.json records, after its current id, a same-project-dir session sharing copied entry uuids with the current file, when adoptForkedClaudeSessions runs, then adopt is called with that session id and the adoption log line is written",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w7-adopt-forks-session-index.ac2",
+            "title": "Given the session index records a post-/clear session (sentinel in lines 1-5, no shared uuids) or a session in another project dir, when adoption runs, then adopt is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w7-adopt-forks-session-index.ac3",
+            "title": "Given a candidate without shared uuids, when adoption runs twice, then the current file is streamed only on the first run (cached negative verdict)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w7-adopt-forks-session-index.ac4",
+            "title": "Given a superseded row, an agent-named row, or a candidate already owned by another conversation, when adoption runs, then that row or candidate is skipped",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w8-adopt-forks-backgrounding-marker",
+        "title": "Adopt forks marked by the backgrounding line when the index has none",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-05T21:04:51Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2652",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-fork-adoption.ts",
+            "tests/unit/lib/overdeck/conversation-fork-adoption.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/overdeck/conversation-fork-adoption.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversation-fork-adoption.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Read .pan/drafts/PAN-2652.md section W8. When W7 adopted nothing for an eligible conversation: read the current file backward in 64 KiB chunks until 20 parseable entries or 1 MiB, find a system entry in the last 20 parseable entries whose content starts 'Backgrounding after the current tool finishes', take its uuid B, scan top-level *.jsonl in the project dir (never subagents/) newer than the current file and not owned, gated by dir mtime per (current id, B); adopt the newest file containing '\"uuid\":\"<B>\"' with no /clear sentinel."
+        },
+        "items": [
+          {
+            "id": "w8-adopt-forks-backgrounding-marker.ac1",
+            "title": "Given a current file with the backgrounding entry 5 entries before its end and a newer project-dir file containing that entry's uuid but no session-index entry, when adoption runs, then adopt is called with the newer file's session id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w8-adopt-forks-backgrounding-marker.ac2",
+            "title": "Given a newer file without the marker uuid, or a file under <id>/subagents/ that contains it, when adoption runs, then adopt is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w8-adopt-forks-backgrounding-marker.ac3",
+            "title": "Given the project dir mtime is unchanged since the last scan for the same marker, when adoption runs again, then readdir is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w9-runtime-pids-pinned-needle",
+        "title": "Teardown process matching includes the launcher-pinned session id",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-05T21:04:51Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2652",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-runtime.ts",
+            "src/dashboard/server/routes/__tests__/conversation-teardown.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/conversation-teardown.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversation-teardown.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Read .pan/drafts/PAN-2652.md section W9. conversationRuntimeRootPids(conv, rows, extraSessionIds = []) builds needles from [conv.claudeSessionId, ...extraSessionIds] (trimmed, non-empty, deduped); killConversationRuntimeProcesses passes the launcher pin read via readLauncherPinnedSessionId. conversation-runtime.ts must not grow past its allowed count."
+        },
+        "items": [
+          {
+            "id": "w9-runtime-pids-pinned-needle.ac1",
+            "title": "Given a process row with args 'claude --resume a' and no launcher path, when conversationRuntimeRootPids runs for a conversation whose claudeSessionId is b with extraSessionIds ['a'], then the row's pid is returned",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w9-runtime-pids-pinned-needle.ac2",
+            "title": "Given the same row and no extraSessionIds, when conversationRuntimeRootPids runs, then the pid is not returned",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w10-native-compact-restart",
+        "title": "Native /compact restarts the runtime on the compacted fork",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-05T21:04:51Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2652",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-message.ts",
+            "src/lib/overdeck/__tests__/conversation-message-native-compact.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-message-native-compact.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversation-message-native-compact.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "Read .pan/drafts/PAN-2652.md section W10. After the fork locator write in the native-compact branch (conversation-message.ts:466-474), call stopConversationRuntime(conv, conv.name) then handleConversationResume(conv.name, { sendResumeContract: false }, { resolveSessionFile: deps.resolveSessionFile, resumeCause: 'system' }), and add restarted: resumed.status === 200 to the response. Copy the mock set from conversation-resume-clear-chain.test.ts."
+        },
+        "items": [
+          {
+            "id": "w10-native-compact-restart.ac1",
+            "title": "Given manualCompactMode overdeck-native and a stubbed compactConversationNative returning fork id f, when '/compact' is sent, then the runtime is stopped and the spawned launcher carries --resume f",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w10-native-compact-restart.ac2",
+            "title": "Given the same request, when the response is read, then it contains compacted: true and restarted: true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w11-resume-adopted-fork-test",
+        "title": "Resume after adoption resumes the adopted fork",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-05T21:04:51Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-2652",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/__tests__/conversation-resume-adopted-fork.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-resume-adopted-fork.test.ts"
+          ],
+          "expected_outputs": [
+            "conversation-resume-adopted-fork.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Read .pan/drafts/PAN-2652.md section W11. Test only: conversation with locator a and launcher pinning a; setConversationClaudeSessionId(name, b); create b.jsonl; harness not alive; handleConversationResume spawns with --resume b and the rewritten launcher.sh pins b."
+        },
+        "items": [
+          {
+            "id": "w11-resume-adopted-fork-test.ac1",
+            "title": "Given a conversation whose current locator was re-pointed from a to b and whose harness is not alive, when handleConversationResume runs, then the spawn receives --resume b",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w11-resume-adopted-fork-test.ac2",
+            "title": "Given that resume, when launcher.sh is read with readLauncherPinnedSessionId, then it returns b",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w12-docs-session-resolution",
+        "title": "Document conversation session resolution and fork adoption",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-05T21:04:51Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2652",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'setConversationClaudeSessionId' docs/DASHBOARD-ARCHITECTURE.md",
+            "grep -n 'lineage' docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "both greps print a line inside the new bullet after the PAN-4485 /clear chain bullet"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-5",
+            "FR-6",
+            "FR-8",
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "Read .pan/drafts/PAN-2652.md section W12. Add one bullet directly after the PAN-4485 /clear chain bullet (~line 705) stating, in plain sentences, every rule listed in the PRD W12 section."
+        },
+        "items": [
+          {
+            "id": "w12-docs-session-resolution.ac1",
+            "title": "Given the docs change, when docs/DASHBOARD-ARCHITECTURE.md is read, then the bullet after the /clear chain bullet states that a conversation's Claude session is its current locator and the launcher pin is only the fallback for a head with no locator",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w12-docs-session-resolution.ac2",
+            "title": "Given the same bullet, when it is read, then it states that the lifecycle poll adopts forks only after a shared-uuid lineage check and never adopts a /clear session or a session another conversation owns",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w12-docs-session-resolution.ac3",
+            "title": "Given the same bullet, when it is read, then it names setConversationClaudeSessionId as the one write door, says an open Conversation tab follows it, and says native /compact restarts the runtime on the fork",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "w2-session-id-helper",
+        "to": "w3-route-conversation-reads",
+        "type": "blocks"
+      },
+      {
+        "from": "w2-session-id-helper",
+        "to": "w4-route-fork-source",
+        "type": "blocks"
+      },
+      {
+        "from": "w2-session-id-helper",
+        "to": "w5-route-share-bridge",
+        "type": "blocks"
+      },
+      {
+        "from": "w2-session-id-helper",
+        "to": "w6-stream-follows-session",
+        "type": "blocks"
+      },
+      {
+        "from": "w1-current-locator-door",
+        "to": "w6-stream-follows-session",
+        "type": "blocks"
+      },
+      {
+        "from": "w7-adopt-forks-session-index",
+        "to": "w8-adopt-forks-backgrounding-marker",
+        "type": "blocks"
+      },
+      {
+        "from": "w1-current-locator-door",
+        "to": "w10-native-compact-restart",
+        "type": "blocks"
+      },
+      {
+        "from": "w1-current-locator-door",
+        "to": "w11-resume-adopted-fork-test",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
