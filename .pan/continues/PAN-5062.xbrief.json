@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5062",
   "created": "2026-11-05T22:39:32.195Z",
-  "updated": "2026-11-05T23:06:31.640Z",
+  "updated": "2026-11-05T23:08:11.263Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -40,9 +40,10 @@
       "doneAt": "2026-11-05T23:06:25.256Z"
     },
     "docs-dbt-recipe": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5062",
-      "claimedAt": "2026-11-05T23:06:31.640Z"
+      "claimedAt": "2026-11-05T23:06:31.640Z",
+      "doneAt": "2026-11-05T23:08:11.263Z"
     }
   }
 }
