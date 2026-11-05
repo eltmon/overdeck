@@ -141,10 +141,15 @@ export async function prepareClaudeOverdeckMcp(
   } catch (error) {
     console.warn(`[agent-injection] overdeck MCP skipped for ${owner.agentId}: ${(error as Error).message}`);
   }
+  let project: { servers: Record<string, ProjectMcpServer>; strict: boolean } = { servers: {}, strict: false };
   try {
-    const project = await launchProjectServers(owner);
-    Object.assign(servers, project.servers);
-    if (Object.keys(servers).length === 0) return {};
+    project = await launchProjectServers(owner);
+  } catch (error) {
+    console.warn(`[agent-injection] project MCP skipped for ${owner.agentId}: ${(error as Error).message}`);
+  }
+  Object.assign(servers, project.servers);
+  if (Object.keys(servers).length === 0) return {};
+  try {
     dir ??= launchDir(owner);
     if (dir === undefined) throw new Error('a conversation launch needs its state dir');
     return {
@@ -154,7 +159,7 @@ export async function prepareClaudeOverdeckMcp(
       ...(project.strict ? { mcpStrict: true } : {}),
     };
   } catch (error) {
-    console.warn(`[agent-injection] project MCP skipped for ${owner.agentId}: ${(error as Error).message}`);
+    console.warn(`[agent-injection] overdeck MCP skipped for ${owner.agentId}: ${(error as Error).message}`);
     return {};
   }
 }

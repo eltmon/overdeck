@@ -13,6 +13,7 @@ const mcpAgents = vi.hoisted(() => ({ value: true }));
 const mintFailure = vi.hoisted(() => ({ error: null as Error | null }));
 type ProjectMcpResult = Awaited<ReturnType<typeof import('../../../../src/lib/projects/project-mcp.js').resolveProjectMcpServers>>;
 const projectMcp = vi.hoisted(() => ({
+  error: null as Error | null,
   result: { projectKey: null, servers: {}, strict: false } as ProjectMcpResult,
   calls: [] as Array<{ issueId?: string; cwd?: string; reservedNames: readonly string[] }>,
 }));
@@ -23,6 +24,7 @@ vi.mock('../../../../src/lib/projects/project-mcp.js', async (importOriginal) =>
     ...actual,
     resolveProjectMcpServers: vi.fn(async (input: { issueId?: string; cwd?: string; reservedNames: readonly string[] }) => {
       projectMcp.calls.push({ issueId: input.issueId, cwd: input.cwd, reservedNames: input.reservedNames });
+      if (projectMcp.error) throw projectMcp.error;
       return projectMcp.result;
     }),
   };
@@ -66,6 +68,7 @@ beforeEach(async () => {
   _resetAccessTokensForTests();
   mcpAgents.value = true;
   mintFailure.error = null;
+  projectMcp.error = null;
   projectMcp.result = { projectKey: null, servers: {}, strict: false };
   projectMcp.calls = [];
 });
@@ -281,6 +284,18 @@ describe('project MCP servers in the launch MCP file (PAN-5061 WI-5)', () => {
 
     expect(result.overdeckMcpServerNames).toEqual(['linear']);
     expect(warn).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the minted overdeck server when project resolution throws', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    projectMcp.error = new Error('projects.yaml is malformed');
+    const result = await prepareClaudeOverdeckMcp({ agentId: 'agent-acme-9', agentKind: 'agent', role: 'work', harness: 'claude-code', cwd: '/w/acme' });
+    const configPath = join(home, 'agents', 'agent-acme-9', 'overdeck-mcp.json');
+
+    expect(result).toEqual({ overdeckMcpConfig: configPath });
+    expect(Object.keys(await readServers(configPath))).toEqual(['overdeck']);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0]![0])).toContain('project MCP skipped for agent-acme-9: projects.yaml is malformed');
   });
 
   it('returns {} and writes no file when nothing resolves', async () => {
