@@ -102,10 +102,13 @@ under the scan root, and no skill nested inside another skill.
 
 Overdeck looks for a license in this order: the `plugin.json` `license`
 string, as written, when one is set; otherwise the first non-blank line of
-`LICENSE`, then `LICENSE.md`, at the plugin root. It checks that line for
-one of four case-sensitive tokens — `MIT`, `Apache`, `BSD`, `GPL` — and
-stores only the matching token. With no match, the `pan skills pack add`
-preview shows `License unknown`. `LICENSE.txt` and `COPYING` are not read.
+`LICENSE` at the plugin root, or of `LICENSE.md` when `LICENSE` is absent
+or blank. It checks that line for one of four case-sensitive tokens —
+`MIT`, `Apache`, `BSD`, `GPL` — and stores only the matching token. With
+no match (including an unmatched `LICENSE` whose first line names no
+token), the `pan skills pack add` preview shows `License unknown` — it
+does not fall through to `LICENSE.md` in that case. `LICENSE.txt` and
+`COPYING` are not read.
 
 Recommend either a `license` string in `plugin.json`, or a `LICENSE` whose
 first line contains one of the four tokens.

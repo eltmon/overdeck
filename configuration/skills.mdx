@@ -14,8 +14,10 @@ valid pack, see [Authoring a skill pack](/guides/skill-pack-authoring).
 No schema validates any of these keys — each reader parses its own file
 by hand, and a malformed value is simply ignored rather than rejected.
 Prefer the CLI (`pan skills set`, `pan skills pack …`) to hand-editing
-these files; a hand edit that breaks the YAML is read as if the file were
-empty, silently.
+these files; a hand edit that breaks the YAML is read as if the file
+were empty for most reads, silently — `pan skills set` against a broken
+global `config.yaml` is the exception and exits 1 with `cannot parse
+<path>`.
 
 ## Where settings live
 
@@ -54,7 +56,7 @@ skills:
 | --- | --- | --- | --- |
 | `url` | non-empty string | none; required unless the pack id is known | `pan skills pack add` |
 | `ref` | non-empty string (tag, branch, or SHA) | none; `pstack` and `sageox` default it | `pan skills pack add\|update` |
-| `commit` | 40 lowercase hex characters | the commit the ref resolved to | `pan skills pack add\|update\|sync` |
+| `commit` | 40 lowercase hex characters | the commit the ref resolved to | `pan skills pack add\|update` |
 | `adapter` | one of `plain`, `claude-plugin`, `deft-readonly`, `gstack-runtime` | unset — resolved from `KNOWN_PACKS` or detection when absent | `pan skills pack add --adapter` only |
 | `browser` | `true` only | unset (no consent recorded) | `pan skills pack browser <id> on\|off` |
 
