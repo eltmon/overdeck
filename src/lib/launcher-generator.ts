@@ -238,8 +238,7 @@ export interface LauncherConfig extends CodexNativeEndpointOption {
    *   --mcp-config <path> --dangerously-load-development-channels server:<name>
    * to the claude command before --session-id and --model.
    *
-   * --mcp-config is additive — project-level .mcp.json continues to load —
-   * so we MUST NOT also pass --strict-mcp-config.
+   * A repo .mcp.json never loads here: it waits for an approval Overdeck never gives (PAN-5061 F-2); strict mode is opt-in per project (`mcp_strict`).
    *
    * When undefined, the generated script is byte-for-byte identical to the
    * pre-PAN-985 behaviour (channels off path).
@@ -256,6 +255,10 @@ export interface LauncherConfig extends CodexNativeEndpointOption {
 
   /** PAN-4932: `<dir>/overdeck-mcp.json`; Claude Code paths append `--mcp-config=` and, without an allow-list, `--allowedTools=mcp__overdeck`. */
   overdeckMcpConfig?: string;
+  /** PAN-5061: server names in `overdeckMcpConfig`, for `--allowedTools=`. */
+  overdeckMcpServerNames?: string[];
+  /** PAN-5061: the launch project's `mcp_strict`; Claude Code paths add `--strict-mcp-config`. */
+  mcpStrict?: boolean;
 
   /** Wrap Claude Code in the PTY supervisor: `node <supervisorScriptPath> claude ...`. Defaults to false. */
   useSupervisor?: boolean;
@@ -268,8 +271,7 @@ export interface LauncherConfig extends CodexNativeEndpointOption {
  * fragment when both channels-bridge fields are set. Returns an empty string when
  * channelsBridgeMcpConfig is unset so existing call sites stay byte-identical.
  *
- * Note: --mcp-config is intentionally additive (no --strict-mcp-config) so the
- * project's .mcp.json continues to load alongside the bridge.
+ * A repo .mcp.json never loads in a spawned session (PAN-5061 F-2); strict mode is opt-in per project (`mcp_strict`).
  */
 function buildChannelsArgs(config: LauncherConfig): string {
   if (!config.channelsBridgeMcpConfig) return '';
@@ -555,7 +557,7 @@ function buildCommand(config: LauncherConfig): string[] {
     if (config.baseCommand) {
       let cmd = config.baseCommand;
       cmd += buildChannelsArgs(config);
-      cmd += overdeckMcpArgs(config.overdeckMcpConfig, cmd);
+      cmd += overdeckMcpArgs(config.overdeckMcpConfig, cmd, { serverNames: config.overdeckMcpServerNames, strict: config.mcpStrict });
       for (const file of systemPromptFiles(config)) {
         cmd += ` --append-system-prompt-file ${shellQuote(file)}`;
       }
@@ -688,7 +690,7 @@ function buildNonConversationCommand(config: LauncherConfig, useExec: boolean): 
 
   // Append channels bridge args (no-op when channelsBridgeMcpConfig unset)
   cmd += buildChannelsArgs(config);
-  cmd += overdeckMcpArgs(config.overdeckMcpConfig, cmd);
+  cmd += overdeckMcpArgs(config.overdeckMcpConfig, cmd, { serverNames: config.overdeckMcpServerNames, strict: config.mcpStrict });
 
   // Append session args
   if (config.resumeSessionId) {
