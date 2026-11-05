@@ -426,3 +426,43 @@ describe('runQualityGates — PAN-5062 gate.env placeholders', () => {
     expect(call[1]?.env?.DBT_SCHEMA).toBe('dev_{{FEATURE_IDENT}}');
   });
 });
+
+describe('runQualityGates — PAN-5062 workspaceEnv merge', () => {
+  beforeEach(() => {
+    execMock.mockReset();
+    execMock.mockResolvedValue({ stdout: '', stderr: '' });
+  });
+
+  it('lets gate.env override a workspaceEnv key but keeps the rest on a host gate', async () => {
+    const gates = { dbt: { command: 'dbt build', env: { DBT_SCHEMA: 'gate' } } };
+    await runQualityGates(gates, workspacePath, 'pre_push', {
+      workspaceEnv: { DBT_SCHEMA: 'ws', DBT_TARGET: 'dev' },
+    });
+
+    const env = execMock.mock.calls[0][1]?.env;
+    expect(env?.DBT_SCHEMA).toBe('gate');
+    expect(env?.DBT_TARGET).toBe('dev');
+  });
+
+  it('preserves a dashboard-runtime-named key set only by workspaceEnv instead of deleting it', async () => {
+    const gates = { dbt: { command: 'dbt build' } };
+    await runQualityGates(gates, workspacePath, 'pre_push', {
+      workspaceEnv: { PORT: '4100' },
+    });
+
+    expect(execMock.mock.calls[0][1]?.env?.PORT).toBe('4100');
+  });
+
+  it('never passes workspaceEnv to a container gate\'s -e flags', async () => {
+    execMock.mockResolvedValueOnce({ stdout: 'proj-feature-pan-1-dbt\n', stderr: '' });
+    const gates = {
+      dbt: { command: 'dbt build', container: true, container_name: 'proj-feature-pan-1-dbt' },
+    };
+    await runQualityGates(gates, workspacePath, 'pre_push', {
+      workspaceEnv: { DBT_TARGET: 'dev' },
+    });
+
+    const cmd = execMock.mock.calls[1][0] as string;
+    expect(cmd).not.toContain('-e DBT_TARGET');
+  });
+});
