@@ -25,6 +25,8 @@ import { open, readdir, readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 
+import type { HarnessTranscriptKind } from '@overdeck/contracts';
+
 import { getOverdeckHome } from '../paths.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { claudeProjectDir } from '../runtimes/storage/claude-code.js';
@@ -189,13 +191,24 @@ export async function readFirstClearTimestamp(
   return { clearTs: null, definitive: lineCount > 5 };
 }
 
+/** Transcript kinds whose running process Claude Code can fork in-process (PAN-4562 table, not a harness branch). */
+const FORKS_IN_PROCESS: Record<HarnessTranscriptKind, boolean> = {
+  'claude-jsonl': true,
+  'ohmypi-jsonl': false,
+  'codex-rollout-jsonl': false,
+  'acp-jsonl': false,
+  'kimi-wire-jsonl': false,
+  'muse-jsonl': false,
+  'prime-agent-jsonl': false,
+};
+
 type EligibleConversation = LegacyConversation & { claudeSessionId: string; cwd: string; tmuxSession: string };
 
 function isEligible(conv: LegacyConversation): conv is EligibleConversation {
   return conv.status === 'active'
     && !isAgentConversationName(conv.name)
     && !isSupersededConversation(conv)
-    && getHarnessBehavior(conv.harness as HarnessName | null | undefined).transcriptKind === 'claude-jsonl'
+    && FORKS_IN_PROCESS[getHarnessBehavior(conv.harness as HarnessName | null | undefined).transcriptKind]
     && !!conv.cwd
     && !!conv.claudeSessionId
     && !!conv.tmuxSession;
