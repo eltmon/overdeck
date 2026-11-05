@@ -40,6 +40,15 @@ skill-name/
     └── assets/      - Files used in output (templates, images)
 ```
 
+## Where the skill goes
+
+A finished skill has four possible homes:
+
+- `sync-sources/skills/<name>/` — Overdeck's own bundled skills; `pan sync` ships them to every user. Use `/pan-skill-installer` to wire one in.
+- `<projectRoot>/.pan/skills/<name>/` — a project skill, copied once into a new issue workspace's `.claude/skills/` for Claude Code only (not Codex or Pi), and never overwritten once a name is taken.
+- `~/.claude/skills/` or `~/.agents/skills/` — a personal skill, local to your own machine.
+- a skill pack repository, as `skills/<name>/SKILL.md`, registered with `pan skills pack add`; see `guides/skill-pack-authoring.mdx`. Skill names here follow the same rule as everywhere else: `^[a-z0-9][a-z0-9-]*$`.
+
 ### Frontmatter (Critical)
 
 ```yaml
