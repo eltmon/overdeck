@@ -66,7 +66,7 @@ If your GitHub account is not on the invite list, or you cancel the GitHub step:
 This GitHub account is not on the overdeck.ai invite list, or sign-in was cancelled. Ask the operator to allow it, then run: pan account login
 ```
 
-Other failures: `The sign-in code expired. Run: pan account login`; `Cannot reach <baseUrl>: <reason>` after the service is unreachable for several consecutive polls; or, if a token arrived but reading the account afterward failed, the token is still saved and it prints `Signed in (device <label>, <deviceId>), but could not read the account: <reason>. Run: pan account status`.
+Other failures: `The sign-in code expired. Run: pan account login`; `Cannot reach <baseUrl>: <reason>` when the first request fails with a network error three times in a row (it is retried after 1 s and 2 s), or when the service is unreachable for several consecutive polls. `<reason>` names the underlying network cause when there is one, for example `fetch failed (ECONNRESET: socket hang up)`; or, if a token arrived but reading the account afterward failed, the token is still saved and it prints `Signed in (device <label>, <deviceId>), but could not read the account: <reason>. Run: pan account status`.
 
 ## status
 
