@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5069",
   "created": "2026-11-05T23:26:20.599Z",
-  "updated": "2026-11-05T23:40:58.410Z",
+  "updated": "2026-11-05T23:40:59.980Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -50,6 +50,11 @@
       "claimedBy": "agent-pan-5069",
       "claimedAt": "2026-11-05T23:39:51.904Z",
       "doneAt": "2026-11-05T23:40:58.410Z"
+    },
+    "a7-resumable-signin": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5069",
+      "claimedAt": "2026-11-05T23:40:59.980Z"
     }
   }
 }
