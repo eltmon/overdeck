@@ -53,7 +53,7 @@ function formatGateOutput(stdout: string, stderr: string): string {
   return [stdout, stderr].filter(Boolean).join('\n--- stderr ---\n');
 }
 
-function buildQualityGateEnv(gateEnv: Record<string, string> | undefined): NodeJS.ProcessEnv {
+function buildQualityGateEnv(gateEnv: Record<string, string> | undefined, projectEnv: Record<string, string> = {}): NodeJS.ProcessEnv {
   const env = { ...process.env };
   for (const key of DASHBOARD_RUNTIME_ENV_KEYS) {
     if (!Object.prototype.hasOwnProperty.call(gateEnv ?? {}, key)) {
@@ -74,7 +74,19 @@ function buildQualityGateEnv(gateEnv: Record<string, string> | undefined): NodeJ
   // gate may still opt back in via gate.env. The skip mechanism lives in
   // scripts/build-post-cli.mjs (PAN-1659). Release/publish builds the index
   // through a separate path (build-for-publish.mjs) that never sets this.
-  return { SKIP_DOCS_INDEX: '1', ...env, ...gateEnv };
+  // PAN-5061: the project's secrets go under gate.env, which still wins.
+  return { SKIP_DOCS_INDEX: '1', ...env, ...projectEnv, ...gateEnv };
+}
+
+/** The gate's project secrets (PAN-5061 FR-10); `{}` on any error, logged without values. */
+async function gateProjectEnv(issueId: string | undefined, projectPath: string): Promise<Record<string, string>> {
+  try {
+    const { projectLaunchEnv } = await import('../projects/launch-env.js');
+    return await projectLaunchEnv({ issueId, cwd: projectPath });
+  } catch (error) {
+    console.warn(`[project-env] gate project secrets skipped for ${issueId ?? projectPath}: ${(error as Error).message}`);
+    return {};
+  }
 }
 
 /**
@@ -173,6 +185,8 @@ export interface QualityGateResult {
 export interface QualityGateRunOptions {
   /** Issue identity included in admission logs and durable worker state. */
   issueId?: string;
+  /** PAN-5061: project secrets for gate env; resolved from projectPath when undefined. */
+  projectEnv?: Record<string, string>;
   /** Whether the workspace is remote (SSH) */
   isRemote?: boolean;
   /** VM name for SSH connections (required when isRemote is true) */
@@ -280,6 +294,8 @@ export async function runQualityGates(
     }
   }
   const results: QualityGateResult[] = [];
+  // PAN-5061 D-8: host-run gates get their project's secrets; remote gates do not resolve them.
+  const projectEnv = opts.projectEnv ?? (opts.isRemote ? {} : await gateProjectEnv(opts.issueId, projectPath));
 
   for (const [name, gate] of Object.entries(gates)) {
     const gatePhase = gate.phase || 'pre_push';
@@ -453,7 +469,7 @@ export async function runQualityGates(
 
         // When running in container, don't set host cwd (irrelevant)
         const useHostCwd = !isRemote && !(gate.container && gate.container_name);
-        const env = buildQualityGateEnv(gate.env);
+        const env = buildQualityGateEnv(gate.env, projectEnv);
         if (admission) env.OVERDECK_GATE_ADMITTED = '1';
         const execPromise = execAsync(resolvedCommand, {
           cwd: useHostCwd ? cwd : undefined,

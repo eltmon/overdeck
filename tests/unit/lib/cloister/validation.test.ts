@@ -16,7 +16,13 @@ vi.mock('../../../../src/lib/cloister/quality-gate-admission.js', () => ({
   acquireQualityGateAdmission: admissionMocks.acquire,
 }));
 
+vi.mock('../../../../src/lib/projects/launch-env.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../../src/lib/projects/launch-env.js')>();
+  return { ...actual, projectLaunchEnv: vi.fn(actual.projectLaunchEnv) };
+});
+
 import { autoRevertMerge, runQualityGates } from '../../../../src/lib/cloister/validation.js';
+import { projectLaunchEnv } from '../../../../src/lib/projects/launch-env.js';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 
@@ -139,6 +145,41 @@ echo "pass stderr diagnostic" >&2
 
       expect(results).toEqual([]);
       expect(admissionMocks.acquire).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('runQualityGates project secrets (PAN-5061)', () => {
+    const probeGate = { probe: { command: 'echo "probe=[$PAN5061_PROBE]"' } };
+
+    it('gives a host gate the project value', async () => {
+      const [result] = await runQualityGates(probeGate, testDir, 'pre_push', { projectEnv: { PAN5061_PROBE: 'alpha' } });
+      expect(result.passed).toBe(true);
+      expect(result.output).toContain('probe=[alpha]');
+    });
+
+    it('lets gate.env override the project value', async () => {
+      const [result] = await runQualityGates(
+        { probe: { ...probeGate.probe, env: { PAN5061_PROBE: 'from-gate' } } },
+        testDir,
+        'pre_push',
+        { projectEnv: { PAN5061_PROBE: 'alpha' } },
+      );
+      expect(result.output).toContain('probe=[from-gate]');
+    });
+
+    it('leaves the key absent with an empty projectEnv', async () => {
+      const [result] = await runQualityGates(probeGate, testDir, 'pre_push', { projectEnv: {} });
+      expect(result.output).toContain('probe=[]');
+    });
+
+    it('resolves project secrets from projectPath for a host run, never for a remote run', async () => {
+      vi.mocked(projectLaunchEnv).mockClear();
+      await runQualityGates({}, testDir, 'pre_push', { issueId: 'NOPE-1' });
+      expect(projectLaunchEnv).toHaveBeenCalledWith({ issueId: 'NOPE-1', cwd: testDir });
+
+      vi.mocked(projectLaunchEnv).mockClear();
+      await runQualityGates({}, testDir, 'pre_push', { isRemote: true, vmName: 'vm-1' });
+      expect(projectLaunchEnv).not.toHaveBeenCalled();
     });
   });
 
