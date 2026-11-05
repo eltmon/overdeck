@@ -1,0 +1,586 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-05T22:35:51Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5062: dbt projects: placeholders in gate env, identifier-safe feature placeholder, per-workspace dev target",
+    "updated": "2026-11-05T22:38:18.249Z"
+  },
+  "plan": {
+    "id": "pan-5062",
+    "title": "dbt projects: placeholders in gate env, identifier-safe feature placeholder, per-workspace dev target",
+    "status": "proposed",
+    "uid": "b681e54e-6462-462f-aaa2-515f45d544e4",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-05T22:35:51Z",
+    "updated": "2026-11-05T22:38:18.249Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5062",
+        "label": "PAN-5062",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5062.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "quality-gates",
+      "placeholders",
+      "workspace-env",
+      "dbt",
+      "docs"
+    ],
+    "narratives": {
+      "Problem": "dbt projects cannot run cleanly through the pipeline. gate.env values are passed raw, so env: { DBT_SCHEMA: \"dev_{{FEATURE_NAME}}\" } reaches dbt literally. FEATURE_NAME contains hyphens (min-574), which are invalid in unquoted SQL identifiers. The rendered workspace .env is never loaded into agent shells or gates, and dbt env_var() reads only the process environment, so an agent's dbt build cannot target its own dev schema. The docs have no recipe and list only three gate placeholders.",
+      "Proposal": "Add a required FEATURE_IDENT placeholder (lowercase, every char outside [a-z0-9_] becomes _) at all six placeholder construction sites. Render gate.env values with the gate's placeholders once per gate and use the result for both the host env and container -e flags. Add an opt-in workspace.env.load switch: a new src/lib/workspace-env.ts parses the rendered workspace .env (never sources it), drops reserved keys, and feeds host gates (precedence process < workspace .env < gate.env) and agent launchers (quoted exports emitted inside generateLauncherScript right after SKIP_DOCS_INDEX, skipped for project roots and remote launches). Document a dbt / data-projects recipe in configuration/projects.mdx and list FEATURE_IDENT and env.load in polyrepo.mdx and docs/CONFIGURATION.md. Full detail, before/after snippets and file anchors are in .pan/drafts/PAN-5062.md.",
+      "NonGoals": "- Cloning or dropping a warehouse database per workspace (Hume create/teardown pattern)\n- Per-project credentials and MCP servers (filed separately)\n- Passing gate.env or the workspace .env to remote (Fly ssh) gates\n- Passing the workspace .env to container gates\n- Changing container docker exec -e quoting (stays -e K=\"v\")\n- Wiring, repurposing or removing the dead workspace.env.secrets_file field\n- Re-rendering <workspace>/.env for workspaces created before env.template changed\n- Loading the workspace .env by default (it stays opt-in via env.load)\n- Sourcing the .env file with the shell\n- Raising any scripts/file-size-allowlist.txt cap\n- Installing or invoking dbt, DuckDB, Snowflake or Docker in any test"
+    },
+    "autoDecisions": [
+      {
+        "summary": "FEATURE_IDENT is a required field of TemplatePlaceholders, not optional",
+        "rationale": "A required field makes npm run typecheck fail at any construction site that forgets it, which mechanically enforces 'available everywhere placeholders are'."
+      },
+      {
+        "summary": "FEATURE_IDENT = FEATURE_NAME.toLowerCase().replace(/[^a-z0-9_]/g, '_'), one char in one char out, no collapsing or leading-digit handling",
+        "rationale": "Plain reading of the issue (hyphens and dots become _, lowercase). Docs tell users to use it after a prefix (dev_{{FEATURE_IDENT}}), which also covers digit-leading names."
+      },
+      {
+        "summary": "Workspace .env loading is opt-in via workspace.env.load: true, default off",
+        "rationale": "Existing env.template projects would otherwise start exporting values such as PORT or COMPOSE_PROJECT_NAME into agent shells and gates, a silent behavior change."
+      },
+      {
+        "summary": "Host gate env precedence is process.env (filtered) < workspace .env < rendered gate.env",
+        "rationale": "gate.env is the most specific config and must win; the workspace .env is per-workspace and beats the dashboard's inherited env."
+      },
+      {
+        "summary": "The workspace .env is parsed (KEY=value) and emitted through shellQuote, never sourced; OVERDECK_*, PATH and HOME keys are dropped",
+        "rationale": "Compose-style .env values are not valid shell and sourcing executes them; reserved keys would break agent identity, tool resolution or gate determinism."
+      },
+      {
+        "summary": "Agent loading is one call inside generateLauncherScript (after SKIP_DOCS_INDEX), with all logic in src/lib/workspace-env.ts",
+        "rationale": "There are 15 generateLauncherScript call sites (spawn, resume, recovery x5, messaging, conversations, planning); one generator call covers all of them, and the generator has 3 lines of headroom under the 1000-line ceiling."
+      },
+      {
+        "summary": "Agent loading skips project roots and spawnMode 'remote'",
+        "rationale": "Conversations launch in the project root, whose .env Overdeck did not render; remote working dirs do not exist on this host."
+      },
+      {
+        "summary": "Container -e quoting is unchanged and container/remote gates do not get the workspace .env",
+        "rationale": "Single-quoting would stop host $VAR expansion existing configs may rely on; containers get env from compose; remote gates never received gate.env either."
+      },
+      {
+        "summary": "Recipe gate names are dbt-parse and dbt-build",
+        "rationale": "selectLocalVerificationGates drops a gate named exactly 'test' from the local run when verification.tests resolves to ci."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "One user-facing capability (dbt-ready gates and per-workspace dev target) whose three code changes share TemplatePlaceholders, QualityGateRunOptions and the new workspace-env module; splitting into sibling issues would ship a placeholder no gate env can use, or an env switch with no identifier-safe value to put in it.",
+      "canonicalFilename": "2026-11-05-PAN-5062-dbt-projects-placeholders-in-gate-env-identifier-safe-feature-placeholder-per-workspace-dev-target.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "feature-ident-placeholder",
+        "title": "Add the FEATURE_IDENT placeholder at every placeholder construction site",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-05T22:35:51Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5062",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/workspace-config.ts",
+            "src/lib/workspace/devcontainer-renderer.ts",
+            "src/lib/cloister/verification-runner.ts",
+            "src/dashboard/server/routes/workspaces/merge-ops.ts",
+            "src/lib/test-runner.ts",
+            "src/lib/lifecycle/teardown-workspace.ts",
+            "tests/unit/lib/workspace-config-feature-ident.test.ts",
+            "src/lib/workspace/__tests__/ensure-devcontainer.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/workspace-config-feature-ident.test.ts src/lib/workspace/__tests__/ensure-devcontainer.test.ts",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "workspace-config-feature-ident.test.ts and ensure-devcontainer.test.ts pass",
+            "file-size guard reports no violations"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. In src/lib/workspace-config.ts add a required `FEATURE_IDENT: string;` to `export interface TemplatePlaceholders` (after FEATURE_NAME, with a PAN-5062 comment) and an exported `toFeatureIdent(featureName: string): string` directly above `replacePlaceholders`, returning `featureName.toLowerCase().replace(/[^a-z0-9_]/g, '_')`. Set FEATURE_IDENT next to FEATURE_NAME at the five other construction sites: createWorkspacePlaceholders in src/lib/workspace/devcontainer-renderer.ts (`toFeatureIdent(featureName)`), the `const placeholders: TemplatePlaceholders = {` literal in src/lib/cloister/verification-runner.ts (~406, `toFeatureIdent(featureName)`), the `const gatePlaceholders = {` literal in src/dashboard/server/routes/workspaces/merge-ops.ts (~650), the placeholders literal in src/lib/test-runner.ts (~299, `toFeatureIdent(featureName || 'main')`), and `function buildPlaceholders(` in src/lib/lifecycle/teardown-workspace.ts (`toFeatureIdent(issueLower)`). Leave src/dashboard/server/routes/workspaces.ts ~1039 alone (port map, not TemplatePlaceholders). Add tests: new tests/unit/lib/workspace-config-feature-ident.test.ts and one assertion in the existing createWorkspacePlaceholders describe of src/lib/workspace/__tests__/ensure-devcontainer.test.ts. merge-ops.ts is over 1000 lines (cap 1835) and may grow by one line only."
+        },
+        "items": [
+          {
+            "id": "feature-ident-placeholder.ac1",
+            "title": "Given toFeatureIdent, when called with 'min-574', 'MIN-574.1' and 'pan_5062', then it returns 'min_574', 'min_574_1' and 'pan_5062' (asserted in tests/unit/lib/workspace-config-feature-ident.test.ts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "feature-ident-placeholder.ac2",
+            "title": "Given the substitution map for feature 'min-574', when the workspace-config.ts token substitution function renders 'dev_{{FEATURE_IDENT}}', then it returns 'dev_min_574'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "feature-ident-placeholder.ac3",
+            "title": "Given the workspace token builder in devcontainer-renderer.ts called with feature 'min-846', when its result is read, then FEATURE_IDENT equals 'min_846' (asserted in ensure-devcontainer.test.ts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "feature-ident-placeholder.ac4",
+            "title": "Given FEATURE_IDENT is a required field of the token interface in workspace-config.ts, when npm run typecheck runs, then it exits 0 and the diff sets FEATURE_IDENT in verification-runner.ts, merge-ops.ts, test-runner.ts, teardown-workspace.ts and devcontainer-renderer.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gate-env-placeholders",
+        "title": "Render gate.env placeholders for host and container quality gates",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-05T22:35:51Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5062",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/validation.ts",
+            "tests/cloister/verification-gate.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/cloister/verification-gate.test.ts tests/unit/lib/cloister/validation.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "verification-gate.test.ts and validation.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. In runQualityGates (src/lib/cloister/validation.ts), right after `const command = opts.placeholders ? replacePlaceholders(gate.command, ...) : gate.command;` (~323), compute `const gateEnv = gate.env && opts.placeholders ? Object.fromEntries(Object.entries(gate.env).map(([k, v]) => [k, replacePlaceholders(v, opts.placeholders!)])) : gate.env;` with a PAN-5062 comment. Use gateEnv in the container `envFlags` map (~391; keep the `-e ${k}=\"${v}\"` quoting) and in `buildQualityGateEnv(gateEnv)` (~456). Remote (fly ssh) path unchanged. In tests/cloister/verification-gate.test.ts (exec is mocked) add FEATURE_IDENT: 'pan_1' to the PAN-666 placeholders fixture and add three tests: host env rendering, container -e rendering (first execMock call resolves the docker ps liveness stdout 'proj-feature-pan-1-dbt\\n'), and literal pass-through without placeholders."
+        },
+        "items": [
+          {
+            "id": "gate-env-placeholders.ac1",
+            "title": "Given a host gate with env { DBT_SCHEMA: 'dev_{{FEATURE_IDENT}}' } and a substitution map whose FEATURE_IDENT is 'pan_1', when runQualityGates runs it, then the exec call's options.env.DBT_SCHEMA equals 'dev_pan_1'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-env-placeholders.ac2",
+            "title": "Given a container gate with container_name 'proj-{{FEATURE_FOLDER}}-dbt' and the same env, when runQualityGates runs it against a live container, then the docker exec command contains '-e DBT_SCHEMA=\"dev_pan_1\"' and contains no '{{'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-env-placeholders.ac3",
+            "title": "Given runQualityGates is called without a substitution map, when the host gate runs, then options.env.DBT_SCHEMA preserves the literal 'dev_{{FEATURE_IDENT}}'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "workspace-env-module",
+        "title": "Add the workspace-env module and the workspace.env.load config field",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-05T22:35:51Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5062",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "gates-load-workspace-env",
+            "launcher-workspace-env"
+          ],
+          "files_scope": [
+            "src/lib/workspace-env.ts",
+            "src/lib/workspace-config.ts",
+            "src/lib/projects.ts",
+            "tests/unit/lib/workspace-env.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/workspace-env.test.ts",
+            "npm run lint:circular",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "workspace-env.test.ts passes",
+            "circular-dependency lint reports no new cycle",
+            "file-size guard reports no violations (projects.ts does not grow)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. Create src/lib/workspace-env.ts exporting parseWorkspaceEnv(content), readWorkspaceEnv(workspacePath), loadWorkspaceEnvForProject(project, workspacePath) and workspaceEnvLauncherLines(workingDir, findProject = findProjectByPath). parseWorkspaceEnv: trim each line, skip blank and '#' lines, strip an optional leading 'export ', match ^([A-Za-z_][A-Za-z0-9_]*)=(.*)$, strip one pair of matching surrounding quotes, drop keys matching /^OVERDECK_/ plus PATH and HOME, ignore non-matching lines. readWorkspaceEnv returns {} when <workspacePath>/.env is missing. loadWorkspaceEnvForProject returns {} unless project?.workspace?.env?.load === true and resolve(workspacePath) !== resolve(project.path). workspaceEnvLauncherLines checks existsSync(<workingDir>/.env) first (returns [] without a project lookup), then maps loadWorkspaceEnvForProject(findProject(workingDir), workingDir) to `export ${k}=${shellQuote(v)}` lines (shellQuote from src/lib/shell-quote.ts). Add `load?: boolean` with a PAN-5062 doc comment to `export interface EnvConfig` in src/lib/workspace-config.ts, and add `load?: boolean` on the same line of the inline env type in src/lib/projects.ts (grep `env?: { template?: string; secrets_file?: string }`; projects.ts is over 1000 lines and must not grow). No child processes. Tests in tests/unit/lib/workspace-env.test.ts use temp dirs and fake values only."
+        },
+        "items": [
+          {
+            "id": "workspace-env-module.ac1",
+            "title": "Given .env content with a comment, an 'export ' prefix, quoted values, 'URL=http://x?a=1&b=2', and OVERDECK_AGENT_ID/PATH/HOME keys, when parseWorkspaceEnv runs, then it returns the unquoted values, keeps the URL literally and drops the three reserved keys",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workspace-env-module.ac2",
+            "title": "Given a project without env.load, or a workspacePath equal to project.path, when loadWorkspaceEnvForProject runs, then it returns {}; given env.load true and a workspace .env, then it returns the parsed map",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workspace-env-module.ac3",
+            "title": "Given an opted-in workspace .env with DBT_SCHEMA=dev_min_574 and a value containing a single quote, '&' and a space, when workspaceEnvLauncherLines runs with an injected findProject, then it returns \"export DBT_SCHEMA='dev_min_574'\" and a shell-quoted line that bash evaluates back to the original value",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workspace-env-module.ac4",
+            "title": "Given a workingDir with no .env file, when workspaceEnvLauncherLines runs, then it returns [] and the injected findProject is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gates-load-workspace-env",
+        "title": "Merge the opted-in workspace .env into host quality gate environments",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-05T22:35:51Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5062",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/validation.ts",
+            "src/lib/cloister/verification-runner.ts",
+            "src/dashboard/server/routes/workspaces/merge-ops.ts",
+            "tests/cloister/verification-gate.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/cloister/verification-gate.test.ts tests/unit/lib/cloister/validation.test.ts",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "verification-gate.test.ts and validation.test.ts pass",
+            "file-size guard reports no violations"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. Add `workspaceEnv?: Record<string, string>` (PAN-5062 doc comment: host gates only) to QualityGateRunOptions in src/lib/cloister/validation.ts. Change buildQualityGateEnv to (gateEnv, workspaceEnv?) returning { SKIP_DOCS_INDEX: '1', ...env, ...workspaceEnv, ...gateEnv }, and make the DASHBOARD_RUNTIME_ENV_KEYS deletion keep a key that either workspaceEnv or gateEnv sets. Pass opts.workspaceEnv only on the host path (container envFlags and the remote fly ssh path do not use it). In src/lib/cloister/verification-runner.ts add `workspaceEnv: loadWorkspaceEnvForProject(projectConfig, workspacePath)` to the runQualityGates options (~501); do the same in the runQualityGates call in src/dashboard/server/routes/workspaces/merge-ops.ts (~682). Keep verification-runner.ts at or under 1000 lines. Tests in tests/cloister/verification-gate.test.ts with fake values."
+        },
+        "items": [
+          {
+            "id": "gates-load-workspace-env.ac1",
+            "title": "Given workspaceEnv { DBT_SCHEMA: 'ws', DBT_TARGET: 'dev' } and gate env { DBT_SCHEMA: 'gate' }, when a host gate runs, then the exec env has DBT_SCHEMA 'gate' and DBT_TARGET 'dev'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gates-load-workspace-env.ac2",
+            "title": "Given workspaceEnv { PORT: '4100' } and no gate env, when a host gate runs, then the exec env preserves PORT '4100' instead of deleting it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gates-load-workspace-env.ac3",
+            "title": "Given workspaceEnv { DBT_TARGET: 'dev' } and a container gate, when it runs, then the docker exec command contains no '-e DBT_TARGET'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gates-load-workspace-env.ac4",
+            "title": "Given the diff, when verification-runner.ts and merge-ops.ts call runQualityGates, then both pass workspaceEnv from loadWorkspaceEnvForProject(projectConfig, workspacePath)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "launcher-workspace-env",
+        "title": "Export the opted-in workspace .env from agent launcher scripts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-05T22:35:51Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5062",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/launcher-generator.ts",
+            "src/lib/__tests__/launcher-generator-workspace-env.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/launcher-generator-workspace-env.test.ts src/lib/__tests__/launcher-generator.test.ts",
+            "bash scripts/lint-file-size.sh",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "launcher-generator-workspace-env.test.ts and launcher-generator.test.ts pass",
+            "file-size guard reports no violations and launcher-generator.ts is at most 1000 lines",
+            "circular-dependency lint reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. In src/lib/launcher-generator.ts add `import { workspaceEnvLauncherLines } from './workspace-env.js';` and, directly after `lines.push('export SKIP_DOCS_INDEX=1');`, the single line `if (config.spawnMode !== 'remote') lines.push(...workspaceEnvLauncherLines(config.workingDir)); // PAN-5062`. The file is 997 lines and the ceiling is 1000. Implementation checkpoint: after the edit run `wc -l src/lib/launcher-generator.ts`; if it exceeds 1000, replace the five-line `if (config.extraEnvExports) { for ... lines.push(expr) }` block with the behavior-identical `lines.push(...(config.extraEnvExports ?? []));`. Never raise an allowlist cap. Add src/lib/__tests__/launcher-generator-workspace-env.test.ts that vi.mocks '../workspace-env.js' so workspaceEnvLauncherLines returns [\"export DBT_SCHEMA='dev_pan_1'\"]."
+        },
+        "items": [
+          {
+            "id": "launcher-workspace-env.ac1",
+            "title": "Given workspaceEnvLauncherLines returns \"export DBT_SCHEMA='dev_pan_1'\" and overdeckEnv.agentId is set, when generateLauncherScript runs, then the script contains that line after 'export SKIP_DOCS_INDEX=1' and before 'export OVERDECK_AGENT_ID='",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launcher-workspace-env.ac2",
+            "title": "Given spawnMode 'remote', when generateLauncherScript runs, then the script omits the DBT_SCHEMA export and workspaceEnvLauncherLines is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launcher-workspace-env.ac3",
+            "title": "Given the edited tree, when bash scripts/lint-file-size.sh runs, then it exits 0 and wc -l reports launcher-generator.ts at 1000 lines or fewer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-dbt-recipe",
+        "title": "Document the dbt and data projects recipe in configuration/projects.mdx",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-05T22:35:51Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5062",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/projects.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n 'dbt and data projects\\|FEATURE_IDENT\\|dbt-parse\\|dbt-build\\|env_var(.DBT_SCHEMA.)\\|dbt-duckdb\\|env.load\\|20 minutes' configuration/projects.mdx"
+          ],
+          "expected_outputs": [
+            "docs lint completes without errors",
+            "grep prints matches for every listed term"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. In configuration/projects.mdx: (1) in the ### Configuration Fields table add rows workspace.env.template and workspace.env.load directly after the existing `workspace` row; (2) in ### Quality gates change the `env` row to say values accept the same placeholders as command; (3) replace the sentence that lists only {{CHANGED_BASE}}, {{FEATURE_FOLDER}} and {{WORKSPACE_PATH}} with one saying command, container_name and env values accept every placeholder (FEATURE_NAME, FEATURE_IDENT, FEATURE_FOLDER, BRANCH_NAME, COMPOSE_PROJECT, DOMAIN, PROJECT_NAME, PROJECT_PATH, PROJECTS_DIR, WORKSPACE_PATH, HOME, CHANGED_BASE) and defining FEATURE_IDENT (min-574 -> min_574); (4) add a ### dbt and data projects subsection after the Quality gates example with: a working projects.yaml example (workspace.env.template 'DBT_SCHEMA=dev_{{FEATURE_IDENT}}', workspace.env.load: true, gates dbt-parse `dbt parse` and dbt-build `dbt build --target dev`, each with env DBT_SCHEMA: dev_{{FEATURE_IDENT}}); the profiles.yml line schema: \"{{ env_var('DBT_SCHEMA') }}\"; a dbt-duckdb variant using a per-workspace file (DBT_DUCKDB_PATH={{WORKSPACE_PATH}}/dev.duckdb) that costs nothing; why gates are not named test (verification.tests: ci drops a gate named exactly test); that warehouse credentials come from the dashboard's environment, which loads ~/.overdeck.env; the 20-minute per-gate timeout; and the finding that dbt env_var() reads the process env and the workspace .env reaches agent shells and host gates only with env.load: true (never container or remote gates). Write in plain STE-style prose."
+        },
+        "items": [
+          {
+            "id": "docs-dbt-recipe.ac1",
+            "title": "Given configuration/projects.mdx, when grepped, then it contains a '### dbt and data projects' heading whose YAML example defines gates dbt-parse and dbt-build with env DBT_SCHEMA: dev_{{FEATURE_IDENT}} and sets workspace.env.load: true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-dbt-recipe.ac2",
+            "title": "Given the new subsection, when read, then it shows schema: \"{{ env_var('DBT_SCHEMA') }}\", a dbt-duckdb per-workspace file example, the 20-minute gate timeout, ~/.overdeck.env as the credential source, and why no gate is named test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-dbt-recipe.ac3",
+            "title": "Given the Quality gates section, when read, then it states that command, container_name and env values accept all twelve {{...}} tokens including {{FEATURE_IDENT}}, and the Configuration Fields table renders workspace.env.template and workspace.env.load rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-placeholder-tables",
+        "title": "List FEATURE_IDENT and gate env placeholders in polyrepo.mdx and docs/CONFIGURATION.md",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-11-05T22:35:51Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5062",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/polyrepo.mdx",
+            "docs/CONFIGURATION.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n 'FEATURE_IDENT' configuration/polyrepo.mdx docs/CONFIGURATION.md"
+          ],
+          "expected_outputs": [
+            "docs lint completes without errors",
+            "grep prints a FEATURE_IDENT match in each file"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. In configuration/polyrepo.mdx ## Template Placeholders table add the row `| {{FEATURE_IDENT}} | min_123 | FEATURE_NAME as an unquoted SQL identifier |` after the FEATURE_NAME row, and in the env: example block (~126) add `load: false` with a comment saying true exports this .env into agent shells and host quality gates. In docs/CONFIGURATION.md ### Change-Scoped Verification Gates (~601) add one sentence: gate env values take the same placeholders as command, including {{FEATURE_IDENT}}, with a link to the dbt recipe in configuration/projects.mdx."
+        },
+        "items": [
+          {
+            "id": "docs-placeholder-tables.ac1",
+            "title": "Given configuration/polyrepo.mdx, when its template token table renders, then it shows a {{FEATURE_IDENT}} row with example min_123, and the env example shows a load key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-placeholder-tables.ac2",
+            "title": "Given docs/CONFIGURATION.md, when the Change-Scoped Verification Gates section is read, then it states gate env values accept the same {{...}} tokens as command, including {{FEATURE_IDENT}}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "feature-ident-placeholder",
+        "to": "workspace-env-module",
+        "type": "blocks"
+      },
+      {
+        "from": "feature-ident-placeholder",
+        "to": "gates-load-workspace-env",
+        "type": "blocks"
+      },
+      {
+        "from": "gate-env-placeholders",
+        "to": "gates-load-workspace-env",
+        "type": "blocks"
+      },
+      {
+        "from": "workspace-env-module",
+        "to": "gates-load-workspace-env",
+        "type": "blocks"
+      },
+      {
+        "from": "workspace-env-module",
+        "to": "launcher-workspace-env",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
