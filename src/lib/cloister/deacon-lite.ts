@@ -28,6 +28,7 @@ import { liveAgentInventory } from '../terminal-backends/inventory.js';
 import { deliverAgentMessage } from '../agents/delivery.js';
 import { getWorkspaceGitState } from '../workspaces/git-state.js';
 import { isDeaconGloballyPaused } from '../overdeck/control-settings.js';
+import { readRecordedAgentStopAt } from '../overdeck/event-reads.js';
 import { listWorkspaces } from '../workspaces/resolver.js';
 import { reconcileClosedIssueAgents } from './closed-issue-reaper.js';
 import { checkApiErrorAgents } from './deacon-api-recovery.js';
@@ -133,8 +134,9 @@ export function setAgentStatusChangedNotifier(fn: AgentStatusChangedNotifier | n
 }
 
 /**
- * PAN-4300: agents this process already reported dead, keyed by id, valued
- * by launch generation. Nothing writes a dead agent's state.json off
+ * PAN-4300: agents this process already accounted for, keyed by id, valued
+ * by launch generation: reported dead, or skipped because their stop was
+ * already recorded (PAN-5074). Nothing writes a dead agent's state.json off
  * `running` (the supervisor's exit appends `agent.stopped` only), so without
  * this the same death was reported on every 60s tick — ~50k events/day.
  * In memory by design: a deacon child restart reports each still-dead
@@ -144,6 +146,22 @@ const reportedDeadAgents = new Map<string, string>();
 
 function launchGeneration(agent: AgentState): string {
   return `${agent.startedAt}|${agent.lastResumeAt ?? ''}`;
+}
+
+/**
+ * PAN-5074: when the agent's stop is already recorded, its epoch ms, else
+ * null. Since PAN-3917 a normal stop (planning finalize, abort, wipe) is
+ * recorded only as an event and leaves `state.json` at `running`, so the
+ * label `listAgentStates` filters on says nothing about a death (PAN-4210).
+ * A failed read returns null, which reports the death as before.
+ */
+function recordedStopAt(agent: AgentState): number | null {
+  try {
+    return readRecordedAgentStopAt(agent);
+  } catch (err) {
+    console.error(`[deacon-lite] Failed to read the lifecycle events of ${agent.id}:`, err);
+    return null;
+  }
 }
 
 export function __resetReportedDeadAgentsForTests(): void {
@@ -184,6 +202,13 @@ export async function reconcileAgentLiveness(): Promise<string[]> {
     if (!isConfirmedDead(verdict)) continue;
     const generation = launchGeneration(agent);
     if (reportedDeadAgents.get(agent.id) === generation) continue;
+    // PAN-5074: an agent that ended normally is not a death.
+    const stoppedAt = recordedStopAt(agent);
+    if (stoppedAt !== null) {
+      reportedDeadAgents.set(agent.id, generation);
+      actions.push(`reconcileAgentLiveness: ${agent.id} already stopped at ${new Date(stoppedAt).toISOString()}; not reported dead`);
+      continue;
+    }
     const reason = `absent from the ${inventory.backend} inventory; ${verdict.reason}`;
 
     if (agentStoppedNotifier) {

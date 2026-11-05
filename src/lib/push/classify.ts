@@ -181,13 +181,25 @@ function record(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null;
 }
 
-export function edgeNotificationFromEvent(event: { type: string; timestamp: string; payload: unknown }): EdgeNotification | null {
+export interface EdgeNotificationOptions {
+  /**
+   * PAN-5074: true when the agent's stop was recorded before this event, so
+   * its pane going away is an ordinary end, not a failure.
+   */
+  stopAlreadyRecorded?: (agentId: string) => boolean;
+}
+
+export function edgeNotificationFromEvent(
+  event: { type: string; timestamp: string; payload: unknown },
+  opts: EdgeNotificationOptions = {},
+): EdgeNotification | null {
   const payload = record(event.payload);
   if (!payload) return null;
 
   if (event.type === 'agent.heartbeat_dead') {
     const agentId = nonEmpty(payload['agentId']);
     if (!agentId) return null;
+    if (opts.stopAlreadyRecorded?.(agentId)) return null;
     const issueId = nonEmpty(payload['issueId']);
     return {
       kind: 'failed',

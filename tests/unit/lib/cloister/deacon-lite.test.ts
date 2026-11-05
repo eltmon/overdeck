@@ -21,10 +21,15 @@ const mocks = vi.hoisted(() => ({
   recoverSilentReviewers: vi.fn(async () => [] as string[]),
   retryDeferredHandoffs: vi.fn(async () => [] as string[]),
   reapFinishedRemoteAgents: vi.fn(async () => [] as string[]),
+  readRecordedAgentStopAt: vi.fn((): number | null => null),
 }));
 
 vi.mock('../../../../src/lib/overdeck/control-settings.js', () => ({
   isDeaconGloballyPaused: mocks.isDeaconGloballyPaused,
+}));
+
+vi.mock('../../../../src/lib/overdeck/event-reads.js', () => ({
+  readRecordedAgentStopAt: mocks.readRecordedAgentStopAt,
 }));
 
 vi.mock('../../../../src/lib/agents.js', () => ({
@@ -134,6 +139,7 @@ describe('deacon-lite', () => {
     mocks.liveAgentInventory.mockResolvedValue(inventory(['agent-pan-1']));
     mocks.capturePaneText.mockReturnValue('');
     mocks.reconcileClosedIssueAgents.mockResolvedValue([]);
+    mocks.readRecordedAgentStopAt.mockReturnValue(null);
     __resetStuckWorkAgentCooldownForTests();
     __resetReportedDeadAgentsForTests();
     __resetApiErrorRecoveryStateForTests();
@@ -348,6 +354,86 @@ describe('deacon-lite', () => {
       await expect(reconcileAgentLiveness()).resolves.toEqual(
         expect.arrayContaining([]),
       );
+    });
+
+    // PAN-5074: planning finalize records the stop as an event only, so the
+    // planning agent's state.json still says `running` after its pane is gone.
+    describe('recorded stop (PAN-5074)', () => {
+      const FINALIZED_AT = Date.parse('2026-09-18T11:30:00.000Z');
+
+      it('does not report a finalized planning agent whose state.json still says running', async () => {
+        const planning = workAgent({ id: 'planning-pan-1', role: 'planning' });
+        mocks.listAgentStates.mockReturnValue([planning]);
+        mocks.liveAgentInventory.mockResolvedValue(inventory([]));
+        mocks.isAlive.mockResolvedValue({ alive: false, reason: 'no-session' });
+        mocks.readRecordedAgentStopAt.mockReturnValue(FINALIZED_AT);
+        const notifier = vi.fn();
+        setAgentStoppedNotifier(notifier);
+
+        const actions = await reconcileAgentLiveness();
+
+        expect(mocks.readRecordedAgentStopAt).toHaveBeenCalledWith(planning);
+        expect(notifier).not.toHaveBeenCalled();
+        expect(actions).toEqual([
+          'reconcileAgentLiveness: planning-pan-1 already stopped at 2026-09-18T11:30:00.000Z; not reported dead',
+        ]);
+        setAgentStoppedNotifier(null);
+      });
+
+      it('reads the event log once per launch generation, not every tick', async () => {
+        mocks.listAgentStates.mockReturnValue([workAgent({ id: 'planning-pan-1', role: 'planning' })]);
+        mocks.liveAgentInventory.mockResolvedValue(inventory([]));
+        mocks.isAlive.mockResolvedValue({ alive: false, reason: 'no-session' });
+        mocks.readRecordedAgentStopAt.mockReturnValue(FINALIZED_AT);
+        const notifier = vi.fn();
+        setAgentStoppedNotifier(notifier);
+
+        await reconcileAgentLiveness();
+        await expect(reconcileAgentLiveness()).resolves.toEqual([]);
+
+        expect(mocks.readRecordedAgentStopAt).toHaveBeenCalledTimes(1);
+        expect(notifier).not.toHaveBeenCalled();
+        setAgentStoppedNotifier(null);
+      });
+
+      it('still reports a running work agent whose pane vanished with no stop recorded', async () => {
+        mocks.listAgentStates.mockReturnValue([workAgent()]);
+        mocks.liveAgentInventory.mockResolvedValue(inventory([]));
+        mocks.isAlive.mockResolvedValue({ alive: false, reason: 'no-session' });
+        const notifier = vi.fn();
+        setAgentStoppedNotifier(notifier);
+
+        await reconcileAgentLiveness();
+
+        expect(mocks.readRecordedAgentStopAt).toHaveBeenCalledTimes(1);
+        expect(notifier).toHaveBeenCalledWith('agent-pan-1');
+        setAgentStoppedNotifier(null);
+      });
+
+      it('reports the death when the event log cannot be read', async () => {
+        mocks.listAgentStates.mockReturnValue([workAgent()]);
+        mocks.liveAgentInventory.mockResolvedValue(inventory([]));
+        mocks.isAlive.mockResolvedValue({ alive: false, reason: 'no-session' });
+        mocks.readRecordedAgentStopAt.mockImplementation(() => { throw new Error('db locked'); });
+        const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const notifier = vi.fn();
+        setAgentStoppedNotifier(notifier);
+
+        await reconcileAgentLiveness();
+
+        expect(notifier).toHaveBeenCalledWith('agent-pan-1');
+        consoleErrorSpy.mockRestore();
+        setAgentStoppedNotifier(null);
+      });
+
+      it('never reads the event log for an agent that is alive', async () => {
+        mocks.listAgentStates.mockReturnValue([workAgent()]);
+        mocks.isAlive.mockResolvedValue({ alive: true, paneAlive: true });
+
+        await reconcileAgentLiveness();
+
+        expect(mocks.readRecordedAgentStopAt).not.toHaveBeenCalled();
+      });
     });
 
     // PAN-4300: reportedDeadAgents guard — a confirmed-dead agent is reported
