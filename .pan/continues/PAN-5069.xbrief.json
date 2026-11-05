@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5069",
   "created": "2026-11-05T23:26:20.599Z",
-  "updated": "2026-11-05T23:58:15.920Z",
+  "updated": "2026-11-05T23:58:28.649Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -119,6 +119,10 @@
     "a3-device-code-names.ac2": {
       "status": "completed",
       "doneAt": "2026-11-05T23:58:15.920Z"
+    },
+    "a3-device-code-names.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:58:28.649Z"
     }
   }
 }
