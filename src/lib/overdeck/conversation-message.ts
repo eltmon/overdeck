@@ -470,7 +470,15 @@ export async function handleConversationMessage(
     }
     const compactResult = await compactConversationNative(compactSessionFile, conv.name);
     setConversationClaudeSessionId(conv.name, compactResult.forkedSessionId);
-    return jsonResponse({ ok: true, compacted: true, mode: 'overdeck-native', model: compactResult.model });
+    // PAN-2652: the view now follows the compacted fork, so the live process must
+    // move to it too: restart the runtime with --resume <fork>. Loaded lazily so
+    // this module does not pull the runtime launch graph into every importer.
+    const { handleConversationResume, stopConversationRuntime } = await import('./conversation-runtime.js');
+    await stopConversationRuntime(conv, conv.name);
+    const resumed = await handleConversationResume(conv.name, { sendResumeContract: false }, {
+      resolveSessionFile: deps.resolveSessionFile, resumeCause: 'system',
+    });
+    return jsonResponse({ ok: true, compacted: true, mode: 'overdeck-native', model: compactResult.model, restarted: resumed.status === 200 });
   }
 
   const allAttachmentPaths = extractConversationAttachmentPaths(message);
