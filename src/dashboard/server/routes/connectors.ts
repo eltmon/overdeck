@@ -12,7 +12,9 @@
  * `DELETE /api/connectors/self` is the connector's own logout: the scope table
  * admits it with `read:state`, and the handler then requires a `connector`
  * credential. The `:id` route hands `self` to the same handler, whichever of
- * the two routes the router matched.
+ * the two routes the router matched. `GET /api/connectors/self` (PAN-5069
+ * FR-10) lets the same credential read its own record and this machine's name,
+ * so `pan mcp connector connect` can verify the route end to end.
  *
  * `POST /api/connectors/exchange` is reachable only through a pairing-mode
  * secure channel. It takes the intent of the channel's pairingId first, so any
@@ -151,6 +153,23 @@ export async function handleConnectorSelfRevoke(credential: DashboardCredential 
   return noStore(jsonResponse({ ok: true }));
 }
 
+/** FR-10: the calling connector's own record. Exactly a connector credential may call this. */
+export async function handleConnectorSelf(credential: DashboardCredential | null): Promise<HttpServerResponse.HttpServerResponse> {
+  if (credential?.kind !== 'connector') {
+    return noStore(jsonResponse({ error: 'only a paired connector may read itself', code: 'not-a-connector' }, { status: 403 }));
+  }
+  const record = (await listAccessTokens()).find((entry) => entry.id === credential.tokenId && !entry.revokedAt);
+  if (!record) return noStore(jsonResponse({ error: 'this connector was removed', code: 'connector-removed' }, { status: 403 }));
+  const descriptor = await buildEnvironmentDescriptor();
+  return noStore(jsonResponse({
+    id: record.id,
+    name: record.name,
+    scopes: record.scopes,
+    clientId: record.clientId ?? null,
+    machine: { environmentId: descriptor.environmentId, label: descriptor.label },
+  }));
+}
+
 function parseExchangeBody(text: string): { clientId: string; label: string } | string {
   let value: unknown;
   try {
@@ -259,6 +278,15 @@ const selfRevokeRoute = HttpRouter.add(
   }),
 );
 
+const selfRoute = HttpRouter.add(
+  'GET',
+  '/api/connectors/self',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    return yield* Effect.promise(() => handleConnectorSelf(resolveRequestCredential(request)));
+  }),
+);
+
 const revokeRoute = HttpRouter.add(
   'DELETE',
   '/api/connectors/:id',
@@ -273,4 +301,4 @@ const revokeRoute = HttpRouter.add(
   }),
 );
 
-export const connectorsRouteLayer = Layer.mergeAll(exchangeRoute, pairingRoute, listRoute, selfRevokeRoute, revokeRoute);
+export const connectorsRouteLayer = Layer.mergeAll(exchangeRoute, pairingRoute, listRoute, selfRoute, selfRevokeRoute, revokeRoute);
