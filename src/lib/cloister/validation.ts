@@ -294,8 +294,9 @@ export async function runQualityGates(
     }
   }
   const results: QualityGateResult[] = [];
-  // PAN-5061 D-8: host-run gates get their project's secrets; remote gates do not resolve them.
-  const projectEnv = opts.projectEnv ?? (opts.isRemote ? {} : await gateProjectEnv(opts.issueId, projectPath));
+  // PAN-5061 D-8: host-run command gates get their project's secrets; remote gates do not resolve them.
+  // Resolved on the first command gate only, so an http_health-only run does no project lookup.
+  let projectEnv = opts.projectEnv ?? (opts.isRemote ? {} : undefined);
 
   for (const [name, gate] of Object.entries(gates)) {
     const gatePhase = gate.phase || 'pre_push';
@@ -421,6 +422,8 @@ export async function runQualityGates(
         resolvedCommand = `nice -n 19 sh -c '${escaped}'`;
       }
     }
+
+    projectEnv ??= await gateProjectEnv(opts.issueId, projectPath);
 
     // PAN-2461: gates may declare `retry: N` — CI-parity for suites with known
     // order-dependent flakes. A pass on any attempt is a pass.

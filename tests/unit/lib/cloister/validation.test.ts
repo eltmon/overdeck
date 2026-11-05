@@ -172,13 +172,17 @@ echo "pass stderr diagnostic" >&2
       expect(result.output).toContain('probe=[]');
     });
 
-    it('resolves project secrets from projectPath for a host run, never for a remote run', async () => {
+    it('resolves project secrets once from projectPath for host command gates', async () => {
       vi.mocked(projectLaunchEnv).mockClear();
-      await runQualityGates({}, testDir, 'pre_push', { issueId: 'NOPE-1' });
+      await runQualityGates({ a: { command: 'true' }, b: { command: 'true' } }, testDir, 'pre_push', { issueId: 'NOPE-1' });
+      expect(projectLaunchEnv).toHaveBeenCalledTimes(1);
       expect(projectLaunchEnv).toHaveBeenCalledWith({ issueId: 'NOPE-1', cwd: testDir });
+    });
 
+    it('never resolves project secrets for a remote run or a run with no command gate', async () => {
       vi.mocked(projectLaunchEnv).mockClear();
       await runQualityGates({}, testDir, 'pre_push', { isRemote: true, vmName: 'vm-1' });
+      await runQualityGates({}, testDir, 'pre_push', { issueId: 'NOPE-1' });
       expect(projectLaunchEnv).not.toHaveBeenCalled();
     });
   });
