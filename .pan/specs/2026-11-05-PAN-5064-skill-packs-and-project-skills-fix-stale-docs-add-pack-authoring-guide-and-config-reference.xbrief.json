@@ -4,17 +4,17 @@
     "created": "2026-11-05T22:45:22Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5064: Skill packs and project skills: fix stale docs, add pack authoring guide and config reference",
-    "updated": "2026-11-05T22:47:43.536Z"
+    "updated": "2026-11-05T22:49:14.848Z"
   },
   "plan": {
     "id": "pan-5064",
     "title": "Skill packs and project skills: fix stale docs, add pack authoring guide and config reference",
-    "status": "proposed",
+    "status": "running",
     "uid": "c9059c74-63c8-41cf-a43f-33c3b8643fde",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-05T22:45:22Z",
-    "updated": "2026-11-05T22:47:43.536Z",
+    "updated": "2026-11-05T22:49:14.848Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5064",
@@ -843,5 +843,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
