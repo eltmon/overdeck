@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5064",
   "created": "2026-11-05T22:52:07.107Z",
-  "updated": "2026-11-05T23:29:53.801Z",
+  "updated": "2026-11-05T23:30:09.592Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -128,6 +128,10 @@
     "skill-packs-dev-guide-fixes.ac3": {
       "status": "completed",
       "doneAt": "2026-11-05T23:29:53.800Z"
+    },
+    "skill-packs-dev-guide-fixes.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:30:09.592Z"
     }
   }
 }
