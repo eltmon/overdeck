@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5062",
   "created": "2026-11-05T22:39:32.195Z",
-  "updated": "2026-11-05T23:16:05.948Z",
+  "updated": "2026-11-05T23:16:23.233Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -110,6 +110,10 @@
     "gates-load-workspace-env.ac4": {
       "status": "completed",
       "doneAt": "2026-11-05T23:16:05.947Z"
+    },
+    "launcher-workspace-env.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:16:23.232Z"
     }
   }
 }
