@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5064",
   "created": "2026-11-05T22:52:07.107Z",
-  "updated": "2026-11-05T23:31:47.443Z",
+  "updated": "2026-11-05T23:32:14.412Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -156,6 +156,10 @@
     "usage-md-fixes.ac2": {
       "status": "completed",
       "doneAt": "2026-11-05T23:31:47.443Z"
+    },
+    "handoff-pack-help-text.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:32:14.412Z"
     }
   }
 }
