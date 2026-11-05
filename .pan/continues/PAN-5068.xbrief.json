@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5068",
   "created": "2026-11-05T23:10:23.659Z",
-  "updated": "2026-11-05T23:38:03.297Z",
+  "updated": "2026-11-05T23:38:19.993Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -52,6 +52,10 @@
     "describe-error-cause.ac5": {
       "status": "completed",
       "doneAt": "2026-11-05T23:38:03.296Z"
+    },
+    "device-code-retry.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:38:19.993Z"
     }
   }
 }
