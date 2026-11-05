@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2652",
   "created": "2026-11-05T21:12:48.966Z",
-  "updated": "2026-11-05T22:12:08.248Z",
+  "updated": "2026-11-05T22:12:22.554Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -204,6 +204,10 @@
     "w11-resume-adopted-fork-test.ac1": {
       "status": "completed",
       "doneAt": "2026-11-05T22:12:08.248Z"
+    },
+    "w11-resume-adopted-fork-test.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-05T22:12:22.554Z"
     }
   }
 }
