@@ -125,6 +125,16 @@ describe('readProjectSecrets (PAN-5061 WI-2)', () => {
   });
 });
 
+describe('readProjectSecrets reserved provider keys (PAN-5061 wi2-launch-env.ac3)', () => {
+  it('keeps exactly FOO when the file also sets OPENAI_API_KEY and OVERDECK_HOME', async () => {
+    writeFileSync(SECRETS, 'OPENAI_API_KEY=sk-fixture-value\nOVERDECK_HOME=/fixture-home\nFOO=bar\n');
+    const { secrets, warnings } = await read(withSecretsFile(SECRETS));
+    expect(secrets).toEqual({ FOO: 'bar' });
+    expect(warnings).toEqual(['[project-env] acme: secrets_file reserved keys dropped: OPENAI_API_KEY, OVERDECK_HOME']);
+    expect(warnings.join('\n')).not.toContain('sk-fixture-value');
+  });
+});
+
 describe('projectLaunchEnv (PAN-5061 WI-2)', () => {
   it("gives a launch its own project's secrets and none to another project", async () => {
     writeFileSync(SECRETS, 'PAN5061_PROBE=acme-only\n');
