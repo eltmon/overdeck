@@ -251,6 +251,8 @@ projects:
 | `workspace_command` | No | Custom workspace creation script |
 | `workspace_remove_command` | No | Custom workspace cleanup script |
 | `workspace` | No | Polyrepo/progressive workspace configuration |
+| `workspace.env.template` | No | Path to an env template rendered to `<workspace>/.env` at workspace creation. |
+| `workspace.env.load` | No | When `true`, loads the rendered `<workspace>/.env` into agent launcher shells and host quality gates. Default `false`. See [dbt and data projects](#dbt-and-data-projects). |
 | `release` | No | Coordinated post-merge release configuration |
 | `verification.tests` | No | `ci` or `local`: where the verification gate's `test` gate runs. `ci` skips the local `quality_gates.test` run and treats the CI test job on the PR head as the test gate; `local` runs it on the host. Default: `ci` when the project has `github_repo` and a GitHub Actions workflow that runs a job named `test`/`tests`/`test-*`/`test (…)` on pull requests, else `local`. |
 | `quality_gates` | No | Map of verification gates; see [Quality gates](#quality-gates). |
@@ -272,7 +274,7 @@ is skipped on the host when `verification.tests` resolves to `ci` (above).
 | `command` | Yes for `type: command` gates | — | Shell command to run. |
 | `path` | No | workspace root | Path relative to the workspace. For a container gate, the container's working directory is `/workspaces/feature/<path>`. |
 | `required` | No | `true` | When `true`, the first failed required gate stops the run; the gate's name becomes the run's `failedCheck`. |
-| `env` | No | — | Extra environment variables for the gate's process. |
+| `env` | No | — | Extra environment variables for the gate's process. Values accept the same placeholders as `command` (below). |
 | `phase` | No | `pre_push` | `pre_push` or `post_push`: when the gate runs relative to the push. |
 | `type` | No | `command` | `command` or `http_health`. |
 | `url` | No | — | URL to check; only used when `type: http_health`. |
@@ -282,11 +284,18 @@ is skipped on the host when `verification.tests` resolves to `ci` (above).
 | `container_name` | No | — | Container name; supports placeholders (below). Used only when `container: true`; without it the gate runs on the host even if `container: true` is set. |
 | `retry` | No | `0` | Extra attempts on failure before the gate counts as failed (PAN-2461: CI-parity for suites with known order-dependent flakes). |
 
-`command` and `container_name` accept the placeholders `{{CHANGED_BASE}}`,
-`{{FEATURE_FOLDER}}`, and `{{WORKSPACE_PATH}}`. A gate's process does not
-inherit the agent's full environment: every `OVERDECK_*` variable except
-`OVERDECK_HOME` is dropped, as are `API_PORT`, `PORT`, and `DASHBOARD_URL`
-unless the gate sets them itself, and `SKIP_DOCS_INDEX=1` is always set. See
+`command`, `container_name`, and `env` values accept every placeholder:
+`{{FEATURE_NAME}}`, `{{FEATURE_IDENT}}`, `{{FEATURE_FOLDER}}`,
+`{{BRANCH_NAME}}`, `{{COMPOSE_PROJECT}}`, `{{DOMAIN}}`, `{{PROJECT_NAME}}`,
+`{{PROJECT_PATH}}`, `{{PROJECTS_DIR}}`, `{{WORKSPACE_PATH}}`, `{{HOME}}`, and
+`{{CHANGED_BASE}}`. `{{FEATURE_IDENT}}` is `{{FEATURE_NAME}}` rewritten to a
+valid unquoted SQL identifier — lowercased, with every character that is not
+a letter, digit, or underscore replaced with `_` (`min-574` → `min_574`) —
+for values like a dbt schema name where a raw hyphen is invalid. A gate's
+process does not inherit the agent's full environment: every `OVERDECK_*`
+variable except `OVERDECK_HOME` is dropped, as are `API_PORT`, `PORT`, and
+`DASHBOARD_URL` unless the gate sets them itself, and `SKIP_DOCS_INDEX=1` is
+always set. See
 [Change-Scoped Verification Gates](https://github.com/eltmon/overdeck/blob/main/docs/CONFIGURATION.md#change-scoped-verification-gates)
 for the placeholder values in context.
 
@@ -315,6 +324,73 @@ projects:
 See also [What a verification run does](https://github.com/eltmon/overdeck/blob/main/docs/PIPELINE-GATES.md#what-a-verification-run-does),
 [Why verification is slow](https://github.com/eltmon/overdeck/blob/main/docs/PIPELINE-GATES.md#why-verification-is-slow),
 and [Choosing a project's local gates](https://github.com/eltmon/overdeck/blob/main/docs/PIPELINE-GATES.md#choosing-a-projects-local-gates).
+
+### dbt and data projects
+
+dbt reads its target schema from `env_var('DBT_SCHEMA')` in `profiles.yml`,
+and `env_var()` reads the process environment — not a `.env` file and not a
+placeholder in `profiles.yml` itself. Give each agent's workspace its own dev
+schema with `workspace.env.template` and `workspace.env.load: true`, then
+reference the same variable from a quality gate's `env`:
+
+```yaml
+projects:
+  warehouse:
+    name: "Warehouse"
+    path: /home/user/projects/warehouse
+    issue_prefix: WH
+    workspace:
+      env:
+        template: infra/env.template
+        load: true
+    quality_gates:
+      dbt-parse:
+        command: dbt parse
+        env:
+          DBT_SCHEMA: "dev_{{FEATURE_IDENT}}"
+      dbt-build:
+        command: dbt build --target dev
+        env:
+          DBT_SCHEMA: "dev_{{FEATURE_IDENT}}"
+```
+
+`infra/env.template` renders to `<workspace>/.env` at workspace creation and
+can set `DBT_SCHEMA=dev_{{FEATURE_IDENT}}` itself; with `env.load: true` that
+line reaches both the agent's launcher shell and the gates above. `profiles.yml`
+then picks it up with:
+
+```yaml
+outputs:
+  dev:
+    schema: "{{ env_var('DBT_SCHEMA') }}"
+```
+
+Neither gate is named `test`: a project whose `verification.tests` resolves
+to `ci` (the default when the repo has a GitHub Actions `test` job — see
+[Configuration Fields](#configuration-fields)) drops any gate named exactly
+`test` from the host run, treating the CI job as the test gate instead. Name
+dbt gates `dbt-parse` / `dbt-build` / `dbt-test`, never `test`.
+
+A dbt-duckdb project that costs nothing to run needs no warehouse at all —
+point it at a file inside the workspace instead of a schema:
+
+```yaml
+quality_gates:
+  dbt-build:
+    command: dbt build --target dev
+    env:
+      DBT_DUCKDB_PATH: "{{WORKSPACE_PATH}}/dev.duckdb"
+```
+
+Warehouse credentials (a Snowflake/BigQuery/Redshift key, for example) belong
+in the dashboard's own environment — `~/.overdeck.env` (see
+[API Keys](https://github.com/eltmon/overdeck/blob/main/docs/CONFIGURATION.md#api-keys-overdeckenv))
+— not in the workspace `.env`: the workspace `.env` reaches agent launcher
+shells and host quality gates only when `workspace.env.load: true`, and never
+reaches container or remote (`fly ssh`) gates, which stay on `docker exec`
+`-e` flags or SSH's own environment. A `dbt build` that seeds a real
+warehouse can run long; each gate gets a 20-minute timeout before Overdeck
+kills it.
 
 ### Separate the issue tracker from the code host
 
