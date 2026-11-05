@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5061",
   "created": "2026-11-05T22:48:30.946Z",
-  "updated": "2026-11-05T23:04:03.923Z",
+  "updated": "2026-11-05T23:04:10.608Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -62,6 +62,11 @@
       "claimedBy": "agent-pan-5061",
       "claimedAt": "2026-11-05T23:02:39.716Z",
       "doneAt": "2026-11-05T23:04:03.923Z"
+    },
+    "wi10-docs-mcp": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5061",
+      "claimedAt": "2026-11-05T23:04:10.608Z"
     }
   }
 }
