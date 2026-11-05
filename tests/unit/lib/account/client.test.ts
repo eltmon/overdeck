@@ -6,6 +6,7 @@ import {
   getMe,
   platformString,
   pollForToken,
+  requestDeviceCode,
   resolveBaseUrl,
   revokeDevice,
   type DeviceCode,
@@ -137,6 +138,37 @@ describe('pollForToken (D-5)', () => {
     await vi.advanceTimersByTimeAsync(5000);
 
     await expect(promise).resolves.toEqual({ ok: false, reason: 'expired_token', detail: 'The sign-in code expired.' });
+  });
+});
+
+describe('requestDeviceCode name fields (PAN-5069 FR-9)', () => {
+  function deviceCodeResponse(): Response {
+    return new Response(JSON.stringify({
+      device_code: 'oddc_code', user_code: 'ABCDEFGH', verification_uri: `${BASE_URL}/activate`,
+      verification_uri_complete: `${BASE_URL}/activate?user_code=ABCDEFGH`, expires_in: 900, interval: 5,
+    }), { status: 200 });
+  }
+
+  async function postedForm(input: Parameters<typeof requestDeviceCode>[1]): Promise<URLSearchParams> {
+    const fetchMock = vi.fn().mockResolvedValue(deviceCodeResponse());
+    await requestDeviceCode(BASE_URL, input, { fetch: fetchMock });
+    expect(fetchMock).toHaveBeenCalledWith(`${BASE_URL}/oauth/device/code`, expect.objectContaining({ method: 'POST' }));
+    return new URLSearchParams((fetchMock.mock.calls[0]![1] as RequestInit).body as string);
+  }
+
+  it('sends client_name and target_name trimmed and cut to 64 characters', async () => {
+    const form = await postedForm({ platform: 'node', environmentId: 'env-1', clientName: `  ${'b'.repeat(70)} `, targetName: ' desk mac ' });
+    expect(form.get('client_name')).toBe('b'.repeat(64));
+    expect(form.get('target_name')).toBe('desk mac');
+    expect(form.get('platform')).toBe('node');
+    expect(form.get('environment_id')).toBe('env-1');
+  });
+
+  it('sends neither field when they are absent or blank', async () => {
+    for (const input of [{ platform: 'node', environmentId: 'env-1' }, { platform: 'node', environmentId: 'env-1', clientName: '  ', targetName: '' }]) {
+      const form = await postedForm(input);
+      expect([...form.keys()].sort()).toEqual(['environment_id', 'platform']);
+    }
   });
 });
 

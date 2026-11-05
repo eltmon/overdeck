@@ -99,16 +99,25 @@ async function postForm(baseUrl: string, path: string, body: URLSearchParams, do
   });
 }
 
-/** POST /oauth/device/code */
+/**
+ * POST /oauth/device/code. `clientName` (the bot) and `targetName` (the machine) are display
+ * claims for the activate page (PAN-5069 FR-9), trimmed and cut to 64 characters, and sent only
+ * when non-empty; an account service that predates them ignores the extra fields.
+ */
 export async function requestDeviceCode(
   baseUrl: string,
-  input: { platform: string; environmentId: string },
+  input: { platform: string; environmentId: string; clientName?: string; targetName?: string },
   opts: ClientOptions = {},
 ): Promise<DeviceCode> {
   const doFetch = opts.fetch ?? fetch;
+  const form = new URLSearchParams({ platform: input.platform, environment_id: input.environmentId });
+  const clientName = input.clientName?.trim().slice(0, 64);
+  const targetName = input.targetName?.trim().slice(0, 64);
+  if (clientName) form.set('client_name', clientName);
+  if (targetName) form.set('target_name', targetName);
   let res: Response;
   try {
-    res = await postForm(baseUrl, '/oauth/device/code', new URLSearchParams({ platform: input.platform, environment_id: input.environmentId }), doFetch);
+    res = await postForm(baseUrl, '/oauth/device/code', form, doFetch);
   } catch (error) {
     throw new AccountClientError(`Cannot reach ${baseUrl}: ${describeError(error)}`);
   }
