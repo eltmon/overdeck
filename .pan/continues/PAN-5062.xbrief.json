@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5062",
   "created": "2026-11-05T22:39:32.195Z",
-  "updated": "2026-11-05T23:12:39.070Z",
+  "updated": "2026-11-05T23:12:54.010Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -58,6 +58,10 @@
     "feature-ident-placeholder.ac2": {
       "status": "completed",
       "doneAt": "2026-11-05T23:12:39.069Z"
+    },
+    "feature-ident-placeholder.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:12:54.009Z"
     }
   }
 }
