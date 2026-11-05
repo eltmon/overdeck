@@ -104,6 +104,35 @@ describe('runConnectorLogin', () => {
     expect(io.lines.join('\n')).not.toContain('odd_');
   });
 
+  it('signs in after one transient device-code network failure (PAN-5068)', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const calls: Recorded[] = [];
+    const io = recordingIo();
+    const baseFetch = accountFetch(() => json(200, { access_token: DEVICE_TOKEN, device_id: 'dev-1', label: 'brave-otter' }), calls);
+    let deviceCodeFailed = false;
+    const fetchImpl = (async (input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith('/oauth/device/code') && !deviceCodeFailed) {
+        deviceCodeFailed = true;
+        calls.push({ url, body: typeof init?.body === 'string' ? init.body : undefined });
+        throw new TypeError('fetch failed', { cause: { code: 'ECONNRESET', message: 'socket hang up' } });
+      }
+      return baseFetch(input, init);
+    }) as typeof fetch;
+    const done = runConnectorLogin(
+      { home, env: { OVERDECK_ACCOUNT_URL: 'https://account.example', OVERDECK_CONNECTOR_DIRECTORY_URL: 'https://connect.example' } },
+      io,
+      { fetch: fetchImpl },
+    );
+    expect(await settle(done)).toBe(0);
+
+    const deviceCodeCalls = calls.filter((call) => call.url.endsWith('/oauth/device/code'));
+    expect(deviceCodeCalls).toHaveLength(2);
+    const account = await readAccount(home);
+    expect(account?.accessToken).toBe(DEVICE_TOKEN);
+    expect(io.lines.some((line) => line.startsWith('Cannot reach'))).toBe(false);
+  });
+
   it('refuses an http directory URL before any request', async () => {
     const calls: Recorded[] = [];
     const io = recordingIo();
