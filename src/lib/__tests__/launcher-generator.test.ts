@@ -6,6 +6,8 @@ import { join } from 'path';
 import { generateLauncherScript, type LauncherConfig  } from '../launcher-generator.js';
 import { EFFORT_LEVELS } from '@overdeck/contracts';
 import { resolveEffort } from '../agents/resolve-effort.js';
+import { packageRoot } from '../paths.js';
+import { panCliShimLauncherLines } from '../pan-cli-shim.js';
 
 // Pin OVERDECK_HOME to an empty temp dir so the COLORFGBG export (derived
 // from ~/.overdeck/ui-theme.json) deterministically uses the dark default
@@ -29,6 +31,27 @@ const DEFAULT_CONFIG: LauncherConfig = {
   role: 'work',
   workingDir: '/workspace/project',
 };
+
+// PAN-2630: the pan-cli-shim block embeds the running node's execPath and
+// packageRoot, both machine-specific, so snapshots normalize them too.
+function normalize(script: string): string {
+  return script
+    .replaceAll(tempHome, '<OVERDECK_HOME>')
+    .replaceAll(process.execPath, '<NODE>')
+    .replaceAll(packageRoot, '<PACKAGE_ROOT>');
+}
+
+// PAN-2630: this dev checkout has a real dist/cli/index.js, so the launcher's
+// pan-cli-shim block really writes a working `pan`/`overdeck` into
+// <OVERDECK_HOME>/cli-bin and prepends it to PATH — shadowing a fixture `pan`
+// a test placed earlier on PATH. Pre-creating that directory read-only makes
+// the shim's write fail (its `cat >` redirection errors), so the block no-ops
+// per its own failure handling and leaves PATH, and the fixture, untouched.
+function blockPanCliShim(): void {
+  const dir = join(tempHome, 'cli-bin');
+  mkdirSync(dir, { recursive: true });
+  chmodSync(dir, 0o555);
+}
 
 function materializeGitGuard(): { script: string; wrapperPath: string; worktree: string; outside: string } {
   const realGitDir = join(tempHome, 'real-git');
@@ -103,7 +126,7 @@ describe('generateLauncherScript', () => {
       role: 'work',
       baseCommand: 'claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6',
     });
-    expect(script.replaceAll(tempHome, '<OVERDECK_HOME>')).toMatchInlineSnapshot(`
+    expect(normalize(script)).toMatchInlineSnapshot(`
       "#!/bin/bash
       export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
@@ -111,6 +134,18 @@ describe('generateLauncherScript', () => {
       mkdir -p '<OVERDECK_HOME>/tmp' && chmod 700 '<OVERDECK_HOME>/tmp' && export CLAUDE_CODE_TMPDIR='<OVERDECK_HOME>/tmp'
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
+      if [ -f '<PACKAGE_ROOT>/dist/cli/index.js' ] && mkdir -p '<OVERDECK_HOME>/cli-bin' 2>/dev/null \\
+        && cat > '<OVERDECK_HOME>/cli-bin'/pan.tmp.$$ <<'OVERDECK_PAN_SHIM'
+      #!/bin/sh
+      exec '<NODE>' '<PACKAGE_ROOT>/dist/cli/index.js' "$@"
+      OVERDECK_PAN_SHIM
+      then
+        if chmod 0755 '<OVERDECK_HOME>/cli-bin'/pan.tmp.$$ && cp -p '<OVERDECK_HOME>/cli-bin'/pan.tmp.$$ '<OVERDECK_HOME>/cli-bin'/overdeck.tmp.$$ \\
+          && mv -f '<OVERDECK_HOME>/cli-bin'/overdeck.tmp.$$ '<OVERDECK_HOME>/cli-bin'/overdeck && mv -f '<OVERDECK_HOME>/cli-bin'/pan.tmp.$$ '<OVERDECK_HOME>/cli-bin'/pan; then
+          export PATH='<OVERDECK_HOME>/cli-bin':"$PATH"
+        fi
+        rm -f '<OVERDECK_HOME>/cli-bin'/pan.tmp.$$ '<OVERDECK_HOME>/cli-bin'/overdeck.tmp.$$ 2>/dev/null
+      fi
       if ! PAN_SKILL_SETTINGS="$(pan skills launch-settings --harness claude-code --cwd '/workspace/project')"; then echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS=''; fi
       case "$PAN_SKILL_SETTINGS" in ''|'{'*'}') ;; *) echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS='' ;; esac
       cd -- '/workspace/project'
@@ -129,7 +164,7 @@ describe('generateLauncherScript', () => {
       cavemanExports: 'export CAVEMAN_DEFAULT_MODE="active"\n',
       baseCommand: 'claude --dangerously-skip-permissions --permission-mode bypassPermissions --model gpt-5.4',
     });
-    expect(script.replaceAll(tempHome, '<OVERDECK_HOME>')).toMatchInlineSnapshot(`
+    expect(normalize(script)).toMatchInlineSnapshot(`
       "#!/bin/bash
       export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
@@ -137,6 +172,18 @@ describe('generateLauncherScript', () => {
       mkdir -p '<OVERDECK_HOME>/tmp' && chmod 700 '<OVERDECK_HOME>/tmp' && export CLAUDE_CODE_TMPDIR='<OVERDECK_HOME>/tmp'
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
+      if [ -f '<PACKAGE_ROOT>/dist/cli/index.js' ] && mkdir -p '<OVERDECK_HOME>/cli-bin' 2>/dev/null \\
+        && cat > '<OVERDECK_HOME>/cli-bin'/pan.tmp.$$ <<'OVERDECK_PAN_SHIM'
+      #!/bin/sh
+      exec '<NODE>' '<PACKAGE_ROOT>/dist/cli/index.js' "$@"
+      OVERDECK_PAN_SHIM
+      then
+        if chmod 0755 '<OVERDECK_HOME>/cli-bin'/pan.tmp.$$ && cp -p '<OVERDECK_HOME>/cli-bin'/pan.tmp.$$ '<OVERDECK_HOME>/cli-bin'/overdeck.tmp.$$ \\
+          && mv -f '<OVERDECK_HOME>/cli-bin'/overdeck.tmp.$$ '<OVERDECK_HOME>/cli-bin'/overdeck && mv -f '<OVERDECK_HOME>/cli-bin'/pan.tmp.$$ '<OVERDECK_HOME>/cli-bin'/pan; then
+          export PATH='<OVERDECK_HOME>/cli-bin':"$PATH"
+        fi
+        rm -f '<OVERDECK_HOME>/cli-bin'/pan.tmp.$$ '<OVERDECK_HOME>/cli-bin'/overdeck.tmp.$$ 2>/dev/null
+      fi
       if ! PAN_SKILL_SETTINGS="$(pan skills launch-settings --harness claude-code --cwd '/workspace/project')"; then echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS=''; fi
       case "$PAN_SKILL_SETTINGS" in ''|'{'*'}') ;; *) echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS='' ;; esac
       cd -- '/workspace/project'
@@ -160,7 +207,7 @@ describe('generateLauncherScript', () => {
       resumeSessionId: 'sess-123',
       model: 'gpt-5.4',
     });
-    expect(script.replaceAll(tempHome, '<OVERDECK_HOME>')).toMatchInlineSnapshot(`
+    expect(normalize(script)).toMatchInlineSnapshot(`
       "#!/bin/bash
       export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
@@ -168,6 +215,18 @@ describe('generateLauncherScript', () => {
       mkdir -p '<OVERDECK_HOME>/tmp' && chmod 700 '<OVERDECK_HOME>/tmp' && export CLAUDE_CODE_TMPDIR='<OVERDECK_HOME>/tmp'
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
+      if [ -f '<PACKAGE_ROOT>/dist/cli/index.js' ] && mkdir -p '<OVERDECK_HOME>/cli-bin' 2>/dev/null \\
+        && cat > '<OVERDECK_HOME>/cli-bin'/pan.tmp.$$ <<'OVERDECK_PAN_SHIM'
+      #!/bin/sh
+      exec '<NODE>' '<PACKAGE_ROOT>/dist/cli/index.js' "$@"
+      OVERDECK_PAN_SHIM
+      then
+        if chmod 0755 '<OVERDECK_HOME>/cli-bin'/pan.tmp.$$ && cp -p '<OVERDECK_HOME>/cli-bin'/pan.tmp.$$ '<OVERDECK_HOME>/cli-bin'/overdeck.tmp.$$ \\
+          && mv -f '<OVERDECK_HOME>/cli-bin'/overdeck.tmp.$$ '<OVERDECK_HOME>/cli-bin'/overdeck && mv -f '<OVERDECK_HOME>/cli-bin'/pan.tmp.$$ '<OVERDECK_HOME>/cli-bin'/pan; then
+          export PATH='<OVERDECK_HOME>/cli-bin':"$PATH"
+        fi
+        rm -f '<OVERDECK_HOME>/cli-bin'/pan.tmp.$$ '<OVERDECK_HOME>/cli-bin'/overdeck.tmp.$$ 2>/dev/null
+      fi
       if ! PAN_SKILL_SETTINGS="$(pan skills launch-settings --harness claude-code --cwd '/workspace/project')"; then echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS=''; fi
       case "$PAN_SKILL_SETTINGS" in ''|'{'*'}') ;; *) echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS='' ;; esac
       cd -- '/workspace/project'
@@ -320,7 +379,7 @@ describe('generateLauncherScript', () => {
       debugLog: '/tmp/pan-launcher-debug.log',
       keepAlive: true,
     });
-    expect(script.replaceAll(tempHome, '<OVERDECK_HOME>')).toMatchInlineSnapshot(`
+    expect(normalize(script)).toMatchInlineSnapshot(`
       "#!/bin/bash
       export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
@@ -609,6 +668,18 @@ describe('generateLauncherScript', () => {
       chmod 0755 '<OVERDECK_HOME>/agents/plan-abc/git-guard/gh'
       fi
       export PATH="<OVERDECK_HOME>/agents/plan-abc/git-guard:$PATH"
+      if [ -f '<PACKAGE_ROOT>/dist/cli/index.js' ] && mkdir -p '<OVERDECK_HOME>/cli-bin' 2>/dev/null \\
+        && cat > '<OVERDECK_HOME>/cli-bin'/pan.tmp.$$ <<'OVERDECK_PAN_SHIM'
+      #!/bin/sh
+      exec '<NODE>' '<PACKAGE_ROOT>/dist/cli/index.js' "$@"
+      OVERDECK_PAN_SHIM
+      then
+        if chmod 0755 '<OVERDECK_HOME>/cli-bin'/pan.tmp.$$ && cp -p '<OVERDECK_HOME>/cli-bin'/pan.tmp.$$ '<OVERDECK_HOME>/cli-bin'/overdeck.tmp.$$ \\
+          && mv -f '<OVERDECK_HOME>/cli-bin'/overdeck.tmp.$$ '<OVERDECK_HOME>/cli-bin'/overdeck && mv -f '<OVERDECK_HOME>/cli-bin'/pan.tmp.$$ '<OVERDECK_HOME>/cli-bin'/pan; then
+          export PATH='<OVERDECK_HOME>/cli-bin':"$PATH"
+        fi
+        rm -f '<OVERDECK_HOME>/cli-bin'/pan.tmp.$$ '<OVERDECK_HOME>/cli-bin'/overdeck.tmp.$$ 2>/dev/null
+      fi
       if ! PAN_SKILL_SETTINGS="$(pan skills launch-settings --harness claude-code --cwd '/workspace/project' --issue 'PAN-824' --plugin-link '<OVERDECK_HOME>/launch/plan-abc/skill-packs')"; then echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS=''; fi
       case "$PAN_SKILL_SETTINGS" in ''|'{'*'}') ;; *) echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS='' ;; esac
       if [ -d '<OVERDECK_HOME>/launch/plan-abc/skill-packs' ]; then PAN_SKILL_PLUGIN_DIR='<OVERDECK_HOME>/launch/plan-abc/skill-packs'; else PAN_SKILL_PLUGIN_DIR=''; fi
@@ -647,7 +718,7 @@ describe('generateLauncherScript', () => {
       sessionId: 'sess-abc',
       model: 'claude-sonnet-4-6',
     });
-    expect(script.replaceAll(tempHome, '<OVERDECK_HOME>')).toMatchInlineSnapshot(`
+    expect(normalize(script)).toMatchInlineSnapshot(`
       "#!/bin/bash
       export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
@@ -932,6 +1003,18 @@ describe('generateLauncherScript', () => {
       chmod 0755 '<OVERDECK_HOME>/agents/spec-123/git-guard/gh'
       fi
       export PATH="<OVERDECK_HOME>/agents/spec-123/git-guard:$PATH"
+      if [ -f '<PACKAGE_ROOT>/dist/cli/index.js' ] && mkdir -p '<OVERDECK_HOME>/cli-bin' 2>/dev/null \\
+        && cat > '<OVERDECK_HOME>/cli-bin'/pan.tmp.$$ <<'OVERDECK_PAN_SHIM'
+      #!/bin/sh
+      exec '<NODE>' '<PACKAGE_ROOT>/dist/cli/index.js' "$@"
+      OVERDECK_PAN_SHIM
+      then
+        if chmod 0755 '<OVERDECK_HOME>/cli-bin'/pan.tmp.$$ && cp -p '<OVERDECK_HOME>/cli-bin'/pan.tmp.$$ '<OVERDECK_HOME>/cli-bin'/overdeck.tmp.$$ \\
+          && mv -f '<OVERDECK_HOME>/cli-bin'/overdeck.tmp.$$ '<OVERDECK_HOME>/cli-bin'/overdeck && mv -f '<OVERDECK_HOME>/cli-bin'/pan.tmp.$$ '<OVERDECK_HOME>/cli-bin'/pan; then
+          export PATH='<OVERDECK_HOME>/cli-bin':"$PATH"
+        fi
+        rm -f '<OVERDECK_HOME>/cli-bin'/pan.tmp.$$ '<OVERDECK_HOME>/cli-bin'/overdeck.tmp.$$ 2>/dev/null
+      fi
       if ! PAN_SKILL_SETTINGS="$(pan skills launch-settings --harness claude-code --cwd '/workspace/project' --issue 'PAN-824' --plugin-link '<OVERDECK_HOME>/launch/spec-123/skill-packs')"; then echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS=''; fi
       case "$PAN_SKILL_SETTINGS" in ''|'{'*'}') ;; *) echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS='' ;; esac
       if [ -d '<OVERDECK_HOME>/launch/spec-123/skill-packs' ]; then PAN_SKILL_PLUGIN_DIR='<OVERDECK_HOME>/launch/spec-123/skill-packs'; else PAN_SKILL_PLUGIN_DIR=''; fi
@@ -1033,7 +1116,7 @@ describe('generateLauncherScript', () => {
       sessionId: 'sess-xyz',
       model: 'claude-sonnet-4-6',
     });
-    expect(script.replaceAll(tempHome, '<OVERDECK_HOME>')).toMatchInlineSnapshot(`
+    expect(normalize(script)).toMatchInlineSnapshot(`
       "#!/bin/bash
       export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
@@ -1041,6 +1124,18 @@ describe('generateLauncherScript', () => {
       mkdir -p '<OVERDECK_HOME>/tmp' && chmod 700 '<OVERDECK_HOME>/tmp' && export CLAUDE_CODE_TMPDIR='<OVERDECK_HOME>/tmp'
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
+      if [ -f '<PACKAGE_ROOT>/dist/cli/index.js' ] && mkdir -p '<OVERDECK_HOME>/cli-bin' 2>/dev/null \\
+        && cat > '<OVERDECK_HOME>/cli-bin'/pan.tmp.$$ <<'OVERDECK_PAN_SHIM'
+      #!/bin/sh
+      exec '<NODE>' '<PACKAGE_ROOT>/dist/cli/index.js' "$@"
+      OVERDECK_PAN_SHIM
+      then
+        if chmod 0755 '<OVERDECK_HOME>/cli-bin'/pan.tmp.$$ && cp -p '<OVERDECK_HOME>/cli-bin'/pan.tmp.$$ '<OVERDECK_HOME>/cli-bin'/overdeck.tmp.$$ \\
+          && mv -f '<OVERDECK_HOME>/cli-bin'/overdeck.tmp.$$ '<OVERDECK_HOME>/cli-bin'/overdeck && mv -f '<OVERDECK_HOME>/cli-bin'/pan.tmp.$$ '<OVERDECK_HOME>/cli-bin'/pan; then
+          export PATH='<OVERDECK_HOME>/cli-bin':"$PATH"
+        fi
+        rm -f '<OVERDECK_HOME>/cli-bin'/pan.tmp.$$ '<OVERDECK_HOME>/cli-bin'/overdeck.tmp.$$ 2>/dev/null
+      fi
       if ! PAN_SKILL_SETTINGS="$(pan skills launch-settings --harness claude-code --cwd '/workspace/project' --plugin-link '<OVERDECK_HOME>/launch/sess-xyz/skill-packs')"; then echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS=''; fi
       case "$PAN_SKILL_SETTINGS" in ''|'{'*'}') ;; *) echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS='' ;; esac
       if [ -d '<OVERDECK_HOME>/launch/sess-xyz/skill-packs' ]; then PAN_SKILL_PLUGIN_DIR='<OVERDECK_HOME>/launch/sess-xyz/skill-packs'; else PAN_SKILL_PLUGIN_DIR=''; fi
@@ -1074,7 +1169,7 @@ describe('generateLauncherScript', () => {
       providerExports: 'export ANTHROPIC_BASE_URL="http://proxy"',
       baseCommand: 'claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6',
     });
-    expect(script.replaceAll(tempHome, '<OVERDECK_HOME>')).toMatchInlineSnapshot(`
+    expect(normalize(script)).toMatchInlineSnapshot(`
       "#!/bin/bash
       export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
@@ -1083,6 +1178,18 @@ describe('generateLauncherScript', () => {
       set -o pipefail
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
+      if [ -f '<PACKAGE_ROOT>/dist/cli/index.js' ] && mkdir -p '<OVERDECK_HOME>/cli-bin' 2>/dev/null \\
+        && cat > '<OVERDECK_HOME>/cli-bin'/pan.tmp.$$ <<'OVERDECK_PAN_SHIM'
+      #!/bin/sh
+      exec '<NODE>' '<PACKAGE_ROOT>/dist/cli/index.js' "$@"
+      OVERDECK_PAN_SHIM
+      then
+        if chmod 0755 '<OVERDECK_HOME>/cli-bin'/pan.tmp.$$ && cp -p '<OVERDECK_HOME>/cli-bin'/pan.tmp.$$ '<OVERDECK_HOME>/cli-bin'/overdeck.tmp.$$ \\
+          && mv -f '<OVERDECK_HOME>/cli-bin'/overdeck.tmp.$$ '<OVERDECK_HOME>/cli-bin'/overdeck && mv -f '<OVERDECK_HOME>/cli-bin'/pan.tmp.$$ '<OVERDECK_HOME>/cli-bin'/pan; then
+          export PATH='<OVERDECK_HOME>/cli-bin':"$PATH"
+        fi
+        rm -f '<OVERDECK_HOME>/cli-bin'/pan.tmp.$$ '<OVERDECK_HOME>/cli-bin'/overdeck.tmp.$$ 2>/dev/null
+      fi
       if ! PAN_SKILL_SETTINGS="$(pan skills launch-settings --harness claude-code --cwd '/workspace/project')"; then echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS=''; fi
       case "$PAN_SKILL_SETTINGS" in ''|'{'*'}') ;; *) echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS='' ;; esac
       cd -- '/workspace/project'
@@ -1110,7 +1217,7 @@ describe('generateLauncherScript', () => {
       extraArgs: '--effort "high"',
       keepAlive: true,
     });
-    expect(script.replaceAll(tempHome, '<OVERDECK_HOME>')).toMatchInlineSnapshot(`
+    expect(normalize(script)).toMatchInlineSnapshot(`
       "#!/bin/bash
       export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
@@ -1125,6 +1232,18 @@ describe('generateLauncherScript', () => {
       export COLORFGBG='15;0'
       export OVERDECK_ISSUE_ID='PAN-824'
       export ANTHROPIC_BASE_URL="http://proxy"
+      if [ -f '<PACKAGE_ROOT>/dist/cli/index.js' ] && mkdir -p '<OVERDECK_HOME>/cli-bin' 2>/dev/null \\
+        && cat > '<OVERDECK_HOME>/cli-bin'/pan.tmp.$$ <<'OVERDECK_PAN_SHIM'
+      #!/bin/sh
+      exec '<NODE>' '<PACKAGE_ROOT>/dist/cli/index.js' "$@"
+      OVERDECK_PAN_SHIM
+      then
+        if chmod 0755 '<OVERDECK_HOME>/cli-bin'/pan.tmp.$$ && cp -p '<OVERDECK_HOME>/cli-bin'/pan.tmp.$$ '<OVERDECK_HOME>/cli-bin'/overdeck.tmp.$$ \\
+          && mv -f '<OVERDECK_HOME>/cli-bin'/overdeck.tmp.$$ '<OVERDECK_HOME>/cli-bin'/overdeck && mv -f '<OVERDECK_HOME>/cli-bin'/pan.tmp.$$ '<OVERDECK_HOME>/cli-bin'/pan; then
+          export PATH='<OVERDECK_HOME>/cli-bin':"$PATH"
+        fi
+        rm -f '<OVERDECK_HOME>/cli-bin'/pan.tmp.$$ '<OVERDECK_HOME>/cli-bin'/overdeck.tmp.$$ 2>/dev/null
+      fi
       if ! PAN_SKILL_SETTINGS="$(pan skills launch-settings --harness claude-code --cwd '/workspace/project' --issue 'PAN-824' --plugin-link '<OVERDECK_HOME>/launch/sess-conv/skill-packs')"; then echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS=''; fi
       case "$PAN_SKILL_SETTINGS" in ''|'{'*'}') ;; *) echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS='' ;; esac
       if [ -d '<OVERDECK_HOME>/launch/sess-conv/skill-packs' ]; then PAN_SKILL_PLUGIN_DIR='<OVERDECK_HOME>/launch/sess-conv/skill-packs'; else PAN_SKILL_PLUGIN_DIR=''; fi
@@ -1168,7 +1287,7 @@ describe('generateLauncherScript', () => {
       resumeSessionId: 'sess-resume',
       keepAlive: true,
     });
-    expect(script.replaceAll(tempHome, '<OVERDECK_HOME>')).toMatchInlineSnapshot(`
+    expect(normalize(script)).toMatchInlineSnapshot(`
       "#!/bin/bash
       export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
@@ -1181,6 +1300,18 @@ describe('generateLauncherScript', () => {
       export LANG=C.UTF-8
       export LC_ALL=C.UTF-8
       export COLORFGBG='15;0'
+      if [ -f '<PACKAGE_ROOT>/dist/cli/index.js' ] && mkdir -p '<OVERDECK_HOME>/cli-bin' 2>/dev/null \\
+        && cat > '<OVERDECK_HOME>/cli-bin'/pan.tmp.$$ <<'OVERDECK_PAN_SHIM'
+      #!/bin/sh
+      exec '<NODE>' '<PACKAGE_ROOT>/dist/cli/index.js' "$@"
+      OVERDECK_PAN_SHIM
+      then
+        if chmod 0755 '<OVERDECK_HOME>/cli-bin'/pan.tmp.$$ && cp -p '<OVERDECK_HOME>/cli-bin'/pan.tmp.$$ '<OVERDECK_HOME>/cli-bin'/overdeck.tmp.$$ \\
+          && mv -f '<OVERDECK_HOME>/cli-bin'/overdeck.tmp.$$ '<OVERDECK_HOME>/cli-bin'/overdeck && mv -f '<OVERDECK_HOME>/cli-bin'/pan.tmp.$$ '<OVERDECK_HOME>/cli-bin'/pan; then
+          export PATH='<OVERDECK_HOME>/cli-bin':"$PATH"
+        fi
+        rm -f '<OVERDECK_HOME>/cli-bin'/pan.tmp.$$ '<OVERDECK_HOME>/cli-bin'/overdeck.tmp.$$ 2>/dev/null
+      fi
       if ! PAN_SKILL_SETTINGS="$(pan skills launch-settings --harness claude-code --cwd '/workspace/project')"; then echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS=''; fi
       case "$PAN_SKILL_SETTINGS" in ''|'{'*'}') ;; *) echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS='' ;; esac
       cd -- '/workspace/project'
@@ -1205,7 +1336,7 @@ describe('generateLauncherScript', () => {
       baseCommand: 'claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6',
       changeDir: false,
     });
-    expect(script.replaceAll(tempHome, '<OVERDECK_HOME>')).toMatchInlineSnapshot(`
+    expect(normalize(script)).toMatchInlineSnapshot(`
       "#!/bin/bash
       export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
@@ -1246,7 +1377,7 @@ describe('generateLauncherScript', () => {
       promptFile: '/tmp/init-prompt.txt',
       baseCommand: 'claude --dangerously-skip-permissions --permission-mode bypassPermissions',
     });
-    expect(script.replaceAll(tempHome, '<OVERDECK_HOME>')).toMatchInlineSnapshot(`
+    expect(normalize(script)).toMatchInlineSnapshot(`
       "#!/bin/bash
       export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
@@ -1254,6 +1385,18 @@ describe('generateLauncherScript', () => {
       mkdir -p '<OVERDECK_HOME>/tmp' && chmod 700 '<OVERDECK_HOME>/tmp' && export CLAUDE_CODE_TMPDIR='<OVERDECK_HOME>/tmp'
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
+      if [ -f '<PACKAGE_ROOT>/dist/cli/index.js' ] && mkdir -p '<OVERDECK_HOME>/cli-bin' 2>/dev/null \\
+        && cat > '<OVERDECK_HOME>/cli-bin'/pan.tmp.$$ <<'OVERDECK_PAN_SHIM'
+      #!/bin/sh
+      exec '<NODE>' '<PACKAGE_ROOT>/dist/cli/index.js' "$@"
+      OVERDECK_PAN_SHIM
+      then
+        if chmod 0755 '<OVERDECK_HOME>/cli-bin'/pan.tmp.$$ && cp -p '<OVERDECK_HOME>/cli-bin'/pan.tmp.$$ '<OVERDECK_HOME>/cli-bin'/overdeck.tmp.$$ \\
+          && mv -f '<OVERDECK_HOME>/cli-bin'/overdeck.tmp.$$ '<OVERDECK_HOME>/cli-bin'/overdeck && mv -f '<OVERDECK_HOME>/cli-bin'/pan.tmp.$$ '<OVERDECK_HOME>/cli-bin'/pan; then
+          export PATH='<OVERDECK_HOME>/cli-bin':"$PATH"
+        fi
+        rm -f '<OVERDECK_HOME>/cli-bin'/pan.tmp.$$ '<OVERDECK_HOME>/cli-bin'/overdeck.tmp.$$ 2>/dev/null
+      fi
       if ! PAN_SKILL_SETTINGS="$(pan skills launch-settings --harness claude-code --cwd '/workspace/project')"; then echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS=''; fi
       case "$PAN_SKILL_SETTINGS" in ''|'{'*'}') ;; *) echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS='' ;; esac
       cd -- '/workspace/project'
@@ -1273,7 +1416,7 @@ describe('generateLauncherScript', () => {
       baseCommand: 'claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6',
       promptInline: 'Please read the continuation prompt and continue.',
     });
-    expect(script.replaceAll(tempHome, '<OVERDECK_HOME>')).toMatchInlineSnapshot(`
+    expect(normalize(script)).toMatchInlineSnapshot(`
       "#!/bin/bash
       export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
@@ -1281,6 +1424,18 @@ describe('generateLauncherScript', () => {
       mkdir -p '<OVERDECK_HOME>/tmp' && chmod 700 '<OVERDECK_HOME>/tmp' && export CLAUDE_CODE_TMPDIR='<OVERDECK_HOME>/tmp'
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
+      if [ -f '<PACKAGE_ROOT>/dist/cli/index.js' ] && mkdir -p '<OVERDECK_HOME>/cli-bin' 2>/dev/null \\
+        && cat > '<OVERDECK_HOME>/cli-bin'/pan.tmp.$$ <<'OVERDECK_PAN_SHIM'
+      #!/bin/sh
+      exec '<NODE>' '<PACKAGE_ROOT>/dist/cli/index.js' "$@"
+      OVERDECK_PAN_SHIM
+      then
+        if chmod 0755 '<OVERDECK_HOME>/cli-bin'/pan.tmp.$$ && cp -p '<OVERDECK_HOME>/cli-bin'/pan.tmp.$$ '<OVERDECK_HOME>/cli-bin'/overdeck.tmp.$$ \\
+          && mv -f '<OVERDECK_HOME>/cli-bin'/overdeck.tmp.$$ '<OVERDECK_HOME>/cli-bin'/overdeck && mv -f '<OVERDECK_HOME>/cli-bin'/pan.tmp.$$ '<OVERDECK_HOME>/cli-bin'/pan; then
+          export PATH='<OVERDECK_HOME>/cli-bin':"$PATH"
+        fi
+        rm -f '<OVERDECK_HOME>/cli-bin'/pan.tmp.$$ '<OVERDECK_HOME>/cli-bin'/overdeck.tmp.$$ 2>/dev/null
+      fi
       if ! PAN_SKILL_SETTINGS="$(pan skills launch-settings --harness claude-code --cwd '/workspace/project')"; then echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS=''; fi
       case "$PAN_SKILL_SETTINGS" in ''|'{'*'}') ;; *) echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS='' ;; esac
       cd -- '/workspace/project'
@@ -1318,7 +1473,7 @@ describe('generateLauncherScript', () => {
       changeDir: false,
       baseCommand: 'claude --model claude-sonnet-4-6',
     });
-    expect(script.replaceAll(tempHome, '<OVERDECK_HOME>')).toMatchInlineSnapshot(`
+    expect(normalize(script)).toMatchInlineSnapshot(`
       "#!/bin/bash
       export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
@@ -1326,6 +1481,18 @@ describe('generateLauncherScript', () => {
       mkdir -p '<OVERDECK_HOME>/tmp' && chmod 700 '<OVERDECK_HOME>/tmp' && export CLAUDE_CODE_TMPDIR='<OVERDECK_HOME>/tmp'
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export SKIP_DOCS_INDEX=1
+      if [ -f '<PACKAGE_ROOT>/dist/cli/index.js' ] && mkdir -p '<OVERDECK_HOME>/cli-bin' 2>/dev/null \\
+        && cat > '<OVERDECK_HOME>/cli-bin'/pan.tmp.$$ <<'OVERDECK_PAN_SHIM'
+      #!/bin/sh
+      exec '<NODE>' '<PACKAGE_ROOT>/dist/cli/index.js' "$@"
+      OVERDECK_PAN_SHIM
+      then
+        if chmod 0755 '<OVERDECK_HOME>/cli-bin'/pan.tmp.$$ && cp -p '<OVERDECK_HOME>/cli-bin'/pan.tmp.$$ '<OVERDECK_HOME>/cli-bin'/overdeck.tmp.$$ \\
+          && mv -f '<OVERDECK_HOME>/cli-bin'/overdeck.tmp.$$ '<OVERDECK_HOME>/cli-bin'/overdeck && mv -f '<OVERDECK_HOME>/cli-bin'/pan.tmp.$$ '<OVERDECK_HOME>/cli-bin'/pan; then
+          export PATH='<OVERDECK_HOME>/cli-bin':"$PATH"
+        fi
+        rm -f '<OVERDECK_HOME>/cli-bin'/pan.tmp.$$ '<OVERDECK_HOME>/cli-bin'/overdeck.tmp.$$ 2>/dev/null
+      fi
       if ! PAN_SKILL_SETTINGS="$(pan skills launch-settings --harness claude-code --cwd '/workspace/project')"; then echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS=''; fi
       case "$PAN_SKILL_SETTINGS" in ''|'{'*'}') ;; *) echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS='' ;; esac
       set -m
@@ -1439,7 +1606,11 @@ describe('generateLauncherScript', () => {
       useSupervisor: true,
       supervisorScriptPath: '/opt/pan dist/pty-supervisor.js',
     });
-    const execLines = script.split('\n').filter((line) => line.startsWith('exec '));
+    // PAN-2630's pan-cli-shim block also embeds a literal `exec '<node>'
+    // '<bundle>' "$@"` line; it's the only exec line that forwards its own
+    // args verbatim, so excluding lines ending in that placeholder isolates
+    // the supervisor-wrapped command this test is actually checking.
+    const execLines = script.split('\n').filter((line) => line.startsWith('exec ') && !line.endsWith('"$@"'));
     expect(execLines).toEqual([
       "exec node '/opt/pan dist/pty-supervisor.js' claude --agent pan-work-agent ${PAN_SKILL_SETTINGS:+--settings \"$PAN_SKILL_SETTINGS\"} ${PAN_SKILL_PLUGIN_DIR:+--plugin-dir \"$PAN_SKILL_PLUGIN_DIR\"} --session-id 'sess-supervisor' --model 'gpt-5.5'",
     ]);
@@ -1586,6 +1757,7 @@ describe('generateLauncherScript', () => {
       },
     }));
 
+    blockPanCliShim();
     const result = spawnSync('bash', [launcherPath], {
       encoding: 'utf-8',
       env: { ...process.env, PATH: `${binDir}:${process.env.PATH ?? ''}` },
@@ -1639,6 +1811,7 @@ describe('generateLauncherScript', () => {
       },
     }));
 
+    blockPanCliShim();
     const result = spawnSync('bash', [launcherPath], {
       encoding: 'utf-8',
       env: { ...process.env, PATH: `${binDir}:${process.env.PATH ?? ''}` },
@@ -1678,6 +1851,7 @@ describe('generateLauncherWrapper', () => {
           `mkdir -p '${tempHome}/tmp' && chmod 700 '${tempHome}/tmp' && export CLAUDE_CODE_TMPDIR='${tempHome}/tmp'`,
           'command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"',
           'export SKIP_DOCS_INDEX=1',
+          ...panCliShimLauncherLines(),
           `if ! PAN_SKILL_SETTINGS="$(pan skills launch-settings --harness claude-code --cwd '/workspace/project' --plugin-link '${tempHome}/launch/sess-abc/skill-packs')"; then echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS=''; fi`,
           `case "$PAN_SKILL_SETTINGS" in ''|'{'*'}') ;; *) echo "[launcher] WARNING: skill overrides not applied" >&2; PAN_SKILL_SETTINGS='' ;; esac`,
           `if [ -d '${tempHome}/launch/sess-abc/skill-packs' ]; then PAN_SKILL_PLUGIN_DIR='${tempHome}/launch/sess-abc/skill-packs'; else PAN_SKILL_PLUGIN_DIR=''; fi`,
@@ -2248,7 +2422,10 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
         supervisorScriptPath: '/dist/pty-supervisor.js',
       });
       expect(script).toMatch(/^node '\/dist\/pty-supervisor\.js' kimi -m 'kimi-code\/k3-256k' --yolo$/m);
-      expect(script).not.toMatch(/^exec /m);
+      // PAN-2630's pan-cli-shim block embeds its own `exec '<node>' '<bundle>'
+      // "$@"` line; excluding that placeholder-argv line keeps this assertion
+      // scoped to whether the harness command itself was wrapped in exec.
+      expect(script.split('\n').filter(line => line.startsWith('exec ') && !line.endsWith('"$@"'))).toEqual([]);
     });
 
     // The CLI only accepts ids from its own config.toml catalog. Translating at
