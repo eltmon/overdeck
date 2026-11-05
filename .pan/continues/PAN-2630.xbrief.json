@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2630",
   "created": "2026-11-05T21:09:00.725Z",
-  "updated": "2026-11-05T22:27:32.840Z",
+  "updated": "2026-11-05T22:27:47.058Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -118,6 +118,10 @@
     "doctor-pan-on-path.ac2": {
       "status": "completed",
       "doneAt": "2026-11-05T22:27:32.840Z"
+    },
+    "doctor-pan-on-path.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-05T22:27:47.058Z"
     }
   }
 }
