@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5069",
   "created": "2026-11-05T23:26:20.599Z",
-  "updated": "2026-11-05T23:38:08.188Z",
+  "updated": "2026-11-05T23:39:46.311Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -40,9 +40,10 @@
       "doneAt": "2026-11-05T23:38:06.768Z"
     },
     "a6-connect-contract": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5069",
-      "claimedAt": "2026-11-05T23:38:08.187Z"
+      "claimedAt": "2026-11-05T23:38:08.187Z",
+      "doneAt": "2026-11-05T23:39:46.310Z"
     }
   }
 }
