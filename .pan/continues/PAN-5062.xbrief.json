@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5062",
   "created": "2026-11-05T22:39:32.195Z",
-  "updated": "2026-11-05T22:58:00.866Z",
+  "updated": "2026-11-05T23:02:22.757Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -28,9 +28,10 @@
       "doneAt": "2026-11-05T22:57:56.532Z"
     },
     "gates-load-workspace-env": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5062",
-      "claimedAt": "2026-11-05T22:58:00.866Z"
+      "claimedAt": "2026-11-05T22:58:00.866Z",
+      "doneAt": "2026-11-05T23:02:22.757Z"
     }
   }
 }
