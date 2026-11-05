@@ -335,7 +335,9 @@ restart-all of that conversation. With `--issue` and no `--cwd`, the handoff sta
 Claude Code, the one conversation harness Herdr must detect; kimi-code, muse and the codex TUI are
 pane-bound (no Herdr agent record, so `agent.prompt` cannot reach them) and keep the supervisor as
 their delivery path (`conversationUsesSupervisor`). The launcher exports `OVERDECK_AGENT_ID` on Herdr (the hooks have no `$TMUX` to read the name
-from), and the keep-alive sleep loop is tmux-only, as for planners. On Herdr the launcher `exec`s
+from), and the keep-alive sleep loop is tmux-only, as for planners. Every non-remote launcher also
+writes the `pan` shim to `~/.overdeck/cli-bin` and puts that directory first on PATH (PAN-2630). On
+Herdr the launcher `exec`s
 Claude Code, so the pane's foreground process is `claude` and Herdr's detection sees it (see
 "supervisor vs direct exec" below); on tmux Claude Code still runs as the launcher's child.
 

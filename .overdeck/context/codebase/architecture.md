@@ -124,6 +124,8 @@ terminal backend (Herdr by default, tmux when `terminal.backend: tmux`).
 - `agent-tmpdir.ts` — the `CLAUDE_CODE_TMPDIR` launcher line (PAN-4998), so
   Claude Code's session scratchpad lives under `~/.overdeck/tmp` instead of
   `/tmp`; `cloister/agent-tmp-sweep.ts` removes idle session dirs hourly.
+- `pan-cli-shim.ts` — the `pan`/`overdeck` exec shim in `<OVERDECK_HOME>/cli-bin`
+  that every non-remote launcher writes and puts first on PATH (PAN-2630).
 - `tmux.ts` — tmux primitives on the `overdeck` socket. Async (Effect) variants
   are canonical; `*Sync` are legacy debt.
 - `session-format-converter.ts` — conversation transcript conversion between
