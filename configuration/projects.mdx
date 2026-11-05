@@ -251,7 +251,7 @@ projects:
 | `workspace_command` | No | Custom workspace creation script |
 | `workspace_remove_command` | No | Custom workspace cleanup script |
 | `workspace` | No | Polyrepo/progressive workspace configuration |
-| `workspace.env.template` | No | Path to an env template rendered to `<workspace>/.env` at workspace creation. |
+| `workspace.env.template` | No | Inline `.env` content (placeholders accepted) rendered to `<workspace>/.env` at workspace creation. |
 | `workspace.env.load` | No | When `true`, loads the rendered `<workspace>/.env` into agent launcher shells and host quality gates. Default `false`. See [dbt and data projects](#dbt-and-data-projects). |
 | `release` | No | Coordinated post-merge release configuration |
 | `verification.tests` | No | `ci` or `local`: where the verification gate's `test` gate runs. `ci` skips the local `quality_gates.test` run and treats the CI test job on the PR head as the test gate; `local` runs it on the host. Default: `ci` when the project has `github_repo` and a GitHub Actions workflow that runs a job named `test`/`tests`/`test-*`/`test (…)` on pull requests, else `local`. |
@@ -341,7 +341,8 @@ projects:
     issue_prefix: WH
     workspace:
       env:
-        template: infra/env.template
+        template: |
+          DBT_SCHEMA=dev_{{FEATURE_IDENT}}
         load: true
     quality_gates:
       dbt-parse:
@@ -354,10 +355,12 @@ projects:
           DBT_SCHEMA: "dev_{{FEATURE_IDENT}}"
 ```
 
-`infra/env.template` renders to `<workspace>/.env` at workspace creation and
-can set `DBT_SCHEMA=dev_{{FEATURE_IDENT}}` itself; with `env.load: true` that
-line reaches both the agent's launcher shell and the gates above. `profiles.yml`
-then picks it up with:
+`workspace.env.template` is inline `.env` content, rendered with the same
+placeholders as `command` and written verbatim to `<workspace>/.env` at
+workspace creation — it is not a path to a file in the project repo. With
+`env.load: true` that `DBT_SCHEMA=dev_{{FEATURE_IDENT}}` line reaches both the
+agent's launcher shell and the gates above. `profiles.yml` then picks it up
+with:
 
 ```yaml
 outputs:
@@ -375,11 +378,22 @@ A dbt-duckdb project that costs nothing to run needs no warehouse at all —
 point it at a file inside the workspace instead of a schema:
 
 ```yaml
+workspace:
+  env:
+    template: |
+      DBT_DUCKDB_PATH={{WORKSPACE_PATH}}/dev.duckdb
+    load: true
 quality_gates:
   dbt-build:
     command: dbt build --target dev
     env:
       DBT_DUCKDB_PATH: "{{WORKSPACE_PATH}}/dev.duckdb"
+```
+
+```yaml
+outputs:
+  dev:
+    path: "{{ env_var('DBT_DUCKDB_PATH') }}"
 ```
 
 Warehouse credentials (a Snowflake/BigQuery/Redshift key, for example) belong

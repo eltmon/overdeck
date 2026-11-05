@@ -5,7 +5,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { mkdtempSync, rmSync, writeFileSync } from 'fs';
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import {
@@ -92,14 +92,50 @@ describe('loadWorkspaceEnvForProject', () => {
     const project = projectConfig({ path: projectPath, workspace: { env: { load: true } } });
     expect(loadWorkspaceEnvForProject(project, workspacePath)).toEqual({ DBT_SCHEMA: 'dev_min_574' });
   });
+
+  it('returns {} when project.path reaches the same directory through a symlink', () => {
+    const realDir = makeTempDir();
+    writeFileSync(join(realDir, '.env'), 'DBT_SCHEMA=dev_min_574\n');
+    const parent = makeTempDir();
+    const linkedPath = join(parent, 'linked-project');
+    symlinkSync(realDir, linkedPath, 'dir');
+    const project = projectConfig({ path: linkedPath, workspace: { env: { load: true } } });
+
+    expect(loadWorkspaceEnvForProject(project, realDir)).toEqual({});
+  });
 });
 
 describe('workspaceEnvLauncherLines', () => {
-  it('returns [] and never calls findProject when workingDir has no .env', () => {
+  it('returns [] when there is no .env in workingDir, any ancestor, or no project is found', () => {
     const dir = makeTempDir();
-    const findProject = vi.fn();
+    const findProject = vi.fn(() => null);
     expect(workspaceEnvLauncherLines(dir, findProject)).toEqual([]);
-    expect(findProject).not.toHaveBeenCalled();
+    expect(findProject).toHaveBeenCalledWith(dir);
+  });
+
+  it('finds .env in an ancestor workspace root when launched from a polyrepo subdirectory', () => {
+    const projectPath = makeTempDir();
+    const workspaceRoot = join(projectPath, 'workspaces', 'feature-pan-1');
+    const subdir = join(workspaceRoot, 'frontend');
+    mkdirSync(subdir, { recursive: true });
+    writeFileSync(join(workspaceRoot, '.env'), 'DBT_SCHEMA=dev_pan_1\n');
+    const project = projectConfig({ path: projectPath, workspace: { env: { load: true } } });
+    const findProject = vi.fn(() => project);
+
+    const lines = workspaceEnvLauncherLines(subdir, findProject);
+
+    expect(lines).toContain("export DBT_SCHEMA='dev_pan_1'");
+  });
+
+  it('never climbs into the project checkout\'s own .env', () => {
+    const projectPath = makeTempDir();
+    writeFileSync(join(projectPath, '.env'), 'DBT_SCHEMA=should_not_leak\n');
+    const subdir = join(projectPath, 'workspaces', 'feature-pan-1', 'frontend');
+    mkdirSync(subdir, { recursive: true });
+    const project = projectConfig({ path: projectPath, workspace: { env: { load: true } } });
+    const findProject = vi.fn(() => project);
+
+    expect(workspaceEnvLauncherLines(subdir, findProject)).toEqual([]);
   });
 
   it('shell-quotes a value with a single quote, an ampersand and a space, and round-trips through bash', async () => {
@@ -117,5 +153,13 @@ describe('workspaceEnvLauncherLines', () => {
 
     const { stdout } = await execFileAsync('bash', ['-c', `${trickyLine}; printf '%s' "$TRICKY"`]);
     expect(stdout).toBe(tricky);
+  });
+
+  it('returns [] instead of throwing when findProject rejects (e.g. malformed projects.yaml)', () => {
+    const dir = makeTempDir();
+    writeFileSync(join(dir, '.env'), 'DBT_SCHEMA=dev_min_574\n');
+    const findProject = vi.fn(() => { throw new Error('malformed projects.yaml'); });
+
+    expect(workspaceEnvLauncherLines(dir, findProject)).toEqual([]);
   });
 });
