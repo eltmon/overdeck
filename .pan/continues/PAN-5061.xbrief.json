@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5061",
   "created": "2026-11-05T22:48:30.946Z",
-  "updated": "2026-11-05T23:05:43.418Z",
+  "updated": "2026-11-05T23:29:09.052Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -74,6 +74,10 @@
       "claimedBy": "agent-pan-5061",
       "claimedAt": "2026-11-05T23:05:06.790Z",
       "doneAt": "2026-11-05T23:05:43.418Z"
+    },
+    "wi1-parse-mcp-servers.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:29:09.051Z"
     }
   }
 }
