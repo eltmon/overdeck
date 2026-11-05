@@ -68,4 +68,14 @@ describe('conversationRuntimeRootPids', () => {
     expect(pids).toContain(100);
     expect(pids).not.toContain(200);
   });
+
+  // PAN-2652 W9: after fork adoption claudeSessionId moves, but the process cmdline keeps the launched id.
+  it('matches the launched (pinned) session id passed as an extra needle', () => {
+    mockedFindManagedServerPidSync.mockReturnValue(undefined);
+    const conv = { tmuxSession: 'conv-20261105-2652', claudeSessionId: 'bbbbbbbb-2652' } as any;
+    const rows = [{ pid: 300, ppid: 0, args: 'claude --resume aaaaaaaa-2652' }];
+
+    expect(conversationRuntimeRootPids(conv, rows, ['aaaaaaaa-2652'])).toEqual([300]);
+    expect(conversationRuntimeRootPids(conv, rows)).toEqual([]);
+  });
 });

@@ -67,7 +67,6 @@ import { listCodexSubagents, resolveCodexSubagentTranscript } from '../../dashbo
 import { listSubagentMetas, subagentTranscriptPath } from '../../dashboard/server/services/conversation/subagents.js';
 import { selectInitialWindow, selectPageBefore, transcriptIdOf } from '../../dashboard/server/services/conversation/window.js';
 import {
-  readLauncherPinnedSessionId,
   resolveAcpTranscriptPath,
   resolveCodexRolloutPath,
   resolveKimiWirePath,
@@ -78,6 +77,7 @@ import { resolveEffectivePullRequest, type HarnessTranscriptKind, type TimelineK
 import { listConversationPullRequests } from './conversation-pull-requests.js';
 import { codexConversationPendingInput } from './conversation-delivery.js';
 import { readConversationInputTarget } from './conversation-input-target.js';
+import { resolveConversationClaudeSessionId } from './conversation-claude-session.js';
 import { claudeConversationPaneChoice, type PendingPaneChoice } from './conversation-pane-choice.js';
 import { conversationPendingPermission, readConversationPermission, type PendingPermission } from './conversation-permission.js';
 import { findClaudeSessionFileById } from './claude-session-file-search.js';
@@ -152,11 +152,11 @@ export async function resolveSessionFile(conv: Conversation): Promise<string | n
     const path = await lookup.resolve(conv);
     if (path || lookup.onMiss === 'return') return path;
   }
-  // claude-code: prefer the launcher's pinned live session id, then the recorded
-  // canonical id. Do not guess from JSONL mtime; compaction can make old files
-  // newer than the terminal's current transcript.
-  const pinned = await readLauncherPinnedSessionId(conv.tmuxSession);
-  const sessionId = pinned ?? conv.claudeSessionId;
+  // claude-code: prefer the conversation's current locator, then the launcher's
+  // pinned session id (PAN-2652; superseded /clear rows never read the shared pin).
+  // Do not guess from JSONL mtime; compaction can make old files newer than the
+  // terminal's current transcript.
+  const sessionId = await resolveConversationClaudeSessionId(conv);
   if (sessionId) {
     const deterministic = sessionFilePath(conv.cwd, sessionId);
     if (existsSync(deterministic)) return deterministic;

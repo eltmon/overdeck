@@ -712,6 +712,25 @@ door that does not exist; a real record read door would be a separate change.
   restart-all restarts each live session once, through its owner; plan-action,
   permission and pane-choice answers on a superseded row return 409. There is no
   boot-time conversation auto-resume.
+- A human conversation's Claude session is its current locator: the newest
+  `conversation_files` row (PAN-2652). The launcher pin (`--session-id`/`--resume` in
+  `launcher.sh`) is only the fallback for a chain head that has no locator. A superseded
+  /clear row reads its own locator and never the shared pin. Agent conversations keep
+  the pin first. `resolveConversationClaudeSessionId`
+  (`src/lib/overdeck/conversation-claude-session.ts`) applies this for transcript reads,
+  fork sources and the shared-session bridge. Claude Code can move a running process to
+  a new session file in-process (backgrounding a turn), so the 10-second lifecycle poll
+  adopts forks before the /clear scan. It takes candidates from the conversation's
+  `sessions.json` index and from the backgrounding marker near the end of the current
+  file. It adopts a candidate only after a lineage check finds a shared entry uuid with
+  the current file. It never adopts a /clear session, a session in another project dir,
+  or a session another conversation owns (`src/lib/overdeck/conversation-fork-adoption.ts`).
+  `setConversationClaudeSessionId` is the one write door: it makes the id current
+  without duplicating a locator row (the cost ledger sums every row) and notifies the
+  live stream, so an open Conversation tab switches to the new transcript with a reset
+  snapshot. Resume launches `--resume <current locator>`. Stop still matches the process
+  by its launched (pinned) id. Native `/compact` records the compacted fork and restarts
+  the runtime on it.
 - Conversation sends carry `clientMessageId`; retries preserve it and set `retry: true`.
   The server coalesces matching concurrent requests and retains their result, including
   ambiguous failures. Changed text or command confirmation requires a new ID. Receipts

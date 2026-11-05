@@ -70,7 +70,7 @@ function kimiBucketFor(workDir: string): string {
 }
 
 function conversation(overrides: Partial<Conversation>): Conversation {
-  return { status: 'active', ...overrides } as Conversation;
+  return { name: overrides.tmuxSession ?? 'conv-golden', status: 'active', ...overrides } as Conversation;
 }
 
 beforeEach(() => {

@@ -8,12 +8,12 @@ import { resolveDiscoveredSessionFile } from '../conversations/discovered-sessio
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { claudeProjectsRoot, sessionFilePath } from '../runtimes/storage/claude-code.js';
 import {
-  readLauncherPinnedSessionId,
   resolveCodexRolloutPath,
   resolveKimiWirePath,
   resolvePiSessionPath,
 } from '../agents/transcript-resolver.js';
 import type { LegacyConversation as Conversation } from './conversations.js';
+import { resolveConversationClaudeSessionId } from './conversation-claude-session.js';
 
 const SESSION_FILE_MISS_TTL_MS = 2000;
 const sessionFileByIdCache = new Map<string, { path: string | null; ts: number }>();
@@ -80,8 +80,8 @@ export async function resolveForkSourceSessionFile(conv: Conversation): Promise<
     const nativePath = await resolveNative(conv);
     if (nativePath) return nativePath;
   }
-  const pinned = await readLauncherPinnedSessionId(conv.tmuxSession);
-  const sessionId = pinned ?? conv.claudeSessionId;
+  // Current locator first, then the launcher pin (PAN-2652).
+  const sessionId = await resolveConversationClaudeSessionId(conv);
   if (sessionId) {
     const deterministic = sessionFilePath(conv.cwd, sessionId);
     if (existsSync(deterministic)) return deterministic;
