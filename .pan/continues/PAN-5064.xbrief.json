@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5064",
   "created": "2026-11-05T22:52:07.107Z",
-  "updated": "2026-11-05T23:10:10.957Z",
+  "updated": "2026-11-05T23:10:15.960Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -50,6 +50,11 @@
       "claimedBy": "agent-pan-5064",
       "claimedAt": "2026-11-05T23:08:55.743Z",
       "doneAt": "2026-11-05T23:10:10.957Z"
+    },
+    "skill-config-reference": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5064",
+      "claimedAt": "2026-11-05T23:10:15.960Z"
     }
   }
 }
