@@ -254,6 +254,9 @@ projects:
 | `release` | No | Coordinated post-merge release configuration |
 | `verification.tests` | No | `ci` or `local`: where the verification gate's `test` gate runs. `ci` skips the local `quality_gates.test` run and treats the CI test job on the PR head as the test gate; `local` runs it on the host. Default: `ci` when the project has `github_repo` and a GitHub Actions workflow that runs a job named `test`/`tests`/`test-*`/`test (…)` on pull requests, else `local`. |
 | `quality_gates` | No | Map of verification gates; see [Quality gates](#quality-gates). |
+| `mcp_servers` | No | MCP servers for this project's agents, in the role `mcpServers:` shape (a list of single-key maps); see [Project MCP servers](/configuration/mcp#project-mcp-servers). |
+| `mcp_strict` | No | `true` adds `--strict-mcp-config` to the project's Claude Code launches, so only Overdeck's, the project's and the role's MCP servers load. Default: `false`. |
+| `workspace.env.secrets_file` | No | Absolute or `~/` path to a dotenv file whose values reach this project's agents and host-run gates; see [Project credentials](#project-credentials). |
 
 *Not required if `issue_prefixes` or `issue_pattern` is specified.
 
@@ -286,7 +289,8 @@ is skipped on the host when `verification.tests` resolves to `ci` (above).
 `{{FEATURE_FOLDER}}`, and `{{WORKSPACE_PATH}}`. A gate's process does not
 inherit the agent's full environment: every `OVERDECK_*` variable except
 `OVERDECK_HOME` is dropped, as are `API_PORT`, `PORT`, and `DASHBOARD_URL`
-unless the gate sets them itself, and `SKIP_DOCS_INDEX=1` is always set. See
+unless the gate sets them itself, and `SKIP_DOCS_INDEX=1` is always set. The
+project's `secrets_file` values are added, under `gate.env`. See
 [Change-Scoped Verification Gates](https://github.com/eltmon/overdeck/blob/main/docs/CONFIGURATION.md#change-scoped-verification-gates)
 for the placeholder values in context.
 
@@ -315,6 +319,46 @@ projects:
 See also [What a verification run does](https://github.com/eltmon/overdeck/blob/main/docs/PIPELINE-GATES.md#what-a-verification-run-does),
 [Why verification is slow](https://github.com/eltmon/overdeck/blob/main/docs/PIPELINE-GATES.md#why-verification-is-slow),
 and [Choosing a project's local gates](https://github.com/eltmon/overdeck/blob/main/docs/PIPELINE-GATES.md#choosing-a-projects-local-gates).
+
+### Project credentials
+
+`workspace.env.secrets_file` gives one project's agents and gates their own
+credentials, for example a separate `LINEAR_API_KEY` for each of two Linear
+workspaces:
+
+```yaml
+projects:
+  myn:
+    workspace:
+      env:
+        secrets_file: ~/.overdeck/secrets/myn.env
+```
+
+The file uses the same dotenv format as `~/.overdeck.env`: one `KEY=VALUE` per
+line, `#` comments, optional surrounding quotes. These rules apply:
+
+- The path must be absolute or start with `~/`, and it must live outside the
+  project's `path`, so the values never sit in the repository. A relative path,
+  a path inside the project, or a missing file gives no secrets and one
+  `[project-env] <project>: …` warning.
+- Keys starting with `OVERDECK_` and the provider keys Overdeck controls (such
+  as `ANTHROPIC_BASE_URL` and `ANTHROPIC_API_KEY`) are reserved. They are
+  dropped with a warning that names the keys, never the values.
+- Overdeck reads the file on every launch, so an edit applies to the next
+  launch of an agent, conversation or gate.
+- The values reach the project's agent panes, where Overdeck's own launch keys
+  win, and its host-run quality gates, where `gate.env` wins. They also fill
+  `${NAME}` references in the project's
+  [MCP servers](/configuration/mcp#project-mcp-servers).
+- Only a launch or gate of this project gets them. The project comes from the
+  issue prefix, else from the project whose `path` contains the launch
+  directory.
+- Remote (Fly) gates do not get them, and neither does the inside of a
+  container gate: `gate.env` reaches only the `docker exec` client.
+
+This adds credentials. It does not remove anything: every agent still sees the
+keys in `~/.overdeck.env`. Opt-in isolation from those keys is tracked in
+[PAN-5065](https://github.com/eltmon/overdeck/issues/5065).
 
 ### Separate the issue tracker from the code host
 
