@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5064",
   "created": "2026-11-05T22:52:07.107Z",
-  "updated": "2026-11-05T23:35:16.837Z",
+  "updated": "2026-11-05T23:35:33.626Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -208,6 +208,10 @@
     "docs-nav-entries.ac1": {
       "status": "completed",
       "doneAt": "2026-11-05T23:35:16.836Z"
+    },
+    "docs-nav-entries.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:35:33.626Z"
     }
   }
 }
