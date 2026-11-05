@@ -16,6 +16,7 @@ import { overdeckMcpArgs } from './mcp/overdeck-mcp-args.js';
 import { resolveKimiNativeEffort } from './kimi-effort.js';
 import { getClaudeCodeLaunchModel } from './kimi-claude-routing.js';
 import { harnessLaunchLines } from './launcher-job-control.js';
+import { workspaceEnvLauncherLines } from './workspace-env.js';
 
 export type LauncherSpawnMode = 'conversation' | 'remote' | 'resume';
 
@@ -347,6 +348,7 @@ export function generateLauncherScript(config: LauncherConfig): string {
   // concurrent agent workspaces stampedes the host to OOM. Release/publish
   // builds the index through a separate path that never sources this launcher.
   lines.push('export SKIP_DOCS_INDEX=1');
+  if (config.spawnMode !== 'remote') lines.push(...workspaceEnvLauncherLines(config.workingDir)); // PAN-5062
 
   // Terminal env (TERM/COLORTERM/LANG/LC_ALL)
   if (config.setTerminalEnv) {
