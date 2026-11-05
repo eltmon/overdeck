@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5069",
   "created": "2026-11-05T23:26:20.599Z",
-  "updated": "2026-11-05T23:51:57.787Z",
+  "updated": "2026-11-05T23:52:03.258Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -73,6 +73,11 @@
       "status": "cancelled",
       "claimedBy": "agent-pan-5069",
       "claimedAt": "2026-11-05T23:51:39.250Z"
+    },
+    "a10-connect-docs": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5069",
+      "claimedAt": "2026-11-05T23:52:03.258Z"
     }
   }
 }
