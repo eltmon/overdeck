@@ -35,6 +35,26 @@ import type { TerminalBackendName } from '../../lib/terminal-backends/types.js';
 import { renderHerdrReport } from '../herdr-report.js';
 import { setupOllamaForInstall } from './install-ollama.js';
 import { evaluatePrereqGate, forgivenPrereqNames, type PrereqResult } from './install-prereqs.js';
+import { findExecutableOnPath, writePanCliShims } from '../../lib/pan-cli-shim.js';
+
+/** PAN-2630: writes the pan/overdeck PATH shim and hints at the PATH line when pan is missing. */
+export async function installPanCliShimStep(deps: {
+  write: typeof writePanCliShims;
+  pathEnv: string | undefined;
+  find: typeof findExecutableOnPath;
+  log: (line: string) => void;
+}): Promise<void> {
+  const result = await deps.write();
+  if (result.status === 'written') {
+    deps.log(chalk.green(`✓ pan shim written to ${result.dir}`));
+    if (deps.find('pan', deps.pathEnv) === null) {
+      deps.log(chalk.yellow(`pan is not on your PATH. Add this to your shell profile: export PATH="${result.dir}:$PATH"`));
+    }
+    return;
+  }
+  const reason = result.status === 'missing-bundle' ? `CLI bundle missing at ${result.bundle}` : result.message;
+  deps.log(chalk.yellow(`pan shim not written: ${reason}`));
+}
 
 export function registerInstallCommand(program: Command): void {
   program
@@ -282,6 +302,13 @@ async function installCommand(options: InstallOptions): Promise<void> {
   }
 
   await setupHooksCommand();
+
+  await installPanCliShimStep({
+    write: writePanCliShims,
+    pathEnv: process.env.PATH,
+    find: findExecutableOnPath,
+    log: (line) => console.log(line),
+  });
 
   // Claude Code reads statusLine from ~/.claude/settings.json at conversation
   // launch. Provision it during install as well as sync so a first conversation
