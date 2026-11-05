@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5068",
   "created": "2026-11-05T23:10:23.659Z",
-  "updated": "2026-11-05T23:39:50.793Z",
+  "updated": "2026-11-05T23:40:09.142Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -76,6 +76,10 @@
     "connector-login-transient-test.ac2": {
       "status": "completed",
       "doneAt": "2026-11-05T23:39:50.793Z"
+    },
+    "docs-retry-and-cause.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:40:09.142Z"
     }
   }
 }
