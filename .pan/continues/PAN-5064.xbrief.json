@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5064",
   "created": "2026-11-05T22:52:07.107Z",
-  "updated": "2026-11-05T23:33:00.579Z",
+  "updated": "2026-11-05T23:33:15.218Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -172,6 +172,10 @@
     "handoff-pack-help-text.ac4": {
       "status": "completed",
       "doneAt": "2026-11-05T23:33:00.579Z"
+    },
+    "pack-authoring-guide.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:33:15.218Z"
     }
   }
 }
