@@ -99,9 +99,7 @@ export interface PanRecordsConfig {
   path?: string;
 }
 
-/**
- * Workspace configuration (imported from workspace-config.ts for full details)
- */
+/** Workspace configuration (imported from workspace-config.ts for full details) */
 export interface WorkspaceConfig {
   type?: 'polyrepo' | 'monorepo';
   workspaces_dir?: string;
@@ -535,6 +533,8 @@ export interface ProjectConfig {
    * this is config, not a validated schema.
    */
   effort?: EffortLevel;
+  /** PAN-5061: MCP servers for this project's agents (role `mcpServers:` shape) and the Claude `--strict-mcp-config` opt-in; see src/lib/projects/project-mcp.ts. */
+  mcp_servers?: unknown; mcp_strict?: boolean;
 }
 
 /** Resolve the issue prefix for a project. */
