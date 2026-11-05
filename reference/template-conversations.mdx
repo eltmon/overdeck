@@ -1,6 +1,6 @@
 ---
 title: Template Conversations
-description: Proposal — loading curated skill bundles into a single conversation
+description: Proposal — loading a curated skill set into a single conversation
 ---
 
 # Template Conversations
@@ -9,7 +9,9 @@ description: Proposal — loading curated skill bundles into a single conversati
 Overdeck ships **skill packs**, which operators also call skill bundles:
 third-party skill repositories pinned to a commit and turned on per
 project, issue or conversation. See [Skill Packs](/features/skill-packs).
-This page is a separate, unbuilt proposal.
+This page is a separate, unbuilt proposal. This proposal's `pan bundle`
+commands and `skill-bundles/` files name a curated skill set. They are not
+skill packs, and they do not exist.
 </Note>
 
 Loading a curated *group* of skills into one conversation — including skills
@@ -26,7 +28,7 @@ scheduled.
 ## The idea in one paragraph
 
 A **template conversation** is a conversation (or agent run) you start by
-picking a named **skill bundle** — a curated group of skills — instead of
+picking a named **skill set** — a curated group of skills — instead of
 inheriting whatever the global `pan sync` happens to have installed. The bundle
 can contain skills that are **not** in Overdeck's `skills/` tree and are
 **not** synced to every agent: a Stripe-integration skill pulled from a public
@@ -173,7 +175,7 @@ feature available now.
 
 ### Two new concepts
 
-**Skill bundle** — a named, declarative list of skill *sources*:
+**Skill set** — a named, declarative list of skill *sources*:
 
 ```yaml
 # ~/.overdeck/skill-bundles/myn-frontend.yaml

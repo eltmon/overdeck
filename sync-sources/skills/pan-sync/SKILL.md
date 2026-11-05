@@ -16,7 +16,7 @@ allowed-tools:
 
 ## Overview
 
-This skill guides you through syncing Overdeck skills to its supported agent harnesses. The sync process copies complete, manifest-managed skill bundles from `~/.overdeck/skills/` into each native discovery directory.
+This skill guides you through syncing Overdeck skills to its supported agent harnesses. The sync process copies complete, manifest-managed skill directories from `~/.overdeck/skills/` into each native discovery directory.
 
 ## Auto-Sync
 
@@ -44,7 +44,7 @@ Agent receives global, project, workspace, role, and briefing context
 ```
 
 **Key points:**
-- Skill bundles are copied recursively, including their scripts, references, and templates; empty source directories are ignored.
+- Skill directories are copied recursively, including their scripts, references, and templates; empty source directories are ignored.
 - Manifest ownership lets `pan sync` update Overdeck-managed files without overwriting user-owned skills.
 - When a bundled skill, agent, rule, or hook is removed, the next sync prunes its managed cache and harness copies. Hooks in `~/.overdeck/bin/` are tracked by `~/.overdeck/bin/.overdeck-manifest.json`; only hooks sync wrote are ever removed (PAN-3881).
 - User-modified stale files are preserved, released from manifest ownership, and listed in the sync output.
