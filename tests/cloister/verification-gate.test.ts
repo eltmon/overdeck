@@ -340,6 +340,7 @@ describe('runQualityGates — PAN-666 changed-file scoping placeholders', () => 
 
   const placeholders = {
     FEATURE_NAME: 'pan-1',
+    FEATURE_IDENT: 'pan_1',
     FEATURE_FOLDER: 'feature-pan-1',
     BRANCH_NAME: 'feature/pan-1',
     COMPOSE_PROJECT: 'overdeck-feature-pan-1',
@@ -369,5 +370,59 @@ describe('runQualityGates — PAN-666 changed-file scoping placeholders', () => 
     // verbatim (a project that opts into scoping must run under verification,
     // which always supplies CHANGED_BASE).
     expect(cmd).toContain('{{CHANGED_BASE}}');
+  });
+});
+
+describe('runQualityGates — PAN-5062 gate.env placeholders', () => {
+  beforeEach(() => {
+    execMock.mockReset();
+    execMock.mockResolvedValue({ stdout: '', stderr: '' });
+  });
+
+  const placeholders = {
+    FEATURE_NAME: 'pan-1',
+    FEATURE_IDENT: 'pan_1',
+    FEATURE_FOLDER: 'feature-pan-1',
+    BRANCH_NAME: 'feature/pan-1',
+    COMPOSE_PROJECT: 'overdeck-feature-pan-1',
+    DOMAIN: 'localhost',
+    PROJECT_NAME: 'overdeck',
+    PROJECT_PATH: '/tmp/overdeck',
+    PROJECTS_DIR: '/tmp',
+    WORKSPACE_PATH: workspacePath,
+    CHANGED_BASE: 'origin/main',
+  };
+
+  it('substitutes {{FEATURE_IDENT}} into a host gate\'s env values', async () => {
+    const gates = { dbt: { command: 'dbt build', env: { DBT_SCHEMA: 'dev_{{FEATURE_IDENT}}' } } };
+    await runQualityGates(gates, workspacePath, 'pre_push', { placeholders });
+
+    const call = execMock.mock.calls[0];
+    expect(call[1]?.env?.DBT_SCHEMA).toBe('dev_pan_1');
+  });
+
+  it('substitutes {{FEATURE_IDENT}} into a container gate\'s -e flags', async () => {
+    execMock.mockResolvedValueOnce({ stdout: 'proj-feature-pan-1-dbt\n', stderr: '' });
+    const gates = {
+      dbt: {
+        command: 'dbt build',
+        container: true,
+        container_name: 'proj-{{FEATURE_FOLDER}}-dbt',
+        env: { DBT_SCHEMA: 'dev_{{FEATURE_IDENT}}' },
+      },
+    };
+    await runQualityGates(gates, workspacePath, 'pre_push', { placeholders });
+
+    const cmd = execMock.mock.calls[1][0] as string;
+    expect(cmd).toContain('-e DBT_SCHEMA="dev_pan_1"');
+    expect(cmd).not.toContain('{{');
+  });
+
+  it('leaves gate.env literal when no placeholders map is provided', async () => {
+    const gates = { dbt: { command: 'dbt build', env: { DBT_SCHEMA: 'dev_{{FEATURE_IDENT}}' } } };
+    await runQualityGates(gates, workspacePath);
+
+    const call = execMock.mock.calls[0];
+    expect(call[1]?.env?.DBT_SCHEMA).toBe('dev_{{FEATURE_IDENT}}');
   });
 });
