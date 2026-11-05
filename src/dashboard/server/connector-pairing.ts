@@ -45,7 +45,7 @@ export async function issueConnectorPairing(input: { name: string; scopes: reado
   const issued = issuePairingCredential();
   const { pairingId } = pairingSecrets(nodeCrypto, issued.credential);
   intents.set(pairingId, { name: input.name, scopes: [...input.scopes], expiresAt: Date.parse(issued.expiresAt) });
-  const pairingString = buildConnectorPairLink({ environmentId: identity.environmentId, machineKeyHex, code: issued.credential });
+  const pairingString = buildConnectorPairLink({ environmentId: identity.environmentId, machineKeyHex, code: issued.credential, machineLabel: identity.label });
   return { pairingString, expiresAt: issued.expiresAt };
 }
 
