@@ -4,17 +4,17 @@
     "created": "2026-11-05T23:01:06Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5068: Account sign-in: retry the device-code request once a network error hits, and show fetch's real cause",
-    "updated": "2026-11-05T23:09:09.878Z"
+    "updated": "2026-11-05T23:10:10.803Z"
   },
   "plan": {
     "id": "pan-5068",
     "title": "Account sign-in: retry the device-code request once a network error hits, and show fetch's real cause",
-    "status": "proposed",
+    "status": "running",
     "uid": "c8d14343-3225-424b-a683-ebae7d500854",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-05T23:01:06Z",
-    "updated": "2026-11-05T23:09:09.878Z",
+    "updated": "2026-11-05T23:10:10.803Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5068",
@@ -346,5 +346,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
