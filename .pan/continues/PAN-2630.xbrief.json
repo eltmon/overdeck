@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2630",
   "created": "2026-11-05T21:09:00.725Z",
-  "updated": "2026-11-05T22:26:38.202Z",
+  "updated": "2026-11-05T22:26:51.733Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -102,6 +102,10 @@
     "sync-writes-shim.ac1": {
       "status": "completed",
       "doneAt": "2026-11-05T22:26:38.202Z"
+    },
+    "sync-writes-shim.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-05T22:26:51.733Z"
     }
   }
 }
