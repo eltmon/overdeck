@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5064",
   "created": "2026-11-05T22:52:07.107Z",
-  "updated": "2026-11-05T23:27:48.346Z",
+  "updated": "2026-11-05T23:28:03.837Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -96,6 +96,10 @@
     "skills-page-fixes.ac4": {
       "status": "completed",
       "doneAt": "2026-11-05T23:27:48.346Z"
+    },
+    "skill-packs-page-fixes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:28:03.836Z"
     }
   }
 }
