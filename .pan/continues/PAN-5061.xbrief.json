@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-5061",
+  "created": "2026-11-05T22:48:30.946Z",
+  "updated": "2026-11-05T22:48:30.946Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "wi1-parse-mcp-servers": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5061",
+      "claimedAt": "2026-11-05T22:48:30.946Z"
+    }
+  }
+}
