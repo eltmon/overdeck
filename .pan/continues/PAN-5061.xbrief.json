@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5061",
   "created": "2026-11-05T22:48:30.946Z",
-  "updated": "2026-11-05T22:58:01.945Z",
+  "updated": "2026-11-05T22:59:30.581Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -40,9 +40,10 @@
       "doneAt": "2026-11-05T22:57:56.768Z"
     },
     "wi6-codex-render": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5061",
-      "claimedAt": "2026-11-05T22:58:01.945Z"
+      "claimedAt": "2026-11-05T22:58:01.945Z",
+      "doneAt": "2026-11-05T22:59:30.581Z"
     }
   }
 }
