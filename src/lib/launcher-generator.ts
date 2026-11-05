@@ -253,12 +253,8 @@ export interface LauncherConfig extends CodexNativeEndpointOption {
    */
   channelsBridgeServerName?: string;
 
-  /** PAN-4932: `<dir>/overdeck-mcp.json`; Claude Code paths append `--mcp-config=` and, without an allow-list, `--allowedTools=mcp__overdeck`. */
-  overdeckMcpConfig?: string;
-  /** PAN-5061: server names in `overdeckMcpConfig`, for `--allowedTools=`. */
-  overdeckMcpServerNames?: string[];
-  /** PAN-5061: the launch project's `mcp_strict`; Claude Code paths add `--strict-mcp-config`. */
-  mcpStrict?: boolean;
+  /** PAN-4932/PAN-5061: `<dir>/overdeck-mcp.json` → `--mcp-config=`; without an allow-list, `--allowedTools=` names its servers (`overdeckMcpServerNames`, default `mcp__overdeck`); `mcpStrict` (the project's `mcp_strict`) adds `--strict-mcp-config`. */
+  overdeckMcpConfig?: string; overdeckMcpServerNames?: string[]; mcpStrict?: boolean;
 
   /** Wrap Claude Code in the PTY supervisor: `node <supervisorScriptPath> claude ...`. Defaults to false. */
   useSupervisor?: boolean;
