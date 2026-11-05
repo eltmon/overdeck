@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5061",
   "created": "2026-11-05T22:48:30.946Z",
-  "updated": "2026-11-05T22:53:32.841Z",
+  "updated": "2026-11-05T22:53:38.171Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
       "claimedBy": "agent-pan-5061",
       "claimedAt": "2026-11-05T22:52:13.309Z",
       "doneAt": "2026-11-05T22:53:32.840Z"
+    },
+    "wi4-launcher-flags": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5061",
+      "claimedAt": "2026-11-05T22:53:38.171Z"
     }
   }
 }
