@@ -2,12 +2,18 @@
   "version": "1",
   "issueId": "PAN-2630",
   "created": "2026-11-05T21:09:00.725Z",
-  "updated": "2026-11-05T22:28:57.295Z",
+  "updated": "2026-11-05T22:36:11.712Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
   "resumePoint": null,
-  "sessionHistory": [],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-05T22:36Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-05T22:36:11.712Z"
+    }
+  ],
   "items": {
     "pan-cli-shim-module": {
       "status": "completed",
@@ -143,5 +149,14 @@
       "status": "completed",
       "doneAt": "2026-11-05T22:28:57.295Z"
     }
-  }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-05T22:36:11Z",
+      "markdownBody": "# CI Failure Feedback for PAN-2630\n\nPull request: https://github.com/eltmon/overdeck/pull/5063 (head `598c4f5e`)\n\nSource: check_run:test-shard (1/4)\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\n## Failing checks (1)\n\n### test-shard (1/4)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/127576286893/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/42121940387/job/127576286893  \n```\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/__tests__/agent-text-cli-verbs.test.ts\u001b[2m > \u001b[22magent-facing text names only registered pan commands (PAN-3868, PAN-3934)\u001b[2m > \u001b[22mresolves every pan command in hooks, prompts, agents, rules, skills and CLI docs\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/__tests__/agent-text-cli-verbs.test.ts\u001b[2m > \u001b[22magent-facing text names only registered pan commands (PAN-3868, PAN-3934)\u001b[2m > \u001b[22mresolves every pan command in hooks, prompts, agents, rules, skills and CLI docs\n\u001b[31m\u001b[1mAssertionError\u001b[22m: expected [ Array(1) ] to deeply equal []\u001b[39m\n\n\u001b[32m- Expected\u001b[39m\n\u001b[31m+ Received\u001b[39m\n\n\u001b[32m- []\u001b[39m\n\u001b[31m+ [\u001b[39m\n\u001b[31m+   \"reference/troubleshooting.mdx:92: pan on\",\u001b[39m\n\u001b[31m+ ]\u001b[39m\n\n\u001b[36m \u001b[2m❯\u001b[22m src/lib/__tests__/agent-text-cli-verbs.test.ts:\u001b[2m182:20\u001b[22m\u001b[39m\n    \u001b[90m180|\u001b[39m describe('agent-facing text names only registered pan commands (PAN-38…\n    \u001b[90m181|\u001b[39m   it('resolves every pan command in hooks, prompts, agents, rules, ski…\n    \u001b[90m182|\u001b[39m     \u001b[34mexpect\u001b[39m(\u001b[34mscan\u001b[39m())\u001b[33m.\u001b[39m\u001b[34mtoEqual\u001b[39m([])\u001b[33m;\u001b[39m\n    \u001b[90m   |\u001b[39m                    \u001b[31m^\u001b[39m\n    \u001b[90m183|\u001b[39m   })\u001b[33m;\u001b[39m\n    \u001b[90m184|\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\u001b[22m\u001b[39m\n\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m1 failed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[1m\u001b[32m615 passed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[33m2 skipped\u001b[39m\u001b[90m (618)\u001b[39m\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    }
+  ]
 }
