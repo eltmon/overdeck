@@ -1,5 +1,9 @@
-import { describe, expect, it } from 'vitest';
-import { parseProjectMcpServers } from '../../../../src/lib/projects/project-mcp.js';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
+import { PROJECTS_CONFIG_FILE, invalidateProjectsConfigCache } from '../../../../src/lib/projects.js';
+import { parseProjectMcpServers, resolveProjectMcpServers } from '../../../../src/lib/projects/project-mcp.js';
 
 function parse(raw: unknown) {
   const warnings: string[] = [];
@@ -112,5 +116,97 @@ describe('parseProjectMcpServers (PAN-5061 WI-1)', () => {
     const { warnings } = parse([{ h: { type: 'http', url: 'https://x', headers: { Authorization: 42, Token: 'sk-SECRET-VALUE' } } }]);
     expect(warnings).toHaveLength(1);
     expect(warnings.join('\n')).not.toContain('sk-SECRET-VALUE');
+  });
+});
+
+// tests/setup/overdeck-home.ts points OVERDECK_HOME and HOME at per-worker temp dirs.
+const ROOT = join(homedir(), 'pan-5061-project-mcp');
+const SECRETS = join(ROOT, 'acme.env');
+
+function writeAcme(projectYaml: string): void {
+  writeFileSync(
+    PROJECTS_CONFIG_FILE,
+    `projects:\n  acme:\n    name: acme\n    path: ${join(ROOT, 'acme')}\n    issue_prefix: ACME\n` +
+      `    workspace:\n      env:\n        secrets_file: ${SECRETS}\n${projectYaml}`,
+  );
+  invalidateProjectsConfigCache();
+}
+
+async function resolve(reservedNames: string[] = []) {
+  const warnings: string[] = [];
+  const result = await resolveProjectMcpServers({ issueId: 'ACME-7', reservedNames, warn: (line) => warnings.push(line) });
+  return { ...result, warnings };
+}
+
+describe('resolveProjectMcpServers (PAN-5061 WI-3)', () => {
+  beforeEach(() => {
+    mkdirSync(join(ROOT, 'acme'), { recursive: true });
+    writeFileSync(SECRETS, 'ACME_LINEAR_KEY=lin-from-secrets\nSHARED=from-secrets\n');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    rmSync(ROOT, { recursive: true, force: true });
+    rmSync(PROJECTS_CONFIG_FILE, { force: true });
+    invalidateProjectsConfigCache();
+  });
+
+  it('expands ${NAME} from secrets first, then process.env, and leaves $NAME untouched', async () => {
+    vi.stubEnv('SHARED', 'from-process-env');
+    vi.stubEnv('SENTRY_TOKEN', 'sentry-from-env');
+    writeAcme(
+      `    mcp_servers:\n` +
+        `      - linear:\n          command: npx\n          args: ["-y", "linear-mcp", "--key=\${ACME_LINEAR_KEY}", "$ACME_LINEAR_KEY"]\n` +
+        `          env:\n            SHARED: "\${SHARED}"\n` +
+        `      - sentry:\n          type: http\n          url: "https://mcp.sentry.dev/\${SENTRY_TOKEN}"\n` +
+        `          headers:\n            Authorization: "Bearer \${SENTRY_TOKEN}"\n`,
+    );
+    const { projectKey, servers, strict, warnings } = await resolve();
+    expect(warnings).toEqual([]);
+    expect(projectKey).toBe('acme');
+    expect(strict).toBe(false);
+    expect(servers.linear).toEqual({
+      type: 'stdio',
+      command: 'npx',
+      args: ['-y', 'linear-mcp', '--key=lin-from-secrets', '$ACME_LINEAR_KEY'],
+      env: { SHARED: 'from-secrets' },
+    });
+    expect(servers.sentry).toEqual({
+      type: 'http',
+      url: 'https://mcp.sentry.dev/sentry-from-env',
+      headers: { Authorization: 'Bearer sentry-from-env' },
+    });
+  });
+
+  it('skips a server with an unresolved reference and names only the variable', async () => {
+    writeAcme(
+      `    mcp_servers:\n` +
+        `      - ok:\n          command: mcp-ok\n          args: ["\${ACME_LINEAR_KEY}"]\n` +
+        `      - broken:\n          command: mcp-broken\n          args: ["\${ACME_LINEAR_KEY}", "\${PAN5061_UNSET_VAR}"]\n`,
+    );
+    const { servers, warnings } = await resolve();
+    expect(Object.keys(servers)).toEqual(['ok']);
+    expect(warnings).toEqual(['[project-mcp] acme: server broken skipped: ${PAN5061_UNSET_VAR} is not set']);
+    expect(warnings.join('\n')).not.toContain('lin-from-secrets');
+  });
+
+  it("drops a server that clashes with the launching role's server", async () => {
+    writeAcme(`    mcp_servers:\n      - playwright:\n          command: my-playwright\n      - fs:\n          command: mcp-fs\n`);
+    const { servers, warnings } = await resolve(['playwright']);
+    expect(Object.keys(servers)).toEqual(['fs']);
+    expect(warnings).toEqual(['[project-mcp] acme: server playwright skipped: the launching role declares a server with this name']);
+  });
+
+  it('reports mcp_strict', async () => {
+    writeAcme(`    mcp_strict: true\n    mcp_servers:\n      - fs:\n          command: mcp-fs\n`);
+    expect((await resolve()).strict).toBe(true);
+    writeAcme(`    mcp_servers:\n      - fs:\n          command: mcp-fs\n`);
+    expect((await resolve()).strict).toBe(false);
+  });
+
+  it('returns nothing for a launch with no project', async () => {
+    writeAcme('');
+    const result = await resolveProjectMcpServers({ issueId: 'NOPE-1', cwd: join(ROOT, 'elsewhere'), reservedNames: [] });
+    expect(result).toEqual({ projectKey: null, servers: {}, strict: false });
   });
 });
