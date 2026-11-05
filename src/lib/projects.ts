@@ -112,7 +112,7 @@ export interface WorkspaceConfig {
   docker?: { traefik?: string; compose_template?: string };
   database?: DatabaseConfig;
   agent?: { template_dir: string; templates?: Array<{ source: string; target: string }>; copy_dirs?: string[]; symlinks?: string[] };
-  env?: { template?: string; secrets_file?: string };
+  env?: { template?: string; secrets_file?: string; load?: boolean };
   services?: Array<{ name: string; path: string; start_command: string; docker_command?: string; health_url?: string; port?: number }>;
   progressive?: boolean;
   always_include?: string[];

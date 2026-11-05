@@ -76,6 +76,10 @@ export interface EnvConfig {
   template?: string;
   /** Additional env vars from secrets */
   secrets_file?: string;
+  // PAN-5062: when true, the workspace's rendered .env is loaded into agent
+  // launcher shells and host quality gate environments (never container or
+  // remote gates). Default false — a workspace's .env stays opt-in.
+  load?: boolean;
 }
 
 export interface ServiceConfig {
