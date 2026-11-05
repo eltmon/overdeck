@@ -260,7 +260,9 @@ describe('adoptForkedClaudeSessions — backgrounding marker (PAN-2652 W8)', () 
 
   it('ac3: does not rescan the project dir while its mtime is unchanged', async () => {
     await writeCurrent();
-    await writeJsonl(projectDir, B, [...forkHead(), entry('x1')]);
+    const settled = await writeJsonl(projectDir, B, [...forkHead(), entry('x1')]);
+    const fortyFiveSecondsAgo = new Date(Date.now() - 45_000);
+    await utimes(settled, fortyFiveSecondsAgo, fortyFiveSecondsAgo);
 
     await adoptForkedClaudeSessions([conv()], deps());
     expect(dirReads).toHaveLength(1);
@@ -268,6 +270,21 @@ describe('adoptForkedClaudeSessions — backgrounding marker (PAN-2652 W8)', () 
     await adoptForkedClaudeSessions([conv()], deps());
     expect(dirReads).toHaveLength(1);
     expect(adopted).toEqual([]);
+  });
+
+  // CodeRabbit on #5060: appends do not change the dir mtime, so a fork that is
+  // still being copied must not close the gate.
+  it('rescans while an unmatched candidate is still settling, then adopts it once the marker lands', async () => {
+    await writeCurrent();
+    const forkPath = await writeJsonl(projectDir, B, [...forkHead(), entry('u4')]);
+
+    await adoptForkedClaudeSessions([conv()], deps());
+    expect(adopted).toEqual([]);
+
+    await writeFile(forkPath, `${[...forkHead(), entry('u4'), marker].join('\n')}\n`);
+    await adoptForkedClaudeSessions([conv()], deps());
+    expect(dirReads).toHaveLength(2);
+    expect(adopted).toEqual([['conv-a', B]]);
   });
 
   it('does not scan when the marker is not in the current file', async () => {

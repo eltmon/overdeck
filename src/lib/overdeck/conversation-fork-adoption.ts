@@ -250,6 +250,8 @@ const TAIL_MAX_BYTES = 1024 * 1024;
 const TAIL_ENTRY_LIMIT = 20;
 /** `${current id}\u0000${marker uuid}` → project dir mtime at the last marker scan. */
 const markerScanDirMtime = new Map<string, number>();
+/** An unmatched candidate modified this recently may still be receiving the fork copy. */
+const MARKER_SCAN_SETTLE_MS = 30_000;
 
 /**
  * The last parseable entries of a JSONL, newest first, read backward in 64 KiB
@@ -301,8 +303,9 @@ async function backgroundingMarkerUuid(currentPath: string): Promise<string | nu
 /**
  * Source B: the current file's tail carries the backgrounding marker, so the fork
  * is a newer top-level JSONL in the same project dir that copied the marker entry.
- * Rescans only when the project dir's mtime changed since the last scan for the
- * same marker. Never descends into `<id>/subagents/`.
+ * Rescans only when the project dir's mtime changed since the last completed scan
+ * for the same marker, or while an unmatched candidate is still settling. Never
+ * descends into `<id>/subagents/`.
  */
 async function adoptFromBackgroundingMarker(
   conv: EligibleConversation,
@@ -315,11 +318,6 @@ async function adoptFromBackgroundingMarker(
   const gateKey = `${conv.claudeSessionId}\u0000${markerUuid}`;
   const dirMtime = (await stat(projectDir)).mtimeMs;
   if (markerScanDirMtime.get(gateKey) === dirMtime) return null;
-  if (markerScanDirMtime.size >= LINEAGE_CACHE_LIMIT) {
-    const oldest = markerScanDirMtime.keys().next().value;
-    if (oldest !== undefined) markerScanDirMtime.delete(oldest);
-  }
-  markerScanDirMtime.set(gateKey, dirMtime);
 
   const currentMtime = (await stat(currentPath)).mtimeMs;
   const candidates: Array<{ id: string; path: string; mtimeMs: number }> = [];
@@ -336,6 +334,15 @@ async function adoptFromBackgroundingMarker(
     if (!(await fileContainsAnyUuid(candidate.path, [markerUuid], deps))) continue;
     if ((await readFirstClearTimestamp(candidate.path)).clearTs !== null) continue;
     return candidate.id;
+  }
+  // Appends do not change the dir mtime, so close the gate only when no unmatched
+  // candidate may still be receiving copied entries. A scan that throws leaves it open.
+  if (!candidates.some((candidate) => Date.now() - candidate.mtimeMs < MARKER_SCAN_SETTLE_MS)) {
+    if (markerScanDirMtime.size >= LINEAGE_CACHE_LIMIT) {
+      const oldest = markerScanDirMtime.keys().next().value;
+      if (oldest !== undefined) markerScanDirMtime.delete(oldest);
+    }
+    markerScanDirMtime.set(gateKey, dirMtime);
   }
   return null;
 }
