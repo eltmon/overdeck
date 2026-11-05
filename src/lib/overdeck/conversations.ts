@@ -28,6 +28,7 @@ import { getEventStore } from '../../dashboard/server/event-store.js';
 import { ensureDiscoveredSessionsSchema } from './discovered-sessions.js';
 import { localEnvironmentId } from './conversation-environment.js';
 import { readLatestIndexedSessionId } from '../session-history.js';
+import { notifyConversationSessionChanged } from './conversation-session-events.js';
 
 // ── Local Drizzle table definitions ──────────────────────────────────────────
 // Mirror locked schema (docs/overdeck-remodel/overdeck-schema.ts:97-163).
@@ -406,7 +407,7 @@ const LEGACY_CONVERSATION_SELECT = `
       SELECT cf.locator
       FROM conversation_files cf
       WHERE cf.conversation_id = c.id
-      ORDER BY (cf.harness = 'claude-code') DESC, cf.created_at ASC, cf.id ASC
+      ORDER BY (cf.harness = 'claude-code') DESC, cf.created_at DESC, cf.id DESC
       LIMIT 1
     ) AS claude_session_id
   FROM conversations c
@@ -423,12 +424,13 @@ export function isAgentConversationName(name: string): boolean {
 /**
  * Live Claude session id for a conversation — consistent across every consumer (PAN-1866).
  *
- * Work-agent / specialist conversations rotate Claude sessions, but the DB only records the
- * FIRST session (the oldest conversation_files locator), so the stored id is stale by
- * construction. The agent folder's append-only session index is authoritative.
- * For agent conversations resolve its newest entry, falling back to the DB value;
- * for human conversation-panel sessions the DB value is canonical. Applied at the read door so the
- * CLI, panel, teardown, and frontend all observe the same id.
+ * Human conversation-panel rows return the current (newest) conversation_files locator, which
+ * fork adoption and the write door (setConversationClaudeSessionId) keep fresh (PAN-2652).
+ * Work-agent / specialist conversations rotate Claude sessions without going through the write
+ * door, so for them the agent folder's append-only session index is authoritative: resolve its
+ * newest entry, falling back to the DB value. Applied at the read door so the CLI, panel,
+ * teardown, and frontend all observe the same id. No filesystem read for human rows: this runs
+ * per row on every list.
  *
  * Read inline (not via lib/agents.ts) to avoid the agents <-> conversations import cycle.
  */
@@ -896,10 +898,23 @@ export function setConversationClaudeSessionId(name: string, claudeSessionId: st
   const id = getConversationUuidByName(name);
   if (!id) return;
   const harness = getConversationByName(name)?.harness ?? 'claude-code';
-  db.prepare(`
-    INSERT OR IGNORE INTO conversation_files (conversation_id, harness, locator, created_at)
-    VALUES (?, ?, ?, ?)
-  `).run(id, harness, claudeSessionId, toMillis());
+  const changed = db.transaction(() => {
+    const current = db.prepare(`
+      SELECT locator, created_at FROM conversation_files WHERE conversation_id = ?
+      ORDER BY (harness = 'claude-code') DESC, created_at DESC, id DESC LIMIT 1
+    `).get<{ locator: string; created_at: number }>(id);
+    if (current?.locator === claudeSessionId) return false;
+    // Strictly newer than the current row so same-millisecond writes still win.
+    const now = Math.max(toMillis(), (current?.created_at ?? 0) + 1);
+    const updated = db.prepare(`UPDATE conversation_files SET created_at = ? WHERE conversation_id = ? AND locator = ?`)
+      .run(now, id, claudeSessionId);
+    if (updated.changes === 0) {
+      db.prepare(`INSERT INTO conversation_files (conversation_id, harness, locator, created_at) VALUES (?, ?, ?, ?)`)
+        .run(id, harness, claudeSessionId, now);
+    }
+    return true;
+  })();
+  if (changed) notifyConversationSessionChanged(name, claudeSessionId);
 }
 
 export function updateConversationDeliveryMethod(name: string, method: 'auto' | 'channels' | 'tmux' | null): void {
