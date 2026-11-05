@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2630",
   "created": "2026-11-05T21:09:00.725Z",
-  "updated": "2026-11-05T22:24:17.138Z",
+  "updated": "2026-11-05T22:24:29.631Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -66,6 +66,10 @@
     "pan-cli-shim-module.ac4": {
       "status": "completed",
       "doneAt": "2026-11-05T22:24:17.137Z"
+    },
+    "pan-cli-shim-module.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-05T22:24:29.631Z"
     }
   }
 }
