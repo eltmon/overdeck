@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5061",
   "created": "2026-11-05T22:48:30.946Z",
-  "updated": "2026-11-05T22:59:35.551Z",
+  "updated": "2026-11-05T23:01:20.468Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -46,9 +46,10 @@
       "doneAt": "2026-11-05T22:59:30.581Z"
     },
     "wi7-thread-launch-cwd": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5061",
-      "claimedAt": "2026-11-05T22:59:35.551Z"
+      "claimedAt": "2026-11-05T22:59:35.551Z",
+      "doneAt": "2026-11-05T23:01:20.468Z"
     }
   }
 }
