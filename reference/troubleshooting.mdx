@@ -89,7 +89,7 @@ A fresh source checkout has no npm-managed bin link for `pan`/`overdeck` — `np
 node <your-checkout>/dist/cli/index.js doctor
 ```
 
-`pan doctor`'s `pan on PATH` row reports whether your shell resolves `pan` at all: `ok` with the resolved path (appending `(Overdeck shim)` when it's Overdeck's own copy), or `warn` when nothing on PATH matches. The warning isn't fatal — agents launched by Overdeck get `pan` from `~/.overdeck/cli-bin` regardless, since every non-remote launcher writes that shim at spawn time (PAN-2630) — but it means your own shell still can't run `pan` directly. Three remedies, in the order the warning lists them:
+`pan doctor`'s "pan on PATH" row reports whether your shell resolves `pan` at all: `ok` with the resolved path (appending `(Overdeck shim)` when it's Overdeck's own copy), or `warn` when nothing on PATH matches. The warning isn't fatal — agents launched by Overdeck get `pan` from `~/.overdeck/cli-bin` regardless, since every non-remote launcher writes that shim at spawn time (PAN-2630) — but it means your own shell still can't run `pan` directly. Three remedies, in the order the warning lists them:
 
 1. `npm install -g @overdeck/core`
 2. `npm link` inside your Overdeck checkout, after `npm run build`
