@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5064",
   "created": "2026-11-05T22:52:07.107Z",
-  "updated": "2026-11-05T23:13:04.272Z",
+  "updated": "2026-11-05T23:14:48.572Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -70,9 +70,10 @@
       "doneAt": "2026-11-05T23:12:59.489Z"
     },
     "skill-creator-skill-update": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5064",
-      "claimedAt": "2026-11-05T23:13:04.272Z"
+      "claimedAt": "2026-11-05T23:13:04.272Z",
+      "doneAt": "2026-11-05T23:14:48.572Z"
     }
   }
 }
