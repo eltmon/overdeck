@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2652",
   "created": "2026-11-05T21:12:48.966Z",
-  "updated": "2026-11-05T21:32:49.819Z",
+  "updated": "2026-11-05T21:34:11.755Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -52,9 +52,10 @@
       "doneAt": "2026-11-05T21:32:26.626Z"
     },
     "w8-adopt-forks-backgrounding-marker": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-2652",
-      "claimedAt": "2026-11-05T21:32:49.818Z"
+      "claimedAt": "2026-11-05T21:32:49.818Z",
+      "doneAt": "2026-11-05T21:34:11.755Z"
     }
   }
 }
