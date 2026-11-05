@@ -197,4 +197,33 @@ describe('native /compact restarts the runtime on the compacted fork (PAN-2652 W
     expect(launcher).not.toContain(ORIGINAL_ID);
     expect(payload).toMatchObject({ ok: true, compacted: true, mode: 'overdeck-native', restarted: true });
   });
+
+  // CodeRabbit on #5060: a failed restart after compaction is an error, not a success.
+  it('reports a failed restart as an error while noting compaction completed', async () => {
+    const { createConversation, getConversationByName } = await import('../conversations.js');
+    const { handleConversationMessage } = await import('../conversation-message.js');
+
+    // A cwd outside the (mocked) home fails resume's containment check before any spawn.
+    const cwd = join(tmpdir(), `pan-2652-outside-home-${Date.now()}`);
+    mkdirSync(cwd, { recursive: true });
+    const sessionFile = join(overdeckHome, 'compact-fail-session.jsonl');
+    writeFileSync(sessionFile, '');
+    createConversation({ name: 'native-compact-fail', tmuxSession: 'conv-native-compact-fail', cwd, harness: 'claude-code', claudeSessionId: ORIGINAL_ID });
+
+    try {
+      const response = await handleConversationMessage('native-compact-fail', { message: '/compact' }, {
+        resolveSessionFile: async () => sessionFile,
+        generateAiTitle: async () => {},
+        shouldInterceptManualCompact: () => true,
+      });
+      const payload = decodeJsonResponse(response as unknown as { body: unknown });
+
+      expect((response as unknown as { status?: number }).status).toBe(502);
+      expect(payload).toMatchObject({ ok: false, compacted: true, restarted: false, mode: 'overdeck-native' });
+      expect(getConversationByName('native-compact-fail')?.claudeSessionId).toBe(FORK_ID);
+      expect(createSessionCalls).toHaveLength(0);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
 });

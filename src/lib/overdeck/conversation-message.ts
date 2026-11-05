@@ -478,7 +478,14 @@ export async function handleConversationMessage(
     const resumed = await handleConversationResume(conv.name, { sendResumeContract: false }, {
       resolveSessionFile: deps.resolveSessionFile, resumeCause: 'system',
     });
-    return jsonResponse({ ok: true, compacted: true, mode: 'overdeck-native', model: compactResult.model, restarted: resumed.status === 200 });
+    if (resumed.status !== 200) {
+      // The fork is recorded and the old runtime is stopped; say so instead of reporting success.
+      return jsonResponse({
+        ok: false, compacted: true, restarted: false, mode: 'overdeck-native', model: compactResult.model,
+        error: `Compaction completed but the runtime restart failed (status ${resumed.status}); resume the conversation to continue on the compacted session`,
+      }, { status: 502 });
+    }
+    return jsonResponse({ ok: true, compacted: true, mode: 'overdeck-native', model: compactResult.model, restarted: true });
   }
 
   const allAttachmentPaths = extractConversationAttachmentPaths(message);
