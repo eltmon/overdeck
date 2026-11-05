@@ -18,7 +18,7 @@
  */
 import { toSharedMessage, type ConversationPayload, type SharedMessage } from '@overdeck/contracts';
 
-import { readLauncherPinnedSessionId } from '../../../lib/agents/transcript-resolver.js';
+import { resolveConversationClaudeSessionId } from '../../../lib/overdeck/conversation-claude-session.js';
 import type { LegacyConversation } from '../../../lib/overdeck/conversations.js';
 import { sessionFilePath } from '../../../lib/runtimes/storage/claude-code.js';
 import { gateSnapshotEmission, watchConversation } from '../services/conversation-service.js';
@@ -230,8 +230,8 @@ function replaceMessages(state: BridgeState, messages: ParseResult['messages'], 
 export async function resolveClaudeSessionFile(conversationName: string): Promise<string | null> {
   const conv = await runDashboardDbJob<LegacyConversation | null>('getConversationByName', conversationName);
   if (!conv) return null;
-  const pinned = conv.tmuxSession ? await readLauncherPinnedSessionId(conv.tmuxSession) : null;
-  const sessionId = pinned ?? conv.claudeSessionId;
+  // Current locator first, then the launcher pin (PAN-2652). Viewers resolve on join.
+  const sessionId = await resolveConversationClaudeSessionId(conv);
   if (!sessionId) return null;
   const sessionFile = sessionFilePath(conv.cwd, sessionId);
   if (isPiSessionFile(sessionFile)) return null;
