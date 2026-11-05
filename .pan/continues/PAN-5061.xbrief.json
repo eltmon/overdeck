@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5061",
   "created": "2026-11-05T22:48:30.946Z",
-  "updated": "2026-11-05T22:54:55.238Z",
+  "updated": "2026-11-05T22:57:56.768Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,9 +34,10 @@
       "doneAt": "2026-11-05T22:54:51.074Z"
     },
     "wi5-claude-acp-render": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5061",
-      "claimedAt": "2026-11-05T22:54:55.238Z"
+      "claimedAt": "2026-11-05T22:54:55.238Z",
+      "doneAt": "2026-11-05T22:57:56.768Z"
     }
   }
 }
