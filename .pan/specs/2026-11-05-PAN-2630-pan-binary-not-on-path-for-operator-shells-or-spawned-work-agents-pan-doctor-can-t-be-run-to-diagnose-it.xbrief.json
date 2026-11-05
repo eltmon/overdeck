@@ -4,17 +4,17 @@
     "created": "2026-11-05T21:02:20Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2630: pan binary not on PATH for operator shells or spawned work agents; pan doctor can't be run to diagnose it",
-    "updated": "2026-11-05T21:07:55.732Z"
+    "updated": "2026-11-05T21:08:43.653Z"
   },
   "plan": {
     "id": "pan-2630",
     "title": "pan binary not on PATH for operator shells or spawned work agents; pan doctor can't be run to diagnose it",
-    "status": "proposed",
+    "status": "running",
     "uid": "a8fac534-3501-40dc-855c-d5b7dad4585a",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-05T21:02:20Z",
-    "updated": "2026-11-05T21:07:55.732Z",
+    "updated": "2026-11-05T21:08:43.653Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2630",
@@ -569,5 +569,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
