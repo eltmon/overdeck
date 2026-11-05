@@ -4,17 +4,17 @@
     "created": "2026-11-05T21:04:51Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2652: Conversation view diverges from Terminal: Claude Code backgrounding forks the session file in-process, invisible to all session-id resolution paths",
-    "updated": "2026-11-05T21:11:41.998Z"
+    "updated": "2026-11-05T21:12:38.380Z"
   },
   "plan": {
     "id": "pan-2652",
     "title": "Conversation view diverges from Terminal: Claude Code backgrounding forks the session file in-process, invisible to all session-id resolution paths",
-    "status": "proposed",
+    "status": "running",
     "uid": "3476ad0c-8a07-4794-9116-70f02e2e9c88",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-05T21:04:51Z",
-    "updated": "2026-11-05T21:11:41.998Z",
+    "updated": "2026-11-05T21:12:38.380Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2652",
@@ -860,5 +860,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
