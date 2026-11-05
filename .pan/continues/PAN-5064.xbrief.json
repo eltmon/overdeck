@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5064",
   "created": "2026-11-05T22:52:07.107Z",
-  "updated": "2026-11-05T23:30:25.943Z",
+  "updated": "2026-11-05T23:30:42.650Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -136,6 +136,10 @@
     "skills-cli-ref-fixes.ac1": {
       "status": "completed",
       "doneAt": "2026-11-05T23:30:25.943Z"
+    },
+    "skills-cli-ref-fixes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:30:42.650Z"
     }
   }
 }
