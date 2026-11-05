@@ -1,0 +1,943 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-05T23:19:59Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5069: Connect a bot in one paste and one approval: the bot does the setup, the human only consents",
+    "updated": "2026-11-05T23:25:05.698Z"
+  },
+  "plan": {
+    "id": "pan-5069",
+    "title": "Connect a bot in one paste and one approval: the bot does the setup, the human only consents",
+    "status": "proposed",
+    "uid": "c7bfcff2-e04c-4567-be55-3a036926a9ca",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-05T23:19:59Z",
+    "updated": "2026-11-05T23:25:05.698Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5069",
+        "label": "PAN-5069",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5070",
+        "label": "PAN-5070 (Part B, dashboard side)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5071",
+        "label": "PAN-5071 (Part C, account page)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5072",
+        "label": "PAN-5072 (Part D, integrations)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "connector",
+      "mcp",
+      "bots",
+      "anywhere",
+      "cli"
+    ],
+    "narratives": {
+      "Problem": "Connecting a self-hosted bot takes a pairing string handled by the operator, a secret store, a typed 8-letter code and several commands; closing the dialog loses the string. The bot has a shell and can do the setup itself; the human should only consent.",
+      "Proposal": "Part A of the PRD (.pan/drafts/pan-5069.md): a resumable, idempotent 'pan mcp connector connect <pairingString>' that signs in with the device flow (exiting at once with the activate link, resuming on rerun), pairs with the machine-minted code, verifies the route with a new GET /api/connectors/self, and prints the stdio MCP registration plus one machine-readable OVERDECK_CONNECT status line with stable error codes and exit codes 0/1/3/4. The pairing string carries the machine name (n=) and the device-code request carries the bot and machine names for the activate page. Parts B (PAN-5070 dashboard Copy message, pending requests, notice), C (PAN-5071 account Authorize page) and D (PAN-5072 integrations and skill) are sibling issues.",
+      "NonGoals": "- Changing top-level pan connect, pan login, or the manual login/pair/serve/status/logout behavior and messages\n- Dashboard changes for the Copy message, pending requests list, connector TTL, Grok Bot reach or Needs-you notice (PAN-5070)\n- Account service (services/account) changes, migrations or the activate page (PAN-5071)\n- integrations/* READMEs, SKILL.md, grok-bot mcp.json and Hermes/OpenClaw-specific registration formats (PAN-5072)\n- configuration/bots.mdx and configuration/mcp.mdx (PAN-5070)\n- A machine-side Approve/Deny card or any second required operator step\n- Retrying the device-code request inside requestDeviceCode (PAN-5068)\n- The hosted-bot relay without the relay plan (PAN-5058)\n- Running serve as a background service; the registration is stdio only\n- Printing any token, device code or local token"
+    },
+    "metadata": {
+      "docsJustification": "Part A documents its CLI surface in cli/mcp.mdx (item a10-connect-docs); configuration/bots.mdx, configuration/mcp.mdx, integration READMEs and SKILL.md are owned by sibling issues PAN-5070 and PAN-5072.",
+      "canonicalFilename": "2026-11-05-PAN-5069-connect-a-bot-in-one-paste-and-one-approval-the-bot-does-the-setup-the-human-only-consents.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "autoDecisions": [
+      {
+        "summary": "The command is 'pan mcp connector connect <pairingString>', not top-level 'connect'",
+        "rationale": "Top-level 'pan connect' (src/cli/commands/connect.ts, PAN-4656) already exists and installs this computer's Overdeck server as a service; running it on a bot VM would do that. The connector group keeps the existing namespace."
+      },
+      {
+        "summary": "connect is resumable: a run that creates a sign-in link exits 3 at once; reruns poll up to --wait (default 120 s)",
+        "rationale": "Bot shells usually show output only after a command exits and the operator flagged Grok's state across turns as unreliable, so the link must reach the bot quickly and progress lives on disk in pending-signin.json."
+      },
+      {
+        "summary": "The machine name travels as optional n= in the pairing string",
+        "rationale": "The connector requests the device code before it can join the directory, so the string is the only source; old parsers ignore unknown params."
+      },
+      {
+        "summary": "Verification uses a new GET /api/connectors/self (connector credential only, read:state)",
+        "rationale": "read:state is always granted to connectors; the route proves the token and returns the name and scopes the ready line reports."
+      },
+      {
+        "summary": "Status contract: last stdout line 'OVERDECK_CONNECT <json>', exit 0 ready / 1 error / 3 authorize / 4 retry",
+        "rationale": "One unambiguous machine-readable line is easy for an LLM bot to act on; distinct exit codes let scripts branch without parsing."
+      },
+      {
+        "summary": "Split the feature into four issues: PAN-5069 (bot side), PAN-5070 (dashboard), PAN-5071 (account page), PAN-5072 (integrations)",
+        "rationale": "The full feature exceeds the finalize size lint (about 60 files, 12+ subsystems); the account Worker deploys separately and only the operator deploys it; each part is independently shippable from one PRD."
+      },
+      {
+        "summary": "No machine-side confirm card",
+        "rationale": "The Copy click is root consent; the code is single use, short lived and bound to the proved link key at exchange, and the directory also requires the machine's account. A second click protects nothing more and the operator asked to avoid extra steps without a stated reason."
+      },
+      {
+        "summary": "Registration is a stdio server for every platform",
+        "rationale": "The bot's MCP client starts it on demand; no background process or local token header to keep alive on a VM."
+      },
+      {
+        "summary": "A refused pairing code is reported immediately as pairing-code-refused without a relay retry",
+        "rationale": "takePairingById consumes the code on any outcome, so a relay retry cannot succeed and would only hide the real cause."
+      }
+    ],
+    "items": [
+      {
+        "id": "a1-pair-link-machine-name",
+        "title": "Carry the machine name as optional n= in the connector pairing string",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-05T23:19:59Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-5069",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/connector-pairing.ts",
+            "packages/contracts/src/__tests__/connector-pairing.test.ts",
+            "src/dashboard/server/connector-pairing.ts",
+            "src/dashboard/server/__tests__/connector-pairing.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run packages/contracts/src/__tests__/connector-pairing.test.ts src/dashboard/server/__tests__/connector-pairing.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "See PRD .pan/drafts/pan-5069.md work item A-1. Add optional machineLabel to ConnectorPairLinkInput and CONNECTOR_PAIR_MACHINE_LABEL_MAX = 64. buildConnectorPairLink appends &n=<encodeURIComponent(label.trim().slice(0,64)).replace(/'/g,'%27')> only when the trimmed label is non-empty. parseConnectorPairLink returns machineLabel when n is a non-empty string of at most 64 chars after trim, otherwise omits the key; n never makes the parse return null. issueConnectorPairing passes machineLabel: identity.label from ensureEnvironmentIdentity()."
+        },
+        "items": [
+          {
+            "id": "a1-pair-link-machine-name.ac1",
+            "title": "Given a label containing a space, an apostrophe and an ampersand, buildConnectorPairLink then parseConnectorPairLink returns the same environmentId, machineKeyHex, code and machineLabel (round-trip test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "a1-pair-link-machine-name.ac2",
+            "title": "parseConnectorPairLink of a v=1 string without n returns an object with no machineLabel key, and a string whose n decodes to 65 characters parses with no machineLabel (no null)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "a1-pair-link-machine-name.ac3",
+            "title": "The built string contains no raw apostrophe character when the label has one (it is encoded as %27)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "a1-pair-link-machine-name.ac4",
+            "title": "issueConnectorPairing returns a pairingString whose parsed machineLabel equals the mocked environment identity label",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "a2-connectors-self-route",
+        "title": "Add GET /api/connectors/self for a connector to read its own record",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-05T23:19:59Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-5069",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/connectors.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/__tests__/connectors.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/connectors.test.ts tests/unit/lib/overdeck",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "connectors.test.ts and the no-loss matrix tests pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "See PRD .pan/drafts/pan-5069.md work item A-2. Export handleConnectorSelf(credential) in routes/connectors.ts: non-connector credential -> 403 {code:'not-a-connector'}; record missing or revoked -> 403 {code:'connector-removed'}; else 200 {id,name,scopes,clientId,machine:{environmentId,label}} from listAccessTokens and buildEnvironmentDescriptor, Cache-Control no-store. Add HttpRouter GET '/api/connectors/self' to connectorsRouteLayer. Add route-scopes row {GET,/api/connectors/self,read:state} next to the DELETE row and a no-loss-matrix READ row."
+        },
+        "items": [
+          {
+            "id": "a2-connectors-self-route.ac1",
+            "title": "Given a connector credential, handleConnectorSelf returns 200 with the record's name, scopes and machine.label equal to the environment identity label",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "a2-connectors-self-route.ac2",
+            "title": "Given the root session credential, handleConnectorSelf returns 403 with code not-a-connector",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "a2-connectors-self-route.ac3",
+            "title": "Given a connector credential whose record is revoked, handleConnectorSelf returns 403 with code connector-removed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "a2-connectors-self-route.ac4",
+            "title": "route-scopes.ts contains a GET /api/connectors/self row with scope read:state, and no-loss-matrix.ts contains a row for surface 'GET /api/connectors/self'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "a3-device-code-names",
+        "title": "Send optional client_name and target_name on the device-code request",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-05T23:19:59Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5069",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/account/client.ts",
+            "tests/unit/lib/account/client.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/account/client.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "client.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "See PRD .pan/drafts/pan-5069.md work item A-3. requestDeviceCode input gains clientName?: string and targetName?: string; each is trimmed and cut to 64 chars and set as client_name / target_name form fields only when non-empty. Change only the form building (PAN-5068 edits error handling in the same function)."
+        },
+        "items": [
+          {
+            "id": "a3-device-code-names.ac1",
+            "title": "Given clientName and targetName longer than 64 characters, the POST /oauth/device/code form contains client_name and target_name cut to 64 characters",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "a3-device-code-names.ac2",
+            "title": "Given neither field, the posted form contains exactly platform and environment_id, as today",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "a3-device-code-names.ac3",
+            "title": "Given whitespace-only clientName, the form omits client_name",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "a4-pending-signin-record",
+        "title": "Store a pending device sign-in in the connector home",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-05T23:19:59Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5069",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/mcp/connector/home.ts",
+            "tests/unit/lib/mcp/connector/home.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/mcp/connector/home.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "home.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-11",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "See PRD .pan/drafts/pan-5069.md work item A-4. Add PENDING_SIGNIN_FILE='pending-signin.json', interface ConnectorPendingSignIn {v:1, baseUrl, directoryUrl, deviceCode, userCode, verificationUriComplete, interval, expiresAt}, readPendingSignIn / writePendingSignIn / removePendingSignIn using the existing strict reader and writeSecretFile (0600, atomic). removeConnectorFiles also deletes it. Update the module header file list."
+        },
+        "items": [
+          {
+            "id": "a4-pending-signin-record.ac1",
+            "title": "writePendingSignIn then readPendingSignIn returns an equal record and the file mode is 0600",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "a4-pending-signin-record.ac2",
+            "title": "readPendingSignIn throws on a malformed file and on a file readable by group or other",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "a4-pending-signin-record.ac3",
+            "title": "removeConnectorFiles deletes pending-signin.json, and removePendingSignIn on an absent file resolves without error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "a5-pair-outcome",
+        "title": "Return a typed outcome from the pairing core and stop relay retries on a refused code",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-05T23:19:59Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5069",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/mcp/connector/pair.ts",
+            "tests/unit/lib/mcp/connector/pair.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/mcp/connector/pair.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "pair.test.ts passes including its existing message assertions",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-7",
+            "FR-11"
+          ],
+          "foundationFor": [
+            "a8-connect-command"
+          ]
+        },
+        "narrative": {
+          "Action": "See PRD .pan/drafts/pan-5069.md work item A-5. Export PairFailureCode, PairOutcome and pairWithMachine(opts, deps) holding today's runConnectorPair body; runConnectorPair becomes a printer with byte-identical messages. Classify per the A-5 table. A direct open that throws ChannelOpenError (from @overdeck/anywhere-channel) with code 'pairing-refused' returns pairing-code-refused at once without dialing rtc+turn. Messages on paths that exist today stay byte-identical; the new direct pairing-refused path prints today's exchangeRefusal 403 text."
+        },
+        "items": [
+          {
+            "id": "a5-pair-outcome.ac1",
+            "title": "Given every failure path pair.test.ts exercises today, runConnectorPair prints byte-identical io.err text (the file's expected strings are unchanged)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "a5-pair-outcome.ac2",
+            "title": "Given a direct openPairingChannel that rejects with ChannelOpenError code pairing-refused, pairWithMachine returns code pairing-code-refused and openPairingChannel is never called with an rtc+turn:// URL",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "a5-pair-outcome.ac3",
+            "title": "Given direct failure with rtc.relayRefusal() non-null, pairWithMachine returns relay-plan-needed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "a5-pair-outcome.ac4",
+            "title": "Given a directory without the string's environmentId, pairWithMachine returns machine-not-in-account",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "a6-connect-contract",
+        "title": "Define the OVERDECK_CONNECT status line, exit codes, error codes and stdio registration",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-05T23:19:59Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-5069",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/lib/mcp/connector/connect-output.ts",
+            "tests/unit/lib/mcp/connector/connect-output.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/mcp/connector/connect-output.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "connect-output.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-6",
+            "FR-7",
+            "NFR-1"
+          ],
+          "foundationFor": [
+            "a7-resumable-signin",
+            "a8-connect-command",
+            "a10-connect-docs"
+          ]
+        },
+        "narrative": {
+          "Action": "See PRD .pan/drafts/pan-5069.md work item A-6. New module with CONNECT_STATUS_PREFIX 'OVERDECK_CONNECT ', CONNECT_EXIT {ready:0,error:1,authorize:3,retry:4}, CONNECT_PLATFORMS, ConnectCode (every code in the A-6 table as its own string-literal union, defined here, not imported from pair.ts), ConnectStatus, formatStatusLine, exitCodeFor, registrationFor, registrationLines, and a fixed next text per code plus the authorize and ready next texts. This contract is consumed by PAN-5070 (Copy message) and PAN-5072 (SKILL.md), so keep names and shapes exactly as the PRD states. ConnectCode excludes not-signed-in."
+        },
+        "items": [
+          {
+            "id": "a6-connect-contract.ac1",
+            "title": "formatStatusLine returns one line starting with 'OVERDECK_CONNECT {' whose remainder JSON.parse returns the input status with v equal to 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "a6-connect-contract.ac2",
+            "title": "exitCodeFor returns 0 for ready, 1 for error, 3 for authorize and 4 for retry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "a6-connect-contract.ac3",
+            "title": "registrationFor returns command npx and args ending in 'mcp','connector','serve','--stdio' with @overdeck/core@<version>, and includes env.OVERDECK_CONNECTOR_HOME only when that variable is set and non-empty",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "a6-connect-contract.ac4",
+            "title": "registrationLines('grok-bot', ...) produces a JSON block that parses to mcpServers.overdeck with the same command and args",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "a6-connect-contract.ac5",
+            "title": "Given each ConnectCode value, the next-text lookup returns a non-empty string (a test iterates the full code list)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "a7-resumable-signin",
+        "title": "Sign the connector in with a resumable device flow that exits as soon as it has a link",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-05T23:19:59Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-5069",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/mcp/connector/connect-signin.ts",
+            "tests/unit/lib/mcp/connector/connect-signin.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/mcp/connector/connect-signin.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "connect-signin.test.ts passes using fake timers",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-9",
+            "NFR-1",
+            "NFR-3",
+            "NFR-4"
+          ],
+          "acJustification": "Six criteria: each of the five poll outcomes plus the fresh-run path is a distinct observable branch of the resumable sign-in.",
+          "readinessReason": "It writes only two new files (connect-signin.ts and its test); its inputs (a3, a4, a6) are ordered by blocks edges, so after them it shares no file with any other item."
+        },
+        "narrative": {
+          "Action": "See PRD .pan/drafts/pan-5069.md work item A-7. ensureSignedIn(opts, io, deps) follows steps 1-4 exactly: account present -> ok; live pending sign-in -> poll with pollForToken using expiresIn = min(waitSeconds, secondsUntilExpiry); no live pending -> requestDeviceCode with clientName/targetName, write pending-signin.json, print the link, return authorize at once without polling. waitSeconds 0 skips polling. Tests use vi.useFakeTimers and injected fetch only. An expired_token outcome whose detail is 'expired_token' (server-expired) always removes the file and requests a new code; any other expired_token detail is the local budget and returns authorize with the same url while the local expiry has not passed."
+        },
+        "items": [
+          {
+            "id": "a7-resumable-signin.ac1",
+            "title": "Given an empty home, ensureSignedIn writes pending-signin.json, makes no /oauth/token request, and returns status authorize whose url equals verification_uri_complete",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "a7-resumable-signin.ac2",
+            "title": "Given a live pending sign-in whose grant is approved, ensureSignedIn writes account.json, removes pending-signin.json and returns ok",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "a7-resumable-signin.ac3",
+            "title": "Given a live pending sign-in still pending and waitSeconds 10, after advancing fake timers 10 s ensureSignedIn returns authorize with the same url and keeps the file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "a7-resumable-signin.ac4",
+            "title": "Given an expired pending sign-in, ensureSignedIn requests a new device code and returns authorize with the new url",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "a7-resumable-signin.ac5",
+            "title": "Given access_denied from the token endpoint, ensureSignedIn removes pending-signin.json and returns error code signin-denied",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "a7-resumable-signin.ac6",
+            "title": "Given a live pending sign-in whose token endpoint answers expired_token before the local expiry, ensureSignedIn requests a new device code and returns authorize with the new url",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "a7b-link-error-code",
+        "title": "Expose the ConnectorLink probe's ChannelOpenError code",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-05T23:19:59Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5069",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/mcp/connector/channel-api.ts",
+            "tests/unit/lib/mcp/connector/channel-api.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/mcp/connector/channel-api.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "channel-api.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "See PRD .pan/drafts/pan-5069.md work item A-7b. Add private errorCode and public lastErrorCode(): ChannelOpenErrorCode | null to ConnectorLink; set it from the direct probe's error when it is a ChannelOpenError (else null), reset it to null on a successful probe. No other behavior change."
+        },
+        "items": [
+          {
+            "id": "a7b-link-error-code.ac1",
+            "title": "Given a direct probe that rejects with ChannelOpenError('unknown-peer'), lastErrorCode() returns 'unknown-peer' after connect()",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "a7b-link-error-code.ac2",
+            "title": "Given a direct probe that rejects with a plain Error, lastErrorCode() returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "a7b-link-error-code.ac3",
+            "title": "Given a failed probe followed by a successful one, lastErrorCode() returns null and health().ok is true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "a8-connect-command",
+        "title": "Run sign-in, pairing and verification as one idempotent connect command",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-05T23:19:59Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-5069",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/mcp/connector/connect.ts",
+            "tests/unit/lib/mcp/connector/connect.test.ts",
+            "src/lib/mcp/connector/pair.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/mcp/connector/connect.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "connect.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "NFR-1",
+            "NFR-4"
+          ],
+          "acJustification": "Six criteria: the command's stages each have one observable outcome and the no-token check spans all of them.",
+          "readinessReason": "It adds connect.ts and its test and exports within() from pair.ts; the only overlap (pair.ts with a5) is ordered by the a5 -> a8 edge, so once its blockers land it runs alone in its slot."
+        },
+        "narrative": {
+          "Action": "See PRD .pan/drafts/pan-5069.md work item A-8. runConnectorConnect runs stages 1-6: parse, ensureSignedIn (targetName = link.machineLabel), reuse a matching pairing.json when GET /api/connectors/self over a ConnectorLink answers 200, re-pair with pairWithMachine when it answers 401/403 or no pairing matches, verify, then print registrationLines and the ready status line. The status line is always the last stdout line; the return value is exitCodeFor(status). Clean up link, rtc dialer, rtc and directory in finally. A pairWithMachine not-signed-in outcome (should not happen after sign-in) is reported as error pairing-failed with the message as detail. Re-pair also when the link probe is refused at the channel layer: ConnectorLink.lastErrorCode() is 'unknown-peer' or 'identity-refused' (a removed connector loses its pinned key, so no HTTP status comes back); only transport failures and the 30 s timeout are retry verify-failed. Export within() from pair.ts and import it."
+        },
+        "items": [
+          {
+            "id": "a8-connect-command.ac1",
+            "title": "Given 'garbage' as the pairing string, runConnectorConnect returns 1 and the last io.out line parses to status error with code bad-pairing-string",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "a8-connect-command.ac2",
+            "title": "Given a signed-in home, a successful pair and a 200 from GET /api/connectors/self, runConnectorConnect returns 0 and the last line is status ready with machine, route and a registration whose args end in --stdio",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "a8-connect-command.ac3",
+            "title": "Given an existing pairing.json for the same machine and a 200 verify, runConnectorConnect returns 0 without opening a pairing-mode channel",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "a8-connect-command.ac4",
+            "title": "Given an existing pairing whose verify answers 403, or whose link probe is refused with lastErrorCode 'unknown-peer', runConnectorConnect pairs again with the given code",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "a8-connect-command.ac6",
+            "title": "Given a pairWithMachine outcome pairing-code-refused, runConnectorConnect returns 1 and the last line has code pairing-code-refused; given a verify timeout it returns 4 with code verify-failed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "a8-connect-command.ac5",
+            "title": "No line written to io.out or io.err in any test contains odk_, odl_, oddc_ or the fixture account access token",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "a9-connect-cli",
+        "title": "Register pan mcp connector connect with validated --platform and --wait",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-05T23:19:59Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5069",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/mcp-connector.ts",
+            "tests/unit/cli/mcp-connector.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/mcp-connector.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "mcp-connector.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "See PRD .pan/drafts/pan-5069.md work item A-9. Add connector.command('connect <pairingString>') with --name, --platform (grok-bot|grok-build|hermes|openclaw|other, default other, list inlined), --wait (integer 0-900, default 120), --account-url, --directory-url. Export parseConnectWait and parseConnectPlatform; bad values print one stderr line and exit 1 before any connector module loads. The action lazy-imports connect.js and passes appVersion(), connectorHome(process.env) and process.env. Update the test header and any five-subcommand count to six; mock connect.js like serve.js."
+        },
+        "items": [
+          {
+            "id": "a9-connect-cli.ac1",
+            "title": "parseConnectWait accepts '0' and '900', returns 120 for undefined, and rejects '901', '-1' and 'abc'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "a9-connect-cli.ac2",
+            "title": "parseConnectPlatform accepts each of grok-bot, grok-build, hermes, openclaw, other and rejects an unknown id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "a9-connect-cli.ac3",
+            "title": "pan mcp connector --help lists connect, and running connect with --wait abc exits 1 without importing connect.js",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "a10-connect-docs",
+        "title": "Document pan mcp connector connect in cli/mcp.mdx",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-05T23:19:59Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5069",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/mcp.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n '### connect' cli/mcp.mdx",
+            "grep -c 'pairing-code-refused\\|relay-plan-needed\\|signin-denied' cli/mcp.mdx"
+          ],
+          "expected_outputs": [
+            "the connect heading is found",
+            "the error codes are found in the page"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-7",
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "See PRD .pan/drafts/pan-5069.md work item A-10. Add '### connect' under '## connector' before '### login': synopsis, flag table, the six stages, the OVERDECK_CONNECT line with one example per status, the exit-code table (0/1/3/4) and the full code table with next steps as implemented in connect-output.ts. In the intro: connect is the one-command path for bots, login/pair/serve stay the manual path, the home holds pending-signin.json while a sign-in waits, and top-level pan connect is unrelated (it installs this computer's server)."
+        },
+        "items": [
+          {
+            "id": "a10-connect-docs.ac1",
+            "title": "cli/mcp.mdx contains a '### connect' section showing the synopsis 'pan mcp connector connect <pairingString>' with --name, --platform and --wait",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "a10-connect-docs.ac2",
+            "title": "The section shows an OVERDECK_CONNECT example line for each of ready, authorize, retry and error and an exit-code table with 0, 1, 3 and 4",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "a10-connect-docs.ac3",
+            "title": "The section contains every code from connect-output.ts with its next step, and the connector intro contains pending-signin.json and says top-level pan connect installs a server",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "a1-pair-link-machine-name",
+        "to": "a8-connect-command",
+        "type": "blocks"
+      },
+      {
+        "from": "a2-connectors-self-route",
+        "to": "a8-connect-command",
+        "type": "blocks"
+      },
+      {
+        "from": "a3-device-code-names",
+        "to": "a7-resumable-signin",
+        "type": "blocks"
+      },
+      {
+        "from": "a4-pending-signin-record",
+        "to": "a7-resumable-signin",
+        "type": "blocks"
+      },
+      {
+        "from": "a6-connect-contract",
+        "to": "a7-resumable-signin",
+        "type": "blocks"
+      },
+      {
+        "from": "a5-pair-outcome",
+        "to": "a8-connect-command",
+        "type": "blocks"
+      },
+      {
+        "from": "a6-connect-contract",
+        "to": "a8-connect-command",
+        "type": "blocks"
+      },
+      {
+        "from": "a7-resumable-signin",
+        "to": "a8-connect-command",
+        "type": "blocks"
+      },
+      {
+        "from": "a8-connect-command",
+        "to": "a9-connect-cli",
+        "type": "blocks"
+      },
+      {
+        "from": "a9-connect-cli",
+        "to": "a10-connect-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "a7b-link-error-code",
+        "to": "a8-connect-command",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
