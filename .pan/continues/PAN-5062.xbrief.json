@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5062",
   "created": "2026-11-05T22:39:32.195Z",
-  "updated": "2026-11-05T23:17:53.528Z",
+  "updated": "2026-11-05T23:18:08.101Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -138,6 +138,10 @@
     "docs-placeholder-tables.ac1": {
       "status": "completed",
       "doneAt": "2026-11-05T23:17:53.528Z"
+    },
+    "docs-placeholder-tables.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:18:08.101Z"
     }
   }
 }
