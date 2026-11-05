@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-2630",
   "created": "2026-11-05T21:09:00.725Z",
-  "updated": "2026-11-05T22:25:29.113Z",
+  "updated": "2026-11-05T22:25:45.216Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -86,6 +86,10 @@
     "launcher-emits-shim.ac4": {
       "status": "completed",
       "doneAt": "2026-11-05T22:25:29.113Z"
+    },
+    "install-writes-shim.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-05T22:25:45.216Z"
     }
   }
 }
