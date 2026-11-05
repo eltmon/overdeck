@@ -11,6 +11,22 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mcpAgents = vi.hoisted(() => ({ value: true }));
 const mintFailure = vi.hoisted(() => ({ error: null as Error | null }));
+type ProjectMcpResult = Awaited<ReturnType<typeof import('../../../../src/lib/projects/project-mcp.js').resolveProjectMcpServers>>;
+const projectMcp = vi.hoisted(() => ({
+  result: { projectKey: null, servers: {}, strict: false } as ProjectMcpResult,
+  calls: [] as Array<{ issueId?: string; cwd?: string; reservedNames: readonly string[] }>,
+}));
+
+vi.mock('../../../../src/lib/projects/project-mcp.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../../src/lib/projects/project-mcp.js')>();
+  return {
+    ...actual,
+    resolveProjectMcpServers: vi.fn(async (input: { issueId?: string; cwd?: string; reservedNames: readonly string[] }) => {
+      projectMcp.calls.push({ issueId: input.issueId, cwd: input.cwd, reservedNames: input.reservedNames });
+      return projectMcp.result;
+    }),
+  };
+});
 
 vi.mock('../../../../src/lib/config-yaml.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../src/lib/config-yaml.js')>();
@@ -50,6 +66,8 @@ beforeEach(async () => {
   _resetAccessTokensForTests();
   mcpAgents.value = true;
   mintFailure.error = null;
+  projectMcp.result = { projectKey: null, servers: {}, strict: false };
+  projectMcp.calls = [];
 });
 
 afterEach(async () => {
@@ -213,5 +231,93 @@ describe('overdeck MCP injection for Codex (PAN-4933 W-INJ2)', () => {
     expect(await prepareCodexOverdeckMcp({ agentId: 'conv-codex-1', agentKind: 'conversation', role: 'conversation', harness: 'codex' })).toEqual({});
     expect(warn).toHaveBeenCalledTimes(1);
     expect(String(warn.mock.calls[0]![0])).toContain('conv-codex-1');
+  });
+});
+
+const LINEAR_SERVER = { type: 'stdio' as const, command: 'npx', args: ['-y', 'linear-mcp'], env: { LINEAR_API_KEY: 'lin-acme' } };
+const SENTRY_SERVER = { type: 'http' as const, url: 'https://mcp.sentry.dev/mcp', headers: {} };
+
+async function readServers(path: string): Promise<Record<string, unknown>> {
+  return (JSON.parse(await readFile(path, 'utf8')) as { mcpServers: Record<string, unknown> }).mcpServers;
+}
+
+describe('project MCP servers in the launch MCP file (PAN-5061 WI-5)', () => {
+  it('writes overdeck first, then the project servers, and passes the owner cwd and issue', async () => {
+    projectMcp.result = { projectKey: 'acme', servers: { linear: LINEAR_SERVER, sentry: SENTRY_SERVER }, strict: false };
+    const result = await prepareClaudeOverdeckMcp({
+      agentId: 'agent-acme-1', agentKind: 'agent', role: 'work', harness: 'claude-code', cwd: '/w/acme', issueId: 'ACME-1',
+    });
+    const configPath = join(home, 'agents', 'agent-acme-1', 'overdeck-mcp.json');
+
+    expect(result).toEqual({ overdeckMcpConfig: configPath, overdeckMcpServerNames: ['overdeck', 'linear', 'sentry'] });
+    const servers = await readServers(configPath);
+    expect(Object.keys(servers)).toEqual(['overdeck', 'linear', 'sentry']);
+    expect(servers.linear).toEqual(LINEAR_SERVER);
+    expect((await stat(configPath)).mode & 0o777).toBe(0o600);
+    expect(projectMcp.calls).toEqual([{ issueId: 'ACME-1', cwd: '/w/acme', reservedNames: ['overdeck'] }]);
+  });
+
+  it('reserves the launching role\'s own server names', async () => {
+    await prepareClaudeOverdeckMcp({ agentId: 'agent-acme-t', agentKind: 'agent', role: 'test', harness: 'claude-code', cwd: '/w/acme' });
+    expect(projectMcp.calls[0]!.reservedNames).toEqual(['overdeck', 'playwright']);
+  });
+
+  it('writes the project servers alone when mcp.agents is false', async () => {
+    mcpAgents.value = false;
+    projectMcp.result = { projectKey: 'acme', servers: { linear: LINEAR_SERVER }, strict: false };
+    const result = await prepareClaudeOverdeckMcp({ agentId: 'agent-acme-2', agentKind: 'agent', role: 'work', harness: 'claude-code', cwd: '/w/acme' });
+    const configPath = join(home, 'agents', 'agent-acme-2', 'overdeck-mcp.json');
+
+    expect(result).toEqual({ overdeckMcpConfig: configPath, overdeckMcpServerNames: ['linear'] });
+    expect(Object.keys(await readServers(configPath))).toEqual(['linear']);
+    expect(await listAccessTokens()).toEqual([]);
+  });
+
+  it('writes the project servers alone when the mint fails', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    mintFailure.error = new Error('registry is corrupt');
+    projectMcp.result = { projectKey: 'acme', servers: { linear: LINEAR_SERVER }, strict: false };
+    const result = await prepareClaudeOverdeckMcp({ agentId: 'agent-acme-3', agentKind: 'agent', role: 'work', harness: 'claude-code', cwd: '/w/acme' });
+
+    expect(result.overdeckMcpServerNames).toEqual(['linear']);
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns {} and writes no file when nothing resolves', async () => {
+    mcpAgents.value = false;
+    expect(await prepareClaudeOverdeckMcp({ agentId: 'agent-acme-4', agentKind: 'agent', role: 'work', harness: 'claude-code', cwd: '/w/x' })).toEqual({});
+    await expect(stat(join(home, 'agents', 'agent-acme-4', 'overdeck-mcp.json'))).rejects.toThrow();
+  });
+
+  it('passes mcp_strict through', async () => {
+    projectMcp.result = { projectKey: 'acme', servers: { linear: LINEAR_SERVER }, strict: true };
+    const result = await prepareClaudeOverdeckMcp({ agentId: 'agent-acme-5', agentKind: 'agent', role: 'work', harness: 'claude-code', cwd: '/w/acme' });
+    expect(result.mcpStrict).toBe(true);
+  });
+
+  it('writes the same file for an ACP launch', async () => {
+    projectMcp.result = { projectKey: 'acme', servers: { linear: LINEAR_SERVER }, strict: false };
+    const result = await prepareClaudeOverdeckMcp({ agentId: 'agent-acme-6', agentKind: 'agent', role: 'work', harness: 'opencode', cwd: '/w/acme' });
+    const configPath = join(home, 'agents', 'agent-acme-6', 'overdeck-mcp.json');
+
+    expect(result.overdeckMcpConfig).toBe(configPath);
+    expect(Object.keys(await readServers(configPath))).toEqual(['overdeck', 'linear']);
+  });
+
+  it('warns once for a harness that provisions no MCP and returns {}', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    projectMcp.result = { projectKey: 'acme', servers: { linear: LINEAR_SERVER, sentry: SENTRY_SERVER }, strict: false };
+
+    expect(await prepareClaudeOverdeckMcp({ agentId: 'agent-acme-7', agentKind: 'agent', role: 'work', harness: 'ohmypi', cwd: '/w/acme' })).toEqual({});
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0]![0])).toBe('[project-mcp] acme: harness ohmypi does not provision MCP; servers unavailable: linear, sentry');
+    expect(String(warn.mock.calls[0]![0])).not.toContain('lin-acme');
+  });
+
+  it('does not warn for a codex launch, which provisions through its server map', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    projectMcp.result = { projectKey: 'acme', servers: { linear: LINEAR_SERVER }, strict: false };
+    expect(await prepareClaudeOverdeckMcp({ agentId: 'agent-acme-8', agentKind: 'agent', role: 'work', harness: 'codex', cwd: '/w/acme' })).toEqual({});
+    expect(warn).not.toHaveBeenCalled();
   });
 });
