@@ -27,7 +27,7 @@ import { normalizeAgentId } from '../agents/identity.js';
 import { FLYWHEEL_CONVERSATION_SESSION } from '../flywheel/constants.js';
 import { ensureAgentMcpToken, type AgentTokenRole } from './agent-token.js';
 import { overdeckMcpEnabledFor } from './overdeck-mcp-gate.js';
-import { resolveProjectMcpServers } from '../projects/project-mcp.js';
+import { resolveProjectMcpServers, type ProjectMcpServer } from '../projects/project-mcp.js';
 import { CLAUDE_OVERDECK_MCP_CONFIG_FILE, OVERDECK_MCP_SERVER_NAME } from './overdeck-mcp-args.js';
 
 export { harnessGetsOverdeckMcp, overdeckMcpEnabledFor } from './overdeck-mcp-gate.js';
@@ -171,17 +171,12 @@ async function warnUnprovisionedProjectServers(owner: OverdeckMcpLaunchOwner): P
   }
 }
 
-/** The `[mcp_servers.overdeck]` table entry a Codex launch merges into its server map. */
-export interface CodexOverdeckMcpServer {
-  type: 'stdio';
-  command: string;
-  args: string[];
-  env: Record<string, string>;
-  defaultToolsApprovalMode: 'approve';
-}
+/** A `[mcp_servers.<name>]` table entry a Codex launch merges into its server map: `overdeck` or a project server. */
+export type CodexOverdeckMcpServer = ProjectMcpServer & { defaultToolsApprovalMode: 'approve' };
 
 /**
  * PAN-4933 W-INJ2: `{}` unless the harness uses a Codex home; never throws.
+ * PAN-5061: the map also carries the launch project's servers, each with `approve` like `overdeck`.
  * `defaultToolsApprovalMode: 'approve'` is required because Overdeck's MCP tools
  * carry no `readOnlyHint` annotations, so Codex would otherwise refuse every
  * model-initiated call under `approval_policy = "never"` (planning landmine,
@@ -189,12 +184,19 @@ export interface CodexOverdeckMcpServer {
  */
 export async function prepareCodexOverdeckMcp(owner: OverdeckMcpLaunchOwner): Promise<Record<string, CodexOverdeckMcpServer>> {
   if (!getHarnessBehavior(owner.harness).usesCodexHome) return {};
+  const servers: Record<string, CodexOverdeckMcpServer> = {};
   try {
     const minted = await mintOverdeckTokenFile(owner);
-    if (minted === null) return {};
-    return { overdeck: { ...overdeckStdioServer(minted.tokenFile), defaultToolsApprovalMode: 'approve' } };
+    if (minted !== null) servers[OVERDECK_MCP_SERVER_NAME] = { ...overdeckStdioServer(minted.tokenFile), defaultToolsApprovalMode: 'approve' };
   } catch (error) {
     console.warn(`[agent-injection] overdeck MCP skipped for ${owner.agentId}: ${(error as Error).message}`);
-    return {};
   }
+  try {
+    for (const [name, server] of Object.entries((await launchProjectServers(owner)).servers)) {
+      servers[name] = { ...server, defaultToolsApprovalMode: 'approve' };
+    }
+  } catch (error) {
+    console.warn(`[agent-injection] project MCP skipped for ${owner.agentId}: ${(error as Error).message}`);
+  }
+  return servers;
 }

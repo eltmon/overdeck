@@ -70,6 +70,9 @@ export interface CodexMcpServerDef {
   command?: string
   args?: string[]
   env?: Record<string, string>
+  /** PAN-5061: `type: 'http'` servers render `url` and an `http_headers` inline table. */
+  url?: string
+  headers?: Record<string, string>
   defaultToolsApprovalMode?: 'auto' | 'prompt' | 'writes' | 'approve'
 }
 
@@ -321,12 +324,17 @@ export function initCodexHome(codexHomeDir: string, opts: InitCodexHomeOpts): vo
       const escaped = escapeTomlBasicString(opts.trustedDir)
       lines.push('', `[projects."${escaped}"]`, 'trust_level = "trusted"')
     }
+    const inlineTable = (map: Record<string, string> | undefined) => Object.entries(map ?? {})
+      .filter((entry): entry is [string, string] => typeof entry[1] === 'string')
+      .map(([key, value]) => `"${escapeTomlBasicString(key)}" = "${escapeTomlBasicString(value)}"`)
     for (const [name, definition] of Object.entries(opts.mcpServers ?? {})) {
-      if (definition.type !== 'stdio' || typeof definition.command !== 'string' || definition.command.length === 0) {
-        console.warn(`[codex] skipping MCP server "${name}" — only stdio command servers are provisioned into codex config`)
+      const isStdio = definition.type === 'stdio' && typeof definition.command === 'string' && definition.command.length > 0
+      const isHttp = definition.type === 'http' && typeof definition.url === 'string' && definition.url.length > 0
+      if (!isStdio && !isHttp) {
+        console.warn(`[codex] skipping MCP server "${name}" — only stdio command or http url servers are provisioned into codex config`)
         continue
       }
-      if (definition.command === 'npx' && !hasImmutableNpxPackageSelector(definition.args)) {
+      if (isStdio && definition.command === 'npx' && !hasImmutableNpxPackageSelector(definition.args)) {
         console.warn(`[codex] skipping MCP server "${name}" — npx MCP packages must use an exact immutable version`)
         continue
       }
@@ -334,15 +342,18 @@ export function initCodexHome(codexHomeDir: string, opts: InitCodexHomeOpts): vo
       const escapedName = escapeTomlBasicString(name)
       const sectionKey = /^[A-Za-z0-9_-]+$/.test(name) ? name : `"${escapedName}"`
       lines.push('', `[mcp_servers.${sectionKey}]`)
-      lines.push(`command = "${escapeTomlBasicString(definition.command)}"`)
-      const args = definition.args?.filter((arg): arg is string => typeof arg === 'string') ?? []
-      if (args.length > 0) {
-        lines.push(`args = [${args.map(arg => `"${escapeTomlBasicString(arg)}"`).join(', ')}]`)
-      }
-      const env = Object.entries(definition.env ?? {}).filter((entry): entry is [string, string] => typeof entry[1] === 'string')
-      if (env.length > 0) {
-        const values = env.map(([key, value]) => `"${escapeTomlBasicString(key)}" = "${escapeTomlBasicString(value)}"`)
-        lines.push(`env = { ${values.join(', ')} }`)
+      if (isHttp) {
+        lines.push(`url = "${escapeTomlBasicString(definition.url!)}"`)
+        const headers = inlineTable(definition.headers)
+        if (headers.length > 0) lines.push(`http_headers = { ${headers.join(', ')} }`)
+      } else {
+        lines.push(`command = "${escapeTomlBasicString(definition.command!)}"`)
+        const args = definition.args?.filter((arg): arg is string => typeof arg === 'string') ?? []
+        if (args.length > 0) {
+          lines.push(`args = [${args.map(arg => `"${escapeTomlBasicString(arg)}"`).join(', ')}]`)
+        }
+        const env = inlineTable(definition.env)
+        if (env.length > 0) lines.push(`env = { ${env.join(', ')} }`)
       }
       if (definition.defaultToolsApprovalMode !== undefined) {
         if (CODEX_MCP_APPROVAL_MODES.has(definition.defaultToolsApprovalMode)) {

@@ -321,3 +321,27 @@ describe('project MCP servers in the launch MCP file (PAN-5061 WI-5)', () => {
     expect(warn).not.toHaveBeenCalled();
   });
 });
+
+describe('project MCP servers in the Codex server map (PAN-5061 WI-6)', () => {
+  it('adds project servers with approve after overdeck', async () => {
+    projectMcp.result = { projectKey: 'acme', servers: { linear: LINEAR_SERVER, sentry: SENTRY_SERVER }, strict: false };
+    const result = await prepareCodexOverdeckMcp({ agentId: 'agent-acme-c1', agentKind: 'agent', role: 'work', harness: 'codex', cwd: '/w/acme', issueId: 'ACME-2' });
+
+    expect(Object.keys(result)).toEqual(['overdeck', 'linear', 'sentry']);
+    expect(result.linear).toEqual({ ...LINEAR_SERVER, defaultToolsApprovalMode: 'approve' });
+    expect(result.sentry).toEqual({ ...SENTRY_SERVER, defaultToolsApprovalMode: 'approve' });
+    expect(projectMcp.calls).toEqual([{ issueId: 'ACME-2', cwd: '/w/acme', reservedNames: ['overdeck'] }]);
+  });
+
+  it('returns only overdeck when the project has no servers', async () => {
+    const result = await prepareCodexOverdeckMcp({ agentId: 'agent-acme-c2', agentKind: 'agent', role: 'work', harness: 'codex', cwd: '/w/acme' });
+    expect(Object.keys(result)).toEqual(['overdeck']);
+  });
+
+  it('returns the project servers alone when mcp.agents is false', async () => {
+    mcpAgents.value = false;
+    projectMcp.result = { projectKey: 'acme', servers: { linear: LINEAR_SERVER }, strict: false };
+    const result = await prepareCodexOverdeckMcp({ agentId: 'agent-acme-c3', agentKind: 'agent', role: 'work', harness: 'codex', cwd: '/w/acme' });
+    expect(Object.keys(result)).toEqual(['linear']);
+  });
+});
