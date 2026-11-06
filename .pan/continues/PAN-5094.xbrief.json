@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5094",
   "created": "2026-11-06T17:38:04.566Z",
-  "updated": "2026-11-06T18:48:49.860Z",
+  "updated": "2026-11-06T18:49:30.209Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -126,6 +126,10 @@
     "reapable-rule.ac2": {
       "status": "completed",
       "doneAt": "2026-11-06T18:48:49.860Z"
+    },
+    "reapable-rule.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-06T18:49:30.209Z"
     }
   }
 }
