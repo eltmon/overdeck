@@ -1,0 +1,729 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-06T17:21:03Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5093: Alert the operator (Needs-you + phone push) when free disk drops below 5 GiB / 2 GiB; today it hit 17 MB unnoticed",
+    "updated": "2026-11-06T17:32:04.041Z"
+  },
+  "plan": {
+    "id": "pan-5093",
+    "title": "Alert the operator (Needs-you + phone push) when free disk drops below 5 GiB / 2 GiB; today it hit 17 MB unnoticed",
+    "status": "proposed",
+    "uid": "bcd29167-4ff8-4161-a14b-37bddfa09d99",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-06T17:21:03Z",
+    "updated": "2026-11-06T17:32:04.041Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5093",
+        "label": "PAN-5093",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5093.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "disk",
+      "alerting",
+      "push",
+      "needs-you",
+      "resources"
+    ],
+    "metadata": {
+      "sizeJustification": "One alert feature fed by one state machine: the issue requires both the Needs-you item and the phone push, and splitting the dashboard card into a sibling issue would ship a disk alert API with no on-screen consumer. The 33-file surface is 8 small items, 13 of whose files are new tests or the CI test-subset list; the subsystem count is inflated because each of the three doc files counts as its own subsystem. Every item runs in its own slot with no shared files.",
+      "canonicalFilename": "2026-11-06-PAN-5093-alert-the-operator-needs-you-phone-push-when-free-disk-drops-below-5-gib-2-gib-today-it-hit-17-mb-unnoticed.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Free space on / fell from 7.5 GiB to 17 MB within an hour on 2026-11-06 and nothing told the operator. At that level SQLite and transcript JSONL writes can fail mid-write and zero-fill files. The only disk guards today hold new workspace setups below 10 GiB (src/lib/disk-floor.ts, PAN-4961) and prune Docker BuildKit cache (src/lib/cloister/disk-pressure-patrol.ts, PAN-3809); neither raises a Needs-you item or a phone push.",
+      "Proposal": "A disk alert service in the primary dashboard polls statfs on the Overdeck home every 30 s. A pure state machine (src/lib/disk-alert.ts) moves between ok, warning (below resources.disk_warn_gb, default 5) and critical (below resources.disk_critical_gb, default 2), raising at once and lowering only 0.5 GiB past a threshold. Each upward crossing sends one edge push through the existing needs-you dispatcher (kind failed, tag disk:<level>:<since>) and writes an activity entry, then measures the biggest space holders once (du with 120 s timeouts, Docker reclaimable, the conversation search index). GET /api/disk-alert serves the snapshot; useDecisions turns it into one Needs-you item (diskLow, or blocking diskCritical) rendered by a dedicated DiskAlertCard on the desktop and a read-only line on the phone. Docs: docs/PIPELINE-GATES.md, configuration/memory-governor.mdx, configuration/push-notifications.mdx. Full detail and before/after code in .pan/drafts/PAN-5093.md.",
+      "NonGoals": "- Deleting, pruning, migrating or moving any file or directory; the holder list is read-only, including the stale ~/.overdeck/conversations/embeddings.db copy\n- Changing DISK_SAFETY_FLOOR_BYTES, DISK_PRUNE_TRIGGER_BYTES, the BuildKit prune patrol or hygiene.ts's 10 GiB default, or unifying them with the new keys\n- A new push kind, a new phone notification category, or any change under apps/mobile\n- Raising ntfy priority, or bypassing the push rate limit, pause or category mute\n- Propagating the disk alert to linked machines (buildNeedsYou() and the fleet Needs-you stay unchanged)\n- Watching any filesystem other than the one holding the Overdeck home\n- A Settings UI for the thresholds\n- Running the alert in the Deacon child, behind the Deacon freeze, or in a CLI command\n- Running du or docker on every poll"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Run the alert as a primary-dashboard service, not a Deacon patrol",
+        "rationale": "The push dispatcher lives in the primary dashboard process; a Deacon patrol would need a new cross-process event, and the Deacon freeze would silence the alert exactly when nobody is watching. This also settles the issue's TENET-10 note: nothing goes into the Deacon patrol, so no supervised handoff is needed."
+      },
+      {
+        "summary": "Reuse push kind 'failed' and category 'failed' instead of adding a kind or category",
+        "rationale": "The dispatcher drops kinds missing from an explicit push.events list, and a new phone category is a key of the phone app's closed CATEGORY_LABEL record, needing an app release. Consequence: a phone with Failures muted or paused gets no disk push; the Needs-you item still shows."
+      },
+      {
+        "summary": "'Louder' critical = its own push titled 'Disk critical', plus a blocking Needs-you item sorted first",
+        "rationale": "Web Push and the Overdeck app already send failed at high urgency. Raising ntfy priority would widen the provider surface for a marginal gain; recorded as a NonGoal."
+      },
+      {
+        "summary": "Thresholds are config keys resources.disk_warn_gb (5) and resources.disk_critical_gb (2); poll interval 30 s and recovery margin 0.5 GiB are documented constants",
+        "rationale": "The issue asks for config keys beside the disk floor with documented defaults; the memory keys use the *_gb naming in the same resources block. An inverted pair falls back to the defaults with one warning, matching merge-cpu.ts. Thresholds are read each poll with the async loadGlobalConfigNoMigration() (machine-wide global config), never the sync loadConfigSync()."
+      },
+      {
+        "summary": "A dashboard that starts while the disk is already low pushes once",
+        "rationale": "The incident went unnoticed; failing loud on start is the point. A restart while still low pushing again is accepted."
+      },
+      {
+        "summary": "Push first, measure holders afterwards, once per crossing, 120 s per path, at most 4 du processes",
+        "rationale": "du over 53 GiB trees on a nearly full disk can take minutes; the push must not wait on it, and repeated du would add I/O load while the disk is under pressure."
+      },
+      {
+        "summary": "Show both conversation search index files (configured and stale default path) in the holders; defer cleanup or migration",
+        "rationale": "The issue comment asks for the index size in the hints and a decision on the stale copy. The issue scopes hints as read-only, so the stale copy is labeled 'not in use' for the operator to judge, and cleanup is a NonGoal."
+      },
+      {
+        "summary": "Keep the dispatcher's rate limit, pause and mute for disk pushes",
+        "rationale": "Pause and mute are explicit operator choices; at most two disk pushes per crossing make summary folding rare, and the Needs-you item still carries the details."
+      },
+      {
+        "summary": "Snapshot type DiskAlertSnapshot lives in @overdeck/contracts",
+        "rationale": "Server and frontend both use it; packages/contracts is the repo's shared-type home."
+      }
+    ],
+    "items": [
+      {
+        "id": "config-keys",
+        "title": "Add resources.disk_warn_gb and resources.disk_critical_gb config keys",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-06T17:21:03Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5093",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/config-yaml/schema-disk.ts",
+            "src/lib/config-yaml/merge-disk.ts",
+            "src/lib/config-yaml/schema.ts",
+            "src/lib/config-yaml/merge.ts",
+            "src/lib/config-yaml/defaults.ts",
+            "src/lib/config-yaml/__tests__/merge-disk.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/config-yaml/__tests__/merge-disk.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "merge-disk.test.ts passes",
+            "typecheck completes without errors",
+            "file-size guard passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Create schema-disk.ts (DiskResourcesYamlConfig with disk_warn_gb/disk_critical_gb; DiskResourcesConfig with diskWarnGb/diskCriticalGb) and merge-disk.ts (mergeDiskResources(yaml, resolved, defaults): accept finite numbers > 0 and <= 1024; if critical >= warn, console.warn once per distinct pair and reset both to defaults). Extend ResourcesConfig (schema.ts line 421) with DiskResourcesYamlConfig and the resolved resources type (schema.ts line 979) with DiskResourcesConfig; add diskWarnGb: 5 and diskCriticalGb: 2 to the defaults.ts resources block; call mergeDiskResources right after mergeCpuResources in merge.ts (line 854). schema.ts must stay <= 1114 lines and merge.ts <= 1045."
+        },
+        "items": [
+          {
+            "id": "config-keys.ac1",
+            "title": "Given no resources.disk_* keys, when the config merges, then resources.diskWarnGb defaults to 5 and resources.diskCriticalGb defaults to 2",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-keys.ac2",
+            "title": "Given disk_warn_gb: 8 and disk_critical_gb: 3, when merged, then the resolved values are 8 and 3; values 0, -1, '5', NaN and 2000 are ignored and the earlier value is preserved",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-keys.ac3",
+            "title": "Given disk_warn_gb: 2 and disk_critical_gb: 3, when merged twice, then both values fall back to 5 and 2 and console.warn is emitted exactly once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-keys.ac4",
+            "title": "bash scripts/lint-file-size.sh exits 0 with schema.ts at or under 1114 lines and merge.ts at or under 1045 lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "alert-core",
+        "title": "Add the pure disk alert state machine and the DiskAlertSnapshot contract",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-06T17:21:03Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5093",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "holders",
+            "alert-service",
+            "disk-alert-route",
+            "desktop-card",
+            "phone-line"
+          ],
+          "files_scope": [
+            "packages/contracts/src/disk-alert.ts",
+            "packages/contracts/src/index.ts",
+            "src/lib/disk-alert.ts",
+            "src/lib/__tests__/disk-alert.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/disk-alert.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "disk-alert.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2 and the 'Snapshot contract' section. Add packages/contracts/src/disk-alert.ts (DiskAlertLevel, DiskSpaceHolder, DiskAlertHolders, DiskAlertSnapshot exactly as in the PRD) and export it from the contracts index. Add src/lib/disk-alert.ts with DISK_ALERT_POLL_MS = 30_000, DISK_ALERT_RECOVERY_MARGIN_BYTES = 0.5 GiB, diskAlertThresholds(), nextDiskAlertLevel() (raise at once, lower only past threshold + margin, rule code in the PRD), isDiskAlertCrossing() (severity rank rises), and diskAlertPush(level, availableBytes, thresholds, path, since) returning an EdgeNotification with kind/category 'failed', tag disk:<level>:<since>, title 'Disk low · <x> GiB free' or 'Disk critical · <x> GiB free', the PRD body text, url '/m', issueId null. No I/O in this module."
+        },
+        "items": [
+          {
+            "id": "alert-core.ac1",
+            "title": "nextDiskAlertLevel returns critical below the critical threshold, warning between the thresholds, and lowers a level only when free bytes reach that level's threshold plus 0.5 GiB (e.g. previous warning at warn+0.3 GiB stays warning, at warn+0.6 GiB returns ok)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "alert-core.ac2",
+            "title": "isDiskAlertCrossing returns true for ok->warning, ok->critical and warning->critical, and false for every equal or downward pair",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "alert-core.ac3",
+            "title": "diskAlertPush('critical', 1.2 GiB, ...) produces kind 'failed', category 'failed', title 'Disk critical · 1.2 GiB free' and url '/m'; two calls with different since values produce different tags",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "alert-core.ac4",
+            "title": "packages/contracts exports DiskAlertSnapshot and npm run typecheck exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "holders",
+        "title": "Add the read-only space holder collector",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-06T17:21:03Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5093",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/disk-alert-holders.ts",
+            "src/lib/__tests__/disk-alert-holders.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/disk-alert-holders.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "disk-alert-holders.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. collectDiskHolders(deps) measures each child of the Overdeck home, ~/.claude/projects, ~/.local/share/opencode/opencode.db, the configured conversationSearch.dbPath and (when different and present) ~/.overdeck/conversations/embeddings.db, and the caches ~/.local/share/pnpm/store, ~/.cache/huggingface, ~/.cache/ms-playwright, ~/.npm/_cacache, ~/.bun/install/cache, ~/.cache/uv. Skip missing paths and paths on a different device than the Overdeck home. Directories via async execFile('du', ['-sk','-x',path], {timeout: 120_000}) at most 4 at a time; files via stat size; a rejected measure drops the row and sets incomplete. Docker reclaimable via async 'docker system df --format {{json .}}' summed with parseDockerReclaimable (strip '(NN%)', reuse parseDockerSize from src/lib/workspace/disk-cost.ts). Sort descending, drop rows under 100 MiB, keep 12, then re-append any cut conversation index row. Labels per the PRD. All I/O injectable; no execSync. conversationIndexPath is passed in by the caller, which reads it with the async loadGlobalConfigNoMigration(), never loadConfigSync."
+        },
+        "items": [
+          {
+            "id": "holders.ac1",
+            "title": "Given injected sizes, collectDiskHolders returns rows sorted by bytes descending, capped at 12, without rows under 100 MiB",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "holders.ac2",
+            "title": "Given a conversation index smaller than the 12th row, the result still includes a 'Conversation search index' row; a 'Conversation search index (not in use)' row appears only when the configured path differs from the default path and the default file exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "holders.ac3",
+            "title": "collectDiskHolders returns no row for a path whose dev differs from the Overdeck home's dev, and when duKb rejects for a path it returns the other rows with incomplete: true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "holders.ac4",
+            "title": "parseDockerReclaimable sums the Reclaimable column of every JSON line (e.g. '1.5GB (40%)' and '500MB (10%)') using parseDockerSize, and returns 0 for empty input",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "alert-service",
+        "title": "Run the disk alert service in the primary dashboard and push on each crossing",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-06T17:21:03Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5093",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/disk-alert-service.ts",
+            "src/dashboard/server/services/__tests__/disk-alert-service.test.ts",
+            "src/dashboard/server/services/needs-you-push-service.ts",
+            "src/dashboard/server/main.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/disk-alert-service.test.ts src/dashboard/server/services/__tests__/needs-you-push-service.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "disk-alert-service.test.ts and needs-you-push-service.test.ts pass",
+            "typecheck completes without errors",
+            "file-size guard passed with main.ts at or under 1000 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-8",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3",
+            "NFR-4",
+            "NFR-5"
+          ],
+          "acJustification": "Six ACs: the critique-driven scan concurrency and recovery-invalidation cases are separate behaviors from the crossing/push rules and each needs its own check."
+        },
+        "narrative": {
+          "Action": "PRD WI-4 (revised after critique round 1). Add pushNeedsYouEdge(notification) to needs-you-push-service.ts (state?.dispatcher.observeEdge; no-op before start). Create disk-alert-service.ts with startDiskAlertService(deps) (idempotent; one poll at once, then setInterval(DISK_ALERT_POLL_MS) unref'd; skip a tick while a poll is in flight), stopDiskAlertService(), getDiskAlertSnapshot() (level 'ok', checkedAt null when not started) and pollDiskAlertOnce(). Each poll: await readThresholds() — diskAlertThresholds((await loadGlobalConfigNoMigration()).config.resources), never loadConfigSync (it does sync fs reads); a rejection keeps the last good thresholds — then async statfs of getOverdeckHome() (failure -> skip, level unchanged), then nextDiskAlertLevel. On a crossing: set since, push(diskAlertPush(...)), emitActivityEntry (source 'dashboard', link '/resources', warn for warning, error + desktop:true for critical), then ensureHolderScan(). critical->warning: no push, no entry, since kept. Any->ok: clear since and holders, increment alertGeneration, emit one info entry. ensureHolderScan(): no-op while scanInFlight (one scan service-wide, so at most 4 du processes across crossings); else record scanGeneration = alertGeneration, measuring = true, run collectHolders(); on settle clear scanInFlight and measuring, publish the result (rejection -> { incomplete: true, holders: [] }) only if scanGeneration === alertGeneration and level !== 'ok'; if stale and level !== 'ok', call ensureHolderScan() again. In main.ts call startDiskAlertService() right after startNeedsYouPushService(...) inside the existing !isPeerDashboard block (line 280) and stopDiskAlertService() beside stopNeedsYouPushService() (line 779); at most 7 added lines. Tests use vi.useFakeTimers and inject every dep, with deferred promises for the collector."
+        },
+        "items": [
+          {
+            "id": "alert-service.ac1",
+            "title": "Given free space 4 GiB on the first poll, the service pushes exactly one notification with tag starting 'disk:warning:' and a second poll at 4 GiB pushes nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "alert-service.ac2",
+            "title": "Given a warning level, a poll at 1.5 GiB pushes one critical notification, a later poll at 3 GiB pushes nothing and the snapshot level becomes 'warning', and a poll at 5.6 GiB returns level 'ok' and emits one info activity entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "alert-service.ac3",
+            "title": "After a recovery to ok, a new drop to 4 GiB (advanced with vi.advanceTimersByTimeAsync) pushes again with a tag different from the first warning's tag",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "alert-service.ac4",
+            "title": "When readSpace rejects, the level is preserved and nothing is pushed; when readThresholds rejects, the poll applies the previous thresholds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "alert-service.ac5",
+            "title": "Given an unresolved collector during warning, when a critical poll follows, then collectHolders was called exactly once and its result shows on the critical snapshot; when the disk recovers to ok before the collector resolves, then the snapshot keeps holders: null; when a new crossing happens before that stale scan resolves, then collectHolders is called a second time",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "alert-service.ac6",
+            "title": "After stopDiskAlertService(), advancing fake time by 120 s produces no further readSpace calls, and main.ts is at or under 1000 lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "disk-alert-route",
+        "title": "Serve GET /api/disk-alert with its scope and no-loss rows",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-06T17:21:03Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-5093",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/disk-alert.ts",
+            "src/dashboard/server/__tests__/disk-alert-route.test.ts",
+            "src/dashboard/server/server.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/disk-alert-route.test.ts src/dashboard/server/__tests__/route-scopes.test.ts",
+            "npx vitest run --configLoader runner tests/unit/lib/overdeck/no-loss-matrix.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "disk-alert-route.test.ts and route-scopes.test.ts pass",
+            "no-loss-matrix.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. Create routes/disk-alert.ts on the routes/github-quota.ts template: HttpRouter.add('GET', '/api/disk-alert', httpHandler(Effect.sync(() => jsonResponse(getDiskAlertSnapshot())))) exported as diskAlertRouteLayer; add it to server.ts beside githubQuotaRouteLayer. Add { method: 'GET', path: '/api/disk-alert', scope: 'read:state' } to ROUTE_SCOPES with a PAN-5093 comment, and the no-loss-matrix row { surface: 'GET /api/disk-alert', kind: 'http', disposition: 'READ', door: 'getDiskAlertSnapshot (PAN-5093): ...' }. If the no-loss-matrix test file lives elsewhere, run the test that imports no-loss-matrix.ts."
+        },
+        "items": [
+          {
+            "id": "disk-alert-route.ac1",
+            "title": "GET /api/disk-alert returns HTTP 200 with the JSON snapshot getDiskAlertSnapshot() returns (mocked in the test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "disk-alert-route.ac2",
+            "title": "The route-scope lookup for GET /api/disk-alert returns 'read:state', so a paired phone with read:state is accepted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "disk-alert-route.ac3",
+            "title": "tests/unit/lib/overdeck/no-loss-matrix.ts contains a 'GET /api/disk-alert' row and the no-loss matrix test passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "desktop-card",
+        "title": "Show the disk alert as a Needs-you card on the desktop dashboard",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-06T17:21:03Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5093",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/diskAlert.ts",
+            "src/dashboard/frontend/src/lib/useDecisions.ts",
+            "src/dashboard/frontend/src/lib/pendingInput.ts",
+            "src/dashboard/frontend/src/components/DiskAlertCard.tsx",
+            "src/dashboard/frontend/src/components/DecisionsPanel.tsx",
+            "src/dashboard/frontend/src/components/__tests__/DiskAlertCard.test.tsx",
+            "src/dashboard/frontend/src/lib/__tests__/useDecisions.test.ts",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/__tests__/DiskAlertCard.test.tsx src/lib/__tests__/useDecisions.test.ts src/components/__tests__/DecisionsPanel.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "DiskAlertCard, useDecisions and DecisionsPanel tests pass",
+            "typecheck completes without errors",
+            "lint (including lint:circular) passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4",
+            "FR-6"
+          ],
+          "acJustification": "Six ACs: the failed-refetch retention case came from plan critique and is a separate behavior from rendering and grouping."
+        },
+        "narrative": {
+          "Action": "PRD WI-6 (revised after critique round 1). Add lib/diskAlert.ts (DISK_ALERT_QUERY_KEY, fetchDiskAlert via fetchWithTimeout('/api/disk-alert') that THROWS on a non-ok response or network error, so React Query keeps the last successful snapshot; must not import useDecisions). In useDecisions.ts: Decision gains diskAlert?: DiskAlertSnapshot; add exported diskAlertDecisions(snapshot) (none at ok or null; id 'disk-alert', source 'agent', label 'Disk low'/'Disk critical', kinds ['diskLow'] or ['diskCritical'], since = snapshot.since ?? checkedAt ?? '', blocking at critical); add 'diskCritical' to BLOCKING_KINDS; add a useQuery with refetchInterval 10_000 and retry: false, and include its rows before the sort and in the useMemo deps. pendingInput.ts: add the two kinds and labels 'Disk space low'/'Disk space critical'. DiskAlertCard.tsx (decisions.module.css styles, data-testid disk-alert-card): free-space line per the PRD, holder rows (label + GiB to one decimal), 'Measuring space holders…' while measuring, 'Some sizes timed out.' when incomplete, and an Open Resources button using pushState('/resources') + a synthetic popstate. DecisionsPanel: Group checks d.diskAlert before d.mcpSignIn; the panel renders disk decisions first in their own Group titled 'System' with hint \"Overdeck's machine needs attention\" and excludes them from 'Blocking work' and 'Waiting'. Add src/components/__tests__/DiskAlertCard.test.tsx to scripts/frontend-test-subset.txt in sorted position."
+        },
+        "items": [
+          {
+            "id": "desktop-card.ac1",
+            "title": "diskAlertDecisions returns [] for null and level ok, one non-blocking 'diskLow' decision for warning, and one blocking 'diskCritical' decision for critical",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "desktop-card.ac2",
+            "title": "DiskAlertCard renders the free-space line, one row per holder, 'Measuring space holders…' while measuring and 'Some sizes timed out.' when incomplete",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "desktop-card.ac3",
+            "title": "When Open Resources is clicked, window.location.pathname becomes '/resources'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "desktop-card.ac4",
+            "title": "DecisionsPanel renders data-testid 'disk-alert-card' inside a group titled 'System', renders no Answer button for it, and a critical disk decision does not appear under 'Blocking work'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "desktop-card.ac5",
+            "title": "scripts/frontend-test-subset.txt contains the line 'src/components/__tests__/DiskAlertCard.test.tsx'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "desktop-card.ac6",
+            "title": "Given /api/disk-alert first returns a warning snapshot and the next refetch rejects, useDecisions still returns the 'diskLow' decision",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "phone-line",
+        "title": "Show the disk alert as a read-only line in the phone Needs-you list",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-06T17:21:03Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5093",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/mobile/MobileNeedsYou.tsx",
+            "src/dashboard/frontend/src/components/mobile/__tests__/MobileNeedsYou.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/mobile/__tests__/MobileNeedsYou.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "MobileNeedsYou.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. In MobileNeedsYou.tsx ReadOnlyAction, before the mcpSignIn branch: if decision.diskAlert, render a muted paragraph with diskAlertPhoneText(snapshot): '<x> GiB free · biggest: <label> <y> GiB · free space on the desktop', omitting the 'biggest' part when holders are null or empty. No Open or Answer button for it."
+        },
+        "items": [
+          {
+            "id": "phone-line.ac1",
+            "title": "Given a warning snapshot with holders, MobileNeedsYou renders the text '4.1 GiB free · biggest: ~/.overdeck/transcript-preservation 53.0 GiB · free space on the desktop'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "phone-line.ac2",
+            "title": "Given a disk decision, MobileNeedsYou renders no Open button and no Answer button for that row, and with holders null the text omits the 'biggest' part",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document the disk alert in PIPELINE-GATES, the memory governor page and the push page",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-06T17:21:03Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5093",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/PIPELINE-GATES.md",
+            "configuration/memory-governor.mdx",
+            "configuration/push-notifications.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'Disk alert (PAN-5093)' docs/PIPELINE-GATES.md",
+            "grep -n 'disk_warn_gb' configuration/memory-governor.mdx",
+            "grep -n -i 'disk' configuration/push-notifications.mdx"
+          ],
+          "expected_outputs": [
+            "each grep prints at least one matching line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-5",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. docs/PIPELINE-GATES.md: add '### Disk alert (PAN-5093)' right after '### Disk-low hold (PAN-4961)' covering placement (primary dashboard, 30 s statfs, not behind the Deacon freeze), levels and the 0.5 GiB margin, the push (kind failed, one per crossing), the Needs-you item (diskLow, blocking diskCritical), read-only holders measured once per crossing, GET /api/disk-alert, and that it is separate from the 10 GiB workspace floor and the BuildKit prune. configuration/memory-governor.mdx: add '## Disk alert' with both keys, defaults, the inverted-pair fallback and the YAML example from the PRD. configuration/push-notifications.mdx: extend the Failed row of 'What you get' with the disk alert and add one sentence under 'Pause and notification types' that disk alerts follow the Failures switch."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "docs/PIPELINE-GATES.md contains a '### Disk alert (PAN-5093)' section placed after '### Disk-low hold (PAN-4961)' that names resources.disk_warn_gb, resources.disk_critical_gb and GET /api/disk-alert",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "configuration/memory-governor.mdx contains a '## Disk alert' section with a YAML example showing disk_warn_gb: 5 and disk_critical_gb: 2",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "configuration/push-notifications.mdx contains low disk space in the Failed row of 'What you get' and a sentence stating that disk alerts follow the Failures switch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "config-keys",
+        "to": "alert-service",
+        "type": "blocks"
+      },
+      {
+        "from": "alert-core",
+        "to": "holders",
+        "type": "blocks"
+      },
+      {
+        "from": "alert-core",
+        "to": "alert-service",
+        "type": "blocks"
+      },
+      {
+        "from": "holders",
+        "to": "alert-service",
+        "type": "blocks"
+      },
+      {
+        "from": "alert-service",
+        "to": "disk-alert-route",
+        "type": "blocks"
+      },
+      {
+        "from": "alert-core",
+        "to": "desktop-card",
+        "type": "blocks"
+      },
+      {
+        "from": "desktop-card",
+        "to": "phone-line",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
