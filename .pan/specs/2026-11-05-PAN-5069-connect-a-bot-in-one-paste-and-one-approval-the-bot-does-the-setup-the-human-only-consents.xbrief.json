@@ -4,17 +4,17 @@
     "created": "2026-11-05T23:19:59Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5069: Connect a bot in one paste and one approval: the bot does the setup, the human only consents",
-    "updated": "2026-11-05T23:25:05.698Z"
+    "updated": "2026-11-05T23:26:17.706Z"
   },
   "plan": {
     "id": "pan-5069",
     "title": "Connect a bot in one paste and one approval: the bot does the setup, the human only consents",
-    "status": "proposed",
+    "status": "running",
     "uid": "c7bfcff2-e04c-4567-be55-3a036926a9ca",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-05T23:19:59Z",
-    "updated": "2026-11-05T23:25:05.698Z",
+    "updated": "2026-11-05T23:26:17.706Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5069",
@@ -939,5 +939,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
