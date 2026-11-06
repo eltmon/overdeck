@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5083",
   "created": "2026-11-06T03:58:56.829Z",
-  "updated": "2026-11-06T04:07:47.546Z",
+  "updated": "2026-11-06T04:07:59.564Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -14,6 +14,11 @@
       "claimedBy": "agent-pan-5083",
       "claimedAt": "2026-11-06T03:58:56.829Z",
       "doneAt": "2026-11-06T04:07:47.546Z"
+    },
+    "mcp-classifier": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5083",
+      "claimedAt": "2026-11-06T04:07:59.564Z"
     }
   }
 }
