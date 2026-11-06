@@ -4,17 +4,17 @@
     "created": "2026-11-06T03:56:48Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5084: Telemetry: CI runs, test homes and throwaway VMs report as new installs (5,818 of 5,824 ids are one-day ghosts)",
-    "updated": "2026-11-06T04:09:18.328Z"
+    "updated": "2026-11-06T04:10:21.405Z"
   },
   "plan": {
     "id": "pan-5084",
     "title": "Telemetry: CI runs, test homes and throwaway VMs report as new installs (5,818 of 5,824 ids are one-day ghosts)",
-    "status": "proposed",
+    "status": "running",
     "uid": "8e55ea6d-79e4-4541-85a9-4c625e7a485d",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-06T03:56:48Z",
-    "updated": "2026-11-06T04:09:18.328Z",
+    "updated": "2026-11-06T04:10:21.405Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5084",
@@ -901,5 +901,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
