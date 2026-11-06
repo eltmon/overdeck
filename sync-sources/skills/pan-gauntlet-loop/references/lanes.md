@@ -35,6 +35,7 @@ refuse the wrong move; "Skill" means the orchestrator enforces it.
 | V23 | Push egress blocked by a tool reviewer → `BLOCKED … push`, supervisor pushes | Skill (restated in the lane contract as "report blocked, do not stop working") |
 | V24 | A critic on another machine (`--machine`) judges only a pushed commit | Door: the owner fetches `origin` and refuses with 400 when the judged commit is not there |
 | V25 | Steer a lane on another machine as `@<machine>/<name>` | Skill: `pan tell conv-<name>` reaches only lanes on this machine; `pan lane list` shows the machine |
+| V26 | Check the disk floor before every launch wave and every self-made worktree; reap superseded lanes before the next iteration | Door: `pan lane start` refuses below the floor (507 `disk-low`); `pan lane list --reapable`; `pan lane disk-check` |
 
 ## The COMMON-brief pattern
 
