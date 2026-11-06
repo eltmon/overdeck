@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5100",
   "created": "2026-11-06T23:08:04.192Z",
-  "updated": "2026-11-06T23:41:44.035Z",
+  "updated": "2026-11-06T23:46:54.801Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -40,9 +40,10 @@
       "doneAt": "2026-11-06T23:41:38.437Z"
     },
     "wi5-request-observer": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5100",
-      "claimedAt": "2026-11-06T23:41:44.034Z"
+      "claimedAt": "2026-11-06T23:41:44.034Z",
+      "doneAt": "2026-11-06T23:46:54.800Z"
     }
   }
 }
