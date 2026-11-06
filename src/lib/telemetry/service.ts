@@ -14,6 +14,14 @@ const DEFAULT_POSTHOG_HOST = 'https://us.i.posthog.com';
 const SHUTDOWN_TIMEOUT_MS = 2_000;
 const FLAG_TIMEOUT_MS = 500;
 
+/** PAN-5100: the PostHog key and host this install sends to, shared with the phone's client config. */
+export function resolvePostHogTarget(): { key: string; host: string } {
+  return {
+    key: process.env.POSTHOG_API_KEY ?? DEFAULT_POSTHOG_API_KEY,
+    host: process.env.POSTHOG_HOST ?? DEFAULT_POSTHOG_HOST,
+  };
+}
+
 export type AnalyticsClientType = 'cli' | 'server';
 
 export interface AnalyticsServiceOptions {
@@ -228,10 +236,11 @@ export class AnalyticsService {
     if (this.client) return this.client;
 
     try {
+      const target = resolvePostHogTarget();
       this.client = new PostHog(
-        process.env.POSTHOG_API_KEY ?? DEFAULT_POSTHOG_API_KEY,
+        target.key,
         {
-          host: process.env.POSTHOG_HOST ?? DEFAULT_POSTHOG_HOST,
+          host: target.host,
           enableExceptionAutocapture: false,
         },
       );
