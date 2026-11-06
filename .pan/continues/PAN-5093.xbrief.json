@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5093",
   "created": "2026-11-06T17:35:39.830Z",
-  "updated": "2026-11-06T18:40:29.182Z",
+  "updated": "2026-11-06T19:19:40.392Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -56,6 +56,10 @@
       "claimedBy": "agent-pan-5093",
       "claimedAt": "2026-11-06T18:38:21.050Z",
       "doneAt": "2026-11-06T18:40:29.181Z"
+    },
+    "config-keys.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-06T19:19:40.392Z"
     }
   }
 }
