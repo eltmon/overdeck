@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5094",
   "created": "2026-11-06T17:38:04.566Z",
-  "updated": "2026-11-06T18:21:26.932Z",
+  "updated": "2026-11-06T18:21:41.659Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -44,6 +44,11 @@
       "claimedBy": "agent-pan-5094",
       "claimedAt": "2026-11-06T18:09:56.552Z",
       "doneAt": "2026-11-06T18:21:26.932Z"
+    },
+    "list-reapable": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5094",
+      "claimedAt": "2026-11-06T18:21:41.659Z"
     }
   }
 }
