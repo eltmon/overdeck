@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5069",
   "created": "2026-11-05T23:26:20.599Z",
-  "updated": "2026-11-06T00:02:09.222Z",
+  "updated": "2026-11-06T00:02:23.319Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -183,6 +183,10 @@
     "a7-resumable-signin.ac3": {
       "status": "completed",
       "doneAt": "2026-11-06T00:02:09.222Z"
+    },
+    "a7-resumable-signin.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-06T00:02:23.318Z"
     }
   }
 }
