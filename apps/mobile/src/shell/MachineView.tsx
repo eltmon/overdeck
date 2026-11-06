@@ -1,8 +1,8 @@
 /**
  * The phone screens for the current machine (PAN-4837 FR-8, D-9). `MobileApp` runs unchanged; the
  * channel shims carry its requests. The query client mirrors the frontend's `main.tsx` options. The
- * frontend's boot-time settings and theme reconciles and telemetry are not run: they read admin
- * routes (PAN-4835 H-4).
+ * frontend's boot-time settings and theme reconciles are not run: they read admin routes (PAN-4835
+ * H-4). Telemetry boots from the phone-readable client config instead (PAN-5100).
  */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
@@ -11,6 +11,8 @@ import { ImageLightboxHost } from '../../../../src/dashboard/frontend/src/compon
 import { DialogProvider } from '../../../../src/dashboard/frontend/src/components/DialogProvider';
 import MobileApp from '../../../../src/dashboard/frontend/src/components/mobile/MobileApp';
 import { installQueryRecovery } from '../../../../src/dashboard/frontend/src/lib/queryRecovery';
+import { currentMachineId } from './store';
+import { bootPhoneTelemetry } from './telemetry';
 import { UpdatingBanner } from './UpdatingBanner';
 
 function isNetworkError(error: unknown): boolean {
@@ -45,6 +47,10 @@ interface MachineViewProps {
 export function MachineView({ label, onMachines }: MachineViewProps) {
   const [queryClient] = useState(createQueryClient);
   useEffect(() => installQueryRecovery(queryClient), [queryClient]);
+  useEffect(() => {
+    const id = currentMachineId();
+    if (id) void bootPhoneTelemetry({ environmentId: id });
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>
