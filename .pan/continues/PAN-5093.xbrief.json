@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5093",
   "created": "2026-11-06T17:35:39.830Z",
-  "updated": "2026-11-06T19:29:59.563Z",
+  "updated": "2026-11-06T19:30:26.131Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -156,6 +156,10 @@
     "desktop-card.ac4": {
       "status": "completed",
       "doneAt": "2026-11-06T19:29:59.563Z"
+    },
+    "desktop-card.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-06T19:30:26.131Z"
     }
   }
 }
