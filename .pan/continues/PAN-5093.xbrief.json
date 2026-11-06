@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5093",
   "created": "2026-11-06T17:35:39.830Z",
-  "updated": "2026-11-06T19:25:43.711Z",
+  "updated": "2026-11-06T19:26:05.093Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -116,6 +116,10 @@
     "alert-service.ac3": {
       "status": "completed",
       "doneAt": "2026-11-06T19:25:43.711Z"
+    },
+    "alert-service.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-06T19:26:05.093Z"
     }
   }
 }
