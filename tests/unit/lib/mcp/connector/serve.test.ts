@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { createServer, type Server } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -21,6 +22,7 @@ import {
   startConnectorHttp,
 } from '../../../../../src/lib/mcp/connector/serve.js';
 import { ALL_TOOLS } from '../../../../../src/lib/mcp/server.js';
+import { McpUsageTelemetry } from '../../../../../src/lib/telemetry/mcp.js';
 
 const LOCAL_TOKEN = `odl_${'a'.repeat(64)}`;
 const ALL_SCOPES = ['read:state', 'read:conversations', 'tell', 'operate'];
@@ -38,7 +40,7 @@ function fakeApi(): DashboardApi & { calls: Array<{ method: DashboardApiMethod; 
 
 let close: (() => Promise<void>) | null = null;
 
-async function start(scopes = ALL_SCOPES) {
+async function start(scopes = ALL_SCOPES, usage?: McpUsageTelemetry) {
   const api = fakeApi();
   const http = await startConnectorHttp({
     port: 0,
@@ -46,6 +48,7 @@ async function start(scopes = ALL_SCOPES) {
     api,
     scopes,
     health: () => ({ ok: true, machine: 'studio', route: 'direct' }),
+    ...(usage ? { usage } : {}),
   });
   close = http.close;
   const base = `http://127.0.0.1:${http.port}`;
@@ -177,6 +180,60 @@ describe('serveConnectorStdio', () => {
     const names = messages[0]?.result?.tools.map((tool) => tool.name) ?? [];
     expect(names).toContain('list_conversations');
     expect(names).not.toContain('list_machines');
+  });
+});
+
+describe('connector usage telemetry (PAN-5083 W-7)', () => {
+  const originalHome = process.env.OVERDECK_HOME;
+  let home: string;
+  const initialize = (name: string) =>
+    ({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-11-25', capabilities: {}, clientInfo: { name, version: '1.0.0' } } });
+
+  beforeEach(async () => {
+    home = await mkdtemp(join(tmpdir(), 'connector-telemetry-'));
+    process.env.OVERDECK_HOME = home;
+  });
+
+  afterEach(async () => {
+    if (originalHome === undefined) delete process.env.OVERDECK_HOME;
+    else process.env.OVERDECK_HOME = originalHome;
+    await rm(home, { recursive: true, force: true });
+  });
+
+  function tracked() {
+    const capture = vi.fn();
+    return { capture, usage: new McpUsageTelemetry({ analytics: () => ({ capture }), enabled: () => true }) };
+  }
+
+  it('records an HTTP initialize as connector_http / connector and writes no ledger', async () => {
+    const { capture, usage } = tracked();
+    const { rpc } = await start(ALL_SCOPES, usage);
+    expect((await rpc(initialize('hermes-agent'))).status).toBe(200);
+    await usage.settled();
+
+    expect(capture.mock.calls).toEqual([
+      ['mcp_session_seen', { mcp_surface: 'connector_http', mcp_protocol: '2025-11-25', mcp_client: 'hermes', mcp_auth: 'connector' }],
+    ]);
+    expect(existsSync(join(home, 'telemetry-mcp-seen.json'))).toBe(false);
+  });
+
+  it('records a stdio initialize as connector_stdio and writes no ledger', async () => {
+    const { capture, usage } = tracked();
+    const stdin = new PassThrough();
+    const stdout = new PassThrough();
+    const lines: string[] = [];
+    stdout.on('data', (chunk: Buffer) => lines.push(...chunk.toString('utf8').split('\n').filter(Boolean)));
+    const done = serveConnectorStdio({ api: fakeApi(), scopes: ALL_SCOPES, stdin, stdout, usage });
+    stdin.write(`${JSON.stringify(initialize('openclaw'))}\n`);
+    await vi.waitFor(() => expect(lines.length).toBeGreaterThan(0));
+    stdin.end();
+    await done;
+    await usage.settled();
+
+    expect(capture.mock.calls).toEqual([
+      ['mcp_session_seen', { mcp_surface: 'connector_stdio', mcp_protocol: '2025-11-25', mcp_client: 'openclaw', mcp_auth: 'connector' }],
+    ]);
+    expect(existsSync(join(home, 'telemetry-mcp-seen.json'))).toBe(false);
   });
 });
 

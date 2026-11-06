@@ -1,0 +1,742 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-06T03:50:45Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5083: Telemetry: record which MCP protocol revisions, clients and surfaces are used (PostHog)",
+    "updated": "2026-11-06T03:58:42.483Z"
+  },
+  "plan": {
+    "id": "pan-5083",
+    "title": "Telemetry: record which MCP protocol revisions, clients and surfaces are used (PostHog)",
+    "status": "running",
+    "uid": "e4a9a572-454e-487a-99eb-a2ce9ed6d292",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-06T03:50:45Z",
+    "updated": "2026-11-06T03:58:42.483Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5083",
+        "label": "PAN-5083",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5082",
+        "label": "PAN-5082",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "telemetry",
+      "mcp",
+      "posthog",
+      "privacy"
+    ],
+    "narratives": {
+      "Problem": "PostHog has no MCP event, so the operator cannot see which MCP protocol revisions, clients and surfaces use Overdeck, and cannot time the 2026-07-28 migration (PAN-5082) on data.",
+      "Proposal": "Add two closed-enum events, mcp_session_seen (surface, requested protocol, bucketed client, credential kind) and mcp_tool_called (surface, client, tool; presence per day), through one tracker module src/lib/telemetry/mcp.ts with a pure classifier. HTTP surfaces observe the raw body and header before the SDK transport (so refused 2026-07-28 requests count); stdio surfaces observe via an onmessage accessor; tool calls are recorded in server.ts. Dedupe per UTC day in memory plus a ~/.overdeck ledger for dashboard and stdio surfaces. Contract, docs tables, privacy and drift tests, user docs and PostHog insight definitions ship together.",
+      "NonGoals": "- Creating the PostHog dashboard inside the PR (post-merge operator step)\n- Moving to MCP SDK v2 or answering 2026-07-28 requests (PAN-5082)\n- Telemetry for the Channels bridge MCP server (src/lib/channels/overdeck-bridge.ts)\n- Per-call counts, latency, arguments, results or error rates for tools\n- Recording unauthenticated or refused (401/403/503) requests\n- Sending any raw client name, version, title, URL, token, token id, OAuth client id, caller key, IP, path or tool argument\n- Telemetry from the services/ Workers or the phone app\n- Writing any new file under ~/.overdeck from connector surfaces"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Observe HTTP surfaces before the SDK transport and stdio via an onmessage accessor, through one shared tracker module, instead of only inside server.ts",
+        "rationale": "SDK 1.30.1 validateProtocolVersion answers 400 for a 2026-07-28 header before any server hook, so a server.ts-only hook would never see the clients the migration decision depends on"
+      },
+      {
+        "summary": "mcp_session_seen uses the requested protocolVersion from initialize, else the _meta key, else the MCP-Protocol-Version header",
+        "rationale": "The SDK silently answers unsupported requests with 2025-11-25; the requested value is the migration signal"
+      },
+      {
+        "summary": "mcp_auth domain is agent_token, oauth, access_token, connector; device and none dropped",
+        "rationale": "/mcp and pan mcp serve refuse device credentials and unauthenticated requests before observation, so device and none could never be sent; plain Copy-MCP-URL tokens need access_token"
+      },
+      {
+        "summary": "mcp_client adds opencode and kimi",
+        "rationale": "They are Overdeck-managed ACP harnesses that spawn pan mcp serve and would otherwise all read other"
+      },
+      {
+        "summary": "Dedupe key includes mcp_auth",
+        "rationale": "Keeps mcp_auth accurate at a bounded cost of at most four events per surface/client/protocol per day"
+      },
+      {
+        "summary": "Persist dedupe in ~/.overdeck/telemetry-mcp-seen.json for dashboard and stdio surfaces; connector surfaces dedupe in memory only",
+        "rationale": "pan mcp serve runs one process per agent session, so memory-only dedupe would send one event per session; the connector adds no new file under ~/.overdeck"
+      },
+      {
+        "summary": "Connector surfaces emit telemetry",
+        "rationale": "The connector already runs inside the CLI telemetry lifecycle (cli_command_run), which applies the same opt-out and install id"
+      },
+      {
+        "summary": "mcp_tool_called is presence-per-day with no count_bucket",
+        "rationale": "A correct daily count needs cross-process merging, restarts would send partial counts, and count_bucket tops at 11+; install-days per tool and client is the coarse signal"
+      },
+      {
+        "summary": "The PostHog MCP usage dashboard is delivered as insight definitions in docs/TELEMETRY.md; creating it in PostHog is a post-merge operator step",
+        "rationale": "Creating it needs PostHog write access the work agent lacks, and it has no data until the events ship"
+      }
+    ],
+    "items": [
+      {
+        "id": "contract-schema",
+        "title": "Add mcp_session_seen and mcp_tool_called to the telemetry contract and docs/TELEMETRY.md tables",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-06T03:50:45Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-5083",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/telemetry.ts",
+            "docs/TELEMETRY.md",
+            "tests/unit/lib/telemetry/mcp-domains.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/telemetry-docs.test.ts tests/unit/lib/telemetry/mcp-domains.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "telemetry-docs.test.ts and mcp-domains.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ],
+          "foundationFor": [
+            "mcp-classifier",
+            "mcp-tracker",
+            "server-tool-hook",
+            "dashboard-route-labels",
+            "stdio-serve-labels",
+            "connector-labels",
+            "mcp-privacy-test",
+            "mcp-docs"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-5083.md W-1. Append the two event names after relay_usage_sampled; add TELEMETRY_MCP_TOOLS (every ALL_TOOLS name, alphabetical); add domains mcp_auth (agent_token, oauth, access_token, connector), mcp_client (claude_code, codex, cursor, vscode, chatgpt, grok, hermes, openclaw, gemini, opencode, kimi, overdeck_connector, other), mcp_protocol (2026-07-28, 2025-11-25, 2025-06-18, 2025-03-26, 2024-11-05, 2024-10-07, other), mcp_surface (dashboard_http, public_http, stdio, connector_http, connector_stdio), mcp_tool; add catalog rows and exported types (McpSessionSeenProperties, McpToolCalledProperties, TelemetryMcpSurface/Protocol/Client/Auth/Tool). Add the matching event and domain rows to docs/TELEMETRY.md. New mcp-domains.test.ts asserts mcp_tool equals ALL_TOOLS names sorted and connectorTools() names are a subset."
+        },
+        "items": [
+          {
+            "id": "contract-schema.ac1",
+            "title": "Given the contract change, when tests/unit/telemetry-docs.test.ts parses docs/TELEMETRY.md, then documentedCatalog and documentedDomains equal the contract, including the two new event rows and five new domain rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contract-schema.ac2",
+            "title": "TELEMETRY_EVENT_CATALOG.mcp_session_seen returns exactly the properties mcp_surface, mcp_protocol, mcp_client, mcp_auth and mcp_tool_called exactly mcp_surface, mcp_client, mcp_tool",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contract-schema.ac3",
+            "title": "Given ALL_TOOLS gains or loses a tool, when mcp-domains.test.ts runs, then it fails until TELEMETRY_PROPERTY_DOMAINS.mcp_tool equals the sorted ALL_TOOLS names",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contract-schema.ac4",
+            "title": "TELEMETRY_PROPERTY_DOMAINS.mcp_auth contains exactly agent_token, oauth, access_token, connector, and mcp_client contains opencode and kimi",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mcp-classifier",
+        "title": "Add the pure MCP session classifier src/lib/telemetry/mcp-classify.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-06T03:50:45Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5083",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/telemetry/mcp-classify.ts",
+            "tests/unit/lib/telemetry/mcp-classify.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/telemetry/mcp-classify.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "mcp-classify.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-5083.md W-2 and decisions D-2, D-3, D-4, D-5. Exports MCP_META_PROTOCOL_KEY, MCP_META_CLIENT_KEY, bucketMcpProtocol, bucketMcpClient (the ordered substring table in D-4, first match wins; non-string or >200 chars -> other), mcpAuthForToken (oauthClientId -> oauth, else agentId -> agent_token, else access_token), mcpSessionFacts (initialize -> params.protocolVersion + clientInfo.name; else _meta keys with header fallback; else nothing; batches flattened; never throws), mcpRequestClient. Imports only types from @overdeck/contracts, nothing from the MCP SDK."
+        },
+        "items": [
+          {
+            "id": "mcp-classifier.ac1",
+            "title": "bucketMcpClient returns claude_code for 'claude-code', codex for 'codex-mcp-client', cursor for 'cursor-vscode', vscode for 'Visual Studio Code' and other for a 201-character name or the number 42",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-classifier.ac2",
+            "title": "mcpSessionFacts returns [] for a tools/call that carries only an MCP-Protocol-Version header and no _meta keys",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-classifier.ac3",
+            "title": "mcpSessionFacts returns { protocol: '2026-07-28', client: undefined } for a request whose params._meta holds only io.modelcontextprotocol/protocolVersion",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-classifier.ac4",
+            "title": "mcpSessionFacts returns one fact per initialize in a JSON-RPC batch array and returns [] for non-object input",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-classifier.ac5",
+            "title": "bucketMcpProtocol returns other for '2027-01-01' and the exact value for each of the six listed revisions",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mcp-tracker",
+        "title": "Add the deduping usage tracker src/lib/telemetry/mcp.ts with the daily usage ledger",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-06T03:50:45Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-5083",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/telemetry/mcp.ts",
+            "src/lib/telemetry/service.ts",
+            "tests/unit/lib/telemetry/mcp-telemetry.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run tests/unit/lib/telemetry/mcp-telemetry.test.ts tests/unit/lib/telemetry/service.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors (no new import cycle)",
+            "mcp-telemetry.test.ts and service.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-8",
+            "NFR-2",
+            "NFR-3",
+            "NFR-5"
+          ],
+          "foundationFor": [
+            "server-tool-hook",
+            "dashboard-route-labels",
+            "stdio-serve-labels",
+            "connector-labels",
+            "mcp-privacy-test"
+          ],
+          "parallelSafeReason": "Touches only the new src/lib/telemetry/mcp.ts, one export keyword in service.ts and its own new test file; no other item edits those files."
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-5083.md W-3 and decisions D-6, D-7, D-10, D-11, D-12. Export telemetryBlockedForProcess from service.ts. McpUsageTelemetry with injectable analytics/now/enabled/ledgerFile; synchronous never-throwing noteRequest and noteToolCall; in-memory key set cleared on UTC day change; caller-key -> client map capped at 256; persisted surfaces (dashboard_http, public_http, stdio) load ~/.overdeck/telemetry-mcp-seen.json once per day and write it tmp+rename through a serialized promise chain tracked by trackAnalyticsTask; connector surfaces memory only. mcpTelemetryEnabled default. observeMcpTransport installs an onmessage accessor before connect. Async fs only (node:fs/promises). observeMcpTransport setter rule: when the assigned value is not a function, store it unwrapped; the getter returns whatever was stored."
+        },
+        "items": [
+          {
+            "id": "mcp-tracker.ac1",
+            "title": "Given two identical initialize messages on one UTC day, when noteRequest runs twice, then exactly one mcp_session_seen capture is emitted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-tracker.ac2",
+            "title": "Given a key already written to the ledger file that day, when a new McpUsageTelemetry on the same file notes it, then no capture is emitted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-tracker.ac3",
+            "title": "Given a connector_http or connector_stdio label, when a session is noted, then a capture is emitted and the ledger file is never created",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-tracker.ac4",
+            "title": "Given OVERDECK_TELEMETRY=0 with VITEST and NODE_ENV cleared, when a tracker using the default enabled notes a session, then no capture is emitted and no ledger file is created",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-tracker.ac5",
+            "title": "Given a throwing analytics client, when noteRequest and noteToolCall run, then neither throws",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "server-tool-hook",
+        "title": "Record mcp_tool_called in the tools/call handler of src/lib/mcp/server.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-06T03:50:45Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5083",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/mcp/server.ts",
+            "tests/unit/lib/mcp/usage-telemetry.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run tests/unit/lib/mcp/usage-telemetry.test.ts tests/unit/lib/mcp/visibility.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors",
+            "usage-telemetry.test.ts and visibility.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-5083.md W-4. createOverdeckMcpServer gains an optional third argument usage?: { label: McpUsageLabel; telemetry?: McpUsageTelemetry }. After a successful byName lookup in the CallToolRequestSchema handler and before tool.run, call (usage.telemetry ?? mcpUsageTelemetry).noteToolCall(usage.label, tool.name, request.params) inside try/catch, only when usage is given. Update the module header comment to list ../telemetry/mcp.js. tests/unit/lib/mcp/harness.ts stays unchanged."
+        },
+        "items": [
+          {
+            "id": "server-tool-hook.ac1",
+            "title": "Given a server created with a label and an injected tracker, when a client calls list_conversations twice, then exactly one mcp_tool_called capture with mcp_tool list_conversations is emitted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-tool-hook.ac2",
+            "title": "Given a server created without the usage argument, when a tool is called, then no capture is emitted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-tool-hook.ac3",
+            "title": "Given a tools/call for an unknown tool name, when it is handled, then the server returns the existing Unknown tool error and emits no capture",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dashboard-route-labels",
+        "title": "Label and observe dashboard /mcp requests before the SDK transport",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-06T03:50:45Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5083",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/mcp.ts",
+            "src/dashboard/server/__tests__/mcp-route.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/__tests__/mcp-route.test.ts src/dashboard/server/__tests__/public-mcp-acceptance.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "mcp-route.test.ts and public-mcp-acceptance.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-5083.md W-5 and D-1, D-11. McpRouteDeps gains usage?: McpUsageTelemetry. After the credential checks build the label: surface public_http when isTailscaleFunnelRequest(headers) else dashboard_http; auth mcpAuthForToken(credential); callerKey credential.oauthClientId ?? credential.tokenId. In serveMcpRequest parse the body (skip on JSON error) and call usage.noteRequest(label, parsed, headers.get('mcp-protocol-version') ?? undefined) before transport.handleRequest; pass { label, telemetry: usage } to createOverdeckMcpServer. Refused requests (401/403/503) are never observed."
+        },
+        "items": [
+          {
+            "id": "dashboard-route-labels.ac1",
+            "title": "Given an initialize from clientInfo.name claude-code with protocolVersion 2025-11-25 and a plain token, when POST /mcp runs, then the tracker emits mcp_session_seen with dashboard_http, 2025-11-25, claude_code, access_token",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-route-labels.ac2",
+            "title": "Given a tools/list with header MCP-Protocol-Version 2026-07-28 and the _meta protocol key, when POST /mcp runs, then the response status is 400 and mcp_session_seen records mcp_protocol 2026-07-28",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-route-labels.ac3",
+            "title": "Given a request with no credential, when POST /mcp answers 401, then no capture is emitted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-route-labels.ac4",
+            "title": "Given an OAuth token over Tailscale Funnel with Public MCP enabled, when an initialize is posted, then mcp_session_seen records mcp_surface public_http and mcp_auth oauth",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stdio-serve-labels",
+        "title": "Label and observe pan mcp serve stdio messages",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-06T03:50:45Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5083",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/mcp.ts",
+            "tests/unit/cli/mcp.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/cli/mcp.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "tests/unit/cli/mcp.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-5083.md W-6. McpServeDeps gains usage?: McpUsageTelemetry. Create the StdioServerTransport first, build { surface: 'stdio', auth: mcpAuthForToken(record), callerKey: 'stdio' }, call observeMcpTransport(transport, label, usage) before server.connect, and pass { label, telemetry: usage } to createOverdeckMcpServer. Load the telemetry modules in the existing Promise.all dynamic import."
+        },
+        "items": [
+          {
+            "id": "stdio-serve-labels.ac1",
+            "title": "Given stdin carries an initialize written before the transport attaches, when runMcpServe serves it, then the injected tracker emits one mcp_session_seen with mcp_surface stdio",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stdio-serve-labels.ac2",
+            "title": "Given an agent token record, when runMcpServe serves an initialize, then mcp_auth is agent_token",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stdio-serve-labels.ac3",
+            "title": "The existing tools/list exchange in tests/unit/cli/mcp.test.ts still returns the full tool list",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "connector-labels",
+        "title": "Label and observe connector HTTP and stdio MCP traffic",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-06T03:50:45Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5083",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/mcp/connector/serve.ts",
+            "tests/unit/lib/mcp/connector/serve.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/mcp/connector/serve.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "connector serve.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-5083.md W-7 and D-7, D-8. startConnectorHttp and serveConnectorStdio inputs gain usage?: McpUsageTelemetry. HTTP: after JSON.parse call usage.noteRequest({ surface: 'connector_http', auth: 'connector', callerKey: 'connector_http' }, parsed, string header mcp-protocol-version) and pass the label to createOverdeckMcpServer. Stdio: create the transport, observeMcpTransport with { surface: 'connector_stdio', auth: 'connector', callerKey: 'connector_stdio' }, pass the label, then connect."
+        },
+        "items": [
+          {
+            "id": "connector-labels.ac1",
+            "title": "Given an HTTP initialize to the connector, when it is served, then mcp_session_seen records mcp_surface connector_http and mcp_auth connector",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "connector-labels.ac2",
+            "title": "Given a stdio initialize to the connector, when it is served, then mcp_session_seen records mcp_surface connector_stdio",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "connector-labels.ac3",
+            "title": "Given either connector surface records a session, then no telemetry-mcp-seen.json file exists under the test OVERDECK_HOME",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mcp-privacy-test",
+        "title": "Add the MCP telemetry privacy test",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-06T03:50:45Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-5083",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/lib/telemetry/mcp-telemetry-privacy.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/telemetry/mcp-telemetry-privacy.test.ts"
+          ],
+          "expected_outputs": [
+            "mcp-telemetry-privacy.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-5083.md W-8. Same style as tests/unit/lib/telemetry/github-telemetry-privacy.test.ts: mock posthog-node, config.js, install-id.js; real AnalyticsService('server'); temp OVERDECK_HOME; tracker with enabled () => true. Feed initialize with clientInfo { name 'claude-code-internal-zq7', version '2.1.293', title 'Claude Code', websiteUrl 'https://claude.com/claude-code' }, callerKey 'tok_secret_caller', and noteToolCall for send_message with arguments { conversation 'conv-private', message 'secret prompt' }. Delete VITEST and NODE_ENV in beforeEach and restore them in afterEach (AnalyticsService creates no client while telemetryBlockedForProcess() is true)."
+        },
+        "items": [
+          {
+            "id": "mcp-privacy-test.ac1",
+            "title": "Given the planted raw values, when the two captured payloads are serialized, then none contains internal-zq7, 2.1.293, Claude Code, claude.com, tok_secret_caller, conv-private, secret prompt, the host name, the user name or the temp home path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-privacy-test.ac2",
+            "title": "Given the captured payloads, when each mcp_* property value is checked, then it is a member of its TELEMETRY_PROPERTY_DOMAINS domain",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mcp-docs",
+        "title": "Document MCP telemetry and the PostHog MCP usage insights",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-06T03:50:45Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5083",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/TELEMETRY.md",
+            "configuration/telemetry.mdx",
+            "configuration/mcp.mdx",
+            ".overdeck/context/codebase/architecture.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/telemetry-docs.test.ts"
+          ],
+          "expected_outputs": [
+            "telemetry-docs.test.ts passes after the prose edits"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-5083.md W-9 and D-13. docs/TELEMETRY.md: new '## MCP events' section (surfaces, requested-protocol rule, 2026-07-28 recorded even when the SDK refuses it, client bucket table, auth mapping, dedupe and the telemetry-mcp-seen.json ledger, connector memory-only, mcp_tool_called presence-per-day) plus '### MCP usage dashboard (PostHog)' with three insights (unique installs weekly by mcp_protocol, mcp_client, mcp_surface) and the HogQL example from the PRD; add src/lib/telemetry/mcp.ts to Implementation boundaries. configuration/telemetry.mdx 'What is sent' bullet; configuration/mcp.mdx intro paragraph linking Telemetry; architecture.md telemetry bullet. Do not change the last-verified line."
+        },
+        "items": [
+          {
+            "id": "mcp-docs.ac1",
+            "title": "docs/TELEMETRY.md contains a '## MCP events' heading and the HogQL query selecting count(DISTINCT distinct_id) for event mcp_session_seen grouped by mcp_protocol",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-docs.ac2",
+            "title": "configuration/telemetry.mdx 'What is sent' contains a bullet naming MCP surface, protocol revision, client family and tool use, stating that client names, versions, tokens and tool arguments are never sent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-docs.ac3",
+            "title": "configuration/mcp.mdx states that telemetry records MCP surface, protocol revision and client family at most once a day and links to the Telemetry page",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "contract-schema",
+        "to": "mcp-classifier",
+        "type": "blocks"
+      },
+      {
+        "from": "mcp-classifier",
+        "to": "mcp-tracker",
+        "type": "blocks"
+      },
+      {
+        "from": "contract-schema",
+        "to": "mcp-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "mcp-tracker",
+        "to": "server-tool-hook",
+        "type": "blocks"
+      },
+      {
+        "from": "server-tool-hook",
+        "to": "dashboard-route-labels",
+        "type": "blocks"
+      },
+      {
+        "from": "server-tool-hook",
+        "to": "stdio-serve-labels",
+        "type": "blocks"
+      },
+      {
+        "from": "server-tool-hook",
+        "to": "connector-labels",
+        "type": "blocks"
+      },
+      {
+        "from": "mcp-tracker",
+        "to": "mcp-privacy-test",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "One event pipeline must land on every MCP surface at once, and the contract/docs drift test forces the contract and docs/TELEMETRY.md into the same change, so the touched subsystems (contracts, lib/telemetry, lib/mcp, dashboard server, cli, docs) cannot ship as separate issues.",
+      "canonicalFilename": "2026-11-06-PAN-5083-telemetry-record-which-mcp-protocol-revisions-clients-and-surfaces-are-used-posthog.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}

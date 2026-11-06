@@ -13,6 +13,9 @@
  *
  * stdout carries only JSON-RPC (NFR-6); every diagnostic goes to stderr.
  *
+ * The transport is observed for MCP usage telemetry before `connect`, so an
+ * `initialize` buffered on stdin is still seen (PAN-5083).
+ *
  * `src/cli/index.ts` imports this module at startup to register the verb, so
  * it imports only Commander types, `./mcp-oauth.js` (`pan mcp oauth`,
  * PAN-4945) and `./mcp-connector.js` (`pan mcp connector`, PAN-4950), each
@@ -20,6 +23,8 @@
  */
 import type { Readable, Writable } from 'node:stream';
 import type { Command } from 'commander';
+
+import type { McpUsageTelemetry } from '../../lib/telemetry/mcp.js';
 
 import { registerMcpConnectorCommands } from './mcp-connector.js';
 import { registerMcpOAuthCommands } from './mcp-oauth.js';
@@ -29,6 +34,8 @@ export interface McpServeDeps {
   stdin: Readable;
   stdout: Writable;
   stderr: (line: string) => void;
+  /** PAN-5083: MCP usage telemetry; defaults to the process tracker. */
+  usage?: McpUsageTelemetry;
 }
 
 const CREATE_HINT = 'pan token create mcp --scopes read:state,read:conversations,operate';
@@ -97,22 +104,35 @@ export async function runMcpServe(deps: McpServeDeps): Promise<number> {
     return 1;
   }
 
-  const [{ StdioServerTransport }, { getDashboardApiUrl }, { createFetchDashboardApi }, { createOverdeckMcpServer, hasAgentId }] = await Promise.all([
+  const [
+    { StdioServerTransport },
+    { getDashboardApiUrl },
+    { createFetchDashboardApi },
+    { createOverdeckMcpServer, hasAgentId },
+    { mcpUsageTelemetry, observeMcpTransport },
+    { mcpAuthForToken },
+  ] = await Promise.all([
     import('@modelcontextprotocol/sdk/server/stdio.js'),
     import('../../lib/config.js'),
     import('../../lib/mcp/dashboard-api.js'),
     import('../../lib/mcp/server.js'),
+    import('../../lib/telemetry/mcp.js'),
+    import('../../lib/telemetry/mcp-classify.js'),
   ]);
+  const usage = deps.usage ?? mcpUsageTelemetry;
+  const label = { surface: 'stdio', auth: mcpAuthForToken(record), callerKey: 'stdio' } as const;
   const server = createOverdeckMcpServer({
     api: createFetchDashboardApi({ baseUrl: getDashboardApiUrl(), token }),
     scopes: record.scopes,
     isAgent: hasAgentId(record),
-  });
+  }, undefined, { label, telemetry: usage });
   const closed = new Promise<void>((resolve) => {
     deps.stdin.once('end', resolve);
     deps.stdin.once('close', resolve);
   });
-  await server.connect(new StdioServerTransport(deps.stdin, deps.stdout));
+  const transport = new StdioServerTransport(deps.stdin, deps.stdout);
+  observeMcpTransport(transport, label, usage);
+  await server.connect(transport);
   await closed;
   await server.close();
   return 0;

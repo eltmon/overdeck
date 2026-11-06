@@ -120,6 +120,11 @@ file. The key is never shown in the Settings UI.
   category), phone pair and remove events, which route kind a link's channel
   uses and why it failed (at most one event per change), and an hourly bucket
   of relayed bytes
+- MCP: once a day per combination, which MCP surface, protocol revision, client
+  family (for example `claude_code` or `codex`) and credential kind was used,
+  and which Overdeck MCP tools each client family called (a connector that
+  restarts during the day can send a combination again). Client names,
+  versions, tokens and tool arguments are never sent.
 
 The overdeck.ai hosted services (account, directory and share) send no telemetry.
 

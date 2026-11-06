@@ -47,7 +47,8 @@ terminal backend (Herdr by default, tmux when `terminal.backend: tmux`).
   `config.ts`'s `resolveTelemetryState()` is the one door for effective
   on/off/`disabledBy`, combining the env override, config, and
   `environment.ts`'s CI/temporary-home auto-exclusion with `install-kind.ts`'s
-  per-process install kind (PAN-5084).
+  per-process install kind (PAN-5084). `mcp.ts` + `mcp-classify.ts` for MCP
+  usage (PAN-5083); HTTP surfaces observe before the SDK transport.
 - `agents.ts` is now a thin barrel over `src/lib/agents/` — `spawn.ts` (`spawnAgent`,
   `spawnRun`), `spawn-prep.ts` (`buildAgentLaunchConfig`, tier spawn params),
   `staffing.ts` (the single staffing resolver, PAN-2397), `resolve-tier.ts` +

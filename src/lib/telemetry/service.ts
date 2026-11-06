@@ -49,7 +49,7 @@ function getOverdeckVersion(): string {
   return cachedOverdeckVersion;
 }
 
-function telemetryBlockedForProcess(): boolean {
+export function telemetryBlockedForProcess(): boolean {
   return Boolean(process.env.VITEST) || process.env.NODE_ENV === 'test';
 }
 
