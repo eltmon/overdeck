@@ -64,8 +64,17 @@ function environmentQuote(value: string): string {
 
 /**
  * The unit text. Matches the hand-written host unit except for the quoted
- * absolute ExecStart. When the operator set `HERDR_CONFIG_PATH`, the unit
- * carries it (absolute), so the server reads the file Overdeck edits.
+ * absolute ExecStart and the two OOM properties. When the operator set
+ * `HERDR_CONFIG_PATH`, the unit carries it (absolute), so the server reads the
+ * file Overdeck edits.
+ *
+ * Every agent pane lives in this unit's cgroup. Under systemd's default
+ * `OOMPolicy=stop`, one OOM-killed pane process stops the whole unit and
+ * `KillMode=control-group` then kills every pane: on 2026-11-06 the kernel
+ * killed one 660 MB OBS browser process started from a pane and every
+ * conversation in every project died with it. `continue` lets only the killed
+ * process die. `ManagedOOMPreference=avoid` asks systemd-oomd to pick other
+ * cgroups first. Same fix as the tmux server unit (PAN-3539).
  */
 export function renderHerdrUnit(binary: string, session: string, configPath?: string): string {
   return [
@@ -75,6 +84,8 @@ export function renderHerdrUnit(binary: string, session: string, configPath?: st
     '[Service]',
     ...(configPath ? [`Environment=${environmentQuote(`HERDR_CONFIG_PATH=${configPath}`)}`] : []),
     `ExecStart=${systemdQuote(binary)} --session ${session} server`,
+    'OOMPolicy=continue',
+    'ManagedOOMPreference=avoid',
     'Restart=on-failure',
     'RestartSec=3',
     '',
