@@ -133,6 +133,68 @@ describe('ConnectorLink', () => {
     link.stop();
   });
 
+  it('reports the ChannelOpenError code of a refused direct probe (PAN-5069 A-7b)', async () => {
+    const { link } = setup({
+      relayRefusal: 'The relay needs the relay plan',
+      probe: async () => {
+        throw new ChannelOpenError('unknown-peer', 'unknown peer');
+      },
+    });
+    await link.connect();
+    expect(link.lastErrorCode()).toBe('unknown-peer');
+    link.stop();
+  });
+
+  it('reports no code for a plain Error', async () => {
+    const { link } = setup({
+      relayRefusal: 'The relay needs the relay plan',
+      probe: async () => {
+        throw new Error('boom');
+      },
+    });
+    await link.connect();
+    expect(link.lastErrorCode()).toBeNull();
+    link.stop();
+  });
+
+  it('keeps a machine refusal from either probe over a transport failure from the other', async () => {
+    const relayRefused = setup({
+      probe: async (url) => {
+        throw url.startsWith('rtc://') ? new ChannelOpenError('unreachable', 'ICE failed') : new ChannelOpenError('unknown-peer', 'unknown peer');
+      },
+    });
+    await relayRefused.link.connect();
+    expect(relayRefused.link.lastErrorCode()).toBe('unknown-peer');
+    relayRefused.link.stop();
+
+    const directRefused = setup({
+      probe: async (url) => {
+        throw url.startsWith('rtc://') ? new ChannelOpenError('identity-refused', 'refused') : new ChannelOpenError('timeout', 'timed out');
+      },
+    });
+    await directRefused.link.connect();
+    expect(directRefused.link.lastErrorCode()).toBe('identity-refused');
+    directRefused.link.stop();
+  });
+
+  it('clears the code after a later successful probe', async () => {
+    let refuse = true;
+    const { link } = setup({
+      relayRefusal: 'The relay needs the relay plan',
+      probe: async () => {
+        if (refuse) throw new ChannelOpenError('unknown-peer', 'unknown peer');
+        return fakeSocket();
+      },
+    });
+    await link.connect();
+    expect(link.lastErrorCode()).toBe('unknown-peer');
+    refuse = false;
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(link.lastErrorCode()).toBeNull();
+    expect(link.health().ok).toBe(true);
+    link.stop();
+  });
+
   it('backs off 1 s, 2 s, 4 s up to 60 s and resets after a success', async () => {
     let succeed = false;
     const { link, probes, order } = setup({ relayRefusal: 'no relay', probe: async () => (succeed ? fakeSocket() : failing()) });

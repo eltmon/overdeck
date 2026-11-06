@@ -23,7 +23,7 @@ import {
   writeAccount,
   writePairing,
 } from '../../../../../src/lib/mcp/connector/home.js';
-import { type ConnectorDeps, runConnectorLogout, runConnectorPair } from '../../../../../src/lib/mcp/connector/pair.js';
+import { type ConnectorDeps, pairWithMachine, runConnectorLogout, runConnectorPair } from '../../../../../src/lib/mcp/connector/pair.js';
 
 const ENV = '0f1e2d3c-4b5a-4978-8695-a4b3c2d1e0f9';
 const MACHINE_KEY = 'ab'.repeat(32);
@@ -264,6 +264,72 @@ describe('runConnectorPair', () => {
     const io = recordingIo();
     expect(await run(deps({ machines: [] }), io)).toBe(1);
     expect(io.err_.join('\n')).toContain('does not include machine');
+  });
+});
+
+describe('pairWithMachine outcome codes (PAN-5069 FR-4, FR-7)', () => {
+  const pair = (d: ConnectorDeps) => pairWithMachine({ pairingString, label: 'bot box', home, appVersion: '0.74.0' }, d);
+
+  it('returns pairing-code-refused when the direct dial refuses the code, without trying the relay', async () => {
+    await signIn();
+    const d = deps({
+      open: async () => {
+        throw new ChannelOpenError('pairing-refused', 'pairing id refused');
+      },
+    });
+    expect(await pair(d)).toEqual({
+      ok: false,
+      code: 'pairing-code-refused',
+      message: 'The machine refused the pairing code (it may have expired); ask for a new one in Connect a bot.',
+    });
+    expect(d.urls).toEqual([`rtc://${ENV}`]);
+    expect(await readPairing(home)).toBeNull();
+  });
+
+  it('returns relay-plan-needed when the direct dial fails and the relay is refused', async () => {
+    await signIn();
+    const d = deps({
+      relayRefusal: 'The relay needs the relay plan',
+      open: async () => {
+        throw new ChannelOpenError('unreachable', 'ICE failed');
+      },
+    });
+    expect(await pair(d)).toMatchObject({ ok: false, code: 'relay-plan-needed' });
+  });
+
+  it('returns machine-not-in-account for a machine the directory does not list, and machine-offline for an offline one', async () => {
+    await signIn();
+    expect(await pair(deps({ machines: [] }))).toMatchObject({ ok: false, code: 'machine-not-in-account' });
+    expect(await pair(deps({ machines: [{ ...MACHINE, online: false }] }))).toMatchObject({ ok: false, code: 'machine-offline' });
+  });
+
+  it('returns pairing-code-refused when the relay dial refuses the code, and machine-unreachable otherwise', async () => {
+    await signIn();
+    const refused = await pair(deps({
+      open: async (url) => {
+        throw url.startsWith('rtc://') ? new ChannelOpenError('unreachable', 'ICE failed') : new ChannelOpenError('pairing-refused', 'pairing id refused');
+      },
+    }));
+    expect(refused).toMatchObject({ ok: false, code: 'pairing-code-refused' });
+    const unreachable = await pair(deps({
+      open: async () => {
+        throw new ChannelOpenError('unreachable', 'ICE failed');
+      },
+    }));
+    expect(unreachable).toMatchObject({ ok: false, code: 'machine-unreachable' });
+  });
+
+  it('classifies the exchange answer: 403 is pairing-code-refused, 409 is pairing-failed', async () => {
+    await signIn();
+    answer = { status: 403, body: { error: 'expired' } };
+    expect(await pair(deps())).toMatchObject({ ok: false, code: 'pairing-code-refused' });
+    answer = { status: 409, body: { error: 'in use', code: 'link-key-in-use' } };
+    expect(await pair(deps())).toMatchObject({ ok: false, code: 'pairing-failed', message: 'This link key is already paired; run pair again.' });
+  });
+
+  it('returns the machine, environment and scopes on success', async () => {
+    await signIn();
+    expect(await pair(deps())).toEqual({ ok: true, machineLabel: 'studio', environmentId: ENV, scopes: ['read:state', 'operate'] });
   });
 });
 

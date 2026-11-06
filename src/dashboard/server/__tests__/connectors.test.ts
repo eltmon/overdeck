@@ -35,7 +35,8 @@ const { _resetConnectorPairingForTests, takeConnectorIntent } = await import('..
 const { _resetPairingCredentialsForTests, issuePairingCredential } = await import('../pairing-credentials.js');
 const { remoteGateRejection } = await import('../remote-request-gate.js');
 const { resolveDashboardCredential } = await import('../routes/dashboard-auth.js');
-const { connectorsRouteLayer, handleConnectorList, handleConnectorsExchange, handleConnectorPairing, handleConnectorRevoke, handleConnectorSelfRevoke } = await import('../routes/connectors.js');
+const { connectorsRouteLayer, handleConnectorList, handleConnectorsExchange, handleConnectorPairing, handleConnectorRevoke, handleConnectorSelf, handleConnectorSelfRevoke } = await import('../routes/connectors.js');
+const { buildEnvironmentDescriptor } = await import('../routes/environment.js');
 type MachineKeyPair = import('../../../lib/anywhere/machine-key.js').MachineKeyPair;
 type ChannelMarker = import('../channel-peer.js').ChannelMarker;
 
@@ -187,6 +188,51 @@ describe('DELETE /api/connectors/:id and /self (PAN-4949 D-13, D-16)', () => {
     const { status, json } = await read(response);
     expect(status).toBe(403);
     expect(json.error).toBe('only a paired connector may revoke itself');
+  });
+});
+
+describe('GET /api/connectors/self (PAN-5069 FR-10)', () => {
+  it('answers a connector with its own record and this machine name', async () => {
+    const { token, record } = await mintConnector();
+    const asConnector = resolveDashboardCredential({ authorization: `Bearer ${token}` }, { mode: 'link', remoteKeyHex: CONNECTOR_KEY, pairingId: null });
+    const { status, json, cacheControl } = await read(await handleConnectorSelf(asConnector));
+    const descriptor = await buildEnvironmentDescriptor();
+    expect(status).toBe(200);
+    expect(cacheControl).toBe('no-store');
+    expect(json).toEqual({
+      id: record.id,
+      name: 'bot:desk',
+      scopes: ['read:state', 'tell'],
+      clientId: CLIENT_ID,
+      machine: { environmentId: descriptor.environmentId, label: descriptor.label },
+    });
+  });
+
+  it('refuses the root session with not-a-connector', async () => {
+    const { status, json } = await read(await handleConnectorSelf({ kind: 'root-session' }));
+    expect(status).toBe(403);
+    expect(json.code).toBe('not-a-connector');
+  });
+
+  it('refuses a connector whose record was revoked with connector-removed', async () => {
+    const { token, record } = await mintConnector();
+    const asConnector = resolveDashboardCredential({ authorization: `Bearer ${token}` }, { mode: 'link', remoteKeyHex: CONNECTOR_KEY, pairingId: null });
+    await revokeAccessToken(record.id);
+    const { status, json } = await read(await handleConnectorSelf(asConnector));
+    expect(status).toBe(403);
+    expect(json.code).toBe('connector-removed');
+  });
+
+  it('routes GET /api/connectors/self through the self handler', async () => {
+    const req = HttpServerRequest.fromWeb(new Request('http://localhost/api/connectors/self', { method: 'GET' }))
+      .modify({ remoteAddress: Option.some('127.0.0.1') });
+    const response = await Effect.runPromise(Effect.scoped(Effect.flatMap(
+      HttpRouter.toHttpEffect(connectorsRouteLayer),
+      (app) => Effect.provideService(app, HttpServerRequest.HttpServerRequest, req),
+    )));
+    const { status, json } = await read(response);
+    expect(status).toBe(403);
+    expect(json.code).toBe('not-a-connector');
   });
 });
 

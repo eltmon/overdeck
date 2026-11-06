@@ -13,11 +13,15 @@ import {
   readIdentity,
   readLocalToken,
   readPairing,
+  readPendingSignIn,
   removeConnectorFiles,
+  removePendingSignIn,
   replaceLinkKey,
   writeAccount,
   writePairing,
+  writePendingSignIn,
   type ConnectorPairing,
+  type ConnectorPendingSignIn,
 } from '../../../../../src/lib/mcp/connector/home.js';
 
 const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -31,6 +35,17 @@ const PAIRING: ConnectorPairing = {
   tokenId: 'tok-1',
   scopes: ['read:state'],
   pairedAt: '2026-11-04T00:00:00.000Z',
+};
+
+const PENDING: ConnectorPendingSignIn = {
+  v: 1,
+  baseUrl: 'https://account.overdeck.ai',
+  directoryUrl: 'https://connect.overdeck.ai',
+  deviceCode: 'oddc_code',
+  userCode: 'ABCDEFGH',
+  verificationUriComplete: 'https://account.overdeck.ai/activate?user_code=ABCDEFGH',
+  interval: 5,
+  expiresAt: '2026-11-05T00:15:00.000Z',
 };
 
 let root: string;
@@ -165,8 +180,33 @@ describe('local token', () => {
   });
 });
 
+describe('pending sign-in (PAN-5069 FR-3)', () => {
+  it('round-trips through pending-signin.json written 0600', async () => {
+    await writePendingSignIn(home, PENDING);
+    expect(await readPendingSignIn(home)).toEqual(PENDING);
+    expect(await modeOf(join(home, 'pending-signin.json'))).toBe(0o600);
+  });
+
+  it('refuses a malformed file and a group-readable file', async () => {
+    await writePendingSignIn(home, PENDING);
+    await writeFile(join(home, 'pending-signin.json'), JSON.stringify({ ...PENDING, interval: 'soon' }), { mode: 0o600 });
+    await expect(readPendingSignIn(home)).rejects.toThrow(/pending-signin\.json .* is malformed/);
+    await writePendingSignIn(home, PENDING);
+    await chmod(join(home, 'pending-signin.json'), 0o640);
+    await expect(readPendingSignIn(home)).rejects.toThrow(/must be mode 0600/);
+  });
+
+  it('removePendingSignIn deletes the file and tolerates its absence', async () => {
+    await writePendingSignIn(home, PENDING);
+    await removePendingSignIn(home);
+    expect(await readPendingSignIn(home)).toBeNull();
+    await expect(removePendingSignIn(home)).resolves.toBeUndefined();
+  });
+});
+
 describe('removeConnectorFiles', () => {
-  it('removes all four files and tolerates an empty home', async () => {
+  it('removes all five files and tolerates an empty home', async () => {
+    await writePendingSignIn(home, PENDING);
     await ensureIdentity(home);
     await ensureLocalToken(home);
     await writePairing(home, PAIRING);

@@ -1,7 +1,8 @@
 /**
- * `pan mcp connector login|pair|serve|status|logout` — the Overdeck connector a self-hosted bot
- * runs to reach one Overdeck machine's MCP tools (PAN-4927 W-CONN2, PAN-4950 FR-2 to FR-4, FR-9).
- * See configuration/mcp.mdx.
+ * `pan mcp connector connect|login|pair|serve|status|logout` — the Overdeck connector a self-hosted
+ * bot runs to reach one Overdeck machine's MCP tools (PAN-4927 W-CONN2, PAN-4950 FR-2 to FR-4, FR-9).
+ * `connect` (PAN-5069) is the one resumable command a bot runs: sign in, pair, verify, and print the
+ * MCP registration. See cli/mcp.mdx and configuration/mcp.mdx.
  *
  * `src/cli/commands/mcp.ts` registers this group at startup, so this module imports only Commander
  * types statically (NFR-5). The connector modules (werift, the directory client, the channel code
@@ -11,6 +12,12 @@
 import type { Command } from 'commander';
 
 export const PORT_MESSAGE = '--port must be an integer from 1 to 65535';
+export const WAIT_MESSAGE = '--wait must be an integer from 0 to 900';
+
+/** Inlined from connect-output.ts CONNECT_PLATFORMS so this module loads nothing at startup (NFR-5). */
+const CONNECT_PLATFORM_IDS = ['grok-bot', 'grok-build', 'hermes', 'openclaw', 'other'] as const;
+type ConnectPlatformId = (typeof CONNECT_PLATFORM_IDS)[number];
+export const PLATFORM_MESSAGE = `--platform must be one of ${CONNECT_PLATFORM_IDS.join(', ')}`;
 
 /** `--port`: an integer from 1 to 65535, default 7466; null for anything else. */
 export function parseConnectorPort(raw: string | undefined): number | null {
@@ -18,6 +25,20 @@ export function parseConnectorPort(raw: string | undefined): number | null {
   if (!/^\d+$/.test(raw)) return null;
   const port = Number(raw);
   return port >= 1 && port <= 65535 ? port : null;
+}
+
+/** `--wait`: whole seconds from 0 to 900, default 120; null for anything else. */
+export function parseConnectWait(raw: string | undefined): number | null {
+  if (raw === undefined) return 120;
+  if (!/^\d+$/.test(raw)) return null;
+  const seconds = Number(raw);
+  return seconds <= 900 ? seconds : null;
+}
+
+/** `--platform`: one of the known bot platforms, default `other`; null for anything else. */
+export function parseConnectPlatform(raw: string | undefined): ConnectPlatformId | null {
+  if (raw === undefined) return 'other';
+  return (CONNECT_PLATFORM_IDS as readonly string[]).includes(raw) ? (raw as ConnectPlatformId) : null;
 }
 
 const io = {
@@ -39,6 +60,13 @@ async function home(): Promise<string> {
   return connectorHome(process.env);
 }
 
+/** Prints `message` and exits 1 when `value` is null; used before any connector module loads. */
+async function validOrExit<T>(value: T | null, message: string): Promise<T> {
+  if (value !== null) return value;
+  io.err(message);
+  return finish(1);
+}
+
 /** Validates `--port` before any connector module loads; exits 1 on a bad value. */
 async function portOrExit(raw: string | undefined): Promise<number> {
   const port = parseConnectorPort(raw);
@@ -49,6 +77,41 @@ async function portOrExit(raw: string | undefined): Promise<number> {
 
 export function registerMcpConnectorCommands(mcp: Command, appVersion: () => string): void {
   const connector = mcp.command('connector').description('Run an Overdeck connector for a self-hosted bot (see configuration/mcp.mdx)');
+
+  connector
+    .command('connect <pairingString>')
+    .description('Sign in, pair, verify and print the MCP registration in one resumable command (for bots)')
+    .option('--name <bot>', 'the bot name shown on the sign-in page and on the machine (default: host name)')
+    .option('--platform <id>', `${CONNECT_PLATFORM_IDS.join(', ')} (default: other)`)
+    .option('--wait <seconds>', 'how long a rerun waits for the sign-in approval (default 120)')
+    .option('--account-url <url>', 'overdeck.ai account service URL')
+    .option('--directory-url <url>', 'overdeck.ai directory URL')
+    .action(
+      async (
+        pairingString: string,
+        options: { name?: string; platform?: string; wait?: string; accountUrl?: string; directoryUrl?: string },
+      ) => {
+        const platform = await validOrExit(parseConnectPlatform(options.platform), PLATFORM_MESSAGE);
+        const waitSeconds = await validOrExit(parseConnectWait(options.wait), WAIT_MESSAGE);
+        const { runConnectorConnect } = await import('../../lib/mcp/connector/connect.js');
+        await finish(
+          await runConnectorConnect(
+            {
+              pairingString,
+              ...(options.name !== undefined ? { name: options.name } : {}),
+              platform,
+              waitSeconds,
+              ...(options.accountUrl !== undefined ? { accountUrl: options.accountUrl } : {}),
+              ...(options.directoryUrl !== undefined ? { directoryUrl: options.directoryUrl } : {}),
+              home: await home(),
+              env: process.env,
+              appVersion: appVersion(),
+            },
+            io,
+          ),
+        );
+      },
+    );
 
   connector
     .command('login')

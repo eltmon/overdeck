@@ -167,6 +167,10 @@ bot runs, pairs with one Overdeck machine, and serves that machine's MCP tools o
 [Run the Overdeck connector](/configuration/bots#run-the-overdeck-connector) for the whole
 setup.
 
+`connect` is the one-command path for bots: the bot runs it, shows the user one link, and runs
+it again until it prints `ready`. `login`, `pair` and `serve` remain the manual path. The
+top-level `pan connect` is a different command: it installs this computer's Overdeck server.
+
 It needs Node 22.16 or later. On a computer without Overdeck, run each command as
 `npx -y @overdeck/core@<version> mcp connector <command>`; the Connect a bot dialog shows the
 exact version.
@@ -177,9 +181,93 @@ exact version.
 | `OVERDECK_CONNECTOR_DIRECTORY_URL` | The overdeck.ai directory URL when `login` has no `--directory-url`. Default `https://connect.overdeck.ai`. |
 | `OVERDECK_ACCOUNT_URL` | The overdeck.ai account service URL when `login` has no `--account-url`. Default `https://account.overdeck.ai`. |
 
-The connector home is mode 0700 and holds four files, each mode 0600: `account.json`,
-`identity.json`, `pairing.json` and `local-token`. The connector never reads or writes
+The connector home is mode 0700 and holds up to five files, each mode 0600: `account.json`,
+`identity.json`, `pairing.json`, `local-token`, and `pending-signin.json`, which exists only
+while a sign-in that `connect` started waits for approval. The connector never reads or writes
 `~/.overdeck`.
+
+### connect
+
+```bash
+pan mcp connector connect <pairingString> [--name <bot>] [--platform <id>] [--wait <seconds>] \
+  [--account-url <url>] [--directory-url <url>]
+```
+
+Sign in, pair, verify the route, and print the MCP registration, in one command a bot can run
+again after any result. Each run continues from the stage the last run reached. Put the pairing
+string in single quotes.
+
+| Flag | Effect |
+| --- | --- |
+| `--name <bot>` | The bot's name. The sign-in page shows it, and so do the directory and the machine. Default: the host name. |
+| `--platform <id>` | `grok-bot`, `grok-build`, `hermes`, `openclaw` or `other`. It sets the shape of the registration lines. Default `other`. |
+| `--wait <seconds>` | How long a run waits for an approval that an earlier run started. An integer from 0 to 900. Default `120`. |
+| `--account-url <url>` | overdeck.ai account service URL. |
+| `--directory-url <url>` | overdeck.ai directory URL. |
+
+A `--wait` or `--platform` value outside these ranges prints one line to stderr and exits 1.
+
+The stages, in order:
+
+1. **Read the pairing string.** A string that is not an Overdeck connector pairing string stops
+   the run with `bad-pairing-string`.
+2. **Sign in.** With no `account.json`, the run requests a device code, saves it in
+   `pending-signin.json`, prints the activate link and stops with `authorize` at once. The next
+   run waits up to `--wait` seconds for the approval. If the user has not approved yet, it stops
+   with `authorize` and the same link. If the code expired, it stops with `authorize` and a new
+   link.
+3. **Check the existing pairing.** When `pairing.json` names the machine in the pairing string,
+   the run verifies it (stage 5) and uses the code only when the machine no longer accepts this
+   connector.
+4. **Pair** with the one-time code in the pairing string. A code is used at most once per run.
+5. **Verify.** Open a link to the machine within 30 seconds and call
+   `GET /api/connectors/self`.
+6. **Report.** Print `Connected to <machine> over <route> with <scopes>.`, the registration in
+   the platform's config shape, and the `ready` line.
+
+The last line of stdout is always one status line: `OVERDECK_CONNECT ` and then one line of
+JSON with `"v":1`. A bot acts on this line only. The command never prints a token or the
+device code. Examples, one for each status:
+
+```text
+OVERDECK_CONNECT {"v":1,"status":"ready","machine":"studio","environmentId":"0f1e2d3c-4b5a-4978-8695-a4b3c2d1e0f9","route":"relay","scopes":["read:state","tell"],"registration":{"name":"overdeck","transport":"stdio","command":"npx","args":["-y","@overdeck/core@0.75.0","mcp","connector","serve","--stdio"]},"next":"Register the MCP server shown above, then call list_conversations once and tell the user the result."}
+OVERDECK_CONNECT {"v":1,"status":"authorize","url":"https://account.overdeck.ai/activate?user_code=ABCDEFGH","expiresAt":"2026-11-05T12:15:00.000Z","next":"Show the user this link and ask them to open it and click Authorize. When they say they did, run the same command again."}
+OVERDECK_CONNECT {"v":1,"status":"retry","code":"machine-offline","detail":"studio is offline in the overdeck.ai directory.","next":"The machine is offline. Ask the user to start Overdeck there, then run the same command again."}
+OVERDECK_CONNECT {"v":1,"status":"error","code":"pairing-code-refused","detail":"The machine refused the pairing code (it may have expired); ask for a new one in Connect a bot.","next":"The pairing code expired, was cancelled or was already used. Ask the user to click Copy again in Overdeck (Settings → Anywhere → Bots) and paste the new message."}
+```
+
+`registration` carries `"env":{"OVERDECK_CONNECTOR_HOME":"<path>"}` only when that variable
+is set.
+
+| Status | Exit code | Meaning |
+| --- | --- | --- |
+| `ready` | 0 | Paired and verified. Register the server in `registration`. |
+| `error` | 1 | The run cannot finish without the user. Follow `next`. |
+| `authorize` | 3 | The user must open `url` and click Authorize. Then run the command again. |
+| `retry` | 4 | A temporary failure. Run the command again later. |
+
+Every `retry` and `error` line carries a `code`, an optional `detail`, and a `next` sentence
+for the bot. "Copy again" below means: ask the user to click Copy again in Overdeck
+(Settings → Anywhere → Bots) and paste the new message. "Log out and rerun" means: run the
+same npx command with `mcp connector logout` in place of `mcp connector connect …`, then run
+the same command again.
+
+| `code` | Status | Next step |
+| --- | --- | --- |
+| `bad-pairing-string` | error | Copy again. |
+| `unsupported-platform` | error | This computer's OS or CPU cannot run the connector; tell the user. |
+| `home-unreadable` | error | Show the user `detail`; the connector home has a bad file. |
+| `signin-denied` | error | The sign-in was cancelled or this GitHub account is not invited. Tell the user, then run the same command again for a new link. |
+| `network` | retry | overdeck.ai could not be reached. Run the same command again in a minute. |
+| `directory-refused` | error | Show the user `detail`. If it says the sign-in is not valid, log out and rerun. |
+| `machine-not-in-account` | error | You signed in with an account that does not own this machine. Log out and rerun, and ask the user to authorize with the account their Overdeck uses. |
+| `machine-offline` | retry | The machine is offline. Ask the user to start Overdeck there, then run the same command again. |
+| `relay-plan-needed` | error | This network blocks direct connections and the account has no relay plan. Tell the user. |
+| `machine-unreachable` | retry | The machine could not be reached. Run the same command again in a minute. |
+| `pairing-code-refused` | error | The pairing code expired, was cancelled or was already used. Copy again. |
+| `key-mismatch` | error | The machine's key does not match the message. Copy again. |
+| `pairing-failed` | error | Copy again, and show the user `detail`. |
+| `verify-failed` | retry | Paired, but the test call failed. Run the same command again. |
 
 ### login
 
@@ -244,4 +332,5 @@ prints a token.
 pan mcp connector logout
 ```
 
-Remove this connector from its machine and overdeck.ai, then delete its files.
+Remove this connector from its machine and overdeck.ai, then delete its files, including a
+waiting `pending-signin.json`.

@@ -4,7 +4,7 @@
  * keep a lapsed intent long enough that its code never pairs anything else.
  * W-7: the browser, machine and phone exchanges refuse a connector code.
  */
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -70,6 +70,13 @@ describe('connector pairing intents (PAN-4949 D-6, D-7)', () => {
     expect(parsed!.environmentId).toBe(descriptor.environmentId);
     expect(parsed!.machineKeyHex).toBe(descriptor.machineKey);
     expect(Number.isNaN(Date.parse(expiresAt))).toBe(false);
+  });
+
+  it('names this machine by its environment identity label (PAN-5069 FR-8)', async () => {
+    const environmentId = '0b5c6c1e-3f2a-4d8e-9a7b-1c2d3e4f5a6b';
+    await writeFile(join(home, 'environment-id.json'), JSON.stringify({ v: 1, environmentId, label: "Ed's desk", createdAt: '2026-11-05T00:00:00.000Z' }));
+    const { pairingString } = await issueConnectorPairing({ name: 'bot:desk', scopes: ['read:state'] });
+    expect(parseConnectorPairLink(pairingString)).toMatchObject({ environmentId, machineLabel: "Ed's desk" });
   });
 
   it('recognizes a connector code and not a plain pairing code', async () => {

@@ -1,0 +1,260 @@
+{
+  "version": "1",
+  "issueId": "PAN-5069",
+  "created": "2026-11-05T23:26:20.599Z",
+  "updated": "2026-11-06T00:06:50.512Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "a1-pair-link-machine-name": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5069",
+      "claimedAt": "2026-11-05T23:26:20.599Z",
+      "doneAt": "2026-11-05T23:27:42.056Z"
+    },
+    "a2-connectors-self-route": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5069",
+      "claimedAt": "2026-11-05T23:27:54.790Z",
+      "doneAt": "2026-11-05T23:28:59.571Z"
+    },
+    "a3-device-code-names": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5069",
+      "claimedAt": "2026-11-05T23:29:01.283Z",
+      "doneAt": "2026-11-05T23:29:44.974Z"
+    },
+    "a4-pending-signin-record": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5069",
+      "claimedAt": "2026-11-05T23:29:46.612Z",
+      "doneAt": "2026-11-05T23:30:57.509Z"
+    },
+    "a5-pair-outcome": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5069",
+      "claimedAt": "2026-11-05T23:30:59.071Z",
+      "doneAt": "2026-11-05T23:38:06.768Z"
+    },
+    "a6-connect-contract": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5069",
+      "claimedAt": "2026-11-05T23:38:08.187Z",
+      "doneAt": "2026-11-05T23:39:46.310Z"
+    },
+    "a7b-link-error-code": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5069",
+      "claimedAt": "2026-11-05T23:39:51.904Z",
+      "doneAt": "2026-11-05T23:40:58.410Z"
+    },
+    "a7-resumable-signin": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5069",
+      "claimedAt": "2026-11-05T23:40:59.980Z",
+      "doneAt": "2026-11-05T23:45:07.957Z"
+    },
+    "a8-connect-command": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5069",
+      "claimedAt": "2026-11-05T23:45:14.364Z",
+      "doneAt": "2026-11-05T23:50:01.354Z"
+    },
+    "a9-connect-cli": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5069",
+      "claimedAt": "2026-11-05T23:50:06.132Z",
+      "doneAt": "2026-11-05T23:51:36.957Z"
+    },
+    "a10-docs": {
+      "status": "cancelled",
+      "claimedBy": "agent-pan-5069",
+      "claimedAt": "2026-11-05T23:51:39.250Z"
+    },
+    "a10-connect-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5069",
+      "claimedAt": "2026-11-05T23:52:03.258Z",
+      "doneAt": "2026-11-05T23:53:02.072Z"
+    },
+    "a1-pair-link-machine-name.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:56:17.048Z"
+    },
+    "a1-pair-link-machine-name.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:56:29.525Z"
+    },
+    "a1-pair-link-machine-name.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:56:42.665Z"
+    },
+    "a1-pair-link-machine-name.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:56:55.950Z"
+    },
+    "a2-connectors-self-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:57:08.685Z"
+    },
+    "a2-connectors-self-route.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:57:21.781Z"
+    },
+    "a2-connectors-self-route.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:57:35.319Z"
+    },
+    "a2-connectors-self-route.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:57:48.839Z"
+    },
+    "a3-device-code-names.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:58:01.976Z"
+    },
+    "a3-device-code-names.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:58:15.920Z"
+    },
+    "a3-device-code-names.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:58:28.649Z"
+    },
+    "a4-pending-signin-record.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:58:41.472Z"
+    },
+    "a4-pending-signin-record.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:58:54.840Z"
+    },
+    "a4-pending-signin-record.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:59:07.967Z"
+    },
+    "a5-pair-outcome.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:59:20.860Z"
+    },
+    "a5-pair-outcome.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:59:34.060Z"
+    },
+    "a5-pair-outcome.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:59:47.230Z"
+    },
+    "a5-pair-outcome.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-06T00:00:01.140Z"
+    },
+    "a6-connect-contract.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-06T00:00:17.805Z"
+    },
+    "a6-connect-contract.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-06T00:00:34.776Z"
+    },
+    "a6-connect-contract.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-06T00:00:51.579Z"
+    },
+    "a6-connect-contract.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-06T00:01:08.296Z"
+    },
+    "a6-connect-contract.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-06T00:01:22.990Z"
+    },
+    "a7-resumable-signin.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-06T00:01:38.297Z"
+    },
+    "a7-resumable-signin.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-06T00:01:53.736Z"
+    },
+    "a7-resumable-signin.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-06T00:02:09.222Z"
+    },
+    "a7-resumable-signin.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-06T00:02:23.318Z"
+    },
+    "a7-resumable-signin.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-06T00:02:37.052Z"
+    },
+    "a7-resumable-signin.ac6": {
+      "status": "completed",
+      "doneAt": "2026-11-06T00:02:50.011Z"
+    },
+    "a7b-link-error-code.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-06T00:03:03.607Z"
+    },
+    "a7b-link-error-code.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-06T00:03:17.844Z"
+    },
+    "a7b-link-error-code.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-06T00:03:32.760Z"
+    },
+    "a8-connect-command.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-06T00:03:47.779Z"
+    },
+    "a8-connect-command.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-06T00:04:02.110Z"
+    },
+    "a8-connect-command.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-06T00:04:16.315Z"
+    },
+    "a8-connect-command.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-06T00:04:30.893Z"
+    },
+    "a8-connect-command.ac6": {
+      "status": "completed",
+      "doneAt": "2026-11-06T00:04:47.550Z"
+    },
+    "a8-connect-command.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-06T00:05:03.053Z"
+    },
+    "a9-connect-cli.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-06T00:05:20.376Z"
+    },
+    "a9-connect-cli.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-06T00:05:37.873Z"
+    },
+    "a9-connect-cli.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-06T00:05:56.824Z"
+    },
+    "a10-connect-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-06T00:06:17.068Z"
+    },
+    "a10-connect-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-06T00:06:36.340Z"
+    },
+    "a10-connect-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-06T00:06:50.511Z"
+    }
+  }
+}

@@ -21,7 +21,7 @@
 import type { DirectoryWebClient } from '@overdeck/anywhere-channel/web';
 
 import type { ChannelSocket } from '../../anywhere/channel/channel-socket.js';
-import { ChannelOpenError, openChannel, type OpenChannelOptions, type TransportUrl } from '../../anywhere/channel/open.js';
+import { ChannelOpenError, type ChannelOpenErrorCode, openChannel, type OpenChannelOptions, type TransportUrl } from '../../anywhere/channel/open.js';
 import type { RtcTransport } from '../../anywhere/channel/rtc-transport.js';
 import { linkFetch, type LinkRouteInfo, type LinkRouteSource, LinkUnavailableError } from '../../anywhere/link-client.js';
 import type { MachineKeyPair } from '../../anywhere/machine-key.js';
@@ -50,6 +50,15 @@ function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+function openErrorCode(error: unknown): ChannelOpenErrorCode | null {
+  return error instanceof ChannelOpenError ? error.code : null;
+}
+
+/** The machine answered and refused this connector's link key. */
+function refusedByMachine(code: ChannelOpenErrorCode | null): boolean {
+  return code === 'unknown-peer' || code === 'identity-refused';
+}
+
 export class ConnectorLink implements LinkRouteSource {
   private url: TransportUrl | null = null;
   private route: ConnectorRoute = 'down';
@@ -59,6 +68,7 @@ export class ConnectorLink implements LinkRouteSource {
   private stopped = false;
   private machineOnline: boolean;
   private error: string | null = null;
+  private errorCode: ChannelOpenErrorCode | null = null;
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly waiters = new Set<(online: boolean) => void>();
   private readonly offDirectory: () => void;
@@ -118,6 +128,16 @@ export class ConnectorLink implements LinkRouteSource {
     return this.error;
   }
 
+  /**
+   * The ChannelOpenError code of the last failed probe round, or null (PAN-5069 A-7b). A refusal
+   * by the machine (`unknown-peer`, `identity-refused`) on either probe wins over a transport
+   * failure on the other, so `connect` can tell a removed connector from no route even when the
+   * direct path is blocked and only the relay reaches the machine.
+   */
+  lastErrorCode(): ChannelOpenErrorCode | null {
+    return this.errorCode;
+  }
+
   /** One probe round now: direct, then relay when allowed. A failure schedules the next round. */
   async connect(): Promise<void> {
     if (this.stopped || this.probing || !this.machineOnline) return;
@@ -132,6 +152,7 @@ export class ConnectorLink implements LinkRouteSource {
         return;
       } catch (error) {
         this.error = errorText(error);
+        this.errorCode = openErrorCode(error);
       }
       const refusal = this.input.rtc.relayRefusal();
       if (refusal !== null) {
@@ -142,6 +163,7 @@ export class ConnectorLink implements LinkRouteSource {
           return;
         } catch (error) {
           this.error = errorText(error);
+          if (!refusedByMachine(this.errorCode)) this.errorCode = openErrorCode(error);
         }
       }
       this.fail();
@@ -178,6 +200,7 @@ export class ConnectorLink implements LinkRouteSource {
     this.route = route;
     this.attempt = 0;
     this.error = null;
+    this.errorCode = null;
     this.wake(true);
   }
 
