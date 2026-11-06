@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5069",
   "created": "2026-11-05T23:26:20.599Z",
-  "updated": "2026-11-06T00:01:22.991Z",
+  "updated": "2026-11-06T00:01:38.298Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -171,6 +171,10 @@
     "a6-connect-contract.ac5": {
       "status": "completed",
       "doneAt": "2026-11-06T00:01:22.990Z"
+    },
+    "a7-resumable-signin.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-06T00:01:38.297Z"
     }
   }
 }
