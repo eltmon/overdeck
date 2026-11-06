@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5084",
   "created": "2026-11-06T04:10:40.261Z",
-  "updated": "2026-11-06T04:54:08.577Z",
+  "updated": "2026-11-06T05:06:02.354Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -28,9 +28,10 @@
       "doneAt": "2026-11-06T04:54:00.015Z"
     },
     "fly-remote-vm-marker": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5084",
-      "claimedAt": "2026-11-06T04:54:08.577Z"
+      "claimedAt": "2026-11-06T04:54:08.577Z",
+      "doneAt": "2026-11-06T05:06:02.354Z"
     }
   }
 }
