@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5094",
   "created": "2026-11-06T17:38:04.566Z",
-  "updated": "2026-11-06T17:58:43.162Z",
+  "updated": "2026-11-06T18:02:20.902Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -22,9 +22,10 @@
       "doneAt": "2026-11-06T17:58:38.450Z"
     },
     "owner-door-disk": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5094",
-      "claimedAt": "2026-11-06T17:58:43.161Z"
+      "claimedAt": "2026-11-06T17:58:43.161Z",
+      "doneAt": "2026-11-06T18:02:20.902Z"
     }
   }
 }
