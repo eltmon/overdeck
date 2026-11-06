@@ -4,17 +4,17 @@
     "created": "2026-11-06T17:40:00Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5094: Lane launches ignore the disk floor and superseded lanes are never reaped (31 lanes / ~45 GiB in one morning)",
-    "updated": "2026-11-06T17:35:37.995Z"
+    "updated": "2026-11-06T17:37:09.830Z"
   },
   "plan": {
     "id": "pan-5094",
     "title": "Lane launches ignore the disk floor and superseded lanes are never reaped (31 lanes / ~45 GiB in one morning)",
-    "status": "proposed",
+    "status": "running",
     "uid": "b4c9998e-173c-4cb6-9617-e0057dd3e883",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-06T17:40:00Z",
-    "updated": "2026-11-06T17:35:37.995Z",
+    "updated": "2026-11-06T17:37:09.830Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5094",
@@ -935,5 +935,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
