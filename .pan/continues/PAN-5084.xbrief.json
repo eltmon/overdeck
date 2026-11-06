@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5084",
   "created": "2026-11-06T04:10:40.261Z",
-  "updated": "2026-11-06T06:34:32.742Z",
+  "updated": "2026-11-06T06:34:48.766Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -212,6 +212,10 @@
     "ci-workflows-telemetry-off.ac3": {
       "status": "completed",
       "doneAt": "2026-11-06T06:34:32.742Z"
+    },
+    "harness-telemetry-off.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-06T06:34:48.766Z"
     }
   }
 }
