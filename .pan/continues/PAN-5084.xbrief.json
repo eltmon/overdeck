@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5084",
   "created": "2026-11-06T04:10:40.261Z",
-  "updated": "2026-11-06T06:31:29.171Z",
+  "updated": "2026-11-06T06:31:44.844Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -164,6 +164,10 @@
     "settings-api-telemetry-fields.ac1": {
       "status": "completed",
       "doneAt": "2026-11-06T06:31:29.171Z"
+    },
+    "settings-api-telemetry-fields.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-06T06:31:44.844Z"
     }
   }
 }
