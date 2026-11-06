@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5093",
   "created": "2026-11-06T17:35:39.830Z",
-  "updated": "2026-11-06T17:47:41.268Z",
+  "updated": "2026-11-06T17:48:14.067Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -14,6 +14,11 @@
       "claimedBy": "agent-pan-5093",
       "claimedAt": "2026-11-06T17:35:39.830Z",
       "doneAt": "2026-11-06T17:47:41.268Z"
+    },
+    "alert-core": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5093",
+      "claimedAt": "2026-11-06T17:48:14.067Z"
     }
   }
 }
