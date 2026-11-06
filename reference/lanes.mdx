@@ -38,7 +38,7 @@ pan lane start (--key <key> | --for <builder key>) --role <role> (--brief <file>
                [--run <key>] [--parent <conv>] [--project <key>] [--model <m>] [--harness <h>] [--effort <e>]
                [--title <t>] [--branch <b>] [--from <ref>] [--at <ref>] [--reuse] [--replace] [--no-wait] [--json]
                [--machine <label|environment-id|auto>] [--needs <tag,…>]
-pan lane list  [--run <key>] [--parent <conv>] [--json]
+pan lane list  [--run <key>] [--parent <conv>] [--reapable] [--json]
 pan lane show  (<lane> | --run <key> --key <key>) [--json]
 pan lane wait  <lane> [--after <seq>] [--timeout <s>]
 pan lane wait  (--run <key> | --parent <conv>) [--after <cursor>] [--timeout <s>]
@@ -46,6 +46,7 @@ pan lane report (--file <path> | --stdin) [--status done|blocked|failed] [--allo
                [--verdict <value>] [--defects <n>] [--verdict-file <path>]
 pan lane stop  <lane>
 pan lane reap  <lane> [--park] [--keep]
+pan lane disk-check [--project <key> | --path <dir>]
 ```
 
 `<lane>` accepts a conversation id, a conversation name or `conv-<name>`. A lane on
@@ -59,13 +60,14 @@ another machine is messaged with `pan tell @<label>/<name>`. See
 | Command | What it does |
 |---------|--------------|
 | `start` | Creates the lane's directory, writes the brief once to `~/.overdeck/agents/conv-<name>/lane-brief.md`, creates the conversation with the lane contract as its first message, and waits up to 180 s until it has started (`--no-wait` returns at once). Prints `Lane <run>/<key> <role> i<n>: conv <id> (<name>) in <cwd>`, or `… : <name> on <machine> in <cwd>` for a lane on another machine. With `--machine auto` it first prints Auto's reason line, and a `Passed over: …` line when Auto skipped machines, on stderr, also when Auto picks this machine. |
-| `list` | Every lane with `ID`, `RUN/KEY`, `ROLE`, `MACHINE`, `ITER`, `ACTIVITY`, `REPORT`, `FOR`, `VERDICT`, `BRANCH@SHA`, `AHEAD`, `DIRTY`, `MODEL` and `COST`. An archived lane reads `archived` in `ACTIVITY`. `MACHINE` is `-` for a lane on this machine. |
+| `list` | Every lane with `ID`, `RUN/KEY`, `ROLE`, `MACHINE`, `ITER`, `ACTIVITY`, `REAPABLE`, `REPORT`, `FOR`, `VERDICT`, `BRANCH@SHA`, `AHEAD`, `DIRTY`, `MODEL` and `COST`. An archived lane reads `archived` in `ACTIVITY`. `MACHINE` is `-` for a lane on this machine. `--reapable` shows only lanes a newer iteration superseded — reap candidates; see [Reap](#reap). |
 | `show` | The builder → critic chain of one run and key, then one line per lane. See [Critics and builders](#critics-and-builders). |
 | `wait <lane>` | Waits for the lane's next report, with `pan worker wait` semantics. |
-| `wait --run` / `--parent` | Waits for the next report of any lane in the set after a cursor `<atMs>.<name>.<seq>`, oldest first. Prints the report body on stdout and the next command, with the new cursor, on stderr. |
+| `wait --run` / `--parent` | Waits for the next report of any lane in the set after a cursor `<atMs>.<name>.<seq>`, oldest first. Prints the report body on stdout and the next command, with the new cursor, on stderr. When a report arrives, a `reapable: <name>, …` line (see [Reap](#reap)) prints on stderr right before it. |
 | `report` | Run inside a lane: records its report in the worker report store keyed `conv-<name>`, with the head SHA and branch for git-backed lanes. |
 | `stop` | Stops the lane through the conversation stop door, on the lane's own machine. |
 | `reap` | Removes the lane's directory and archives its conversation. See [Reap](#reap). |
+| `disk-check` | Checks the disk floor at a project's lanes root, or at a given or current directory, before a launch wave or a worktree you create yourself. See [Disk floor](#disk-floor). |
 
 Messages to a lane go through `pan tell conv-<name> "<text>"`; there is no lane
 verb for it. A lane on another machine is `pan tell @<label>/<name> "<text>"`.
@@ -89,6 +91,9 @@ The HTTP API behind the CLI is `POST /api/lanes` (with `machine` and `needs`),
 | 1 | A usage or request error (for example a refused launch) |
 
 `start`, `stop` and `reap` exit 0 on success and 1 on any refusal.
+
+`disk-check` exits 0 when there is room, 4 when the floor refuses, and 1 on a
+usage or lookup error.
 
 ## Lanes on other machines
 
@@ -249,6 +254,47 @@ A refused reap archives nothing. The brief, the reports and any parked patch in
 `pan lane list` and `GET /api/lanes` with `activity: stopped`, so a run's
 ledger stays complete. Reap builders before the orchestrator lane that launched
 them: an archived orchestrator lane leaves its unreaped builders as orphans.
+
+A lane is **reapable** — a candidate for `pan lane reap` right now — when a
+newer iteration of the same run, key and role exists, no row of its own
+iteration is `working`, `needs-you` or `starting`, and either some row of that
+iteration filed a report or none is `idle`. Orchestrator lanes are never
+reapable: archiving one orphans the builders it launched. Being reapable is a
+candidate, not a promise — the reap itself can still refuse (a live process in
+the directory, a dirty tree without `--park`).
+
+`pan lane list --run <run> --reapable` lists the candidates; reap each with
+`pan lane reap <name>` (`--park` for a dirty tree) before launching more lanes
+in the run. `pan lane wait` prints the same names on stderr right after a
+report arrives, so the loop is: wait, reap whatever it names, launch the next
+iteration.
+
+## Disk floor
+
+A lane launch is admitted against the same 10 GiB safety floor as a workspace
+start (PAN-4961), at the project's lanes root: below the floor, `start`
+refuses with HTTP 507, `code: disk-low`, and the `Disk low — new workspace
+starts are held` text naming free, reserved and needed GiB. `--force` does
+not bypass it — it still bypasses only the CPU check. A lane that creates a
+new worktree (a builder, critic, verifier or orchestrator without `--reuse`)
+reserves the project's workspace-start estimate with a 2 GiB minimum; `--reuse`
+and `play` lanes reserve 0 bytes but are still checked. A launched lane's
+reservation keeps counting for 15 minutes after the door returns, while it
+checks out and installs, so a burst of launches cannot each pass the floor
+before any of them has written. A lane on another machine (`--machine`) is
+checked by its owner, against the owner's own lanes root; home runs no disk
+check for it.
+
+The lane door sees only lanes: a worktree you create yourself with
+`git worktree add`, or through Agent-tool worktree isolation, is invisible to
+it and to `pan lane reap`. Run `pan lane disk-check --project <key>` before
+every launch wave and before creating one of these worktrees yourself; with
+`--path <dir>` it checks the filesystem holding that directory instead (the
+current directory by default). It exits 0 with a `Disk ok: …` line when there
+is room, 4 with the refusal on stderr when there is not, and with `--project`
+it also lists directories under the lanes root that no lane row claims — not
+lanes, so `pan lane reap` cannot remove them; remove each with
+`git worktree remove <dir>` once its work is merged or saved.
 
 ## Critics and builders
 
