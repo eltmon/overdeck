@@ -6,6 +6,9 @@ const posthogMock = vi.hoisted(() => ({
   unregister: vi.fn(),
   capture: vi.fn(),
   captureException: vi.fn(),
+  opt_out_capturing: vi.fn(),
+  opt_in_capturing: vi.fn(),
+  has_opted_out_capturing: vi.fn(() => false),
 }));
 
 vi.mock('posthog-js', () => ({ default: posthogMock }));
@@ -202,5 +205,103 @@ describe('frontend telemetry wrapper', () => {
     expect(JSON.stringify(sanitized)).not.toContain('PAN-2599');
     expect(JSON.stringify(sanitized)).not.toContain('/home/alice');
     expect(JSON.stringify(sanitized)).not.toContain('ghp_secret');
+  });
+
+  // PAN-5100 WI-4
+  describe('initTelemetryFromConfig', () => {
+    it('registers client desktop and platform web with no bootstrap or memory persistence', async () => {
+      const { initTelemetryFromConfig } = await import('../telemetry');
+
+      const ok = initTelemetryFromConfig({ enabled: true }, {
+        client: 'desktop',
+        platform: 'web',
+        posthogKey: 'phc_test',
+        posthogHost: 'https://us.i.posthog.com',
+      });
+
+      expect(ok).toBe(true);
+      expect(posthogMock.register).toHaveBeenCalledWith({ client: 'desktop', platform: 'web' });
+      const initOptions = posthogMock.init.mock.calls[0]?.[1] as Record<string, unknown>;
+      expect(initOptions.persistence).toBeUndefined();
+      expect(initOptions.bootstrap).toBeUndefined();
+    });
+
+    it('passes memory persistence and bootstrap.distinctID for a phone with machineIdentity', async () => {
+      const { initTelemetryFromConfig } = await import('../telemetry');
+
+      const ok = initTelemetryFromConfig({ enabled: true, installId: 'id-1' }, {
+        client: 'phone',
+        platform: 'ios',
+        posthogKey: 'phc_test',
+        posthogHost: 'https://us.i.posthog.com',
+        machineIdentity: true,
+      });
+
+      expect(ok).toBe(true);
+      const initOptions = posthogMock.init.mock.calls[0]?.[1] as Record<string, unknown>;
+      expect(initOptions.persistence).toBe('memory');
+      expect(initOptions.bootstrap).toEqual({ distinctID: 'id-1' });
+      expect(posthogMock.register).toHaveBeenCalledWith({ client: 'phone', platform: 'ios' });
+    });
+
+    it('registers build_commit only when the config has one', async () => {
+      const { initTelemetryFromConfig } = await import('../telemetry');
+
+      initTelemetryFromConfig({ enabled: true, buildCommit: 'abc1234' }, {
+        client: 'desktop',
+        platform: 'web',
+        posthogKey: 'phc_test',
+        posthogHost: 'https://us.i.posthog.com',
+      });
+
+      expect(posthogMock.register).toHaveBeenCalledWith({ build_commit: 'abc1234' });
+    });
+
+    it('never registers a build_commit key when the config has none', async () => {
+      const { initTelemetryFromConfig } = await import('../telemetry');
+
+      initTelemetryFromConfig({ enabled: true }, {
+        client: 'desktop',
+        platform: 'web',
+        posthogKey: 'phc_test',
+        posthogHost: 'https://us.i.posthog.com',
+      });
+
+      expect(posthogMock.register).not.toHaveBeenCalledWith(
+        expect.objectContaining({ build_commit: expect.anything() }),
+      );
+    });
+
+    it('returns false and never calls posthog.init when effectiveEnabled is false', async () => {
+      const { initTelemetryFromConfig } = await import('../telemetry');
+
+      const ok = initTelemetryFromConfig({ effectiveEnabled: false }, {
+        client: 'desktop',
+        platform: 'web',
+        posthogKey: 'phc_test',
+        posthogHost: 'https://us.i.posthog.com',
+      });
+
+      expect(ok).toBe(false);
+      expect(posthogMock.init).not.toHaveBeenCalled();
+      expect(posthogMock.register).not.toHaveBeenCalled();
+    });
+
+    it('is idempotent: a second call while initialized returns true without a second posthog.init', async () => {
+      const { initTelemetryFromConfig } = await import('../telemetry');
+      const context = {
+        client: 'desktop' as const,
+        platform: 'web' as const,
+        posthogKey: 'phc_test',
+        posthogHost: 'https://us.i.posthog.com',
+      };
+
+      const first = initTelemetryFromConfig({ enabled: true }, context);
+      const second = initTelemetryFromConfig({ enabled: true }, context);
+
+      expect(first).toBe(true);
+      expect(second).toBe(true);
+      expect(posthogMock.init).toHaveBeenCalledTimes(1);
+    });
   });
 });
