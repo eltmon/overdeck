@@ -24,6 +24,8 @@ concurrency:
 # HuggingFace. CI never publishes, so it never needs the index.
 env:
   SKIP_DOCS_INDEX: '1'
+  # PAN-5084: CI runs are not real installs; never mint an install id for them.
+  OVERDECK_TELEMETRY: '0'
 
 # NOTE: This workflow is a safety check ONLY. The primary verification gate runs in
 # Overdeck's verification-runner BEFORE PR creation. GitHub CI runs here for cross-developer

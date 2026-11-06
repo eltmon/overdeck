@@ -23,6 +23,10 @@ on:
 permissions:
   contents: read
 
+# PAN-5084: this smoke test is not a real install; never mint an install id for it.
+env:
+  OVERDECK_TELEMETRY: '0'
+
 jobs:
   pack:
     runs-on: ubuntu-latest
