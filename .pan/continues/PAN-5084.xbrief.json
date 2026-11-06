@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5084",
   "created": "2026-11-06T04:10:40.261Z",
-  "updated": "2026-11-06T06:34:48.766Z",
+  "updated": "2026-11-06T06:35:05.854Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -216,6 +216,10 @@
     "harness-telemetry-off.ac1": {
       "status": "completed",
       "doneAt": "2026-11-06T06:34:48.766Z"
+    },
+    "harness-telemetry-off.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-06T06:35:05.853Z"
     }
   }
 }
