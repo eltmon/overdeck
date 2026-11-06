@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5083",
   "created": "2026-11-06T03:58:56.829Z",
-  "updated": "2026-11-06T04:14:23.245Z",
+  "updated": "2026-11-06T04:14:28.039Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -30,6 +30,11 @@
       "claimedBy": "agent-pan-5083",
       "claimedAt": "2026-11-06T04:12:52.224Z",
       "doneAt": "2026-11-06T04:14:23.244Z"
+    },
+    "dashboard-route-labels": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5083",
+      "claimedAt": "2026-11-06T04:14:28.039Z"
     }
   }
 }
