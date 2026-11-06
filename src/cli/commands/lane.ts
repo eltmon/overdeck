@@ -125,7 +125,7 @@ interface ApiAnswer {
   body: Record<string, unknown> | null;
 }
 
-async function api(deps: LaneCliDeps, method: 'GET' | 'POST', path: string, body?: unknown): Promise<ApiAnswer> {
+async function api(deps: LaneCliDeps, method: 'GET' | 'POST', path: string, body?: unknown, timeoutMs = 120_000): Promise<ApiAnswer> {
   const response = await deps.fetch(`${deps.apiUrl()}${path}`, {
     method,
     // POSTs need a trusted Origin (routes/origin-validation.ts), as plan-finalize sends. The sender
@@ -134,7 +134,7 @@ async function api(deps: LaneCliDeps, method: 'GET' | 'POST', path: string, body
       ? { 'Content-Type': 'application/json', Origin: deps.apiUrl(), 'x-overdeck-sender': senderFromEnv(deps.env).id }
       : {},
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-    signal: AbortSignal.timeout(120_000),
+    signal: AbortSignal.timeout(timeoutMs),
   });
   const text = await response.text();
   let parsed: Record<string, unknown> | null = null;
@@ -356,6 +356,20 @@ export async function laneListCommand(options: { run?: string; parent?: string; 
   return WORKER_EXIT.done;
 }
 
+/** FR-8: the reapable hint must not hold a returned report for long. */
+export const REAPABLE_HINT_TIMEOUT_MS = 5_000;
+
+/** PAN-5094 FR-8: one stderr line naming reapable lanes of the set; a failed or slow read prints nothing. */
+async function printReapableHint(deps: LaneCliDeps, filter: { run?: string; parent?: string }): Promise<void> {
+  const params = new URLSearchParams(filter.run ? { run: filter.run } : { parent: filter.parent ?? '' });
+  const answer = await api(deps, 'GET', `/api/lanes?${params.toString()}`, undefined, REAPABLE_HINT_TIMEOUT_MS).catch(() => null);
+  if (answer?.status !== 200 || !Array.isArray(answer.body?.lanes)) return;
+  const names = (answer.body.lanes as LaneView[]).filter((lane) => lane.reapable).map((lane) => lane.name);
+  if (names.length > 0) {
+    deps.stderr(`reapable: ${names.join(', ')} (superseded by a newer iteration); reap each with pan lane reap <name> before launching more lanes`);
+  }
+}
+
 function laneWaitOutcome(name: string, outcome: WaitOutcome, deps: LaneCliDeps, afterSeq?: number): number {
   switch (outcome.kind) {
     case 'report':
@@ -405,7 +419,9 @@ export async function laneWaitCommand(
       }
     }
     try {
-      return laneWaitOutcome(ref.name, await deps.waitForLane(ref.name, { afterSeq, timeoutMs }), deps, afterSeq);
+      const outcome = await deps.waitForLane(ref.name, { afterSeq, timeoutMs });
+      if (outcome.kind === 'report' && ref.run) await printReapableHint(deps, { run: ref.run });
+      return laneWaitOutcome(ref.name, outcome, deps, afterSeq);
     } catch (error) {
       deps.stderr(`Could not wait on lane ${ref.name}: ${error instanceof Error ? error.message : String(error)}`);
       return WORKER_EXIT.usage;
@@ -427,6 +443,7 @@ export async function laneWaitCommand(
     deps.stderr(`no new lane report; next: pan lane wait ${scope}${outcome.cursor ? ` --after ${outcome.cursor}` : ''}`);
     return WORKER_EXIT.timeout;
   }
+  await printReapableHint(deps, options.run ? { run: options.run } : { parent: options.parent });
   deps.stdout(outcome.report.body);
   deps.stderr(`lane ${outcome.lane.run}/${outcome.lane.key} (${outcome.lane.name}) report ${outcome.report.seq}: ${outcome.report.status}; next: pan lane wait ${scope} --after ${outcome.cursor}`);
   return outcome.report.status === 'done' ? WORKER_EXIT.done : WORKER_EXIT.blocked;

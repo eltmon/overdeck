@@ -189,6 +189,59 @@ describe('pan lane wait', () => {
   });
 });
 
+describe('pan lane wait reapable hint (PAN-5094 wait-reapable-hint)', () => {
+  const REPORT = { seq: 3, at: '2026-09-26T12:00:00.000Z', body: '# result' };
+  const setReport = { kind: 'report' as const, lane: { name: 'brisk-otter', run: 'hotel', key: '663', activity: 'idle' as const, lastActivityAt: null }, report: { ...REPORT, status: 'done' as const }, cursor: '1790000000000.brisk-otter.3' };
+
+  it('prints a reapable line before the status line for a run wait (ac1)', async () => {
+    const { deps, fetchMock, err } = harness({ waitForLaneSet: vi.fn(async () => setReport) });
+    fetchMock.mockImplementation(async (url: string) => (String(url).includes('/api/lanes?')
+      ? json(200, { generatedAt: 'now', lanes: [{ name: 'reap-i1', reapable: true }, { name: 'reap-i2', reapable: false }] })
+      : json(201, LAUNCHED)));
+
+    expect(await laneWaitCommand(undefined, { run: 'hotel' }, deps)).toBe(0);
+
+    expect(err).toEqual([
+      'reapable: reap-i1 (superseded by a newer iteration); reap each with pan lane reap <name> before launching more lanes',
+      'lane hotel/663 (brisk-otter) report 3: done; next: pan lane wait --run hotel --after 1790000000000.brisk-otter.3',
+    ]);
+    expect(String(fetchMock.mock.calls.at(-1)?.[0])).toBe('http://localhost:3011/api/lanes?run=hotel');
+  });
+
+  it('prints a reapable line for a single-lane wait when the lane has a run', async () => {
+    const { deps, fetchMock, err } = harness({ waitForLane: vi.fn(async () => ({ kind: 'report' as const, report: { ...REPORT, status: 'done' as const } })) });
+    fetchMock.mockImplementation(async (url: string) => (String(url).includes('/api/lanes?')
+      ? json(200, { generatedAt: 'now', lanes: [{ name: 'reap-i1', reapable: true }] })
+      : json(201, LAUNCHED)));
+
+    expect(await laneWaitCommand('conv-brisk-otter', {}, deps)).toBe(0);
+
+    expect(err[0]).toBe('reapable: reap-i1 (superseded by a newer iteration); reap each with pan lane reap <name> before launching more lanes');
+    expect(String(fetchMock.mock.calls.at(-1)?.[0])).toBe('http://localhost:3011/api/lanes?run=hotel');
+  });
+
+  it('prints no reapable line, with the exit code unchanged, when GET /api/lanes answers 500 or the fetch throws (ac2)', async () => {
+    const serverError = harness({ waitForLaneSet: vi.fn(async () => setReport) });
+    serverError.fetchMock.mockImplementation(async (url: string) => (String(url).includes('/api/lanes?') ? json(500, { error: 'boom' }) : json(201, LAUNCHED)));
+    expect(await laneWaitCommand(undefined, { run: 'hotel' }, serverError.deps)).toBe(0);
+    expect(serverError.err.some((line) => line.startsWith('reapable:'))).toBe(false);
+
+    const thrown = harness({ waitForLaneSet: vi.fn(async () => setReport) });
+    thrown.fetchMock.mockImplementation(async (url: string) => {
+      if (String(url).includes('/api/lanes?')) throw new DOMException('timed out', 'TimeoutError');
+      return json(201, LAUNCHED);
+    });
+    expect(await laneWaitCommand(undefined, { run: 'hotel' }, thrown.deps)).toBe(0);
+    expect(thrown.err.some((line) => line.startsWith('reapable:'))).toBe(false);
+  });
+
+  it('sends no GET /api/lanes request when the wait times out (ac3)', async () => {
+    const { deps, fetchMock } = harness({ waitForLaneSet: vi.fn(async () => ({ kind: 'timeout' as const, cursor: '' })) });
+    expect(await laneWaitCommand(undefined, { run: 'hotel' }, deps)).toBe(3);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
 describe('pan lane reap and list', () => {
   it('sends park and keep false by default and keep true with --keep', async () => {
     const { deps, fetchMock } = harness();
