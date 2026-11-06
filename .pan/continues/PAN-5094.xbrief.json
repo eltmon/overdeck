@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5094",
   "created": "2026-11-06T17:38:04.566Z",
-  "updated": "2026-11-06T18:54:09.034Z",
+  "updated": "2026-11-06T18:54:28.105Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -162,6 +162,10 @@
     "list-reapable.ac3": {
       "status": "completed",
       "doneAt": "2026-11-06T18:54:09.033Z"
+    },
+    "list-reapable.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-06T18:54:28.105Z"
     }
   }
 }
