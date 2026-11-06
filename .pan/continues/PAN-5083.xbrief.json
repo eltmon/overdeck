@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5083",
   "created": "2026-11-06T03:58:56.829Z",
-  "updated": "2026-11-06T04:46:47.674Z",
+  "updated": "2026-11-06T04:47:05.440Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -168,6 +168,10 @@
     "connector-labels.ac3": {
       "status": "completed",
       "doneAt": "2026-11-06T04:46:47.673Z"
+    },
+    "mcp-privacy-test.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-06T04:47:05.440Z"
     }
   }
 }
