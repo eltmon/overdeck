@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5094",
   "created": "2026-11-06T17:38:04.566Z",
-  "updated": "2026-11-06T18:57:37.823Z",
+  "updated": "2026-11-06T18:57:59.145Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -198,6 +198,10 @@
     "disk-check-verb.ac5": {
       "status": "completed",
       "doneAt": "2026-11-06T18:57:37.823Z"
+    },
+    "docs-lanes-reference.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-06T18:57:59.145Z"
     }
   }
 }
