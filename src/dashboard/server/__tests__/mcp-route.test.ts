@@ -31,6 +31,7 @@ const { _resetDashboardSessionTokenForTests } = await import('../routes/dashboar
 const { _resetTrustedOriginsForTests } = await import('../routes/origin-validation.js');
 const { remoteRequestGateLayer } = await import('../remote-request-gate.js');
 const { makeMcpRouteLayer } = await import('../routes/mcp.js');
+const { McpUsageTelemetry } = await import('../../../lib/telemetry/mcp.js');
 
 const app = Layer.mergeAll(
   remoteRequestGateLayer,
@@ -46,11 +47,11 @@ interface SentResponse {
   json: unknown;
 }
 
-async function send(method: string, headers: Record<string, string>, body?: string): Promise<SentResponse> {
+async function send(method: string, headers: Record<string, string>, body?: string, target: Layer.Layer<never> = app): Promise<SentResponse> {
   const request = HttpServerRequest.fromWeb(new Request('http://dashboard.test/mcp', { method, headers, body }))
     .modify({ remoteAddress: Option.some(LAN_PEER) });
   const response = await Effect.runPromise(Effect.scoped(Effect.flatMap(
-    HttpRouter.toHttpEffect(app),
+    HttpRouter.toHttpEffect(target),
     (handler) => Effect.provideService(handler, HttpServerRequest.HttpServerRequest, request),
   )));
   const raw = response as unknown as { status: number; headers: Record<string, string>; body: { body?: Uint8Array } };
@@ -221,5 +222,78 @@ describe('/mcp over Tailscale Funnel (PAN-4947 FR-3)', () => {
     const funneled = await send('POST', { ...MCP_HEADERS, ...FUNNEL, ...bearer(token) }, TOOLS_LIST);
     expect(funneled.status).toBe(403);
     expect(funneled.json).toEqual({ error: 'public MCP accepts only OAuth sign-ins' });
+  });
+});
+
+describe('/mcp usage telemetry (PAN-5083)', () => {
+  const capture = vi.fn();
+  const usage = new McpUsageTelemetry({ analytics: () => ({ capture }), enabled: () => true, ledgerFile: () => join(home, 'telemetry-mcp-seen.json') });
+  const observed = Layer.mergeAll(
+    remoteRequestGateLayer,
+    makeMcpRouteLayer({ makeApi: () => ({ request: async () => ({ status: 200, json: [] }) }), usage }),
+  );
+  const initialize = (name: string, protocolVersion: string) =>
+    JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion, capabilities: {}, clientInfo: { name, version: '9.9.9' } } });
+
+  beforeEach(() => {
+    capture.mockReset();
+  });
+
+  afterEach(async () => {
+    await usage.settled();
+    rmSync(join(home, 'telemetry-mcp-seen.json'), { force: true });
+  });
+
+  it('records an initialize from claude-code with a plain token as dashboard_http / access_token', async () => {
+    const { token } = await createAccessToken({ name: 'mcp', scopes: ['read:state'], kind: 'token' });
+    const response = await send('POST', { ...MCP_HEADERS, ...bearer(token) }, initialize('claude-code', '2025-11-25'), observed);
+    await usage.settled();
+
+    expect(response.status).toBe(200);
+    expect(capture.mock.calls).toContainEqual(['mcp_session_seen', {
+      mcp_surface: 'dashboard_http', mcp_protocol: '2025-11-25', mcp_client: 'claude_code', mcp_auth: 'access_token',
+    }]);
+  });
+
+  it('records a 2026-07-28 request that the SDK transport refuses with 400', async () => {
+    const { token } = await createAccessToken({ name: 'mcp', scopes: ['read:state'], kind: 'token' });
+    const body = JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/list', params: { _meta: { 'io.modelcontextprotocol/protocolVersion': '2026-07-28' } } });
+    const response = await send('POST', { ...MCP_HEADERS, ...bearer(token), 'mcp-protocol-version': '2026-07-28' }, body, observed);
+    await usage.settled();
+
+    expect(response.status).toBe(400);
+    expect(capture.mock.calls).toContainEqual(['mcp_session_seen', {
+      mcp_surface: 'dashboard_http', mcp_protocol: '2026-07-28', mcp_client: 'other', mcp_auth: 'access_token',
+    }]);
+  });
+
+  it('records nothing for a request without a credential', async () => {
+    const response = await send('POST', MCP_HEADERS, initialize('claude-code', '2025-11-25'), observed);
+    await usage.settled();
+
+    expect(response.status).toBe(401);
+    expect(capture).not.toHaveBeenCalled();
+  });
+
+  it('records an OAuth initialize over Funnel as public_http / oauth', async () => {
+    writeFileSync(join(home, 'config.yaml'), 'mcp:\n  public:\n    enabled: true\n');
+    invalidatePublicMcpConfig();
+    try {
+      const { token } = await createAccessToken({
+        name: 'xAI (OAuth)', scopes: ['read:state'], kind: 'token',
+        oauthClientId: `odc_${'5'.repeat(32)}`, oauthFamilyId: '6'.repeat(32),
+        expiresAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+      });
+      const response = await send('POST', { ...MCP_HEADERS, 'tailscale-funnel-request': '?1', ...bearer(token) }, initialize('grok', '2025-06-18'), observed);
+      await usage.settled();
+
+      expect(response.status).toBe(200);
+      expect(capture.mock.calls).toContainEqual(['mcp_session_seen', {
+        mcp_surface: 'public_http', mcp_protocol: '2025-06-18', mcp_client: 'grok', mcp_auth: 'oauth',
+      }]);
+    } finally {
+      rmSync(join(home, 'config.yaml'), { force: true });
+      invalidatePublicMcpConfig();
+    }
   });
 });
