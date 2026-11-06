@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5084",
   "created": "2026-11-06T04:10:40.261Z",
-  "updated": "2026-11-06T06:30:00.746Z",
+  "updated": "2026-11-06T06:30:18.520Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -144,6 +144,10 @@
     "env-exclusion-detector.ac4": {
       "status": "completed",
       "doneAt": "2026-11-06T06:30:00.746Z"
+    },
+    "resolve-telemetry-state.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-06T06:30:18.519Z"
     }
   }
 }
