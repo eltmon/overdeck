@@ -29,6 +29,8 @@ export const TELEMETRY_EVENT_NAMES = [
   "relay_usage_sampled",
   "mcp_session_seen",
   "mcp_tool_called",
+  "client_request_failed",
+  "phone_link_state",
 ] as const
 
 export type TelemetryEventName = typeof TELEMETRY_EVENT_NAMES[number]
@@ -177,6 +179,259 @@ const TELEMETRY_MCP_TOOLS = [
   "worker_report",
 ] as const
 
+/**
+ * PAN-5100: every `ROUTE_SCOPES` path (`src/dashboard/server/route-scopes.ts`),
+ * sorted, then `other`. Literal so the type stays a closed union; regenerate with:
+ *   grep -oE "path: '[^']*'" src/dashboard/server/route-scopes.ts | sed "s/path: '//; s/'//" | { cat; echo /api/telemetry/client-config; } | LC_ALL=C sort -u
+ */
+const TELEMETRY_CLIENT_ROUTES = [
+  "/api/activity",
+  "/api/agent-directory",
+  "/api/agent-requests",
+  "/api/agents",
+  "/api/agents/:id/answer-question",
+  "/api/agents/:id/message",
+  "/api/agents/:id/permissions/:requestId/respond",
+  "/api/agents/:id/plan-action",
+  "/api/agents/:id/tell",
+  "/api/connectors/self",
+  "/api/conversations",
+  "/api/conversations/:id",
+  "/api/conversations/:id/codex-approval",
+  "/api/conversations/:id/pane-choice",
+  "/api/conversations/:id/permission",
+  "/api/conversations/:id/pi-ask-answer",
+  "/api/conversations/:name/abort",
+  "/api/conversations/:name/about",
+  "/api/conversations/:name/attachments/:file",
+  "/api/conversations/:name/bookmarks",
+  "/api/conversations/:name/compact",
+  "/api/conversations/:name/delete-image",
+  "/api/conversations/:name/diffs",
+  "/api/conversations/:name/diffs/:turnId",
+  "/api/conversations/:name/kickoff",
+  "/api/conversations/:name/message",
+  "/api/conversations/:name/message-locator",
+  "/api/conversations/:name/messages",
+  "/api/conversations/:name/plan-action",
+  "/api/conversations/:name/preview-ports",
+  "/api/conversations/:name/pull-requests",
+  "/api/conversations/:name/pull-requests/sync",
+  "/api/conversations/:name/release",
+  "/api/conversations/:name/release/complete",
+  "/api/conversations/:name/release/transfer/:transferId",
+  "/api/conversations/:name/release/undo",
+  "/api/conversations/:name/resume",
+  "/api/conversations/:name/scheduled-messages",
+  "/api/conversations/:name/scheduled-messages/:id",
+  "/api/conversations/:name/schedules",
+  "/api/conversations/:name/schedules/:id",
+  "/api/conversations/:name/stop",
+  "/api/conversations/:name/switch-model",
+  "/api/conversations/:name/thinking-level",
+  "/api/conversations/:name/tool-body/:toolUseId",
+  "/api/conversations/:name/upload-image",
+  "/api/conversations/pending-input",
+  "/api/costs/request-digest",
+  "/api/costs/summary",
+  "/api/disk-alert",
+  "/api/fleet/conversations",
+  "/api/fleet/issues/:id/activity",
+  "/api/fleet/issues/:id/start",
+  "/api/fleet/machines",
+  "/api/fleet/needs-you",
+  "/api/fleet/placement",
+  "/api/fleet/search",
+  "/api/fleet/workers",
+  "/api/fleet/workers/:id/stop",
+  "/api/flywheel/status",
+  "/api/issues",
+  "/api/lanes",
+  "/api/lanes/:name",
+  "/api/lanes/:name/stop",
+  "/api/machines/conversations",
+  "/api/machines/heartbeat",
+  "/api/machines/issue-activity",
+  "/api/machines/needs-you",
+  "/api/machines/projects",
+  "/api/machines/projects/:key/file",
+  "/api/machines/projects/:key/source",
+  "/api/machines/self",
+  "/api/machines/work/conversations",
+  "/api/machines/work/issues/:id/start",
+  "/api/machines/work/lanes",
+  "/api/machines/work/lanes/:name/reap",
+  "/api/machines/work/lanes/:name/status",
+  "/api/machines/work/projects",
+  "/api/machines/work/projects/:jobId",
+  "/api/machines/work/workers",
+  "/api/needs-you",
+  "/api/palette/search",
+  "/api/phones/self",
+  "/api/phones/self/notification-preferences",
+  "/api/phones/self/push-key",
+  "/api/pipeline/membership",
+  "/api/pull-requests",
+  "/api/pull-requests/conversations",
+  "/api/registered-projects",
+  "/api/self/done",
+  "/api/self/handoff",
+  "/api/self/jobs/:id",
+  "/api/self/jobs/:id/wait",
+  "/api/self/lanes",
+  "/api/self/lanes/report",
+  "/api/self/lanes/wait",
+  "/api/self/machine-link-requests",
+  "/api/self/machine-link-requests/:id/wait",
+  "/api/self/memory/facts",
+  "/api/self/memory/search",
+  "/api/self/pull-request-watches",
+  "/api/self/pull-request-watches/:id",
+  "/api/self/pull-requests",
+  "/api/self/secret-requests",
+  "/api/self/secret-requests/:id/wait",
+  "/api/self/tasks/block",
+  "/api/self/tasks/claim",
+  "/api/self/tasks/done",
+  "/api/self/worker-report",
+  "/api/self/workers",
+  "/api/self/workers/:id",
+  "/api/self/workers/:id/wait",
+  "/api/settings/resolved",
+  "/api/telemetry/client-config",
+  "/api/versions/self",
+  "/api/versions/self/update",
+  "/api/workers",
+  "/api/workers/:id/status",
+  "/api/workers/:id/stop",
+  "/events/stream",
+  "/events/version",
+  "other",
+] as const
+
+/**
+ * PAN-5100: the distinct first segments after `/api/` of every `NO_LOSS_MATRIX`
+ * HTTP surface whose disposition is not `DELETE` (`tests/unit/lib/overdeck/no-loss-matrix.ts`),
+ * plus `events` and `telemetry`, sorted, then `other`.
+ */
+const TELEMETRY_CLIENT_ROUTE_AREAS = [
+  "access-tokens",
+  "account",
+  "activity",
+  "admin",
+  "agent-directory",
+  "agent-requests",
+  "agents",
+  "anywhere",
+  "artifacts",
+  "autopreso",
+  "backlog",
+  "boot-reconciliation",
+  "cache",
+  "cache-status",
+  "claude-code",
+  "cliproxy",
+  "cloister",
+  "color-themes",
+  "command-deck",
+  "commands",
+  "confirmations",
+  "connectors",
+  "context",
+  "conversations",
+  "costs",
+  "dashboard",
+  "deacon",
+  "deft",
+  "deploy",
+  "dev",
+  "devices",
+  "diffs",
+  "directory",
+  "discovered-sessions",
+  "disk-alert",
+  "effort",
+  "environment",
+  "events",
+  "fleet",
+  "flywheel",
+  "fs",
+  "git-activity",
+  "github-quota",
+  "godview",
+  "health",
+  "hooks",
+  "internal",
+  "issues",
+  "jev",
+  "joins",
+  "knowledge-viewer",
+  "lanes",
+  "linear-mcp-auth",
+  "linked-conversations",
+  "machines",
+  "mcp",
+  "mcp-oauth",
+  "memory",
+  "merge-queue",
+  "merge-train",
+  "metrics",
+  "model-presets",
+  "models",
+  "needs-you",
+  "no-resume-mode",
+  "orders",
+  "pairing",
+  "palette",
+  "parked",
+  "phones",
+  "pipeline",
+  "planning",
+  "prereqs",
+  "project-mappings",
+  "projects",
+  "pull-requests",
+  "push",
+  "rally",
+  "registered-projects",
+  "registry",
+  "remote",
+  "resources",
+  "restart-gate",
+  "resume-all",
+  "review",
+  "self",
+  "session-trees",
+  "settings",
+  "shadow",
+  "share-probe",
+  "shares",
+  "show",
+  "skills",
+  "specialists",
+  "system",
+  "tailscale",
+  "telemetry",
+  "terminals",
+  "tiered",
+  "tracker-status",
+  "trackers",
+  "triggers",
+  "tts",
+  "update",
+  "vault",
+  "velocity",
+  "version",
+  "versions",
+  "voice",
+  "webhooks",
+  "workers",
+  "workspace-registry",
+  "workspace-stack-health",
+  "workspaces",
+  "other",
+] as const
+
 export const TELEMETRY_PROPERTY_DOMAINS = {
   agent_spawn_mode: ["spawn-and-send", "spawn-work-and-send"],
   answer_type: ["custom", "selection", "note", "selection+note"],
@@ -185,6 +440,8 @@ export const TELEMETRY_PROPERTY_DOMAINS = {
   channel_error_class: ["none", "unreachable", "identity_refused", "unknown_peer", "unsupported", "no_relay_plan", "descriptor_failed", "wrong_machine", "heartbeat_failed", "revoked"],
   channel_route: TELEMETRY_CHANNEL_ROUTES,
   cli_verb: TELEMETRY_CLI_VERBS,
+  client_route: TELEMETRY_CLIENT_ROUTES,          // every ROUTE_SCOPES path, sorted, then "other"
+  client_route_area: TELEMETRY_CLIENT_ROUTE_AREAS, // sorted areas (D-7), then "other"
   close_out_variant: ["card", "inspector"],
   count_bucket: ["0", "1-2", "3-5", "6-10", "11+"],
   dashboard_tab: [
@@ -220,10 +477,14 @@ export const TELEMETRY_PROPERTY_DOMAINS = {
   fork_kind: ["summary", "handoff", "plain"],
   github_caller: TELEMETRY_GITHUB_CALLERS,
   harness: TELEMETRY_HARNESSES,
+  http_method: ["GET", "POST", "PUT", "PATCH", "DELETE", "other"],
   install_kind: TELEMETRY_INSTALL_KINDS,
   link_failure_reason: ["bad_pairing_url", "unreachable", "pairing_refused", "unsupported", "identity_mismatch", "exchange_failed", "grant_refused", "offline", "approval_refused", "approval_failed", "other"],
   link_method: ["pairing_code", "ssh", "fly", "directory_approval", "other"],
+  link_reason: ["none", "offline", "no_path", "unreachable", "removed", "pairing_refused", "identity_mismatch", "unsupported", "channel_failed", "delayed", "restarting", "unauthorized", "resume", "other"],
+  link_route: ["direct", "relay", "unknown"],
   link_side: ["requester", "approver"],
+  link_state: ["failed", "dropped", "recovered", "route_changed"],
   mcp_auth: ["agent_token", "oauth", "access_token", "connector"],
   mcp_client: ["claude_code", "codex", "cursor", "vscode", "chatgpt", "grok", "hermes", "openclaw", "gemini", "opencode", "kimi", "overdeck_connector", "other"],
   mcp_protocol: ["2026-07-28", "2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05", "2024-10-07", "other"],
@@ -239,7 +500,10 @@ export const TELEMETRY_PROPERTY_DOMAINS = {
   quota_points_bucket: ["0", "1-49", "50-199", "200-499", "500-999", "1000-2499", "2500+"],
   quota_remaining_bucket: ["0", "1-99", "100-499", "500-999", "1000-2499", "2500+", "unknown"],
   rate_limit_kind: ["primary", "secondary"],
+  recovery_bucket: ["none", "under_1s", "1s-4s", "5s-14s", "15s-59s", "60s+"],
   relay_bytes_bucket: ["under_1mb", "1mb-9mb", "10mb-99mb", "100mb-999mb", "1gb+"],
+  request_status: ["400", "401", "403", "404", "408", "409", "413", "422", "429", "other_4xx", "500", "502", "503", "504", "other_5xx", "network", "timeout", "aborted"],
+  telemetry_client: ["phone", "desktop"],
 } as const
 
 export type TelemetryPropertyDomainName = keyof typeof TELEMETRY_PROPERTY_DOMAINS
@@ -308,6 +572,8 @@ export const TELEMETRY_EVENT_CATALOG = {
   relay_usage_sampled: { bytes: "relay_bytes_bucket" },
   mcp_session_seen: { mcp_surface: "mcp_surface", mcp_protocol: "mcp_protocol", mcp_client: "mcp_client", mcp_auth: "mcp_auth" },
   mcp_tool_called: { mcp_surface: "mcp_surface", mcp_client: "mcp_client", mcp_tool: "mcp_tool" },
+  client_request_failed: { client: "telemetry_client", route: "client_route", route_area: "client_route_area", method: "http_method", status: "request_status" },
+  phone_link_state: { state: "link_state", reason: "link_reason", route: "link_route", recover_time: "recovery_bucket" },
 } as const satisfies Record<TelemetryEventName, Record<string, TelemetryPropertyDomainName>>
 
 type TelemetryPropertyValue<Domain extends TelemetryPropertyDomainName> =
@@ -352,6 +618,29 @@ export type AnywhereChannelOpenedProperties = EventProperties<"anywhere_channel_
 export type RelayUsageSampledProperties = EventProperties<"relay_usage_sampled">
 export type McpSessionSeenProperties = EventProperties<"mcp_session_seen">
 export type McpToolCalledProperties = EventProperties<"mcp_tool_called">
+export type TelemetryClient = TelemetryPropertyValue<"telemetry_client">
+export type TelemetryClientRoute = TelemetryPropertyValue<"client_route">
+export type TelemetryClientRouteArea = TelemetryPropertyValue<"client_route_area">
+export type TelemetryHttpMethod = TelemetryPropertyValue<"http_method">
+export type TelemetryRequestStatus = TelemetryPropertyValue<"request_status">
+export type TelemetryLinkState = TelemetryPropertyValue<"link_state">
+export type TelemetryLinkReason = TelemetryPropertyValue<"link_reason">
+export type TelemetryLinkRoute = TelemetryPropertyValue<"link_route">
+export type TelemetryRecoveryBucket = TelemetryPropertyValue<"recovery_bucket">
+export type ClientRequestFailedProperties = EventProperties<"client_request_failed">
+export type PhoneLinkStateProperties = EventProperties<"phone_link_state">
+
+/** PAN-5100: what `GET /api/telemetry/client-config` returns (D-10..D-12). */
+export interface TelemetryClientConfig {
+  readonly effectiveEnabled: boolean
+  readonly installId?: string
+  readonly installKind?: TelemetryInstallKind
+  readonly buildCommit?: string
+  readonly operatorHash?: string
+  readonly posthogKey?: string
+  readonly posthogHost?: string
+}
+
 export type TelemetryQuotaPointsBucket = TelemetryPropertyValue<"quota_points_bucket">
 export type TelemetryQuotaRemainingBucket = TelemetryPropertyValue<"quota_remaining_bucket">
 export type TelemetryGitHubCaller = TelemetryPropertyValue<"github_caller">
@@ -397,6 +686,67 @@ export function bucketRelayBytes(bytes: number): TelemetryRelayBytesBucket {
   if (bytes < 100_000_000) return "10mb-99mb"
   if (bytes < 1_000_000_000) return "100mb-999mb"
   return "1gb+"
+}
+
+/** PAN-5100: the closed route template and area for a same-origin path (query and hash ignored). */
+export function clientRouteOf(pathname: string): { route: TelemetryClientRoute; route_area: TelemetryClientRouteArea } {
+  const clean = pathname.split(/[?#]/)[0] ?? pathname
+  const segments = clean.split("/").filter((segment) => segment.length > 0)
+
+  let bestTemplate: string | null = null
+  let bestLiteralCount = -1
+  for (const template of TELEMETRY_CLIENT_ROUTES) {
+    if (template === "other") continue
+    const templateSegments = template.split("/").filter((segment) => segment.length > 0)
+    if (templateSegments.length !== segments.length) continue
+    let literalCount = 0
+    let matches = true
+    for (let i = 0; i < templateSegments.length; i++) {
+      const templateSegment = templateSegments[i]!
+      const pathSegment = segments[i]!
+      if (templateSegment.startsWith(":")) continue
+      if (templateSegment !== pathSegment) {
+        matches = false
+        break
+      }
+      literalCount++
+    }
+    if (matches && literalCount > bestLiteralCount) {
+      bestTemplate = template
+      bestLiteralCount = literalCount
+    }
+  }
+
+  const route = (bestTemplate ?? "other") as TelemetryClientRoute
+
+  let route_area: TelemetryClientRouteArea = "other"
+  if (segments[0] === "events") {
+    route_area = "events"
+  } else if (segments[0] === "api" && segments[1] !== undefined && (TELEMETRY_CLIENT_ROUTE_AREAS as readonly string[]).includes(segments[1])) {
+    route_area = segments[1] as TelemetryClientRouteArea
+  }
+
+  return { route, route_area }
+}
+
+/** PAN-5100: an HTTP status (≥ 400) as a closed bucket. */
+export function bucketRequestStatus(status: number): TelemetryRequestStatus {
+  const exact = String(status)
+  if ((TELEMETRY_PROPERTY_DOMAINS.request_status as readonly string[]).includes(exact)) {
+    return exact as TelemetryRequestStatus
+  }
+  if (status >= 400 && status < 500) return "other_4xx"
+  return "other_5xx"
+}
+
+/** PAN-5100: milliseconds to recover as a coarse bucket. */
+export function bucketRecoveryMs(ms: number | null): TelemetryRecoveryBucket {
+  if (ms === null) return "none"
+  if (ms < 1_000) return "under_1s"
+  if (ms < 5_000) return "1s-4s"
+  if (ms < 15_000) return "5s-14s"
+  if (ms < 60_000) return "15s-59s"
+  return "60s+"
 }
 
 export type TelemetryEventProperties = {
