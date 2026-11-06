@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5094",
   "created": "2026-11-06T17:38:04.566Z",
-  "updated": "2026-11-06T18:44:27.720Z",
+  "updated": "2026-11-06T18:44:58.917Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -94,6 +94,10 @@
     "home-door-disk.ac1": {
       "status": "completed",
       "doneAt": "2026-11-06T18:44:27.719Z"
+    },
+    "home-door-disk.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-06T18:44:58.916Z"
     }
   }
 }
