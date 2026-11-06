@@ -174,6 +174,8 @@ async function bootOnce(
       OVERDECK_DISABLE_AUTO_MERGE: '1',
       // fix10: never let a UAT host reach a Herdr session.
       OVERDECK_TERMINAL_BACKEND: 'tmux',
+      // PAN-5084: test servers are not installs.
+      OVERDECK_TELEMETRY: '0',
       ...env,
     },
     stdio: ['ignore', 'pipe', 'pipe'],

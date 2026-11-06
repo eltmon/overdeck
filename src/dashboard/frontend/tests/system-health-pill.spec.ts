@@ -50,6 +50,8 @@ async function startThrowawayDashboard(): Promise<ThrowawayDashboard> {
       OVERDECK_NO_RESUME: '1',
       // fix10: never let a UAT host reach a Herdr session.
       OVERDECK_TERMINAL_BACKEND: 'tmux',
+      // PAN-5084: test servers are not installs.
+      OVERDECK_TELEMETRY: '0',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });

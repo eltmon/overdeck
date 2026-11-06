@@ -59,6 +59,8 @@ export function buildServerEnv(base: NodeJS.ProcessEnv, opts: ServerEnvOptions):
     OVERDECK_DASHBOARD_URL: url,
     DASHBOARD_URL: url,
     OVERDECK_TERMINAL_BACKEND: 'tmux',
+    // PAN-5084: test servers are not installs.
+    OVERDECK_TELEMETRY: '0',
     OVERDECK_TMUX_SOCKET_NAME: tmuxSocketName(opts.machine, opts.pid ?? process.pid),
     // A peer-mode dashboard: no Deacon, no resume; the link supervisor is opted back in.
     OVERDECK_DISABLE_DEACON: '1',
