@@ -28,6 +28,7 @@ import {
   pendingItemsFromConversationRow,
   pendingItemsFromEnrichment,
   type ConversationRowLike,
+  type EdgeNotification,
   type EnrichmentPayloadLike,
 } from '../../../lib/push/classify.js';
 import { createNeedsYouDispatcher, type DispatcherStats, type NeedsYouDispatcher } from '../../../lib/push/dispatcher.js';
@@ -185,6 +186,11 @@ export function stopNeedsYouPushService(): void {
   clearInterval(current.scanTimer);
   if (current.wakeTimer !== null) clearTimeout(current.wakeTimer);
   current.dispatcher.dispose();
+}
+
+/** PAN-5093: send one edge notification through the running dispatcher; a no-op before start. */
+export function pushNeedsYouEdge(notification: EdgeNotification): void {
+  state?.dispatcher.observeEdge(notification);
 }
 
 /** Send a test notification to every target, bypassing dedup and the rate limit. */
