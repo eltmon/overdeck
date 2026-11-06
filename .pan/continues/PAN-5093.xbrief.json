@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5093",
   "created": "2026-11-06T17:35:39.830Z",
-  "updated": "2026-11-06T19:23:56.491Z",
+  "updated": "2026-11-06T19:24:16.645Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -96,6 +96,10 @@
     "holders.ac2": {
       "status": "completed",
       "doneAt": "2026-11-06T19:23:56.490Z"
+    },
+    "holders.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-06T19:24:16.645Z"
     }
   }
 }
