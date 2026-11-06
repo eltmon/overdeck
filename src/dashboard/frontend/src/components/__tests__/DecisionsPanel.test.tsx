@@ -274,6 +274,49 @@ describe('DecisionsPanel', () => {
   });
 });
 
+describe('DecisionsPanel disk alert (PAN-5093)', () => {
+  const diskAlertSnapshot = {
+    level: 'critical' as const,
+    path: '/home/op/.overdeck',
+    availableBytes: 1.2 * 1024 ** 3,
+    totalBytes: 100 * 1024 ** 3,
+    warningBytes: 5 * 1024 ** 3,
+    criticalBytes: 2 * 1024 ** 3,
+    since: '2026-11-06T17:00:00.000Z',
+    checkedAt: '2026-11-06T17:00:30.000Z',
+    measuring: false,
+    holders: null,
+  };
+  const diskAlertDecision = {
+    id: 'disk-alert',
+    source: 'agent' as const,
+    label: 'Disk critical',
+    kinds: ['diskCritical'],
+    since: diskAlertSnapshot.since,
+    blocking: true,
+    diskAlert: diskAlertSnapshot,
+  };
+
+  it('renders disk-alert-card in its own System group, with no Answer button', () => {
+    vi.spyOn(useDecisionsModule, 'useDecisions').mockReturnValue([diskAlertDecision]);
+    renderWithQuery(<DecisionsPanel />);
+
+    expect(screen.getByTestId('disk-alert-card')).toBeTruthy();
+    expect(screen.getByText('System')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Answer' })).toBeNull();
+  });
+
+  it('keeps a critical disk decision out of "Blocking work"', () => {
+    vi.spyOn(useDecisionsModule, 'useDecisions').mockReturnValue([agentDecision, diskAlertDecision]);
+    renderWithQuery(<DecisionsPanel />);
+
+    const blockingGroup = screen.getByText('Blocking work').closest('section');
+    expect(blockingGroup?.textContent).not.toContain('Disk critical');
+    const systemGroup = screen.getByText('System').closest('section');
+    expect(systemGroup?.textContent).toContain('Disk critical');
+  });
+});
+
 describe('DecisionsCount', () => {
   it('counts agents and conversations together', () => {
     vi.spyOn(useDecisionsModule, 'useDecisions').mockReturnValue([agentDecision, conversationDecision, planDecision]);
