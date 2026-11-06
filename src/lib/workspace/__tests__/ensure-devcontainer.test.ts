@@ -47,6 +47,7 @@ describe('createWorkspacePlaceholders', () => {
     const cfg = buildProjectConfig('/tmp/x');
     const ph = createWorkspacePlaceholders(cfg, 'min-846', '/tmp/x/workspaces/feature-min-846');
     expect(ph.FEATURE_NAME).toBe('min-846');
+    expect(ph.FEATURE_IDENT).toBe('min_846');
     expect(ph.FEATURE_FOLDER).toBe('feature-min-846');
     expect(ph.BRANCH_NAME).toBe('feature/min-846');
     expect(ph.PROJECT_NAME).toBe('x');

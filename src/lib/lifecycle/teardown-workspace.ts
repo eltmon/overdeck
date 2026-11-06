@@ -29,6 +29,7 @@ import { pruneAgentStateDir } from '../agents/state-dir-removal.js';
 import { reapWorkerWorktrees } from '../workspaces/worker-worktrees.js';
 import { listAgentStatesSync, saveAgentStateSync } from '../agents/agent-state.js';
 import { revokeAgentMcpTokensForIssue } from '../mcp/agent-token.js';
+import { toFeatureIdent } from '../workspace-config.js';
 
 const execAsync = promisify(exec);
 
@@ -664,6 +665,7 @@ function buildPlaceholders(
   const domain = opts.workspaceConfig?.dns?.domain || 'localhost';
   return {
     FEATURE_NAME: issueLower,
+    FEATURE_IDENT: toFeatureIdent(issueLower),
     FEATURE_FOLDER: featureFolder,
     BRANCH_NAME: `feature/${issueLower}`,
     COMPOSE_PROJECT: `${projName}-${featureFolder}`,

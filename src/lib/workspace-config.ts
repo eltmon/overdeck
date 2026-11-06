@@ -76,6 +76,10 @@ export interface EnvConfig {
   template?: string;
   /** Additional env vars from secrets */
   secrets_file?: string;
+  // PAN-5062: when true, the workspace's rendered .env is loaded into agent
+  // launcher shells and host quality gate environments (never container or
+  // remote gates). Default false — a workspace's .env stays opt-in.
+  load?: boolean;
 }
 
 export interface ServiceConfig {
@@ -300,6 +304,9 @@ export interface ProjectsConfig {
  */
 export interface TemplatePlaceholders {
   FEATURE_NAME: string;      // e.g., 'min-123'
+  // PAN-5062: identifier-safe form of FEATURE_NAME for use in contexts (e.g. SQL
+  // schema names) where hyphens and other non-identifier characters are invalid.
+  FEATURE_IDENT: string;     // e.g., 'min_123'
   FEATURE_FOLDER: string;    // e.g., 'feature-min-123'
   BRANCH_NAME: string;       // e.g., 'feature/min-123'
   COMPOSE_PROJECT: string;   // e.g., 'myn-feature-min-123'
@@ -314,6 +321,15 @@ export interface TemplatePlaceholders {
   // run only tests affected by the PR's changes and skip pre-existing failures in
   // unmodified files. Only set during verification (where a target branch exists).
   CHANGED_BASE?: string;
+}
+
+/**
+ * Convert a feature name to an identifier-safe form (lowercase, non-alphanumeric
+ * characters replaced with underscores) for use where raw hyphens are invalid,
+ * e.g. unquoted SQL identifiers.
+ */
+export function toFeatureIdent(featureName: string): string {
+  return featureName.toLowerCase().replace(/[^a-z0-9_]/g, '_');
 }
 
 /**
