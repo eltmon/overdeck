@@ -19,7 +19,7 @@ A notification for four kinds of item:
 | **Question** | An agent or conversation asks an AskUserQuestion, or a `pan ask` decision is waiting for you. |
 | **Approval needed** | A plan waits for approval, or a permission prompt waits in an agent or conversation. |
 | **Finished** | A work agent ran `pan done` (verification started), or an issue merged. |
-| **Failed** | An agent stopped responding, a merge failed, a stalled review escalated, or a conflict repair escalated. |
+| **Failed** | An agent stopped responding, a merge failed, a stalled review escalated, or a conflict repair escalated. An agent that ended normally, such as a planning agent after its plan is finalized, does not notify. |
 
 Each item notifies once, when it first appears. When you answer it and a new
 question arrives later, that new question notifies again. A dashboard restart

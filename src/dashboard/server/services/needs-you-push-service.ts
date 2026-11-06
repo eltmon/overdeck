@@ -19,8 +19,10 @@
  * Runs in the primary dashboard only; a peer would send every push twice.
  * Nothing here throws into the event-store subscriber.
  */
+import { getAgentState } from '../../../lib/agents/agent-state-read.js';
 import { loadConfigSync } from '../../../lib/config-yaml.js';
 import type { PushEventKind } from '../../../lib/config-yaml/push-config.js';
+import { readRecordedAgentStopAt } from '../../../lib/overdeck/event-reads.js';
 import {
   edgeNotificationFromEvent,
   pendingItemsFromConversationRow,
@@ -119,10 +121,27 @@ export function wakeNeedsYouPush(_reason: string): void {
   }, WAKE_DEBOUNCE_MS);
 }
 
+/**
+ * PAN-5074: true when `agentId` has a stop recorded before event `sequence`.
+ * Only events older than the `agent.heartbeat_dead` count, because deacon-lite
+ * appends its own `stopped` right after it; so a planning agent stopped by
+ * finalize is suppressed and a genuine death still pushes. A failed read
+ * pushes, as before.
+ */
+function stopRecordedBefore(agentId: string, sequence: number): boolean {
+  try {
+    return readRecordedAgentStopAt(getAgentState(agentId) ?? { id: agentId }, { beforeSequence: sequence }) !== null;
+  } catch (error) {
+    console.warn('[push] lifecycle read failed:', error instanceof Error ? error.message : error);
+    return false;
+  }
+}
+
 export function startNeedsYouPushService(deps: {
   readConversationFeed: () => Promise<{ body: unknown; status?: number }>;
   store?: Pick<EventStore, 'subscribe'>;
   providers?: PushProvider[];
+  stopRecordedBefore?: (agentId: string, sequence: number) => boolean;
 }): void {
   if (state !== null) return;
   const dispatcher = createNeedsYouDispatcher({ providers: deps.providers ?? defaultProviders(), readConfig: readPushConfig });
@@ -134,7 +153,10 @@ export function startNeedsYouPushService(deps: {
         const { subject, items } = pendingItemsFromEnrichment(event.payload as EnrichmentPayloadLike);
         dispatcher.observeSubject(subject, items);
       } else if (event.type === 'agent.heartbeat_dead' || event.type === 'pipeline.journal') {
-        const edge = edgeNotificationFromEvent(event);
+        const isStopRecorded = deps.stopRecordedBefore ?? stopRecordedBefore;
+        const edge = edgeNotificationFromEvent(event, {
+          stopAlreadyRecorded: (agentId) => isStopRecorded(agentId, event.sequence),
+        });
         if (edge) dispatcher.observeEdge(edge);
       } else if (event.type === 'conversation.permission_changed') {
         if ((event.payload as { waiting?: unknown }).waiting === true) wakeNeedsYouPush('permission');

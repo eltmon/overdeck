@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   edgeNotificationFromEvent,
@@ -91,6 +91,16 @@ describe('push classifier (PAN-2354)', () => {
     expect(edgeNotificationFromEvent({ type: 'agent.heartbeat_dead', timestamp: NOW, payload: { agentId: 'agent-pan-5', issueId: 'PAN-5' } }))
       .toEqual(expect.objectContaining({ kind: 'failed', category: 'stopped', tag: `dead:agent-pan-5:${NOW}`, body: 'The agent stopped responding.', url: '/m' }));
     expect(edgeNotificationFromEvent({ type: 'agent.stopped', timestamp: NOW, payload: { agentId: 'agent-pan-5' } })).toBeNull();
+  });
+
+  // PAN-5074: an agent whose stop was already recorded ended normally.
+  it('returns null for agent.heartbeat_dead when the stop was already recorded', () => {
+    const event = { type: 'agent.heartbeat_dead', timestamp: NOW, payload: { agentId: 'planning-pan-5', issueId: 'PAN-5' } };
+    const stopAlreadyRecorded = vi.fn((agentId: string) => agentId === 'planning-pan-5');
+    expect(edgeNotificationFromEvent(event, { stopAlreadyRecorded })).toBeNull();
+    expect(stopAlreadyRecorded).toHaveBeenCalledWith('planning-pan-5');
+    expect(edgeNotificationFromEvent(event, { stopAlreadyRecorded: () => false }))
+      .toEqual(expect.objectContaining({ kind: 'failed', body: 'The agent stopped responding.' }));
   });
 
   it('never puts the conversation title in the public title', () => {

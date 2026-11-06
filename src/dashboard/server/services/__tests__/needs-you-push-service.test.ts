@@ -36,7 +36,7 @@ function fakeStore() {
         return unsubscribe;
       },
     },
-    emit(event: { type: string; timestamp?: string; payload: unknown }) {
+    emit(event: { type: string; timestamp?: string; payload: unknown; sequence?: number }) {
       for (const fn of subscribers) fn({ sequence: 1, timestamp: new Date().toISOString(), ...event } as unknown as StoredEvent);
     },
   };
@@ -132,6 +132,20 @@ describe('needs-you push service (PAN-2354)', () => {
     });
     await vi.advanceTimersByTimeAsync(0);
     expect(provider.sent).toEqual([expect.objectContaining({ kind: 'failed', body: 'Merge failed.', url: '/m' })]);
+  });
+
+  // PAN-5074: a planning agent stopped by finalize must not push "stopped responding".
+  it('sends no failed push for agent.heartbeat_dead when the stop was recorded before it', async () => {
+    const provider = fakeProvider(true);
+    const events = fakeStore();
+    const stopRecordedBefore = vi.fn((agentId: string) => agentId === 'planning-pan-9');
+    startNeedsYouPushService({ readConversationFeed: vi.fn(async () => ({ body: [] })), store: events.store, providers: [provider], stopRecordedBefore });
+    events.emit({ type: 'agent.heartbeat_dead', sequence: 42, payload: { agentId: 'planning-pan-9', issueId: 'PAN-9' } });
+    events.emit({ type: 'agent.heartbeat_dead', sequence: 43, payload: { agentId: 'agent-pan-9', issueId: 'PAN-9' } });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(stopRecordedBefore).toHaveBeenCalledWith('planning-pan-9', 42);
+    expect(stopRecordedBefore).toHaveBeenCalledWith('agent-pan-9', 43);
+    expect(provider.sent).toEqual([expect.objectContaining({ kind: 'failed', body: 'The agent stopped responding.', tag: expect.stringContaining('dead:agent-pan-9:') })]);
   });
 
   it('sends a question from an agent.enrichment_changed event', async () => {
