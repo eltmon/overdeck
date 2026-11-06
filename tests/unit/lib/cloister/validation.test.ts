@@ -167,6 +167,23 @@ echo "pass stderr diagnostic" >&2
       expect(result.output).toContain('probe=[from-gate]');
     });
 
+    it('puts the workspace .env over project secrets, and gate.env over both (PAN-5062 merge)', async () => {
+      const gate = { probe: { command: 'echo "probe=[$PAN5061_PROBE] ws=[$PAN5061_WS]"' } };
+      const [both] = await runQualityGates(gate, testDir, 'pre_push', {
+        projectEnv: { PAN5061_PROBE: 'project', PAN5061_WS: 'project' },
+        workspaceEnv: { PAN5061_WS: 'workspace' },
+      });
+      expect(both.output).toContain('probe=[project] ws=[workspace]');
+
+      const [gateWins] = await runQualityGates(
+        { probe: { ...gate.probe, env: { PAN5061_WS: 'gate' } } },
+        testDir,
+        'pre_push',
+        { projectEnv: { PAN5061_WS: 'project' }, workspaceEnv: { PAN5061_WS: 'workspace' } },
+      );
+      expect(gateWins.output).toContain('ws=[gate]');
+    });
+
     it('leaves the key absent with an empty projectEnv', async () => {
       const [result] = await runQualityGates(probeGate, testDir, 'pre_push', { projectEnv: {} });
       expect(result.output).toContain('probe=[]');

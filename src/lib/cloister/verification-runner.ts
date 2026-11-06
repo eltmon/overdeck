@@ -57,7 +57,8 @@ import { XBriefMergeConflictError } from '../xbrief/io.js';
 import { isXBriefFilename } from '../xbrief/lifecycle.js';
 import { checkIncompletePlanItems } from '../work/done-preflight.js';
 import { capturePipelineStageForIssue } from '../telemetry/pipeline.js';
-import type { TemplatePlaceholders } from '../workspace-config.js';
+import { toFeatureIdent, type TemplatePlaceholders } from '../workspace-config.js';
+import { loadWorkspaceEnvForProject } from '../workspace-env.js';
 import { snapshotWorkspaceHeads, type HeadAnchor } from '../git-utils.js';
 import { primaryShaFromAnchor } from './verified-head.js';
 import { createDecidedStopCheck, readVerifiedHead, readWorkspaceHeadShort } from './verification-decided-stop.js';
@@ -405,6 +406,7 @@ export async function runVerificationForIssueInProcess(
     const changedBase = `origin/${repoRoots[0]?.targetBranch ?? getSyncTargetBranch(workspacePath, projectConfig, undefined)}`;
     const placeholders: TemplatePlaceholders = {
       FEATURE_NAME: featureName,
+      FEATURE_IDENT: toFeatureIdent(featureName),
       FEATURE_FOLDER: featureFolder,
       BRANCH_NAME: `feature/${featureName}`,
       COMPOSE_PROJECT: `${basename(projectPath)}-${featureFolder}`,
@@ -504,6 +506,7 @@ export async function runVerificationForIssueInProcess(
       isRemote: workspaceInfo.isRemote,
       vmName: workspaceInfo.vmName,
       placeholders,
+      workspaceEnv: loadWorkspaceEnvForProject(projectConfig, workspacePath),
       ...(options.onGateLog ? { onLog: options.onGateLog } : {}),
       onAdmissionPhase: (state) => markVerificationWorkerAdmissionPhase(issueId, state),
       onGateStart: (name) => {

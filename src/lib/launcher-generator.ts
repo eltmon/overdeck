@@ -16,6 +16,7 @@ import { overdeckMcpArgs } from './mcp/overdeck-mcp-args.js';
 import { resolveKimiNativeEffort } from './kimi-effort.js';
 import { getClaudeCodeLaunchModel } from './kimi-claude-routing.js';
 import { harnessLaunchLines } from './launcher-job-control.js';
+import { workspaceEnvLauncherLines } from './workspace-env.js';
 import { panCliShimLauncherLines } from './pan-cli-shim.js';
 
 export type LauncherSpawnMode = 'conversation' | 'remote' | 'resume';
@@ -346,6 +347,7 @@ export function generateLauncherScript(config: LauncherConfig): string {
   // concurrent agent workspaces stampedes the host to OOM. Release/publish
   // builds the index through a separate path that never sources this launcher.
   lines.push('export SKIP_DOCS_INDEX=1');
+  if (config.spawnMode !== 'remote') lines.push(...workspaceEnvLauncherLines(config.workingDir)); // PAN-5062
 
   // Terminal env (TERM/COLORTERM/LANG/LC_ALL)
   if (config.setTerminalEnv) {
@@ -389,11 +391,7 @@ export function generateLauncherScript(config: LauncherConfig): string {
   else if (config.overdeckEnv?.agentId) lines.push(...buildGitGuardLines(config.overdeckEnv.agentId, config.workingDir, config.gitGuardMode ?? 'default'));
 
   // Extra env exports
-  if (config.extraEnvExports) {
-    for (const expr of config.extraEnvExports) {
-      lines.push(expr);
-    }
-  }
+  lines.push(...(config.extraEnvExports ?? []));
   if (config.spawnMode !== 'remote') lines.push(...panCliShimLauncherLines());
 
   for (const file of preparedContext.sources) {

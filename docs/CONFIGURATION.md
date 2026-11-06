@@ -615,6 +615,8 @@ A project with extra test roots (e.g. overdeck's `src/dashboard/frontend`) appen
 
 Gate commands do not inherit the dashboard's `OVERDECK_*` environment (PAN-3902). Variables such as `OVERDECK_NO_RESUME` or `OVERDECK_TERMINAL_BACKEND` describe how the host booted, and a gate that saw them would pass or fail by boot state instead of by the diff. Only `OVERDECK_HOME` passes through. A gate that needs another `OVERDECK_*` value sets it in its `env:` map. The dashboard's `API_PORT`, `PORT`, and `DASHBOARD_URL` are dropped the same way.
 
+A gate's `env:` values take the same `{{...}}` placeholders as `command`, including `{{FEATURE_IDENT}}` — see the [dbt and data projects](https://github.com/eltmon/overdeck/blob/main/configuration/projects.mdx#dbt-and-data-projects) recipe for a worked example.
+
 Keep e2e, Playwright, and other heavy browser tests out of the local per-change gate. Put them in CI-only jobs or an explicit `@slow` tier so local agent verification stays fast and targeted.
 
 ### Tests on CI (`verification.tests`)

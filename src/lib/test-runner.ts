@@ -10,7 +10,7 @@ import { join, basename } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { homedir } from 'os';
-import { ProjectConfig, TestConfig, TemplatePlaceholders, replacePlaceholders } from './workspace-config.js';
+import { ProjectConfig, TestConfig, TemplatePlaceholders, replacePlaceholders, toFeatureIdent } from './workspace-config.js';
 
 const execAsync = promisify(exec);
 
@@ -298,6 +298,7 @@ export async function runTests(options: RunTestsOptions): Promise<TestRunResult>
   const featureFolder = featureName ? `feature-${featureName}` : 'main';
   const placeholders: TemplatePlaceholders = {
     FEATURE_NAME: featureName || 'main',
+    FEATURE_IDENT: toFeatureIdent(featureName || 'main'),
     FEATURE_FOLDER: featureFolder,
     BRANCH_NAME: featureName ? `feature/${featureName}` : 'main',
     COMPOSE_PROJECT: `${basename(projectConfig.path)}-${featureFolder}`,
