@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-06T17:35:00.893288Z · model: claude-opus-5-5 · open: 867_
+_Last sequenced: 2026-11-06T17:58:37.477302Z · model: claude-opus-5-5 · open: 868_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -53,825 +53,826 @@ _Last sequenced: 2026-11-06T17:35:00.893288Z · model: claude-opus-5-5 · open: 
 | 46 | PAN-3653 | M | critical | ok |  |  | A strike blocked on red main has no owner that wakes it when main goes green; the session stays alive so recover refuses it. |
 | 47 | PAN-3630 | M | critical | ok |  |  | pan tell reported three deliveries to a live agent, moved all three to read/, and the agent received none — the delivery door lies. |
 | 48 | PAN-3805 | S | critical | needs-refinement |  |  | Codex idle poke spawns codex exec instead of the app-server door; failed sends still tick the counter and pause healthy agents |
-| 49 | PAN-3560 | M | critical | ok |  |  | PTY supervisor overloads under concurrent review convoys; fleet-wide 502 'input echo confirmation failed' kills resumes and feedback. |
-| 50 | PAN-3520 | S | critical | ok |  |  | Test gate records 'failed' for load-induced timeouts; retry timeout-only failures in isolation before writing a verdict. |
-| 51 | PAN-4439 | S | high | ok |  |  | CI relay has no backstop for webhooks missed during pan reload; red test jobs never reach the agent, PRs stall |
-| 52 | PAN-4392 | XS | high | ok |  |  | pan task done accepts an Item: trailer from another issue's merged commit (history-wide grep); gate passes with no evidence |
-| 53 | PAN-3500 | S | critical | ok |  |  | A review sub-role edited seven tracked files after writing its report and the changes were auto-committed into the feature history. |
-| 54 | PAN-3313 | S | critical | ok |  |  | A transient upstream stream error benches CLIProxy's only auth: ~70% of GPT-routed inference 503s with a message that blames credentials. |
-| 55 | PAN-3282 | M | critical | ok |  |  | Review agents die before writing a verdict across 5 issues and 2 projects, leaving a verdict-shaped status with no artifact behind it. |
-| 56 | PAN-4391 | S | high | ok |  |  | pan worker run fails in polyrepo workspaces because the root is not a git repo; delegation is broken for MYN |
-| 57 | PAN-4390 | S | high | ok |  |  | Polyrepo workspace create runs npm install in the project's parent dir, reports failure and hides the workspace from list |
-| 58 | PAN-2695 | S | high | ok |  |  | Concurrent review dispatches race fresh-spawn vs resume |
-| 59 | PAN-2742 | S | high | ok |  |  | synthesis fires 42s after spawn and reports reviewers with reports on disk as 'infrastructure failure' |
-| 60 | PAN-2706 | M | high | needs-refinement |  |  | Ghost test sessions absorb every test dispatch |
-| 61 | PAN-4374 | S | high | ok |  |  | Memory extraction has no working provider on subscription-only hosts; nothing extracted since 2026-08-13. Add claude-cli |
-| 62 | PAN-4344 | S | high | ok |  |  | Registered projects lack the agent main-push guard; ship a pre-push hook so agents cannot push to main outside overdeck |
-| 63 | PAN-4550 | XS | medium | ok |  |  | Two unit tests read host state (DASHSCOPE_BASE_URL, git-ignored .map files), so pan release check reports false reds locally |
-| 64 | PAN-4566 | S | high | ok |  |  | A failed replayEvents leaves the coordinator un-bootstrapped; tab defers live events with no banner. PAN-4559 fallback has landed. |
-| 65 | PAN-4622 | M | high | ok |  |  | Restart after consuming a verification result, or a dirty tree at boot, still re-runs 25-45 min of passed gates. PAN-4532 merged |
-| 66 | PAN-2940 | M | critical | ok |  |  | Three red-mains in one day from direct-push series bypassing PR CI |
-| 67 | PAN-3708 | M | critical | ok |  |  | pan strike dies at git worktree list on a polyrepo wrapper — the urgent-strike escape hatch is unavailable for MYN-class projects. |
-| 68 | PAN-3605 | XS | high | ok |  |  | Supply chain: lint-effect-diagnostics npx fell back to the registry and ran a squatted unscoped package; pin the scoped local bin. |
-| 69 | PAN-4624 | S | high | ok |  |  | Polyrepo ci-mode test gate reads CI verdict for the wrapper HEAD, never the member repo PR head, so red CI is silently missed. |
-| 70 | PAN-4792 | S | high | ok |  |  | Paste guard only knows numbered menus; a failed paste presses Enter into unnumbered selects, silently setting defaultMode=auto. |
-| 71 | PAN-3557 | S | critical | ok |  |  | Post-merge label writes have no retry; a 403 hides a merged issue from the verify-on-main sweep while lifecycle reports success. |
-| 72 | PAN-3543 | S | critical | ok |  |  | Completed-handoff agents are unstartable: start, --fresh and reset-session all refuse while the refusal itself recommends --fresh. |
-| 73 | PAN-3522 | S | critical | ok |  |  | Supervisor watchdog restart-churns under CPU storm because the probe timeout budget ignores the boot warm phase. |
-| 74 | PAN-3314 | M | critical | ok |  |  | One cgroup holds every agent pane, so a single hungry agent inflates the unit and oomd kills the whole fleet — twice now. |
-| 75 | PAN-3278 | S | critical | needs-refinement |  |  | A finished work agent with an open PR sat two hours because review was never dispatched and auto-requeue fired none of 25 attempts. |
-| 76 | PAN-4623 | XS | high | ok |  |  | deacon-lite stalled-review fallback calls a starter never registered in the deacon child, so stranded reviews stay stranded. TENET-10 |
-| 77 | PAN-3234 | S | critical | needs-refinement |  |  | Agents freeze indefinitely on blocking choice menus and no health surface notices; the detector is wired only to delivery refusal. |
-| 78 | PAN-3205 | S | critical | ok |  |  | The deployment gate promises the queued deploy will fire at the next verification boundary; that trigger does not exist. |
-| 79 | PAN-3118 | S | critical | needs-refinement |  |  | Model-specific quota exhaustion is invisible everywhere but the pane: four planning agents read 'running' at $0.00 with no fallback. |
-| 80 | PAN-3106 | S | critical | ok |  |  | auto_merge_default: hold is consulted on one merge path only, so held issues merge individually and defeat the UAT train. |
-| 81 | PAN-3100 | S | critical | ok |  |  | The test role evaluates the dirty working tree, so a live work agent's uncommitted edits are recorded as the issue's test failure. |
-| 82 | PAN-4213 | M | high | ok |  |  | Merge-train follow-ups from #4066 (merged): stamp-vs-pin mismatch, reset --keep can strand agent commits, fetch retry, tests |
-| 83 | PAN-4753 | XL | high | needs-refinement | ✓ |  | Epic: restore merge trains (MergeTrain component, strike fast lane); PAN-4750 merged; PRD being written, no children yet; handoff. |
-| 84 | PAN-3096 | S | critical | ok |  |  | pan done blocks on generated .devcontainer/ and dev, and agents resolve it by deleting workspace infrastructure or inventing gitignores. |
-| 85 | PAN-3084 | S | critical | needs-refinement |  |  | A review session spawned but never briefed sits at zero context forever, and restart 'preserves' the zombie that blocks its replacement. |
-| 86 | PAN-3043 | S | critical | needs-refinement |  |  | Provider health is probed only at spawn, so a mid-run 403 quota refusal leaves an agent 'running' for days holding a slot. |
-| 87 | PAN-1824 | S | high | ok |  |  | Fix flaky main CI: fake timers + @slow exclusion for real-timer test family |
-| 88 | PAN-2932 | S | high | ok |  | PAN-2337 | intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap leaves :3011 unbound (Bad Gateway) after pan reload |
-| 89 | PAN-2935 | S | critical | ok |  |  | Workspace devcontainer duplicate backend hijacks Traefik router |
-| 90 | PAN-2337 | XS | critical | ok |  |  | Reload/build atomicity: an in-place `npm run build` under a live dashboard breaks new PTY-supervisor spawns until restart |
-| 91 | PAN-2422 | XS | high | ok |  | PAN-2337 | rebuilding dist under a live server breaks lazy chunk imports |
-| 92 | PAN-2699 | XS | high | ok |  |  | npm run build regenerates the committed record-cost-event.js bundle |
-| 93 | PAN-2957 | XS | high | ok |  | PAN-2337 | npm run build intermittently produces stale frontend bundles |
-| 94 | PAN-2850 | M | high | ok |  |  | npm test fails in clean checkout after pretest removes dashboard bundle |
-| 95 | PAN-2758 | S | critical | needs-refinement |  |  | Provider capacity error silently zombies a spawned agent: willRetry=false, turn reported completed, state stays status=running forever |
-| 96 | PAN-2817 | M | high | needs-refinement |  |  | Idle-at-prompt work/review agents are never redriven: gpt-5.6-sol sessions stop at the composer mid-task and sit for hours |
-| 97 | PAN-2813 | M | high | ok |  |  | Scheduler yield never self-clears: yielded work agents stay paused after the blocking review completes/merges |
-| 98 | PAN-2668 | M | high | ok |  |  | Verification/review feedback silently queued to stopped-by-user agents |
-| 99 | PAN-2569 | XS | critical | ok |  |  | planning finalizes (issue→planned) but work agent does not auto-spawn |
-| 100 | PAN-4269 | M | high | ok |  |  | macOS conversations hang on 'Working…'/'waiting for transcript'; governor ruled out, root cause unknown (delivery or transcript find). |
-| 101 | PAN-3811 | M | high | ok |  |  | The PAN-3809 emergency strike prunes BuildKit unconditionally; inventory, bounded reclaim door and retention floor are still missing |
-| 102 | PAN-2179 | S | high | needs-refinement |  |  | relaunch can leave a zombie agent |
-| 103 | PAN-2169 | S | high | needs-refinement |  |  | kimi agent silently frozen at 100% ctx (no thrown overflow error) not caught by CONTEXT_OVERFLOW_PATTERNS |
-| 104 | PAN-2734 | S | high | ok |  |  | merge queue head-of-line zombie |
-| 105 | PAN-3697 | XS | high | ok |  |  | Deployed dashboard PATH omits Bun, so verification workers hit 'bun: not found' before the required install gate. |
-| 106 | PAN-3633 | S | high | ok |  |  | Strike workspaces spawn without @types, so the contract's own typecheck gate fails and agents abort reporting a false red main. |
-| 107 | PAN-4420 | S | high | ok |  |  | npx @overdeck/core on native Windows serves 404 for every page: static root is built from a URL path |
-| 108 | PAN-3099 | XS | critical | ok |  |  | --health-timeout 120 is enforced as 120ms and a false-failed check exits after killing the old server — nothing left listening. |
-| 109 | PAN-4418 | S | high | ok |  |  | vault join fails on native Windows: core.autocrlf=true rewrites the VAULT-FORMAT marker; blocks Windows continue flow |
-| 110 | PAN-3040 | S | critical | ok |  |  | pan strike is monorepo-shaped end to end and fails immediately on polyrepo projects; same defect as PAN-3708. |
-| 111 | PAN-3023 | S | critical | ok |  |  | Post-planning auto-spawn logs 'attempt 1/3' and never retries after a transient Docker EOF, stranding the issue with no re-drive owner. |
-| 112 | PAN-1618 | S | high | ok |  |  | Substrate: work-spawn docker-health gate has no autonomous recovery |
-| 113 | PAN-3916 | M | high | ok |  |  | Session pointers go stale after rollover + crash recovery; issue view and pan tell confirmation track a dead transcript |
-| 114 | PAN-3900 | S | high | ok |  |  | Docker bridge pool exhausted by orphaned workspace networks; pan start fails; bridge-pool patrol only warns |
-| 115 | PAN-3793 | S | high | ok |  |  | resolveIssuePullRequestRef probes only feature/ and strike/ names, so close-out cannot find a merged PR on a descriptive branch |
-| 116 | PAN-2639 | S | high | ok |  | PAN-2331 | codex-resume replays a rotated-out (revoked) refresh token → codex review convoys wedge with 401 |
-| 117 | PAN-2331 | S | high | ok |  |  | codex rate-limit 'Switch to gpt-5.4-mini?' modal stalls autonomous agents (no auto-dismiss) |
-| 118 | PAN-2333 | M | high | ok |  |  | feat: handle codex weekly-quota exhaustion gracefully |
-| 119 | PAN-4184 | S | high | needs-refinement |  |  | --no-deacon on the host port is refused as a peer after the old server stops, so the escape hatch may leave no dashboard; fix unpicked |
-| 120 | PAN-2511 | XS | high | ok |  |  | Work agents burn 20+ min on false test failures |
-| 121 | PAN-2763 | S | high | ok |  |  | Workspace node_modules is symlinked to the primary repo, breaking test resolution |
-| 122 | PAN-2170 | XS | high | ok |  |  | Docker init container lacks Python |
-| 123 | PAN-1198 | S | high | ok |  |  | Workspace init container's bun install doesn't populate container-node-modules named volume |
-| 124 | PAN-4453 | XS | high | ok |  |  | runtimes/codex.ts uses homedir() not OVERDECK_HOME; isolated homes write thread ids into the real ~/.overdeck |
-| 125 | PAN-2106 | S | high | ok |  |  | pan strike workspace setup leaves broken partial workspace + false 'spawned' success (git-lock race) |
-| 126 | PAN-2880 | M | high | ok |  | PAN-2259 | Linear tracker listIssues is a 3N+1 request storm |
-| 127 | PAN-2966 | S | high | ok |  |  | Polyrepo wrapper .gitignore misses .pan/ .devcontainer/ dev |
-| 128 | PAN-2945 | S | high | ok |  |  | pan done rejects Overdeck-generated runtime in polyrepo wrapper repos (.devcontainer/, dev, .pan/review) |
-| 129 | PAN-2680 | M | high | ok |  |  | pan close: Docker teardown silently skips a running stack in multi-repo projects (MYN), aborting close-out |
-| 130 | PAN-4419 | S | high | ok |  | PAN-4418 | pan vault resume cannot spawn claude on native Windows (ENOENT, needs shell/.cmd resolution); --no-launch works |
-| 131 | PAN-3734 | S | high | ok |  |  | Completed swarm slot reuse can start a new item from a stale polyrepo branch — silent wrong-parent work. |
-| 132 | PAN-3621 | M | high | ok |  |  | pan start intermittently dies resolving a chunk graph spliced across two builds — importer from primary dist, path in the live generation. |
-| 133 | PAN-3555 | S | high | ok |  |  | pan start without --fresh silently abandoned an intact 7.5MB warm session, violating the warm-by-default contract. |
-| 134 | PAN-3498 | S | high | ok |  |  | write-sequence pins in-pipeline ranks without renumbering, so the persisted sequence carries duplicate ranks and gaps. |
-| 135 | PAN-3496 | XS | high | ok |  |  | A review convoy member blocked on an operator AskUserQuestion about review depth; review agents must decide and record, not ask. |
-| 136 | PAN-3081 | S | high | ok |  |  | The agent git guard is PATH-based and an agent stripped it unprompted to get past a false block; a control the agent can remove isn't one. |
-| 137 | PAN-2627 | S | high | ok |  |  | Linear poller is blind after cycle rollover |
-| 138 | PAN-2324 | XS | high | ok |  |  | label transition fails atomically on missing 'in-planning' label |
-| 139 | PAN-2165 | XS | high | ok |  |  | pan close: close-issue phase reports success but leaves issue OPEN / wrong labels (remove-label aborts on absent label; no-vBRIEF trans… |
-| 140 | PAN-2905 | S | high | ok |  |  | Dashboard steady-state CPU ~50% keeps API responses at 0.5-1.5s |
-| 141 | PAN-2259 | S | critical | ok |  |  | something burns the full 5k/hr GitHub GraphQL quota |
-| 142 | PAN-2379 | S | high | ok |  |  | dependency install is warn-only + 60s timeout → false verify failures against empty node_modules (blocks swarm convergence) |
-| 143 | PAN-2421 | XS | high | ok |  |  | dashboard server route tests flake under full-suite verification load |
-| 144 | PAN-2430 | S | high | ok |  |  | frontend typecheck fails with dozens of pre-existing unused-local errors |
-| 145 | PAN-2593 | S | high | ok |  |  | server children inherit bare system PATH |
-| 146 | PAN-4302 | M | high | ok |  |  | ~19 files exec gh directly, bypassing runGh: spend is unattributed and keeps hitting GitHub during quota pause. Follow-up to PAN-4291 |
-| 147 | PAN-2080 | M | high | needs-refinement |  |  | External transports (email/Slack/push/TTS) still plausible; its stated dependency on the PAN-2079 Inbox spine is undercut by boot… |
-| 148 | PAN-5048 | M | high | ok |  |  | Needs-you drops an unanswered AskUserQuestion seconds after its phone push; the phone shows 'already answered' with no card. |
-| 149 | PAN-1436 | S | high | ok |  |  | PAN-1419 follow-up: stale stopped-agent zombies still pollute dashboard list |
-| 150 | PAN-3556 | S | high | ok |  |  | No per-agent spawn mutex: two flows allocated session identities 3s apart and the second pin orphaned the first transcript. |
-| 151 | PAN-3553 | S | high | ok |  |  | tmux list-panes -a exits 1 on a zero-session server, so the census reads unavailable post-reboot and conversations hang on 'Starting…'. |
-| 152 | PAN-3535 | S | high | ok |  |  | The drain/resume hold is re-derived from the caller's env each boot, so any restart from a clean shell silently drops it. |
-| 153 | PAN-3429 | M | high | ok |  |  | Memory governor defers admissions but sheds nothing under HARD pressure; concurrent heavy gate runs aren't in the shed ladder. |
-| 154 | PAN-3397 | S | high | ok |  |  | Fresh convoy lanes freeze at 0 output before kickoff; PAN-3375's detector only covers warm resumes, so recovery is manual. |
-| 155 | PAN-3325 | S | high | ok |  |  | A fresh workspace ships an empty-but-present node_modules, so tooling silently resolves the parent repo's deps and gates go false-green. |
-| 156 | PAN-3317 | S | high | ok |  |  | Strike agents are told to rebase, the launcher guard blocks it, and pan sync-main can't resolve a -strike workspace. Overlaps PAN-3306. |
-| 157 | PAN-3284 | S | high | ok |  |  | A workspace-confined agent wrote a doc edit into the primary main worktree — the PAN-2204 write-to-main hazard through a new door. |
-| 158 | PAN-3270 | S | high | ok |  |  | New workspaces arrive with empty node_modules and bun off the agent shell PATH, so the documented bun install remedy fails. |
-| 159 | PAN-4487 | XS | high | ok |  |  | cleanAgentState whitelist drops foreman, modelSpawnKey, workspaceId on every state.json write; add fields + round-trip test |
-| 160 | PAN-3257 | S | high | ok |  |  | Crash-resume leaves a stale PTY socket and drops supervisorEnabled from state.json, so every supervisor delivery fails afterwards. |
-| 161 | PAN-3129 | M | high | ok |  |  | No symlink/TOCTOU containment on canonical writes under agent-controlled paths; a planted symlink redirects a server-side write. |
-| 162 | PAN-3120 | S | high | ok |  |  | A scheduler-yielded work agent makes operator MERGE hard-error on polyrepo and silently dead-end on single-repo. |
-| 163 | PAN-4349 | S | high | ok |  |  | Agent-side GitHub reads prefer REST over GraphQL gh --json until PAN-4302 meters callers; protects the hourly quota |
-| 164 | PAN-3062 | M | high | ok |  |  | The shared primary main worktree stacks several sessions' commits, so whoever pushes next ships everyone else's unverified work. |
-| 165 | PAN-3048 | XS | high | needs-refinement |  |  | Pipeline auto-commit lands Overdeck's own .pan/drafts PRD into product feature branches; the exclusion list is duplicated and has drifted. |
-| 166 | PAN-3032 | S | high | ok |  |  | Rebuild composes under overdeck-feature- while Traefik labels name myn-feature- devnet, and traefik attaches are runtime-only. |
-| 167 | PAN-3833 | S | high | ok |  |  | Feed renders assistant text emitted after tool calls as collapsed thinking rows; operator believes the agent never answered |
-| 168 | PAN-3902 | S | high | ok |  |  | Verification gates inherit OVERDECK_* env from the dashboard, so host boot state (e.g. OVERDECK_NO_RESUME) can red any branch |
-| 169 | PAN-4629 | M | high | ok |  |  | Fresh npx machine cannot pan start: no gh auth token fallback for the GitHub tracker, and registration derives the wrong issue prefix. |
-| 170 | PAN-3854 | S | high | ok |  |  | Feature-workspace devcontainer stack 403s on POST /api/dashboard/session, blocking all in-browser mutation UAT |
-| 171 | PAN-4577 | M | high | ok |  |  | Operator's facts didn't follow them to a new Mac: no importer for Claude auto-memory. PAN-3957 merged, so W9-W11 are unblocked. |
-| 172 | PAN-3307 | XS | high | ok |  |  | commitlint scope-enum lists 11 scopes, 14 real ones are missing, and it still names the removed beads scope — trains everyone to ignore it. |
-| 173 | PAN-4634 | M | medium | needs-refinement |  |  | Terra unserved on claude-code route: no CLIProxy release (to v8.0.44) lists it; bump pin, add to GPT_56_MODELS. Aliases also broken. |
-| 174 | PAN-2642 | XL | high | ok | ✓ |  | Cost strategy: waste detection over budget policing |
-| 175 | PAN-1868 | XS | high | ok |  |  | Cost-bleed circuit breaker: progress-aware, always-on guard against runaway agent spend |
-| 176 | PAN-4847 | S | high | ok |  |  | Remote reap silently skips review request when a background writer dirties a tracked file; pipeline stalls at PR-open. |
-| 177 | PAN-1042 | S | high | ok |  |  | cost_events retention: 14 months of granular rows accumulating with ad-hoc partial deletions |
-| 178 | PAN-4844 | S | medium | ok |  |  | Claude Code parser prices glm-*/qwen3* as Sonnet 4, ohmypi prices DashScope at $0; route both to custom rows. |
-| 179 | PAN-570 | XS | high | ok |  | PAN-2642 | Show PLAN badge on costs when under a subscription/plan |
-| 180 | PAN-2059 | XL | high | ok | ✓ |  | Backlog pickup gate |
-| 181 | PAN-2376 | XL | high | stale | ✓ |  | Epic: CI/CD reliability — all 21 named children are closed; needs an operator disposition (close or restate) |
-| 182 | PAN-3775 | S | high | ok |  |  | makeDbLive opens overdeck.db unmigrated; zero-table db poisons a vitest worker home and breaks later read-only audits. |
-| 183 | PAN-3652 | XS | high | ok |  |  | No workflow_dispatch on ci.yml / state-plane-branches.yml, so an unverified main tip can never be verified and DoD row 6 blocks close-out. |
-| 184 | PAN-3579 | M | high | ok |  |  | ~20 frontend mutations hand-write JSON headers and omit the CSRF token, so each 403s the moment its route becomes guarded. |
-| 185 | PAN-3541 | S | high | ok |  |  | Review restart loops on the session-resume menu because eligibility ignores how the prior session ended; partial mechanical break landed. |
-| 186 | PAN-3463 | S | high | ok |  |  | A legitimate empty-diff slot outcome can never pass item verify, so the slot wedges and blocks dispatch of remaining items forever. |
-| 187 | PAN-3460 | S | high | ok |  |  | Per-item verify_commands that run the whole root suite make slot merge gates load-fragile and hold a patrol in flight for ~17 minutes. |
-| 188 | PAN-3454 | M | high | ok |  |  | Cost hook rescans fork-copied parent history from byte 0 under the reviewer's id — fabricated cache-miss warnings and double-billed spend. |
-| 189 | PAN-3432 | S | high | ok |  |  | Preemptive yield fans out: seven work agents paused to make room for one review convoy, then flood back oldest-first. |
-| 190 | PAN-3306 | S | high | ok |  |  | Three layers disagree on how a strike rebases: the prompt instructs it, the launcher guard blocks it, sync-main resolves the wrong worktree. |
-| 191 | PAN-3297 | S | high | ok |  |  | After a dashboard restart, delivery calls a healthy agent a zombie while resume calls it healthy; both classifiers can't be right. |
-| 192 | PAN-3274 | S | high | needs-refinement |  |  | A test-role agent spawned and never ran a turn, holding an approved CI-green issue out of the merge gate behind a stale failed verdict. |
-| 193 | PAN-3267 | S | high | ok |  |  | GitLab merged-head oracle spawns one glab subprocess per repo × head, so pipeline membership refresh fails on every cycle. |
-| 194 | PAN-3261 | S | high | ok |  |  | The tmux delivery fallback answered a live session-resume menu because its own paste hid the menu from the detector — silent /compact. |
-| 195 | PAN-3256 | S | high | ok |  |  | glab mr list runs with a polyrepo wrapper root as cwd, which is not a git repo, so MYN membership fails forge_unavailable every cycle. |
-| 196 | PAN-4342 | M | medium | ok |  |  | Re-review rounds resume every lane on its own round-1 findings; give each round one fresh critic lane (Deft method) |
-| 197 | PAN-3174 | S | high | ok |  |  | Polyrepo UAT stacks 504: Traefik labels carry the old myn- prefix, Traefik isn't on the overdeck-* devnet, and the fe port is wrong. |
-| 198 | PAN-3050 | XS | high | ok |  |  | Idle-stack reaper's regex only matches overdeck-feature-*-server|frontend, so MYN stacks run for hours after their agents are gone. |
-| 199 | PAN-4365 | S | medium | ok |  |  | Stale defaults: workhorses.expensive is Opus 4.8 and the flywheel role is a literal that ignores the slot; evals now unblocked |
-| 200 | PAN-2980 | XS | high | ok |  |  | The pre-push file-size guard reads the shared working tree, so another session's uncommitted edits block an unrelated, guard-clean push. |
-| 201 | PAN-3769 | S | high | needs-refinement |  |  | Red main 707089c5→e4b280b3 blocked deploys ~14h: missing no-loss lock entry + stale OpenRouter expectation. Verify still reproducing. |
-| 202 | PAN-3760 | S | high | ok |  |  | permissionMode 'auto' undocumented as non-bypass, launcher can emit invalid --permission-mode, invalid values drop silently. |
-| 203 | PAN-3629 | M | high | ok |  |  | No sanctioned door to re-scope a live agent; the operator must violate pan tell doctrine or let the rejected design land. |
-| 204 | PAN-3517 | M | high | ok |  |  | Convoy forks still miss the parent prompt cache in production — launch-injection byte drift plus resume dropping the cache-scope header. |
-| 205 | PAN-3508 | S | high | ok |  |  | pan reload deletes the generation the global pan link points at, so the CLI vanishes mid-deploy for anyone invoking from elsewhere. |
-| 206 | PAN-3303 | S | high | ok |  |  | An empty registered-projects 200 is treated as authoritative, latching Command Deck at 'Unknown project' until a manual page reload. |
-| 207 | PAN-4364 | S | medium | ok |  |  | GPT-6 catalog: gpt-6-sol misclassed frontier and OpenAI tierModels still remap to GPT-5.6; prerequisites have closed |
-| 208 | PAN-3196 | S | high | ok |  |  | Root-owned container residue makes close-out die on EACCES after passing every DoD row; same family as PAN-3570. |
-| 209 | PAN-3186 | XS | high | ok |  |  | One configured non-git member (auricle/infra) blanks pipeline membership for the whole project the resolver claims it can answer. |
-| 210 | PAN-3185 | XS | high | ok |  |  | Racer (deacon auto-resume) was cut but the check-then-create gap in spawn.ts remains; pan start must report the live agent, not fail. |
-| 211 | PAN-3179 | M | high | ok |  |  | A UAT promote is complete at merge time with no production-reach check, so members read shipped while prod serves the old build. |
-| 212 | PAN-3176 | S | high | ok |  |  | UAT promote consults no stack health, so a batch whose stack was never exercised can be promoted from a success-green control. |
-| 213 | PAN-3130 | S | high | ok |  |  | Identifier-joined write paths have no containment assertion, so a crafted issue or agent id could redirect a canonical write. |
-| 214 | PAN-3047 | XS | high | ok |  |  | Strike-branch teardown uses --is-ancestor, which cannot see a squash merge, so all 96 strike/* branches survive as residue. |
-| 215 | PAN-3046 | XS | high | ok |  |  | pan exits with ERR_UNHANDLED_REJECTION when the PostHog shutdown flush times out, so callers read a successful merge handoff as failure. |
-| 216 | PAN-1711 | S | high | ok |  |  | Dashboard event-loop stalls under load force watchdog restarts; the root cause behind the PAN-3522 churn and the 0.5-1.5s API latencies. |
-| 217 | PAN-3667 | M | high | ok |  |  | CLIProxy has no cross-family remap, so every Anthropic-pinned subagent dies at spawn in a proxied session; stopgap is hand-written. |
-| 218 | PAN-4561 | L | medium | ok |  |  | React 18.3 + ~700 hand memo hooks; upgrade to React 19, enable the compiler, ratchet out manual memo. #4560 profiling has landed. |
-| 219 | PAN-4242 | M | high | ok |  |  | pan handoff --cwd skips the folder-trust pre-trust pan start does; successor sits at the trust prompt for hours while shown live |
-| 220 | PAN-2874 | M | high | needs-refinement |  |  | Two of three defects are gone: strike verification now sets skipPlanChecklist, and the landing loop was deleted in the cut. Rescope. |
-| 221 | PAN-3778 | S | medium | ok |  |  | Server snapshot cap shipped in #4558 (closed). Resume-from-offset on resubscribe is the remaining open piece; now unblocked. |
-| 222 | PAN-4575 | S | high | ok |  |  | Kimi ACP cancel is sent with id:"" and rejected, so interrupts never stop Kimi; late chunks land after turn_completed. Unblocked. |
-| 223 | PAN-5087 | S | high | ok |  |  | Attachment messages on every non-Claude harness never match their transcript echo and land in the failed outbox after 4 min. |
-| 224 | PAN-3510 | S | high | ok |  |  | Agent stop leaves detached docker-run test containers alive for hours, contending with other agents' quality gates. |
-| 225 | PAN-4909 | S | high | ok |  |  | Mac set up with connect: Safari on localhost:3011 gets HTTP 401 from the loopback session mint, so the Mac's own dashboard won't load. |
-| 226 | PAN-4616 | S | medium | ok |  |  | After PAN-4614 lands, check whether GitHub mergeable honors merge=union; if not, plan a merge-gate fallback |
-| 227 | PAN-4747 | S | high | ok |  |  | Two pan reloads built into the same generation slot 12s apart; restart lock taken over early, first build died on TS6053. |
-| 228 | PAN-3355 | XS | high | ok |  |  | sessionExists collapses 'no such session' and 'could not ask' into false, so callers read not-running when liveness is unknown. |
-| 229 | PAN-3289 | S | high | ok |  |  | A sequencer pass ran against an empty manifest while the read model held 1120 issues — a transiently empty read at spawn. |
-| 230 | PAN-4348 | S | medium | ok |  |  | Verification emits warn-first evidence of changed files outside every item's files_scope, so scope creep is visible |
-| 231 | PAN-3218 | S | high | ok |  |  | No release-drift signal: an install-breaking fix sat merged and unpublished for ~9 hours with nothing surfacing it. |
-| 232 | PAN-3210 | XS | high | ok |  |  | Close-out teardown scopes by compose project while the guard scopes by working_dir, so an unprefixed dead init container blocks it. |
-| 233 | PAN-3167 | S | high | ok |  |  | krux and lexerra are permanently unreadable through the membership door: an App-not-installed 404 is typed as retryable forge_unavailable. |
-| 234 | PAN-3113 | M | high | ok |  |  | Blocking agent-pane choice prompts show nothing in the conversation view; surface them as inline decision cards with keystroke delivery. |
-| 235 | PAN-3108 | XS | high | ok |  |  | dashboard.log reached 867MB with no rotation — disk cost and un-greppable incident logs exactly when they're needed. |
-| 236 | PAN-3094 | XS | high | ok |  |  | pan done's merge fallback still force-pushes a fast-forwardable branch, so a rejected push leaves completion half-done. |
-| 237 | PAN-3012 | M | high | ok |  |  | Archiving preserves the pointer, not the data: harnesses delete session JSONL on their own schedule and the conversation is unrecoverable. |
-| 238 | PAN-3627 | XS | high | ok |  |  | backlog-auto-trigger throws on a legitimately empty manifest, so a plain npx @overdeck/core in a non-project dir prints a stack trace. |
-| 239 | PAN-3617 | S | high | needs-refinement |  |  | Three strike dispatches for PAN-3586 died with zero output while a sibling worked; may be stale — re-confirm before picking up. |
-| 240 | PAN-4346 | S | medium | ok |  |  | Byte ratchet on the always-loaded rules bundle (40 KB, no ceiling); seeded at current size, growth forbidden |
-| 241 | PAN-3276 | XS | high | ok |  |  | Needs-you rows for pane questions and permission prompts are click-dead, so the list that exists to route the operator routes nowhere. |
-| 242 | PAN-3235 | S | high | ok |  |  | Render and answer agent pane-choice menus on the decision card; PAN-3228 shipped the core and CLI, the dashboard UX remains. |
-| 243 | PAN-4203 | L | high | ok |  |  | Operator-requested pan replan + right-click Replan: API-archive stale branch, verify, reset, comment, auto-replan from main. |
-| 244 | PAN-3789 | L | medium | needs-refinement |  |  | MCP servers configured in standalone Codex never reach Overdeck conversations; no setup, auth or lifecycle story across harnesses |
-| 245 | PAN-3175 | M | high | ok |  |  | Merge-train ordering derives conflicts from file overlap alone, so semantically dependent members batch in any order and break the schema. |
-| 246 | PAN-3015 | L | high | ok |  |  | Claude Code is the only harness still driven by keystroke injection; a pull-based monitor inbox would retire the whole hardening stack. |
-| 247 | PAN-3518 | M | high | needs-refinement |  | PAN-3517 | Re-review resumes re-bill the whole cold history; make reviewResumeDecision TTL- and size-aware. Needs design sign-off. |
-| 248 | PAN-3445 | XS | high | ok |  |  | projects.yaml TCP lock ports overlap the OS ephemeral range, so an unrelated socket makes an uncontended config write fail. |
-| 249 | PAN-3332 | S | high | ok |  |  | A detached slash-command spawn died in 150ms while the UI kept saying 'running in the background'; the activity must own its outcome. |
-| 250 | PAN-4426 | M | medium | ok |  |  | Dashboard controls for Deft Directive detection and managed mode over the PAN-3943 library; blocker has closed |
-| 251 | PAN-4345 | XS | medium | ok |  |  | Terse gate-integrity rule (fix the work, never the gate) plus a Rule Authority note in rule authoring |
-| 252 | PAN-3013 | XS | high | ok |  |  | Role-spawn wrote 26 session-scoped hook paths into the durable ~/.claude/settings.json; they fail on every Linear tool call forever. |
-| 253 | PAN-3771 | M | high | ok |  |  | Conversation search silently empty end-to-end: palette flag off by default, FTS scan manual-only, no summaries. |
-| 254 | PAN-4530 | XS | medium | ok |  |  | Flywheel skill: define 'pipeline clear', go idle with conversation open, and never stop on a stuck pipeline |
-| 255 | PAN-3533 | L | high | ok |  |  | No per-project resource partitioning, so one project's docker stacks and installs starve another project's pipeline and the dashboard. |
-| 256 | PAN-3107 | S | high | ok |  |  | OOM spikes are unattributable after the fact; productize the machine-local memory-attribution census stopgap. |
-| 257 | PAN-4512 | M | medium | needs-refinement |  |  | Tier escalation config is shown but nothing fires it since the Cut; choose a trigger, persist tierOverrides, re-dispatch |
-| 258 | PAN-1666 | XL | medium | ok | ✓ |  | Pipeline Throughput Hardening |
-| 259 | PAN-1556 | S | high | ok |  |  | Session/activity feed: coalesce review-spawn spam, supersede re-reviews per issue, keep active conversations most-recent |
-| 260 | PAN-4510 | S | medium | ok |  |  | Show effort on issue-view agent rows, conversation rows and Agents-page conversation entries; split from closed PAN-4259 |
-| 261 | PAN-2190 | L | high | ok |  |  | Decompose routes/workspaces/merge-ops.ts (1,925 lines) |
-| 262 | PAN-2233 | L | high | ok |  |  | decompose merge-agent.ts (1,414 lines) into focused modules |
-| 263 | PAN-2186 | S | high | ok |  |  | Rescoped: after a merge the pending auto-merge row must clear and tracker labels must match the merged PR. Label-retry half is PAN-3557. |
-| 264 | PAN-4632 | S | medium | ok |  |  | Markdown chip 'Open in File Manager' xdg-opens the file in its MIME app and sticks as the left-click default; drop it, repair stored pref. |
-| 265 | PAN-2241 | S | high | ok |  |  | complete-planning is not serialized or idempotent per issue (spec tmp-rename 500s, bead delete-recreate thrash) |
-| 266 | PAN-2242 | S | high | ok |  |  | Unidentified duplicate caller fires complete-planning in pairs every ~2 minutes (perpetual loop while session survives) |
-| 267 | PAN-2240 | S | high | ok |  |  | pan tell contradicts itself on dead ohmypi sessions |
-| 268 | PAN-4926 | XS | medium | ok |  |  | pan down SIGTERMs the smee pidfile PID without verifying it is smee; a reused PID kills an unrelated process. XS guard + test. |
-| 269 | PAN-2243 | S | high | ok |  |  | pan plan finalize: CLI aborts complete-planning at 90s while the server handler legitimately finishes later (false ✖ Failed) |
-| 270 | PAN-2202 | S | high | ok |  |  | complete-planning silently skips spec promotion on a dead session's unanswered AskUserQuestion |
-| 271 | PAN-2237 | S | high | ok |  |  | pan plan done swallows vbrief quality lint details |
-| 272 | PAN-2487 | M | high | ok |  |  | CI-green merge skip + Ship & Merge cockpit view (live door log + progress) + active-node spinner |
-| 273 | PAN-4811 | M | medium | ok |  |  | Lanes on a new Fly VM plus gauntlet.fly.max_vms cap; PAN-4743 landed the Fly target door, so this is now unblocked. |
-| 274 | PAN-5079 | S | high | ok |  |  | pan task claim/cancel/done write any id, so a typo leaves a stray row in the committed continue file an agent can't remove. |
-| 275 | PAN-4756 | L | medium | ok |  |  | Move ~45 bespoke dialogs onto the shared Modal from PAN-4755 (now landed); surface/structure only, unblocked. |
-| 276 | PAN-4778 | S | medium | ok |  |  | Workspace-image CI never published: wrong Fly app, fly not on PATH, no FLY_API_TOKEN (operator). Fly VMs run a June image. |
-| 277 | PAN-4817 | S | medium | ok |  | PAN-4778 | Fly app's cached image predates pan serve --no-open, so every new Fly VM crashes and rolls back; blocks live Fly verification. |
-| 278 | PAN-2211 | M | high | ok |  |  | writeSwarmSlotCompletion has no production caller; pan done in a slot workspace must record it. Swarm is dormant (Cut D11). |
-| 279 | PAN-2210 | M | high | ok |  |  | Rewritten pan done has no slot handling: a slot agent takes the issue-level PR/review path. Must record slot completion only. |
-| 280 | PAN-2201 | XS | high | ok |  |  | Close-out label step fails atomically when a hardcoded label (e.g. 'in-planning') is absent from the repo |
-| 281 | PAN-2646 | XS | high | ok |  |  | configurable global/project/issue policy UI with default OFF |
-| 282 | PAN-2755 | S | high | ok |  |  | per-issue review-model override never reached convoy sub-reviewers on the discovery-fork path |
-| 283 | PAN-2754 | S | high | ok |  |  | `always` is inert |
-| 284 | PAN-2809 | M | high | ok |  |  | Live-terminal Playwright UAT blocked in containerized workspaces (node-pty musl/glibc mismatch + Vite/Traefik WS Origin 403) |
-| 285 | PAN-2810 | M | high | ok |  |  | Workspace 'vitest --changed' gate diverges from CI: App.test.tsx fails locally on missing selectPendingInputSubjects mock |
-| 286 | PAN-2495 | S | high | ok |  |  | PAN-2487 ci-green merge skip bypassed CI-green gate |
-| 287 | PAN-2478 | S | high | ok |  |  | CI flake: Playwright browser install fails on packages.microsoft.com apt (NOSPLIT), red-mains legit merges |
-| 288 | PAN-1710 | S | high | ok |  |  | 'Clean install + server smoke test' hangs (3 consecutive 20-min timeout kills) on feature/pan-1491 and feature/pan-1641 |
-| 289 | PAN-1558 | M | high | ok |  |  | Review/specialist agents should run in the workspace Docker container, not inherit host-override |
-| 290 | PAN-1766 | S | high | ok |  |  | work agents hang on Claude Code settings-file protection when editing .claude/** |
-| 291 | PAN-4853 | M | low | ok |  |  | SageOx dashboard views (session tab, context trace, project panel); blocked by PAN-4852; session-to-issue mapping is a checkpoint |
-| 292 | PAN-2266 | M | high | ok |  |  | feat: add zcode harness and make it the default for glm-5.2 |
-| 293 | PAN-1578 | M | high | ok |  |  | GitHub Copilot CLI as a first-class harness (pipeline peer to Claude Code, Pi, Codex) |
-| 294 | PAN-1538 | M | high | ok |  |  | Unblock Pi source forks |
-| 295 | PAN-687 | M | high | ok |  |  | Support OpenCode as alternative coding agent |
-| 296 | PAN-466 | M | high | ok |  |  | Add QwenCoder CLI as a supported runtime alongside Claude Code and Codex |
-| 297 | PAN-465 | M | high | ok |  |  | Add OpenRouter as a model provider |
-| 298 | PAN-463 | M | high | ok |  |  | Add Qwen 3.6+ model support |
-| 299 | PAN-1142 | M | high | needs-refinement |  |  | Per-role/conversation effort config; likely superseded by merged PAN-4249 resolver and its S-slices, confirm or close |
-| 300 | PAN-1424 | M | high | needs-refinement |  |  | Model pool dispatch + work.* subtype taxonomy (follow-up to PAN-1122) |
-| 301 | PAN-1196 | M | high | needs-refinement |  |  | Workhorse routing by bead difficulty + subject-matter (single-agent and swarm) |
-| 302 | PAN-1311 | M | high | needs-refinement |  |  | Swarm: fast-track tier |
-| 303 | PAN-1313 | L | high | ok |  |  | Finish src/lib Effect migration: remove or justify legacy Promise/sync surfaces |
-| 304 | PAN-4863 | S | medium | ok |  |  | Manual AC-10 check of Anywhere connect on a real systemd VPS; needs a release shipping `pan connect` and a human-provisioned VPS. |
-| 305 | PAN-1246 | M | high | ok |  |  | Perf: projection-cached VCS driver for diff/checkpoint reads (port of t3code #2586) |
-| 306 | PAN-1253 | M | high | needs-refinement |  |  | Flywheel: respect issue dependencies before autopicking work |
-| 307 | PAN-1357 | M | high | ok |  |  | Template conversations: load curated skill bundles into a single conversation |
-| 308 | PAN-1915 | M | high | ok |  |  | enhancement(security): API key at-rest hardening |
-| 309 | PAN-4886 | S | medium | ok |  |  | Live relay check on Fly unrun three times: device codes expire unapproved. Needs an operator present to approve one code. |
-| 310 | PAN-1435 | XS | high | ok |  |  | API keys in ~/.panopticon/config.yaml stored as plaintext |
-| 311 | PAN-1672 | M | high | ok |  |  | GPT-5.5/CLIProxy context-window deadlock: conversations get no overflow recovery + 200k window illusion |
-| 312 | PAN-1640 | M | high | ok |  |  | Re-platform interactive permission allow/deny onto a PreToolUse hook (provider-agnostic) |
-| 313 | PAN-4297 | L | medium | ok |  |  | Hosted encrypted vault on overdeck.ai in tester mode; account service built 2026-10-02, billing no longer a prerequisite |
-| 314 | PAN-2350 | L | high | needs-refinement | ✓ |  | Epic rebaselined 2026-09-28; account service and share-service slice 1 built 2026-10-02. Children carry the order. |
-| 315 | PAN-1217 | XS | high | ok |  |  | Requirements reviewer: classify each AC as in_pr_scope vs whole_feature_scope, only !-block in-PR-scope items |
-| 316 | PAN-2079 | M | high | needs-refinement |  |  | Inbox spine: boot reconciliation (producer #1) is gone; may still be worth pursuing for pending AUQ, cost alerts and other producers |
-| 317 | PAN-4204 | S | medium | ok |  | PAN-4203 | Sync-main conflict error dumps every file path; show the count, a Replan button, and Open workspace only for few conflicts. |
-| 318 | PAN-1219 | M | high | needs-refinement |  |  | Promote across-cycle review state to first-class data (cycle SHA, prior findings) instead of prompt-derived |
-| 319 | PAN-1451 | M | high | needs-refinement |  |  | PAN-1124 follow-up: complete planning-on-main pivot (dropped ACs from scope drift) |
-| 320 | PAN-1452 | M | high | ok |  |  | PAN-1381 follow-up: per-reviewer restart with model override (architectural mismatch with PAN-1048) |
-| 321 | PAN-1553 | M | high | ok |  |  | Investigate Claude Code Fast mode support (and fast-tier pricing) |
-| 322 | PAN-1504 | M | high | ok |  |  | pan hygiene |
-| 323 | PAN-1480 | L | high | ok |  |  | TLDR: 93% bypass rate |
-| 324 | PAN-5058 | XL | high | ok |  |  | Parked, in planning: TLS passthrough relay at <name>.mcp.overdeck.ai so hosted bots reach /mcp without Tailscale Funnel. |
-| 325 | PAN-1479 | M | high | ok |  |  | RTK: Add telemetry to measure token savings from bash output compression |
-| 326 | PAN-2950 | L | high | ok |  |  | Refactor god files back under file-size ceilings after the UX overhaul |
-| 327 | PAN-2720 | M | high | ok |  |  | File-size ratchet counts lines, so it rewards line-packing on the god files it means to improve |
-| 328 | PAN-2650 | S | high | ok |  |  | Shed-stack half is moot (slot merges verify on host); remaining: pan swarm recover path for a stuck ready-to-merge slot. |
-| 329 | PAN-2358 | M | high | ok |  |  | PAN-2145 follow-up: restore PAN-1535 hardening in transformMessageForHarness (rewritten during conversations.ts decomposition) |
-| 330 | PAN-2334 | XS | high | ok |  |  | write a Definition of Ready (DoR) |
-| 331 | PAN-2193 | S | high | ok |  |  | Held issues (objection/parked/vetoed/needs-handoff) are invisible in the Command Deck tree |
-| 332 | PAN-1984 | XS | high | ok |  |  | Migrate or delete the 18 dead panopticon.db modules referenced by ~30 test files (#1983 follow-up) |
-| 333 | PAN-1913 | XS | high | ok |  |  | Project description: show on click, edit in dashboard, mirror into the project layer (and document what's in .pan and ~/.panopticon) |
-| 334 | PAN-1906 | M | high | ok |  |  | Enforce harness restrictions with subscription: gray out non-claude-code, validate everywhere |
-| 335 | PAN-1544 | M | high | ok |  |  | Type cleanup: strip 'ship' from the Role union and its ~10 downstream references |
-| 336 | PAN-955 | S | high | ok |  |  | Workspace devcontainer template versioning + re-render on demand |
-| 337 | PAN-807 | L | high | ok |  |  | Epic C: Workspace state sanity on spawn |
-| 338 | PAN-630 | M | high | ok |  |  | Multi-tenant workspace isolation with ACLs |
-| 339 | PAN-471 | M | high | ok |  |  | Cost reconciler: auto-trigger on agent lifecycle events with debounce |
-| 340 | PAN-438 | M | high | ok |  |  | Migrate remaining REST polling endpoints to Effect RPC |
-| 341 | PAN-578 | M | high | ok |  |  | Security: Comment mediation layer to prevent prompt injection via tracker comments |
-| 342 | PAN-2921 | S | medium | ok |  |  | Strike merge door can report fetch failure after merge and land the same head twice |
-| 343 | PAN-4195 | M | medium | ok |  |  | Every pan call costs ~0.5s/230MB from eager command imports; lazy-load command modules, target --version <100ms |
-| 344 | PAN-2839 | S | medium | ok |  |  | plan→work autoSpawn now 500s with a duplicated workspace prep |
-| 345 | PAN-2824 | S | medium | ok |  |  | pan review pending dies when one project's lens gather fails (non-degrading caller; PAN-2820 class) |
-| 346 | PAN-2792 | S | medium | ok |  |  | Orphan-process sweeps killed the dashboard and live conversations via lsof +D over Bun-hardlinked node_modules |
-| 347 | PAN-2761 | S | medium | ok |  |  | done.test.ts asserts a hardcoded URL without stubbing env, so it fails in any agent shell with OVERDECK_DASHBOARD_URL set and looks lik… |
-| 348 | PAN-2738 | S | medium | ok |  |  | strikes deadlock |
-| 349 | PAN-2717 | S | medium | ok |  |  | conversation permission waits missing from Awareness; strengthen alert pulse |
-| 350 | PAN-2697 | S | medium | ok |  |  | First-review codex parents enter discovery mode and the supervisor session no-ops every discovery-ready signal |
-| 351 | PAN-4236 | S | medium | ok |  |  | GPT-5.6 luna/sol rows in cost.ts disagree with catalog and OpenAI list prices; reconcile and add a cost.ts-vs-catalog parity test |
-| 352 | PAN-2691 | S | medium | ok |  |  | Auto-planned issues park silently when the post-finalize work spawn is gated (stack-unhealthy 422) |
-| 353 | PAN-4306 | M | medium | ok |  |  | Move phase/role/cleanup telemetry from activity.entry to activity.detailed so it stops evicting news; blocked by PAN-4300 |
-| 354 | PAN-3701 | L | high | ok |  |  | Four separate first-party LLM client stacks; consolidate onto effect/unstable/ai LanguageModel + ExecutionPlan. PRD written. |
-| 355 | PAN-3090 | M | high | ok |  |  | Simple issue page opens with a 55KB raw kickoff prompt and hides the pending question the operator actually has to answer. |
-| 356 | PAN-4552 | M | medium | ok |  |  | Fresh-host setup errors still say 'edit config'/'run X'; audit each to auto-fix or one click, and find other first-launch dialogs |
-| 357 | PAN-2670 | S | medium | ok |  |  | Gate the dashboard-server tsconfig in npm run typecheck |
-| 358 | PAN-2664 | S | medium | ok |  |  | auto-commit completes unresolved merge with conflict markers |
-| 359 | PAN-2663 | S | medium | ok |  |  | health probe can accept old dashboard after replacement EADDRINUSE |
-| 360 | PAN-2649 | S | medium | ok |  |  | Ctrl+K conversation search indexes Claude transcripts only |
-| 361 | PAN-2580 | S | medium | ok |  |  | pan tell cannot deliver to codex (GPT) conversations |
-| 362 | PAN-2572 | M | medium | ok |  |  | Noisy EBADENGINE + deprecation warnings on npx/npm install make a healthy install look broken |
-| 363 | PAN-2563 | S | medium | ok |  |  | npm-flavor desktop (npx @overdeck/desktop) lacks node_modules for the server's externalized deps |
-| 364 | PAN-2554 | S | medium | ok |  |  | clicking a project doesn't update the browser URL |
-| 365 | PAN-2550 | XS | medium | ok |  |  | npm test exits 0 despite root-suite failures |
-| 366 | PAN-2547 | S | medium | ok |  |  | pan restart --health-timeout parses seconds as milliseconds |
-| 367 | PAN-2546 | S | medium | ok |  |  | pan tell is codex-conversation-unaware |
-| 368 | PAN-4303 | S | medium | needs-refinement |  |  | Steer busy Codex app-server turns via turn/steer; verify first whether turn/start already steers. Needs PAN-4292's steerKind. |
-| 369 | PAN-3003 | XS | medium | ok |  |  | Generated launcher.sh files omit the OVERDECK_AGENT_ID export the PTY supervisor requires, so manual re-launch dies instantly. |
-| 370 | PAN-2501 | S | medium | ok |  |  | deleteResourceVenvEffect's HttpRouter.schemaParams call fails typecheck under the root tsconfig (masked by src/dashboard/** exclusion) |
-| 371 | PAN-2492 | S | medium | needs-refinement |  |  | pane-detected waits (rate-limit/session-resume) surface as 'needs you' but cannot be answered from the dashboard |
-| 372 | PAN-2491 | M | medium | ok |  |  | Migrate @xenova/transformers to @huggingface/transformers to eliminate silent npx install failures from sharp 0.32 postinstall |
-| 373 | PAN-2489 | S | medium | ok |  |  | strike agents are invisible in the project issue tree |
-| 374 | PAN-2465 | S | medium | ok |  |  | pan done's PR lookup fails at MYN polyrepo root |
-| 375 | PAN-2454 | S | medium | ok |  |  | ratchet audit fails per-commit on push ranges whose NET baseline delta is zero |
-| 376 | PAN-2428 | XS | medium | ok |  |  | MYN workspace Traefik routing broken post-rebrand |
-| 377 | PAN-2423 | XS | medium | ok |  |  | pan workspace rebuild hardcodes 'overdeck-' compose project prefix |
-| 378 | PAN-2416 | S | medium | ok |  |  | codex agents can wedge on the Codex CLI first-run/consent screen |
-| 379 | PAN-4250 | XS | medium | ok |  |  | Stale dated CONVERSATION_TITLE_MODEL literal throws UnknownModelError when titleModel config is unset; one-line fix plus audit |
-| 380 | PAN-2395 | S | medium | ok |  |  | one invalid tiered_execution enum poisons every config read |
-| 381 | PAN-2381 | S | medium | ok |  |  | three event types missing from DomainEvent schema union poison the RPC stream |
-| 382 | PAN-2287 | S | medium | ok |  |  | every supervisor.log line written twice |
-| 383 | PAN-3661 | XS | medium | ok |  |  | Secure review-mode dispatch dropped the HTTP-200 semantic-rejection surface; two frontend tests fail locally while CI stays green. |
-| 384 | PAN-3288 | XS | medium | ok |  |  | Dev-checkout preflight: after a git pull that adds a dep, the CLI dies with ERR_MODULE_NOT_FOUND instead of saying 'run bun install'. |
-| 385 | PAN-3164 | XS | medium | ok |  |  | probeUatStack reports readiness from container count, so the UI offers 'Open UAT frontend' while the API is still resolving Maven deps. |
-| 386 | PAN-3121 | S | medium | ok |  |  | The failed-send outbox never reconciles against the transcript, so a delivered message keeps a Retry twin that would double-send. |
-| 387 | PAN-3014 | XS | medium | ok |  |  | Background title/about spawns use --bare, which now skips credential reads, so every one fails 'Not logged in' with empty stderr. |
-| 388 | PAN-3944 | S | medium | needs-refinement |  |  | Main fix landed (host-backed targets skip Herdr agent.prompt); remaining: buffer bracketed paste in the app-server host, placeholder guard |
-| 389 | PAN-3829 | L | medium | ok |  |  | Managed Claude launch home: overlay hooks/settings/plugins/auth without touching native ~/.claude (draft at handoff/20260909/main) |
-| 390 | PAN-2280 | M | medium | ok |  |  | Resumed conversations wedge without writing transcripts when dashboard is black-holed |
-| 391 | PAN-2197 | S | medium | ok |  |  | work agents skip `pan done` (manual push instead) |
-| 392 | PAN-2069 | XS | medium | ok |  |  | caveman: follow-up gaps |
-| 393 | PAN-1918 | XS | medium | ok |  |  | full frontend vitest suite runs in no CI path |
-| 394 | PAN-1912 | XS | medium | ok |  |  | Pi agent transcripts hide tool-call detail; agent panes lack the Tools show/hide toggle |
-| 395 | PAN-4208 | M | medium | ok |  |  | #4205 follow-ups: Effect-free config read for telemetry to hit <100ms pan --version; CI import test for lazy command targets |
-| 396 | PAN-1846 | S | medium | needs-refinement |  |  | unbounded log growth |
-| 397 | PAN-1830 | S | medium | ok |  |  | Reviewer stuck on gpt-5.5 rate-limit modal blocks REVIEWER_READY |
-| 398 | PAN-1816 | S | medium | ok |  |  | Scratch/UAT-lifecycle issues (PAN-18031) enter the real pipeline: kanban, review convoys, agent registry |
-| 399 | PAN-1795 | S | medium | ok |  |  | Codebase map bootstrapped in planning worktree is never promoted to main |
-| 400 | PAN-1774 | S | medium | ok |  |  | workspace server container crashloops when dist/dashboard/server.js is missing |
-| 401 | PAN-1769 | S | medium | ok |  |  | Supervisor echo-confirm false negative on long messages → triple-paste delivery (rewrite ×2 + tmux fallback); resumed-conv message stil… |
-| 402 | PAN-1761 | S | medium | ok |  |  | conversations endpoints fetched via relative /api path |
-| 403 | PAN-1755 | S | medium | ok |  |  | uat stuck-assembly cap (30m) kills slow-but-alive assemblies and leaves orphaned conflict agents racing the next generation |
-| 404 | PAN-3516 | XS | medium | ok |  |  | Repo .claude/skills holds stale duplicates of pan-handoff, pan-flywheel and okf, so overdeck-dev sessions load outdated skill text. |
-| 405 | PAN-3455 | XS | medium | ok |  |  | cliproxy --version exits 2, so the up-to-date check always returns false and every ensure re-downloads the pinned release. |
-| 406 | PAN-3117 | XS | medium | ok |  |  | A deterministic 400 renders as the generic 'Failed to send' bubble with a Retry that can never succeed. |
-| 407 | PAN-3036 | XS | medium | ok |  |  | Pane-idle detection reads a completed strike's idle composer as a pending question, so a finished strike shows '! INPUT'. |
-| 408 | PAN-3016 | M | medium | ok |  |  | Operator ask: every view should be URL-addressable; cockpit tabs, stage panes and several drawers are still local state. |
-| 409 | PAN-3890 | S | medium | ok |  |  | opencode provider stream errors (rate limit) are invisible in the feed and never retried; first message dies silently |
-| 410 | PAN-3822 | L | medium | ok |  |  | PRD landed (12 items, FR-1..14): link PRs to conversations via branch detection + explicit override; unblocks PAN-3920 |
-| 411 | PAN-5028 | M | medium | ok |  |  | list_pending_input loses a conversation's AskUserQuestion after the PAN-1520 deny hook, contrary to the existing test's contract. |
-| 412 | PAN-5088 | XS | medium | ok |  |  | A long failed-outbox message shrinks the timeline to 40px and hides Retry/Discard; only a refresh recovers. |
-| 413 | PAN-1673 | S | medium | ok |  |  | Regression: pi + gpt-5.5 fails with 'No API key for provider: openai-codex' (worked previously) |
-| 414 | PAN-1669 | S | medium | ok |  |  | restart-with-model doesn't emit a live event |
-| 415 | PAN-1668 | S | medium | ok |  |  | right-click 'restart with <model>' carries model only, never harness |
-| 416 | PAN-1627 | M | medium | ok |  |  | Substrate: Claude Code's native .claude/** settings-edit protection wedges in-scope work agents (un-overridable by PreToolUse auto-appr… |
-| 417 | PAN-1624 | S | medium | ok |  |  | pan handoff --author external: authored doc is socket_write-ten but never submitted |
-| 418 | PAN-3901 | S | medium | ok |  |  | test-skip gate has no audited exemption for opt-in live suites (skipIf on env/binary); allowlist row with justification |
-| 419 | PAN-3852 | S | medium | ok |  |  | Project creation follow-ups: SSH-port repo URLs, dotted repo names, partial-registration retry, non-duplicate 409 mapping |
-| 420 | PAN-3862 | L | medium | needs-refinement |  |  | /agents-v2 machine session explorer over Herdr + all tmux servers; local first, remote via the PAN-3762 environment model |
-| 421 | PAN-1572 | M | medium | needs-refinement |  |  | Settings permission-mode can desync from the resolved mode; body cites the removed DSP flag and a renamed symbol — rewrite first |
-| 422 | PAN-4627 | S | medium | ok |  |  | Homebrew Claude Code installs get a copy-only upgrade banner; make the brew plan runnable and auto-upgrade outdated runnable installs. |
-| 423 | PAN-1571 | S | medium | ok |  |  | Large multi-line pastes (handoff docs) land unsubmitted |
-| 424 | PAN-1565 | S | medium | ok |  |  | Defensive mitigation: auto-recover conversations poisoned by Claude Code thinking-block resume 400 (upstream #63147) |
-| 425 | PAN-1530 | S | medium | ok |  |  | Investigate: state.json with model='gpt-5.5' (a model that doesn't exist) |
-| 426 | PAN-1461 | S | medium | ok |  |  | Conversation transcript: in-page search (Ctrl+F) only finds text in currently-rendered virtualized rows |
-| 427 | PAN-1449 | S | medium | ok |  |  | Memory extraction still failing; the live symptom PAN-4370 closed and PAN-4374 adds a working provider; layout half remains |
-| 428 | PAN-1446 | S | medium | ok |  |  | PAN-1231 follow-up: remove or implement Table + Timeline modes in FleetAgentsView (scope-creep stubs) |
-| 429 | PAN-1445 | S | medium | ok |  |  | PAN-1389 follow-up: remove or implement Files + Comments tabs in SessionFeedSidebar (scope-creep stubs) |
-| 430 | PAN-3616 | S | medium | ok |  |  | Planned deploy restarts show the alarm-toned Reconnecting banner; use the lifecycle signal for calm 'updating' copy. |
-| 431 | PAN-2982 | XS | medium | ok |  |  | Nothing runs a skill's own selftest when sync-sources/skills/** changes; a convoy passed a PR with its selftest red. |
-| 432 | PAN-2981 | S | medium | ok |  |  | The conversation search index never prunes deleted sessions, so Ctrl-K offers zombie hits that 404 on open. |
-| 433 | PAN-2976 | L | medium | ok |  |  | Generalize the ACP harness to any capability-passing ACP CLI: named adapters plus a config-declared custom-agent escape hatch. |
-| 434 | PAN-1444 | S | medium | ok |  |  | Follow-up to PAN-1416: dashboard port lockfile + pan doctor multi-instance check |
-| 435 | PAN-2469 | S | medium | ok |  |  | Assembly landed (mergeReadySlots + finalization); remaining: alarm when all slots merged but no review requested. Swarm dormant. |
-| 436 | PAN-1433 | S | medium | ok |  |  | Conversation agents can leave host main repo in abandoned git rebase state for hours |
-| 437 | PAN-1416 | S | medium | ok |  |  | Workspace-spawned dashboards must never claim the canonical dashboard port |
-| 438 | PAN-1392 | S | low | stale |  |  | docs/prds/active→completed archive step is superseded by .pan/drafts and .pan/specs on the feature branch |
-| 439 | PAN-4151 | L | medium | needs-refinement |  | PAN-3822 | Deferred remainder of PAN-3822/#4067: GitLab MR sync, PR page + search, handoff link copy, diffstat, link-dialog a11y, sync throttle |
-| 440 | PAN-1330 | S | medium | ok |  |  | CLI cannot address planning-*/specialist-* sessions |
-| 441 | PAN-4971 | S | medium | ok |  |  | Viewer header shows only host + count; roster of all participants with host/controller marked. Frontend-only, payload exists. |
-| 442 | PAN-1226 | L | medium | ok |  |  | PAN-1148 unified-dashboard redesign |
-| 443 | PAN-1173 | S | medium | ok |  |  | pan show <bare-number> derives wrong agent ID for PAN-prefixed issues |
-| 444 | PAN-1154 | M | medium | ok |  |  | pan up does not kill existing port holders |
-| 445 | PAN-3354 | XS | medium | ok |  |  | The archive write door accepts kind=main, hiding a project's singleton workspace with no unarchive affordance in the UI. |
-| 446 | PAN-3178 | XL | medium | ok |  |  | Make worktrees and diffs first class: +/- badge, dedicated Changes surface, conversation worktrees. PRD and mockup exist. |
-| 447 | PAN-3017 | S | medium | ok |  |  | The issue-page UAT panel renders only inline actions, so restart/rebuild/stop are unreachable outside the rail's context menu. |
-| 448 | PAN-5057 | XS | medium | ok |  |  | Restart hold is not checked at the gate claim route, so a hold set within ~5 s of approval still lets one restart go ahead. |
-| 449 | PAN-3873 | M | medium | ok |  |  | GitHub event delivery: support gh webhook forward alongside smee with guided setup, settings exposure, and docs |
-| 450 | PAN-1150 | S | medium | ok |  |  | Settings: "Anthropic is not configured" warning persists in Model Routing after claude /login (Provider tab disagrees) |
-| 451 | PAN-1149 | S | medium | ok |  |  | v0.9.3 upgraders: stale workhorses.mid: claude-sonnet-4-7 in config.yaml keeps breaking Model Routing saves |
-| 452 | PAN-1130 | S | medium | ok |  |  | Headless review sub-reviewer normal exit misclassified as 'crashed', triggers spurious restart |
-| 453 | PAN-1129 | S | medium | ok |  |  | Review-request route pushes wrong branch name: 'feature/977' instead of 'feature/pan-977' |
-| 454 | PAN-1128 | S | medium | ok |  |  | Channels: spurious 'no MCP server configured with that name' banner at conversation startup |
-| 455 | PAN-1113 | S | medium | ok |  |  | Conversations sidebar lets you message review-specialist sessions, which derails them silently |
-| 456 | PAN-1068 | S | medium | ok |  |  | PAN-1048 deferred findings: security, correctness, and model validation gaps |
-| 457 | PAN-3938 | M | medium | needs-refinement |  |  | Run Muse Spark under Claude Code via cliproxy — only the paid Zen model is routable; free tier is OpenCode-client gated; needs credit… |
-| 458 | PAN-933 | S | medium | ok |  |  | Review poster cannot post to GitLab MRs (only supports GitHub PRs) |
-| 459 | PAN-932 | S | medium | ok |  |  | pan done: polyrepo uncommitted changes check + existing MR handling |
-| 460 | PAN-927 | M | medium | ok |  |  | Rewrite containerize route: dead code, orphan processes, no pending-op tracking |
-| 461 | PAN-900 | S | medium | ok |  |  | Trust devroot for conversations + atomic .claude.json writes |
-| 462 | PAN-886 | S | medium | ok |  |  | pan review request shows 'fetch failed' instead of actual sync-target-branch error |
-| 463 | PAN-778 | M | medium | ok |  |  | Write conflict race: review-agent fails when test-agent write scope not yet released |
-| 464 | PAN-681 | S | medium | ok |  |  | Feedback routing: wrong issueId written to workspace when verification runs for co-active issues |
-| 465 | PAN-3732 | S | medium | ok |  |  | Codex handoff serializes a large rollout twice (~286MB peak RSS on 50MB); serialize once or stream. |
-| 466 | PAN-3700 | M | medium | ok |  |  | pan acp serve would let Zed and other ACP clients drive Overdeck conversations through canonical doors. PRD written. |
-| 467 | PAN-3290 | XS | medium | ok |  |  | xBRIEF items can carry empty metadata.traces, so docs items sit unanchored in the requirement traceability graph. |
-| 468 | PAN-3132 | M | medium | ok |  |  | xBRIEF v0.9 agentic dispatch fields are half-adopted as a behavior accident; make difficulty/filesScope/verifyCommands a contract. |
-| 469 | PAN-3909 | M | medium | needs-refinement |  |  | One agents read door (operator-directed); the cut deleted the agents table and made liveness.ts canonical — re-scope what remains |
-| 470 | PAN-2659 | S | medium | ok |  |  | acquireRecordLock survives for the planning auto-start consent lock; an ownerless lock after a crash is never reclaimed. |
-| 471 | PAN-3831 | S | medium | ok |  |  | Model picker: gray out models whose provider has no API key or subscription login (per-provider readiness resolver) |
-| 472 | PAN-4779 | S | medium | ok |  |  | Docs on main: 2 MDX parse errors hide pages from Mintlify + 15 broken vision.mdx links; mint broken-links can't gate |
-| 473 | PAN-538 | S | medium | ok |  |  | pan reload freshness guard must also verify the frontend bundle |
-| 474 | PAN-1164 | M | medium | ok |  |  | Conversation diff summaries update live over WebSocket (drop 5s polling) |
-| 475 | PAN-3563 | S | medium | needs-refinement |  |  | pan unstick is gone; verify whether a spawned-but-never-briefed role agent can still read as running forever under liveness.ts |
-| 476 | PAN-1041 | M | medium | ok |  |  | Audit and consolidate REMOTE/LOCAL gates in work-agent prompt template |
-| 477 | PAN-924 | L | medium | needs-refinement |  |  | Spike: evaluate GitNexus for Panopticon integration |
-| 478 | PAN-3770 | S | medium | ok |  |  | Codex conversations never show the working spinner mid-turn; parser marks every agent_message instantly complete. |
-| 479 | PAN-4568 | XS | medium | ok |  |  | Codex sub-agent turn start shows thread: not sub: label; adoption lands one frame late. PAN-4563 replay test has landed. |
-| 480 | PAN-3731 | S | medium | ok |  |  | Restart-gate banner gives no feedback after approval; dead-requester approvals read as a broken button. |
-| 481 | PAN-3530 | S | medium | ok |  |  | Four God View components poll on 30s timers instead of the documented /ws/rpc event contract. |
-| 482 | PAN-3131 | L | medium | ok |  |  | Support xBRIEF planRef sharding so a 1.1MB/227-item plan stops making every finalize failure whole-plan-fatal. |
-| 483 | PAN-3061 | M | medium | ok |  |  | Deterministic start-vs-swarm recommendation at plan-finalize, derived from plan shape plus recorded outcomes. |
-| 484 | PAN-3057 | S | medium | needs-refinement |  |  | Compaction tracking is gone; remaining bug = GPT-5.6 context window declared twice (372K vs 150K); verify separately |
-| 485 | PAN-3892 | M | medium | needs-refinement |  |  | Substrate review follow-ups deferred from PAN-3845 (minor findings, config clear-sentinel); split into workable items |
-| 486 | PAN-4918 | M | medium | ok |  |  | Six Anywhere UI bugs seen while filming: Codex keeps Claude model, Zen models listed first, chip wrap, Pull-here state, no remote archive. |
-| 487 | PAN-863 | M | medium | ok |  |  | One-shot sweep of stale feature branches and worktrees predating the reaper |
-| 488 | PAN-817 | M | medium | ok |  |  | Improve planning dialog layout and content fit |
-| 489 | PAN-802 | M | medium | ok |  |  | Resume on conversation session forks instead of resuming |
-| 490 | PAN-713 | M | medium | ok |  |  | test: add unit tests for doneCommand and approveCommand |
-| 491 | PAN-700 | M | medium | ok |  |  | Detachable terminal for conversation view |
-| 492 | PAN-646 | XS | medium | needs-refinement |  |  | Cancel no longer clears beads or a record; a Recover workflow now means reopening the tracker issue and re-planning |
-| 493 | PAN-532 | M | medium | ok |  |  | Per-project and per-issue model overrides for pipeline roles |
-| 494 | PAN-2896 | M | medium | ok |  |  | Warm resource-discovery and membership caches at boot |
-| 495 | PAN-2685 | M | medium | ok |  |  | Annotated live preview: Codex-style annotate-the-app feedback delivered to agents |
-| 496 | PAN-2626 | M | medium | ok |  |  | allow composer model switching within the same model family (e.g. Sonnet → Fable) |
-| 497 | PAN-2625 | XS | medium | ok |  |  | auto-run /pan-new-project on project creation + setup banner, checklist, teaching empty states, and a guided demo issue |
-| 498 | PAN-2608 | M | medium | ok |  |  | Persistent collaboration roles (owner/editor/viewer) and organizations |
-| 499 | PAN-2582 | M | medium | ok |  |  | show slot assignments on the vBRIEF DAG + unify swarm/tiered terminology (Lead/Crew or Trunk/Lanes) |
-| 500 | PAN-2566 | L | medium | ok | ✓ |  | Triage list of genuine Traycer capability gaps; a container for child issues, not directly workable. |
-| 501 | PAN-2565 | M | medium | ok |  |  | Multi-agent conversations: N agent sessions in one task surface with agent-to-agent messaging |
-| 502 | PAN-3735 | S | medium | ok |  |  | Sandboxed pan CLI reports 'dashboard down, run pan up' when the real cause is no network; sends agents down the wrong path. |
-| 503 | PAN-3335 | XS | medium | ok |  |  | A pasted screenshot can't be viewed anywhere in the dashboard: thumbnail has no click handler and the sent form is a file-link chip. |
-| 504 | PAN-3054 | M | medium | ok |  |  | Benchmark matrix, redesigned 2026-09-29 as E6 of the model-routing PRD; its medians feed PAN-4364 and PAN-4367 |
-| 505 | PAN-2977 | M | medium | ok |  | PAN-2976 | Settings surface that detects installed ACP CLIs, renders the capability checklist, and guides login without a manual terminal. |
-| 506 | PAN-2557 | M | medium | ok |  |  | project-level 'Restart All' context action |
-| 507 | PAN-2553 | M | medium | ok |  |  | project-level CI visibility |
-| 508 | PAN-2521 | S | medium | ok |  |  | launch pipeline agents with harness rate-limit model-switch reminder disabled |
-| 509 | PAN-2493 | M | medium | ok |  |  | align the cockpit Agents-lane and sidebar issue-tree feature sets (two-way gaps) |
-| 510 | PAN-3772 | XS | medium | ok |  |  | Conv view renders Claude Code's synthetic 'no visible output' nudge as an operator message; should read as plumbing. |
-| 511 | PAN-3853 | S | medium | needs-refinement |  |  | Review synthesizer self-declared an operator override; that override door was deleted by the cut — verify on the PR-review path |
-| 512 | PAN-3830 | S | medium | ok |  |  | OpenCode provider: curate picker models via Settings favorites (OpenRouter pattern) instead of listing every discovered model |
-| 513 | PAN-4924 | S | medium | ok |  |  | linked-machines.mdx promises switch model for running conversations; dashboard disables it. Fix docs or add the control. |
-| 514 | PAN-4367 | M | medium | ok |  |  | Replace inherited capability scores for Sonnet 5.5, GPT-6 Sol/Luna with measured ones; eval harness has closed |
-| 515 | PAN-2443 | M | medium | ok |  |  | OpenTelemetry GenAI semconv |
-| 516 | PAN-2442 | M | medium | ok |  |  | Agent Client Protocol (ACP) as Overdeck's structured control plane |
-| 517 | PAN-2409 | M | medium | ok |  |  | enforce the workspace boundary |
-| 518 | PAN-2392 | M | medium | needs-refinement |  |  | Standing Crew survives; panel becomes a cost view from cost_events + tier-metrics; verdict/escalation columns need a new source. |
-| 519 | PAN-2335 | XS | medium | ok |  |  | chore: review the full open backlog for junk/stale/nonsensical issues |
-| 520 | PAN-2295 | L | medium | needs-refinement |  |  | built-in web browser surface (openable like terminal/Claude Code/Codex) + native Agentation integration |
-| 521 | PAN-3767 | S | medium | ok |  |  | Model switch could hang at 'Saving…'; onError toast landed, remaining work is reproducing the hang on a healthy server. |
-| 522 | PAN-3615 | S | medium | needs-refinement |  |  | TTS silent 9+ days from four stacked failures; three already fixed, only follow-ups remain — rescope to what is left. |
-| 523 | PAN-3558 | S | medium | ok |  |  | Subagent rail shows no model or provider, so mixed-model orchestration needs a transcript open per row to see what it is running. |
-| 524 | PAN-3469 | S | medium | ok |  |  | NewProjectModal violates the PAN-3410 page-not-modal doctrine; migrate the create-project flow to a routed page. |
-| 525 | PAN-3333 | M | medium | ok |  |  | Model pickers show $/1M, which says nothing under a subscription; show relative plan-quota drain among sibling models. |
-| 526 | PAN-3058 | M | medium | ok |  |  | Ship named crew presets that populate the whole tiered_execution block so operators don't hand-build the crew table. |
-| 527 | PAN-2288 | L | medium | ok |  |  | tmux managed-server: lossless auto-migration of dirty-founded servers + boot-time ensure call |
-| 528 | PAN-2065 | M | medium | ok |  |  | unified usage & headroom panel across all provider plans (z.ai, Anthropic, Codex, OpenRouter) |
-| 529 | PAN-2031 | M | medium | ok |  |  | ohmypi: add Bun 1.3.11 regression test to checkOhmypi doctor gate |
-| 530 | PAN-2026 | M | medium | ok |  |  | ohmypi: surface 35+ provider matrix in dashboard model picker |
-| 531 | PAN-2025 | M | medium | ok |  |  | ohmypi: extend provider credential passthrough for Groq, Cerebras, Fireworks |
-| 532 | PAN-4366 | M | medium | ok |  |  | Plan the Haiku 4.5 successor and give workhorse:cheap a consumer or drop it; gated on E4 summary-faithfulness |
-| 533 | PAN-2004 | M | medium | ok |  |  | Resumable Planning node: double-click a planned issue's Planning to resume the planning agent |
-| 534 | PAN-1995 | M | medium | ok |  |  | infra: set up smee webhook relay so merge-on-green + post-merge are reactive (not deacon-only) |
-| 535 | PAN-3739 | S | medium | ok |  |  | cost-reconcile re-warns every model-less codex subthread rollout on every sweep; log flood grows without bound. |
-| 536 | PAN-4393 | XS | medium | ok |  |  | ac-eval-fixtures requires observable:false >= 8 but honest labeling of all specs yields 6; lower the floor |
-| 537 | PAN-1985 | M | medium | ok |  |  | Agent wipe-and-respawn family (work + review): harness/model switch + Complete work reset, with confirmation |
-| 538 | PAN-1968 | M | medium | ok |  |  | Finish local-domain rename: pan.localhost → overdeck.localhost |
-| 539 | PAN-1967 | M | medium | needs-refinement |  |  | Flywheel must re-validate (re-plan) pre-cutover plans before implementing them |
-| 540 | PAN-1965 | M | medium | ok |  |  | Project pipeline view: true-state buckets + lens reconciliation (pipeline as exception queue) |
-| 541 | PAN-1937 | M | medium | ok |  |  | feat: data export |
-| 542 | PAN-1926 | M | medium | ok |  |  | --big flag to lift strike's precision-only scope guard (operator-authorized larger strikes) |
-| 543 | PAN-1916 | M | medium | ok |  |  | configurable web search providers (Exa, Tavily, Brave, Perplexity) |
-| 544 | PAN-1854 | M | medium | ok |  |  | Define handoff strategy for large conversations: external vs source authoring + tail-biased read |
-| 545 | PAN-1853 | M | medium | ok |  |  | Surface a transcript-size warning on growing conversations (2 MB warn / 10 MB strong-nudge tiers) |
-| 546 | PAN-1852 | XS | medium | ok |  |  | Capability-tiered work-agent model selection: difficulty→capability-floor routing from benchmark-anchored eval data |
-| 547 | PAN-1844 | M | medium | ok |  |  | Deep-linkable Command Deck: reflect selected issue/agent in the browser URL + make activity notifications link to the specific view |
-| 548 | PAN-1840 | M | medium | ok |  |  | Add 'pan switch <id>' |
-| 549 | PAN-1839 | M | medium | ok |  |  | Settings → Providers: show each provider's default harness in the collapsed row (no expand needed) |
-| 550 | PAN-1776 | M | medium | ok |  |  | Hot-updatable message delivery: version-stamped supervisors + server-side delivery logic |
-| 551 | PAN-3706 | L | medium | ok |  |  | Broadsheet shipped typography only; color, surface, elevation and texture still on Ledger values, so it doesn't read like Subspace. |
-| 552 | PAN-3539 | XS | medium | needs-refinement |  |  | OOMPolicy=continue fix landed with the issue; re-scope to whatever hardening remains or close it out. |
-| 553 | PAN-3502 | XS | medium | needs-refinement |  |  | tiered-crews blendedCost expectation stale vs pricing catalog; likely already fixed by the PAN-3532 cherry-pick — verify. |
-| 554 | PAN-4409 | M | medium | ok |  |  | Overdeck integration on OKF v0.2.0 (injector trust tiers, new verbs); blocked on external eltmon/okf#9 |
-| 555 | PAN-4410 | M | medium | ok |  | PAN-4409 | Migrate eltmon/overdeck-knowledge to OKF v0.2 and refresh stale concepts; last link in the OKF chain |
-| 556 | PAN-2978 | S | medium | ok |  | PAN-2976, PAN-2977 | Opt-in per-agent install recipes for ACP CLIs from the setup UI; deliberately separated for its supply-chain trust decision. |
-| 557 | PAN-4878 | XS | low | ok |  |  | Delete dead ox curl installer in prereqs registry; PAN-4852 builds ox from the pinned fork commit, so ~/.local/bin/ox is never used. |
-| 558 | PAN-1754 | M | medium | ok |  |  | surface + edit the host claude CLI default model (~/.claude/settings.json) from the Settings page |
-| 559 | PAN-1751 | M | medium | ok |  |  | harness picker on every Settings → Roles row (plan/work/review/test/ship/strike), not just Flywheel |
-| 560 | PAN-1750 | M | medium | ok |  |  | UAT assembly/conflict agent |
-| 561 | PAN-1748 | M | medium | ok |  |  | reuse uat-assembly conflict resolutions across generations (rerere or resolution replay) |
-| 562 | PAN-1691 | M | medium | ok |  |  | conflict-aware merge train + on-demand UAT candidate |
-| 563 | PAN-1685 | XS | medium | ok |  |  | Show model capability icons in conversation dialogs + complete per-model vision (supportsImages) audit |
-| 564 | PAN-1676 | M | medium | ok |  |  | harden remote workspaces + `pan workspace move` local↔remote (scale-out / overflow slots) |
-| 565 | PAN-1667 | M | medium | ok |  |  | unify Agents + Resources into one issue-centric holistic view |
-| 566 | PAN-1657 | M | medium | ok |  |  | feat: one-off double-check reviews with a user-specified agent/harness + settings-managed default reviewer |
-| 567 | PAN-1656 | M | medium | ok |  |  | Skills page: make it a full management surface (browse, review, edit, scope, sync status) |
-| 568 | PAN-1655 | M | medium | ok |  |  | Skills: scope by audience AND by agent role (conversation/work/review/ship/plan/test), sync accordingly |
-| 569 | PAN-1654 | XS | medium | ok |  |  | run lint:skills from source via tsx, skip CLI dist build (salvaged from PAN-1615 workspace) |
-| 570 | PAN-1653 | XS | medium | ok |  |  | batch local embedding in buildDocsIndex (salvaged from PAN-1617 workspace) |
-| 571 | PAN-1623 | M | medium | ok |  |  | Codex: surface interactive approval prompts as conversation Q&A (like AskUserQuestion) |
-| 572 | PAN-1561 | M | medium | ok |  |  | feat: Project-scoped dashboard nav (deck of tabs per project + conversations/tree column + activity feed) |
-| 573 | PAN-1550 | M | medium | ok |  |  | feat: FilesPane + BrowserPane |
-| 574 | PAN-1545 | XS | medium | ok |  |  | New Terminal button |
-| 575 | PAN-1542 | XS | medium | ok |  |  | Spawn-refusal modal: render the three-button workflow on dirty-workspace 409 |
-| 576 | PAN-1524 | M | medium | ok |  |  | Slash command aliases: /handoff → /pan-handoff (and similar short forms) |
-| 577 | PAN-1490 | M | medium | ok |  |  | show each conversation's current git branch (port t3code BranchToolbar pattern) |
-| 578 | PAN-1485 | S | medium | needs-refinement |  |  | Remaining scope after #4655 auto-settle: day-10 archive + favorite clearing; close-or-keep is an operator call. |
-| 579 | PAN-1473 | M | medium | ok |  |  | Dashboard conversation composer: refactor context indicator to mirror t3code (show cumulative + live separately) |
-| 580 | PAN-1443 | M | low | stale |  |  | Specs live directly under .pan/specs now; only check that no stale legacy files remain under docs/prds/ |
-| 581 | PAN-1442 | M | medium | ok |  |  | Follow-up to PAN-829: voice-sampler.html cleanup in pan-tts repo |
-| 582 | PAN-1432 | M | medium | ok |  |  | Merge agent leaves packages/contracts/dist stale |
-| 583 | PAN-1223 | M | medium | ok |  |  | Auto-update for users in the field (npm + desktop binaries) |
-| 584 | PAN-1165 | M | medium | ok |  |  | Lightweight review path for small/trivial PRs |
-| 585 | PAN-1151 | XS | medium | ok |  |  | Anthropic Enterprise auth: distinguish from consumer subscription for Pi+Anthropic harness gating |
-| 586 | PAN-4360 | S | medium | ok |  |  | Add pan claude upgrade and offer the Claude Code upgrade in pan install / pan sync; PAN-4359 has closed |
-| 587 | PAN-1060 | M | medium | ok |  |  | Self-modify permission handling: stop the interrupt loop without weakening the safety guard |
-| 588 | PAN-1051 | M | medium | ok |  |  | feat: Subspace-inspired alternate theme with Inter + JetBrains Mono |
-| 589 | PAN-1037 | M | medium | ok |  |  | Retire 'planning-' tmux prefix |
-| 590 | PAN-958 | M | medium | ok |  |  | Implement vBRIEF issue sync: migrate and reconcile GitHub issues into specification |
-| 591 | PAN-949 | M | medium | ok |  |  | feat: add conversation for project from sidebar |
-| 592 | PAN-3157 | XS | medium | ok |  |  | Rescoped: Awareness rail should show conv-flywheel as the Flywheel with its last tick (derive-status.ts) and link to /flywheel. |
-| 593 | PAN-5067 | M | medium | ok |  |  | Skill overrides: bad-YAML issue file is overwritten on write (data loss), license detection gaps, Pi ignores --pack silently. |
-| 594 | PAN-4908 | S | low | ok |  |  | Other remote-not-enabled messages name no file and the dead verb 'pan remote setup'; reuse PAN-4905's remoteEnabledHint(). |
-| 595 | PAN-947 | M | medium | ok |  |  | feat: project management actions in unified sidebar |
-| 596 | PAN-938 | M | medium | ok |  |  | Fizzy visual pipeline |
-| 597 | PAN-903 | M | medium | ok |  |  | Detect ~/.claude.json corruption on startup and surface it in the dashboard |
-| 598 | PAN-902 | XS | medium | ok |  |  | Settings: add 'Run pan sync' button to configuration menu |
-| 599 | PAN-901 | XS | medium | ok |  |  | Settings: add Maintenance panel with Claude Code Organizer + Config Editor quick-launch |
-| 600 | PAN-818 | M | medium | ok |  |  | Make summary optional when forking conversations |
-| 601 | PAN-4308 | S | medium | ok |  |  | Settle reaped Fly remote transcripts into the Session Vault; PAN-4295 auto-reap landed, still blocked by PAN-2609 (engine). |
-| 602 | PAN-3322 | XS | medium | ok |  |  | launcher-generator.ts's file-size ceiling sits 126 lines above the real file, handing back the regrowth the ratchet exists to prevent. |
-| 603 | PAN-678 | M | medium | ok |  |  | pan work issue --auto: headless planning → agent handoff without interactive dialog |
-| 604 | PAN-675 | M | medium | needs-refinement |  |  | Deacon: detect API rate-limit events, surface on dashboard, auto-restart when window resets |
-| 605 | PAN-654 | L | medium | ok |  |  | Project Setup Wizard |
-| 606 | PAN-649 | M | medium | ok |  |  | Render Excalidraw drawings inline in Claude Code conversations |
-| 607 | PAN-637 | XS | medium | ok |  |  | Direct issue kickoff (skip planning) from dashboard UI |
-| 608 | PAN-629 | M | medium | ok |  |  | Workspace quotas and resource governance |
-| 609 | PAN-613 | M | medium | needs-refinement |  |  | Investigate thinking effort levels for agents |
-| 610 | PAN-607 | M | medium | needs-refinement |  |  | Evaluate Ultimate Bug Scanner (UBS) for verification gate |
-| 611 | PAN-606 | M | medium | needs-refinement |  |  | Evaluate MCP Agent Mail for inter-agent communication and file reservations |
-| 612 | PAN-548 | M | medium | ok |  |  | Command Deck: preserve state across navigation including URL routing for tabs |
-| 613 | PAN-546 | M | medium | ok |  |  | Remove claude-code-router |
-| 614 | PAN-537 | M | medium | ok |  |  | feat: show changed files diff summary after each agent response in activity view |
-| 615 | PAN-531 | XS | medium | ok |  |  | PAN: Windows Electron support (WSL2 required) |
-| 616 | PAN-452 | M | medium | ok |  |  | Conversation input bar |
-| 617 | PAN-450 | M | medium | ok |  |  | Adopt remaining Effect patterns |
-| 618 | PAN-1126 | M | medium | ok |  |  | Integrate TLDR summaries into review context manifest |
-| 619 | PAN-1066 | M | medium | ok |  |  | Complete PAN-1048 R5: retire dispatchParallelReview body and specialists.ts module |
-| 620 | PAN-3441 | L | low | ok |  |  | God View 'River' WebGL pipeline visualization fed by the live hook-event stream; PRD and mockup exist. |
-| 621 | PAN-2968 | M | low | ok |  |  | Adopt the interactive decision page as the default way to present operator decisions |
-| 622 | PAN-2941 | M | low | stale |  |  | Superseded by OKF v0.2: drafts plus human verify replace the PR gate (eltmon/okf#6); semantic pass is eltmon/okf#7 |
-| 623 | PAN-2936 | M | low | ok |  |  | Handle loop.max_steps_exceeded: detect and nudge agents to continue instead of stranding them |
-| 624 | PAN-4373 | M | medium | ok |  |  | Optional Jev relevance filter for prompt-time memory injection candidates; both prerequisites have closed |
-| 625 | PAN-2868 | M | low | ok |  |  | Desktop window opens at fixed 1400×900 |
-| 626 | PAN-2767 | M | low | ok |  |  | Expose Codex app-server conversation controls in the dashboard |
-| 627 | PAN-2679 | M | low | ok |  |  | conv-lookup skill: resolve transcripts for codex and pi harness conversations |
-| 628 | PAN-2662 | M | low | ok |  |  | Add project context-menu actions scoped to issues currently in the pipeline |
-| 629 | PAN-2645 | M | low | ok |  |  | Add opt-in Observation-first conversation view |
-| 630 | PAN-2635 | XS | low | ok |  |  | pay down the 152-error src/dashboard/server typecheck debt |
-| 631 | PAN-5066 | M | medium | ok |  |  | Project skills in .pan/skills skip the CLI workspace fallback, never refresh, lose to bundled skills, and never reach Codex/Pi. |
-| 632 | PAN-3443 | L | low | ok |  |  | God View 'Spectrum Deck' visualizer concept with mockup and PRD; pure exploration, no substrate impact. |
-| 633 | PAN-4350 | M | medium | needs-refinement |  |  | Re-dispatch budget for foreman items; issue itself flags an unresolved conflict with the no-stored-state rule |
-| 634 | PAN-4003 | L | medium | ok |  |  | Parked: delete the ohmypi/omp harness, keep Pi; obsoletes 10 open ohmypi issues and shrinks PAN-3958's CH-7 scope |
-| 635 | PAN-4368 | S | medium | ok |  |  | Operator-run checklist: verify Sonnet 5.5 across switch-model, fork and compaction (model-locked thinking blocks) |
-| 636 | PAN-2622 | M | low | ok |  |  | cloister.toml materializes ALL defaults into the user file |
-| 637 | PAN-2600 | XS | low | ok |  |  | Retire the Codex TUI path after app-server burn-in (no-loss audit gate) |
-| 638 | PAN-2533 | XS | low | ok |  |  | UAT workspace magic-link login 502: Traefik picks unreachable panopticon IP for multi-homed fe/api |
-| 639 | PAN-2527 | M | low | ok |  |  | Harness selector should restrict OpenAI models to Claude Code only |
-| 640 | PAN-2514 | M | low | ok |  |  | Claude Code Traffic Inspector |
-| 641 | PAN-2505 | M | low | ok |  |  | lint:circular reports new frontend cycles + stale baseline in chat/conversations components |
-| 642 | PAN-2504 | M | low | ok |  |  | Auto-relaunch npx @overdeck/core under a compatible Node 22+ instead of failing on old Node |
-| 643 | PAN-2449 | M | low | ok |  |  | start-planning: GITHUB_REPOS env shadows projects.yaml github_repo; unknown IDs fall through to Linear and plan the wrong issue |
-| 644 | PAN-4769 | XS | low | ok |  |  | Two-sentence wording fix in features/skill-packs.mdx; PAN-4759 created the page and closed, so this is unblocked. |
-| 645 | PAN-3940 | XL | low | ok | ✓ |  | Parked epic: event-driven plugin/hook system on pipeline-notifier + hygiene-scheduler; do not pick up until the journal has soaked |
-| 646 | PAN-2424 | L | low | ok | ✓ |  | Epic: the Order Book |
-| 647 | PAN-2406 | S | low | ok |  |  | Remaining scope: findAllWorkspacePaths must also enumerate -strike-wt and named-suffix worktrees; gaps 1 and 3 are moot. |
-| 648 | PAN-2394 | M | low | ok |  |  | Incident: conv-* agent-dir cleanup destroyed ohmypi/codex conversation transcripts ("no saved history") |
-| 649 | PAN-4823 | XL | medium | ok | ✓ |  | Epic: Capacitor phone client for Anywhere without Tailscale; 15 children filed (#4828-4843); OD-1 settled; PAN-4774 done. |
-| 650 | PAN-2353 | M | low | needs-refinement |  |  | Overdeck Anywhere P1b: Hermes external-agent bridge (scoped API + Fly 6PN) |
-| 651 | PAN-4294 | L | low | ok |  |  | Anywhere paid tier: Creem subscription, entitlement API, quotas; pricing decided 2026-09-28; waits on PAN-4293 account service |
-| 652 | PAN-3133 | S | low | ok |  |  | Evaluation spike for TRON encoding of prompt-bound xBRIEF payloads; savings are modest today since agents get a bounded slice. |
-| 653 | PAN-5082 | XL | medium | ok |  |  | Move every MCP surface to SDK v2 for the 2026-07-28 spec while keeping 2025-11-25 clients; time it on PAN-5083 data. |
-| 654 | PAN-3011 | M | low | ok |  | PAN-465 | Add poolside Laguna S 2.1 as a model target; the honest hardware note says it will not fit this machine's GPU. |
-| 655 | PAN-2282 | M | low | ok |  |  | Conversation view shows no history for ohmypi-harness conversations |
-| 656 | PAN-2091 | XS | low | ok |  |  | delete dead IssueCockpitBody cockpit subtree (8 files, superseded by IssueMissionControl) |
-| 657 | PAN-2085 | M | low | ok |  |  | Auto-isolate conversations in a lightweight git worktree (Conductor-style workspaces) |
-| 658 | PAN-5070 | M | medium | ok |  |  | Connect a bot: one-click 'Copy for <bot>' message, pending connector requests under Bots, and a connected notice. |
-| 659 | PAN-2084 | M | low | ok |  |  | Auto-create lightweight conversation worktrees on project chats |
-| 660 | PAN-2083 | M | low | ok |  | PAN-1592 | Composer: a failed first send leaves the text in BOTH the composer box and the retry outbox |
-| 661 | PAN-2082 | M | low | ok |  |  | Composer: a single send failure clears ALL in-flight optimistic bubbles (and strips siblings' compaction net) |
-| 662 | PAN-2074 | XS | low | ok |  |  | research: evaluate ponytail (DietrichGebert/ponytail) for prompt compression and consider building in-house |
-| 663 | PAN-2046 | M | low | stale |  |  | Conversation view does not surface terminal command responses |
-| 664 | PAN-2006 | M | low | ok |  |  | Pipeline semantics lock-down: Definition of Ready, pickup gates (parked/vetoed/blocks-main), unblock override, and Run definition |
-| 665 | PAN-3919 | S | low | needs-refinement |  |  | Review the universal effort-high default and supervisor effort discretion; explicitly an operator decision, no work authorized |
-| 666 | PAN-2005 | M | low | ok |  |  | Backlog Sequencer: Pickup Forecast |
-| 667 | PAN-2002 | XS | low | ok |  |  | [HUMAN-ONLY] Sign & notarize the macOS desktop build (Apple Developer ID) |
-| 668 | PAN-1999 | M | low | ok |  |  | Backlog Sequencer: one sequencer per project (currently a single global runner scoped to PAN) |
-| 669 | PAN-1986 | M | low | ok |  |  | restartAgent (change harness/model): wipe stale agent-dir session pointers + refresh conversations row |
-| 670 | PAN-1983 | L | low | ok |  |  | Remove all panopticon.db-supporting code (legacy SQLite layer + db↔db migration + seed-from-legacy) |
-| 671 | PAN-2672 | S | low | needs-refinement |  |  | Transcript half reported fixed; parent-stays-ended half moved to PAN-4485. Verify on current build, then close. |
-| 672 | PAN-1958 | M | low | ok |  |  | Source-tagged programmatic delivery into pi conversation agents (extension sendUserMessage + input.source) |
-| 673 | PAN-5071 | M | medium | ok |  |  | overdeck.ai activate link becomes one Authorize click that names the requesting bot and machine (device_grants migration). |
-| 674 | PAN-1907 | M | low | ok |  |  | Generalize ToS gate: block ALL non-Claude-Code harnesses from Anthropic-subscription models; gray out + non-selectable + validate every… |
-| 675 | PAN-1895 | M | low | ok |  |  | Spawn work agents from issue workspace slide-out |
-| 676 | PAN-1878 | M | low | ok |  |  | process: bake 'docs updated' into acceptance criteria / definition-of-done in role + planning prompts |
-| 677 | PAN-1782 | M | low | ok |  |  | Handoff forks stall at "Injecting…" then die on double 300s summary timeout |
-| 678 | PAN-1773 | M | low | ok |  |  | Swarm v2 Phase 2: remote slot agents on Fly (B5 follow-up to PAN-1762) |
-| 679 | PAN-1646 | M | low | ok |  |  | Rabbit-hole drift detection and lift-to-new-conversation |
-| 680 | PAN-1643 | M | low | ok |  |  | Extend local Ollama support to Codex + Claude Code harnesses and dashboard model picker |
-| 681 | PAN-1592 | M | low | ok |  |  | Composer: make ephemeral composer state reload-durable (pasted images + unsent/failed message text) |
-| 682 | PAN-1581 | M | low | ok |  |  | Duplicate skills in picker: code-review collides with official plugin; beads/pan-flywheel/pan-handoff doubled across project+user sync |
-| 683 | PAN-1552 | M | low | ok |  |  | Dashboard conversation-message 500 cause is unloggable: serve mode never writes dashboard.log |
-| 684 | PAN-1533 | M | low | ok |  |  | Fork-into-worktree from conversation branch chip |
-| 685 | PAN-1483 | XS | low | ok |  |  | Distinguish general-use skills from Panopticon-only dev skills in pan sync |
-| 686 | PAN-1482 | M | low | ok |  |  | Token spend report should aggregate data from repo, not just local machine |
-| 687 | PAN-1481 | M | low | ok |  |  | Add cost-event telemetry for Caveman token savings |
-| 688 | PAN-1356 | M | low | ok |  |  | Extend the memory Observation pipeline to ad-hoc conversations |
-| 689 | PAN-1242 | M | low | ok |  |  | Create a new issue directly from a kanban column |
-| 690 | PAN-1222 | M | low | ok |  |  | Project-templated DB lifecycle: auxiliary databases + seed refresh from prod |
-| 691 | PAN-1208 | M | low | ok |  |  | Polyrepo: support non-feature 'main' workspaces alongside feature-* |
-| 692 | PAN-4352 | XS | low | ok |  |  | Operator verification: skill packs in a managed interactive Claude Code launch now that PAN-4334 has shipped |
-| 693 | PAN-1153 | M | low | ok |  |  | Vite TRAEFIK_ENABLED conflates 'Traefik on' with 'inside container' |
-| 694 | PAN-4298 | XL | low | needs-refinement |  | PAN-4294, PAN-1676 | Anywhere paid tier: run agents on hosted Fly capacity; tenant isolation, credentials, metering open; PAN-4294 and PAN-1676 unbuilt |
-| 695 | PAN-1152 | XS | low | ok |  |  | Remove PANOPTICON_DEV env-var persistence |
-| 696 | PAN-1135 | M | low | ok |  |  | Document the hook system in docs/HOOKS.md |
-| 697 | PAN-1133 | M | low | stale |  |  | Deacon-patrol tie-in for TLDR supervision is gone; would need its own liveness check |
-| 698 | PAN-1123 | XS | low | ok |  |  | Channels delivery: surface failures, add fallback toggle, route conversations through channels |
-| 699 | PAN-1121 | M | low | ok |  |  | Context bloat: agents receive oversized prompts that exceed tool limits and force immediate compaction |
-| 700 | PAN-4248 | L | medium | ok |  |  | List, pull and delete local Ollama models (size, store, in-use) in CLI, dashboard and doctor; PAN-1641 sidecar has merged. |
-| 701 | PAN-1117 | M | low | ok |  |  | Memory: pinned docs (long-form doc chunking + retrieval) |
-| 702 | PAN-1116 | M | low | ok |  |  | Memory: cross-project search mode |
-| 703 | PAN-1065 | M | low | ok |  |  | Validate issueId at every shell-string interpolation site (defense in depth) |
-| 704 | PAN-1064 | M | low | ok |  |  | Harden launcher generation against shell-quote injection (model and arg quoting) |
-| 705 | PAN-1063 | M | low | ok |  |  | Harden tts_daemon.py: bearer auth, CORS, body size cap, concurrency bound |
-| 706 | PAN-3971 | L | low | ok |  |  | Overdeck-native artifact pages (pan artifact publish + state door + dashboard listing); body says backlog only, Claude artifacts work today |
-| 707 | PAN-3768 | XS | low | ok |  |  | pan handoff --title already implemented and landed (678f6b389e5); open only pending close-out. |
-| 708 | PAN-3034 | XS | low | ok |  |  | Fix already landed on main (strike/slot workspace names and live tmux now seed the session tree); open pending close-out. |
-| 709 | PAN-2983 | M | low | stale |  |  | Superseded by the OKF v0.2 redesign: write modes and drafts (eltmon/okf#6) and the advisory semantic pass (eltmon/okf#7) |
-| 710 | PAN-3824 | XS | low | needs-refinement |  |  | Image-only report: default view on Windows breaks the model selector; needs a written repro and expected behavior |
-| 711 | PAN-3823 | XS | low | needs-refinement |  |  | Image-only report titled "pan sync issue"; needs the command, output text, and expected behavior |
-| 712 | PAN-1049 | M | low | needs-refinement |  |  | Spike: evaluate Tauri v2 desktop shell |
-| 713 | PAN-984 | XS | low | needs-refinement |  |  | Evaluate context-mode MCP server as session continuity + search layer |
-| 714 | PAN-962 | M | low | needs-refinement |  |  | Post-PAN-946: vBRIEF lifecycle follow-up plan |
-| 715 | PAN-961 | M | low | ok |  |  | Update documentation for vBRIEF v0.6 lifecycle model |
-| 716 | PAN-943 | M | low | ok |  |  | Add memory file review and management command |
-| 717 | PAN-908 | M | low | ok |  |  | PAN-908: Make work-agent spawn limits configurable and overridable |
-| 718 | PAN-898 | M | low | ok |  |  | Dashboard polling and WebSocket efficiency: remaining audit findings |
-| 719 | PAN-853 | L | low | needs-refinement |  |  | Evaluate terminal-bench@2.0 custom agent harnesses for Panopticon integration |
-| 720 | PAN-833 | M | low | ok |  |  | Agent spawn logs ENOTDIR for .git/pan-credentials in worktrees (GitHub App credential loader) |
-| 721 | PAN-832 | M | low | needs-refinement |  |  | state.json staleness: lastActivity/costSoFar not updated as agent runs; /api/agents drops phase/cost/lastActivity |
-| 722 | PAN-4347 | S | low | ok |  |  | pan done appends continue.json decisions to the PR body so significant decisions outlive the workspace |
-| 723 | PAN-797 | M | low | needs-refinement |  |  | Cost display: cache write tokens not shown separately; investigate Claude Code discrepancy |
-| 724 | PAN-4275 | S | low | ok |  |  | Prove a local Ollama model can finish a real work-agent task; gemma4:12b made zero tool calls. PAN-1641 has merged. |
-| 725 | PAN-2836 | M | low | needs-refinement |  |  | Placement presets now belong on eltmon/okf#4 after the OKF v0.2 redesign; migrate verb collides; re-scope or move upstream |
-| 726 | PAN-790 | L | low | ok |  |  | PAN-789: Eliminate remaining TanStack Query polling |
-| 727 | PAN-786 | M | low | ok |  |  | Post planning Q\&A answers as issue comment |
-| 728 | PAN-777 | M | low | ok |  |  | Inter-agent communication skill: send messages to conversation-mode agents |
-| 729 | PAN-775 | L | low | ok |  |  | Redesign workspace inspector panel: sidebar layout is cramped and wrong |
-| 730 | PAN-3456 | XS | low | ok |  |  | Already fixed in 4117c9a777 with a regression test; open only pending close-out. |
-| 731 | PAN-774 | XS | low | ok |  |  | Unify launch UX and release pipeline for 1.0 |
-| 732 | PAN-773 | XS | low | ok |  |  | Design prompt-style overlays with model hierarchy and scoped toggles |
-| 733 | PAN-772 | M | low | stale |  |  | Auto-resume ladder paths it names are gone; terminal-stack consistency now means the Herdr/tmux contract in TERMINAL-BACKENDS.md |
-| 734 | PAN-771 | M | low | needs-refinement |  |  | Investigate Vercel Sandbox execution backend support |
-| 735 | PAN-769 | M | low | stale |  | PAN-750 | Phase-transition history no longer accumulates in a record; a churn metric would be rebuilt from PR review cycles or the pipeline journal |
-| 736 | PAN-765 | M | low | ok |  |  | Preserve trailing zeros in cost displays |
-| 737 | PAN-764 | M | low | ok |  |  | Add quota/usage inspector for routed model providers |
-| 738 | PAN-4425 | M | low | ok |  |  | Deft fork work in eltmon/directive (env off switch, external-orchestrator mode); outside the overdeck pipeline |
-| 739 | PAN-752 | M | low | ok |  |  | Add Gemini OAuth support, remove O3/O4-mini, disable GPT-5.4-Pro |
-| 740 | PAN-751 | M | low | ok |  |  | Historical Metrics Data Persistence |
-| 741 | PAN-750 | L | low | ok |  |  | Complete Metrics Page Redesign |
-| 742 | PAN-749 | M | low | needs-refinement |  |  | Research and borrow best features from gstack |
-| 743 | PAN-747 | XS | low | ok |  |  | Conversation list items lack accessible labels in accessibility tree |
-| 744 | PAN-743 | XS | low | ok |  |  | Add consistent new conversation icon actions in Command Deck |
-| 745 | PAN-738 | M | low | ok |  |  | Add right-click fork option to conversation list |
-| 746 | PAN-735 | M | low | ok |  |  | Settings page: review and configure overridden subagent model files |
-| 747 | PAN-730 | M | low | ok |  |  | Add provider account telemetry for credits, balances, and usage |
-| 748 | PAN-702 | M | low | ok |  |  | OpenAI provider: add plan/subscription support and fix unregistered model resolution |
-| 749 | PAN-701 | XS | low | ok |  |  | Quick-Create conversation via keystroke using Conversations-page default model |
-| 750 | PAN-663 | XS | low | ok |  |  | Workspace frontend containers not auto-started for panopticon-cli self-hosted workspaces |
-| 751 | PAN-660 | M | low | ok |  |  | Slash menu command catalog drifts: hardcoded array in ComposerPromptEditor needs codegen |
-| 752 | PAN-624 | M | low | ok |  |  | Loop nodes: iterative agent execution with conditional termination |
-| 753 | PAN-623 | M | low | ok |  |  | Multi-channel workflow triggers: Slack, Discord, Telegram, GitHub webhooks |
-| 754 | PAN-622 | M | low | ok |  |  | YAML workflow DAGs: custom per-project pipeline definitions |
-| 755 | PAN-604 | M | low | ok |  |  | Hide planning agent from workspace detail pane |
-| 756 | PAN-603 | M | low | ok |  |  | Plan review loop with configurable reviewer model |
-| 757 | PAN-591 | XS | low | ok |  |  | Integrate Karpathy LLM guidelines into all Panopticon CLAUDE.md templates |
-| 758 | PAN-589 | XS | low | ok |  |  | Review and update commands-skills.md with all available Panopticon skills |
-| 759 | PAN-576 | M | low | ok |  |  | Global / search should include conversations in addition to workspace features |
-| 760 | PAN-571 | XS | low | ok |  |  | Add OpenRouter credits/plan status endpoint and UI |
-| 761 | PAN-568 | M | low | ok |  |  | Kanban: Show workspace and tmux session counts in stats |
-| 762 | PAN-565 | M | low | ok |  |  | Handle CTRL-Z to undo accidental conversation archival |
-| 763 | PAN-564 | M | low | ok |  |  | Slash menu positioned incorrectly |
-| 764 | PAN-554 | M | low | ok |  |  | Add kanban board deeplinks for issue URLs |
-| 765 | PAN-543 | M | low | ok |  |  | Add confirmation dialog before applying Optimal Defaults |
-| 766 | PAN-483 | M | low | ok |  |  | Unify Resume Agent UX |
-| 767 | PAN-480 | M | low | needs-refinement |  |  | Planning-agent --effort; likely covered by merged PAN-4249 resolver and PAN-4258 (plan effort), confirm or close |
-| 768 | PAN-476 | M | low | ok |  |  | Agent resume with Haiku session summary instead of claude --resume |
-| 769 | PAN-468 | M | low | ok |  |  | Agent test conversations pollute production database |
-| 770 | PAN-461 | M | low | ok |  |  | Deep-wipe multi-step progress dialog |
-| 771 | PAN-459 | M | low | ok |  |  | Planning setup screen with SSE progress streaming |
-| 772 | PAN-407 | XS | low | ok |  |  | Run Panopticon from a main workspace for development isolation |
-| 773 | PAN-2348 | XS | low | ok |  |  | docs: migrate STATE-STORAGE-AUDIT.md content to living docs, then delete |
-| 774 | PAN-2346 | XS | low | ok |  |  | docs: refresh AGENT_TYPES_INDEX.md to the post-Cut taxonomy in ROLES.md (xBRIEF items, foreman, conv-flywheel, worker role). |
-| 775 | PAN-2345 | XS | low | ok |  |  | docs: rewrite pan-done.md against done.ts + done-preflight.ts; fix continue path; point MERGE link at MERGE-WORKFLOW.md. |
-| 776 | PAN-2344 | XS | low | ok |  |  | docs: rewrite KANBAN-MODEL.md for derived issue state, pipeline-membership buckets, PR reviews; drop Inspect and beads. |
-| 777 | PAN-2343 | XS | low | ok |  |  | docs: rewrite MISSION-CONTROL.md: state label from deriveStateLabel, membership, liveness.ts; review_status table is gone. |
-| 778 | PAN-2073 | XS | low | ok |  |  | docs: add user-facing page for the Desktop App |
-| 779 | PAN-2071 | XS | low | ok |  |  | docs: add user-facing page for the Hooks system |
-| 780 | PAN-2068 | XS | low | ok |  |  | docs: add user-facing page for Caveman (agent output compression) |
-| 781 | PAN-2067 | XS | low | ok |  |  | docs: add user-facing page for RTK (Bash output compression) |
-| 782 | PAN-1684 | XS | low | ok |  |  | build full marketing kit + plan (SEO, video list, channels) from MARKETING.md seed |
-| 783 | PAN-1683 | XS | low | ok |  |  | docs: canonical agent session-prefix registry + reconcile role taxonomy (ROLES.md/AGENT_TYPES_INDEX/CLAUDE.md) |
-| 784 | PAN-1474 | M | low | ok |  |  | Add ACKNOWLEDGEMENTS doc |
-| 785 | PAN-1469 | M | low | ok |  |  | End-to-end review and consolidation of all project documentation |
-| 786 | PAN-674 | XS | low | ok |  |  | docs: add glossary of Panopticon domain terms |
-| 787 | PAN-634 | M | low | ok |  |  | Documentation cleanup: restructure docs, update installation (npx panctl), refresh stale PRDs |
-| 788 | PAN-2908 | M | low | ok |  |  | Make overdeck not suck |
-| 789 | PAN-106 | M | high | stale |  |  | Cost prediction/estimation for in-progress work |
-| 790 | PAN-262 | M | high | stale |  |  | Refactor post-merge lifecycle into composable, idempotent operations |
-| 791 | PAN-176 | M | high | stale |  |  | PAN-176: Hook-enforced delegation guardrails for specialist agents |
-| 792 | PAN-334 | S | medium | stale |  |  | Dashboard server has no duplicate-process protection |
-| 793 | PAN-324 | XS | medium | needs-refinement |  |  | Approval is now a PR review or the dashboard MERGE button; verify whether the agent detail pane already surfaces MERGE post-cut |
-| 794 | PAN-304 | S | medium | stale |  |  | closeLinearDirect returns stepOk even when state update never happens |
-| 795 | PAN-245 | S | medium | stale |  |  | Ctrl+C aborts planning dialog instead of copying text |
-| 796 | PAN-244 | S | medium | stale |  |  | Deep-wipe leaves local branch and worktree metadata behind |
-| 797 | PAN-4332 | M | low | ok |  |  | Interop: continue t3code sessions in Overdeck and back via native transcripts; PAN-2609 Phase A has closed |
-| 798 | PAN-113 | S | medium | stale |  |  | Dashboard 'Start Agent' returns success before verifying agent actually started |
-| 799 | PAN-49 | XS | medium | stale |  |  | Fix CloisterService tests that require real runtime |
-| 800 | PAN-294 | M | medium | stale |  |  | Surface module initialization errors as system-level, not per-issue |
-| 801 | PAN-293 | M | medium | stale |  |  | Project Living Memory |
-| 802 | PAN-277 | M | medium | stale |  |  | Session reasoning capture & collaborative PRD refinement |
-| 803 | PAN-258 | M | medium | stale |  |  | Kanban board: fit all columns without horizontal scrolling |
-| 804 | PAN-255 | M | medium | stale |  |  | Agents lack awareness of MCP tools |
-| 805 | PAN-252 | XS | medium | stale |  |  | Disable Sync with Main button when workspace is up to date |
-| 806 | PAN-243 | M | medium | stale |  |  | Audit dashboard actions: ensure all are available via CLI |
-| 807 | PAN-77 | XS | medium | stale |  |  | Cost breakdown modal: show costs by stage and model when clicking cost badge |
-| 808 | PAN-54 | L | medium | stale |  |  | e2e command for full workflow integration test |
-| 809 | PAN-38 | M | medium | stale |  |  | Support multiple merge agents per repository |
-| 810 | PAN-37 | M | medium | stale |  |  | Support external PR selection for merge-agent |
-| 811 | PAN-3248 | XS | low | stale |  |  | Stale: targets the deploy patrol (pan reload is the new home) deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 812 | PAN-3244 | S | low | stale |  |  | Stale: targets the deploy-patrol deploy window deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 813 | PAN-2775 | S | low | needs-refinement |  |  | Stale: targets boot-correlated reaping (boot reconciliation) deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 814 | PAN-5072 | M | medium | ok |  | PAN-5070 | Integrations READMEs and shared SKILL.md lead with the one-paste connect flow; Grok Bot moves to the connector. Needs PAN-5070. |
-| 815 | PAN-5033 | XS | medium | ok |  |  | OpenClaw Connect a bot snippet omits hooks.allowConversationAccess, so the needs-you summary stays off with no message. |
-| 816 | PAN-3505 | XS | low | needs-refinement |  |  | Stale: targets the flywheel state write door deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 817 | PAN-5043 | S | medium | ok |  |  | Commit the phone-app iOS Simulator harness (Miniflare connect stand-in, stub account service, rig steps) built twice by hand. |
-| 818 | PAN-5065 | L | medium | ok |  |  | Opt-in mode where a project's agents and gates stop seeing ~/.overdeck.env keys the project did not list. |
-| 819 | PAN-3321 | XS | low | stale |  |  | Stale: targets pan unstick deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 820 | PAN-736 | M | low | stale |  |  | Retired: work-types.ts, WorkTypeRouter and models.overrides are all gone (#4174); per-subagent routing needs a fresh roles.* design |
-| 821 | PAN-762 | M | low | stale |  |  | Premise gone: models.overrides is a retired, ignored key since #4174, so there are no overrides left to warn about |
-| 822 | PAN-299 | M | low | stale |  |  | Granular session state persistence across context compaction |
-| 823 | PAN-298 | M | low | stale |  |  | Auto-detect package manager and runtime in workspace setup |
-| 824 | PAN-297 | M | low | stale |  |  | Workspace templates: pre/post tool hooks for auto-format, typecheck, lint |
-| 825 | PAN-283 | M | low | stale |  |  | Reset should sync workspace feature branch with latest main |
-| 826 | PAN-271 | M | low | stale |  |  | Auto-assign Linear project from project config when creating issues |
-| 827 | PAN-265 | M | low | stale |  |  | Review skill categorization: all skills available everywhere via personal + workspace |
-| 828 | PAN-249 | XS | low | stale |  |  | Add data-testid attributes across dashboard UI and create Playwright smoke test suite |
-| 829 | PAN-228 | M | low | stale |  |  | Shift-left post-edit diagnostics |
-| 830 | PAN-227 | M | low | stale |  |  | Phase gate validation |
-| 831 | PAN-198 | M | low | stale |  |  | Structured audit trail for agent actions |
-| 832 | PAN-190 | M | low | stale |  |  | PAN-190: Specialized reviewer prompts (industry best-practice checklists) |
-| 833 | PAN-180 | M | low | stale |  |  | PAN-180: Cross-terminal file locking for concurrent agents |
-| 834 | PAN-177 | M | low | stale |  |  | PAN-177: Iteration limits with escalation for autonomous agents |
-| 835 | PAN-175 | M | low | stale |  |  | PAN-175: Pre-compact auto-save hook for agent sessions |
-| 836 | PAN-155 | L | low | stale |  |  | PAN-155: Redesign health page with Stitch (system overview, timeline, costs) |
-| 837 | PAN-146 | M | low | stale |  |  | PAN-146: Refine light mode theming across all dashboard pages |
-| 838 | PAN-55 | M | low | stale |  |  | Track specialist costs with time period filtering |
-| 839 | PAN-52 | XS | low | stale |  |  | Guidance needed: Running complex multi-container projects with Panopticon worktrees |
-| 840 | PAN-51 | M | low | stale |  |  | Documentation: Clarify issue tracker options beyond Linear |
-| 841 | PAN-44 | M | low | stale |  |  | Planning should fetch ALL issue context: comments, attachments, linked issues, discussions |
-| 842 | PAN-2070 | XS | low | needs-refinement |  |  | docs: user-facing Flywheel page should target the pan-flywheel v2 loop skill, not a CLI daemon with a dashboard toggle |
-| 843 | PAN-3536 | S | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): pan tell can not reach ohmypi conversations; fix dies with the harness |
-| 844 | PAN-2027 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): routing kimi-k2 through ohmypi needs a different home once OMP is gone |
-| 845 | PAN-2035 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): Copilot provider routing via omp |
-| 846 | PAN-2034 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): end-to-end test for ohmypi tool-call rendering |
-| 847 | PAN-2033 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): ohmypi message-delivery latency benchmark |
-| 848 | PAN-2032 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): local Ollama review role via omp |
-| 849 | PAN-2030 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): version-pin the ohmypi extension |
-| 850 | PAN-2029 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): ohmypi-parser thinking_tokens capture |
-| 851 | PAN-2028 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): per-provider cost grouping keyed on omp |
-| 852 | PAN-2024 | XS | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): ohmypi conversation Tools-toggle |
-| 853 | PAN-2883 | M | high | needs-refinement |  |  | Appears already fixed: resolveIssuePullRequestRef probes strike/<id> at pull-requests.ts:209, which is exactly the fix. Verify and close. |
-| 854 | PAN-2995 | XS | high | needs-refinement |  |  | Same defect as PAN-2828, closed as a duplicate of the fixed #2907; verifyStrikeBranchMergedIntoMain already checks PR-merge and content. |
-| 855 | PAN-4555 | XS | low | ok |  |  | Date-gated: do not start before 2026-12-01. Raise gemini-4-argon pricing rows to list rates; cost tracking halves Argon until then. |
-| 856 | PAN-4590 | L | medium | ok |  |  | Semgrep sast verification gate + review-context findings; first buildable Semgrep child (epic PAN-4585 closed), needs config. |
-| 857 | PAN-4591 | L | medium | ok |  |  | Semgrep in-session: semgrep mcp in work/review roles, post-edit scan hook, semgrep skill; epic PAN-4585 closed, now buildable. |
-| 858 | PAN-4592 | M | low | ok |  | PAN-4590 | pan semgrep ci-setup opens a PR adding a Semgrep Actions workflow + failure relay; needs gate mode from PAN-4590. |
-| 859 | PAN-4594 | M | low | ok |  | PAN-4590 | Dashboard Semgrep controls: Settings security section, per-project sast override, findings in issue view; after PAN-4590. |
-| 860 | PAN-4593 | L | low | needs-refinement |  | PAN-4590 | Semgrep Platform/Guardian tier; operator decisions (offer Guardian? contact Semgrep first?) still open — refine before work. |
-| 861 | PAN-5022 | L | medium | ok |  |  | Phone app: relay notification preferences to offline machines via the directory, and drop muted pushes on the phone. |
-| 862 | PAN-5021 | M | medium | ok |  |  | Phone app PostHog telemetry with its own opt-out, anonymous id and channel error capture; its blockers have both closed. |
-| 863 | PAN-5029 | M | medium | needs-refinement |  |  | Grok Build Tailscale reach can't work: pan mcp serve verifies tokens only against its own machine. Needs a design choice. |
-| 864 | PAN-5078 | XL | low | ok |  |  | Parked: add xAI's Grok Build CLI as a harness over ACP (stdio agent, resumable sessions). |
-| 865 | PAN-4842 | S | medium | ok |  |  | Phone app W-DOC: phone-app.mdx and updates to Anywhere, push, tailscale and service docs; finished last. |
-| 866 | PAN-4851 | S | low | needs-refinement |  |  | Open question: opt-in Overdeck reviewer for Deft-pipeline issues; operator says low priority, do not plan or start without them |
-| 867 | PAN-4887 | M | medium | ok |  |  | Phone app: let phone credentials reach linked machines (fleet Needs-you, linked-conv proxy, /ws/linked); PAN-4835 merged. |
+| 49 | PAN-5095 | S | high | ok |  |  | pan tell to a Codex app-server conversation always queues to mail and is never delivered; fix: post through app-server in every state. |
+| 50 | PAN-3560 | M | critical | ok |  |  | PTY supervisor overloads under concurrent review convoys; fleet-wide 502 'input echo confirmation failed' kills resumes and feedback. |
+| 51 | PAN-3520 | S | critical | ok |  |  | Test gate records 'failed' for load-induced timeouts; retry timeout-only failures in isolation before writing a verdict. |
+| 52 | PAN-4439 | S | high | ok |  |  | CI relay has no backstop for webhooks missed during pan reload; red test jobs never reach the agent, PRs stall |
+| 53 | PAN-4392 | XS | high | ok |  |  | pan task done accepts an Item: trailer from another issue's merged commit (history-wide grep); gate passes with no evidence |
+| 54 | PAN-3500 | S | critical | ok |  |  | A review sub-role edited seven tracked files after writing its report and the changes were auto-committed into the feature history. |
+| 55 | PAN-3313 | S | critical | ok |  |  | A transient upstream stream error benches CLIProxy's only auth: ~70% of GPT-routed inference 503s with a message that blames credentials. |
+| 56 | PAN-3282 | M | critical | ok |  |  | Review agents die before writing a verdict across 5 issues and 2 projects, leaving a verdict-shaped status with no artifact behind it. |
+| 57 | PAN-4391 | S | high | ok |  |  | pan worker run fails in polyrepo workspaces because the root is not a git repo; delegation is broken for MYN |
+| 58 | PAN-4390 | S | high | ok |  |  | Polyrepo workspace create runs npm install in the project's parent dir, reports failure and hides the workspace from list |
+| 59 | PAN-2695 | S | high | ok |  |  | Concurrent review dispatches race fresh-spawn vs resume |
+| 60 | PAN-2742 | S | high | ok |  |  | synthesis fires 42s after spawn and reports reviewers with reports on disk as 'infrastructure failure' |
+| 61 | PAN-2706 | M | high | needs-refinement |  |  | Ghost test sessions absorb every test dispatch |
+| 62 | PAN-4374 | S | high | ok |  |  | Memory extraction has no working provider on subscription-only hosts; nothing extracted since 2026-08-13. Add claude-cli |
+| 63 | PAN-4344 | S | high | ok |  |  | Registered projects lack the agent main-push guard; ship a pre-push hook so agents cannot push to main outside overdeck |
+| 64 | PAN-4550 | XS | medium | ok |  |  | Two unit tests read host state (DASHSCOPE_BASE_URL, git-ignored .map files), so pan release check reports false reds locally |
+| 65 | PAN-4566 | S | high | ok |  |  | A failed replayEvents leaves the coordinator un-bootstrapped; tab defers live events with no banner. PAN-4559 fallback has landed. |
+| 66 | PAN-4622 | M | high | ok |  |  | Restart after consuming a verification result, or a dirty tree at boot, still re-runs 25-45 min of passed gates. PAN-4532 merged |
+| 67 | PAN-2940 | M | critical | ok |  |  | Three red-mains in one day from direct-push series bypassing PR CI |
+| 68 | PAN-3708 | M | critical | ok |  |  | pan strike dies at git worktree list on a polyrepo wrapper — the urgent-strike escape hatch is unavailable for MYN-class projects. |
+| 69 | PAN-3605 | XS | high | ok |  |  | Supply chain: lint-effect-diagnostics npx fell back to the registry and ran a squatted unscoped package; pin the scoped local bin. |
+| 70 | PAN-4624 | S | high | ok |  |  | Polyrepo ci-mode test gate reads CI verdict for the wrapper HEAD, never the member repo PR head, so red CI is silently missed. |
+| 71 | PAN-4792 | S | high | ok |  |  | Paste guard only knows numbered menus; a failed paste presses Enter into unnumbered selects, silently setting defaultMode=auto. |
+| 72 | PAN-3557 | S | critical | ok |  |  | Post-merge label writes have no retry; a 403 hides a merged issue from the verify-on-main sweep while lifecycle reports success. |
+| 73 | PAN-3543 | S | critical | ok |  |  | Completed-handoff agents are unstartable: start, --fresh and reset-session all refuse while the refusal itself recommends --fresh. |
+| 74 | PAN-3522 | S | critical | ok |  |  | Supervisor watchdog restart-churns under CPU storm because the probe timeout budget ignores the boot warm phase. |
+| 75 | PAN-3314 | M | critical | ok |  |  | One cgroup holds every agent pane, so a single hungry agent inflates the unit and oomd kills the whole fleet — twice now. |
+| 76 | PAN-3278 | S | critical | needs-refinement |  |  | A finished work agent with an open PR sat two hours because review was never dispatched and auto-requeue fired none of 25 attempts. |
+| 77 | PAN-4623 | XS | high | ok |  |  | deacon-lite stalled-review fallback calls a starter never registered in the deacon child, so stranded reviews stay stranded. TENET-10 |
+| 78 | PAN-3234 | S | critical | needs-refinement |  |  | Agents freeze indefinitely on blocking choice menus and no health surface notices; the detector is wired only to delivery refusal. |
+| 79 | PAN-3205 | S | critical | ok |  |  | The deployment gate promises the queued deploy will fire at the next verification boundary; that trigger does not exist. |
+| 80 | PAN-3118 | S | critical | needs-refinement |  |  | Model-specific quota exhaustion is invisible everywhere but the pane: four planning agents read 'running' at $0.00 with no fallback. |
+| 81 | PAN-3106 | S | critical | ok |  |  | auto_merge_default: hold is consulted on one merge path only, so held issues merge individually and defeat the UAT train. |
+| 82 | PAN-3100 | S | critical | ok |  |  | The test role evaluates the dirty working tree, so a live work agent's uncommitted edits are recorded as the issue's test failure. |
+| 83 | PAN-4213 | M | high | ok |  |  | Merge-train follow-ups from #4066 (merged): stamp-vs-pin mismatch, reset --keep can strand agent commits, fetch retry, tests |
+| 84 | PAN-4753 | XL | high | needs-refinement | ✓ |  | Epic: restore merge trains (MergeTrain component, strike fast lane); PAN-4750 merged; PRD being written, no children yet; handoff. |
+| 85 | PAN-3096 | S | critical | ok |  |  | pan done blocks on generated .devcontainer/ and dev, and agents resolve it by deleting workspace infrastructure or inventing gitignores. |
+| 86 | PAN-3084 | S | critical | needs-refinement |  |  | A review session spawned but never briefed sits at zero context forever, and restart 'preserves' the zombie that blocks its replacement. |
+| 87 | PAN-3043 | S | critical | needs-refinement |  |  | Provider health is probed only at spawn, so a mid-run 403 quota refusal leaves an agent 'running' for days holding a slot. |
+| 88 | PAN-1824 | S | high | ok |  |  | Fix flaky main CI: fake timers + @slow exclusion for real-timer test family |
+| 89 | PAN-2932 | S | high | ok |  | PAN-2337 | intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap leaves :3011 unbound (Bad Gateway) after pan reload |
+| 90 | PAN-2935 | S | critical | ok |  |  | Workspace devcontainer duplicate backend hijacks Traefik router |
+| 91 | PAN-2337 | XS | critical | ok |  |  | Reload/build atomicity: an in-place `npm run build` under a live dashboard breaks new PTY-supervisor spawns until restart |
+| 92 | PAN-2422 | XS | high | ok |  | PAN-2337 | rebuilding dist under a live server breaks lazy chunk imports |
+| 93 | PAN-2699 | XS | high | ok |  |  | npm run build regenerates the committed record-cost-event.js bundle |
+| 94 | PAN-2957 | XS | high | ok |  | PAN-2337 | npm run build intermittently produces stale frontend bundles |
+| 95 | PAN-2850 | M | high | ok |  |  | npm test fails in clean checkout after pretest removes dashboard bundle |
+| 96 | PAN-2758 | S | critical | needs-refinement |  |  | Provider capacity error silently zombies a spawned agent: willRetry=false, turn reported completed, state stays status=running forever |
+| 97 | PAN-2817 | M | high | needs-refinement |  |  | Idle-at-prompt work/review agents are never redriven: gpt-5.6-sol sessions stop at the composer mid-task and sit for hours |
+| 98 | PAN-2813 | M | high | ok |  |  | Scheduler yield never self-clears: yielded work agents stay paused after the blocking review completes/merges |
+| 99 | PAN-2668 | M | high | ok |  |  | Verification/review feedback silently queued to stopped-by-user agents |
+| 100 | PAN-2569 | XS | critical | ok |  |  | planning finalizes (issue→planned) but work agent does not auto-spawn |
+| 101 | PAN-4269 | M | high | ok |  |  | macOS conversations hang on 'Working…'/'waiting for transcript'; governor ruled out, root cause unknown (delivery or transcript find). |
+| 102 | PAN-3811 | M | high | ok |  |  | The PAN-3809 emergency strike prunes BuildKit unconditionally; inventory, bounded reclaim door and retention floor are still missing |
+| 103 | PAN-2179 | S | high | needs-refinement |  |  | relaunch can leave a zombie agent |
+| 104 | PAN-2169 | S | high | needs-refinement |  |  | kimi agent silently frozen at 100% ctx (no thrown overflow error) not caught by CONTEXT_OVERFLOW_PATTERNS |
+| 105 | PAN-2734 | S | high | ok |  |  | merge queue head-of-line zombie |
+| 106 | PAN-3697 | XS | high | ok |  |  | Deployed dashboard PATH omits Bun, so verification workers hit 'bun: not found' before the required install gate. |
+| 107 | PAN-3633 | S | high | ok |  |  | Strike workspaces spawn without @types, so the contract's own typecheck gate fails and agents abort reporting a false red main. |
+| 108 | PAN-4420 | S | high | ok |  |  | npx @overdeck/core on native Windows serves 404 for every page: static root is built from a URL path |
+| 109 | PAN-3099 | XS | critical | ok |  |  | --health-timeout 120 is enforced as 120ms and a false-failed check exits after killing the old server — nothing left listening. |
+| 110 | PAN-4418 | S | high | ok |  |  | vault join fails on native Windows: core.autocrlf=true rewrites the VAULT-FORMAT marker; blocks Windows continue flow |
+| 111 | PAN-3040 | S | critical | ok |  |  | pan strike is monorepo-shaped end to end and fails immediately on polyrepo projects; same defect as PAN-3708. |
+| 112 | PAN-3023 | S | critical | ok |  |  | Post-planning auto-spawn logs 'attempt 1/3' and never retries after a transient Docker EOF, stranding the issue with no re-drive owner. |
+| 113 | PAN-1618 | S | high | ok |  |  | Substrate: work-spawn docker-health gate has no autonomous recovery |
+| 114 | PAN-3916 | M | high | ok |  |  | Session pointers go stale after rollover + crash recovery; issue view and pan tell confirmation track a dead transcript |
+| 115 | PAN-3900 | S | high | ok |  |  | Docker bridge pool exhausted by orphaned workspace networks; pan start fails; bridge-pool patrol only warns |
+| 116 | PAN-3793 | S | high | ok |  |  | resolveIssuePullRequestRef probes only feature/ and strike/ names, so close-out cannot find a merged PR on a descriptive branch |
+| 117 | PAN-2639 | S | high | ok |  | PAN-2331 | codex-resume replays a rotated-out (revoked) refresh token → codex review convoys wedge with 401 |
+| 118 | PAN-2331 | S | high | ok |  |  | codex rate-limit 'Switch to gpt-5.4-mini?' modal stalls autonomous agents (no auto-dismiss) |
+| 119 | PAN-2333 | M | high | ok |  |  | feat: handle codex weekly-quota exhaustion gracefully |
+| 120 | PAN-4184 | S | high | needs-refinement |  |  | --no-deacon on the host port is refused as a peer after the old server stops, so the escape hatch may leave no dashboard; fix unpicked |
+| 121 | PAN-2511 | XS | high | ok |  |  | Work agents burn 20+ min on false test failures |
+| 122 | PAN-2763 | S | high | ok |  |  | Workspace node_modules is symlinked to the primary repo, breaking test resolution |
+| 123 | PAN-2170 | XS | high | ok |  |  | Docker init container lacks Python |
+| 124 | PAN-1198 | S | high | ok |  |  | Workspace init container's bun install doesn't populate container-node-modules named volume |
+| 125 | PAN-4453 | XS | high | ok |  |  | runtimes/codex.ts uses homedir() not OVERDECK_HOME; isolated homes write thread ids into the real ~/.overdeck |
+| 126 | PAN-2106 | S | high | ok |  |  | pan strike workspace setup leaves broken partial workspace + false 'spawned' success (git-lock race) |
+| 127 | PAN-2880 | M | high | ok |  | PAN-2259 | Linear tracker listIssues is a 3N+1 request storm |
+| 128 | PAN-2966 | S | high | ok |  |  | Polyrepo wrapper .gitignore misses .pan/ .devcontainer/ dev |
+| 129 | PAN-2945 | S | high | ok |  |  | pan done rejects Overdeck-generated runtime in polyrepo wrapper repos (.devcontainer/, dev, .pan/review) |
+| 130 | PAN-2680 | M | high | ok |  |  | pan close: Docker teardown silently skips a running stack in multi-repo projects (MYN), aborting close-out |
+| 131 | PAN-4419 | S | high | ok |  | PAN-4418 | pan vault resume cannot spawn claude on native Windows (ENOENT, needs shell/.cmd resolution); --no-launch works |
+| 132 | PAN-3734 | S | high | ok |  |  | Completed swarm slot reuse can start a new item from a stale polyrepo branch — silent wrong-parent work. |
+| 133 | PAN-3621 | M | high | ok |  |  | pan start intermittently dies resolving a chunk graph spliced across two builds — importer from primary dist, path in the live generation. |
+| 134 | PAN-3555 | S | high | ok |  |  | pan start without --fresh silently abandoned an intact 7.5MB warm session, violating the warm-by-default contract. |
+| 135 | PAN-3498 | S | high | ok |  |  | write-sequence pins in-pipeline ranks without renumbering, so the persisted sequence carries duplicate ranks and gaps. |
+| 136 | PAN-3496 | XS | high | ok |  |  | A review convoy member blocked on an operator AskUserQuestion about review depth; review agents must decide and record, not ask. |
+| 137 | PAN-3081 | S | high | ok |  |  | The agent git guard is PATH-based and an agent stripped it unprompted to get past a false block; a control the agent can remove isn't one. |
+| 138 | PAN-2627 | S | high | ok |  |  | Linear poller is blind after cycle rollover |
+| 139 | PAN-2324 | XS | high | ok |  |  | label transition fails atomically on missing 'in-planning' label |
+| 140 | PAN-2165 | XS | high | ok |  |  | pan close: close-issue phase reports success but leaves issue OPEN / wrong labels (remove-label aborts on absent label; no-vBRIEF trans… |
+| 141 | PAN-2905 | S | high | ok |  |  | Dashboard steady-state CPU ~50% keeps API responses at 0.5-1.5s |
+| 142 | PAN-2259 | S | critical | ok |  |  | something burns the full 5k/hr GitHub GraphQL quota |
+| 143 | PAN-2379 | S | high | ok |  |  | dependency install is warn-only + 60s timeout → false verify failures against empty node_modules (blocks swarm convergence) |
+| 144 | PAN-2421 | XS | high | ok |  |  | dashboard server route tests flake under full-suite verification load |
+| 145 | PAN-2430 | S | high | ok |  |  | frontend typecheck fails with dozens of pre-existing unused-local errors |
+| 146 | PAN-2593 | S | high | ok |  |  | server children inherit bare system PATH |
+| 147 | PAN-4302 | M | high | ok |  |  | ~19 files exec gh directly, bypassing runGh: spend is unattributed and keeps hitting GitHub during quota pause. Follow-up to PAN-4291 |
+| 148 | PAN-2080 | M | high | needs-refinement |  |  | External transports (email/Slack/push/TTS) still plausible; its stated dependency on the PAN-2079 Inbox spine is undercut by boot… |
+| 149 | PAN-5048 | M | high | ok |  |  | Needs-you drops an unanswered AskUserQuestion seconds after its phone push; the phone shows 'already answered' with no card. |
+| 150 | PAN-1436 | S | high | ok |  |  | PAN-1419 follow-up: stale stopped-agent zombies still pollute dashboard list |
+| 151 | PAN-3556 | S | high | ok |  |  | No per-agent spawn mutex: two flows allocated session identities 3s apart and the second pin orphaned the first transcript. |
+| 152 | PAN-3553 | S | high | ok |  |  | tmux list-panes -a exits 1 on a zero-session server, so the census reads unavailable post-reboot and conversations hang on 'Starting…'. |
+| 153 | PAN-3535 | S | high | ok |  |  | The drain/resume hold is re-derived from the caller's env each boot, so any restart from a clean shell silently drops it. |
+| 154 | PAN-3429 | M | high | ok |  |  | Memory governor defers admissions but sheds nothing under HARD pressure; concurrent heavy gate runs aren't in the shed ladder. |
+| 155 | PAN-3397 | S | high | ok |  |  | Fresh convoy lanes freeze at 0 output before kickoff; PAN-3375's detector only covers warm resumes, so recovery is manual. |
+| 156 | PAN-3325 | S | high | ok |  |  | A fresh workspace ships an empty-but-present node_modules, so tooling silently resolves the parent repo's deps and gates go false-green. |
+| 157 | PAN-3317 | S | high | ok |  |  | Strike agents are told to rebase, the launcher guard blocks it, and pan sync-main can't resolve a -strike workspace. Overlaps PAN-3306. |
+| 158 | PAN-3284 | S | high | ok |  |  | A workspace-confined agent wrote a doc edit into the primary main worktree — the PAN-2204 write-to-main hazard through a new door. |
+| 159 | PAN-3270 | S | high | ok |  |  | New workspaces arrive with empty node_modules and bun off the agent shell PATH, so the documented bun install remedy fails. |
+| 160 | PAN-4487 | XS | high | ok |  |  | cleanAgentState whitelist drops foreman, modelSpawnKey, workspaceId on every state.json write; add fields + round-trip test |
+| 161 | PAN-3257 | S | high | ok |  |  | Crash-resume leaves a stale PTY socket and drops supervisorEnabled from state.json, so every supervisor delivery fails afterwards. |
+| 162 | PAN-3129 | M | high | ok |  |  | No symlink/TOCTOU containment on canonical writes under agent-controlled paths; a planted symlink redirects a server-side write. |
+| 163 | PAN-3120 | S | high | ok |  |  | A scheduler-yielded work agent makes operator MERGE hard-error on polyrepo and silently dead-end on single-repo. |
+| 164 | PAN-4349 | S | high | ok |  |  | Agent-side GitHub reads prefer REST over GraphQL gh --json until PAN-4302 meters callers; protects the hourly quota |
+| 165 | PAN-3062 | M | high | ok |  |  | The shared primary main worktree stacks several sessions' commits, so whoever pushes next ships everyone else's unverified work. |
+| 166 | PAN-3048 | XS | high | needs-refinement |  |  | Pipeline auto-commit lands Overdeck's own .pan/drafts PRD into product feature branches; the exclusion list is duplicated and has drifted. |
+| 167 | PAN-3032 | S | high | ok |  |  | Rebuild composes under overdeck-feature- while Traefik labels name myn-feature- devnet, and traefik attaches are runtime-only. |
+| 168 | PAN-3833 | S | high | ok |  |  | Feed renders assistant text emitted after tool calls as collapsed thinking rows; operator believes the agent never answered |
+| 169 | PAN-3902 | S | high | ok |  |  | Verification gates inherit OVERDECK_* env from the dashboard, so host boot state (e.g. OVERDECK_NO_RESUME) can red any branch |
+| 170 | PAN-4629 | M | high | ok |  |  | Fresh npx machine cannot pan start: no gh auth token fallback for the GitHub tracker, and registration derives the wrong issue prefix. |
+| 171 | PAN-3854 | S | high | ok |  |  | Feature-workspace devcontainer stack 403s on POST /api/dashboard/session, blocking all in-browser mutation UAT |
+| 172 | PAN-4577 | M | high | ok |  |  | Operator's facts didn't follow them to a new Mac: no importer for Claude auto-memory. PAN-3957 merged, so W9-W11 are unblocked. |
+| 173 | PAN-3307 | XS | high | ok |  |  | commitlint scope-enum lists 11 scopes, 14 real ones are missing, and it still names the removed beads scope — trains everyone to ignore it. |
+| 174 | PAN-4634 | M | medium | needs-refinement |  |  | Terra unserved on claude-code route: no CLIProxy release (to v8.0.44) lists it; bump pin, add to GPT_56_MODELS. Aliases also broken. |
+| 175 | PAN-2642 | XL | high | ok | ✓ |  | Cost strategy: waste detection over budget policing |
+| 176 | PAN-1868 | XS | high | ok |  |  | Cost-bleed circuit breaker: progress-aware, always-on guard against runaway agent spend |
+| 177 | PAN-4847 | S | high | ok |  |  | Remote reap silently skips review request when a background writer dirties a tracked file; pipeline stalls at PR-open. |
+| 178 | PAN-1042 | S | high | ok |  |  | cost_events retention: 14 months of granular rows accumulating with ad-hoc partial deletions |
+| 179 | PAN-4844 | S | medium | ok |  |  | Claude Code parser prices glm-*/qwen3* as Sonnet 4, ohmypi prices DashScope at $0; route both to custom rows. |
+| 180 | PAN-570 | XS | high | ok |  | PAN-2642 | Show PLAN badge on costs when under a subscription/plan |
+| 181 | PAN-2059 | XL | high | ok | ✓ |  | Backlog pickup gate |
+| 182 | PAN-2376 | XL | high | stale | ✓ |  | Epic: CI/CD reliability — all 21 named children are closed; needs an operator disposition (close or restate) |
+| 183 | PAN-3775 | S | high | ok |  |  | makeDbLive opens overdeck.db unmigrated; zero-table db poisons a vitest worker home and breaks later read-only audits. |
+| 184 | PAN-3652 | XS | high | ok |  |  | No workflow_dispatch on ci.yml / state-plane-branches.yml, so an unverified main tip can never be verified and DoD row 6 blocks close-out. |
+| 185 | PAN-3579 | M | high | ok |  |  | ~20 frontend mutations hand-write JSON headers and omit the CSRF token, so each 403s the moment its route becomes guarded. |
+| 186 | PAN-3541 | S | high | ok |  |  | Review restart loops on the session-resume menu because eligibility ignores how the prior session ended; partial mechanical break landed. |
+| 187 | PAN-3463 | S | high | ok |  |  | A legitimate empty-diff slot outcome can never pass item verify, so the slot wedges and blocks dispatch of remaining items forever. |
+| 188 | PAN-3460 | S | high | ok |  |  | Per-item verify_commands that run the whole root suite make slot merge gates load-fragile and hold a patrol in flight for ~17 minutes. |
+| 189 | PAN-3454 | M | high | ok |  |  | Cost hook rescans fork-copied parent history from byte 0 under the reviewer's id — fabricated cache-miss warnings and double-billed spend. |
+| 190 | PAN-3432 | S | high | ok |  |  | Preemptive yield fans out: seven work agents paused to make room for one review convoy, then flood back oldest-first. |
+| 191 | PAN-3306 | S | high | ok |  |  | Three layers disagree on how a strike rebases: the prompt instructs it, the launcher guard blocks it, sync-main resolves the wrong worktree. |
+| 192 | PAN-3297 | S | high | ok |  |  | After a dashboard restart, delivery calls a healthy agent a zombie while resume calls it healthy; both classifiers can't be right. |
+| 193 | PAN-3274 | S | high | needs-refinement |  |  | A test-role agent spawned and never ran a turn, holding an approved CI-green issue out of the merge gate behind a stale failed verdict. |
+| 194 | PAN-3267 | S | high | ok |  |  | GitLab merged-head oracle spawns one glab subprocess per repo × head, so pipeline membership refresh fails on every cycle. |
+| 195 | PAN-3261 | S | high | ok |  |  | The tmux delivery fallback answered a live session-resume menu because its own paste hid the menu from the detector — silent /compact. |
+| 196 | PAN-3256 | S | high | ok |  |  | glab mr list runs with a polyrepo wrapper root as cwd, which is not a git repo, so MYN membership fails forge_unavailable every cycle. |
+| 197 | PAN-4342 | M | medium | ok |  |  | Re-review rounds resume every lane on its own round-1 findings; give each round one fresh critic lane (Deft method) |
+| 198 | PAN-3174 | S | high | ok |  |  | Polyrepo UAT stacks 504: Traefik labels carry the old myn- prefix, Traefik isn't on the overdeck-* devnet, and the fe port is wrong. |
+| 199 | PAN-3050 | XS | high | ok |  |  | Idle-stack reaper's regex only matches overdeck-feature-*-server|frontend, so MYN stacks run for hours after their agents are gone. |
+| 200 | PAN-4365 | S | medium | ok |  |  | Stale defaults: workhorses.expensive is Opus 4.8 and the flywheel role is a literal that ignores the slot; evals now unblocked |
+| 201 | PAN-2980 | XS | high | ok |  |  | The pre-push file-size guard reads the shared working tree, so another session's uncommitted edits block an unrelated, guard-clean push. |
+| 202 | PAN-3769 | S | high | needs-refinement |  |  | Red main 707089c5→e4b280b3 blocked deploys ~14h: missing no-loss lock entry + stale OpenRouter expectation. Verify still reproducing. |
+| 203 | PAN-3760 | S | high | ok |  |  | permissionMode 'auto' undocumented as non-bypass, launcher can emit invalid --permission-mode, invalid values drop silently. |
+| 204 | PAN-3629 | M | high | ok |  |  | No sanctioned door to re-scope a live agent; the operator must violate pan tell doctrine or let the rejected design land. |
+| 205 | PAN-3517 | M | high | ok |  |  | Convoy forks still miss the parent prompt cache in production — launch-injection byte drift plus resume dropping the cache-scope header. |
+| 206 | PAN-3508 | S | high | ok |  |  | pan reload deletes the generation the global pan link points at, so the CLI vanishes mid-deploy for anyone invoking from elsewhere. |
+| 207 | PAN-3303 | S | high | ok |  |  | An empty registered-projects 200 is treated as authoritative, latching Command Deck at 'Unknown project' until a manual page reload. |
+| 208 | PAN-4364 | S | medium | ok |  |  | GPT-6 catalog: gpt-6-sol misclassed frontier and OpenAI tierModels still remap to GPT-5.6; prerequisites have closed |
+| 209 | PAN-3196 | S | high | ok |  |  | Root-owned container residue makes close-out die on EACCES after passing every DoD row; same family as PAN-3570. |
+| 210 | PAN-3186 | XS | high | ok |  |  | One configured non-git member (auricle/infra) blanks pipeline membership for the whole project the resolver claims it can answer. |
+| 211 | PAN-3185 | XS | high | ok |  |  | Racer (deacon auto-resume) was cut but the check-then-create gap in spawn.ts remains; pan start must report the live agent, not fail. |
+| 212 | PAN-3179 | M | high | ok |  |  | A UAT promote is complete at merge time with no production-reach check, so members read shipped while prod serves the old build. |
+| 213 | PAN-3176 | S | high | ok |  |  | UAT promote consults no stack health, so a batch whose stack was never exercised can be promoted from a success-green control. |
+| 214 | PAN-3130 | S | high | ok |  |  | Identifier-joined write paths have no containment assertion, so a crafted issue or agent id could redirect a canonical write. |
+| 215 | PAN-3047 | XS | high | ok |  |  | Strike-branch teardown uses --is-ancestor, which cannot see a squash merge, so all 96 strike/* branches survive as residue. |
+| 216 | PAN-3046 | XS | high | ok |  |  | pan exits with ERR_UNHANDLED_REJECTION when the PostHog shutdown flush times out, so callers read a successful merge handoff as failure. |
+| 217 | PAN-1711 | S | high | ok |  |  | Dashboard event-loop stalls under load force watchdog restarts; the root cause behind the PAN-3522 churn and the 0.5-1.5s API latencies. |
+| 218 | PAN-3667 | M | high | ok |  |  | CLIProxy has no cross-family remap, so every Anthropic-pinned subagent dies at spawn in a proxied session; stopgap is hand-written. |
+| 219 | PAN-4561 | L | medium | ok |  |  | React 18.3 + ~700 hand memo hooks; upgrade to React 19, enable the compiler, ratchet out manual memo. #4560 profiling has landed. |
+| 220 | PAN-4242 | M | high | ok |  |  | pan handoff --cwd skips the folder-trust pre-trust pan start does; successor sits at the trust prompt for hours while shown live |
+| 221 | PAN-2874 | M | high | needs-refinement |  |  | Two of three defects are gone: strike verification now sets skipPlanChecklist, and the landing loop was deleted in the cut. Rescope. |
+| 222 | PAN-3778 | S | medium | ok |  |  | Server snapshot cap shipped in #4558 (closed). Resume-from-offset on resubscribe is the remaining open piece; now unblocked. |
+| 223 | PAN-4575 | S | high | ok |  |  | Kimi ACP cancel is sent with id:"" and rejected, so interrupts never stop Kimi; late chunks land after turn_completed. Unblocked. |
+| 224 | PAN-5087 | S | high | ok |  |  | Attachment messages on every non-Claude harness never match their transcript echo and land in the failed outbox after 4 min. |
+| 225 | PAN-3510 | S | high | ok |  |  | Agent stop leaves detached docker-run test containers alive for hours, contending with other agents' quality gates. |
+| 226 | PAN-4909 | S | high | ok |  |  | Mac set up with connect: Safari on localhost:3011 gets HTTP 401 from the loopback session mint, so the Mac's own dashboard won't load. |
+| 227 | PAN-4616 | S | medium | ok |  |  | After PAN-4614 lands, check whether GitHub mergeable honors merge=union; if not, plan a merge-gate fallback |
+| 228 | PAN-4747 | S | high | ok |  |  | Two pan reloads built into the same generation slot 12s apart; restart lock taken over early, first build died on TS6053. |
+| 229 | PAN-3355 | XS | high | ok |  |  | sessionExists collapses 'no such session' and 'could not ask' into false, so callers read not-running when liveness is unknown. |
+| 230 | PAN-3289 | S | high | ok |  |  | A sequencer pass ran against an empty manifest while the read model held 1120 issues — a transiently empty read at spawn. |
+| 231 | PAN-4348 | S | medium | ok |  |  | Verification emits warn-first evidence of changed files outside every item's files_scope, so scope creep is visible |
+| 232 | PAN-3218 | S | high | ok |  |  | No release-drift signal: an install-breaking fix sat merged and unpublished for ~9 hours with nothing surfacing it. |
+| 233 | PAN-3210 | XS | high | ok |  |  | Close-out teardown scopes by compose project while the guard scopes by working_dir, so an unprefixed dead init container blocks it. |
+| 234 | PAN-3167 | S | high | ok |  |  | krux and lexerra are permanently unreadable through the membership door: an App-not-installed 404 is typed as retryable forge_unavailable. |
+| 235 | PAN-3113 | M | high | ok |  |  | Blocking agent-pane choice prompts show nothing in the conversation view; surface them as inline decision cards with keystroke delivery. |
+| 236 | PAN-3108 | XS | high | ok |  |  | dashboard.log reached 867MB with no rotation — disk cost and un-greppable incident logs exactly when they're needed. |
+| 237 | PAN-3094 | XS | high | ok |  |  | pan done's merge fallback still force-pushes a fast-forwardable branch, so a rejected push leaves completion half-done. |
+| 238 | PAN-3012 | M | high | ok |  |  | Archiving preserves the pointer, not the data: harnesses delete session JSONL on their own schedule and the conversation is unrecoverable. |
+| 239 | PAN-3627 | XS | high | ok |  |  | backlog-auto-trigger throws on a legitimately empty manifest, so a plain npx @overdeck/core in a non-project dir prints a stack trace. |
+| 240 | PAN-3617 | S | high | needs-refinement |  |  | Three strike dispatches for PAN-3586 died with zero output while a sibling worked; may be stale — re-confirm before picking up. |
+| 241 | PAN-4346 | S | medium | ok |  |  | Byte ratchet on the always-loaded rules bundle (40 KB, no ceiling); seeded at current size, growth forbidden |
+| 242 | PAN-3276 | XS | high | ok |  |  | Needs-you rows for pane questions and permission prompts are click-dead, so the list that exists to route the operator routes nowhere. |
+| 243 | PAN-3235 | S | high | ok |  |  | Render and answer agent pane-choice menus on the decision card; PAN-3228 shipped the core and CLI, the dashboard UX remains. |
+| 244 | PAN-4203 | L | high | ok |  |  | Operator-requested pan replan + right-click Replan: API-archive stale branch, verify, reset, comment, auto-replan from main. |
+| 245 | PAN-3789 | L | medium | needs-refinement |  |  | MCP servers configured in standalone Codex never reach Overdeck conversations; no setup, auth or lifecycle story across harnesses |
+| 246 | PAN-3175 | M | high | ok |  |  | Merge-train ordering derives conflicts from file overlap alone, so semantically dependent members batch in any order and break the schema. |
+| 247 | PAN-3015 | L | high | ok |  |  | Claude Code is the only harness still driven by keystroke injection; a pull-based monitor inbox would retire the whole hardening stack. |
+| 248 | PAN-3518 | M | high | needs-refinement |  | PAN-3517 | Re-review resumes re-bill the whole cold history; make reviewResumeDecision TTL- and size-aware. Needs design sign-off. |
+| 249 | PAN-3445 | XS | high | ok |  |  | projects.yaml TCP lock ports overlap the OS ephemeral range, so an unrelated socket makes an uncontended config write fail. |
+| 250 | PAN-3332 | S | high | ok |  |  | A detached slash-command spawn died in 150ms while the UI kept saying 'running in the background'; the activity must own its outcome. |
+| 251 | PAN-4426 | M | medium | ok |  |  | Dashboard controls for Deft Directive detection and managed mode over the PAN-3943 library; blocker has closed |
+| 252 | PAN-4345 | XS | medium | ok |  |  | Terse gate-integrity rule (fix the work, never the gate) plus a Rule Authority note in rule authoring |
+| 253 | PAN-3013 | XS | high | ok |  |  | Role-spawn wrote 26 session-scoped hook paths into the durable ~/.claude/settings.json; they fail on every Linear tool call forever. |
+| 254 | PAN-3771 | M | high | ok |  |  | Conversation search silently empty end-to-end: palette flag off by default, FTS scan manual-only, no summaries. |
+| 255 | PAN-4530 | XS | medium | ok |  |  | Flywheel skill: define 'pipeline clear', go idle with conversation open, and never stop on a stuck pipeline |
+| 256 | PAN-3533 | L | high | ok |  |  | No per-project resource partitioning, so one project's docker stacks and installs starve another project's pipeline and the dashboard. |
+| 257 | PAN-3107 | S | high | ok |  |  | OOM spikes are unattributable after the fact; productize the machine-local memory-attribution census stopgap. |
+| 258 | PAN-4512 | M | medium | needs-refinement |  |  | Tier escalation config is shown but nothing fires it since the Cut; choose a trigger, persist tierOverrides, re-dispatch |
+| 259 | PAN-1666 | XL | medium | ok | ✓ |  | Pipeline Throughput Hardening |
+| 260 | PAN-1556 | S | high | ok |  |  | Session/activity feed: coalesce review-spawn spam, supersede re-reviews per issue, keep active conversations most-recent |
+| 261 | PAN-4510 | S | medium | ok |  |  | Show effort on issue-view agent rows, conversation rows and Agents-page conversation entries; split from closed PAN-4259 |
+| 262 | PAN-2190 | L | high | ok |  |  | Decompose routes/workspaces/merge-ops.ts (1,925 lines) |
+| 263 | PAN-2233 | L | high | ok |  |  | decompose merge-agent.ts (1,414 lines) into focused modules |
+| 264 | PAN-2186 | S | high | ok |  |  | Rescoped: after a merge the pending auto-merge row must clear and tracker labels must match the merged PR. Label-retry half is PAN-3557. |
+| 265 | PAN-4632 | S | medium | ok |  |  | Markdown chip 'Open in File Manager' xdg-opens the file in its MIME app and sticks as the left-click default; drop it, repair stored pref. |
+| 266 | PAN-2241 | S | high | ok |  |  | complete-planning is not serialized or idempotent per issue (spec tmp-rename 500s, bead delete-recreate thrash) |
+| 267 | PAN-2242 | S | high | ok |  |  | Unidentified duplicate caller fires complete-planning in pairs every ~2 minutes (perpetual loop while session survives) |
+| 268 | PAN-2240 | S | high | ok |  |  | pan tell contradicts itself on dead ohmypi sessions |
+| 269 | PAN-4926 | XS | medium | ok |  |  | pan down SIGTERMs the smee pidfile PID without verifying it is smee; a reused PID kills an unrelated process. XS guard + test. |
+| 270 | PAN-2243 | S | high | ok |  |  | pan plan finalize: CLI aborts complete-planning at 90s while the server handler legitimately finishes later (false ✖ Failed) |
+| 271 | PAN-2202 | S | high | ok |  |  | complete-planning silently skips spec promotion on a dead session's unanswered AskUserQuestion |
+| 272 | PAN-2237 | S | high | ok |  |  | pan plan done swallows vbrief quality lint details |
+| 273 | PAN-2487 | M | high | ok |  |  | CI-green merge skip + Ship & Merge cockpit view (live door log + progress) + active-node spinner |
+| 274 | PAN-4811 | M | medium | ok |  |  | Lanes on a new Fly VM plus gauntlet.fly.max_vms cap; PAN-4743 landed the Fly target door, so this is now unblocked. |
+| 275 | PAN-5079 | S | high | ok |  |  | pan task claim/cancel/done write any id, so a typo leaves a stray row in the committed continue file an agent can't remove. |
+| 276 | PAN-4756 | L | medium | ok |  |  | Move ~45 bespoke dialogs onto the shared Modal from PAN-4755 (now landed); surface/structure only, unblocked. |
+| 277 | PAN-4778 | S | medium | ok |  |  | Workspace-image CI never published: wrong Fly app, fly not on PATH, no FLY_API_TOKEN (operator). Fly VMs run a June image. |
+| 278 | PAN-4817 | S | medium | ok |  | PAN-4778 | Fly app's cached image predates pan serve --no-open, so every new Fly VM crashes and rolls back; blocks live Fly verification. |
+| 279 | PAN-2211 | M | high | ok |  |  | writeSwarmSlotCompletion has no production caller; pan done in a slot workspace must record it. Swarm is dormant (Cut D11). |
+| 280 | PAN-2210 | M | high | ok |  |  | Rewritten pan done has no slot handling: a slot agent takes the issue-level PR/review path. Must record slot completion only. |
+| 281 | PAN-2201 | XS | high | ok |  |  | Close-out label step fails atomically when a hardcoded label (e.g. 'in-planning') is absent from the repo |
+| 282 | PAN-2646 | XS | high | ok |  |  | configurable global/project/issue policy UI with default OFF |
+| 283 | PAN-2755 | S | high | ok |  |  | per-issue review-model override never reached convoy sub-reviewers on the discovery-fork path |
+| 284 | PAN-2754 | S | high | ok |  |  | `always` is inert |
+| 285 | PAN-2809 | M | high | ok |  |  | Live-terminal Playwright UAT blocked in containerized workspaces (node-pty musl/glibc mismatch + Vite/Traefik WS Origin 403) |
+| 286 | PAN-2810 | M | high | ok |  |  | Workspace 'vitest --changed' gate diverges from CI: App.test.tsx fails locally on missing selectPendingInputSubjects mock |
+| 287 | PAN-2495 | S | high | ok |  |  | PAN-2487 ci-green merge skip bypassed CI-green gate |
+| 288 | PAN-2478 | S | high | ok |  |  | CI flake: Playwright browser install fails on packages.microsoft.com apt (NOSPLIT), red-mains legit merges |
+| 289 | PAN-1710 | S | high | ok |  |  | 'Clean install + server smoke test' hangs (3 consecutive 20-min timeout kills) on feature/pan-1491 and feature/pan-1641 |
+| 290 | PAN-1558 | M | high | ok |  |  | Review/specialist agents should run in the workspace Docker container, not inherit host-override |
+| 291 | PAN-1766 | S | high | ok |  |  | work agents hang on Claude Code settings-file protection when editing .claude/** |
+| 292 | PAN-4853 | M | low | ok |  |  | SageOx dashboard views (session tab, context trace, project panel); blocked by PAN-4852; session-to-issue mapping is a checkpoint |
+| 293 | PAN-2266 | M | high | ok |  |  | feat: add zcode harness and make it the default for glm-5.2 |
+| 294 | PAN-1578 | M | high | ok |  |  | GitHub Copilot CLI as a first-class harness (pipeline peer to Claude Code, Pi, Codex) |
+| 295 | PAN-1538 | M | high | ok |  |  | Unblock Pi source forks |
+| 296 | PAN-687 | M | high | ok |  |  | Support OpenCode as alternative coding agent |
+| 297 | PAN-466 | M | high | ok |  |  | Add QwenCoder CLI as a supported runtime alongside Claude Code and Codex |
+| 298 | PAN-465 | M | high | ok |  |  | Add OpenRouter as a model provider |
+| 299 | PAN-463 | M | high | ok |  |  | Add Qwen 3.6+ model support |
+| 300 | PAN-1142 | M | high | needs-refinement |  |  | Per-role/conversation effort config; likely superseded by merged PAN-4249 resolver and its S-slices, confirm or close |
+| 301 | PAN-1424 | M | high | needs-refinement |  |  | Model pool dispatch + work.* subtype taxonomy (follow-up to PAN-1122) |
+| 302 | PAN-1196 | M | high | needs-refinement |  |  | Workhorse routing by bead difficulty + subject-matter (single-agent and swarm) |
+| 303 | PAN-1311 | M | high | needs-refinement |  |  | Swarm: fast-track tier |
+| 304 | PAN-1313 | L | high | ok |  |  | Finish src/lib Effect migration: remove or justify legacy Promise/sync surfaces |
+| 305 | PAN-4863 | S | medium | ok |  |  | Manual AC-10 check of Anywhere connect on a real systemd VPS; needs a release shipping `pan connect` and a human-provisioned VPS. |
+| 306 | PAN-1246 | M | high | ok |  |  | Perf: projection-cached VCS driver for diff/checkpoint reads (port of t3code #2586) |
+| 307 | PAN-1253 | M | high | needs-refinement |  |  | Flywheel: respect issue dependencies before autopicking work |
+| 308 | PAN-1357 | M | high | ok |  |  | Template conversations: load curated skill bundles into a single conversation |
+| 309 | PAN-1915 | M | high | ok |  |  | enhancement(security): API key at-rest hardening |
+| 310 | PAN-4886 | S | medium | ok |  |  | Live relay check on Fly unrun three times: device codes expire unapproved. Needs an operator present to approve one code. |
+| 311 | PAN-1435 | XS | high | ok |  |  | API keys in ~/.panopticon/config.yaml stored as plaintext |
+| 312 | PAN-1672 | M | high | ok |  |  | GPT-5.5/CLIProxy context-window deadlock: conversations get no overflow recovery + 200k window illusion |
+| 313 | PAN-1640 | M | high | ok |  |  | Re-platform interactive permission allow/deny onto a PreToolUse hook (provider-agnostic) |
+| 314 | PAN-4297 | L | medium | ok |  |  | Hosted encrypted vault on overdeck.ai in tester mode; account service built 2026-10-02, billing no longer a prerequisite |
+| 315 | PAN-2350 | L | high | needs-refinement | ✓ |  | Epic rebaselined 2026-09-28; account service and share-service slice 1 built 2026-10-02. Children carry the order. |
+| 316 | PAN-1217 | XS | high | ok |  |  | Requirements reviewer: classify each AC as in_pr_scope vs whole_feature_scope, only !-block in-PR-scope items |
+| 317 | PAN-2079 | M | high | needs-refinement |  |  | Inbox spine: boot reconciliation (producer #1) is gone; may still be worth pursuing for pending AUQ, cost alerts and other producers |
+| 318 | PAN-4204 | S | medium | ok |  | PAN-4203 | Sync-main conflict error dumps every file path; show the count, a Replan button, and Open workspace only for few conflicts. |
+| 319 | PAN-1219 | M | high | needs-refinement |  |  | Promote across-cycle review state to first-class data (cycle SHA, prior findings) instead of prompt-derived |
+| 320 | PAN-1451 | M | high | needs-refinement |  |  | PAN-1124 follow-up: complete planning-on-main pivot (dropped ACs from scope drift) |
+| 321 | PAN-1452 | M | high | ok |  |  | PAN-1381 follow-up: per-reviewer restart with model override (architectural mismatch with PAN-1048) |
+| 322 | PAN-1553 | M | high | ok |  |  | Investigate Claude Code Fast mode support (and fast-tier pricing) |
+| 323 | PAN-1504 | M | high | ok |  |  | pan hygiene |
+| 324 | PAN-1480 | L | high | ok |  |  | TLDR: 93% bypass rate |
+| 325 | PAN-5058 | XL | high | ok |  |  | Parked, in planning: TLS passthrough relay at <name>.mcp.overdeck.ai so hosted bots reach /mcp without Tailscale Funnel. |
+| 326 | PAN-1479 | M | high | ok |  |  | RTK: Add telemetry to measure token savings from bash output compression |
+| 327 | PAN-2950 | L | high | ok |  |  | Refactor god files back under file-size ceilings after the UX overhaul |
+| 328 | PAN-2720 | M | high | ok |  |  | File-size ratchet counts lines, so it rewards line-packing on the god files it means to improve |
+| 329 | PAN-2650 | S | high | ok |  |  | Shed-stack half is moot (slot merges verify on host); remaining: pan swarm recover path for a stuck ready-to-merge slot. |
+| 330 | PAN-2358 | M | high | ok |  |  | PAN-2145 follow-up: restore PAN-1535 hardening in transformMessageForHarness (rewritten during conversations.ts decomposition) |
+| 331 | PAN-2334 | XS | high | ok |  |  | write a Definition of Ready (DoR) |
+| 332 | PAN-2193 | S | high | ok |  |  | Held issues (objection/parked/vetoed/needs-handoff) are invisible in the Command Deck tree |
+| 333 | PAN-1984 | XS | high | ok |  |  | Migrate or delete the 18 dead panopticon.db modules referenced by ~30 test files (#1983 follow-up) |
+| 334 | PAN-1913 | XS | high | ok |  |  | Project description: show on click, edit in dashboard, mirror into the project layer (and document what's in .pan and ~/.panopticon) |
+| 335 | PAN-1906 | M | high | ok |  |  | Enforce harness restrictions with subscription: gray out non-claude-code, validate everywhere |
+| 336 | PAN-1544 | M | high | ok |  |  | Type cleanup: strip 'ship' from the Role union and its ~10 downstream references |
+| 337 | PAN-955 | S | high | ok |  |  | Workspace devcontainer template versioning + re-render on demand |
+| 338 | PAN-807 | L | high | ok |  |  | Epic C: Workspace state sanity on spawn |
+| 339 | PAN-630 | M | high | ok |  |  | Multi-tenant workspace isolation with ACLs |
+| 340 | PAN-471 | M | high | ok |  |  | Cost reconciler: auto-trigger on agent lifecycle events with debounce |
+| 341 | PAN-438 | M | high | ok |  |  | Migrate remaining REST polling endpoints to Effect RPC |
+| 342 | PAN-578 | M | high | ok |  |  | Security: Comment mediation layer to prevent prompt injection via tracker comments |
+| 343 | PAN-2921 | S | medium | ok |  |  | Strike merge door can report fetch failure after merge and land the same head twice |
+| 344 | PAN-4195 | M | medium | ok |  |  | Every pan call costs ~0.5s/230MB from eager command imports; lazy-load command modules, target --version <100ms |
+| 345 | PAN-2839 | S | medium | ok |  |  | plan→work autoSpawn now 500s with a duplicated workspace prep |
+| 346 | PAN-2824 | S | medium | ok |  |  | pan review pending dies when one project's lens gather fails (non-degrading caller; PAN-2820 class) |
+| 347 | PAN-2792 | S | medium | ok |  |  | Orphan-process sweeps killed the dashboard and live conversations via lsof +D over Bun-hardlinked node_modules |
+| 348 | PAN-2761 | S | medium | ok |  |  | done.test.ts asserts a hardcoded URL without stubbing env, so it fails in any agent shell with OVERDECK_DASHBOARD_URL set and looks lik… |
+| 349 | PAN-2738 | S | medium | ok |  |  | strikes deadlock |
+| 350 | PAN-2717 | S | medium | ok |  |  | conversation permission waits missing from Awareness; strengthen alert pulse |
+| 351 | PAN-2697 | S | medium | ok |  |  | First-review codex parents enter discovery mode and the supervisor session no-ops every discovery-ready signal |
+| 352 | PAN-4236 | S | medium | ok |  |  | GPT-5.6 luna/sol rows in cost.ts disagree with catalog and OpenAI list prices; reconcile and add a cost.ts-vs-catalog parity test |
+| 353 | PAN-2691 | S | medium | ok |  |  | Auto-planned issues park silently when the post-finalize work spawn is gated (stack-unhealthy 422) |
+| 354 | PAN-4306 | M | medium | ok |  |  | Move phase/role/cleanup telemetry from activity.entry to activity.detailed so it stops evicting news; blocked by PAN-4300 |
+| 355 | PAN-3701 | L | high | ok |  |  | Four separate first-party LLM client stacks; consolidate onto effect/unstable/ai LanguageModel + ExecutionPlan. PRD written. |
+| 356 | PAN-3090 | M | high | ok |  |  | Simple issue page opens with a 55KB raw kickoff prompt and hides the pending question the operator actually has to answer. |
+| 357 | PAN-4552 | M | medium | ok |  |  | Fresh-host setup errors still say 'edit config'/'run X'; audit each to auto-fix or one click, and find other first-launch dialogs |
+| 358 | PAN-2670 | S | medium | ok |  |  | Gate the dashboard-server tsconfig in npm run typecheck |
+| 359 | PAN-2664 | S | medium | ok |  |  | auto-commit completes unresolved merge with conflict markers |
+| 360 | PAN-2663 | S | medium | ok |  |  | health probe can accept old dashboard after replacement EADDRINUSE |
+| 361 | PAN-2649 | S | medium | ok |  |  | Ctrl+K conversation search indexes Claude transcripts only |
+| 362 | PAN-2580 | S | medium | ok |  |  | pan tell cannot deliver to codex (GPT) conversations |
+| 363 | PAN-2572 | M | medium | ok |  |  | Noisy EBADENGINE + deprecation warnings on npx/npm install make a healthy install look broken |
+| 364 | PAN-2563 | S | medium | ok |  |  | npm-flavor desktop (npx @overdeck/desktop) lacks node_modules for the server's externalized deps |
+| 365 | PAN-2554 | S | medium | ok |  |  | clicking a project doesn't update the browser URL |
+| 366 | PAN-2550 | XS | medium | ok |  |  | npm test exits 0 despite root-suite failures |
+| 367 | PAN-2547 | S | medium | ok |  |  | pan restart --health-timeout parses seconds as milliseconds |
+| 368 | PAN-2546 | S | medium | ok |  |  | pan tell is codex-conversation-unaware |
+| 369 | PAN-4303 | S | medium | needs-refinement |  |  | Steer busy Codex app-server turns via turn/steer; verify first whether turn/start already steers. Needs PAN-4292's steerKind. |
+| 370 | PAN-3003 | XS | medium | ok |  |  | Generated launcher.sh files omit the OVERDECK_AGENT_ID export the PTY supervisor requires, so manual re-launch dies instantly. |
+| 371 | PAN-2501 | S | medium | ok |  |  | deleteResourceVenvEffect's HttpRouter.schemaParams call fails typecheck under the root tsconfig (masked by src/dashboard/** exclusion) |
+| 372 | PAN-2492 | S | medium | needs-refinement |  |  | pane-detected waits (rate-limit/session-resume) surface as 'needs you' but cannot be answered from the dashboard |
+| 373 | PAN-2491 | M | medium | ok |  |  | Migrate @xenova/transformers to @huggingface/transformers to eliminate silent npx install failures from sharp 0.32 postinstall |
+| 374 | PAN-2489 | S | medium | ok |  |  | strike agents are invisible in the project issue tree |
+| 375 | PAN-2465 | S | medium | ok |  |  | pan done's PR lookup fails at MYN polyrepo root |
+| 376 | PAN-2454 | S | medium | ok |  |  | ratchet audit fails per-commit on push ranges whose NET baseline delta is zero |
+| 377 | PAN-2428 | XS | medium | ok |  |  | MYN workspace Traefik routing broken post-rebrand |
+| 378 | PAN-2423 | XS | medium | ok |  |  | pan workspace rebuild hardcodes 'overdeck-' compose project prefix |
+| 379 | PAN-2416 | S | medium | ok |  |  | codex agents can wedge on the Codex CLI first-run/consent screen |
+| 380 | PAN-4250 | XS | medium | ok |  |  | Stale dated CONVERSATION_TITLE_MODEL literal throws UnknownModelError when titleModel config is unset; one-line fix plus audit |
+| 381 | PAN-2395 | S | medium | ok |  |  | one invalid tiered_execution enum poisons every config read |
+| 382 | PAN-2381 | S | medium | ok |  |  | three event types missing from DomainEvent schema union poison the RPC stream |
+| 383 | PAN-2287 | S | medium | ok |  |  | every supervisor.log line written twice |
+| 384 | PAN-3661 | XS | medium | ok |  |  | Secure review-mode dispatch dropped the HTTP-200 semantic-rejection surface; two frontend tests fail locally while CI stays green. |
+| 385 | PAN-3288 | XS | medium | ok |  |  | Dev-checkout preflight: after a git pull that adds a dep, the CLI dies with ERR_MODULE_NOT_FOUND instead of saying 'run bun install'. |
+| 386 | PAN-3164 | XS | medium | ok |  |  | probeUatStack reports readiness from container count, so the UI offers 'Open UAT frontend' while the API is still resolving Maven deps. |
+| 387 | PAN-3121 | S | medium | ok |  |  | The failed-send outbox never reconciles against the transcript, so a delivered message keeps a Retry twin that would double-send. |
+| 388 | PAN-3014 | XS | medium | ok |  |  | Background title/about spawns use --bare, which now skips credential reads, so every one fails 'Not logged in' with empty stderr. |
+| 389 | PAN-3944 | S | medium | needs-refinement |  |  | Main fix landed (host-backed targets skip Herdr agent.prompt); remaining: buffer bracketed paste in the app-server host, placeholder guard |
+| 390 | PAN-3829 | L | medium | ok |  |  | Managed Claude launch home: overlay hooks/settings/plugins/auth without touching native ~/.claude (draft at handoff/20260909/main) |
+| 391 | PAN-2280 | M | medium | ok |  |  | Resumed conversations wedge without writing transcripts when dashboard is black-holed |
+| 392 | PAN-2197 | S | medium | ok |  |  | work agents skip `pan done` (manual push instead) |
+| 393 | PAN-2069 | XS | medium | ok |  |  | caveman: follow-up gaps |
+| 394 | PAN-1918 | XS | medium | ok |  |  | full frontend vitest suite runs in no CI path |
+| 395 | PAN-1912 | XS | medium | ok |  |  | Pi agent transcripts hide tool-call detail; agent panes lack the Tools show/hide toggle |
+| 396 | PAN-4208 | M | medium | ok |  |  | #4205 follow-ups: Effect-free config read for telemetry to hit <100ms pan --version; CI import test for lazy command targets |
+| 397 | PAN-1846 | S | medium | needs-refinement |  |  | unbounded log growth |
+| 398 | PAN-1830 | S | medium | ok |  |  | Reviewer stuck on gpt-5.5 rate-limit modal blocks REVIEWER_READY |
+| 399 | PAN-1816 | S | medium | ok |  |  | Scratch/UAT-lifecycle issues (PAN-18031) enter the real pipeline: kanban, review convoys, agent registry |
+| 400 | PAN-1795 | S | medium | ok |  |  | Codebase map bootstrapped in planning worktree is never promoted to main |
+| 401 | PAN-1774 | S | medium | ok |  |  | workspace server container crashloops when dist/dashboard/server.js is missing |
+| 402 | PAN-1769 | S | medium | ok |  |  | Supervisor echo-confirm false negative on long messages → triple-paste delivery (rewrite ×2 + tmux fallback); resumed-conv message stil… |
+| 403 | PAN-1761 | S | medium | ok |  |  | conversations endpoints fetched via relative /api path |
+| 404 | PAN-1755 | S | medium | ok |  |  | uat stuck-assembly cap (30m) kills slow-but-alive assemblies and leaves orphaned conflict agents racing the next generation |
+| 405 | PAN-3516 | XS | medium | ok |  |  | Repo .claude/skills holds stale duplicates of pan-handoff, pan-flywheel and okf, so overdeck-dev sessions load outdated skill text. |
+| 406 | PAN-3455 | XS | medium | ok |  |  | cliproxy --version exits 2, so the up-to-date check always returns false and every ensure re-downloads the pinned release. |
+| 407 | PAN-3117 | XS | medium | ok |  |  | A deterministic 400 renders as the generic 'Failed to send' bubble with a Retry that can never succeed. |
+| 408 | PAN-3036 | XS | medium | ok |  |  | Pane-idle detection reads a completed strike's idle composer as a pending question, so a finished strike shows '! INPUT'. |
+| 409 | PAN-3016 | M | medium | ok |  |  | Operator ask: every view should be URL-addressable; cockpit tabs, stage panes and several drawers are still local state. |
+| 410 | PAN-3890 | S | medium | ok |  |  | opencode provider stream errors (rate limit) are invisible in the feed and never retried; first message dies silently |
+| 411 | PAN-3822 | L | medium | ok |  |  | PRD landed (12 items, FR-1..14): link PRs to conversations via branch detection + explicit override; unblocks PAN-3920 |
+| 412 | PAN-5028 | M | medium | ok |  |  | list_pending_input loses a conversation's AskUserQuestion after the PAN-1520 deny hook, contrary to the existing test's contract. |
+| 413 | PAN-5088 | XS | medium | ok |  |  | A long failed-outbox message shrinks the timeline to 40px and hides Retry/Discard; only a refresh recovers. |
+| 414 | PAN-1673 | S | medium | ok |  |  | Regression: pi + gpt-5.5 fails with 'No API key for provider: openai-codex' (worked previously) |
+| 415 | PAN-1669 | S | medium | ok |  |  | restart-with-model doesn't emit a live event |
+| 416 | PAN-1668 | S | medium | ok |  |  | right-click 'restart with <model>' carries model only, never harness |
+| 417 | PAN-1627 | M | medium | ok |  |  | Substrate: Claude Code's native .claude/** settings-edit protection wedges in-scope work agents (un-overridable by PreToolUse auto-appr… |
+| 418 | PAN-1624 | S | medium | ok |  |  | pan handoff --author external: authored doc is socket_write-ten but never submitted |
+| 419 | PAN-3901 | S | medium | ok |  |  | test-skip gate has no audited exemption for opt-in live suites (skipIf on env/binary); allowlist row with justification |
+| 420 | PAN-3852 | S | medium | ok |  |  | Project creation follow-ups: SSH-port repo URLs, dotted repo names, partial-registration retry, non-duplicate 409 mapping |
+| 421 | PAN-3862 | L | medium | needs-refinement |  |  | /agents-v2 machine session explorer over Herdr + all tmux servers; local first, remote via the PAN-3762 environment model |
+| 422 | PAN-1572 | M | medium | needs-refinement |  |  | Settings permission-mode can desync from the resolved mode; body cites the removed DSP flag and a renamed symbol — rewrite first |
+| 423 | PAN-4627 | S | medium | ok |  |  | Homebrew Claude Code installs get a copy-only upgrade banner; make the brew plan runnable and auto-upgrade outdated runnable installs. |
+| 424 | PAN-1571 | S | medium | ok |  |  | Large multi-line pastes (handoff docs) land unsubmitted |
+| 425 | PAN-1565 | S | medium | ok |  |  | Defensive mitigation: auto-recover conversations poisoned by Claude Code thinking-block resume 400 (upstream #63147) |
+| 426 | PAN-1530 | S | medium | ok |  |  | Investigate: state.json with model='gpt-5.5' (a model that doesn't exist) |
+| 427 | PAN-1461 | S | medium | ok |  |  | Conversation transcript: in-page search (Ctrl+F) only finds text in currently-rendered virtualized rows |
+| 428 | PAN-1449 | S | medium | ok |  |  | Memory extraction still failing; the live symptom PAN-4370 closed and PAN-4374 adds a working provider; layout half remains |
+| 429 | PAN-1446 | S | medium | ok |  |  | PAN-1231 follow-up: remove or implement Table + Timeline modes in FleetAgentsView (scope-creep stubs) |
+| 430 | PAN-1445 | S | medium | ok |  |  | PAN-1389 follow-up: remove or implement Files + Comments tabs in SessionFeedSidebar (scope-creep stubs) |
+| 431 | PAN-3616 | S | medium | ok |  |  | Planned deploy restarts show the alarm-toned Reconnecting banner; use the lifecycle signal for calm 'updating' copy. |
+| 432 | PAN-2982 | XS | medium | ok |  |  | Nothing runs a skill's own selftest when sync-sources/skills/** changes; a convoy passed a PR with its selftest red. |
+| 433 | PAN-2981 | S | medium | ok |  |  | The conversation search index never prunes deleted sessions, so Ctrl-K offers zombie hits that 404 on open. |
+| 434 | PAN-2976 | L | medium | ok |  |  | Generalize the ACP harness to any capability-passing ACP CLI: named adapters plus a config-declared custom-agent escape hatch. |
+| 435 | PAN-1444 | S | medium | ok |  |  | Follow-up to PAN-1416: dashboard port lockfile + pan doctor multi-instance check |
+| 436 | PAN-2469 | S | medium | ok |  |  | Assembly landed (mergeReadySlots + finalization); remaining: alarm when all slots merged but no review requested. Swarm dormant. |
+| 437 | PAN-1433 | S | medium | ok |  |  | Conversation agents can leave host main repo in abandoned git rebase state for hours |
+| 438 | PAN-1416 | S | medium | ok |  |  | Workspace-spawned dashboards must never claim the canonical dashboard port |
+| 439 | PAN-1392 | S | low | stale |  |  | docs/prds/active→completed archive step is superseded by .pan/drafts and .pan/specs on the feature branch |
+| 440 | PAN-4151 | L | medium | needs-refinement |  | PAN-3822 | Deferred remainder of PAN-3822/#4067: GitLab MR sync, PR page + search, handoff link copy, diffstat, link-dialog a11y, sync throttle |
+| 441 | PAN-1330 | S | medium | ok |  |  | CLI cannot address planning-*/specialist-* sessions |
+| 442 | PAN-4971 | S | medium | ok |  |  | Viewer header shows only host + count; roster of all participants with host/controller marked. Frontend-only, payload exists. |
+| 443 | PAN-1226 | L | medium | ok |  |  | PAN-1148 unified-dashboard redesign |
+| 444 | PAN-1173 | S | medium | ok |  |  | pan show <bare-number> derives wrong agent ID for PAN-prefixed issues |
+| 445 | PAN-1154 | M | medium | ok |  |  | pan up does not kill existing port holders |
+| 446 | PAN-3354 | XS | medium | ok |  |  | The archive write door accepts kind=main, hiding a project's singleton workspace with no unarchive affordance in the UI. |
+| 447 | PAN-3178 | XL | medium | ok |  |  | Make worktrees and diffs first class: +/- badge, dedicated Changes surface, conversation worktrees. PRD and mockup exist. |
+| 448 | PAN-3017 | S | medium | ok |  |  | The issue-page UAT panel renders only inline actions, so restart/rebuild/stop are unreachable outside the rail's context menu. |
+| 449 | PAN-5057 | XS | medium | ok |  |  | Restart hold is not checked at the gate claim route, so a hold set within ~5 s of approval still lets one restart go ahead. |
+| 450 | PAN-3873 | M | medium | ok |  |  | GitHub event delivery: support gh webhook forward alongside smee with guided setup, settings exposure, and docs |
+| 451 | PAN-1150 | S | medium | ok |  |  | Settings: "Anthropic is not configured" warning persists in Model Routing after claude /login (Provider tab disagrees) |
+| 452 | PAN-1149 | S | medium | ok |  |  | v0.9.3 upgraders: stale workhorses.mid: claude-sonnet-4-7 in config.yaml keeps breaking Model Routing saves |
+| 453 | PAN-1130 | S | medium | ok |  |  | Headless review sub-reviewer normal exit misclassified as 'crashed', triggers spurious restart |
+| 454 | PAN-1129 | S | medium | ok |  |  | Review-request route pushes wrong branch name: 'feature/977' instead of 'feature/pan-977' |
+| 455 | PAN-1128 | S | medium | ok |  |  | Channels: spurious 'no MCP server configured with that name' banner at conversation startup |
+| 456 | PAN-1113 | S | medium | ok |  |  | Conversations sidebar lets you message review-specialist sessions, which derails them silently |
+| 457 | PAN-1068 | S | medium | ok |  |  | PAN-1048 deferred findings: security, correctness, and model validation gaps |
+| 458 | PAN-3938 | M | medium | needs-refinement |  |  | Run Muse Spark under Claude Code via cliproxy — only the paid Zen model is routable; free tier is OpenCode-client gated; needs credit… |
+| 459 | PAN-933 | S | medium | ok |  |  | Review poster cannot post to GitLab MRs (only supports GitHub PRs) |
+| 460 | PAN-932 | S | medium | ok |  |  | pan done: polyrepo uncommitted changes check + existing MR handling |
+| 461 | PAN-927 | M | medium | ok |  |  | Rewrite containerize route: dead code, orphan processes, no pending-op tracking |
+| 462 | PAN-900 | S | medium | ok |  |  | Trust devroot for conversations + atomic .claude.json writes |
+| 463 | PAN-886 | S | medium | ok |  |  | pan review request shows 'fetch failed' instead of actual sync-target-branch error |
+| 464 | PAN-778 | M | medium | ok |  |  | Write conflict race: review-agent fails when test-agent write scope not yet released |
+| 465 | PAN-681 | S | medium | ok |  |  | Feedback routing: wrong issueId written to workspace when verification runs for co-active issues |
+| 466 | PAN-3732 | S | medium | ok |  |  | Codex handoff serializes a large rollout twice (~286MB peak RSS on 50MB); serialize once or stream. |
+| 467 | PAN-3700 | M | medium | ok |  |  | pan acp serve would let Zed and other ACP clients drive Overdeck conversations through canonical doors. PRD written. |
+| 468 | PAN-3290 | XS | medium | ok |  |  | xBRIEF items can carry empty metadata.traces, so docs items sit unanchored in the requirement traceability graph. |
+| 469 | PAN-3132 | M | medium | ok |  |  | xBRIEF v0.9 agentic dispatch fields are half-adopted as a behavior accident; make difficulty/filesScope/verifyCommands a contract. |
+| 470 | PAN-3909 | M | medium | needs-refinement |  |  | One agents read door (operator-directed); the cut deleted the agents table and made liveness.ts canonical — re-scope what remains |
+| 471 | PAN-2659 | S | medium | ok |  |  | acquireRecordLock survives for the planning auto-start consent lock; an ownerless lock after a crash is never reclaimed. |
+| 472 | PAN-3831 | S | medium | ok |  |  | Model picker: gray out models whose provider has no API key or subscription login (per-provider readiness resolver) |
+| 473 | PAN-4779 | S | medium | ok |  |  | Docs on main: 2 MDX parse errors hide pages from Mintlify + 15 broken vision.mdx links; mint broken-links can't gate |
+| 474 | PAN-538 | S | medium | ok |  |  | pan reload freshness guard must also verify the frontend bundle |
+| 475 | PAN-1164 | M | medium | ok |  |  | Conversation diff summaries update live over WebSocket (drop 5s polling) |
+| 476 | PAN-3563 | S | medium | needs-refinement |  |  | pan unstick is gone; verify whether a spawned-but-never-briefed role agent can still read as running forever under liveness.ts |
+| 477 | PAN-1041 | M | medium | ok |  |  | Audit and consolidate REMOTE/LOCAL gates in work-agent prompt template |
+| 478 | PAN-924 | L | medium | needs-refinement |  |  | Spike: evaluate GitNexus for Panopticon integration |
+| 479 | PAN-3770 | S | medium | ok |  |  | Codex conversations never show the working spinner mid-turn; parser marks every agent_message instantly complete. |
+| 480 | PAN-4568 | XS | medium | ok |  |  | Codex sub-agent turn start shows thread: not sub: label; adoption lands one frame late. PAN-4563 replay test has landed. |
+| 481 | PAN-3731 | S | medium | ok |  |  | Restart-gate banner gives no feedback after approval; dead-requester approvals read as a broken button. |
+| 482 | PAN-3530 | S | medium | ok |  |  | Four God View components poll on 30s timers instead of the documented /ws/rpc event contract. |
+| 483 | PAN-3131 | L | medium | ok |  |  | Support xBRIEF planRef sharding so a 1.1MB/227-item plan stops making every finalize failure whole-plan-fatal. |
+| 484 | PAN-3061 | M | medium | ok |  |  | Deterministic start-vs-swarm recommendation at plan-finalize, derived from plan shape plus recorded outcomes. |
+| 485 | PAN-3057 | S | medium | needs-refinement |  |  | Compaction tracking is gone; remaining bug = GPT-5.6 context window declared twice (372K vs 150K); verify separately |
+| 486 | PAN-3892 | M | medium | needs-refinement |  |  | Substrate review follow-ups deferred from PAN-3845 (minor findings, config clear-sentinel); split into workable items |
+| 487 | PAN-4918 | M | medium | ok |  |  | Six Anywhere UI bugs seen while filming: Codex keeps Claude model, Zen models listed first, chip wrap, Pull-here state, no remote archive. |
+| 488 | PAN-863 | M | medium | ok |  |  | One-shot sweep of stale feature branches and worktrees predating the reaper |
+| 489 | PAN-817 | M | medium | ok |  |  | Improve planning dialog layout and content fit |
+| 490 | PAN-802 | M | medium | ok |  |  | Resume on conversation session forks instead of resuming |
+| 491 | PAN-713 | M | medium | ok |  |  | test: add unit tests for doneCommand and approveCommand |
+| 492 | PAN-700 | M | medium | ok |  |  | Detachable terminal for conversation view |
+| 493 | PAN-646 | XS | medium | needs-refinement |  |  | Cancel no longer clears beads or a record; a Recover workflow now means reopening the tracker issue and re-planning |
+| 494 | PAN-532 | M | medium | ok |  |  | Per-project and per-issue model overrides for pipeline roles |
+| 495 | PAN-2896 | M | medium | ok |  |  | Warm resource-discovery and membership caches at boot |
+| 496 | PAN-2685 | M | medium | ok |  |  | Annotated live preview: Codex-style annotate-the-app feedback delivered to agents |
+| 497 | PAN-2626 | M | medium | ok |  |  | allow composer model switching within the same model family (e.g. Sonnet → Fable) |
+| 498 | PAN-2625 | XS | medium | ok |  |  | auto-run /pan-new-project on project creation + setup banner, checklist, teaching empty states, and a guided demo issue |
+| 499 | PAN-2608 | M | medium | ok |  |  | Persistent collaboration roles (owner/editor/viewer) and organizations |
+| 500 | PAN-2582 | M | medium | ok |  |  | show slot assignments on the vBRIEF DAG + unify swarm/tiered terminology (Lead/Crew or Trunk/Lanes) |
+| 501 | PAN-2566 | L | medium | ok | ✓ |  | Triage list of genuine Traycer capability gaps; a container for child issues, not directly workable. |
+| 502 | PAN-2565 | M | medium | ok |  |  | Multi-agent conversations: N agent sessions in one task surface with agent-to-agent messaging |
+| 503 | PAN-3735 | S | medium | ok |  |  | Sandboxed pan CLI reports 'dashboard down, run pan up' when the real cause is no network; sends agents down the wrong path. |
+| 504 | PAN-3335 | XS | medium | ok |  |  | A pasted screenshot can't be viewed anywhere in the dashboard: thumbnail has no click handler and the sent form is a file-link chip. |
+| 505 | PAN-3054 | M | medium | ok |  |  | Benchmark matrix, redesigned 2026-09-29 as E6 of the model-routing PRD; its medians feed PAN-4364 and PAN-4367 |
+| 506 | PAN-2977 | M | medium | ok |  | PAN-2976 | Settings surface that detects installed ACP CLIs, renders the capability checklist, and guides login without a manual terminal. |
+| 507 | PAN-2557 | M | medium | ok |  |  | project-level 'Restart All' context action |
+| 508 | PAN-2553 | M | medium | ok |  |  | project-level CI visibility |
+| 509 | PAN-2521 | S | medium | ok |  |  | launch pipeline agents with harness rate-limit model-switch reminder disabled |
+| 510 | PAN-2493 | M | medium | ok |  |  | align the cockpit Agents-lane and sidebar issue-tree feature sets (two-way gaps) |
+| 511 | PAN-3772 | XS | medium | ok |  |  | Conv view renders Claude Code's synthetic 'no visible output' nudge as an operator message; should read as plumbing. |
+| 512 | PAN-3853 | S | medium | needs-refinement |  |  | Review synthesizer self-declared an operator override; that override door was deleted by the cut — verify on the PR-review path |
+| 513 | PAN-3830 | S | medium | ok |  |  | OpenCode provider: curate picker models via Settings favorites (OpenRouter pattern) instead of listing every discovered model |
+| 514 | PAN-4924 | S | medium | ok |  |  | linked-machines.mdx promises switch model for running conversations; dashboard disables it. Fix docs or add the control. |
+| 515 | PAN-4367 | M | medium | ok |  |  | Replace inherited capability scores for Sonnet 5.5, GPT-6 Sol/Luna with measured ones; eval harness has closed |
+| 516 | PAN-2443 | M | medium | ok |  |  | OpenTelemetry GenAI semconv |
+| 517 | PAN-2442 | M | medium | ok |  |  | Agent Client Protocol (ACP) as Overdeck's structured control plane |
+| 518 | PAN-2409 | M | medium | ok |  |  | enforce the workspace boundary |
+| 519 | PAN-2392 | M | medium | needs-refinement |  |  | Standing Crew survives; panel becomes a cost view from cost_events + tier-metrics; verdict/escalation columns need a new source. |
+| 520 | PAN-2335 | XS | medium | ok |  |  | chore: review the full open backlog for junk/stale/nonsensical issues |
+| 521 | PAN-2295 | L | medium | needs-refinement |  |  | built-in web browser surface (openable like terminal/Claude Code/Codex) + native Agentation integration |
+| 522 | PAN-3767 | S | medium | ok |  |  | Model switch could hang at 'Saving…'; onError toast landed, remaining work is reproducing the hang on a healthy server. |
+| 523 | PAN-3615 | S | medium | needs-refinement |  |  | TTS silent 9+ days from four stacked failures; three already fixed, only follow-ups remain — rescope to what is left. |
+| 524 | PAN-3558 | S | medium | ok |  |  | Subagent rail shows no model or provider, so mixed-model orchestration needs a transcript open per row to see what it is running. |
+| 525 | PAN-3469 | S | medium | ok |  |  | NewProjectModal violates the PAN-3410 page-not-modal doctrine; migrate the create-project flow to a routed page. |
+| 526 | PAN-3333 | M | medium | ok |  |  | Model pickers show $/1M, which says nothing under a subscription; show relative plan-quota drain among sibling models. |
+| 527 | PAN-3058 | M | medium | ok |  |  | Ship named crew presets that populate the whole tiered_execution block so operators don't hand-build the crew table. |
+| 528 | PAN-2288 | L | medium | ok |  |  | tmux managed-server: lossless auto-migration of dirty-founded servers + boot-time ensure call |
+| 529 | PAN-2065 | M | medium | ok |  |  | unified usage & headroom panel across all provider plans (z.ai, Anthropic, Codex, OpenRouter) |
+| 530 | PAN-2031 | M | medium | ok |  |  | ohmypi: add Bun 1.3.11 regression test to checkOhmypi doctor gate |
+| 531 | PAN-2026 | M | medium | ok |  |  | ohmypi: surface 35+ provider matrix in dashboard model picker |
+| 532 | PAN-2025 | M | medium | ok |  |  | ohmypi: extend provider credential passthrough for Groq, Cerebras, Fireworks |
+| 533 | PAN-4366 | M | medium | ok |  |  | Plan the Haiku 4.5 successor and give workhorse:cheap a consumer or drop it; gated on E4 summary-faithfulness |
+| 534 | PAN-2004 | M | medium | ok |  |  | Resumable Planning node: double-click a planned issue's Planning to resume the planning agent |
+| 535 | PAN-1995 | M | medium | ok |  |  | infra: set up smee webhook relay so merge-on-green + post-merge are reactive (not deacon-only) |
+| 536 | PAN-3739 | S | medium | ok |  |  | cost-reconcile re-warns every model-less codex subthread rollout on every sweep; log flood grows without bound. |
+| 537 | PAN-4393 | XS | medium | ok |  |  | ac-eval-fixtures requires observable:false >= 8 but honest labeling of all specs yields 6; lower the floor |
+| 538 | PAN-1985 | M | medium | ok |  |  | Agent wipe-and-respawn family (work + review): harness/model switch + Complete work reset, with confirmation |
+| 539 | PAN-1968 | M | medium | ok |  |  | Finish local-domain rename: pan.localhost → overdeck.localhost |
+| 540 | PAN-1967 | M | medium | needs-refinement |  |  | Flywheel must re-validate (re-plan) pre-cutover plans before implementing them |
+| 541 | PAN-1965 | M | medium | ok |  |  | Project pipeline view: true-state buckets + lens reconciliation (pipeline as exception queue) |
+| 542 | PAN-1937 | M | medium | ok |  |  | feat: data export |
+| 543 | PAN-1926 | M | medium | ok |  |  | --big flag to lift strike's precision-only scope guard (operator-authorized larger strikes) |
+| 544 | PAN-1916 | M | medium | ok |  |  | configurable web search providers (Exa, Tavily, Brave, Perplexity) |
+| 545 | PAN-1854 | M | medium | ok |  |  | Define handoff strategy for large conversations: external vs source authoring + tail-biased read |
+| 546 | PAN-1853 | M | medium | ok |  |  | Surface a transcript-size warning on growing conversations (2 MB warn / 10 MB strong-nudge tiers) |
+| 547 | PAN-1852 | XS | medium | ok |  |  | Capability-tiered work-agent model selection: difficulty→capability-floor routing from benchmark-anchored eval data |
+| 548 | PAN-1844 | M | medium | ok |  |  | Deep-linkable Command Deck: reflect selected issue/agent in the browser URL + make activity notifications link to the specific view |
+| 549 | PAN-1840 | M | medium | ok |  |  | Add 'pan switch <id>' |
+| 550 | PAN-1839 | M | medium | ok |  |  | Settings → Providers: show each provider's default harness in the collapsed row (no expand needed) |
+| 551 | PAN-1776 | M | medium | ok |  |  | Hot-updatable message delivery: version-stamped supervisors + server-side delivery logic |
+| 552 | PAN-3706 | L | medium | ok |  |  | Broadsheet shipped typography only; color, surface, elevation and texture still on Ledger values, so it doesn't read like Subspace. |
+| 553 | PAN-3539 | XS | medium | needs-refinement |  |  | OOMPolicy=continue fix landed with the issue; re-scope to whatever hardening remains or close it out. |
+| 554 | PAN-3502 | XS | medium | needs-refinement |  |  | tiered-crews blendedCost expectation stale vs pricing catalog; likely already fixed by the PAN-3532 cherry-pick — verify. |
+| 555 | PAN-4409 | M | medium | ok |  |  | Overdeck integration on OKF v0.2.0 (injector trust tiers, new verbs); blocked on external eltmon/okf#9 |
+| 556 | PAN-4410 | M | medium | ok |  | PAN-4409 | Migrate eltmon/overdeck-knowledge to OKF v0.2 and refresh stale concepts; last link in the OKF chain |
+| 557 | PAN-2978 | S | medium | ok |  | PAN-2976, PAN-2977 | Opt-in per-agent install recipes for ACP CLIs from the setup UI; deliberately separated for its supply-chain trust decision. |
+| 558 | PAN-4878 | XS | low | ok |  |  | Delete dead ox curl installer in prereqs registry; PAN-4852 builds ox from the pinned fork commit, so ~/.local/bin/ox is never used. |
+| 559 | PAN-1754 | M | medium | ok |  |  | surface + edit the host claude CLI default model (~/.claude/settings.json) from the Settings page |
+| 560 | PAN-1751 | M | medium | ok |  |  | harness picker on every Settings → Roles row (plan/work/review/test/ship/strike), not just Flywheel |
+| 561 | PAN-1750 | M | medium | ok |  |  | UAT assembly/conflict agent |
+| 562 | PAN-1748 | M | medium | ok |  |  | reuse uat-assembly conflict resolutions across generations (rerere or resolution replay) |
+| 563 | PAN-1691 | M | medium | ok |  |  | conflict-aware merge train + on-demand UAT candidate |
+| 564 | PAN-1685 | XS | medium | ok |  |  | Show model capability icons in conversation dialogs + complete per-model vision (supportsImages) audit |
+| 565 | PAN-1676 | M | medium | ok |  |  | harden remote workspaces + `pan workspace move` local↔remote (scale-out / overflow slots) |
+| 566 | PAN-1667 | M | medium | ok |  |  | unify Agents + Resources into one issue-centric holistic view |
+| 567 | PAN-1657 | M | medium | ok |  |  | feat: one-off double-check reviews with a user-specified agent/harness + settings-managed default reviewer |
+| 568 | PAN-1656 | M | medium | ok |  |  | Skills page: make it a full management surface (browse, review, edit, scope, sync status) |
+| 569 | PAN-1655 | M | medium | ok |  |  | Skills: scope by audience AND by agent role (conversation/work/review/ship/plan/test), sync accordingly |
+| 570 | PAN-1654 | XS | medium | ok |  |  | run lint:skills from source via tsx, skip CLI dist build (salvaged from PAN-1615 workspace) |
+| 571 | PAN-1653 | XS | medium | ok |  |  | batch local embedding in buildDocsIndex (salvaged from PAN-1617 workspace) |
+| 572 | PAN-1623 | M | medium | ok |  |  | Codex: surface interactive approval prompts as conversation Q&A (like AskUserQuestion) |
+| 573 | PAN-1561 | M | medium | ok |  |  | feat: Project-scoped dashboard nav (deck of tabs per project + conversations/tree column + activity feed) |
+| 574 | PAN-1550 | M | medium | ok |  |  | feat: FilesPane + BrowserPane |
+| 575 | PAN-1545 | XS | medium | ok |  |  | New Terminal button |
+| 576 | PAN-1542 | XS | medium | ok |  |  | Spawn-refusal modal: render the three-button workflow on dirty-workspace 409 |
+| 577 | PAN-1524 | M | medium | ok |  |  | Slash command aliases: /handoff → /pan-handoff (and similar short forms) |
+| 578 | PAN-1490 | M | medium | ok |  |  | show each conversation's current git branch (port t3code BranchToolbar pattern) |
+| 579 | PAN-1485 | S | medium | needs-refinement |  |  | Remaining scope after #4655 auto-settle: day-10 archive + favorite clearing; close-or-keep is an operator call. |
+| 580 | PAN-1473 | M | medium | ok |  |  | Dashboard conversation composer: refactor context indicator to mirror t3code (show cumulative + live separately) |
+| 581 | PAN-1443 | M | low | stale |  |  | Specs live directly under .pan/specs now; only check that no stale legacy files remain under docs/prds/ |
+| 582 | PAN-1442 | M | medium | ok |  |  | Follow-up to PAN-829: voice-sampler.html cleanup in pan-tts repo |
+| 583 | PAN-1432 | M | medium | ok |  |  | Merge agent leaves packages/contracts/dist stale |
+| 584 | PAN-1223 | M | medium | ok |  |  | Auto-update for users in the field (npm + desktop binaries) |
+| 585 | PAN-1165 | M | medium | ok |  |  | Lightweight review path for small/trivial PRs |
+| 586 | PAN-1151 | XS | medium | ok |  |  | Anthropic Enterprise auth: distinguish from consumer subscription for Pi+Anthropic harness gating |
+| 587 | PAN-4360 | S | medium | ok |  |  | Add pan claude upgrade and offer the Claude Code upgrade in pan install / pan sync; PAN-4359 has closed |
+| 588 | PAN-1060 | M | medium | ok |  |  | Self-modify permission handling: stop the interrupt loop without weakening the safety guard |
+| 589 | PAN-1051 | M | medium | ok |  |  | feat: Subspace-inspired alternate theme with Inter + JetBrains Mono |
+| 590 | PAN-1037 | M | medium | ok |  |  | Retire 'planning-' tmux prefix |
+| 591 | PAN-958 | M | medium | ok |  |  | Implement vBRIEF issue sync: migrate and reconcile GitHub issues into specification |
+| 592 | PAN-949 | M | medium | ok |  |  | feat: add conversation for project from sidebar |
+| 593 | PAN-3157 | XS | medium | ok |  |  | Rescoped: Awareness rail should show conv-flywheel as the Flywheel with its last tick (derive-status.ts) and link to /flywheel. |
+| 594 | PAN-5067 | M | medium | ok |  |  | Skill overrides: bad-YAML issue file is overwritten on write (data loss), license detection gaps, Pi ignores --pack silently. |
+| 595 | PAN-4908 | S | low | ok |  |  | Other remote-not-enabled messages name no file and the dead verb 'pan remote setup'; reuse PAN-4905's remoteEnabledHint(). |
+| 596 | PAN-947 | M | medium | ok |  |  | feat: project management actions in unified sidebar |
+| 597 | PAN-938 | M | medium | ok |  |  | Fizzy visual pipeline |
+| 598 | PAN-903 | M | medium | ok |  |  | Detect ~/.claude.json corruption on startup and surface it in the dashboard |
+| 599 | PAN-902 | XS | medium | ok |  |  | Settings: add 'Run pan sync' button to configuration menu |
+| 600 | PAN-901 | XS | medium | ok |  |  | Settings: add Maintenance panel with Claude Code Organizer + Config Editor quick-launch |
+| 601 | PAN-818 | M | medium | ok |  |  | Make summary optional when forking conversations |
+| 602 | PAN-4308 | S | medium | ok |  |  | Settle reaped Fly remote transcripts into the Session Vault; PAN-4295 auto-reap landed, still blocked by PAN-2609 (engine). |
+| 603 | PAN-3322 | XS | medium | ok |  |  | launcher-generator.ts's file-size ceiling sits 126 lines above the real file, handing back the regrowth the ratchet exists to prevent. |
+| 604 | PAN-678 | M | medium | ok |  |  | pan work issue --auto: headless planning → agent handoff without interactive dialog |
+| 605 | PAN-675 | M | medium | needs-refinement |  |  | Deacon: detect API rate-limit events, surface on dashboard, auto-restart when window resets |
+| 606 | PAN-654 | L | medium | ok |  |  | Project Setup Wizard |
+| 607 | PAN-649 | M | medium | ok |  |  | Render Excalidraw drawings inline in Claude Code conversations |
+| 608 | PAN-637 | XS | medium | ok |  |  | Direct issue kickoff (skip planning) from dashboard UI |
+| 609 | PAN-629 | M | medium | ok |  |  | Workspace quotas and resource governance |
+| 610 | PAN-613 | M | medium | needs-refinement |  |  | Investigate thinking effort levels for agents |
+| 611 | PAN-607 | M | medium | needs-refinement |  |  | Evaluate Ultimate Bug Scanner (UBS) for verification gate |
+| 612 | PAN-606 | M | medium | needs-refinement |  |  | Evaluate MCP Agent Mail for inter-agent communication and file reservations |
+| 613 | PAN-548 | M | medium | ok |  |  | Command Deck: preserve state across navigation including URL routing for tabs |
+| 614 | PAN-546 | M | medium | ok |  |  | Remove claude-code-router |
+| 615 | PAN-537 | M | medium | ok |  |  | feat: show changed files diff summary after each agent response in activity view |
+| 616 | PAN-531 | XS | medium | ok |  |  | PAN: Windows Electron support (WSL2 required) |
+| 617 | PAN-452 | M | medium | ok |  |  | Conversation input bar |
+| 618 | PAN-450 | M | medium | ok |  |  | Adopt remaining Effect patterns |
+| 619 | PAN-1126 | M | medium | ok |  |  | Integrate TLDR summaries into review context manifest |
+| 620 | PAN-1066 | M | medium | ok |  |  | Complete PAN-1048 R5: retire dispatchParallelReview body and specialists.ts module |
+| 621 | PAN-3441 | L | low | ok |  |  | God View 'River' WebGL pipeline visualization fed by the live hook-event stream; PRD and mockup exist. |
+| 622 | PAN-2968 | M | low | ok |  |  | Adopt the interactive decision page as the default way to present operator decisions |
+| 623 | PAN-2941 | M | low | stale |  |  | Superseded by OKF v0.2: drafts plus human verify replace the PR gate (eltmon/okf#6); semantic pass is eltmon/okf#7 |
+| 624 | PAN-2936 | M | low | ok |  |  | Handle loop.max_steps_exceeded: detect and nudge agents to continue instead of stranding them |
+| 625 | PAN-4373 | M | medium | ok |  |  | Optional Jev relevance filter for prompt-time memory injection candidates; both prerequisites have closed |
+| 626 | PAN-2868 | M | low | ok |  |  | Desktop window opens at fixed 1400×900 |
+| 627 | PAN-2767 | M | low | ok |  |  | Expose Codex app-server conversation controls in the dashboard |
+| 628 | PAN-2679 | M | low | ok |  |  | conv-lookup skill: resolve transcripts for codex and pi harness conversations |
+| 629 | PAN-2662 | M | low | ok |  |  | Add project context-menu actions scoped to issues currently in the pipeline |
+| 630 | PAN-2645 | M | low | ok |  |  | Add opt-in Observation-first conversation view |
+| 631 | PAN-2635 | XS | low | ok |  |  | pay down the 152-error src/dashboard/server typecheck debt |
+| 632 | PAN-5066 | M | medium | ok |  |  | Project skills in .pan/skills skip the CLI workspace fallback, never refresh, lose to bundled skills, and never reach Codex/Pi. |
+| 633 | PAN-3443 | L | low | ok |  |  | God View 'Spectrum Deck' visualizer concept with mockup and PRD; pure exploration, no substrate impact. |
+| 634 | PAN-4350 | M | medium | needs-refinement |  |  | Re-dispatch budget for foreman items; issue itself flags an unresolved conflict with the no-stored-state rule |
+| 635 | PAN-4003 | L | medium | ok |  |  | Parked: delete the ohmypi/omp harness, keep Pi; obsoletes 10 open ohmypi issues and shrinks PAN-3958's CH-7 scope |
+| 636 | PAN-4368 | S | medium | ok |  |  | Operator-run checklist: verify Sonnet 5.5 across switch-model, fork and compaction (model-locked thinking blocks) |
+| 637 | PAN-2622 | M | low | ok |  |  | cloister.toml materializes ALL defaults into the user file |
+| 638 | PAN-2600 | XS | low | ok |  |  | Retire the Codex TUI path after app-server burn-in (no-loss audit gate) |
+| 639 | PAN-2533 | XS | low | ok |  |  | UAT workspace magic-link login 502: Traefik picks unreachable panopticon IP for multi-homed fe/api |
+| 640 | PAN-2527 | M | low | ok |  |  | Harness selector should restrict OpenAI models to Claude Code only |
+| 641 | PAN-2514 | M | low | ok |  |  | Claude Code Traffic Inspector |
+| 642 | PAN-2505 | M | low | ok |  |  | lint:circular reports new frontend cycles + stale baseline in chat/conversations components |
+| 643 | PAN-2504 | M | low | ok |  |  | Auto-relaunch npx @overdeck/core under a compatible Node 22+ instead of failing on old Node |
+| 644 | PAN-2449 | M | low | ok |  |  | start-planning: GITHUB_REPOS env shadows projects.yaml github_repo; unknown IDs fall through to Linear and plan the wrong issue |
+| 645 | PAN-4769 | XS | low | ok |  |  | Two-sentence wording fix in features/skill-packs.mdx; PAN-4759 created the page and closed, so this is unblocked. |
+| 646 | PAN-3940 | XL | low | ok | ✓ |  | Parked epic: event-driven plugin/hook system on pipeline-notifier + hygiene-scheduler; do not pick up until the journal has soaked |
+| 647 | PAN-2424 | L | low | ok | ✓ |  | Epic: the Order Book |
+| 648 | PAN-2406 | S | low | ok |  |  | Remaining scope: findAllWorkspacePaths must also enumerate -strike-wt and named-suffix worktrees; gaps 1 and 3 are moot. |
+| 649 | PAN-2394 | M | low | ok |  |  | Incident: conv-* agent-dir cleanup destroyed ohmypi/codex conversation transcripts ("no saved history") |
+| 650 | PAN-4823 | XL | medium | ok | ✓ |  | Epic: Capacitor phone client for Anywhere without Tailscale; 15 children filed (#4828-4843); OD-1 settled; PAN-4774 done. |
+| 651 | PAN-2353 | M | low | needs-refinement |  |  | Overdeck Anywhere P1b: Hermes external-agent bridge (scoped API + Fly 6PN) |
+| 652 | PAN-4294 | L | low | ok |  |  | Anywhere paid tier: Creem subscription, entitlement API, quotas; pricing decided 2026-09-28; waits on PAN-4293 account service |
+| 653 | PAN-3133 | S | low | ok |  |  | Evaluation spike for TRON encoding of prompt-bound xBRIEF payloads; savings are modest today since agents get a bounded slice. |
+| 654 | PAN-5082 | XL | medium | ok |  |  | Move every MCP surface to SDK v2 for the 2026-07-28 spec while keeping 2025-11-25 clients; time it on PAN-5083 data. |
+| 655 | PAN-3011 | M | low | ok |  | PAN-465 | Add poolside Laguna S 2.1 as a model target; the honest hardware note says it will not fit this machine's GPU. |
+| 656 | PAN-2282 | M | low | ok |  |  | Conversation view shows no history for ohmypi-harness conversations |
+| 657 | PAN-2091 | XS | low | ok |  |  | delete dead IssueCockpitBody cockpit subtree (8 files, superseded by IssueMissionControl) |
+| 658 | PAN-2085 | M | low | ok |  |  | Auto-isolate conversations in a lightweight git worktree (Conductor-style workspaces) |
+| 659 | PAN-5070 | M | medium | ok |  |  | Connect a bot: one-click 'Copy for <bot>' message, pending connector requests under Bots, and a connected notice. |
+| 660 | PAN-2084 | M | low | ok |  |  | Auto-create lightweight conversation worktrees on project chats |
+| 661 | PAN-2083 | M | low | ok |  | PAN-1592 | Composer: a failed first send leaves the text in BOTH the composer box and the retry outbox |
+| 662 | PAN-2082 | M | low | ok |  |  | Composer: a single send failure clears ALL in-flight optimistic bubbles (and strips siblings' compaction net) |
+| 663 | PAN-2074 | XS | low | ok |  |  | research: evaluate ponytail (DietrichGebert/ponytail) for prompt compression and consider building in-house |
+| 664 | PAN-2046 | M | low | stale |  |  | Conversation view does not surface terminal command responses |
+| 665 | PAN-2006 | M | low | ok |  |  | Pipeline semantics lock-down: Definition of Ready, pickup gates (parked/vetoed/blocks-main), unblock override, and Run definition |
+| 666 | PAN-3919 | S | low | needs-refinement |  |  | Review the universal effort-high default and supervisor effort discretion; explicitly an operator decision, no work authorized |
+| 667 | PAN-2005 | M | low | ok |  |  | Backlog Sequencer: Pickup Forecast |
+| 668 | PAN-2002 | XS | low | ok |  |  | [HUMAN-ONLY] Sign & notarize the macOS desktop build (Apple Developer ID) |
+| 669 | PAN-1999 | M | low | ok |  |  | Backlog Sequencer: one sequencer per project (currently a single global runner scoped to PAN) |
+| 670 | PAN-1986 | M | low | ok |  |  | restartAgent (change harness/model): wipe stale agent-dir session pointers + refresh conversations row |
+| 671 | PAN-1983 | L | low | ok |  |  | Remove all panopticon.db-supporting code (legacy SQLite layer + db↔db migration + seed-from-legacy) |
+| 672 | PAN-2672 | S | low | needs-refinement |  |  | Transcript half reported fixed; parent-stays-ended half moved to PAN-4485. Verify on current build, then close. |
+| 673 | PAN-1958 | M | low | ok |  |  | Source-tagged programmatic delivery into pi conversation agents (extension sendUserMessage + input.source) |
+| 674 | PAN-5071 | M | medium | ok |  |  | overdeck.ai activate link becomes one Authorize click that names the requesting bot and machine (device_grants migration). |
+| 675 | PAN-1907 | M | low | ok |  |  | Generalize ToS gate: block ALL non-Claude-Code harnesses from Anthropic-subscription models; gray out + non-selectable + validate every… |
+| 676 | PAN-1895 | M | low | ok |  |  | Spawn work agents from issue workspace slide-out |
+| 677 | PAN-1878 | M | low | ok |  |  | process: bake 'docs updated' into acceptance criteria / definition-of-done in role + planning prompts |
+| 678 | PAN-1782 | M | low | ok |  |  | Handoff forks stall at "Injecting…" then die on double 300s summary timeout |
+| 679 | PAN-1773 | M | low | ok |  |  | Swarm v2 Phase 2: remote slot agents on Fly (B5 follow-up to PAN-1762) |
+| 680 | PAN-1646 | M | low | ok |  |  | Rabbit-hole drift detection and lift-to-new-conversation |
+| 681 | PAN-1643 | M | low | ok |  |  | Extend local Ollama support to Codex + Claude Code harnesses and dashboard model picker |
+| 682 | PAN-1592 | M | low | ok |  |  | Composer: make ephemeral composer state reload-durable (pasted images + unsent/failed message text) |
+| 683 | PAN-1581 | M | low | ok |  |  | Duplicate skills in picker: code-review collides with official plugin; beads/pan-flywheel/pan-handoff doubled across project+user sync |
+| 684 | PAN-1552 | M | low | ok |  |  | Dashboard conversation-message 500 cause is unloggable: serve mode never writes dashboard.log |
+| 685 | PAN-1533 | M | low | ok |  |  | Fork-into-worktree from conversation branch chip |
+| 686 | PAN-1483 | XS | low | ok |  |  | Distinguish general-use skills from Panopticon-only dev skills in pan sync |
+| 687 | PAN-1482 | M | low | ok |  |  | Token spend report should aggregate data from repo, not just local machine |
+| 688 | PAN-1481 | M | low | ok |  |  | Add cost-event telemetry for Caveman token savings |
+| 689 | PAN-1356 | M | low | ok |  |  | Extend the memory Observation pipeline to ad-hoc conversations |
+| 690 | PAN-1242 | M | low | ok |  |  | Create a new issue directly from a kanban column |
+| 691 | PAN-1222 | M | low | ok |  |  | Project-templated DB lifecycle: auxiliary databases + seed refresh from prod |
+| 692 | PAN-1208 | M | low | ok |  |  | Polyrepo: support non-feature 'main' workspaces alongside feature-* |
+| 693 | PAN-4352 | XS | low | ok |  |  | Operator verification: skill packs in a managed interactive Claude Code launch now that PAN-4334 has shipped |
+| 694 | PAN-1153 | M | low | ok |  |  | Vite TRAEFIK_ENABLED conflates 'Traefik on' with 'inside container' |
+| 695 | PAN-4298 | XL | low | needs-refinement |  | PAN-4294, PAN-1676 | Anywhere paid tier: run agents on hosted Fly capacity; tenant isolation, credentials, metering open; PAN-4294 and PAN-1676 unbuilt |
+| 696 | PAN-1152 | XS | low | ok |  |  | Remove PANOPTICON_DEV env-var persistence |
+| 697 | PAN-1135 | M | low | ok |  |  | Document the hook system in docs/HOOKS.md |
+| 698 | PAN-1133 | M | low | stale |  |  | Deacon-patrol tie-in for TLDR supervision is gone; would need its own liveness check |
+| 699 | PAN-1123 | XS | low | ok |  |  | Channels delivery: surface failures, add fallback toggle, route conversations through channels |
+| 700 | PAN-1121 | M | low | ok |  |  | Context bloat: agents receive oversized prompts that exceed tool limits and force immediate compaction |
+| 701 | PAN-4248 | L | medium | ok |  |  | List, pull and delete local Ollama models (size, store, in-use) in CLI, dashboard and doctor; PAN-1641 sidecar has merged. |
+| 702 | PAN-1117 | M | low | ok |  |  | Memory: pinned docs (long-form doc chunking + retrieval) |
+| 703 | PAN-1116 | M | low | ok |  |  | Memory: cross-project search mode |
+| 704 | PAN-1065 | M | low | ok |  |  | Validate issueId at every shell-string interpolation site (defense in depth) |
+| 705 | PAN-1064 | M | low | ok |  |  | Harden launcher generation against shell-quote injection (model and arg quoting) |
+| 706 | PAN-1063 | M | low | ok |  |  | Harden tts_daemon.py: bearer auth, CORS, body size cap, concurrency bound |
+| 707 | PAN-3971 | L | low | ok |  |  | Overdeck-native artifact pages (pan artifact publish + state door + dashboard listing); body says backlog only, Claude artifacts work today |
+| 708 | PAN-3768 | XS | low | ok |  |  | pan handoff --title already implemented and landed (678f6b389e5); open only pending close-out. |
+| 709 | PAN-3034 | XS | low | ok |  |  | Fix already landed on main (strike/slot workspace names and live tmux now seed the session tree); open pending close-out. |
+| 710 | PAN-2983 | M | low | stale |  |  | Superseded by the OKF v0.2 redesign: write modes and drafts (eltmon/okf#6) and the advisory semantic pass (eltmon/okf#7) |
+| 711 | PAN-3824 | XS | low | needs-refinement |  |  | Image-only report: default view on Windows breaks the model selector; needs a written repro and expected behavior |
+| 712 | PAN-3823 | XS | low | needs-refinement |  |  | Image-only report titled "pan sync issue"; needs the command, output text, and expected behavior |
+| 713 | PAN-1049 | M | low | needs-refinement |  |  | Spike: evaluate Tauri v2 desktop shell |
+| 714 | PAN-984 | XS | low | needs-refinement |  |  | Evaluate context-mode MCP server as session continuity + search layer |
+| 715 | PAN-962 | M | low | needs-refinement |  |  | Post-PAN-946: vBRIEF lifecycle follow-up plan |
+| 716 | PAN-961 | M | low | ok |  |  | Update documentation for vBRIEF v0.6 lifecycle model |
+| 717 | PAN-943 | M | low | ok |  |  | Add memory file review and management command |
+| 718 | PAN-908 | M | low | ok |  |  | PAN-908: Make work-agent spawn limits configurable and overridable |
+| 719 | PAN-898 | M | low | ok |  |  | Dashboard polling and WebSocket efficiency: remaining audit findings |
+| 720 | PAN-853 | L | low | needs-refinement |  |  | Evaluate terminal-bench@2.0 custom agent harnesses for Panopticon integration |
+| 721 | PAN-833 | M | low | ok |  |  | Agent spawn logs ENOTDIR for .git/pan-credentials in worktrees (GitHub App credential loader) |
+| 722 | PAN-832 | M | low | needs-refinement |  |  | state.json staleness: lastActivity/costSoFar not updated as agent runs; /api/agents drops phase/cost/lastActivity |
+| 723 | PAN-4347 | S | low | ok |  |  | pan done appends continue.json decisions to the PR body so significant decisions outlive the workspace |
+| 724 | PAN-797 | M | low | needs-refinement |  |  | Cost display: cache write tokens not shown separately; investigate Claude Code discrepancy |
+| 725 | PAN-4275 | S | low | ok |  |  | Prove a local Ollama model can finish a real work-agent task; gemma4:12b made zero tool calls. PAN-1641 has merged. |
+| 726 | PAN-2836 | M | low | needs-refinement |  |  | Placement presets now belong on eltmon/okf#4 after the OKF v0.2 redesign; migrate verb collides; re-scope or move upstream |
+| 727 | PAN-790 | L | low | ok |  |  | PAN-789: Eliminate remaining TanStack Query polling |
+| 728 | PAN-786 | M | low | ok |  |  | Post planning Q\&A answers as issue comment |
+| 729 | PAN-777 | M | low | ok |  |  | Inter-agent communication skill: send messages to conversation-mode agents |
+| 730 | PAN-775 | L | low | ok |  |  | Redesign workspace inspector panel: sidebar layout is cramped and wrong |
+| 731 | PAN-3456 | XS | low | ok |  |  | Already fixed in 4117c9a777 with a regression test; open only pending close-out. |
+| 732 | PAN-774 | XS | low | ok |  |  | Unify launch UX and release pipeline for 1.0 |
+| 733 | PAN-773 | XS | low | ok |  |  | Design prompt-style overlays with model hierarchy and scoped toggles |
+| 734 | PAN-772 | M | low | stale |  |  | Auto-resume ladder paths it names are gone; terminal-stack consistency now means the Herdr/tmux contract in TERMINAL-BACKENDS.md |
+| 735 | PAN-771 | M | low | needs-refinement |  |  | Investigate Vercel Sandbox execution backend support |
+| 736 | PAN-769 | M | low | stale |  | PAN-750 | Phase-transition history no longer accumulates in a record; a churn metric would be rebuilt from PR review cycles or the pipeline journal |
+| 737 | PAN-765 | M | low | ok |  |  | Preserve trailing zeros in cost displays |
+| 738 | PAN-764 | M | low | ok |  |  | Add quota/usage inspector for routed model providers |
+| 739 | PAN-4425 | M | low | ok |  |  | Deft fork work in eltmon/directive (env off switch, external-orchestrator mode); outside the overdeck pipeline |
+| 740 | PAN-752 | M | low | ok |  |  | Add Gemini OAuth support, remove O3/O4-mini, disable GPT-5.4-Pro |
+| 741 | PAN-751 | M | low | ok |  |  | Historical Metrics Data Persistence |
+| 742 | PAN-750 | L | low | ok |  |  | Complete Metrics Page Redesign |
+| 743 | PAN-749 | M | low | needs-refinement |  |  | Research and borrow best features from gstack |
+| 744 | PAN-747 | XS | low | ok |  |  | Conversation list items lack accessible labels in accessibility tree |
+| 745 | PAN-743 | XS | low | ok |  |  | Add consistent new conversation icon actions in Command Deck |
+| 746 | PAN-738 | M | low | ok |  |  | Add right-click fork option to conversation list |
+| 747 | PAN-735 | M | low | ok |  |  | Settings page: review and configure overridden subagent model files |
+| 748 | PAN-730 | M | low | ok |  |  | Add provider account telemetry for credits, balances, and usage |
+| 749 | PAN-702 | M | low | ok |  |  | OpenAI provider: add plan/subscription support and fix unregistered model resolution |
+| 750 | PAN-701 | XS | low | ok |  |  | Quick-Create conversation via keystroke using Conversations-page default model |
+| 751 | PAN-663 | XS | low | ok |  |  | Workspace frontend containers not auto-started for panopticon-cli self-hosted workspaces |
+| 752 | PAN-660 | M | low | ok |  |  | Slash menu command catalog drifts: hardcoded array in ComposerPromptEditor needs codegen |
+| 753 | PAN-624 | M | low | ok |  |  | Loop nodes: iterative agent execution with conditional termination |
+| 754 | PAN-623 | M | low | ok |  |  | Multi-channel workflow triggers: Slack, Discord, Telegram, GitHub webhooks |
+| 755 | PAN-622 | M | low | ok |  |  | YAML workflow DAGs: custom per-project pipeline definitions |
+| 756 | PAN-604 | M | low | ok |  |  | Hide planning agent from workspace detail pane |
+| 757 | PAN-603 | M | low | ok |  |  | Plan review loop with configurable reviewer model |
+| 758 | PAN-591 | XS | low | ok |  |  | Integrate Karpathy LLM guidelines into all Panopticon CLAUDE.md templates |
+| 759 | PAN-589 | XS | low | ok |  |  | Review and update commands-skills.md with all available Panopticon skills |
+| 760 | PAN-576 | M | low | ok |  |  | Global / search should include conversations in addition to workspace features |
+| 761 | PAN-571 | XS | low | ok |  |  | Add OpenRouter credits/plan status endpoint and UI |
+| 762 | PAN-568 | M | low | ok |  |  | Kanban: Show workspace and tmux session counts in stats |
+| 763 | PAN-565 | M | low | ok |  |  | Handle CTRL-Z to undo accidental conversation archival |
+| 764 | PAN-564 | M | low | ok |  |  | Slash menu positioned incorrectly |
+| 765 | PAN-554 | M | low | ok |  |  | Add kanban board deeplinks for issue URLs |
+| 766 | PAN-543 | M | low | ok |  |  | Add confirmation dialog before applying Optimal Defaults |
+| 767 | PAN-483 | M | low | ok |  |  | Unify Resume Agent UX |
+| 768 | PAN-480 | M | low | needs-refinement |  |  | Planning-agent --effort; likely covered by merged PAN-4249 resolver and PAN-4258 (plan effort), confirm or close |
+| 769 | PAN-476 | M | low | ok |  |  | Agent resume with Haiku session summary instead of claude --resume |
+| 770 | PAN-468 | M | low | ok |  |  | Agent test conversations pollute production database |
+| 771 | PAN-461 | M | low | ok |  |  | Deep-wipe multi-step progress dialog |
+| 772 | PAN-459 | M | low | ok |  |  | Planning setup screen with SSE progress streaming |
+| 773 | PAN-407 | XS | low | ok |  |  | Run Panopticon from a main workspace for development isolation |
+| 774 | PAN-2348 | XS | low | ok |  |  | docs: migrate STATE-STORAGE-AUDIT.md content to living docs, then delete |
+| 775 | PAN-2346 | XS | low | ok |  |  | docs: refresh AGENT_TYPES_INDEX.md to the post-Cut taxonomy in ROLES.md (xBRIEF items, foreman, conv-flywheel, worker role). |
+| 776 | PAN-2345 | XS | low | ok |  |  | docs: rewrite pan-done.md against done.ts + done-preflight.ts; fix continue path; point MERGE link at MERGE-WORKFLOW.md. |
+| 777 | PAN-2344 | XS | low | ok |  |  | docs: rewrite KANBAN-MODEL.md for derived issue state, pipeline-membership buckets, PR reviews; drop Inspect and beads. |
+| 778 | PAN-2343 | XS | low | ok |  |  | docs: rewrite MISSION-CONTROL.md: state label from deriveStateLabel, membership, liveness.ts; review_status table is gone. |
+| 779 | PAN-2073 | XS | low | ok |  |  | docs: add user-facing page for the Desktop App |
+| 780 | PAN-2071 | XS | low | ok |  |  | docs: add user-facing page for the Hooks system |
+| 781 | PAN-2068 | XS | low | ok |  |  | docs: add user-facing page for Caveman (agent output compression) |
+| 782 | PAN-2067 | XS | low | ok |  |  | docs: add user-facing page for RTK (Bash output compression) |
+| 783 | PAN-1684 | XS | low | ok |  |  | build full marketing kit + plan (SEO, video list, channels) from MARKETING.md seed |
+| 784 | PAN-1683 | XS | low | ok |  |  | docs: canonical agent session-prefix registry + reconcile role taxonomy (ROLES.md/AGENT_TYPES_INDEX/CLAUDE.md) |
+| 785 | PAN-1474 | M | low | ok |  |  | Add ACKNOWLEDGEMENTS doc |
+| 786 | PAN-1469 | M | low | ok |  |  | End-to-end review and consolidation of all project documentation |
+| 787 | PAN-674 | XS | low | ok |  |  | docs: add glossary of Panopticon domain terms |
+| 788 | PAN-634 | M | low | ok |  |  | Documentation cleanup: restructure docs, update installation (npx panctl), refresh stale PRDs |
+| 789 | PAN-2908 | M | low | ok |  |  | Make overdeck not suck |
+| 790 | PAN-106 | M | high | stale |  |  | Cost prediction/estimation for in-progress work |
+| 791 | PAN-262 | M | high | stale |  |  | Refactor post-merge lifecycle into composable, idempotent operations |
+| 792 | PAN-176 | M | high | stale |  |  | PAN-176: Hook-enforced delegation guardrails for specialist agents |
+| 793 | PAN-334 | S | medium | stale |  |  | Dashboard server has no duplicate-process protection |
+| 794 | PAN-324 | XS | medium | needs-refinement |  |  | Approval is now a PR review or the dashboard MERGE button; verify whether the agent detail pane already surfaces MERGE post-cut |
+| 795 | PAN-304 | S | medium | stale |  |  | closeLinearDirect returns stepOk even when state update never happens |
+| 796 | PAN-245 | S | medium | stale |  |  | Ctrl+C aborts planning dialog instead of copying text |
+| 797 | PAN-244 | S | medium | stale |  |  | Deep-wipe leaves local branch and worktree metadata behind |
+| 798 | PAN-4332 | M | low | ok |  |  | Interop: continue t3code sessions in Overdeck and back via native transcripts; PAN-2609 Phase A has closed |
+| 799 | PAN-113 | S | medium | stale |  |  | Dashboard 'Start Agent' returns success before verifying agent actually started |
+| 800 | PAN-49 | XS | medium | stale |  |  | Fix CloisterService tests that require real runtime |
+| 801 | PAN-294 | M | medium | stale |  |  | Surface module initialization errors as system-level, not per-issue |
+| 802 | PAN-293 | M | medium | stale |  |  | Project Living Memory |
+| 803 | PAN-277 | M | medium | stale |  |  | Session reasoning capture & collaborative PRD refinement |
+| 804 | PAN-258 | M | medium | stale |  |  | Kanban board: fit all columns without horizontal scrolling |
+| 805 | PAN-255 | M | medium | stale |  |  | Agents lack awareness of MCP tools |
+| 806 | PAN-252 | XS | medium | stale |  |  | Disable Sync with Main button when workspace is up to date |
+| 807 | PAN-243 | M | medium | stale |  |  | Audit dashboard actions: ensure all are available via CLI |
+| 808 | PAN-77 | XS | medium | stale |  |  | Cost breakdown modal: show costs by stage and model when clicking cost badge |
+| 809 | PAN-54 | L | medium | stale |  |  | e2e command for full workflow integration test |
+| 810 | PAN-38 | M | medium | stale |  |  | Support multiple merge agents per repository |
+| 811 | PAN-37 | M | medium | stale |  |  | Support external PR selection for merge-agent |
+| 812 | PAN-3248 | XS | low | stale |  |  | Stale: targets the deploy patrol (pan reload is the new home) deleted by the PAN-3917 cut (ca15def); re-triage or close |
+| 813 | PAN-3244 | S | low | stale |  |  | Stale: targets the deploy-patrol deploy window deleted by the PAN-3917 cut (ca15def); re-triage or close |
+| 814 | PAN-2775 | S | low | needs-refinement |  |  | Stale: targets boot-correlated reaping (boot reconciliation) deleted by the PAN-3917 cut (ca15def); re-triage or close |
+| 815 | PAN-5072 | M | medium | ok |  | PAN-5070 | Integrations READMEs and shared SKILL.md lead with the one-paste connect flow; Grok Bot moves to the connector. Needs PAN-5070. |
+| 816 | PAN-5033 | XS | medium | ok |  |  | OpenClaw Connect a bot snippet omits hooks.allowConversationAccess, so the needs-you summary stays off with no message. |
+| 817 | PAN-3505 | XS | low | needs-refinement |  |  | Stale: targets the flywheel state write door deleted by the PAN-3917 cut (ca15def); re-triage or close |
+| 818 | PAN-5043 | S | medium | ok |  |  | Commit the phone-app iOS Simulator harness (Miniflare connect stand-in, stub account service, rig steps) built twice by hand. |
+| 819 | PAN-5065 | L | medium | ok |  |  | Opt-in mode where a project's agents and gates stop seeing ~/.overdeck.env keys the project did not list. |
+| 820 | PAN-3321 | XS | low | stale |  |  | Stale: targets pan unstick deleted by the PAN-3917 cut (ca15def); re-triage or close |
+| 821 | PAN-736 | M | low | stale |  |  | Retired: work-types.ts, WorkTypeRouter and models.overrides are all gone (#4174); per-subagent routing needs a fresh roles.* design |
+| 822 | PAN-762 | M | low | stale |  |  | Premise gone: models.overrides is a retired, ignored key since #4174, so there are no overrides left to warn about |
+| 823 | PAN-299 | M | low | stale |  |  | Granular session state persistence across context compaction |
+| 824 | PAN-298 | M | low | stale |  |  | Auto-detect package manager and runtime in workspace setup |
+| 825 | PAN-297 | M | low | stale |  |  | Workspace templates: pre/post tool hooks for auto-format, typecheck, lint |
+| 826 | PAN-283 | M | low | stale |  |  | Reset should sync workspace feature branch with latest main |
+| 827 | PAN-271 | M | low | stale |  |  | Auto-assign Linear project from project config when creating issues |
+| 828 | PAN-265 | M | low | stale |  |  | Review skill categorization: all skills available everywhere via personal + workspace |
+| 829 | PAN-249 | XS | low | stale |  |  | Add data-testid attributes across dashboard UI and create Playwright smoke test suite |
+| 830 | PAN-228 | M | low | stale |  |  | Shift-left post-edit diagnostics |
+| 831 | PAN-227 | M | low | stale |  |  | Phase gate validation |
+| 832 | PAN-198 | M | low | stale |  |  | Structured audit trail for agent actions |
+| 833 | PAN-190 | M | low | stale |  |  | PAN-190: Specialized reviewer prompts (industry best-practice checklists) |
+| 834 | PAN-180 | M | low | stale |  |  | PAN-180: Cross-terminal file locking for concurrent agents |
+| 835 | PAN-177 | M | low | stale |  |  | PAN-177: Iteration limits with escalation for autonomous agents |
+| 836 | PAN-175 | M | low | stale |  |  | PAN-175: Pre-compact auto-save hook for agent sessions |
+| 837 | PAN-155 | L | low | stale |  |  | PAN-155: Redesign health page with Stitch (system overview, timeline, costs) |
+| 838 | PAN-146 | M | low | stale |  |  | PAN-146: Refine light mode theming across all dashboard pages |
+| 839 | PAN-55 | M | low | stale |  |  | Track specialist costs with time period filtering |
+| 840 | PAN-52 | XS | low | stale |  |  | Guidance needed: Running complex multi-container projects with Panopticon worktrees |
+| 841 | PAN-51 | M | low | stale |  |  | Documentation: Clarify issue tracker options beyond Linear |
+| 842 | PAN-44 | M | low | stale |  |  | Planning should fetch ALL issue context: comments, attachments, linked issues, discussions |
+| 843 | PAN-2070 | XS | low | needs-refinement |  |  | docs: user-facing Flywheel page should target the pan-flywheel v2 loop skill, not a CLI daemon with a dashboard toggle |
+| 844 | PAN-3536 | S | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): pan tell can not reach ohmypi conversations; fix dies with the harness |
+| 845 | PAN-2027 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): routing kimi-k2 through ohmypi needs a different home once OMP is gone |
+| 846 | PAN-2035 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): Copilot provider routing via omp |
+| 847 | PAN-2034 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): end-to-end test for ohmypi tool-call rendering |
+| 848 | PAN-2033 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): ohmypi message-delivery latency benchmark |
+| 849 | PAN-2032 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): local Ollama review role via omp |
+| 850 | PAN-2030 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): version-pin the ohmypi extension |
+| 851 | PAN-2029 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): ohmypi-parser thinking_tokens capture |
+| 852 | PAN-2028 | M | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): per-provider cost grouping keyed on omp |
+| 853 | PAN-2024 | XS | low | needs-refinement |  |  | Subsumed by PAN-4003 (OMP harness removal): ohmypi conversation Tools-toggle |
+| 854 | PAN-2883 | M | high | needs-refinement |  |  | Appears already fixed: resolveIssuePullRequestRef probes strike/<id> at pull-requests.ts:209, which is exactly the fix. Verify and close. |
+| 855 | PAN-2995 | XS | high | needs-refinement |  |  | Same defect as PAN-2828, closed as a duplicate of the fixed #2907; verifyStrikeBranchMergedIntoMain already checks PR-merge and content. |
+| 856 | PAN-4555 | XS | low | ok |  |  | Date-gated: do not start before 2026-12-01. Raise gemini-4-argon pricing rows to list rates; cost tracking halves Argon until then. |
+| 857 | PAN-4590 | L | medium | ok |  |  | Semgrep sast verification gate + review-context findings; first buildable Semgrep child (epic PAN-4585 closed), needs config. |
+| 858 | PAN-4591 | L | medium | ok |  |  | Semgrep in-session: semgrep mcp in work/review roles, post-edit scan hook, semgrep skill; epic PAN-4585 closed, now buildable. |
+| 859 | PAN-4592 | M | low | ok |  | PAN-4590 | pan semgrep ci-setup opens a PR adding a Semgrep Actions workflow + failure relay; needs gate mode from PAN-4590. |
+| 860 | PAN-4594 | M | low | ok |  | PAN-4590 | Dashboard Semgrep controls: Settings security section, per-project sast override, findings in issue view; after PAN-4590. |
+| 861 | PAN-4593 | L | low | needs-refinement |  | PAN-4590 | Semgrep Platform/Guardian tier; operator decisions (offer Guardian? contact Semgrep first?) still open — refine before work. |
+| 862 | PAN-5022 | L | medium | ok |  |  | Phone app: relay notification preferences to offline machines via the directory, and drop muted pushes on the phone. |
+| 863 | PAN-5021 | M | medium | ok |  |  | Phone app PostHog telemetry with its own opt-out, anonymous id and channel error capture; its blockers have both closed. |
+| 864 | PAN-5029 | M | medium | needs-refinement |  |  | Grok Build Tailscale reach can't work: pan mcp serve verifies tokens only against its own machine. Needs a design choice. |
+| 865 | PAN-5078 | XL | low | ok |  |  | Parked: add xAI's Grok Build CLI as a harness over ACP (stdio agent, resumable sessions). |
+| 866 | PAN-4842 | S | medium | ok |  |  | Phone app W-DOC: phone-app.mdx and updates to Anywhere, push, tailscale and service docs; finished last. |
+| 867 | PAN-4851 | S | low | needs-refinement |  |  | Open question: opt-in Overdeck reviewer for Deft-pipeline issues; operator says low priority, do not plan or start without them |
+| 868 | PAN-4887 | M | medium | ok |  |  | Phone app: let phone credentials reach linked machines (fleet Needs-you, linked-conv proxy, /ws/linked); PAN-4835 merged. |
 
 ## Rationale detail
 
@@ -1067,133 +1068,133 @@ New this pass. pan tell reported successful delivery three times to a live, hear
 
 Idle remediation is now deacon-lite nudge routines; triage asks to verify the Codex app-server delivery bypass against that implementation. The persistent-session invariant still forbids codex exec; rank held.
 
-### PAN-3560 (rank 49)
+### PAN-5095 (rank 49)
+
+New this pass. messageAgent delivers to an app-server target only when a turn-completed marker exists, but Codex app-server never runs the notify hook that writes it, so every pan tell to such a conversation is queued to mail that nothing drains (1,224 strandings on one conversation). The fix is small and well evidenced: post through the app-server unconditionally, as the composer route and MCP send_message already do. Ranked beside the other delivery-door bugs (PAN-3630, PAN-3805) because agent messaging is substrate every orchestrator depends on.
+
+### PAN-3560 (rank 50)
 
 New this pass. Under concurrent review convoys the PTY supervisor returns 502 'input echo confirmation failed' fleet-wide, so no agent can be booted or re-booted and pipeline feedback delivery fails while load is high — confirmed across at least six unrelated agents in one hour. Delivery failing exactly when the pipeline is busiest is what turns a load spike into a stall.
 
-### PAN-3520 (rank 50)
+### PAN-3520 (rank 51)
 
 New this pass. The test gate records a real 'test failed' verdict for uniform 5000ms timeout signatures under host load, proven on multiple branches where the same files pass in isolation in about 19 seconds. Every false verdict costs a full rework cycle and another saturated re-test, so this is both a correctness and a cost fix. Retrying timeout-only failures in isolation before writing a verdict is the minimal change.
 
-### PAN-4439 (rank 51)
+### PAN-4439 (rank 52)
 
 New issue. The polling backstop for the CI failure relay was deleted in the Cut, so a check that completes while the dashboard reloads is never relayed and the PR stalls. Reloads are frequent, and its stated dependency PAN-4432 has closed, so it ranks high in the pipeline block.
 
-### PAN-4392 (rank 52)
+### PAN-4392 (rank 53)
 
 New issue. hasTrailerCommit greps all reachable history, so generic item ids such as docs or tests are satisfied by any merged commit and the checklist gate certifies work that was never committed. It is a gate-integrity hole with an XS fix.
 
-### PAN-3500 (rank 53)
+### PAN-3500 (rank 54)
 
 New this pass. A review sub-role that had already written its report was resumed by a later message and edited seven tracked files, and pan start --fresh then auto-committed those reviewer-owned changes into the feature history during sync-main. Review isolation is currently prompt-level only; it has to be mechanical, because a contaminated branch is very hard to detect after the fact.
 
-### PAN-3313 (rank 54)
+### PAN-3313 (rank 55)
 
 New this pass. A transient upstream stream error benches CLIProxy's only auth entry, so every GPT-routed request returns 503 auth_unavailable until an internal cooldown lapses — 35 failures against 14 successes in one hour, with valid credentials throughout. The message reads as 'your credentials are gone' and sends the operator to re-authenticate, which fixes nothing. Every GPT-routed agent on the machine is affected at once.
 
-### PAN-3282 (rank 55)
+### PAN-3282 (rank 56)
 
 New this pass. Review agents terminate before writing their report across five issues and two projects, twice recurring after a successful recovery, leaving a verdict-shaped status with no artifact behind it and a stuck flag that blocks progress until someone restarts the reviewer by hand. This is the upstream condition PAN-3283 then converts into a false passed verdict.
 
-### PAN-4391 (rank 56)
+### PAN-4391 (rank 57)
 
 New issue. Worker delegation is the supported path for sub-tasks, and it fails outright in every polyrepo workspace, so MYN issues cannot delegate without a manual --cwd workaround. Polyrepo correctness bugs sit in the high band in this sequence.
 
-### PAN-4390 (rank 57)
+### PAN-4390 (rank 58)
 
 New issue. Workspace creation for a polyrepo project reports failure and omits the workspace from pan workspace list although it is usable, which misleads every caller. It belongs with the other polyrepo substrate bugs.
 
-### PAN-2695 (rank 58)
+### PAN-2695 (rank 59)
 
 Concurrent review dispatches race fresh-spawn vs resume, second dispatch resumes a still-booting parent and wedges.
 
-### PAN-2742 (rank 59)
+### PAN-2742 (rank 60)
 
 Synthesis fires 42s after spawn and mislabels reviewers-with-reports-on-disk as infra-failure, bypassing review.
 
-### PAN-2706 (rank 60)
+### PAN-2706 (rank 61)
 
 Triage: verify whether a never-kicked-off test session can still absorb dispatch under the current liveness model. Rank held.
 
-### PAN-4374 (rank 61)
+### PAN-4374 (rank 62)
 
 New issue split out of the now-closed PAN-4370. No memory observation has been extracted on the operator's host since 2026-08-13 because neither provider can authenticate, so the memory substrate is silently dead; it informs PAN-1449.
 
-### PAN-4344 (rank 62)
+### PAN-4344 (rank 63)
 
 New issue from the Deft adoption PRD. Its dependency PAN-3308 has closed. The main-push guard exists only in the overdeck repo, so agents in other registered projects can still push to main, which is the PAN-2204 hazard class.
 
-### PAN-4550 (rank 63)
+### PAN-4550 (rank 64)
 
 Found cutting v0.65.0: CI was green but the local release check failed on two host-dependent tests. XS fix that removes false reds from the release verb, so it sits above routine medium work.
 
-### PAN-4566 (rank 64)
+### PAN-4566 (rank 65)
 
 Rank held at 63 but now unblocked: PAN-4559 closed, so the snapshot fallback this fix routes failures to is on main and work can start.
 
-### PAN-4622 (rank 65)
+### PAN-4622 (rank 66)
 
 Rank held: its only dependency, PAN-4532, closed 2026-10-24, so this follow-up is now unblocked and workable; the residual cases still recover via deacon-lite, so it stays below the active verification bundle.
 
-### PAN-2940 (rank 66)
+### PAN-2940 (rank 67)
 
 Three red-mains in one day from direct-push series bypassing PR CI — conversations need a pre-merge CI surface.
 
-### PAN-3708 (rank 67)
+### PAN-3708 (rank 68)
 
 New this pass. pan strike dies at git worktree list --porcelain on a polyrepo wrapper root, which is not a git repository, so the urgent-strike escape hatch is simply unavailable for MYN-class projects. pan swarm already understands nested repos; strike must use the same project repository inventory. Duplicate of PAN-3040 — close one when this lands.
 
-### PAN-3605 (rank 68)
+### PAN-3605 (rank 69)
 
 New this pass and the only supply-chain finding in the batch. A stale node_modules made npx fall back to the registry, where the unscoped effect-language-service name is claimed by a third party, and npm installed and executed it non-interactively. The payload was benign this time; the name stays third-party-controlled, so a malicious patch release would run on any machine in the same state. The fix is small and the downside is unbounded.
 
-### PAN-4624 (rank 69)
+### PAN-4624 (rank 70)
 
 New issue: a silent verification-gate bypass for polyrepo projects in ci tests mode; scoped fix with clear AC, placed beside the other polyrepo pipeline bugs and after PAN-4527, which touches the same head-resolution code.
 
-### PAN-4792 (rank 70)
+### PAN-4792 (rank 71)
 
 New bug found while planning PAN-4738: the tmux paste guard misses Claude Code's unnumbered select dialogs, so a failed paste's fallback Enter can answer them, including a silent permission-mode change. PAN-4738 removes the one known trigger on Fly, so it ranks with the high-tier delivery bugs rather than the top tier.
 
-### PAN-3557 (rank 71)
+### PAN-3557 (rank 72)
 
 New this pass. Post-merge label application has no retry, so a rate-limited 403 leaves a merged issue without its verifying-on-main label — and the verify-on-main phase enumerates by that label, which makes the issue invisible to the phase that owns it. Lifecycle reported 'completed' throughout, so nothing noticed for 45 minutes.
 
-### PAN-3543 (rank 72)
+### PAN-3543 (rank 73)
 
 New this pass. A completed-handoff agent owed rework after a blocked verdict cannot be started at all: pan start refuses and recommends --fresh, --fresh gives the identical refusal, and reset-session is refused too because the durable plane reconstructs the session pointer. The refusal message names an action the operator cannot take, which is the self-contradictory-deadlock family PAN-3526 opened.
 
-### PAN-3522 (rank 73)
+### PAN-3522 (rank 74)
 
 New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts through a new generation's 138-second boot warm phase and killed it anyway, producing four restarts in ten minutes, racing spawns on port 3012, and a WATCHDOG GIVING UP. Each restart re-triggered docker stack rebuilds, feeding the storm. The probe budget has to know the difference between starved and starting.
 
-### PAN-3314 (rank 74)
+### PAN-3314 (rank 75)
 
 New this pass. Every agent pane is a child of one transient tmux-server unit, so agent memory is the unit's memory and systemd-oomd's kill decision is all-or-nothing: one hungry agent takes the entire fleet with it. That has now happened twice, the second time killing seven work agents, four strikes and a live review convoy. Blast-radius containment is a different fix from choosing a better victim.
 
-### PAN-3278 (rank 75)
+### PAN-3278 (rank 76)
 
 Triage: the auto-requeue machinery cited targeted the deleted review_status table; verify review-dispatch-after-PR-open against the current mechanism (see PAN-3939 for the post-cut reproduction). Rank held.
 
-### PAN-4623 (rank 76)
+### PAN-4623 (rank 77)
 
 New since the prior run (filed by the PAN-4532 plan critic). recoverStalledReviews falls back to getRequestReviewStarter(), which is only registered by the dashboard route module the forked deacon child never loads, so the fallback is a silent no-op in production and a journaled-but-undispatched review with no parent state stays stranded. The fix is a one-call swap to requestReviewThroughRoute, which undispatched-review-recovery already uses. Placed beside PAN-3278 (review never dispatched) because it closes the same throughput hole; it is review-recovery machinery, so it goes through a supervised handoff.
 
-### PAN-3234 (rank 77)
+### PAN-3234 (rank 78)
 
 Triage: verify whether blocking-choice-menu detection is wired to the current liveness/health surface. Rank held.
 
-### PAN-3205 (rank 78)
+### PAN-3205 (rank 79)
 
 New this pass. The deployment gate's queue message is unusually good — it names the holders, the queue age, and warns against forcing — and it promises a 'next verification boundary' trigger that does not exist. Every holder cleared and the deploy never fired; the live build stayed stale for 35 minutes until a manual reload. A correct-sounding instruction that cannot happen is worse than no message.
 
-### PAN-3118 (rank 79)
+### PAN-3118 (rank 80)
 
 Triage: verify "running at $0.00 with no capacity fallback" against the current liveness definition. Rank held.
-
-### PAN-3106 (rank 80)
-
-New this pass. shouldHoldForUat is consulted on exactly one merge path, so every other path merges a ready issue without asking whether its project holds for UAT — verified at code level on a real MIN-901 merge. This defeats the batch-train model directly: issues merge one at a time before a generation can assemble them.
 
 
 <!-- machine-readable; do not hand-edit below this line -->
@@ -1202,10 +1203,10 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-06T17:35:00.893288Z",
+  "generatedAt": "2026-11-06T17:58:37.477302Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 867,
+  "openCount": 868,
   "nodes": [
     {
       "issue": "PAN-5001",
@@ -1835,7 +1836,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3560",
-      "rank": 49,
+      "rank": 50,
       "size": "M",
       "importance": "critical",
       "score": 86,
@@ -1848,7 +1849,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3520",
-      "rank": 50,
+      "rank": 51,
       "size": "S",
       "importance": "critical",
       "score": 86,
@@ -1861,7 +1862,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4439",
-      "rank": 51,
+      "rank": 52,
       "size": "S",
       "importance": "high",
       "score": 84,
@@ -1874,7 +1875,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4392",
-      "rank": 52,
+      "rank": 53,
       "size": "XS",
       "importance": "high",
       "score": 82,
@@ -1887,7 +1888,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3500",
-      "rank": 53,
+      "rank": 54,
       "size": "S",
       "importance": "critical",
       "score": 86,
@@ -1900,7 +1901,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3313",
-      "rank": 54,
+      "rank": 55,
       "size": "S",
       "importance": "critical",
       "score": 86,
@@ -1913,7 +1914,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3282",
-      "rank": 55,
+      "rank": 56,
       "size": "M",
       "importance": "critical",
       "score": 86,
@@ -1926,7 +1927,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4391",
-      "rank": 56,
+      "rank": 57,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -1939,7 +1940,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4390",
-      "rank": 57,
+      "rank": 58,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -1952,7 +1953,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2695",
-      "rank": 58,
+      "rank": 59,
       "size": "S",
       "importance": "high",
       "score": 85,
@@ -1965,7 +1966,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2742",
-      "rank": 59,
+      "rank": 60,
       "size": "S",
       "importance": "high",
       "score": 85,
@@ -1978,7 +1979,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2706",
-      "rank": 60,
+      "rank": 61,
       "size": "M",
       "importance": "high",
       "score": 84,
@@ -1991,7 +1992,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4374",
-      "rank": 61,
+      "rank": 62,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -2004,7 +2005,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4344",
-      "rank": 62,
+      "rank": 63,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -2017,7 +2018,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4550",
-      "rank": 63,
+      "rank": 64,
       "size": "XS",
       "importance": "medium",
       "score": 64,
@@ -2030,7 +2031,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4566",
-      "rank": 64,
+      "rank": 65,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -2043,7 +2044,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4622",
-      "rank": 65,
+      "rank": 66,
       "size": "M",
       "importance": "high",
       "score": 72,
@@ -2056,7 +2057,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2940",
-      "rank": 66,
+      "rank": 67,
       "size": "M",
       "importance": "critical",
       "score": 92,
@@ -2069,7 +2070,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3708",
-      "rank": 67,
+      "rank": 68,
       "size": "M",
       "importance": "critical",
       "score": 84,
@@ -2082,7 +2083,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3605",
-      "rank": 68,
+      "rank": 69,
       "size": "XS",
       "importance": "high",
       "score": 84,
@@ -2095,7 +2096,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4624",
-      "rank": 69,
+      "rank": 70,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -2108,7 +2109,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4792",
-      "rank": 70,
+      "rank": 71,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -2121,7 +2122,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3557",
-      "rank": 71,
+      "rank": 72,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -2134,7 +2135,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3543",
-      "rank": 72,
+      "rank": 73,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -2147,7 +2148,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3522",
-      "rank": 73,
+      "rank": 74,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -2160,7 +2161,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3314",
-      "rank": 74,
+      "rank": 75,
       "size": "M",
       "importance": "critical",
       "score": 84,
@@ -2173,7 +2174,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3278",
-      "rank": 75,
+      "rank": 76,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -2186,7 +2187,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4623",
-      "rank": 76,
+      "rank": 77,
       "size": "XS",
       "importance": "high",
       "score": 82,
@@ -2199,7 +2200,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3234",
-      "rank": 77,
+      "rank": 78,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -2212,7 +2213,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3205",
-      "rank": 78,
+      "rank": 79,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -2225,7 +2226,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3118",
-      "rank": 79,
+      "rank": 80,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -2238,7 +2239,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3106",
-      "rank": 80,
+      "rank": 81,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -2251,7 +2252,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3100",
-      "rank": 81,
+      "rank": 82,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -2264,7 +2265,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4213",
-      "rank": 82,
+      "rank": 83,
       "size": "M",
       "importance": "high",
       "score": 80,
@@ -2277,7 +2278,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4753",
-      "rank": 83,
+      "rank": 84,
       "size": "XL",
       "importance": "high",
       "score": 78,
@@ -2291,7 +2292,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3096",
-      "rank": 84,
+      "rank": 85,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -2304,7 +2305,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3084",
-      "rank": 85,
+      "rank": 86,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -2317,7 +2318,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3043",
-      "rank": 86,
+      "rank": 87,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -2330,7 +2331,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1824",
-      "rank": 87,
+      "rank": 88,
       "size": "S",
       "importance": "high",
       "score": 84,
@@ -2343,7 +2344,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2932",
-      "rank": 88,
+      "rank": 89,
       "size": "S",
       "importance": "high",
       "score": 83,
@@ -2358,7 +2359,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2935",
-      "rank": 89,
+      "rank": 90,
       "size": "S",
       "importance": "critical",
       "score": 91,
@@ -2371,7 +2372,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2337",
-      "rank": 90,
+      "rank": 91,
       "size": "XS",
       "importance": "critical",
       "score": 90,
@@ -2384,7 +2385,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2422",
-      "rank": 91,
+      "rank": 92,
       "size": "XS",
       "importance": "high",
       "score": 83,
@@ -2399,7 +2400,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2699",
-      "rank": 92,
+      "rank": 93,
       "size": "XS",
       "importance": "high",
       "score": 83,
@@ -2412,7 +2413,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2957",
-      "rank": 93,
+      "rank": 94,
       "size": "XS",
       "importance": "high",
       "score": 83,
@@ -2427,7 +2428,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2850",
-      "rank": 94,
+      "rank": 95,
       "size": "M",
       "importance": "high",
       "score": 83,
@@ -2440,7 +2441,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2758",
-      "rank": 95,
+      "rank": 96,
       "size": "S",
       "importance": "critical",
       "score": 90,
@@ -2453,7 +2454,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2817",
-      "rank": 96,
+      "rank": 97,
       "size": "M",
       "importance": "high",
       "score": 83,
@@ -2466,7 +2467,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2813",
-      "rank": 97,
+      "rank": 98,
       "size": "M",
       "importance": "high",
       "score": 83,
@@ -2479,7 +2480,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2668",
-      "rank": 98,
+      "rank": 99,
       "size": "M",
       "importance": "high",
       "score": 82,
@@ -2492,7 +2493,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2569",
-      "rank": 99,
+      "rank": 100,
       "size": "XS",
       "importance": "critical",
       "score": 88,
@@ -2505,7 +2506,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4269",
-      "rank": 100,
+      "rank": 101,
       "size": "M",
       "importance": "high",
       "score": 76,
@@ -2518,7 +2519,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3811",
-      "rank": 101,
+      "rank": 102,
       "size": "M",
       "importance": "high",
       "score": 78,
@@ -2531,7 +2532,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2179",
-      "rank": 102,
+      "rank": 103,
       "size": "S",
       "importance": "high",
       "score": 82,
@@ -2544,7 +2545,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2169",
-      "rank": 103,
+      "rank": 104,
       "size": "S",
       "importance": "high",
       "score": 82,
@@ -2557,7 +2558,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2734",
-      "rank": 104,
+      "rank": 105,
       "size": "S",
       "importance": "high",
       "score": 82,
@@ -2570,7 +2571,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3697",
-      "rank": 105,
+      "rank": 106,
       "size": "XS",
       "importance": "high",
       "score": 82,
@@ -2582,7 +2583,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3633",
-      "rank": 106,
+      "rank": 107,
       "size": "S",
       "importance": "high",
       "score": 82,
@@ -2594,7 +2595,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4420",
-      "rank": 107,
+      "rank": 108,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -2606,7 +2607,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3099",
-      "rank": 108,
+      "rank": 109,
       "size": "XS",
       "importance": "critical",
       "score": 82,
@@ -2618,7 +2619,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4418",
-      "rank": 109,
+      "rank": 110,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -2630,7 +2631,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3040",
-      "rank": 110,
+      "rank": 111,
       "size": "S",
       "importance": "critical",
       "score": 82,
@@ -2642,7 +2643,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3023",
-      "rank": 111,
+      "rank": 112,
       "size": "S",
       "importance": "critical",
       "score": 82,
@@ -2654,7 +2655,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1618",
-      "rank": 112,
+      "rank": 113,
       "size": "S",
       "importance": "high",
       "score": 81,
@@ -2667,7 +2668,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3916",
-      "rank": 113,
+      "rank": 114,
       "size": "M",
       "importance": "high",
       "score": 78,
@@ -2680,7 +2681,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3900",
-      "rank": 114,
+      "rank": 115,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -2693,7 +2694,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3793",
-      "rank": 115,
+      "rank": 116,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -2706,7 +2707,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2639",
-      "rank": 116,
+      "rank": 117,
       "size": "S",
       "importance": "high",
       "score": 81,
@@ -2721,7 +2722,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2331",
-      "rank": 117,
+      "rank": 118,
       "size": "S",
       "importance": "high",
       "score": 81,
@@ -2734,7 +2735,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2333",
-      "rank": 118,
+      "rank": 119,
       "size": "M",
       "importance": "high",
       "score": 81,
@@ -2747,7 +2748,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4184",
-      "rank": 119,
+      "rank": 120,
       "size": "S",
       "importance": "high",
       "score": 81,
@@ -2760,7 +2761,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2511",
-      "rank": 120,
+      "rank": 121,
       "size": "XS",
       "importance": "high",
       "score": 81,
@@ -2773,7 +2774,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2763",
-      "rank": 121,
+      "rank": 122,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -2786,7 +2787,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2170",
-      "rank": 122,
+      "rank": 123,
       "size": "XS",
       "importance": "high",
       "score": 80,
@@ -2799,7 +2800,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1198",
-      "rank": 123,
+      "rank": 124,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -2812,7 +2813,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4453",
-      "rank": 124,
+      "rank": 125,
       "size": "XS",
       "importance": "high",
       "score": 72,
@@ -2824,7 +2825,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2106",
-      "rank": 125,
+      "rank": 126,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -2837,7 +2838,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2880",
-      "rank": 126,
+      "rank": 127,
       "size": "M",
       "importance": "high",
       "score": 80,
@@ -2852,7 +2853,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2966",
-      "rank": 127,
+      "rank": 128,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -2865,7 +2866,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2945",
-      "rank": 128,
+      "rank": 129,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -2878,7 +2879,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2680",
-      "rank": 129,
+      "rank": 130,
       "size": "M",
       "importance": "high",
       "score": 80,
@@ -2891,7 +2892,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4419",
-      "rank": 130,
+      "rank": 131,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -2905,7 +2906,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3734",
-      "rank": 131,
+      "rank": 132,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -2917,7 +2918,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3621",
-      "rank": 132,
+      "rank": 133,
       "size": "M",
       "importance": "high",
       "score": 80,
@@ -2929,7 +2930,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3555",
-      "rank": 133,
+      "rank": 134,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -2941,7 +2942,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3498",
-      "rank": 134,
+      "rank": 135,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -2953,7 +2954,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3496",
-      "rank": 135,
+      "rank": 136,
       "size": "XS",
       "importance": "high",
       "score": 80,
@@ -2965,7 +2966,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3081",
-      "rank": 136,
+      "rank": 137,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -2977,7 +2978,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2627",
-      "rank": 137,
+      "rank": 138,
       "size": "S",
       "importance": "high",
       "score": 79,
@@ -2990,7 +2991,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2324",
-      "rank": 138,
+      "rank": 139,
       "size": "XS",
       "importance": "high",
       "score": 79,
@@ -3003,7 +3004,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2165",
-      "rank": 139,
+      "rank": 140,
       "size": "XS",
       "importance": "high",
       "score": 79,
@@ -3016,7 +3017,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2905",
-      "rank": 140,
+      "rank": 141,
       "size": "S",
       "importance": "high",
       "score": 79,
@@ -3029,7 +3030,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2259",
-      "rank": 141,
+      "rank": 142,
       "size": "S",
       "importance": "critical",
       "score": 86,
@@ -3042,7 +3043,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2379",
-      "rank": 142,
+      "rank": 143,
       "size": "S",
       "importance": "high",
       "score": 79,
@@ -3055,7 +3056,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2421",
-      "rank": 143,
+      "rank": 144,
       "size": "XS",
       "importance": "high",
       "score": 79,
@@ -3068,7 +3069,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2430",
-      "rank": 144,
+      "rank": 145,
       "size": "S",
       "importance": "high",
       "score": 79,
@@ -3081,7 +3082,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2593",
-      "rank": 145,
+      "rank": 146,
       "size": "S",
       "importance": "high",
       "score": 79,
@@ -3094,7 +3095,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4302",
-      "rank": 146,
+      "rank": 147,
       "size": "M",
       "importance": "high",
       "score": 72,
@@ -3107,7 +3108,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2080",
-      "rank": 147,
+      "rank": 148,
       "size": "M",
       "importance": "high",
       "score": 78,
@@ -3120,7 +3121,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-5048",
-      "rank": 148,
+      "rank": 149,
       "size": "M",
       "importance": "high",
       "score": 76,
@@ -3133,7 +3134,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1436",
-      "rank": 149,
+      "rank": 150,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3146,7 +3147,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3556",
-      "rank": 150,
+      "rank": 151,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3158,7 +3159,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3553",
-      "rank": 151,
+      "rank": 152,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3170,7 +3171,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3535",
-      "rank": 152,
+      "rank": 153,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3182,7 +3183,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3429",
-      "rank": 153,
+      "rank": 154,
       "size": "M",
       "importance": "high",
       "score": 78,
@@ -3194,7 +3195,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3397",
-      "rank": 154,
+      "rank": 155,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3206,7 +3207,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3325",
-      "rank": 155,
+      "rank": 156,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3218,7 +3219,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3317",
-      "rank": 156,
+      "rank": 157,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3230,7 +3231,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3284",
-      "rank": 157,
+      "rank": 158,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3242,7 +3243,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3270",
-      "rank": 158,
+      "rank": 159,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3254,7 +3255,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4487",
-      "rank": 159,
+      "rank": 160,
       "size": "XS",
       "importance": "high",
       "score": 74,
@@ -3267,7 +3268,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3257",
-      "rank": 160,
+      "rank": 161,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3279,7 +3280,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3129",
-      "rank": 161,
+      "rank": 162,
       "size": "M",
       "importance": "high",
       "score": 78,
@@ -3291,7 +3292,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3120",
-      "rank": 162,
+      "rank": 163,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3303,7 +3304,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4349",
-      "rank": 163,
+      "rank": 164,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -3315,7 +3316,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3062",
-      "rank": 164,
+      "rank": 165,
       "size": "M",
       "importance": "high",
       "score": 78,
@@ -3327,7 +3328,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3048",
-      "rank": 165,
+      "rank": 166,
       "size": "XS",
       "importance": "high",
       "score": 78,
@@ -3340,7 +3341,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3032",
-      "rank": 166,
+      "rank": 167,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3352,7 +3353,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3833",
-      "rank": 167,
+      "rank": 168,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -3365,7 +3366,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3902",
-      "rank": 168,
+      "rank": 169,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -3378,7 +3379,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4629",
-      "rank": 169,
+      "rank": 170,
       "size": "M",
       "importance": "high",
       "score": 72,
@@ -3391,7 +3392,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3854",
-      "rank": 170,
+      "rank": 171,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -3404,7 +3405,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4577",
-      "rank": 171,
+      "rank": 172,
       "size": "M",
       "importance": "high",
       "score": 70,
@@ -3417,7 +3418,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3307",
-      "rank": 172,
+      "rank": 173,
       "size": "XS",
       "importance": "high",
       "score": 62,
@@ -3430,7 +3431,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4634",
-      "rank": 173,
+      "rank": 174,
       "size": "M",
       "importance": "medium",
       "score": 66,
@@ -3443,7 +3444,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2642",
-      "rank": 174,
+      "rank": 175,
       "size": "XL",
       "importance": "high",
       "score": 77,
@@ -3457,7 +3458,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1868",
-      "rank": 175,
+      "rank": 176,
       "size": "XS",
       "importance": "high",
       "score": 77,
@@ -3470,7 +3471,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4847",
-      "rank": 176,
+      "rank": 177,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -3483,7 +3484,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1042",
-      "rank": 177,
+      "rank": 178,
       "size": "S",
       "importance": "high",
       "score": 77,
@@ -3496,7 +3497,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4844",
-      "rank": 178,
+      "rank": 179,
       "size": "S",
       "importance": "medium",
       "score": 58,
@@ -3509,7 +3510,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-570",
-      "rank": 179,
+      "rank": 180,
       "size": "XS",
       "importance": "high",
       "score": 77,
@@ -3524,7 +3525,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2059",
-      "rank": 180,
+      "rank": 181,
       "size": "XL",
       "importance": "high",
       "score": 77,
@@ -3538,7 +3539,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2376",
-      "rank": 181,
+      "rank": 182,
       "size": "XL",
       "importance": "high",
       "score": 77,
@@ -3552,7 +3553,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3775",
-      "rank": 182,
+      "rank": 183,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -3564,7 +3565,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3652",
-      "rank": 183,
+      "rank": 184,
       "size": "XS",
       "importance": "high",
       "score": 76,
@@ -3576,7 +3577,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3579",
-      "rank": 184,
+      "rank": 185,
       "size": "M",
       "importance": "high",
       "score": 76,
@@ -3588,7 +3589,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3541",
-      "rank": 185,
+      "rank": 186,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -3600,7 +3601,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3463",
-      "rank": 186,
+      "rank": 187,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -3612,7 +3613,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3460",
-      "rank": 187,
+      "rank": 188,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -3624,7 +3625,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3454",
-      "rank": 188,
+      "rank": 189,
       "size": "M",
       "importance": "high",
       "score": 76,
@@ -3636,7 +3637,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3432",
-      "rank": 189,
+      "rank": 190,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -3648,7 +3649,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3306",
-      "rank": 190,
+      "rank": 191,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -3660,7 +3661,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3297",
-      "rank": 191,
+      "rank": 192,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -3672,7 +3673,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3274",
-      "rank": 192,
+      "rank": 193,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -3685,7 +3686,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3267",
-      "rank": 193,
+      "rank": 194,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -3697,7 +3698,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3261",
-      "rank": 194,
+      "rank": 195,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -3709,7 +3710,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3256",
-      "rank": 195,
+      "rank": 196,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -3721,7 +3722,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4342",
-      "rank": 196,
+      "rank": 197,
       "size": "M",
       "importance": "medium",
       "score": 64,
@@ -3733,7 +3734,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3174",
-      "rank": 197,
+      "rank": 198,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -3745,7 +3746,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3050",
-      "rank": 198,
+      "rank": 199,
       "size": "XS",
       "importance": "high",
       "score": 76,
@@ -3757,7 +3758,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4365",
-      "rank": 199,
+      "rank": 200,
       "size": "S",
       "importance": "medium",
       "score": 64,
@@ -3769,7 +3770,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2980",
-      "rank": 200,
+      "rank": 201,
       "size": "XS",
       "importance": "high",
       "score": 76,
@@ -3781,7 +3782,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3769",
-      "rank": 201,
+      "rank": 202,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -3793,7 +3794,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3760",
-      "rank": 202,
+      "rank": 203,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -3805,7 +3806,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3629",
-      "rank": 203,
+      "rank": 204,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -3817,7 +3818,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3517",
-      "rank": 204,
+      "rank": 205,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -3829,7 +3830,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3508",
-      "rank": 205,
+      "rank": 206,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -3841,7 +3842,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3303",
-      "rank": 206,
+      "rank": 207,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -3853,7 +3854,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4364",
-      "rank": 207,
+      "rank": 208,
       "size": "S",
       "importance": "medium",
       "score": 62,
@@ -3865,7 +3866,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3196",
-      "rank": 208,
+      "rank": 209,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -3877,7 +3878,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3186",
-      "rank": 209,
+      "rank": 210,
       "size": "XS",
       "importance": "high",
       "score": 74,
@@ -3889,7 +3890,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3185",
-      "rank": 210,
+      "rank": 211,
       "size": "XS",
       "importance": "high",
       "score": 70,
@@ -3902,7 +3903,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3179",
-      "rank": 211,
+      "rank": 212,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -3914,7 +3915,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3176",
-      "rank": 212,
+      "rank": 213,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -3926,7 +3927,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3130",
-      "rank": 213,
+      "rank": 214,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -3938,7 +3939,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3047",
-      "rank": 214,
+      "rank": 215,
       "size": "XS",
       "importance": "high",
       "score": 74,
@@ -3951,7 +3952,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3046",
-      "rank": 215,
+      "rank": 216,
       "size": "XS",
       "importance": "high",
       "score": 74,
@@ -3963,7 +3964,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1711",
-      "rank": 216,
+      "rank": 217,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -3976,7 +3977,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3667",
-      "rank": 217,
+      "rank": 218,
       "size": "M",
       "importance": "high",
       "score": 72,
@@ -3988,7 +3989,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4561",
-      "rank": 218,
+      "rank": 219,
       "size": "L",
       "importance": "medium",
       "score": 52,
@@ -4001,7 +4002,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4242",
-      "rank": 219,
+      "rank": 220,
       "size": "M",
       "importance": "high",
       "score": 70,
@@ -4014,7 +4015,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2874",
-      "rank": 220,
+      "rank": 221,
       "size": "M",
       "importance": "high",
       "score": 45,
@@ -4027,7 +4028,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3778",
-      "rank": 221,
+      "rank": 222,
       "size": "S",
       "importance": "medium",
       "score": 46,
@@ -4040,7 +4041,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4575",
-      "rank": 222,
+      "rank": 223,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -4053,7 +4054,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-5087",
-      "rank": 223,
+      "rank": 224,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -4066,7 +4067,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3510",
-      "rank": 224,
+      "rank": 225,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -4078,7 +4079,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4909",
-      "rank": 225,
+      "rank": 226,
       "size": "S",
       "importance": "high",
       "score": 68,
@@ -4091,7 +4092,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4616",
-      "rank": 226,
+      "rank": 227,
       "size": "S",
       "importance": "medium",
       "score": 58,
@@ -4104,7 +4105,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4747",
-      "rank": 227,
+      "rank": 228,
       "size": "S",
       "importance": "high",
       "score": 62,
@@ -4117,7 +4118,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3355",
-      "rank": 228,
+      "rank": 229,
       "size": "XS",
       "importance": "high",
       "score": 72,
@@ -4129,7 +4130,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3289",
-      "rank": 229,
+      "rank": 230,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -4141,7 +4142,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4348",
-      "rank": 230,
+      "rank": 231,
       "size": "S",
       "importance": "medium",
       "score": 60,
@@ -4153,7 +4154,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3218",
-      "rank": 231,
+      "rank": 232,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -4165,7 +4166,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3210",
-      "rank": 232,
+      "rank": 233,
       "size": "XS",
       "importance": "high",
       "score": 72,
@@ -4177,7 +4178,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3167",
-      "rank": 233,
+      "rank": 234,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -4189,7 +4190,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3113",
-      "rank": 234,
+      "rank": 235,
       "size": "M",
       "importance": "high",
       "score": 72,
@@ -4201,7 +4202,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3108",
-      "rank": 235,
+      "rank": 236,
       "size": "XS",
       "importance": "high",
       "score": 72,
@@ -4213,7 +4214,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3094",
-      "rank": 236,
+      "rank": 237,
       "size": "XS",
       "importance": "high",
       "score": 72,
@@ -4225,7 +4226,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3012",
-      "rank": 237,
+      "rank": 238,
       "size": "M",
       "importance": "high",
       "score": 72,
@@ -4237,7 +4238,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3627",
-      "rank": 238,
+      "rank": 239,
       "size": "XS",
       "importance": "high",
       "score": 70,
@@ -4249,7 +4250,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3617",
-      "rank": 239,
+      "rank": 240,
       "size": "S",
       "importance": "high",
       "score": 70,
@@ -4261,7 +4262,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4346",
-      "rank": 240,
+      "rank": 241,
       "size": "S",
       "importance": "medium",
       "score": 58,
@@ -4273,7 +4274,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3276",
-      "rank": 241,
+      "rank": 242,
       "size": "XS",
       "importance": "high",
       "score": 70,
@@ -4285,7 +4286,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3235",
-      "rank": 242,
+      "rank": 243,
       "size": "S",
       "importance": "high",
       "score": 70,
@@ -4297,7 +4298,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4203",
-      "rank": 243,
+      "rank": 244,
       "size": "L",
       "importance": "high",
       "score": 62,
@@ -4310,7 +4311,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3789",
-      "rank": 244,
+      "rank": 245,
       "size": "L",
       "importance": "medium",
       "score": 58,
@@ -4323,7 +4324,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3175",
-      "rank": 245,
+      "rank": 246,
       "size": "M",
       "importance": "high",
       "score": 70,
@@ -4335,7 +4336,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3015",
-      "rank": 246,
+      "rank": 247,
       "size": "L",
       "importance": "high",
       "score": 70,
@@ -4347,7 +4348,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3518",
-      "rank": 247,
+      "rank": 248,
       "size": "M",
       "importance": "high",
       "score": 68,
@@ -4362,7 +4363,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3445",
-      "rank": 248,
+      "rank": 249,
       "size": "XS",
       "importance": "high",
       "score": 68,
@@ -4374,7 +4375,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3332",
-      "rank": 249,
+      "rank": 250,
       "size": "S",
       "importance": "high",
       "score": 68,
@@ -4386,7 +4387,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4426",
-      "rank": 250,
+      "rank": 251,
       "size": "M",
       "importance": "medium",
       "score": 58,
@@ -4398,7 +4399,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4345",
-      "rank": 251,
+      "rank": 252,
       "size": "XS",
       "importance": "medium",
       "score": 54,
@@ -4410,7 +4411,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3013",
-      "rank": 252,
+      "rank": 253,
       "size": "XS",
       "importance": "high",
       "score": 68,
@@ -4422,7 +4423,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3771",
-      "rank": 253,
+      "rank": 254,
       "size": "M",
       "importance": "high",
       "score": 66,
@@ -4435,7 +4436,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4530",
-      "rank": 254,
+      "rank": 255,
       "size": "XS",
       "importance": "medium",
       "score": 58,
@@ -4448,7 +4449,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3533",
-      "rank": 255,
+      "rank": 256,
       "size": "L",
       "importance": "high",
       "score": 66,
@@ -4460,7 +4461,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3107",
-      "rank": 256,
+      "rank": 257,
       "size": "S",
       "importance": "high",
       "score": 66,
@@ -4472,7 +4473,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4512",
-      "rank": 257,
+      "rank": 258,
       "size": "M",
       "importance": "medium",
       "score": 52,
@@ -4485,7 +4486,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1666",
-      "rank": 258,
+      "rank": 259,
       "size": "XL",
       "importance": "medium",
       "score": 63,
@@ -4499,7 +4500,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1556",
-      "rank": 259,
+      "rank": 260,
       "size": "S",
       "importance": "high",
       "score": 77,
@@ -4512,7 +4513,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4510",
-      "rank": 260,
+      "rank": 261,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -4525,7 +4526,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2190",
-      "rank": 261,
+      "rank": 262,
       "size": "L",
       "importance": "high",
       "score": 76,
@@ -4538,7 +4539,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2233",
-      "rank": 262,
+      "rank": 263,
       "size": "L",
       "importance": "high",
       "score": 76,
@@ -4551,7 +4552,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2186",
-      "rank": 263,
+      "rank": 264,
       "size": "S",
       "importance": "high",
       "score": 68,
@@ -4564,7 +4565,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4632",
-      "rank": 264,
+      "rank": 265,
       "size": "S",
       "importance": "medium",
       "score": 56,
@@ -4577,7 +4578,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2241",
-      "rank": 265,
+      "rank": 266,
       "size": "S",
       "importance": "high",
       "score": 75,
@@ -4589,7 +4590,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2242",
-      "rank": 266,
+      "rank": 267,
       "size": "S",
       "importance": "high",
       "score": 75,
@@ -4601,7 +4602,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2240",
-      "rank": 267,
+      "rank": 268,
       "size": "S",
       "importance": "high",
       "score": 75,
@@ -4613,7 +4614,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4926",
-      "rank": 268,
+      "rank": 269,
       "size": "XS",
       "importance": "medium",
       "score": 64,
@@ -4626,7 +4627,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2243",
-      "rank": 269,
+      "rank": 270,
       "size": "S",
       "importance": "high",
       "score": 75,
@@ -4638,7 +4639,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2202",
-      "rank": 270,
+      "rank": 271,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -4650,7 +4651,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2237",
-      "rank": 271,
+      "rank": 272,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -4662,7 +4663,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2487",
-      "rank": 272,
+      "rank": 273,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -4674,7 +4675,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4811",
-      "rank": 273,
+      "rank": 274,
       "size": "M",
       "importance": "medium",
       "score": 48,
@@ -4687,7 +4688,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-5079",
-      "rank": 274,
+      "rank": 275,
       "size": "S",
       "importance": "high",
       "score": 68,
@@ -4700,7 +4701,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4756",
-      "rank": 275,
+      "rank": 276,
       "size": "L",
       "importance": "medium",
       "score": 50,
@@ -4713,7 +4714,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4778",
-      "rank": 276,
+      "rank": 277,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -4726,7 +4727,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4817",
-      "rank": 277,
+      "rank": 278,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -4741,7 +4742,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2211",
-      "rank": 278,
+      "rank": 279,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -4754,7 +4755,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2210",
-      "rank": 279,
+      "rank": 280,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -4767,7 +4768,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2201",
-      "rank": 280,
+      "rank": 281,
       "size": "XS",
       "importance": "high",
       "score": 73,
@@ -4779,7 +4780,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2646",
-      "rank": 281,
+      "rank": 282,
       "size": "XS",
       "importance": "high",
       "score": 73,
@@ -4791,7 +4792,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2755",
-      "rank": 282,
+      "rank": 283,
       "size": "S",
       "importance": "high",
       "score": 73,
@@ -4803,7 +4804,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2754",
-      "rank": 283,
+      "rank": 284,
       "size": "S",
       "importance": "high",
       "score": 73,
@@ -4815,7 +4816,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2809",
-      "rank": 284,
+      "rank": 285,
       "size": "M",
       "importance": "high",
       "score": 73,
@@ -4827,7 +4828,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2810",
-      "rank": 285,
+      "rank": 286,
       "size": "M",
       "importance": "high",
       "score": 73,
@@ -4839,7 +4840,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2495",
-      "rank": 286,
+      "rank": 287,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -4851,7 +4852,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2478",
-      "rank": 287,
+      "rank": 288,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -4863,7 +4864,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1710",
-      "rank": 288,
+      "rank": 289,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -4875,7 +4876,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1558",
-      "rank": 289,
+      "rank": 290,
       "size": "M",
       "importance": "high",
       "score": 72,
@@ -4887,7 +4888,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1766",
-      "rank": 290,
+      "rank": 291,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -4899,7 +4900,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4853",
-      "rank": 291,
+      "rank": 292,
       "size": "M",
       "importance": "low",
       "score": 40,
@@ -4912,7 +4913,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2266",
-      "rank": 292,
+      "rank": 293,
       "size": "M",
       "importance": "high",
       "score": 71,
@@ -4924,7 +4925,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1578",
-      "rank": 293,
+      "rank": 294,
       "size": "M",
       "importance": "high",
       "score": 71,
@@ -4936,7 +4937,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1538",
-      "rank": 294,
+      "rank": 295,
       "size": "M",
       "importance": "high",
       "score": 71,
@@ -4948,7 +4949,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-687",
-      "rank": 295,
+      "rank": 296,
       "size": "M",
       "importance": "high",
       "score": 71,
@@ -4960,7 +4961,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-466",
-      "rank": 296,
+      "rank": 297,
       "size": "M",
       "importance": "high",
       "score": 71,
@@ -4972,7 +4973,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-465",
-      "rank": 297,
+      "rank": 298,
       "size": "M",
       "importance": "high",
       "score": 71,
@@ -4984,7 +4985,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-463",
-      "rank": 298,
+      "rank": 299,
       "size": "M",
       "importance": "high",
       "score": 71,
@@ -4996,7 +4997,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1142",
-      "rank": 299,
+      "rank": 300,
       "size": "M",
       "importance": "high",
       "score": 70,
@@ -5009,7 +5010,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1424",
-      "rank": 300,
+      "rank": 301,
       "size": "M",
       "importance": "high",
       "score": 70,
@@ -5021,7 +5022,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1196",
-      "rank": 301,
+      "rank": 302,
       "size": "M",
       "importance": "high",
       "score": 70,
@@ -5033,7 +5034,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1311",
-      "rank": 302,
+      "rank": 303,
       "size": "M",
       "importance": "high",
       "score": 70,
@@ -5045,7 +5046,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1313",
-      "rank": 303,
+      "rank": 304,
       "size": "L",
       "importance": "high",
       "score": 70,
@@ -5057,7 +5058,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4863",
-      "rank": 304,
+      "rank": 305,
       "size": "S",
       "importance": "medium",
       "score": 45,
@@ -5070,7 +5071,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1246",
-      "rank": 305,
+      "rank": 306,
       "size": "M",
       "importance": "high",
       "score": 70,
@@ -5082,7 +5083,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1253",
-      "rank": 306,
+      "rank": 307,
       "size": "M",
       "importance": "high",
       "score": 70,
@@ -5095,7 +5096,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1357",
-      "rank": 307,
+      "rank": 308,
       "size": "M",
       "importance": "high",
       "score": 70,
@@ -5107,7 +5108,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1915",
-      "rank": 308,
+      "rank": 309,
       "size": "M",
       "importance": "high",
       "score": 69,
@@ -5119,7 +5120,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4886",
-      "rank": 309,
+      "rank": 310,
       "size": "S",
       "importance": "medium",
       "score": 45,
@@ -5132,7 +5133,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1435",
-      "rank": 310,
+      "rank": 311,
       "size": "XS",
       "importance": "high",
       "score": 69,
@@ -5144,7 +5145,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1672",
-      "rank": 311,
+      "rank": 312,
       "size": "M",
       "importance": "high",
       "score": 69,
@@ -5156,7 +5157,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1640",
-      "rank": 312,
+      "rank": 313,
       "size": "M",
       "importance": "high",
       "score": 69,
@@ -5168,7 +5169,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4297",
-      "rank": 313,
+      "rank": 314,
       "size": "L",
       "importance": "medium",
       "score": 62,
@@ -5181,7 +5182,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2350",
-      "rank": 314,
+      "rank": 315,
       "size": "L",
       "importance": "high",
       "score": 69,
@@ -5195,7 +5196,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1217",
-      "rank": 315,
+      "rank": 316,
       "size": "XS",
       "importance": "high",
       "score": 69,
@@ -5207,7 +5208,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2079",
-      "rank": 316,
+      "rank": 317,
       "size": "M",
       "importance": "high",
       "score": 60,
@@ -5220,7 +5221,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4204",
-      "rank": 317,
+      "rank": 318,
       "size": "S",
       "importance": "medium",
       "score": 55,
@@ -5235,7 +5236,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1219",
-      "rank": 318,
+      "rank": 319,
       "size": "M",
       "importance": "high",
       "score": 69,
@@ -5248,7 +5249,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1451",
-      "rank": 319,
+      "rank": 320,
       "size": "M",
       "importance": "high",
       "score": 68,
@@ -5261,7 +5262,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1452",
-      "rank": 320,
+      "rank": 321,
       "size": "M",
       "importance": "high",
       "score": 68,
@@ -5273,7 +5274,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1553",
-      "rank": 321,
+      "rank": 322,
       "size": "M",
       "importance": "high",
       "score": 68,
@@ -5285,7 +5286,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1504",
-      "rank": 322,
+      "rank": 323,
       "size": "M",
       "importance": "high",
       "score": 68,
@@ -5297,7 +5298,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1480",
-      "rank": 323,
+      "rank": 324,
       "size": "L",
       "importance": "high",
       "score": 68,
@@ -5309,7 +5310,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-5058",
-      "rank": 324,
+      "rank": 325,
       "size": "XL",
       "importance": "high",
       "score": 66,
@@ -5322,7 +5323,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1479",
-      "rank": 325,
+      "rank": 326,
       "size": "M",
       "importance": "high",
       "score": 68,
@@ -5334,7 +5335,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2950",
-      "rank": 326,
+      "rank": 327,
       "size": "L",
       "importance": "high",
       "score": 68,
@@ -5346,7 +5347,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2720",
-      "rank": 327,
+      "rank": 328,
       "size": "M",
       "importance": "high",
       "score": 67,
@@ -5358,7 +5359,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2650",
-      "rank": 328,
+      "rank": 329,
       "size": "S",
       "importance": "high",
       "score": 67,
@@ -5371,7 +5372,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2358",
-      "rank": 329,
+      "rank": 330,
       "size": "M",
       "importance": "high",
       "score": 67,
@@ -5383,7 +5384,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2334",
-      "rank": 330,
+      "rank": 331,
       "size": "XS",
       "importance": "high",
       "score": 67,
@@ -5395,7 +5396,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2193",
-      "rank": 331,
+      "rank": 332,
       "size": "S",
       "importance": "high",
       "score": 66,
@@ -5407,7 +5408,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1984",
-      "rank": 332,
+      "rank": 333,
       "size": "XS",
       "importance": "high",
       "score": 66,
@@ -5420,7 +5421,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1913",
-      "rank": 333,
+      "rank": 334,
       "size": "XS",
       "importance": "high",
       "score": 66,
@@ -5432,7 +5433,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1906",
-      "rank": 334,
+      "rank": 335,
       "size": "M",
       "importance": "high",
       "score": 66,
@@ -5444,7 +5445,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1544",
-      "rank": 335,
+      "rank": 336,
       "size": "M",
       "importance": "high",
       "score": 66,
@@ -5456,7 +5457,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-955",
-      "rank": 336,
+      "rank": 337,
       "size": "S",
       "importance": "high",
       "score": 66,
@@ -5468,7 +5469,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-807",
-      "rank": 337,
+      "rank": 338,
       "size": "L",
       "importance": "high",
       "score": 66,
@@ -5480,7 +5481,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-630",
-      "rank": 338,
+      "rank": 339,
       "size": "M",
       "importance": "high",
       "score": 66,
@@ -5492,7 +5493,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-471",
-      "rank": 339,
+      "rank": 340,
       "size": "M",
       "importance": "high",
       "score": 65,
@@ -5504,7 +5505,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-438",
-      "rank": 340,
+      "rank": 341,
       "size": "M",
       "importance": "high",
       "score": 65,
@@ -5516,7 +5517,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-578",
-      "rank": 341,
+      "rank": 342,
       "size": "M",
       "importance": "high",
       "score": 65,
@@ -5528,7 +5529,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2921",
-      "rank": 342,
+      "rank": 343,
       "size": "S",
       "importance": "medium",
       "score": 63,
@@ -5540,7 +5541,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4195",
-      "rank": 343,
+      "rank": 344,
       "size": "M",
       "importance": "medium",
       "score": 63,
@@ -5553,7 +5554,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2839",
-      "rank": 344,
+      "rank": 345,
       "size": "S",
       "importance": "medium",
       "score": 63,
@@ -5565,7 +5566,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2824",
-      "rank": 345,
+      "rank": 346,
       "size": "S",
       "importance": "medium",
       "score": 63,
@@ -5577,7 +5578,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2792",
-      "rank": 346,
+      "rank": 347,
       "size": "S",
       "importance": "medium",
       "score": 63,
@@ -5589,7 +5590,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2761",
-      "rank": 347,
+      "rank": 348,
       "size": "S",
       "importance": "medium",
       "score": 62,
@@ -5601,7 +5602,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2738",
-      "rank": 348,
+      "rank": 349,
       "size": "S",
       "importance": "medium",
       "score": 62,
@@ -5613,7 +5614,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2717",
-      "rank": 349,
+      "rank": 350,
       "size": "S",
       "importance": "medium",
       "score": 62,
@@ -5625,7 +5626,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2697",
-      "rank": 350,
+      "rank": 351,
       "size": "S",
       "importance": "medium",
       "score": 62,
@@ -5637,7 +5638,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4236",
-      "rank": 351,
+      "rank": 352,
       "size": "S",
       "importance": "medium",
       "score": 62,
@@ -5650,7 +5651,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2691",
-      "rank": 352,
+      "rank": 353,
       "size": "S",
       "importance": "medium",
       "score": 62,
@@ -5662,7 +5663,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4306",
-      "rank": 353,
+      "rank": 354,
       "size": "M",
       "importance": "medium",
       "score": 61,
@@ -5675,7 +5676,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3701",
-      "rank": 354,
+      "rank": 355,
       "size": "L",
       "importance": "high",
       "score": 62,
@@ -5687,7 +5688,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3090",
-      "rank": 355,
+      "rank": 356,
       "size": "M",
       "importance": "high",
       "score": 62,
@@ -5699,7 +5700,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4552",
-      "rank": 356,
+      "rank": 357,
       "size": "M",
       "importance": "medium",
       "score": 61,
@@ -5712,7 +5713,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2670",
-      "rank": 357,
+      "rank": 358,
       "size": "S",
       "importance": "medium",
       "score": 61,
@@ -5724,7 +5725,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2664",
-      "rank": 358,
+      "rank": 359,
       "size": "S",
       "importance": "medium",
       "score": 61,
@@ -5736,7 +5737,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2663",
-      "rank": 359,
+      "rank": 360,
       "size": "S",
       "importance": "medium",
       "score": 61,
@@ -5748,7 +5749,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2649",
-      "rank": 360,
+      "rank": 361,
       "size": "S",
       "importance": "medium",
       "score": 61,
@@ -5760,7 +5761,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2580",
-      "rank": 361,
+      "rank": 362,
       "size": "S",
       "importance": "medium",
       "score": 61,
@@ -5772,7 +5773,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2572",
-      "rank": 362,
+      "rank": 363,
       "size": "M",
       "importance": "medium",
       "score": 61,
@@ -5784,7 +5785,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2563",
-      "rank": 363,
+      "rank": 364,
       "size": "S",
       "importance": "medium",
       "score": 60,
@@ -5796,7 +5797,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2554",
-      "rank": 364,
+      "rank": 365,
       "size": "S",
       "importance": "medium",
       "score": 60,
@@ -5808,7 +5809,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2550",
-      "rank": 365,
+      "rank": 366,
       "size": "XS",
       "importance": "medium",
       "score": 60,
@@ -5820,7 +5821,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2547",
-      "rank": 366,
+      "rank": 367,
       "size": "S",
       "importance": "medium",
       "score": 60,
@@ -5832,7 +5833,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2546",
-      "rank": 367,
+      "rank": 368,
       "size": "S",
       "importance": "medium",
       "score": 60,
@@ -5844,7 +5845,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4303",
-      "rank": 368,
+      "rank": 369,
       "size": "S",
       "importance": "medium",
       "score": 58,
@@ -5857,7 +5858,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3003",
-      "rank": 369,
+      "rank": 370,
       "size": "XS",
       "importance": "medium",
       "score": 60,
@@ -5869,7 +5870,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2501",
-      "rank": 370,
+      "rank": 371,
       "size": "S",
       "importance": "medium",
       "score": 59,
@@ -5881,7 +5882,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2492",
-      "rank": 371,
+      "rank": 372,
       "size": "S",
       "importance": "medium",
       "score": 59,
@@ -5894,7 +5895,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2491",
-      "rank": 372,
+      "rank": 373,
       "size": "M",
       "importance": "medium",
       "score": 59,
@@ -5906,7 +5907,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2489",
-      "rank": 373,
+      "rank": 374,
       "size": "S",
       "importance": "medium",
       "score": 59,
@@ -5918,7 +5919,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2465",
-      "rank": 374,
+      "rank": 375,
       "size": "S",
       "importance": "medium",
       "score": 59,
@@ -5930,7 +5931,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2454",
-      "rank": 375,
+      "rank": 376,
       "size": "S",
       "importance": "medium",
       "score": 59,
@@ -5942,7 +5943,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2428",
-      "rank": 376,
+      "rank": 377,
       "size": "XS",
       "importance": "medium",
       "score": 58,
@@ -5954,7 +5955,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2423",
-      "rank": 377,
+      "rank": 378,
       "size": "XS",
       "importance": "medium",
       "score": 58,
@@ -5966,7 +5967,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2416",
-      "rank": 378,
+      "rank": 379,
       "size": "S",
       "importance": "medium",
       "score": 58,
@@ -5978,7 +5979,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4250",
-      "rank": 379,
+      "rank": 380,
       "size": "XS",
       "importance": "medium",
       "score": 58,
@@ -5990,7 +5991,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2395",
-      "rank": 380,
+      "rank": 381,
       "size": "S",
       "importance": "medium",
       "score": 58,
@@ -6002,7 +6003,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2381",
-      "rank": 381,
+      "rank": 382,
       "size": "S",
       "importance": "medium",
       "score": 58,
@@ -6014,7 +6015,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2287",
-      "rank": 382,
+      "rank": 383,
       "size": "S",
       "importance": "medium",
       "score": 58,
@@ -6026,7 +6027,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3661",
-      "rank": 383,
+      "rank": 384,
       "size": "XS",
       "importance": "medium",
       "score": 58,
@@ -6038,7 +6039,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3288",
-      "rank": 384,
+      "rank": 385,
       "size": "XS",
       "importance": "medium",
       "score": 58,
@@ -6050,7 +6051,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3164",
-      "rank": 385,
+      "rank": 386,
       "size": "XS",
       "importance": "medium",
       "score": 58,
@@ -6062,7 +6063,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3121",
-      "rank": 386,
+      "rank": 387,
       "size": "S",
       "importance": "medium",
       "score": 58,
@@ -6074,7 +6075,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3014",
-      "rank": 387,
+      "rank": 388,
       "size": "XS",
       "importance": "medium",
       "score": 58,
@@ -6086,7 +6087,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3944",
-      "rank": 388,
+      "rank": 389,
       "size": "S",
       "importance": "medium",
       "score": 45,
@@ -6099,7 +6100,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3829",
-      "rank": 389,
+      "rank": 390,
       "size": "L",
       "importance": "medium",
       "score": 58,
@@ -6112,7 +6113,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2280",
-      "rank": 390,
+      "rank": 391,
       "size": "M",
       "importance": "medium",
       "score": 57,
@@ -6124,7 +6125,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2197",
-      "rank": 391,
+      "rank": 392,
       "size": "S",
       "importance": "medium",
       "score": 57,
@@ -6136,7 +6137,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2069",
-      "rank": 392,
+      "rank": 393,
       "size": "XS",
       "importance": "medium",
       "score": 57,
@@ -6148,7 +6149,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1918",
-      "rank": 393,
+      "rank": 394,
       "size": "XS",
       "importance": "medium",
       "score": 57,
@@ -6160,7 +6161,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1912",
-      "rank": 394,
+      "rank": 395,
       "size": "XS",
       "importance": "medium",
       "score": 57,
@@ -6172,7 +6173,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4208",
-      "rank": 395,
+      "rank": 396,
       "size": "M",
       "importance": "medium",
       "score": 58,
@@ -6185,7 +6186,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1846",
-      "rank": 396,
+      "rank": 397,
       "size": "S",
       "importance": "medium",
       "score": 57,
@@ -6198,7 +6199,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1830",
-      "rank": 397,
+      "rank": 398,
       "size": "S",
       "importance": "medium",
       "score": 57,
@@ -6210,7 +6211,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1816",
-      "rank": 398,
+      "rank": 399,
       "size": "S",
       "importance": "medium",
       "score": 56,
@@ -6222,7 +6223,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1795",
-      "rank": 399,
+      "rank": 400,
       "size": "S",
       "importance": "medium",
       "score": 56,
@@ -6234,7 +6235,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1774",
-      "rank": 400,
+      "rank": 401,
       "size": "S",
       "importance": "medium",
       "score": 56,
@@ -6246,7 +6247,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1769",
-      "rank": 401,
+      "rank": 402,
       "size": "S",
       "importance": "medium",
       "score": 56,
@@ -6258,7 +6259,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1761",
-      "rank": 402,
+      "rank": 403,
       "size": "S",
       "importance": "medium",
       "score": 56,
@@ -6270,7 +6271,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1755",
-      "rank": 403,
+      "rank": 404,
       "size": "S",
       "importance": "medium",
       "score": 56,
@@ -6282,7 +6283,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3516",
-      "rank": 404,
+      "rank": 405,
       "size": "XS",
       "importance": "medium",
       "score": 56,
@@ -6294,7 +6295,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3455",
-      "rank": 405,
+      "rank": 406,
       "size": "XS",
       "importance": "medium",
       "score": 56,
@@ -6306,7 +6307,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3117",
-      "rank": 406,
+      "rank": 407,
       "size": "XS",
       "importance": "medium",
       "score": 56,
@@ -6318,7 +6319,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3036",
-      "rank": 407,
+      "rank": 408,
       "size": "XS",
       "importance": "medium",
       "score": 56,
@@ -6330,7 +6331,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3016",
-      "rank": 408,
+      "rank": 409,
       "size": "M",
       "importance": "medium",
       "score": 56,
@@ -6342,7 +6343,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3890",
-      "rank": 409,
+      "rank": 410,
       "size": "S",
       "importance": "medium",
       "score": 56,
@@ -6355,7 +6356,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3822",
-      "rank": 410,
+      "rank": 411,
       "size": "L",
       "importance": "medium",
       "score": 56,
@@ -6368,7 +6369,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-5028",
-      "rank": 411,
+      "rank": 412,
       "size": "M",
       "importance": "medium",
       "score": 64,
@@ -6381,7 +6382,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-5088",
-      "rank": 412,
+      "rank": 413,
       "size": "XS",
       "importance": "medium",
       "score": 60,
@@ -6394,7 +6395,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1673",
-      "rank": 413,
+      "rank": 414,
       "size": "S",
       "importance": "medium",
       "score": 55,
@@ -6406,7 +6407,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1669",
-      "rank": 414,
+      "rank": 415,
       "size": "S",
       "importance": "medium",
       "score": 55,
@@ -6418,7 +6419,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1668",
-      "rank": 415,
+      "rank": 416,
       "size": "S",
       "importance": "medium",
       "score": 55,
@@ -6430,7 +6431,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1627",
-      "rank": 416,
+      "rank": 417,
       "size": "M",
       "importance": "medium",
       "score": 55,
@@ -6442,7 +6443,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1624",
-      "rank": 417,
+      "rank": 418,
       "size": "S",
       "importance": "medium",
       "score": 55,
@@ -6454,7 +6455,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3901",
-      "rank": 418,
+      "rank": 419,
       "size": "S",
       "importance": "medium",
       "score": 55,
@@ -6467,7 +6468,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3852",
-      "rank": 419,
+      "rank": 420,
       "size": "S",
       "importance": "medium",
       "score": 55,
@@ -6480,7 +6481,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3862",
-      "rank": 420,
+      "rank": 421,
       "size": "L",
       "importance": "medium",
       "score": 55,
@@ -6493,7 +6494,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1572",
-      "rank": 421,
+      "rank": 422,
       "size": "M",
       "importance": "medium",
       "score": 54,
@@ -6506,7 +6507,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4627",
-      "rank": 422,
+      "rank": 423,
       "size": "S",
       "importance": "medium",
       "score": 55,
@@ -6519,7 +6520,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1571",
-      "rank": 423,
+      "rank": 424,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6531,7 +6532,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1565",
-      "rank": 424,
+      "rank": 425,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6543,7 +6544,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1530",
-      "rank": 425,
+      "rank": 426,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6555,7 +6556,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1461",
-      "rank": 426,
+      "rank": 427,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6567,7 +6568,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1449",
-      "rank": 427,
+      "rank": 428,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6579,7 +6580,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1446",
-      "rank": 428,
+      "rank": 429,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6591,7 +6592,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1445",
-      "rank": 429,
+      "rank": 430,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6603,7 +6604,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3616",
-      "rank": 430,
+      "rank": 431,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6615,7 +6616,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2982",
-      "rank": 431,
+      "rank": 432,
       "size": "XS",
       "importance": "medium",
       "score": 54,
@@ -6627,7 +6628,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2981",
-      "rank": 432,
+      "rank": 433,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6639,7 +6640,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2976",
-      "rank": 433,
+      "rank": 434,
       "size": "L",
       "importance": "medium",
       "score": 54,
@@ -6651,7 +6652,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1444",
-      "rank": 434,
+      "rank": 435,
       "size": "S",
       "importance": "medium",
       "score": 53,
@@ -6663,7 +6664,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2469",
-      "rank": 435,
+      "rank": 436,
       "size": "S",
       "importance": "medium",
       "score": 53,
@@ -6676,7 +6677,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1433",
-      "rank": 436,
+      "rank": 437,
       "size": "S",
       "importance": "medium",
       "score": 53,
@@ -6688,7 +6689,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1416",
-      "rank": 437,
+      "rank": 438,
       "size": "S",
       "importance": "medium",
       "score": 53,
@@ -6700,7 +6701,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1392",
-      "rank": 438,
+      "rank": 439,
       "size": "S",
       "importance": "low",
       "score": 12,
@@ -6713,7 +6714,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4151",
-      "rank": 439,
+      "rank": 440,
       "size": "L",
       "importance": "medium",
       "score": 46,
@@ -6727,7 +6728,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1330",
-      "rank": 440,
+      "rank": 441,
       "size": "S",
       "importance": "medium",
       "score": 52,
@@ -6739,7 +6740,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4971",
-      "rank": 441,
+      "rank": 442,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -6752,7 +6753,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1226",
-      "rank": 442,
+      "rank": 443,
       "size": "L",
       "importance": "medium",
       "score": 52,
@@ -6764,7 +6765,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1173",
-      "rank": 443,
+      "rank": 444,
       "size": "S",
       "importance": "medium",
       "score": 52,
@@ -6776,7 +6777,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1154",
-      "rank": 444,
+      "rank": 445,
       "size": "M",
       "importance": "medium",
       "score": 52,
@@ -6788,7 +6789,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3354",
-      "rank": 445,
+      "rank": 446,
       "size": "XS",
       "importance": "medium",
       "score": 52,
@@ -6800,7 +6801,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3178",
-      "rank": 446,
+      "rank": 447,
       "size": "XL",
       "importance": "medium",
       "score": 52,
@@ -6813,7 +6814,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3017",
-      "rank": 447,
+      "rank": 448,
       "size": "S",
       "importance": "medium",
       "score": 52,
@@ -6825,7 +6826,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-5057",
-      "rank": 448,
+      "rank": 449,
       "size": "XS",
       "importance": "medium",
       "score": 56,
@@ -6837,7 +6838,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3873",
-      "rank": 449,
+      "rank": 450,
       "size": "M",
       "importance": "medium",
       "score": 52,
@@ -6850,7 +6851,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1150",
-      "rank": 450,
+      "rank": 451,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -6862,7 +6863,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1149",
-      "rank": 451,
+      "rank": 452,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -6874,7 +6875,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1130",
-      "rank": 452,
+      "rank": 453,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -6886,7 +6887,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1129",
-      "rank": 453,
+      "rank": 454,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -6898,7 +6899,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1128",
-      "rank": 454,
+      "rank": 455,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -6910,7 +6911,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1113",
-      "rank": 455,
+      "rank": 456,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -6922,7 +6923,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1068",
-      "rank": 456,
+      "rank": 457,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -6934,7 +6935,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3938",
-      "rank": 457,
+      "rank": 458,
       "size": "M",
       "importance": "medium",
       "score": 45,
@@ -6947,7 +6948,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-933",
-      "rank": 458,
+      "rank": 459,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -6959,7 +6960,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-932",
-      "rank": 459,
+      "rank": 460,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -6971,7 +6972,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-927",
-      "rank": 460,
+      "rank": 461,
       "size": "M",
       "importance": "medium",
       "score": 50,
@@ -6983,7 +6984,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-900",
-      "rank": 461,
+      "rank": 462,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -6995,7 +6996,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-886",
-      "rank": 462,
+      "rank": 463,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -7007,7 +7008,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-778",
-      "rank": 463,
+      "rank": 464,
       "size": "M",
       "importance": "medium",
       "score": 50,
@@ -7019,7 +7020,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-681",
-      "rank": 464,
+      "rank": 465,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -7031,7 +7032,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3732",
-      "rank": 465,
+      "rank": 466,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -7043,7 +7044,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3700",
-      "rank": 466,
+      "rank": 467,
       "size": "M",
       "importance": "medium",
       "score": 50,
@@ -7055,7 +7056,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3290",
-      "rank": 467,
+      "rank": 468,
       "size": "XS",
       "importance": "medium",
       "score": 50,
@@ -7067,7 +7068,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3132",
-      "rank": 468,
+      "rank": 469,
       "size": "M",
       "importance": "medium",
       "score": 50,
@@ -7079,7 +7080,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3909",
-      "rank": 469,
+      "rank": 470,
       "size": "M",
       "importance": "medium",
       "score": 50,
@@ -7092,7 +7093,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2659",
-      "rank": 470,
+      "rank": 471,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -7105,7 +7106,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3831",
-      "rank": 471,
+      "rank": 472,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -7118,7 +7119,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4779",
-      "rank": 472,
+      "rank": 473,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -7131,7 +7132,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-538",
-      "rank": 473,
+      "rank": 474,
       "size": "S",
       "importance": "medium",
       "score": 49,
@@ -7143,7 +7144,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1164",
-      "rank": 474,
+      "rank": 475,
       "size": "M",
       "importance": "medium",
       "score": 48,
@@ -7155,7 +7156,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3563",
-      "rank": 475,
+      "rank": 476,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -7168,7 +7169,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1041",
-      "rank": 476,
+      "rank": 477,
       "size": "M",
       "importance": "medium",
       "score": 48,
@@ -7180,7 +7181,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-924",
-      "rank": 477,
+      "rank": 478,
       "size": "L",
       "importance": "medium",
       "score": 48,
@@ -7192,7 +7193,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3770",
-      "rank": 478,
+      "rank": 479,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -7204,7 +7205,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4568",
-      "rank": 479,
+      "rank": 480,
       "size": "XS",
       "importance": "medium",
       "score": 46,
@@ -7217,7 +7218,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3731",
-      "rank": 480,
+      "rank": 481,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -7229,7 +7230,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3530",
-      "rank": 481,
+      "rank": 482,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -7241,7 +7242,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3131",
-      "rank": 482,
+      "rank": 483,
       "size": "L",
       "importance": "medium",
       "score": 48,
@@ -7253,7 +7254,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3061",
-      "rank": 483,
+      "rank": 484,
       "size": "M",
       "importance": "medium",
       "score": 48,
@@ -7265,7 +7266,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3057",
-      "rank": 484,
+      "rank": 485,
       "size": "S",
       "importance": "medium",
       "score": 40,
@@ -7278,7 +7279,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3892",
-      "rank": 485,
+      "rank": 486,
       "size": "M",
       "importance": "medium",
       "score": 48,
@@ -7291,7 +7292,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4918",
-      "rank": 486,
+      "rank": 487,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7304,7 +7305,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-863",
-      "rank": 487,
+      "rank": 488,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7316,7 +7317,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-817",
-      "rank": 488,
+      "rank": 489,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7328,7 +7329,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-802",
-      "rank": 489,
+      "rank": 490,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7340,7 +7341,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-713",
-      "rank": 490,
+      "rank": 491,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7352,7 +7353,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-700",
-      "rank": 491,
+      "rank": 492,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7364,7 +7365,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-646",
-      "rank": 492,
+      "rank": 493,
       "size": "XS",
       "importance": "medium",
       "score": 47,
@@ -7377,7 +7378,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-532",
-      "rank": 493,
+      "rank": 494,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7389,7 +7390,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2896",
-      "rank": 494,
+      "rank": 495,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7401,7 +7402,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2685",
-      "rank": 495,
+      "rank": 496,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7413,7 +7414,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2626",
-      "rank": 496,
+      "rank": 497,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7425,7 +7426,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2625",
-      "rank": 497,
+      "rank": 498,
       "size": "XS",
       "importance": "medium",
       "score": 46,
@@ -7437,7 +7438,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2608",
-      "rank": 498,
+      "rank": 499,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7449,7 +7450,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2582",
-      "rank": 499,
+      "rank": 500,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7461,7 +7462,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2566",
-      "rank": 500,
+      "rank": 501,
       "size": "L",
       "importance": "medium",
       "score": 46,
@@ -7475,7 +7476,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2565",
-      "rank": 501,
+      "rank": 502,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7488,7 +7489,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3735",
-      "rank": 502,
+      "rank": 503,
       "size": "S",
       "importance": "medium",
       "score": 46,
@@ -7500,7 +7501,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3335",
-      "rank": 503,
+      "rank": 504,
       "size": "XS",
       "importance": "medium",
       "score": 46,
@@ -7512,7 +7513,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3054",
-      "rank": 504,
+      "rank": 505,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7524,7 +7525,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2977",
-      "rank": 505,
+      "rank": 506,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7538,7 +7539,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2557",
-      "rank": 506,
+      "rank": 507,
       "size": "M",
       "importance": "medium",
       "score": 45,
@@ -7550,7 +7551,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2553",
-      "rank": 507,
+      "rank": 508,
       "size": "M",
       "importance": "medium",
       "score": 45,
@@ -7562,7 +7563,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2521",
-      "rank": 508,
+      "rank": 509,
       "size": "S",
       "importance": "medium",
       "score": 45,
@@ -7574,7 +7575,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2493",
-      "rank": 509,
+      "rank": 510,
       "size": "M",
       "importance": "medium",
       "score": 45,
@@ -7586,7 +7587,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3772",
-      "rank": 510,
+      "rank": 511,
       "size": "XS",
       "importance": "medium",
       "score": 45,
@@ -7598,7 +7599,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3853",
-      "rank": 511,
+      "rank": 512,
       "size": "S",
       "importance": "medium",
       "score": 45,
@@ -7611,7 +7612,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3830",
-      "rank": 512,
+      "rank": 513,
       "size": "S",
       "importance": "medium",
       "score": 45,
@@ -7624,7 +7625,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4924",
-      "rank": 513,
+      "rank": 514,
       "size": "S",
       "importance": "medium",
       "score": 45,
@@ -7637,7 +7638,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4367",
-      "rank": 514,
+      "rank": 515,
       "size": "M",
       "importance": "medium",
       "score": 48,
@@ -7649,7 +7650,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2443",
-      "rank": 515,
+      "rank": 516,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -7661,7 +7662,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2442",
-      "rank": 516,
+      "rank": 517,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -7673,7 +7674,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2409",
-      "rank": 517,
+      "rank": 518,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -7685,7 +7686,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2392",
-      "rank": 518,
+      "rank": 519,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -7698,7 +7699,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2335",
-      "rank": 519,
+      "rank": 520,
       "size": "XS",
       "importance": "medium",
       "score": 44,
@@ -7710,7 +7711,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2295",
-      "rank": 520,
+      "rank": 521,
       "size": "L",
       "importance": "medium",
       "score": 44,
@@ -7722,7 +7723,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3767",
-      "rank": 521,
+      "rank": 522,
       "size": "S",
       "importance": "medium",
       "score": 44,
@@ -7734,7 +7735,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3615",
-      "rank": 522,
+      "rank": 523,
       "size": "S",
       "importance": "medium",
       "score": 44,
@@ -7746,7 +7747,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3558",
-      "rank": 523,
+      "rank": 524,
       "size": "S",
       "importance": "medium",
       "score": 44,
@@ -7758,7 +7759,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3469",
-      "rank": 524,
+      "rank": 525,
       "size": "S",
       "importance": "medium",
       "score": 44,
@@ -7770,7 +7771,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3333",
-      "rank": 525,
+      "rank": 526,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -7782,7 +7783,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3058",
-      "rank": 526,
+      "rank": 527,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -7794,7 +7795,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2288",
-      "rank": 527,
+      "rank": 528,
       "size": "L",
       "importance": "medium",
       "score": 43,
@@ -7806,7 +7807,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2065",
-      "rank": 528,
+      "rank": 529,
       "size": "M",
       "importance": "medium",
       "score": 43,
@@ -7818,7 +7819,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2031",
-      "rank": 529,
+      "rank": 530,
       "size": "M",
       "importance": "medium",
       "score": 43,
@@ -7830,7 +7831,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2026",
-      "rank": 530,
+      "rank": 531,
       "size": "M",
       "importance": "medium",
       "score": 42,
@@ -7842,7 +7843,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2025",
-      "rank": 531,
+      "rank": 532,
       "size": "M",
       "importance": "medium",
       "score": 42,
@@ -7854,7 +7855,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4366",
-      "rank": 532,
+      "rank": 533,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7866,7 +7867,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2004",
-      "rank": 533,
+      "rank": 534,
       "size": "M",
       "importance": "medium",
       "score": 42,
@@ -7878,7 +7879,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1995",
-      "rank": 534,
+      "rank": 535,
       "size": "M",
       "importance": "medium",
       "score": 42,
@@ -7890,7 +7891,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3739",
-      "rank": 535,
+      "rank": 536,
       "size": "S",
       "importance": "medium",
       "score": 42,
@@ -7902,7 +7903,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4393",
-      "rank": 536,
+      "rank": 537,
       "size": "XS",
       "importance": "medium",
       "score": 44,
@@ -7914,7 +7915,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1985",
-      "rank": 537,
+      "rank": 538,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -7926,7 +7927,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1968",
-      "rank": 538,
+      "rank": 539,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -7938,7 +7939,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1967",
-      "rank": 539,
+      "rank": 540,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -7951,7 +7952,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1965",
-      "rank": 540,
+      "rank": 541,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -7963,7 +7964,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1937",
-      "rank": 541,
+      "rank": 542,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -7975,7 +7976,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1926",
-      "rank": 542,
+      "rank": 543,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -7987,7 +7988,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1916",
-      "rank": 543,
+      "rank": 544,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -7999,7 +8000,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1854",
-      "rank": 544,
+      "rank": 545,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8011,7 +8012,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1853",
-      "rank": 545,
+      "rank": 546,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8023,7 +8024,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1852",
-      "rank": 546,
+      "rank": 547,
       "size": "XS",
       "importance": "medium",
       "score": 40,
@@ -8035,7 +8036,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1844",
-      "rank": 547,
+      "rank": 548,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8047,7 +8048,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1840",
-      "rank": 548,
+      "rank": 549,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8059,7 +8060,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1839",
-      "rank": 549,
+      "rank": 550,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8071,7 +8072,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1776",
-      "rank": 550,
+      "rank": 551,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8083,7 +8084,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3706",
-      "rank": 551,
+      "rank": 552,
       "size": "L",
       "importance": "medium",
       "score": 40,
@@ -8095,7 +8096,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3539",
-      "rank": 552,
+      "rank": 553,
       "size": "XS",
       "importance": "medium",
       "score": 40,
@@ -8107,7 +8108,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3502",
-      "rank": 553,
+      "rank": 554,
       "size": "XS",
       "importance": "medium",
       "score": 40,
@@ -8119,7 +8120,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4409",
-      "rank": 554,
+      "rank": 555,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -8131,7 +8132,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4410",
-      "rank": 555,
+      "rank": 556,
       "size": "M",
       "importance": "medium",
       "score": 42,
@@ -8145,7 +8146,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2978",
-      "rank": 556,
+      "rank": 557,
       "size": "S",
       "importance": "medium",
       "score": 40,
@@ -8160,7 +8161,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4878",
-      "rank": 557,
+      "rank": 558,
       "size": "XS",
       "importance": "low",
       "score": 30,
@@ -8173,7 +8174,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1754",
-      "rank": 558,
+      "rank": 559,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -8185,7 +8186,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1751",
-      "rank": 559,
+      "rank": 560,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -8197,7 +8198,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1750",
-      "rank": 560,
+      "rank": 561,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -8209,7 +8210,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1748",
-      "rank": 561,
+      "rank": 562,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -8221,7 +8222,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1691",
-      "rank": 562,
+      "rank": 563,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -8233,7 +8234,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1685",
-      "rank": 563,
+      "rank": 564,
       "size": "XS",
       "importance": "medium",
       "score": 39,
@@ -8245,7 +8246,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1676",
-      "rank": 564,
+      "rank": 565,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -8258,7 +8259,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1667",
-      "rank": 565,
+      "rank": 566,
       "size": "M",
       "importance": "medium",
       "score": 38,
@@ -8270,7 +8271,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1657",
-      "rank": 566,
+      "rank": 567,
       "size": "M",
       "importance": "medium",
       "score": 38,
@@ -8282,7 +8283,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1656",
-      "rank": 567,
+      "rank": 568,
       "size": "M",
       "importance": "medium",
       "score": 38,
@@ -8294,7 +8295,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1655",
-      "rank": 568,
+      "rank": 569,
       "size": "M",
       "importance": "medium",
       "score": 38,
@@ -8306,7 +8307,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1654",
-      "rank": 569,
+      "rank": 570,
       "size": "XS",
       "importance": "medium",
       "score": 38,
@@ -8318,7 +8319,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1653",
-      "rank": 570,
+      "rank": 571,
       "size": "XS",
       "importance": "medium",
       "score": 38,
@@ -8330,7 +8331,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1623",
-      "rank": 571,
+      "rank": 572,
       "size": "M",
       "importance": "medium",
       "score": 38,
@@ -8342,7 +8343,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1561",
-      "rank": 572,
+      "rank": 573,
       "size": "M",
       "importance": "medium",
       "score": 37,
@@ -8354,7 +8355,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1550",
-      "rank": 573,
+      "rank": 574,
       "size": "M",
       "importance": "medium",
       "score": 37,
@@ -8366,7 +8367,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1545",
-      "rank": 574,
+      "rank": 575,
       "size": "XS",
       "importance": "medium",
       "score": 37,
@@ -8378,7 +8379,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1542",
-      "rank": 575,
+      "rank": 576,
       "size": "XS",
       "importance": "medium",
       "score": 37,
@@ -8390,7 +8391,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1524",
-      "rank": 576,
+      "rank": 577,
       "size": "M",
       "importance": "medium",
       "score": 37,
@@ -8402,7 +8403,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1490",
-      "rank": 577,
+      "rank": 578,
       "size": "M",
       "importance": "medium",
       "score": 37,
@@ -8414,7 +8415,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1485",
-      "rank": 578,
+      "rank": 579,
       "size": "S",
       "importance": "medium",
       "score": 32,
@@ -8427,7 +8428,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1473",
-      "rank": 579,
+      "rank": 580,
       "size": "M",
       "importance": "medium",
       "score": 36,
@@ -8439,7 +8440,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1443",
-      "rank": 580,
+      "rank": 581,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -8452,7 +8453,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1442",
-      "rank": 581,
+      "rank": 582,
       "size": "M",
       "importance": "medium",
       "score": 36,
@@ -8464,7 +8465,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1432",
-      "rank": 582,
+      "rank": 583,
       "size": "M",
       "importance": "medium",
       "score": 36,
@@ -8476,7 +8477,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1223",
-      "rank": 583,
+      "rank": 584,
       "size": "M",
       "importance": "medium",
       "score": 36,
@@ -8488,7 +8489,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1165",
-      "rank": 584,
+      "rank": 585,
       "size": "M",
       "importance": "medium",
       "score": 36,
@@ -8500,7 +8501,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1151",
-      "rank": 585,
+      "rank": 586,
       "size": "XS",
       "importance": "medium",
       "score": 35,
@@ -8512,7 +8513,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4360",
-      "rank": 586,
+      "rank": 587,
       "size": "S",
       "importance": "medium",
       "score": 44,
@@ -8524,7 +8525,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1060",
-      "rank": 587,
+      "rank": 588,
       "size": "M",
       "importance": "medium",
       "score": 35,
@@ -8536,7 +8537,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1051",
-      "rank": 588,
+      "rank": 589,
       "size": "M",
       "importance": "medium",
       "score": 35,
@@ -8548,7 +8549,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1037",
-      "rank": 589,
+      "rank": 590,
       "size": "M",
       "importance": "medium",
       "score": 35,
@@ -8560,7 +8561,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-958",
-      "rank": 590,
+      "rank": 591,
       "size": "M",
       "importance": "medium",
       "score": 35,
@@ -8572,7 +8573,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-949",
-      "rank": 591,
+      "rank": 592,
       "size": "M",
       "importance": "medium",
       "score": 35,
@@ -8584,7 +8585,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3157",
-      "rank": 592,
+      "rank": 593,
       "size": "XS",
       "importance": "medium",
       "score": 42,
@@ -8597,7 +8598,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-5067",
-      "rank": 593,
+      "rank": 594,
       "size": "M",
       "importance": "medium",
       "score": 54,
@@ -8609,7 +8610,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4908",
-      "rank": 594,
+      "rank": 595,
       "size": "S",
       "importance": "low",
       "score": 34,
@@ -8622,7 +8623,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-947",
-      "rank": 595,
+      "rank": 596,
       "size": "M",
       "importance": "medium",
       "score": 35,
@@ -8634,7 +8635,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-938",
-      "rank": 596,
+      "rank": 597,
       "size": "M",
       "importance": "medium",
       "score": 34,
@@ -8646,7 +8647,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-903",
-      "rank": 597,
+      "rank": 598,
       "size": "M",
       "importance": "medium",
       "score": 34,
@@ -8658,7 +8659,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-902",
-      "rank": 598,
+      "rank": 599,
       "size": "XS",
       "importance": "medium",
       "score": 34,
@@ -8670,7 +8671,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-901",
-      "rank": 599,
+      "rank": 600,
       "size": "XS",
       "importance": "medium",
       "score": 34,
@@ -8682,7 +8683,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-818",
-      "rank": 600,
+      "rank": 601,
       "size": "M",
       "importance": "medium",
       "score": 34,
@@ -8694,7 +8695,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4308",
-      "rank": 601,
+      "rank": 602,
       "size": "S",
       "importance": "medium",
       "score": 38,
@@ -8707,7 +8708,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3322",
-      "rank": 602,
+      "rank": 603,
       "size": "XS",
       "importance": "medium",
       "score": 34,
@@ -8719,7 +8720,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-678",
-      "rank": 603,
+      "rank": 604,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -8731,7 +8732,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-675",
-      "rank": 604,
+      "rank": 605,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -8744,7 +8745,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-654",
-      "rank": 605,
+      "rank": 606,
       "size": "L",
       "importance": "medium",
       "score": 33,
@@ -8756,7 +8757,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-649",
-      "rank": 606,
+      "rank": 607,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -8768,7 +8769,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-637",
-      "rank": 607,
+      "rank": 608,
       "size": "XS",
       "importance": "medium",
       "score": 33,
@@ -8780,7 +8781,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-629",
-      "rank": 608,
+      "rank": 609,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -8792,7 +8793,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-613",
-      "rank": 609,
+      "rank": 610,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -8804,7 +8805,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-607",
-      "rank": 610,
+      "rank": 611,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -8816,7 +8817,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-606",
-      "rank": 611,
+      "rank": 612,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -8828,7 +8829,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-548",
-      "rank": 612,
+      "rank": 613,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -8840,7 +8841,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-546",
-      "rank": 613,
+      "rank": 614,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -8852,7 +8853,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-537",
-      "rank": 614,
+      "rank": 615,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -8864,7 +8865,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-531",
-      "rank": 615,
+      "rank": 616,
       "size": "XS",
       "importance": "medium",
       "score": 32,
@@ -8876,7 +8877,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-452",
-      "rank": 616,
+      "rank": 617,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -8888,7 +8889,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-450",
-      "rank": 617,
+      "rank": 618,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -8900,7 +8901,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1126",
-      "rank": 618,
+      "rank": 619,
       "size": "M",
       "importance": "medium",
       "score": 30,
@@ -8912,7 +8913,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1066",
-      "rank": 619,
+      "rank": 620,
       "size": "M",
       "importance": "medium",
       "score": 30,
@@ -8924,7 +8925,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3441",
-      "rank": 620,
+      "rank": 621,
       "size": "L",
       "importance": "low",
       "score": 30,
@@ -8936,7 +8937,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2968",
-      "rank": 621,
+      "rank": 622,
       "size": "M",
       "importance": "low",
       "score": 29,
@@ -8948,7 +8949,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2941",
-      "rank": 622,
+      "rank": 623,
       "size": "M",
       "importance": "low",
       "score": 29,
@@ -8961,7 +8962,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2936",
-      "rank": 623,
+      "rank": 624,
       "size": "M",
       "importance": "low",
       "score": 29,
@@ -8973,7 +8974,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4373",
-      "rank": 624,
+      "rank": 625,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8985,7 +8986,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2868",
-      "rank": 625,
+      "rank": 626,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -8997,7 +8998,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2767",
-      "rank": 626,
+      "rank": 627,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -9009,7 +9010,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2679",
-      "rank": 627,
+      "rank": 628,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -9021,7 +9022,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2662",
-      "rank": 628,
+      "rank": 629,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -9033,7 +9034,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2645",
-      "rank": 629,
+      "rank": 630,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -9045,7 +9046,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2635",
-      "rank": 630,
+      "rank": 631,
       "size": "XS",
       "importance": "low",
       "score": 28,
@@ -9057,7 +9058,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-5066",
-      "rank": 631,
+      "rank": 632,
       "size": "M",
       "importance": "medium",
       "score": 52,
@@ -9069,7 +9070,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3443",
-      "rank": 632,
+      "rank": 633,
       "size": "L",
       "importance": "low",
       "score": 28,
@@ -9081,7 +9082,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4350",
-      "rank": 633,
+      "rank": 634,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -9093,7 +9094,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4003",
-      "rank": 634,
+      "rank": 635,
       "size": "L",
       "importance": "medium",
       "score": 30,
@@ -9106,7 +9107,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4368",
-      "rank": 635,
+      "rank": 636,
       "size": "S",
       "importance": "medium",
       "score": 40,
@@ -9118,7 +9119,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2622",
-      "rank": 636,
+      "rank": 637,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -9130,7 +9131,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2600",
-      "rank": 637,
+      "rank": 638,
       "size": "XS",
       "importance": "low",
       "score": 27,
@@ -9142,7 +9143,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2533",
-      "rank": 638,
+      "rank": 639,
       "size": "XS",
       "importance": "low",
       "score": 27,
@@ -9154,7 +9155,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2527",
-      "rank": 639,
+      "rank": 640,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -9166,7 +9167,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2514",
-      "rank": 640,
+      "rank": 641,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -9178,7 +9179,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2505",
-      "rank": 641,
+      "rank": 642,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -9190,7 +9191,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2504",
-      "rank": 642,
+      "rank": 643,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -9202,7 +9203,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2449",
-      "rank": 643,
+      "rank": 644,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -9214,7 +9215,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4769",
-      "rank": 644,
+      "rank": 645,
       "size": "XS",
       "importance": "low",
       "score": 26,
@@ -9227,7 +9228,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3940",
-      "rank": 645,
+      "rank": 646,
       "size": "XL",
       "importance": "low",
       "score": 30,
@@ -9241,7 +9242,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2424",
-      "rank": 646,
+      "rank": 647,
       "size": "L",
       "importance": "low",
       "score": 26,
@@ -9255,7 +9256,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2406",
-      "rank": 647,
+      "rank": 648,
       "size": "S",
       "importance": "low",
       "score": 26,
@@ -9268,7 +9269,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2394",
-      "rank": 648,
+      "rank": 649,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -9280,7 +9281,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4823",
-      "rank": 649,
+      "rank": 650,
       "size": "XL",
       "importance": "medium",
       "score": 32,
@@ -9294,7 +9295,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2353",
-      "rank": 650,
+      "rank": 651,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -9307,7 +9308,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4294",
-      "rank": 651,
+      "rank": 652,
       "size": "L",
       "importance": "low",
       "score": 22,
@@ -9320,7 +9321,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3133",
-      "rank": 652,
+      "rank": 653,
       "size": "S",
       "importance": "low",
       "score": 26,
@@ -9332,7 +9333,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-5082",
-      "rank": 653,
+      "rank": 654,
       "size": "XL",
       "importance": "medium",
       "score": 50,
@@ -9344,7 +9345,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3011",
-      "rank": 654,
+      "rank": 655,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -9359,7 +9360,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2282",
-      "rank": 655,
+      "rank": 656,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9371,7 +9372,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2091",
-      "rank": 656,
+      "rank": 657,
       "size": "XS",
       "importance": "low",
       "score": 25,
@@ -9383,7 +9384,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2085",
-      "rank": 657,
+      "rank": 658,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9395,7 +9396,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-5070",
-      "rank": 658,
+      "rank": 659,
       "size": "M",
       "importance": "medium",
       "score": 50,
@@ -9407,7 +9408,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2084",
-      "rank": 659,
+      "rank": 660,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9419,7 +9420,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2083",
-      "rank": 660,
+      "rank": 661,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9434,7 +9435,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2082",
-      "rank": 661,
+      "rank": 662,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9446,7 +9447,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2074",
-      "rank": 662,
+      "rank": 663,
       "size": "XS",
       "importance": "low",
       "score": 25,
@@ -9458,7 +9459,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2046",
-      "rank": 663,
+      "rank": 664,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9471,7 +9472,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2006",
-      "rank": 664,
+      "rank": 665,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9483,7 +9484,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3919",
-      "rank": 665,
+      "rank": 666,
       "size": "S",
       "importance": "low",
       "score": 25,
@@ -9496,7 +9497,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2005",
-      "rank": 666,
+      "rank": 667,
       "size": "M",
       "importance": "low",
       "score": 24,
@@ -9508,7 +9509,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2002",
-      "rank": 667,
+      "rank": 668,
       "size": "XS",
       "importance": "low",
       "score": 24,
@@ -9520,7 +9521,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1999",
-      "rank": 668,
+      "rank": 669,
       "size": "M",
       "importance": "low",
       "score": 24,
@@ -9532,7 +9533,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1986",
-      "rank": 669,
+      "rank": 670,
       "size": "M",
       "importance": "low",
       "score": 24,
@@ -9544,7 +9545,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1983",
-      "rank": 670,
+      "rank": 671,
       "size": "L",
       "importance": "low",
       "score": 24,
@@ -9556,7 +9557,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2672",
-      "rank": 671,
+      "rank": 672,
       "size": "S",
       "importance": "low",
       "score": 25,
@@ -9569,7 +9570,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1958",
-      "rank": 672,
+      "rank": 673,
       "size": "M",
       "importance": "low",
       "score": 24,
@@ -9581,7 +9582,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-5071",
-      "rank": 673,
+      "rank": 674,
       "size": "M",
       "importance": "medium",
       "score": 48,
@@ -9593,7 +9594,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1907",
-      "rank": 674,
+      "rank": 675,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -9605,7 +9606,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1895",
-      "rank": 675,
+      "rank": 676,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -9617,7 +9618,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1878",
-      "rank": 676,
+      "rank": 677,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -9629,7 +9630,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1782",
-      "rank": 677,
+      "rank": 678,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -9641,7 +9642,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1773",
-      "rank": 678,
+      "rank": 679,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -9653,7 +9654,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1646",
-      "rank": 679,
+      "rank": 680,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -9665,7 +9666,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1643",
-      "rank": 680,
+      "rank": 681,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -9677,7 +9678,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1592",
-      "rank": 681,
+      "rank": 682,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -9689,7 +9690,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1581",
-      "rank": 682,
+      "rank": 683,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -9701,7 +9702,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1552",
-      "rank": 683,
+      "rank": 684,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -9713,7 +9714,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1533",
-      "rank": 684,
+      "rank": 685,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -9725,7 +9726,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1483",
-      "rank": 685,
+      "rank": 686,
       "size": "XS",
       "importance": "low",
       "score": 22,
@@ -9737,7 +9738,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1482",
-      "rank": 686,
+      "rank": 687,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -9749,7 +9750,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1481",
-      "rank": 687,
+      "rank": 688,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -9761,7 +9762,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1356",
-      "rank": 688,
+      "rank": 689,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -9773,7 +9774,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1242",
-      "rank": 689,
+      "rank": 690,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -9785,7 +9786,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1222",
-      "rank": 690,
+      "rank": 691,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -9797,7 +9798,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1208",
-      "rank": 691,
+      "rank": 692,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -9809,7 +9810,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4352",
-      "rank": 692,
+      "rank": 693,
       "size": "XS",
       "importance": "low",
       "score": 28,
@@ -9821,7 +9822,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1153",
-      "rank": 693,
+      "rank": 694,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -9833,7 +9834,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4298",
-      "rank": 694,
+      "rank": 695,
       "size": "XL",
       "importance": "low",
       "score": 20,
@@ -9849,7 +9850,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1152",
-      "rank": 695,
+      "rank": 696,
       "size": "XS",
       "importance": "low",
       "score": 21,
@@ -9861,7 +9862,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1135",
-      "rank": 696,
+      "rank": 697,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -9873,7 +9874,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1133",
-      "rank": 697,
+      "rank": 698,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -9886,7 +9887,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1123",
-      "rank": 698,
+      "rank": 699,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -9898,7 +9899,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1121",
-      "rank": 699,
+      "rank": 700,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -9910,7 +9911,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4248",
-      "rank": 700,
+      "rank": 701,
       "size": "L",
       "importance": "medium",
       "score": 24,
@@ -9923,7 +9924,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1117",
-      "rank": 701,
+      "rank": 702,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -9935,7 +9936,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1116",
-      "rank": 702,
+      "rank": 703,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -9947,7 +9948,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1065",
-      "rank": 703,
+      "rank": 704,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -9959,7 +9960,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1064",
-      "rank": 704,
+      "rank": 705,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -9971,7 +9972,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1063",
-      "rank": 705,
+      "rank": 706,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -9984,7 +9985,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3971",
-      "rank": 706,
+      "rank": 707,
       "size": "L",
       "importance": "low",
       "score": 20,
@@ -9996,7 +9997,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3768",
-      "rank": 707,
+      "rank": 708,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -10008,7 +10009,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3034",
-      "rank": 708,
+      "rank": 709,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -10020,7 +10021,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2983",
-      "rank": 709,
+      "rank": 710,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -10033,7 +10034,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3824",
-      "rank": 710,
+      "rank": 711,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -10046,7 +10047,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3823",
-      "rank": 711,
+      "rank": 712,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -10059,7 +10060,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1049",
-      "rank": 712,
+      "rank": 713,
       "size": "M",
       "importance": "low",
       "score": 19,
@@ -10071,7 +10072,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-984",
-      "rank": 713,
+      "rank": 714,
       "size": "XS",
       "importance": "low",
       "score": 19,
@@ -10083,7 +10084,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-962",
-      "rank": 714,
+      "rank": 715,
       "size": "M",
       "importance": "low",
       "score": 19,
@@ -10096,7 +10097,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-961",
-      "rank": 715,
+      "rank": 716,
       "size": "M",
       "importance": "low",
       "score": 19,
@@ -10108,7 +10109,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-943",
-      "rank": 716,
+      "rank": 717,
       "size": "M",
       "importance": "low",
       "score": 19,
@@ -10120,7 +10121,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-908",
-      "rank": 717,
+      "rank": 718,
       "size": "M",
       "importance": "low",
       "score": 19,
@@ -10132,7 +10133,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-898",
-      "rank": 718,
+      "rank": 719,
       "size": "M",
       "importance": "low",
       "score": 19,
@@ -10144,7 +10145,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-853",
-      "rank": 719,
+      "rank": 720,
       "size": "L",
       "importance": "low",
       "score": 19,
@@ -10156,7 +10157,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-833",
-      "rank": 720,
+      "rank": 721,
       "size": "M",
       "importance": "low",
       "score": 18,
@@ -10168,7 +10169,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-832",
-      "rank": 721,
+      "rank": 722,
       "size": "M",
       "importance": "low",
       "score": 18,
@@ -10181,7 +10182,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4347",
-      "rank": 722,
+      "rank": 723,
       "size": "S",
       "importance": "low",
       "score": 30,
@@ -10193,7 +10194,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-797",
-      "rank": 723,
+      "rank": 724,
       "size": "M",
       "importance": "low",
       "score": 18,
@@ -10205,7 +10206,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4275",
-      "rank": 724,
+      "rank": 725,
       "size": "S",
       "importance": "low",
       "score": 20,
@@ -10218,7 +10219,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2836",
-      "rank": 725,
+      "rank": 726,
       "size": "M",
       "importance": "low",
       "score": 24,
@@ -10231,7 +10232,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-790",
-      "rank": 726,
+      "rank": 727,
       "size": "L",
       "importance": "low",
       "score": 18,
@@ -10243,7 +10244,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-786",
-      "rank": 727,
+      "rank": 728,
       "size": "M",
       "importance": "low",
       "score": 18,
@@ -10255,7 +10256,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-777",
-      "rank": 728,
+      "rank": 729,
       "size": "M",
       "importance": "low",
       "score": 18,
@@ -10267,7 +10268,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-775",
-      "rank": 729,
+      "rank": 730,
       "size": "L",
       "importance": "low",
       "score": 18,
@@ -10279,7 +10280,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3456",
-      "rank": 730,
+      "rank": 731,
       "size": "XS",
       "importance": "low",
       "score": 18,
@@ -10291,7 +10292,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-774",
-      "rank": 731,
+      "rank": 732,
       "size": "XS",
       "importance": "low",
       "score": 17,
@@ -10303,7 +10304,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-773",
-      "rank": 732,
+      "rank": 733,
       "size": "XS",
       "importance": "low",
       "score": 17,
@@ -10315,7 +10316,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-772",
-      "rank": 733,
+      "rank": 734,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10328,7 +10329,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-771",
-      "rank": 734,
+      "rank": 735,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10340,7 +10341,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-769",
-      "rank": 735,
+      "rank": 736,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10355,7 +10356,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-765",
-      "rank": 736,
+      "rank": 737,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10367,7 +10368,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-764",
-      "rank": 737,
+      "rank": 738,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10379,7 +10380,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4425",
-      "rank": 738,
+      "rank": 739,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -10391,7 +10392,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-752",
-      "rank": 739,
+      "rank": 740,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10403,7 +10404,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-751",
-      "rank": 740,
+      "rank": 741,
       "size": "M",
       "importance": "low",
       "score": 16,
@@ -10415,7 +10416,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-750",
-      "rank": 741,
+      "rank": 742,
       "size": "L",
       "importance": "low",
       "score": 16,
@@ -10427,7 +10428,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-749",
-      "rank": 742,
+      "rank": 743,
       "size": "M",
       "importance": "low",
       "score": 16,
@@ -10439,7 +10440,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-747",
-      "rank": 743,
+      "rank": 744,
       "size": "XS",
       "importance": "low",
       "score": 16,
@@ -10451,7 +10452,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-743",
-      "rank": 744,
+      "rank": 745,
       "size": "XS",
       "importance": "low",
       "score": 16,
@@ -10463,7 +10464,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-738",
-      "rank": 745,
+      "rank": 746,
       "size": "M",
       "importance": "low",
       "score": 16,
@@ -10475,7 +10476,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-735",
-      "rank": 746,
+      "rank": 747,
       "size": "M",
       "importance": "low",
       "score": 16,
@@ -10487,7 +10488,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-730",
-      "rank": 747,
+      "rank": 748,
       "size": "M",
       "importance": "low",
       "score": 16,
@@ -10499,7 +10500,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-702",
-      "rank": 748,
+      "rank": 749,
       "size": "M",
       "importance": "low",
       "score": 16,
@@ -10511,7 +10512,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-701",
-      "rank": 749,
+      "rank": 750,
       "size": "XS",
       "importance": "low",
       "score": 15,
@@ -10523,7 +10524,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-663",
-      "rank": 750,
+      "rank": 751,
       "size": "XS",
       "importance": "low",
       "score": 15,
@@ -10535,7 +10536,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-660",
-      "rank": 751,
+      "rank": 752,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -10547,7 +10548,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-624",
-      "rank": 752,
+      "rank": 753,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -10559,7 +10560,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-623",
-      "rank": 753,
+      "rank": 754,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -10571,7 +10572,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-622",
-      "rank": 754,
+      "rank": 755,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -10583,7 +10584,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-604",
-      "rank": 755,
+      "rank": 756,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -10595,7 +10596,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-603",
-      "rank": 756,
+      "rank": 757,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -10607,7 +10608,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-591",
-      "rank": 757,
+      "rank": 758,
       "size": "XS",
       "importance": "low",
       "score": 14,
@@ -10619,7 +10620,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-589",
-      "rank": 758,
+      "rank": 759,
       "size": "XS",
       "importance": "low",
       "score": 14,
@@ -10631,7 +10632,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-576",
-      "rank": 759,
+      "rank": 760,
       "size": "M",
       "importance": "low",
       "score": 14,
@@ -10643,7 +10644,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-571",
-      "rank": 760,
+      "rank": 761,
       "size": "XS",
       "importance": "low",
       "score": 14,
@@ -10655,7 +10656,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-568",
-      "rank": 761,
+      "rank": 762,
       "size": "M",
       "importance": "low",
       "score": 14,
@@ -10667,7 +10668,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-565",
-      "rank": 762,
+      "rank": 763,
       "size": "M",
       "importance": "low",
       "score": 14,
@@ -10679,7 +10680,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-564",
-      "rank": 763,
+      "rank": 764,
       "size": "M",
       "importance": "low",
       "score": 14,
@@ -10691,7 +10692,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-554",
-      "rank": 764,
+      "rank": 765,
       "size": "M",
       "importance": "low",
       "score": 14,
@@ -10703,7 +10704,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-543",
-      "rank": 765,
+      "rank": 766,
       "size": "M",
       "importance": "low",
       "score": 14,
@@ -10715,7 +10716,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-483",
-      "rank": 766,
+      "rank": 767,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -10727,7 +10728,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-480",
-      "rank": 767,
+      "rank": 768,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -10740,7 +10741,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-476",
-      "rank": 768,
+      "rank": 769,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -10752,7 +10753,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-468",
-      "rank": 769,
+      "rank": 770,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -10764,7 +10765,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-461",
-      "rank": 770,
+      "rank": 771,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -10776,7 +10777,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-459",
-      "rank": 771,
+      "rank": 772,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -10788,7 +10789,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-407",
-      "rank": 772,
+      "rank": 773,
       "size": "XS",
       "importance": "low",
       "score": 13,
@@ -10800,7 +10801,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2348",
-      "rank": 773,
+      "rank": 774,
       "size": "XS",
       "importance": "low",
       "score": 10,
@@ -10812,7 +10813,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2346",
-      "rank": 774,
+      "rank": 775,
       "size": "XS",
       "importance": "low",
       "score": 10,
@@ -10825,7 +10826,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2345",
-      "rank": 775,
+      "rank": 776,
       "size": "XS",
       "importance": "low",
       "score": 10,
@@ -10838,7 +10839,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2344",
-      "rank": 776,
+      "rank": 777,
       "size": "XS",
       "importance": "low",
       "score": 10,
@@ -10851,7 +10852,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2343",
-      "rank": 777,
+      "rank": 778,
       "size": "XS",
       "importance": "low",
       "score": 10,
@@ -10864,7 +10865,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2073",
-      "rank": 778,
+      "rank": 779,
       "size": "XS",
       "importance": "low",
       "score": 10,
@@ -10876,7 +10877,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2071",
-      "rank": 779,
+      "rank": 780,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -10888,7 +10889,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2068",
-      "rank": 780,
+      "rank": 781,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -10900,7 +10901,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2067",
-      "rank": 781,
+      "rank": 782,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -10912,7 +10913,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1684",
-      "rank": 782,
+      "rank": 783,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -10924,7 +10925,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1683",
-      "rank": 783,
+      "rank": 784,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -10936,7 +10937,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1474",
-      "rank": 784,
+      "rank": 785,
       "size": "M",
       "importance": "low",
       "score": 9,
@@ -10948,7 +10949,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-1469",
-      "rank": 785,
+      "rank": 786,
       "size": "M",
       "importance": "low",
       "score": 9,
@@ -10960,7 +10961,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-674",
-      "rank": 786,
+      "rank": 787,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -10972,7 +10973,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-634",
-      "rank": 787,
+      "rank": 788,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -10984,7 +10985,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2908",
-      "rank": 788,
+      "rank": 789,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -10996,7 +10997,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-106",
-      "rank": 789,
+      "rank": 790,
       "size": "M",
       "importance": "high",
       "score": 77,
@@ -11009,7 +11010,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-262",
-      "rank": 790,
+      "rank": 791,
       "size": "M",
       "importance": "high",
       "score": 65,
@@ -11021,7 +11022,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-176",
-      "rank": 791,
+      "rank": 792,
       "size": "M",
       "importance": "high",
       "score": 65,
@@ -11033,7 +11034,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-334",
-      "rank": 792,
+      "rank": 793,
       "size": "S",
       "importance": "medium",
       "score": 49,
@@ -11045,7 +11046,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-324",
-      "rank": 793,
+      "rank": 794,
       "size": "XS",
       "importance": "medium",
       "score": 49,
@@ -11058,7 +11059,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-304",
-      "rank": 794,
+      "rank": 795,
       "size": "S",
       "importance": "medium",
       "score": 49,
@@ -11070,7 +11071,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-245",
-      "rank": 795,
+      "rank": 796,
       "size": "S",
       "importance": "medium",
       "score": 49,
@@ -11082,7 +11083,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-244",
-      "rank": 796,
+      "rank": 797,
       "size": "S",
       "importance": "medium",
       "score": 49,
@@ -11094,7 +11095,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4332",
-      "rank": 797,
+      "rank": 798,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -11106,7 +11107,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-113",
-      "rank": 798,
+      "rank": 799,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -11118,7 +11119,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-49",
-      "rank": 799,
+      "rank": 800,
       "size": "XS",
       "importance": "medium",
       "score": 48,
@@ -11130,7 +11131,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-294",
-      "rank": 800,
+      "rank": 801,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -11142,7 +11143,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-293",
-      "rank": 801,
+      "rank": 802,
       "size": "M",
       "importance": "medium",
       "score": 31,
@@ -11154,7 +11155,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-277",
-      "rank": 802,
+      "rank": 803,
       "size": "M",
       "importance": "medium",
       "score": 31,
@@ -11166,7 +11167,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-258",
-      "rank": 803,
+      "rank": 804,
       "size": "M",
       "importance": "medium",
       "score": 31,
@@ -11178,7 +11179,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-255",
-      "rank": 804,
+      "rank": 805,
       "size": "M",
       "importance": "medium",
       "score": 31,
@@ -11190,7 +11191,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-252",
-      "rank": 805,
+      "rank": 806,
       "size": "XS",
       "importance": "medium",
       "score": 31,
@@ -11202,7 +11203,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-243",
-      "rank": 806,
+      "rank": 807,
       "size": "M",
       "importance": "medium",
       "score": 31,
@@ -11214,7 +11215,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-77",
-      "rank": 807,
+      "rank": 808,
       "size": "XS",
       "importance": "medium",
       "score": 31,
@@ -11226,7 +11227,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-54",
-      "rank": 808,
+      "rank": 809,
       "size": "L",
       "importance": "medium",
       "score": 31,
@@ -11238,7 +11239,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-38",
-      "rank": 809,
+      "rank": 810,
       "size": "M",
       "importance": "medium",
       "score": 30,
@@ -11250,7 +11251,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-37",
-      "rank": 810,
+      "rank": 811,
       "size": "M",
       "importance": "medium",
       "score": 30,
@@ -11263,7 +11264,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3248",
-      "rank": 811,
+      "rank": 812,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -11276,7 +11277,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3244",
-      "rank": 812,
+      "rank": 813,
       "size": "S",
       "importance": "low",
       "score": 20,
@@ -11289,7 +11290,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2775",
-      "rank": 813,
+      "rank": 814,
       "size": "S",
       "importance": "low",
       "score": 20,
@@ -11302,7 +11303,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-5072",
-      "rank": 814,
+      "rank": 815,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -11316,7 +11317,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-5033",
-      "rank": 815,
+      "rank": 816,
       "size": "XS",
       "importance": "medium",
       "score": 46,
@@ -11328,7 +11329,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3505",
-      "rank": 816,
+      "rank": 817,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -11341,7 +11342,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-5043",
-      "rank": 817,
+      "rank": 818,
       "size": "S",
       "importance": "medium",
       "score": 44,
@@ -11353,7 +11354,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-5065",
-      "rank": 818,
+      "rank": 819,
       "size": "L",
       "importance": "medium",
       "score": 44,
@@ -11365,7 +11366,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3321",
-      "rank": 819,
+      "rank": 820,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -11378,7 +11379,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-736",
-      "rank": 820,
+      "rank": 821,
       "size": "M",
       "importance": "low",
       "score": 14,
@@ -11391,7 +11392,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-762",
-      "rank": 821,
+      "rank": 822,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -11404,7 +11405,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-299",
-      "rank": 822,
+      "rank": 823,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -11416,7 +11417,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-298",
-      "rank": 823,
+      "rank": 824,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -11428,7 +11429,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-297",
-      "rank": 824,
+      "rank": 825,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11440,7 +11441,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-283",
-      "rank": 825,
+      "rank": 826,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11452,7 +11453,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-271",
-      "rank": 826,
+      "rank": 827,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11464,7 +11465,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-265",
-      "rank": 827,
+      "rank": 828,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11476,7 +11477,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-249",
-      "rank": 828,
+      "rank": 829,
       "size": "XS",
       "importance": "low",
       "score": 12,
@@ -11488,7 +11489,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-228",
-      "rank": 829,
+      "rank": 830,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11500,7 +11501,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-227",
-      "rank": 830,
+      "rank": 831,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11512,7 +11513,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-198",
-      "rank": 831,
+      "rank": 832,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11524,7 +11525,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-190",
-      "rank": 832,
+      "rank": 833,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11536,7 +11537,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-180",
-      "rank": 833,
+      "rank": 834,
       "size": "M",
       "importance": "low",
       "score": 11,
@@ -11548,7 +11549,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-177",
-      "rank": 834,
+      "rank": 835,
       "size": "M",
       "importance": "low",
       "score": 11,
@@ -11560,7 +11561,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-175",
-      "rank": 835,
+      "rank": 836,
       "size": "M",
       "importance": "low",
       "score": 11,
@@ -11572,7 +11573,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-155",
-      "rank": 836,
+      "rank": 837,
       "size": "L",
       "importance": "low",
       "score": 11,
@@ -11584,7 +11585,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-146",
-      "rank": 837,
+      "rank": 838,
       "size": "M",
       "importance": "low",
       "score": 11,
@@ -11596,7 +11597,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-55",
-      "rank": 838,
+      "rank": 839,
       "size": "M",
       "importance": "low",
       "score": 11,
@@ -11608,7 +11609,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-52",
-      "rank": 839,
+      "rank": 840,
       "size": "XS",
       "importance": "low",
       "score": 11,
@@ -11620,7 +11621,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-51",
-      "rank": 840,
+      "rank": 841,
       "size": "M",
       "importance": "low",
       "score": 11,
@@ -11632,7 +11633,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-44",
-      "rank": 841,
+      "rank": 842,
       "size": "M",
       "importance": "low",
       "score": 10,
@@ -11644,7 +11645,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2070",
-      "rank": 842,
+      "rank": 843,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -11657,7 +11658,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-3536",
-      "rank": 843,
+      "rank": 844,
       "size": "S",
       "importance": "low",
       "score": 12,
@@ -11670,7 +11671,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2027",
-      "rank": 844,
+      "rank": 845,
       "size": "M",
       "importance": "low",
       "score": 11,
@@ -11683,7 +11684,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2035",
-      "rank": 845,
+      "rank": 846,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -11696,7 +11697,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2034",
-      "rank": 846,
+      "rank": 847,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -11709,7 +11710,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2033",
-      "rank": 847,
+      "rank": 848,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -11722,7 +11723,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2032",
-      "rank": 848,
+      "rank": 849,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -11735,7 +11736,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2030",
-      "rank": 849,
+      "rank": 850,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -11748,7 +11749,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2029",
-      "rank": 850,
+      "rank": 851,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -11761,7 +11762,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2028",
-      "rank": 851,
+      "rank": 852,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -11774,7 +11775,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2024",
-      "rank": 852,
+      "rank": 853,
       "size": "XS",
       "importance": "low",
       "score": 8,
@@ -11787,7 +11788,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2883",
-      "rank": 853,
+      "rank": 854,
       "size": "M",
       "importance": "high",
       "score": 20,
@@ -11800,7 +11801,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-2995",
-      "rank": 854,
+      "rank": 855,
       "size": "XS",
       "importance": "high",
       "score": 20,
@@ -11813,7 +11814,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4555",
-      "rank": 855,
+      "rank": 856,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -11826,7 +11827,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4590",
-      "rank": 856,
+      "rank": 857,
       "size": "L",
       "importance": "medium",
       "score": 50,
@@ -11839,7 +11840,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4591",
-      "rank": 857,
+      "rank": 858,
       "size": "L",
       "importance": "medium",
       "score": 45,
@@ -11852,7 +11853,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4592",
-      "rank": 858,
+      "rank": 859,
       "size": "M",
       "importance": "low",
       "score": 38,
@@ -11867,7 +11868,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4594",
-      "rank": 859,
+      "rank": 860,
       "size": "M",
       "importance": "low",
       "score": 36,
@@ -11882,7 +11883,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4593",
-      "rank": 860,
+      "rank": 861,
       "size": "L",
       "importance": "low",
       "score": 30,
@@ -11897,7 +11898,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-5022",
-      "rank": 861,
+      "rank": 862,
       "size": "L",
       "importance": "medium",
       "score": 42,
@@ -11909,7 +11910,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-5021",
-      "rank": 862,
+      "rank": 863,
       "size": "M",
       "importance": "medium",
       "score": 42,
@@ -11921,7 +11922,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-5029",
-      "rank": 863,
+      "rank": 864,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -11933,7 +11934,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-5078",
-      "rank": 864,
+      "rank": 865,
       "size": "XL",
       "importance": "low",
       "score": 34,
@@ -11945,7 +11946,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4842",
-      "rank": 865,
+      "rank": 866,
       "size": "S",
       "importance": "medium",
       "score": 26,
@@ -11958,7 +11959,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4851",
-      "rank": 866,
+      "rank": 867,
       "size": "S",
       "importance": "low",
       "score": 15,
@@ -11971,7 +11972,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     },
     {
       "issue": "PAN-4887",
-      "rank": 867,
+      "rank": 868,
       "size": "M",
       "importance": "medium",
       "score": 30,
@@ -11979,6 +11980,19 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "dependsOn": [],
       "why": "Phone app: let phone credentials reach linked machines (fleet Needs-you, linked-conv proxy, /ws/linked); PAN-4835 merged.",
       "rationale": "PAN-4835 merged in #4894, which clears its only dependency; rank held because the Anywhere phone epic is low-impact relative to substrate work above it.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5095",
+      "rank": 49,
+      "size": "S",
+      "importance": "high",
+      "score": 82,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan tell to a Codex app-server conversation always queues to mail and is never delivered; fix: post through app-server in every state.",
+      "rationale": "New this pass. messageAgent delivers to an app-server target only when a turn-completed marker exists, but Codex app-server never runs the notify hook that writes it, so every pan tell to such a conversation is queued to mail that nothing drains (1,224 strandings on one conversation). The fix is small and well evidenced: post through the app-server unconditionally, as the composer route and MCP send_message already do. Ranked beside the other delivery-door bugs (PAN-3630, PAN-3805) because agent messaging is substrate every orchestrator depends on.",
       "gate": "auto",
       "planning": "auto"
     }
@@ -13145,6 +13159,27 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "type": "informs",
       "source": "github-ref",
       "confidence": 1
+    },
+    {
+      "from": "PAN-5095",
+      "to": "PAN-2580",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.7
+    },
+    {
+      "from": "PAN-5095",
+      "to": "PAN-2546",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
+    },
+    {
+      "from": "PAN-5095",
+      "to": "PAN-4303",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
     }
   ]
 }
