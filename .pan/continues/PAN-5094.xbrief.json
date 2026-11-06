@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5094",
   "created": "2026-11-06T17:38:04.566Z",
-  "updated": "2026-11-06T18:59:02.586Z",
+  "updated": "2026-11-06T18:59:26.275Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -214,6 +214,10 @@
     "docs-lanes-reference.ac4": {
       "status": "completed",
       "doneAt": "2026-11-06T18:59:02.585Z"
+    },
+    "skill-pan-lane.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-06T18:59:26.275Z"
     }
   }
 }
