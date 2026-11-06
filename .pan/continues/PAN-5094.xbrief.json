@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5094",
   "created": "2026-11-06T17:38:04.566Z",
-  "updated": "2026-11-06T18:47:02.782Z",
+  "updated": "2026-11-06T18:47:35.309Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -114,6 +114,10 @@
     "owner-door-disk.ac2": {
       "status": "completed",
       "doneAt": "2026-11-06T18:47:02.782Z"
+    },
+    "owner-door-disk.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-06T18:47:35.309Z"
     }
   }
 }
