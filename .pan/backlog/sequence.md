@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-06T22:38:42.329361Z · model: claude-opus-5-5 · open: 870_
+_Last sequenced: 2026-11-06T23:01:43.510215Z · model: claude-opus-5-5 · open: 870_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -869,7 +869,7 @@ _Last sequenced: 2026-11-06T22:38:42.329361Z · model: claude-opus-5-5 · open: 
 | 862 | PAN-4594 | M | low | ok |  | PAN-4590 | Dashboard Semgrep controls: Settings security section, per-project sast override, findings in issue view; after PAN-4590. |
 | 863 | PAN-4593 | L | low | needs-refinement |  | PAN-4590 | Semgrep Platform/Guardian tier; operator decisions (offer Guardian? contact Semgrep first?) still open — refine before work. |
 | 864 | PAN-5022 | L | medium | ok |  |  | Phone app: relay notification preferences to offline machines via the directory, and drop muted pushes on the phone. |
-| 865 | PAN-5021 | M | medium | ok |  |  | Phone app PostHog telemetry with its own opt-out, anonymous id and channel error capture; its blockers have both closed. |
+| 865 | PAN-5021 | M | low | needs-refinement |  | PAN-5100 | Superseded in design by in-pipeline PAN-5100 (machine setting, machine install id); re-scope or close once 5100 lands. |
 | 866 | PAN-5029 | M | medium | needs-refinement |  |  | Grok Build Tailscale reach can't work: pan mcp serve verifies tokens only against its own machine. Needs a design choice. |
 | 867 | PAN-5078 | XL | low | ok |  |  | Parked: add xAI's Grok Build CLI as a harness over ACP (stdio agent, resumable sessions). |
 | 868 | PAN-4842 | S | medium | ok |  |  | Phone app W-DOC: phone-app.mdx and updates to Anywhere, push, tailscale and service docs; finished last. |
@@ -1205,7 +1205,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-06T22:38:42.329361Z",
+  "generatedAt": "2026-11-06T23:01:43.510215Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 870,
@@ -11953,11 +11953,14 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "issue": "PAN-5021",
       "rank": 865,
       "size": "M",
-      "importance": "medium",
-      "score": 42,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Phone app PostHog telemetry with its own opt-out, anonymous id and channel error capture; its blockers have both closed.",
+      "importance": "low",
+      "score": 25,
+      "condition": "needs-refinement",
+      "dependsOn": [
+        "PAN-5100"
+      ],
+      "why": "Superseded in design by in-pipeline PAN-5100 (machine setting, machine install id); re-scope or close once 5100 lands.",
+      "rationale": "Rank held but importance and score lowered: a 2026-11-06 comment from PAN-5100 planning says 5100 ships phone telemetry with conflicting decisions and asks to re-scope or close this issue after 5100 lands.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13229,6 +13232,13 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.4
+    },
+    {
+      "from": "PAN-5100",
+      "to": "PAN-5021",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 0.9
     }
   ]
 }
