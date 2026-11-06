@@ -1,0 +1,1100 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-06T22:47:58Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5100: Telemetry: capture phone and dashboard client errors (failed API reads, crashes, link drops) in PostHog",
+    "updated": "2026-11-06T23:03:47.836Z"
+  },
+  "plan": {
+    "id": "pan-5100",
+    "title": "Telemetry: capture phone and dashboard client errors (failed API reads, crashes, link drops) in PostHog",
+    "status": "proposed",
+    "uid": "c578a9d5-dd98-42ef-bef9-56d1276f932e",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-06T22:47:58Z",
+    "updated": "2026-11-06T23:03:47.836Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5100",
+        "label": "PAN-5100",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5100.md",
+        "label": "PRD",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5021",
+        "label": "PAN-5021 (overlapping, superseded decisions)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "telemetry",
+      "posthog",
+      "mobile",
+      "dashboard-frontend",
+      "dashboard-server",
+      "privacy"
+    ],
+    "metadata": {
+      "sizeJustification": "One TestFlight build must carry the whole change (the operator uploads phone builds by hand from the Mac rig), and the store privacy declarations must land in the same PR as the first phone analytics or the build ships a false declaration. Of the ~40 files, 17 are tests, docs or store declarations; production code is ~14 small edits across 5 subsystems (contracts, dashboard server, dashboard frontend, phone app, docs). Splitting the phone link-state reporter out would force a second TestFlight build and a second privacy review for the same data categories.",
+      "canonicalFilename": "2026-11-06-PAN-5100-telemetry-capture-phone-and-dashboard-client-errors-failed-api-reads-crashes-link-drops-in-posthog.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Phone and dashboard client errors never reach PostHog. The phone app runs no telemetry at all because the frontend's initTelemetry() reads the admin route GET /api/settings, which a phone token cannot call. On both clients, a failed read such as GET /api/conversations is handled inside the component (\"Couldn't load conversations.\") and nothing is captured. Link drops and failures on the phone are invisible.",
+      "Proposal": "Add two closed-domain events to the telemetry contract: client_request_failed (client, route template, route area, method, status bucket) and phone_link_state (state, reason, route, recovery bucket). Capture request failures with one fetch wrapper (lib/requestFailures.ts) installed outermost on the desktop and, after the channel shims, on the phone; throttle to one event per route/area/status per 60 s. Add GET /api/telemetry/client-config (read:state) so the phone reads the machine's effective telemetry setting, install id, build commit and PostHog key/host; the phone caches the last answer per machine so failures while the link is down are still reported, and a fresh 'off' disables capture. Split the browser door into initTelemetryFromConfig() with client/platform/app_version/build_commit super properties and in-memory persistence plus distinct_id = machine install id on the phone. Add a phone error boundary around MobileApp, a phone link-state reporter driven by dial errors, connection-phase transitions and the route each link used, update the store privacy declarations, and document everything. Full detail: .pan/drafts/PAN-5100.md.",
+      "NonGoals": "- No QueryCache or MutationCache onError handlers and no query_key_root property (the fetch layer has no query context).\n- No telemetry switch in the phone's own Settings and no separate phone telemetry id (PAN-5100 overrides PAN-5021 here).\n- No change to the desktop's distinct_id behavior.\n- No telemetry on phone shell screens before a machine view opens (sign-in, machine list, pairing).\n- Requests that fail before the telemetry door is initialized are not reported.\n- Errors a query function throws after a successful HTTP response (parse or shape checks) are not reported as client_request_failed.\n- No change to packages/anywhere-channel.\n- No route vocabulary beyond ROUTE_SCOPES for desktop admin routes; they report route=other with a route_area.\n- No raw path, URL, response body, conversation name or id, machine label or environment id in any event.\n- No changes in eltmon/overdeck-landing, App Store Connect or Play Console, and no TestFlight upload by the work agent; these are post-merge operator steps recorded in apps/mobile/acceptance/PAN-5100.md."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Capture request failures with a single fetch wrapper instead of QueryCache/MutationCache onError handlers.",
+        "rationale": "The cache handlers receive only the Error each query function builds (e.g. 'Failed to load conversations: 500'), so route and status are unavailable there; 236 frontend files call fetch directly. The fetch layer sees URL, method and status for every request, as apps/mobile/src/shell/requestLog.ts already does."
+      },
+      {
+        "summary": "Drop the query_key_root property.",
+        "rationale": "A fetch wrapper cannot know which query called it; route already names the failing endpoint."
+      },
+      {
+        "summary": "route is a closed domain built from ROUTE_SCOPES paths plus 'other', with a separate closed route_area from the no-loss matrix.",
+        "rationale": "tests/unit/contracts/telemetry-schema.test.ts forbids broad string property values; ROUTE_SCOPES is exactly the phone-callable surface, and route_area keeps desktop admin failures diagnosable without any id ever being sent."
+      },
+      {
+        "summary": "client, platform, app_version, build_commit, install_kind and install_id are PostHog super properties, not catalog properties (client is also in the client_request_failed catalog).",
+        "rationale": "app_version and build_commit are free strings the closed catalog cannot hold; super properties also put client=phone on $exception events, as the issue requires."
+      },
+      {
+        "summary": "PAN-5100's decisions (machine setting, machine install id) override PAN-5021's (phone switch, separate id); keep PAN-5021's in-memory persistence.",
+        "rationale": "PAN-5100 is the newer, explicit operator decision for this scope; in-memory persistence stops one machine's id leaking into another machine's events because opening a machine reloads the page."
+      },
+      {
+        "summary": "The phone caches the last client-config answer per machine and initializes from a cached 'on' immediately.",
+        "rationale": "Without it a link that is down from the start (the reported 'Couldn't load conversations' case) could never be reported, because consent comes from the machine. A fresh 'off' disables capture and clears the cache; sign-out clears all caches."
+      },
+      {
+        "summary": "The machine returns the PostHog key and host in the client config; when telemetry is off it returns only effectiveEnabled:false.",
+        "rationale": "The phone's Vite root does not load the frontend's .env.production; the machine already owns these values in AnalyticsService, and nothing identifying leaves the machine when telemetry is off."
+      },
+      {
+        "summary": "phone_link_state uses a new link_reason domain that reuses link_failure_reason spellings where meanings match.",
+        "rationale": "linkFailureReason maps MachineLinkError codes the phone never throws, and link_failure_reason lacks none/removed/drop reasons; sharing spellings keeps PostHog breakdowns comparable."
+      },
+      {
+        "summary": "A link drop is the /ws/rpc connection phase leaving 'live' after it was live once; a drop within 5 s of a foreground resume has reason 'resume'.",
+        "rationale": "MachineDialer exposes only onRecovered; the phase is the operator-visible symptom and needs no change to packages/anywhere-channel."
+      },
+      {
+        "summary": "app_version is APP_VERSION from apps/mobile/src/shell/config.ts, not version.ts.",
+        "rationale": "version.ts only compares versions; config.ts line 10 reads apps/mobile/package.json."
+      },
+      {
+        "summary": "Update the phone's store privacy declarations in this PR.",
+        "rationale": "privacy-app.html, RELEASE.md and PrivacyInfo.xcprivacy state the app has no analytics or crash reporting; shipping posthog-js with them unchanged is a false declaration."
+      },
+      {
+        "summary": "Keep the phone link-state reporter in this issue rather than a sibling issue, with a sizeJustification.",
+        "rationale": "Phone builds are uploaded by hand; one TestFlight build and one privacy review should cover all phone diagnostics."
+      },
+      {
+        "summary": "Report phone 403s on admin routes as client_request_failed like any other failure.",
+        "rationale": "They are the phone UI's remaining scope gaps (PAN-4835 H-4), which is diagnostic; the scope inventory apps/mobile/request-log.json holds one such row and the 60 s throttle bounds repeats."
+      }
+    ],
+    "items": [
+      {
+        "id": "wi1-contract",
+        "title": "Contract: client_request_failed and phone_link_state events, closed domains, route helpers and docs catalog rows",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-06T22:47:58Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-5100",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "wi2-client-config-builder",
+            "wi3-client-config-route",
+            "wi4-browser-door",
+            "wi5-request-observer",
+            "wi9b-link-reporter",
+            "wi11-docs"
+          ],
+          "files_scope": [
+            "packages/contracts/src/telemetry.ts",
+            "tests/unit/contracts/telemetry-schema.test.ts",
+            "tests/unit/contracts/telemetry-client-route.test.ts",
+            "docs/TELEMETRY.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/contracts/telemetry-schema.test.ts tests/unit/contracts/telemetry-client-route.test.ts tests/unit/telemetry-docs.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the three test files pass, including 'exports all twenty-nine telemetry event names'",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-1 and the 'Contract shape' section exactly: append the two event names, add the nine domains (client_route and client_route_area as literal as-const arrays generated by the PRD's commands, other last), the two catalog entries, the listed types, clientRouteOf/bucketRequestStatus/bucketRecoveryMs with the PRD's rules, and the TelemetryClientConfig interface. Update EXPECTED_EVENTS and the test title, add tests/unit/contracts/telemetry-client-route.test.ts with cases (a)-(h), and add the event and domain rows to docs/TELEMETRY.md in the format tests/unit/telemetry-docs.test.ts parses. client_route must already include /api/telemetry/client-config and client_route_area must include telemetry and events."
+        },
+        "items": [
+          {
+            "id": "wi1-contract.ac1",
+            "title": "Given the contract, when telemetry-schema.test.ts runs, then TELEMETRY_EVENT_NAMES equals the expected list ending in client_request_failed, phone_link_state and PropertyValuesAreRestricted stays true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-contract.ac2",
+            "title": "clientRouteOf('/api/conversations/abc-123?x=1') returns route '/api/conversations/:id' with route_area 'conversations', and clientRouteOf('/api/conversations/pending-input') returns the literal pending-input template",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-contract.ac3",
+            "title": "clientRouteOf('/api/settings') returns { route: 'other', route_area: 'settings' } and an unknown first segment returns route_area 'other'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-contract.ac4",
+            "title": "The telemetry-client-route test fails when a non-DELETE NO_LOSS_MATRIX /api/ surface has a first segment missing from client_route_area, and passes on the committed tree",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-contract.ac5",
+            "title": "tests/unit/telemetry-docs.test.ts passes with docs/TELEMETRY.md listing both new event rows and all nine new domain rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi2-client-config-builder",
+        "title": "Server: telemetryClientConfig() builder and buildCommit in the /api/settings telemetry block",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-06T22:47:58Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5100",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/settings-api-telemetry.ts",
+            "src/lib/telemetry/service.ts",
+            "tests/unit/lib/settings-api-telemetry.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/settings-api-telemetry.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tests/unit/lib/settings-api-telemetry.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-2: export resolvePostHogTarget() from src/lib/telemetry/service.ts and use it at the existing init; add optional buildCommit to ApiTelemetryConfig (validate, load from getBuildInfo() only when a non-empty string, carry through mergeApiTelemetrySettings); add telemetryClientConfig() returning exactly { effectiveEnabled: false } when resolveTelemetryState() is off, else installId, installKind, buildCommit (if any), operatorHash (if any), posthogKey and posthogHost."
+        },
+        "items": [
+          {
+            "id": "wi2-client-config-builder.ac1",
+            "title": "Given telemetry resolves off, telemetryClientConfig() returns exactly { effectiveEnabled: false } with no installId, posthogKey or posthogHost",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-client-config-builder.ac2",
+            "title": "Given telemetry resolves on, telemetryClientConfig() returns effectiveEnabled true, installId, installKind, posthogKey and posthogHost equal to resolvePostHogTarget()",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-client-config-builder.ac3",
+            "title": "When getBuildInfo().buildCommit is null, neither telemetryClientConfig() nor telemetrySettingsFromConfig() emits a buildCommit key; when it is 'abc1234' both return it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-client-config-builder.ac4",
+            "title": "validateApiTelemetryConfig({ enabled: true, buildCommit: 5 }) returns the error 'telemetry.buildCommit must be a string'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi3-client-config-route",
+        "title": "Server: GET /api/telemetry/client-config route with read:state scope and no-loss matrix row",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-06T22:47:58Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-5100",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/telemetry-client-config.ts",
+            "src/dashboard/server/server.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/routes/__tests__/telemetry-client-config.test.ts",
+            "src/dashboard/server/__tests__/route-scopes.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/telemetry-client-config.test.ts src/dashboard/server/__tests__/route-scopes.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the three test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-3: new route file modelled on routes/disk-alert.ts serving telemetryClientConfig(); register telemetryClientConfigRouteLayer in server.ts beside diskAlertRouteLayer; add the read:state row to ROUTE_SCOPES after /api/registered-projects with a PAN-5100 comment; add the READ row to NO_LOSS_MATRIX; add the two route-scopes tests (every ROUTE_SCOPES path is in client_route; requiredScopeFor('GET', '/api/telemetry/client-config') is read:state) and a route test in the agent-directory-route.test.ts style."
+        },
+        "items": [
+          {
+            "id": "wi3-client-config-route.ac1",
+            "title": "GET /api/telemetry/client-config returns status 200 with the body telemetryClientConfig() produces (mocked on and mocked off)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-client-config-route.ac2",
+            "title": "requiredScopeFor('GET', '/api/telemetry/client-config') returns 'read:state', so a phone credential is admitted and no admin route is widened",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-client-config-route.ac3",
+            "title": "route-scopes.test.ts fails when a ROUTE_SCOPES path is missing from TELEMETRY_PROPERTY_DOMAINS.client_route and passes on the committed tree",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-client-config-route.ac4",
+            "title": "tests/unit/lib/overdeck/no-loss-matrix.test.ts passes with the new GET /api/telemetry/client-config surface enumerated",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi4-browser-door",
+        "title": "Browser door: initTelemetryFromConfig with client super properties, phone identity, and disableTelemetry",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-06T22:47:58Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5100",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "wi4b-door-consent",
+            "wi6-phone-boot"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/telemetry.ts",
+            "src/dashboard/frontend/src/lib/__tests__/telemetry.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/lib/__tests__/telemetry.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "src/lib/__tests__/telemetry.test.ts passes, old and new cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-4: extract initTelemetryFromConfig(config, context) from initTelemetry(), keeping every existing posthog.init option, the sanitizer and the operatorHash register/unregister logic; add persistence 'memory' and bootstrap.distinctID = installId when context.machineIdentity is true; register client, platform, app_version (when given), build_commit (when given), install_id and install_kind; add telemetryClient(). disableTelemetry(), re-enable, pending exceptions and throw-safety are wi4b. initTelemetry() keeps reading /api/settings and delegates with client 'desktop', platform 'web' and the build env key/host. Keep the MODE === 'test' guards in capture() and captureException(). initTelemetryFromConfig is idempotent: a call while already initialized returns true without calling posthog.init again (React StrictMode runs the phone's mount effect twice)."
+        },
+        "items": [
+          {
+            "id": "wi4-browser-door.ac1",
+            "title": "Given a phone context with machineIdentity and installId 'id-1', initTelemetryFromConfig passes persistence 'memory' and bootstrap.distinctID 'id-1' to posthog.init and registers client 'phone'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-browser-door.ac2",
+            "title": "Given /api/settings with telemetry on, initTelemetry() registers client 'desktop' and platform 'web' and passes no bootstrap or memory persistence",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-browser-door.ac3",
+            "title": "initTelemetryFromConfig({ effectiveEnabled: false }, …) returns false and never calls posthog.init or posthog.register",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-browser-door.ac5",
+            "title": "A second initTelemetryFromConfig call while initialized returns true and posthog.init has been called exactly once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi4b-door-consent",
+        "title": "Browser door: opt-out and re-enable, pending pre-init exceptions, and throw-safe capture",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-06T22:47:58Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5100",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/telemetry.ts",
+            "src/dashboard/frontend/src/lib/__tests__/telemetry.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/lib/__tests__/telemetry.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "src/lib/__tests__/telemetry.test.ts passes, old and new cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-6",
+            "FR-7",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-4b: track loaded vs initialized; disableTelemetry() calls posthog.opt_out_capturing() when loaded, sets initialized false and clears pending exceptions; an 'on' config when already loaded calls posthog.opt_in_capturing({ captureEventName: false }) and re-registers super properties instead of a second posthog.init; a first init with an 'on' config also opts in when posthog.has_opted_out_capturing() returns true. captureException before init queues up to PENDING_EXCEPTION_LIMIT = 5 entries, flushed once on an 'on' init and discarded on an 'off' init or disable. capture() and captureException() wrap posthog calls in try/catch."
+        },
+        "items": [
+          {
+            "id": "wi4b-door-consent.ac1",
+            "title": "Given on → disableTelemetry() → on, the door calls opt_out_capturing then opt_in_capturing({ captureEventName: false }), posthog.init receives exactly one call, and a later capture() reaches posthog.capture",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4b-door-consent.ac2",
+            "title": "Given has_opted_out_capturing() returns true at first init and the config is on, the door calls opt_in_capturing({ captureEventName: false })",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4b-door-consent.ac3",
+            "title": "Given a captureException before init, an 'on' init sends exactly one posthog.captureException and an 'off' init sends none; seven pre-init exceptions produce at most five sends",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4b-door-consent.ac4",
+            "title": "Given posthog.capture and posthog.captureException throw, capture() and captureException() return without throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi5-request-observer",
+        "title": "Request-failure fetch observer emitting client_request_failed, installed on the desktop",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-06T22:47:58Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5100",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "wi8-phone-observer"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/requestFailures.ts",
+            "src/dashboard/frontend/src/lib/__tests__/requestFailures.test.ts",
+            "src/dashboard/frontend/src/main.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/lib/__tests__/requestFailures.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "src/lib/__tests__/requestFailures.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-1",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-5: new lib/requestFailures.ts with installRequestFailureObserver({ client, target?, report?, now? }) and classifyFetchRejection(); same-origin /api/ and /events/ paths only (pathOf copied from apps/mobile/src/shell/requestLog.ts); route and route_area only from clientRouteOf; status via bucketRequestStatus or the rejection class; method bucketed to the http_method domain; throttle key route+area+status for 60 s; report wrapped in try/catch; return the inner response unchanged and rethrow the same rejection. Call installRequestFailureObserver({ client: 'desktop' }) in main.tsx on the line before void initTelemetry(). Add the test file to scripts/frontend-test-subset.txt in sorted position. Use fake timers for the throttle test and construct DOMException TimeoutError/AbortError directly."
+        },
+        "items": [
+          {
+            "id": "wi5-request-observer.ac1",
+            "title": "Given a 500 on GET /api/conversations, the observer reports exactly { client: 'desktop', route: '/api/conversations', route_area: 'conversations', method: 'GET', status: '500' } once, and the caller receives the original response object",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-request-observer.ac2",
+            "title": "Given a second identical failure within 60 s, the observer sends no report; after advancing fake timers by 60 000 ms the next failure emits a report again",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-request-observer.ac3",
+            "title": "A rejected fetch reports network for TypeError, timeout for DOMException TimeoutError, aborted for DOMException AbortError, and rethrows the same error object",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-request-observer.ac4",
+            "title": "Given a 2xx response, a cross-host URL (https://us.i.posthog.com/e/) or a throwing report function, the observer emits no report and returns the inner response unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-request-observer.ac5",
+            "title": "A failure on /api/projects/secret-key/thing emits a payload in which no value contains the string 'secret-key'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi6-phone-boot",
+        "title": "Phone: boot telemetry from the machine's client config with a per-machine cached answer",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-06T22:47:58Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5100",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/src/shell/telemetry.ts",
+            "apps/mobile/src/shell/__tests__/telemetry.test.ts",
+            "apps/mobile/src/shell/MachineView.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix apps/mobile test -- src/shell/__tests__/telemetry.test.ts",
+            "npm run typecheck",
+            "npm --prefix apps/mobile run build"
+          ],
+          "expected_outputs": [
+            "src/shell/__tests__/telemetry.test.ts passes",
+            "typecheck (including typecheck:mobile) completes without errors",
+            "the phone Vite build completes and resolves posthog-js (D-17 checkpoint)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-6: new apps/mobile/src/shell/telemetry.ts exporting bootPhoneTelemetry(deps) and TELEMETRY_CACHE_PREFIX; init from a cached 'on' answer at once, then fetch /api/telemetry/client-config; null keeps state, off disables and removes the cache, on stores and inits once; context client 'phone', platform from shellPlatform(), appVersion APP_VERSION, machineIdentity true, key/host from the config; never rejects. In MachineView.tsx call it once on mount with currentMachineId() and update the header sentence as the PRD states. Run the D-17 checkpoint (phone build); only if posthog-js fails to resolve, add it to apps/mobile/package.json with the frontend's exact version and run bun install. A fresh 'on' after an earlier 'off' in the same page re-enables through initTelemetryFromConfig (wi4b opt-in path)."
+        },
+        "items": [
+          {
+            "id": "wi6-phone-boot.ac1",
+            "title": "Given the machine answers { effectiveEnabled: false }, bootPhoneTelemetry never calls the injected init and removes overdeck.telemetry.<environmentId> from storage",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-phone-boot.ac2",
+            "title": "Given the machine answers on, bootPhoneTelemetry calls init once with client 'phone' and machineIdentity true and persists the answer under overdeck.telemetry.<environmentId>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-phone-boot.ac3",
+            "title": "Given a cached 'on' answer and a fetch that returns null (link down), bootPhoneTelemetry initializes from the cache",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-phone-boot.ac4",
+            "title": "Given a cached 'on' answer and a fresh 'off' answer, bootPhoneTelemetry calls disable; given a throwing fetchConfig, the returned promise resolves",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi7-phone-error-boundary",
+        "title": "Phone: error boundary around MobileApp that captures $exception and renders a Reload fallback",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-06T22:47:58Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5100",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/src/shell/MachineView.tsx",
+            "apps/mobile/src/shell/__tests__/MachineView.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix apps/mobile test -- src/shell/__tests__/MachineView.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "src/shell/__tests__/MachineView.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-7: add a PhoneErrorBoundary class component in MachineView.tsx whose componentDidCatch calls captureException(error, { action: 'frontend_unhandled_error', trigger: 'root_error_boundary' }) from the frontend telemetry door, and whose fallback renders 'Something went wrong on this screen.' with a 'Reload' button calling location.reload(); wrap only the <MobileApp …/> element. Do not reuse RootErrorBoundary from recovery.tsx. componentDidCatch wraps its captureException call in try/catch. A crash on MobileApp's first render, before MachineView's boot effect, is held by the wi4b pending-exception list."
+        },
+        "items": [
+          {
+            "id": "wi7-phone-error-boundary.ac1",
+            "title": "Given a child of PhoneErrorBoundary that throws during render, captureException is called once with { action: 'frontend_unhandled_error', trigger: 'root_error_boundary' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7-phone-error-boundary.ac2",
+            "title": "After the throw, the boundary renders 'Something went wrong on this screen.' and a button named 'Reload'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7-phone-error-boundary.ac3",
+            "title": "Given captureException throws inside componentDidCatch, the boundary still renders the 'Reload' fallback",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi8-phone-observer",
+        "title": "Phone: install the request-failure observer after the channel shims and before the shell",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-06T22:47:58Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5100",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/src/main.tsx",
+            "apps/mobile/src/__tests__/boot.test.ts",
+            "apps/mobile/src/shell/__tests__/requestFailures.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix apps/mobile test -- src/__tests__/boot.test.ts src/shell/__tests__/requestFailures.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "boot.test.ts and requestFailures.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-8: in apps/mobile/src/main.tsx dynamically import the frontend lib/requestFailures module after installChannelShims (and the optional request log), call installRequestFailureObserver({ client: 'phone' }), then import and render ShellApp; update the header comment. Update boot.test.ts to mock the observer module and expect ['shims', 'observer', 'shell']. Add a phone test proving a 503 on /api/conversations reports client 'phone'."
+        },
+        "items": [
+          {
+            "id": "wi8-phone-observer.ac1",
+            "title": "boot.test.ts records the order ['shims', 'observer', 'shell'] when main.tsx loads",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8-phone-observer.ac2",
+            "title": "Given the observer installed with client 'phone' over a fetch answering 503 for /api/conversations, report is called once with client 'phone', route '/api/conversations' and status '503'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi9a-link-route",
+        "title": "Phone: connection reports the route each opened link used via onLinkOpened",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-06T22:47:58Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5100",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/src/shell/connection.ts",
+            "apps/mobile/src/shell/__tests__/connection.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix apps/mobile test -- src/shell/__tests__/connection.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "connection.test.ts passes, old and new cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-9a: add optional onLinkOpened(environmentId, route) to ConnectionDeps; call it in openLink after the secure open resolves, inside try/catch, before returning the stream. openPairing does not call it."
+        },
+        "items": [
+          {
+            "id": "wi9a-link-route.ac1",
+            "title": "Given a direct openLink, onLinkOpened receives (environmentId, 'direct'); given a relay fallback, it receives (environmentId, 'relay')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi9a-link-route.ac2",
+            "title": "A failed secure open never calls onLinkOpened, and a throwing onLinkOpened still returns the stream from openLink",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi9b-link-reporter",
+        "title": "Phone: phone_link_state reporter for failures, drops, recoveries and route changes, wired in ShellApp",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-06T22:47:58Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5100",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/src/shell/linkTelemetry.ts",
+            "apps/mobile/src/shell/__tests__/linkTelemetry.test.ts",
+            "apps/mobile/src/shell/lifecycle.ts",
+            "apps/mobile/src/shell/ShellApp.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix apps/mobile test -- src/shell/__tests__/linkTelemetry.test.ts src/shell/__tests__/ShellApp.test.tsx src/shell/__tests__/lifecycle.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "linkTelemetry, ShellApp and lifecycle tests pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-1",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-9b: export lastResumedAt() from lifecycle.ts; new linkTelemetry.ts with installLinkTelemetry(deps) and linkReasonOf() using the PRD's mapping and the four behaviors (failed throttled per reason for 60 s; dropped only after the phase was live once, reason 'resume' within 5 000 ms of a resume else the phase name; recovered with bucketRecoveryMs; route_changed only when a previous route for the same id differs). In ShellApp's services effect create the reporter before createConnection, pass onLinkOpened, subscribe to useConnectionState with deriveConnectionPhase, and uninstall in the cleanup. Fake timers in tests. The reporter takes currentEnvironmentId (currentMachineId from ./store) and routeOpened ignores any other machine before touching state, because notification-preference sync opens links to every paired machine over the same connection."
+        },
+        "items": [
+          {
+            "id": "wi9b-link-reporter.ac1",
+            "title": "linkReasonOf returns offline for directory-offline, no_path for no-path, removed for removed, pairing_refused for pairing-refused, identity_mismatch for identity, unsupported for outdated, channel_failed for other with a ChannelOpenError cause, and other for other",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi9b-link-reporter.ac2",
+            "title": "Given phases live → delayed → live 3 s apart, the reporter emits dropped (reason delayed) then recovered with recover_time '1s-4s'; the first transition to live emits nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi9b-link-reporter.ac3",
+            "title": "A drop that starts 2 s after lastResumedAt() emits reason 'resume'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi9b-link-reporter.ac4",
+            "title": "Two identical dial failures within 60 s emit one failed event; routeOpened direct then relay for one machine emits one route_changed with route 'relay'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi9b-link-reporter.ac5",
+            "title": "Given machine A is current, routeOpened('B', 'relay') emits nothing and a later A drop still reports A's last route",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi10-store-privacy",
+        "title": "Phone store privacy declarations describe the new anonymous diagnostics",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-06T22:47:58Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5100",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/store/privacy-app.html",
+            "apps/mobile/ios/App/App/PrivacyInfo.xcprivacy",
+            "apps/mobile/RELEASE.md",
+            "apps/mobile/src/__tests__/native-config.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix apps/mobile test -- src/__tests__/native-config.test.ts",
+            "grep -n 'no analytics, crash-reporting' apps/mobile/store/privacy-app.html apps/mobile/RELEASE.md || true"
+          ],
+          "expected_outputs": [
+            "native-config.test.ts passes with the new plist assertions",
+            "the grep prints no matching line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-10: update privacy-app.html 'What we collect' and line 42; add ProductInteraction and CrashData collected types (not linked, not tracking, purpose analytics) to PrivacyInfo.xcprivacy keeping NSPrivacyTracking false; update RELEASE.md 'Data the app collects' and add the operator checklist (App Store Connect App Privacy, Play Data safety, overdeck.ai/privacy/app) to be done before the first upload; extend native-config.test.ts to assert the new plist entries."
+        },
+        "items": [
+          {
+            "id": "wi10-store-privacy.ac1",
+            "title": "native-config.test.ts asserts NSPrivacyCollectedDataTypeProductInteraction and NSPrivacyCollectedDataTypeCrashData with linked false, tracking false and purpose NSPrivacyCollectedDataTypePurposeAnalytics, and passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi10-store-privacy.ac2",
+            "title": "privacy-app.html and RELEASE.md no longer contain the claim that the app has no analytics or crash-reporting code, and privacy-app.html contains a paragraph naming PostHog diagnostics that follow the machine's telemetry setting",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi10-store-privacy.ac3",
+            "title": "RELEASE.md contains the three pre-upload operator steps: App Store Connect App Privacy, Play Data safety, and overdeck.ai/privacy/app in eltmon/overdeck-landing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi11-docs",
+        "title": "Docs: telemetry reference, user telemetry and phone pages, phone acceptance file, codebase map",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-06T22:47:58Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5100",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/TELEMETRY.md",
+            "configuration/telemetry.mdx",
+            "configuration/phone.mdx",
+            "apps/mobile/acceptance/PAN-5100.md",
+            ".overdeck/context/codebase/architecture.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/telemetry-docs.test.ts",
+            "grep -n 'sends no telemetry yet' docs/TELEMETRY.md || true",
+            "grep -n '## Diagnostics' configuration/phone.mdx"
+          ],
+          "expected_outputs": [
+            "telemetry-docs.test.ts passes",
+            "the first grep prints no matching line",
+            "the second grep prints the Diagnostics heading"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD WI-11: in docs/TELEMETRY.md replace the 'phone app sends no telemetry yet' paragraph with a 'Client request failures and the phone' section (observer, route/area rules, status buckets, 60 s throttle, no query_key_root, phone consent with cache and 'next successful connection' consequence, identity, super properties, phone_link_state meanings), add requestFailures.ts to Implementation boundaries, and add client/platform/app_version/build_commit to the browser super-property paragraph. Add the failed-request and phone bullets to configuration/telemetry.mdx 'What is sent' and the never-sent items. Add a '## Diagnostics' section to configuration/phone.mdx before '## Remove a phone'. Write apps/mobile/acceptance/PAN-5100.md with per-AC evidence and the D-19 post-merge operator steps as unchecked boxes. Correct architecture.md line 46 as the PRD states, leaving the last-verified line unchanged. Also state (PRD D-20) that a phone 403 on an admin route is reported as client_request_failed with status 403 and marks a phone scope gap."
+        },
+        "items": [
+          {
+            "id": "wi11-docs.ac1",
+            "title": "docs/TELEMETRY.md no longer contains 'sends no telemetry yet' and its new section states the phone initializes only when the machine's effective telemetry is on and that turning it off reaches the phone on its next successful connection",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi11-docs.ac2",
+            "title": "configuration/phone.mdx renders a '## Diagnostics' section naming failed API routes, link health and crashes as what the app sends",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi11-docs.ac3",
+            "title": "configuration/telemetry.mdx 'What is sent' contains failed requests (route template, area, method, status class) and 'What is never sent' contains response bodies, conversation names and ids, and full URLs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi11-docs.ac4",
+            "title": "apps/mobile/acceptance/PAN-5100.md contains an evidence line per issue acceptance criterion and unchecked boxes for the TestFlight upload and the three store/landing privacy steps",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "wi1-contract",
+        "to": "wi2-client-config-builder",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-contract",
+        "to": "wi3-client-config-route",
+        "type": "blocks"
+      },
+      {
+        "from": "wi2-client-config-builder",
+        "to": "wi3-client-config-route",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-contract",
+        "to": "wi4-browser-door",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-contract",
+        "to": "wi5-request-observer",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-contract",
+        "to": "wi9b-link-reporter",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-contract",
+        "to": "wi11-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "wi4-browser-door",
+        "to": "wi6-phone-boot",
+        "type": "blocks"
+      },
+      {
+        "from": "wi6-phone-boot",
+        "to": "wi7-phone-error-boundary",
+        "type": "blocks"
+      },
+      {
+        "from": "wi5-request-observer",
+        "to": "wi8-phone-observer",
+        "type": "blocks"
+      },
+      {
+        "from": "wi9a-link-route",
+        "to": "wi9b-link-reporter",
+        "type": "blocks"
+      },
+      {
+        "from": "wi4-browser-door",
+        "to": "wi4b-door-consent",
+        "type": "blocks"
+      },
+      {
+        "from": "wi4b-door-consent",
+        "to": "wi6-phone-boot",
+        "type": "blocks"
+      },
+      {
+        "from": "wi4b-door-consent",
+        "to": "wi7-phone-error-boundary",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
