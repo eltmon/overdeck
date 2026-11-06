@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5084",
   "created": "2026-11-06T04:10:40.261Z",
-  "updated": "2026-11-06T05:29:33.712Z",
+  "updated": "2026-11-06T05:42:31.112Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -46,9 +46,10 @@
       "doneAt": "2026-11-06T05:29:23.393Z"
     },
     "settings-api-telemetry-fields": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5084",
-      "claimedAt": "2026-11-06T05:29:33.712Z"
+      "claimedAt": "2026-11-06T05:29:33.712Z",
+      "doneAt": "2026-11-06T05:42:31.111Z"
     }
   }
 }
