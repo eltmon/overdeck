@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-5084",
+  "created": "2026-11-06T04:10:40.261Z",
+  "updated": "2026-11-06T04:10:40.261Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "install-kind-domain": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5084",
+      "claimedAt": "2026-11-06T04:10:40.261Z"
+    }
+  }
+}
