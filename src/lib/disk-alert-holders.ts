@@ -15,6 +15,7 @@ import { promisify } from 'node:util';
 import type { DiskAlertHolders, DiskSpaceHolder } from '@overdeck/contracts';
 import { createPromiseConcurrencyLimiter } from './concurrency.js';
 import { getOverdeckHome } from './paths.js';
+import { claudeProjectsRoot } from './runtimes/storage/claude-code.js';
 import { parseDockerSize } from './workspace/disk-cost.js';
 
 const execFileAsync = promisify(execFile);
@@ -114,6 +115,11 @@ function resolveDeps(deps: Partial<HolderDeps>): HolderDeps {
 
 interface Candidate { label: string; path: string }
 
+/** Display a path under `home` as `~/...`, so a storage module's own path never needs a duplicate literal here. */
+function tildeLabel(home: string, path: string): string {
+  return path.startsWith(`${home}/`) ? `~${path.slice(home.length)}` : path;
+}
+
 function cacheCandidates(home: string): Candidate[] {
   return [
     { label: '~/.local/share/pnpm/store', path: join(home, '.local', 'share', 'pnpm', 'store') },
@@ -140,9 +146,10 @@ export async function collectDiskHolders(deps: Partial<HolderDeps> = {}): Promis
   const homeDev = homeEntry.dev;
 
   const overdeckHomeChildren = await d.listDir(d.overdeckHome);
+  const claudeProjectsPath = claudeProjectsRoot(d.home);
   const candidates: Candidate[] = [
     ...overdeckHomeChildren.map((name) => ({ label: `~/.overdeck/${name}`, path: join(d.overdeckHome, name) })),
-    { label: '~/.claude/projects', path: join(d.home, '.claude', 'projects') },
+    { label: tildeLabel(d.home, claudeProjectsPath), path: claudeProjectsPath },
     { label: '~/.local/share/opencode/opencode.db', path: join(d.home, '.local', 'share', 'opencode', 'opencode.db') },
     ...cacheCandidates(d.home),
   ];
