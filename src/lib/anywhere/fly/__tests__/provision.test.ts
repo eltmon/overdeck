@@ -164,6 +164,16 @@ describe('provisionFlyMachine (PAN-4652 WI-7)', () => {
     expect(h.events.indexOf('write:/.overdeck/environment-id.json')).toBeLessThan(h.events.findIndex((e) => e.includes('pan serve')));
   });
 
+  it('writes the remote_vm install-kind marker before pan serve starts (PAN-5084)', async () => {
+    const h = harness();
+    await provisionFlyMachine({}, h.deps);
+
+    expect(h.files.get('/.overdeck/install-kind')).toBe('remote_vm\n');
+    expect(h.events.indexOf('write:/.overdeck/install-kind')).toBeLessThan(
+      h.events.findIndex((e) => e.includes('pan serve')),
+    );
+  });
+
   it('installs home\'s version on a mismatch and fails with version-mismatch when it still differs', async () => {
     const h = harness((command) => {
       if (command === 'pan --version') return { stdout: '0.71.0\n' };
