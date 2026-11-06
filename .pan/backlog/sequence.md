@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-06T16:17:12.152069Z · model: claude-opus-5-5 · open: 866_
+_Last sequenced: 2026-11-06T16:29:06.106241Z · model: claude-opus-5-5 · open: 866_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -24,7 +24,7 @@ _Last sequenced: 2026-11-06T16:17:12.152069Z · model: claude-opus-5-5 · open: 
 | 17 | PAN-4705 | S | high | ok |  |  | quality-gate-admission test leaks a poller past afterEach rmSync; unhandled ENOENT fails unrelated PR CI shards. |
 | 18 | PAN-4746 | S | high | ok |  |  | CI test shard flakes on ENOTEMPTY: afterEach rmSync races an unawaited snapshot write; reds unrelated PRs (seen on #4745). |
 | 19 | PAN-4572 | M | medium | ok |  |  | Residual re-render offenders PAN-4560 profiled but left: unmemoized deck rows, App 5 s poll, clock/selector identity bugs. |
-| 20 | PAN-5093 | M | high | ok |  |  | No alert when free disk falls below 5/2 GiB; it hit 17 MB unnoticed, risking SQLite/JSONL truncation. Add Needs-you + phone push. |
+| 20 | PAN-5093 | M | high | ok |  |  | Disk hit 17 MB unnoticed (embeddings.db burst too); no alert below 5/2 GiB risks SQLite/JSONL truncation. Add Needs-you + push. |
 | 21 | PAN-4625 | S | high | ok |  |  | CI relay debounces a later failed check on the same head, so agents never see a failing test shard; lands after PAN-4534 (same file) |
 | 22 | PAN-4586 | XS | critical | ok |  |  | Herdr pane.read nests text under result.read; every Overdeck pane-text reader gets '' — detection, inventory, resume all blind |
 | 23 | PAN-4217 | S | critical | ok |  |  | vbrief-ac gate reads AC statuses nothing writes; plans with nested ACs fail verification and pan done with no verb to clear it |
@@ -952,7 +952,7 @@ PAN-4560 merged (closed completed 2026-10-20), so this follow-up is now unblocke
 
 ### PAN-5093 (rank 20)
 
-New substrate issue (2026-11-06 incident): free space fell to 17 MB with no operator signal, which puts overdeck.db and transcript JSONL writes at risk of mid-write truncation. The fix is well specified (threshold alerts, top-holder hints, config keys, fake-timer tests, docs), so it ranks with the high-impact substrate bugs but below the pipeline-unblocking criticals.
+Rank held at 20: the 2026-11-06 owner comment adds scope rather than changing priority. It traces the second drop to the dashboard writing the conversation-search embeddings.db (sqlite-vec growth to ~4 GB) and a stale 2.4 GB copy at the default path, so the alert hints should show index size and the fix should decide on the stale copy. The issue stays a well-specified, high-impact substrate bug below the pipeline-unblocking criticals.
 
 ### PAN-4625 (rank 21)
 
@@ -1201,7 +1201,7 @@ New this pass. The test role evaluates the workspace working tree rather than th
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-06T16:17:12.152069Z",
+  "generatedAt": "2026-11-06T16:29:06.106241Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 866,
@@ -11963,8 +11963,8 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "score": 78,
       "condition": "ok",
       "dependsOn": [],
-      "why": "No alert when free disk falls below 5/2 GiB; it hit 17 MB unnoticed, risking SQLite/JSONL truncation. Add Needs-you + phone push.",
-      "rationale": "New substrate issue (2026-11-06 incident): free space fell to 17 MB with no operator signal, which puts overdeck.db and transcript JSONL writes at risk of mid-write truncation. The fix is well specified (threshold alerts, top-holder hints, config keys, fake-timer tests, docs), so it ranks with the high-impact substrate bugs but below the pipeline-unblocking criticals.",
+      "why": "Disk hit 17 MB unnoticed (embeddings.db burst too); no alert below 5/2 GiB risks SQLite/JSONL truncation. Add Needs-you + push.",
+      "rationale": "Rank held at 20: the 2026-11-06 owner comment adds scope rather than changing priority. It traces the second drop to the dashboard writing the conversation-search embeddings.db (sqlite-vec growth to ~4 GB) and a stale 2.4 GB copy at the default path, so the alert hints should show index size and the fix should decide on the stale copy. The issue stays a well-specified, high-impact substrate bug below the pipeline-unblocking criticals.",
       "gate": "auto",
       "planning": "auto"
     }
@@ -13117,6 +13117,13 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.4
+    },
+    {
+      "from": "PAN-3771",
+      "to": "PAN-5093",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.3
     }
   ]
 }
