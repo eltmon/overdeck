@@ -56,6 +56,7 @@ function harness() {
     sleep: vi.fn(async () => undefined),
     homeDir: () => TEST_HOME,
     tmpRoot: join(TEST_HOME, 'tmp'),
+    disk: { read: vi.fn(async () => 1024 ** 4), estimate: vi.fn(async () => 0) },
   } satisfies Deps;
   return { deps, git };
 }
