@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5084",
   "created": "2026-11-06T04:10:40.261Z",
-  "updated": "2026-11-06T06:36:00.444Z",
+  "updated": "2026-11-06T06:36:17.943Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -232,6 +232,10 @@
     "telemetry-docs.ac2": {
       "status": "completed",
       "doneAt": "2026-11-06T06:36:00.443Z"
+    },
+    "telemetry-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-06T06:36:17.943Z"
     }
   }
 }
