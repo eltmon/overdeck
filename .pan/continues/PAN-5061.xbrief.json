@@ -1,0 +1,268 @@
+{
+  "version": "1",
+  "issueId": "PAN-5061",
+  "created": "2026-11-05T22:48:30.946Z",
+  "updated": "2026-11-05T23:52:55.094Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-05T23:48Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-05T23:48:08.624Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-05T23:52Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-11-05T23:52:37.758Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-05T23:52:55.094Z"
+    }
+  ],
+  "items": {
+    "wi1-parse-mcp-servers": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5061",
+      "claimedAt": "2026-11-05T22:48:30.946Z",
+      "doneAt": "2026-11-05T22:50:13.107Z"
+    },
+    "wi2-launch-env": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5061",
+      "claimedAt": "2026-11-05T22:50:22.304Z",
+      "doneAt": "2026-11-05T22:52:09.245Z"
+    },
+    "wi3-resolve-project-mcp": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5061",
+      "claimedAt": "2026-11-05T22:52:13.309Z",
+      "doneAt": "2026-11-05T22:53:32.840Z"
+    },
+    "wi4-launcher-flags": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5061",
+      "claimedAt": "2026-11-05T22:53:38.171Z",
+      "doneAt": "2026-11-05T22:54:51.074Z"
+    },
+    "wi5-claude-acp-render": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5061",
+      "claimedAt": "2026-11-05T22:54:55.238Z",
+      "doneAt": "2026-11-05T22:57:56.768Z"
+    },
+    "wi6-codex-render": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5061",
+      "claimedAt": "2026-11-05T22:58:01.945Z",
+      "doneAt": "2026-11-05T22:59:30.581Z"
+    },
+    "wi7-thread-launch-cwd": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5061",
+      "claimedAt": "2026-11-05T22:59:35.551Z",
+      "doneAt": "2026-11-05T23:01:20.468Z"
+    },
+    "wi8-pane-secrets": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5061",
+      "claimedAt": "2026-11-05T23:01:24.984Z",
+      "doneAt": "2026-11-05T23:02:33.368Z"
+    },
+    "wi9-gate-secrets": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5061",
+      "claimedAt": "2026-11-05T23:02:39.716Z",
+      "doneAt": "2026-11-05T23:04:03.923Z"
+    },
+    "wi10-docs-mcp": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5061",
+      "claimedAt": "2026-11-05T23:04:10.608Z",
+      "doneAt": "2026-11-05T23:05:05.334Z"
+    },
+    "wi11-docs-projects": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5061",
+      "claimedAt": "2026-11-05T23:05:06.790Z",
+      "doneAt": "2026-11-05T23:05:43.418Z"
+    },
+    "wi1-parse-mcp-servers.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:29:09.051Z"
+    },
+    "wi1-parse-mcp-servers.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:29:24.339Z"
+    },
+    "wi1-parse-mcp-servers.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:29:39.403Z"
+    },
+    "wi1-parse-mcp-servers.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:29:54.908Z"
+    },
+    "wi2-launch-env.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:30:10.621Z"
+    },
+    "wi2-launch-env.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:30:26.984Z"
+    },
+    "wi2-launch-env.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:30:43.807Z"
+    },
+    "wi2-launch-env.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:31:01.267Z"
+    },
+    "wi3-resolve-project-mcp.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:31:17.727Z"
+    },
+    "wi3-resolve-project-mcp.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:31:33.007Z"
+    },
+    "wi3-resolve-project-mcp.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:31:48.295Z"
+    },
+    "wi3-resolve-project-mcp.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:32:04.143Z"
+    },
+    "wi4-launcher-flags.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:32:20.256Z"
+    },
+    "wi4-launcher-flags.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:32:35.228Z"
+    },
+    "wi4-launcher-flags.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:32:50.736Z"
+    },
+    "wi4-launcher-flags.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:33:05.722Z"
+    },
+    "wi5-claude-acp-render.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:33:20.388Z"
+    },
+    "wi5-claude-acp-render.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:33:34.645Z"
+    },
+    "wi5-claude-acp-render.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:33:49.564Z"
+    },
+    "wi5-claude-acp-render.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:34:05.354Z"
+    },
+    "wi5-claude-acp-render.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:34:20.891Z"
+    },
+    "wi6-codex-render.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:34:36.962Z"
+    },
+    "wi6-codex-render.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:34:52.120Z"
+    },
+    "wi6-codex-render.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:35:07.862Z"
+    },
+    "wi7-thread-launch-cwd.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:35:24.049Z"
+    },
+    "wi7-thread-launch-cwd.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:35:40.324Z"
+    },
+    "wi7-thread-launch-cwd.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:35:57.154Z"
+    },
+    "wi8-pane-secrets.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:36:14.055Z"
+    },
+    "wi8-pane-secrets.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:36:29.974Z"
+    },
+    "wi8-pane-secrets.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:36:45.485Z"
+    },
+    "wi9-gate-secrets.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:37:01.545Z"
+    },
+    "wi9-gate-secrets.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:37:17.677Z"
+    },
+    "wi9-gate-secrets.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:37:34.393Z"
+    },
+    "wi10-docs-mcp.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:37:50.645Z"
+    },
+    "wi10-docs-mcp.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:38:06.003Z"
+    },
+    "wi10-docs-mcp.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:38:20.410Z"
+    },
+    "wi11-docs-projects.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:38:34.718Z"
+    },
+    "wi11-docs-projects.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:38:49.650Z"
+    },
+    "wi11-docs-projects.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:39:04.902Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-05T23:48:08Z",
+      "markdownBody": "# CI Failure Feedback for PAN-5061\n\nPull request: https://github.com/eltmon/overdeck/pull/5077 (head `dd3ba31a`)\n\nSource: check_run:test-shard (4/4)\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\n## Failing checks (1)\n\n### test-shard (4/4)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/127608481782/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/42131354114/job/127608481782  \n```\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/cloister/verification-gate.test.ts\u001b[2m > \u001b[22mrunQualityGates — CPU admission lifecycle\u001b[2m > \u001b[22mbypasses admission for HTTP health gates\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/cloister/verification-gate.test.ts\u001b[2m > \u001b[22mrunQualityGates — CPU admission lifecycle\u001b[2m > \u001b[22mbypasses admission for HTTP health gates\n\u001b[31m\u001b[1mError\u001b[22m: Test timed out in 5000ms.\nIf this is a long-running test, pass a timeout value as the last argument or configure it globally with \"testTimeout\".\u001b[39m\n\u001b[36m \u001b[2m❯\u001b[22m tests/cloister/verification-gate.test.ts:\u001b[2m316:3\u001b[22m\u001b[39m\n    \u001b[90m314|\u001b[39m   })\u001b[33m;\u001b[39m\n    \u001b[90m315|\u001b[39m\n    \u001b[90m316|\u001b[39m   \u001b[34mit\u001b[39m(\u001b[32m'bypasses admission for HTTP health gates'\u001b[39m\u001b[33m,\u001b[39m \u001b[35masync\u001b[39m () \u001b[33m=>\u001b[39m {\n    \u001b[90m   |\u001b[39m   \u001b[31m^\u001b[39m\n    \u001b[90m317|\u001b[39m     vi\u001b[33m.\u001b[39m\u001b[34museFakeTimers\u001b[39m()\u001b[33m;\u001b[39m\n    \u001b[90m318|\u001b[39m     execMock\u001b[33m.\u001b[39m\u001b[34mmockResolvedValue\u001b[39m({ stdout\u001b[33m:\u001b[39m \u001b[32m'200'\u001b[39m\u001b[33m,\u001b[39m stderr\u001b[33m:\u001b[39m \u001b[32m''\u001b[39m })\u001b[33m;\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\u001b[22m\u001b[39m\n\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m1 failed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[1m\u001b[32m618 passed\u001b[39m\u001b[22m\u001b[90m (619)\u001b[39m\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    },
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-11-05T23:52:37Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-5061\n\n# Review — PAN-5061\n## Verdict: CHANGES REQUESTED — CI test-shard (4/4) is red at dd3ba31: the new awaited gate-secrets lookup in `runQualityGates` times out `verification-gate.test.ts` \"bypasses admission for HTTP health gates\"\n\n## Context\n- Run ID: agent-pan-5061-review-dd3ba31a\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-5061/.pan/review/agent-pan-5061-review-dd3ba31a/context.json\n- Branch / workspace: feature/pan-5061 / /home/eltmon/Projects/overdeck/workspaces/feature-pan-5061\n- PR: https://github.com/eltmon/overdeck/pull/5077\n- HEAD reviewed: dd3ba31a28b01819fb0e154754e6a3bf136d336a\n- Base: 5ff981f25cd (merge-base with origin/main); no prior review cycle\n\n## Blocking Findings\n\n### [correctness] Gate project-secrets lookup runs real I/O before the gate loop and breaks an existing CI test — `src/lib/cloister/validation.ts:298`\n- Severity: ! MUST\n- Classification / requirement scope: implementation defect; in_pr_scope (WI-9 / FR-10, D-8)\n- Trigger and changed-code connection: dd3ba31 adds `const projectEnv = opts.projectEnv ?? (opts.isRemote ? {} : await gateProjectEnv(opts.issueId, projectPath));` before the gate loop. `gateProjectEnv` does a dynamic `import()` plus `listProjectsAsync`/`realpath`/`readFile`. `tests/cloister/verification-gate.test.ts:316` (\"bypasses admission for HTTP health gates\") calls `runQualityGates` under `vi.useFakeTimers()`, then `await vi.advanceTimersByTimeAsync(1)`. On CI the real I/O has not finished when the timer advances, so the http_health wait timer registers after the advance and the test never completes.\n- Expected / observed / impact: expected the existing suite to stay green; observed `Error: Test timed out in 5000ms` on the PR head. The CI test job is the required test gate for this repo, so the change cannot merge as reviewed.\n- Evidence: CI run 42131354114 (headSha dd3ba31), job `test-shard (4/4)` 127608481782: `FAIL tests/cloister/verification-gate.test.ts > runQualityGates — CPU admission lifecycle > bypasses admission for HTTP health gates`, `Test Files 1 failed | 618 passed`. The aggregate `test` job also failed. I did not run `tests/cloister/verification-gate.test.ts` locally at dd3ba31: the working tree had already moved to a77491. The timing explanation comes from the CI log and from the author's fix commit message.\n- Fix: resolve the project env lazily, only for command gates, or have the test pass `projectEnv: {}`. The work agent already pushed a77491fcc2c (\"resolve gate project secrets only for command gates\") during this review. It is outside this run's reviewed HEAD. The next cycle must confirm the a77491 CI test shards are green. It must also check that command-gate tests that use fake timers and advance them right after the call do not hit the same race, because the lazy lookup still awaits real I/O before the first command gate.\n\n## Non-blocking Findings\n\n- **~ Spec defect: `mcp_strict` drops out when no server resolves** — `src/lib/mcp/agent-injection.ts:151`. The code follows WI-5 step 4 exactly: \"If `servers` is empty, return `{}` (NFR-1)\". That step conflicts with FR-6, which says `mcp_strict: true` \"adds `--strict-mcp-config` to Claude Code launches of that project\". As a result, a project with `mcp_strict: true`, no `mcp_servers`, and `mcp.agents: false` (or a failed mint) gets no strict flag, and its user-scope servers still load. FR-6 should win, because it states the intent. Correct WI-5 step 4 to return `{ mcpStrict: true }` from the empty-servers branch when the project is strict. `overdeckMcpArgs` already emits strict with no path. This is an edge case and not blocking.\n- **? Secrets files can override non-reserved process keys** — `src/lib/projects/launch-env.ts:37`. Only `OVERDECK_*` and `BLANKED_PROVIDER_ENV` keys are reserved, so a secrets file that sets `PATH`, `HOME` or `NODE_OPTIONS` overrides the gate's inherited env and any pane key that `request.env` does not set. This complies with FR-9 as written, and the file is operator-owned (trusted). A docs sentence or a small denylist would prevent accidents.\n- **? Duplicate warnings for a bad `secrets_file`** — a Claude launch of a project with servers reads the secrets file twice: once in `resolveProjectMcpServers` and once in `launchAgentPane`. So a missing or relative path logs the same `[project-env]` warning twice per launch. This is cosmetic.\n- **? Server-name ordering** — a project server whose name is integer-like (for example `123`, which `^[A-Za-z0-9_-]+$` allows) sorts ahead of `overdeck` in `Object.keys`. That breaks the FR-5 \"`overdeck` first\" ordering. It has no functional impact.\n- **Note: the plan-artifact commits hold the implementation.** Most source changes landed in commits titled `chore(workspace): plan artifacts for PAN-5061`, not in per-item commits with `Item:` trailers as the PRD's repo rules ask. This is a process issue only.\n\n## Coverage\n\nChanged-file ledger (dd3ba31 vs 5ff981f25cd):\n\n| File | Status |\n| --- | --- |\n| src/lib/mcp/agent-injection.ts | reviewed: mint/project decoupling (D-3), never-throws, overdeck-first ordering, NFR-1 default names, FR-8 warning path, Codex map |\n| src/lib/agents/spawn.ts, spawn-prep.ts | reviewed: `cwd`/`issueId` threaded in place; full result spread (`...overdeckMcp`) carries the new fields |\n| src/lib/planning/spawn-planning-session.ts, routes/misc/planning.ts | reviewed |\n| src/lib/agents/recovery.ts, messaging.ts | reviewed |\n| src/lib/overdeck/conversation-runtime.ts | reviewed: tokenRow-gated (bare conversations get nothing, as specified) |\n| src/lib/projects/project-mcp.ts | reviewed: validation rules, `${NAME}` expansion, unresolved skip, reserved names, no values in warnings |\n| src/lib/projects/launch-env.ts | reviewed: issue-first/cwd resolution, `~/` expansion, inside-repo check via canonical paths, reserved keys, values never logged |\n| src/lib/terminal-backends/launch.ts | reviewed: env merge under `request.env`; `{}` vs `undefined` is equivalent for Herdr `tab.create` (optional overlay map) and tmux (`{...spec.env}`) |\n| src/lib/cloister/validation.ts | reviewed: **blocking finding above** |\n| src/lib/runtimes/codex.ts (+ test) | reviewed: http rendering, TOML escaping, npx pin rule limited to stdio |\n| src/lib/mcp/overdeck-mcp-args.ts | reviewed: byte-identical with no opts |\n| src/lib/launcher-generator.ts | reviewed: both call sites pass opts; stale comments replaced |\n| src/lib/projects.ts, src/lib/env-loader.ts | reviewed (type fields; parser export) |\n| configuration/mcp.mdx, configuration/projects.mdx, docs/ROLES.md | reviewed against code: field rules, URL rule, harness table, strict, OAuth, secrets rules match the implementation |\n| .overdeck/context/codebase/concerns.md | reviewed: three verified landmines added; one stray `last-verified` marker moved |\n| tests/unit/... (6 files) | reviewed and run |\n| .pan/drafts, .pan/specs, .pan/continues | read (PRD); plan artifacts, not applicable to code review |\n\nDimensions:\n- Correctness: one blocker (CI regression); mint/project decoupling, role-wins clash rule, call-site threading, harness launch-kind routing (`claude-code`/`acp-host` file; codex map; others warn) verified against `packages/contracts/src/harness-behavior.ts`.\n- Security: secrets reach only the resolving project's panes and gates (issue-prefix then deepest containing root); values never appear in warnings or errors; launch MCP file and Codex `config.toml` stay `0600`; the secrets path must be absolute and outside the repo. tmux `-e` argv exposure matches the existing provider-key path (D-7, accepted). No new trust boundary.\n- Performance: per launch, one cached `projects.yaml` read, a realpath per project only when the issue does not resolve, and one small file read. Bounded and async; there are no new sync child processes. `resolveProjectFromIssueSync`/`parseRoleMcpServers` use the existing sync helpers that the PRD named.\n- Requirements/UX: see the matrix below.\n\nAC matrix:\n\n| AC | Status | Evidence |\n| --- | --- | --- |\n| AC-WI-1 | met | project-mcp.test.ts passes; `wc -l src/lib/projects.ts` = 1217 |\n| AC-WI-2 | met | launch-env.test.ts passes (includes no-value-in-warnings case) |\n| AC-WI-3 | met | resolveProjectMcpServers tests pass |\n| AC-WI-4 | met | launcher-generator-overdeck-mcp.test.ts passes; strict cases present |\n| AC-WI-5 | met | agent-injection tests pass (gate-off file, no-file case) |\n| AC-WI-6 | met | codex.test.ts + codex-agent-home-golden.test.ts pass |\n| AC-WI-7 | met | typecheck passed (`overdeck/test` check on dd3ba31); `lint-file-size.sh` passes locally |\n| AC-WI-8 | met | launch-project-env.test.ts passes |\n| AC-WI-9 | met locally / **unmet on CI** | validation.test.ts passes, but the change breaks verification-gate.test.ts on CI |\n| AC-WI-10 | met | `## Project MCP servers`, harness table, strict paragraph present; ROLES.md bullet corrected |\n| AC-WI-11 | met | `### Project credentials` + three table rows present |\n\n## Verification\n- `npx vitest run` on the 8 touched/related files (project-mcp, launch-env, agent-injection, launcher-generator-overdeck-mcp, launch-project-env, cloister/validation, runtimes codex, codex-agent-home-golden): 8 files, 150 tests passed.\n- `npm run lint:effect-diagnostics`: passed (227 known, none new).\n- `bash scripts/lint-file-size.sh`: passed.\n- CI for dd3ba31 (run 42131354114): build, lint groups (skills, state), smoke, integrations and `overdeck/test` (typecheck+lint) passed. **`test-shard (4/4)` and `test` failed** (see blocker).\n- The full suite was not run locally (CI owns it).\n\n## Scope Note\nWhile this review ran, the work agent pushed a77491fcc2c to the branch. It targets the blocker above. This run reviewed dd3ba31 only. The next review cycle should cover a77491 and wait for its CI run (42132343766, in progress at review time) to finish green. The working tree also had an uncommitted change to `.pan/continues/PAN-5061.xbrief.json`.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-5061/.pan/review/agent-pan-5061-review-dd3ba31a/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-5061 -m \"Fixed review issues\"`"
+    }
+  ],
+  "agentModel": "claude-opus-5-5"
+}

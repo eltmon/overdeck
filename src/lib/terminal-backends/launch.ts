@@ -156,9 +156,26 @@ async function applyCpuClass(request: LaunchPaneRequest): Promise<readonly strin
 }
 
 /**
+ * The launch project's secrets (PAN-5061 D-7): every launch path reaches this
+ * chokepoint, so each pane gets its own project's `secrets_file` and no other.
+ * `{}` on any error, logged without values.
+ */
+async function projectEnvForLaunch(request: LaunchPaneRequest): Promise<Record<string, string>> {
+  try {
+    // Lazy: keep projects.yaml loading out of this widely imported module's static graph.
+    const { projectLaunchEnv } = await import('../projects/launch-env.js');
+    return await projectLaunchEnv({ issueId: request.issueId, cwd: request.cwd });
+  } catch (error) {
+    console.warn(`[project-env] project secrets skipped for ${request.agentId}: ${(error as Error).message}`);
+    return {};
+  }
+}
+
+/**
  * Place a pane in the issue workspace, run the launcher in it, and stamp its
  * tokens. Behaves exactly as `createSession` did on tmux. A Claude Code pane's
- * cwd is pre-trusted first (PAN-3905).
+ * cwd is pre-trusted first (PAN-3905). The launch project's secrets go under
+ * Overdeck's own launch env, so Overdeck's keys win (PAN-5061).
  */
 export async function launchAgentPane(
   request: LaunchPaneRequest,
@@ -177,7 +194,7 @@ export async function launchAgentPane(
     resolved.startAgent(workspace, {
       kind: request.tokens.harness,
       argv,
-      env: request.env,
+      env: { ...(await projectEnvForLaunch(request)), ...request.env },
       tokens: request.tokens,
       name: request.agentId,
       cwd: request.cwd,

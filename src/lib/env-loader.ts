@@ -17,7 +17,7 @@ const ENV_FILE_PATH = join(homedir(), '.overdeck.env');
 /**
  * Parse a .env file content into key-value pairs
  */
-function parseEnvFile(content: string): Record<string, string> {
+export function parseEnvFile(content: string): Record<string, string> {
   const result: Record<string, string> = {};
 
   for (const line of content.split('\n')) {

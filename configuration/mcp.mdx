@@ -515,6 +515,108 @@ Every other agent — `kimi-code`, `ohmypi`, `muse`, `prime-agent`, any agent in
 a Docker workspace, and every agent when `mcp.agents` is `false` — is told
 "Overdeck commands" instead, with the `pan` equivalent for each of those.
 
+## Project MCP servers
+
+A project can give its own agents extra MCP servers, separate from every other
+project's. Declare them under `projects.<key>.mcp_servers` in
+`~/.overdeck/projects.yaml`. Two projects can then use two accounts on one
+service, for example two Linear workspaces, without either agent seeing the
+other's server.
+
+```yaml
+projects:
+  myn:
+    mcp_strict: true
+    mcp_servers:
+      - sentry:
+          command: npx
+          args: ["-y", "@sentry/mcp-server@0.20.0"]
+          env:
+            SENTRY_ACCESS_TOKEN: ${SENTRY_TOKEN_MYN}
+      - linear-myn:
+          type: http
+          url: https://mcp.linear.app/mcp
+          headers:
+            Authorization: Bearer ${LINEAR_API_KEY_MYN}
+    workspace:
+      env:
+        secrets_file: ~/.overdeck/secrets/myn.env
+```
+
+`mcp_servers` uses the role `mcpServers:` shape: a YAML list of single-key
+maps. Each entry follows these rules:
+
+- `type: stdio` is the default. It needs `command`; `args` (a list of strings)
+  and `env` (a map of strings) are optional.
+- `type: http` needs `url`, which must start with `https://`, or with
+  `http://localhost` or `http://127.0.0.1`. `headers` (a map of strings) is
+  optional.
+- A name matches `^[A-Za-z0-9_-]+$`. The name `overdeck` is reserved. When two
+  entries share a name, the first one is kept.
+- An invalid entry is skipped with one warning,
+  `[project-mcp] <project>: server <name> skipped: <reason>`. The other entries
+  still apply. A plain map in place of the list is rejected as a whole.
+
+**Which project a launch belongs to.** Overdeck resolves the launch project from
+the issue prefix first, then from the launch directory: the project whose
+`path` contains the agent's cwd. A launch that matches neither, for example a
+handoff worktree in an unregistered directory, gets no project servers and no
+project secrets.
+
+**`${NAME}` references.** Overdeck replaces each `${NAME}` in `args`, `env`
+values, `url` and `headers` values at launch time. It looks in the project's
+`secrets_file` first (see
+[Project credentials](/configuration/projects#project-credentials)), then in
+the environment of the process that launches the agent. A server with an
+unresolved reference is skipped with a warning that names the server and the
+variable, never a value. `$NAME` without braces is left as written. The
+resolved values are written into the agent's launch files, which are mode
+`0600` in a `0700` directory, so keep the values themselves in `secrets_file`,
+never in `projects.yaml` or the repo.
+
+**What each harness gets:**
+
+| Harness | Project servers |
+| --- | --- |
+| `claude-code` | stdio and http, in the same `overdeck-mcp.json` as the `overdeck` server |
+| `codex` | stdio and http (`url` plus `http_headers`) in `codex-home-v2/config.toml`, each with `default_tools_approval_mode = "approve"`. Codex skips an `npx` server whose package has no exact version, the same rule as role servers (PAN-2698). |
+| `acp`, `opencode` | stdio only, through the same `overdeck-mcp.json`. The ACP host drops http entries with a warning. |
+| `ohmypi`, `kimi-code`, `muse`, `prime-agent` | not provisioned. Each launch logs one warning naming the harness and the servers it cannot use. |
+
+The launch file is written whenever at least one server resolves, so project
+servers still load when `mcp.agents` is `false` or the agent token could not be
+minted; only the `overdeck` entry drops out. Bare conversations get no launch
+file and no project servers.
+
+When the launching role declares a server with the same name (`roles/test.md`
+declares `playwright`), the role's server wins and the project's entry is
+skipped with a warning.
+
+On Claude Code, the launcher adds `--allowedTools=mcp__overdeck,mcp__<name>,…`
+for every server in the file, so a project tool call does not stop at a
+permission prompt. Roles with a `tools:` allow-list (review, test) keep their
+own list and do not get the project tools added. That matters only under
+`claude.permissionMode: auto`, where a tool outside the list asks first.
+
+**Strict mode.** `mcp_strict: true` adds `--strict-mcp-config` to that
+project's Claude Code launches. Claude Code then loads only the servers from
+`--mcp-config` files: the `overdeck` server, the project's servers and the
+role's servers, which also arrive through `--mcp-config`. Your user-scope
+servers in `~/.claude.json` and your claude.ai connectors do not load, which
+keeps their tools out of the agent's context. The default is `false`. Strict
+mode has no effect on other harnesses.
+
+**A repo `.mcp.json` does not load in agents.** Claude Code waits for an
+approval of a project-scope `.mcp.json` that a spawned agent never gives, so
+servers that only live there are unavailable to Overdeck agents with or without
+strict mode. Declare them in `mcp_servers` instead.
+
+**OAuth logins.** An http server's OAuth login belongs to its name and URL. A
+project server with the same name and URL as one you signed in to yourself
+reuses that login. A server under a new name or URL has no login, and an agent
+cannot complete an interactive sign-in, so send a token header from
+`secrets_file` instead, as `linear-myn` does above.
+
 ## Scopes and the approve scope
 
 An MCP token is an ordinary access token. Copy MCP URL gives it `read:state`,

@@ -346,7 +346,7 @@ Continue the PLANNING session. Do NOT implement anything.
             extraEnvExports: [harnessLaunch.pathExport],
             appendSystemPromptFiles: await claudePlanningSystemPromptFiles(agentCwd),
             promptInline: `Please read the continuation prompt at ${continuationPromptPath} and continue the planning session.`,
-            ...(await prepareClaudeOverdeckMcp({ agentId: sessionName, agentKind: 'agent', role: 'plan', harness: 'claude-code' })),
+            ...(await prepareClaudeOverdeckMcp({ agentId: sessionName, agentKind: 'agent', role: 'plan', harness: 'claude-code', cwd: agentCwd, issueId })),
           }),
           { mode: 0o755 },
         );

@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { generateLauncherScript, type LauncherConfig } from '../../../src/lib/launcher-generator.js';
+import { overdeckMcpArgs } from '../../../src/lib/mcp/overdeck-mcp-args.js';
 
 let tempHome: string;
 let prevHome: string | undefined;
@@ -142,5 +143,63 @@ describe('generateLauncherScript — overdeck MCP for ACP launches (PAN-4934)', 
 
   it('adds no host flag when the field is unset', () => {
     expect(hostLine(generateLauncherScript(ACP_CONFIG))).not.toContain('--mcp-config');
+  });
+});
+
+describe('overdeckMcpArgs — project servers and strict mode (PAN-5061)', () => {
+  it('keeps the pre-PAN-5061 output without opts', () => {
+    expect(overdeckMcpArgs(CONFIG_PATH, 'claude')).toBe(` --mcp-config='${CONFIG_PATH}' --allowedTools=mcp__overdeck`);
+    expect(overdeckMcpArgs(undefined, 'claude')).toBe('');
+  });
+
+  it('allows every server in the launch MCP file', () => {
+    expect(overdeckMcpArgs(CONFIG_PATH, 'claude', { serverNames: ['overdeck', 'sentry'] })).toBe(
+      ` --mcp-config='${CONFIG_PATH}' --allowedTools=mcp__overdeck,mcp__sentry`,
+    );
+  });
+
+  it('adds no allow-list when the command already has one', () => {
+    expect(overdeckMcpArgs(CONFIG_PATH, "claude --allowedTools 'Read'", { serverNames: ['sentry'] })).toBe(
+      ` --mcp-config='${CONFIG_PATH}'`,
+    );
+  });
+
+  it('adds --strict-mcp-config with and without a config path', () => {
+    expect(overdeckMcpArgs(CONFIG_PATH, 'claude', { strict: true })).toBe(
+      ` --mcp-config='${CONFIG_PATH}' --allowedTools=mcp__overdeck --strict-mcp-config`,
+    );
+    expect(overdeckMcpArgs(undefined, 'claude', { strict: true })).toBe(' --strict-mcp-config');
+  });
+});
+
+describe('generateLauncherScript — project MCP (PAN-5061)', () => {
+  it('adds --strict-mcp-config to a Claude launcher with mcpStrict', () => {
+    const script = generateLauncherScript({
+      ...WORK_CONFIG,
+      overdeckMcpConfig: CONFIG_PATH,
+      overdeckMcpServerNames: ['overdeck', 'linear'],
+      mcpStrict: true,
+    });
+
+    expect(script).toContain(`--mcp-config='${CONFIG_PATH}' --allowedTools=mcp__overdeck,mcp__linear --strict-mcp-config`);
+  });
+
+  it("keeps a role's space-form --mcp-config next to --strict-mcp-config", () => {
+    const script = generateLauncherScript({
+      ...WORK_CONFIG,
+      role: 'test',
+      baseCommand: "claude --permission-mode default --mcp-config '/h/agents/a/role-mcp.json'",
+      overdeckMcpConfig: CONFIG_PATH,
+      mcpStrict: true,
+    });
+
+    expect(script).toContain("--mcp-config '/h/agents/a/role-mcp.json'");
+    expect(script).toContain(`--mcp-config='${CONFIG_PATH}'`);
+    expect(script).toContain('--strict-mcp-config');
+  });
+
+  it('adds --strict-mcp-config in the conversation path', () => {
+    const script = generateLauncherScript({ ...WORK_CONFIG, spawnMode: 'conversation', mcpStrict: true });
+    expect(script).toContain('--strict-mcp-config');
   });
 });

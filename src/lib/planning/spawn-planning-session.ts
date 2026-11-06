@@ -565,7 +565,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
       ? await getOhmypiLauncherFields(sessionName, planningModel, resolvedEffort.effort)
       : {};
     const codexLauncherFields = behavior.usesCodexHome
-      ? getCodexLauncherFields(sessionName, planningModel, workspacePath, 'plan', resolvedEffort.effort, await prepareCodexOverdeckMcp({ agentId: sessionName, agentKind: 'agent', role: 'plan', harness: effectiveHarness }))
+      ? getCodexLauncherFields(sessionName, planningModel, workspacePath, 'plan', resolvedEffort.effort, await prepareCodexOverdeckMcp({ agentId: sessionName, agentKind: 'agent', role: 'plan', harness: effectiveHarness, cwd: workspacePath, issueId: issue.identifier }))
       : {};
     const acpLauncherFields = behavior.launchCommandKind === 'acp-host'
       ? await getAcpLauncherFields(
@@ -628,7 +628,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
         ...acpLauncherFields,
         ...kimiCodeLauncherFields,
         ...(primeLaunch?.fields ?? {}),
-        ...(await prepareClaudeOverdeckMcp({ agentId: sessionName, agentKind: 'agent', role: 'plan', harness: effectiveHarness })),
+        ...(await prepareClaudeOverdeckMcp({ agentId: sessionName, agentKind: 'agent', role: 'plan', harness: effectiveHarness, cwd: workspacePath, issueId: issue.identifier })),
         ...(effectiveHarness === 'muse' ? { museModel: planningModel, museEffort: resolvedEffort.effort, museContextFile: await materializeMuseContext(sessionName, workspacePath, roleAgentDefinitionPath('plan')) } : {}),
       }),
       { mode: 0o755 },

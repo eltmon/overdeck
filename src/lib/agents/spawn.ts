@@ -321,7 +321,7 @@ async function spawnRunWithoutConsentClaim(
     ? await getOhmypiLauncherFields(agentId, selectedModel, options.effort)
     : {};
   const codexLauncherFields = resolvedHarness === 'codex'
-    ? getCodexLauncherFields(agentId, selectedModel, workspace, role, options.effort, await prepareCodexOverdeckMcp({ agentId, agentKind: 'agent', role, harness: resolvedHarness }))
+    ? getCodexLauncherFields(agentId, selectedModel, workspace, role, options.effort, await prepareCodexOverdeckMcp({ agentId, agentKind: 'agent', role, harness: resolvedHarness, cwd: workspace, issueId }))
     : {};
   const acpLauncherFields = isAcp
     ? await getAcpLauncherFields(
@@ -431,7 +431,7 @@ async function spawnRunWithoutConsentClaim(
     ...kimiCodeLauncherFields,
     ...museLauncherFields,
     ...(primeLaunch?.fields ?? {}),
-    ...(await prepareClaudeOverdeckMcp({ agentId, agentKind: 'agent', role, harness: resolvedHarness })),
+    ...(await prepareClaudeOverdeckMcp({ agentId, agentKind: 'agent', role, harness: resolvedHarness, cwd: workspace, issueId })),
   });
 
   const launcherScript = join(getAgentDir(agentId), 'launcher.sh');

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { existsSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { parse as parseToml } from '@iarna/toml'
 
 import { CodexRuntimeSync, writeThreadId, recordCodexRolloutSession, initCodexHome, toCodexSandboxValue } from '../codex.js'
 import { findRolloutPath, extractThreadIdFromRollout, findLatestRollout } from '../storage/codex.js'
@@ -241,8 +242,40 @@ describe('initCodexHome', () => {
     const { readFileSync: readNode } = require('node:fs')
     const config = readNode(join(codexDir, 'config.toml'), 'utf8')
     expect(config).not.toContain('[mcp_servers')
-    expect(warn).toHaveBeenCalledWith('[codex] skipping MCP server "remote" — only stdio command servers are provisioned into codex config')
+    expect(warn).toHaveBeenCalledWith('[codex] skipping MCP server "remote" — only stdio command or http url servers are provisioned into codex config')
     warn.mockRestore()
+  })
+
+  it('writes http MCP servers with url and http_headers (PAN-5061)', () => {
+    const codexDir = join(ctx.codexHome, 'agent-init-mcp-http')
+    initCodexHome(codexDir, {
+      effort: 'high',
+      mcpServers: {
+        sentry: {
+          type: 'http',
+          url: 'https://mcp.sentry.dev/mcp',
+          headers: { Authorization: 'Bearer tok"en', 'X-Org': 'acme' },
+          defaultToolsApprovalMode: 'approve',
+        },
+        bare: { type: 'http', url: 'http://127.0.0.1:8080/mcp' },
+      },
+    })
+
+    const { readFileSync: readNode } = require('node:fs')
+    const config = readNode(join(codexDir, 'config.toml'), 'utf8')
+    expect(config).toContain(
+      '[mcp_servers.sentry]\nurl = "https://mcp.sentry.dev/mcp"\n' +
+        'http_headers = { "Authorization" = "Bearer tok\\"en", "X-Org" = "acme" }\n' +
+        'default_tools_approval_mode = "approve"',
+    )
+    expect(config).toContain('[mcp_servers.bare]\nurl = "http://127.0.0.1:8080/mcp"\n')
+    expect(config).not.toMatch(/\[mcp_servers\.bare\]\n[^[]*http_headers/)
+    const parsed = parseToml(config) as { mcp_servers: Record<string, Record<string, unknown>> }
+    expect(parsed.mcp_servers.sentry).toEqual({
+      url: 'https://mcp.sentry.dev/mcp',
+      http_headers: { Authorization: 'Bearer tok"en', 'X-Org': 'acme' },
+      default_tools_approval_mode: 'approve',
+    })
   })
 
   it('rejects mutable npx MCP package selectors', () => {

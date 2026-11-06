@@ -700,7 +700,7 @@ export async function spawnConversationSession(
         approvalPolicy: codexApprovalPolicy,
         sandboxMode: codexSandboxMode,
         approvalsReviewer: codexApprovalsReviewer,
-        mcpServers: tokenRow ? await prepareCodexOverdeckMcp({ agentId: tokenRow.name, agentKind: 'conversation', role: conversationTokenRole(tokenRow, role, tmuxSession), harness, dir: stateDir }) : undefined,
+        mcpServers: tokenRow ? await prepareCodexOverdeckMcp({ agentId: tokenRow.name, agentKind: 'conversation', role: conversationTokenRole(tokenRow, role, tmuxSession), harness, dir: stateDir, cwd, issueId }) : undefined,
       });
       const resumeSessionId = resume
         ? await resolveCodexRolloutPath(tmuxSession, { agentsDirOverride: join(getOverdeckHome(), 'agents') })
@@ -774,7 +774,7 @@ export async function spawnConversationSession(
     await writeChannelsBridgeMcpConfig(channelsBridgeMcpConfig, tmuxSession);
   }
   const overdeckMcp = tokenRow
-    ? await prepareClaudeOverdeckMcp({ agentId: tokenRow.name, agentKind: 'conversation', role: conversationTokenRole(tokenRow, role, tmuxSession), harness, dir: stateDir })
+    ? await prepareClaudeOverdeckMcp({ agentId: tokenRow.name, agentKind: 'conversation', role: conversationTokenRole(tokenRow, role, tmuxSession), harness, dir: stateDir, cwd, issueId })
     : {};
   // PAN-1837 review fix: the tmux-create + session-capture sequence below is
   // wrapped per-bucket (withKimiSessionCaptureLock) for kimi-code conversations

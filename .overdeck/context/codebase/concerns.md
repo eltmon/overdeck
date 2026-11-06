@@ -746,7 +746,6 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   cannot unlock the login keychain for codesign; the upload uses the Xcode Apple ID session, not
   App Store Connect API keys. `connect.overdeck.ai/healthz` `apns:true`/`fcm:true` only means the
   secrets parse; a delivered push is the proof. Steps and store facts: `apps/mobile/RELEASE.md`.
-<!-- last-verified: 2026-11-04 -->
 
 - **Launch-context tools block keys on the MCP gate** (PAN-4935 planning) — the managed launch context ends with
   an "Overdeck tools" (MCP) or "Overdeck commands" (`pan`) block chosen by `overdeckMcpEnabledFor`, the same gate
@@ -797,4 +796,16 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   ledger sums every matching row, so a raw INSERT double-counts cost, and the write door is what the open
   Conversation tab follows. The live process keeps its launched id after fork adoption, so process matching must
   include the launcher pin (`conversationRuntimeRootPids` extra ids).
+- **Repo `.mcp.json` servers do not load in spawned Claude sessions** (PAN-5061 planning probe, Claude Code 2.1.293) —
+  `claude mcp list` reports them `⏸ Pending approval`; `preTrustDirectory` writes `enabledMcpjsonServers: []` and nothing
+  approves them. `--strict-mcp-config` keeps every `--mcp-config=` file (two equals-form files both load) and drops
+  `~/.claude.json` user servers and claude.ai connectors. An HTTP MCP server's OAuth login is keyed by server name and URL:
+  the operator's own name + URL reuses their login (`connected`); any other name is `needs-auth`.
+- **`~/.overdeck.env` keys are not in agent panes on a systemd Herdr host** (PAN-5061 planning probe, key names only) —
+  the dashboard process holds all of them, the Herdr server and the `tmux -L overdeck` server hold none, and a planning
+  agent's shell held none. Agents still reach them through every `pan` subprocess (`src/cli/index.ts` loads the file)
+  and gates spread the dashboard's `process.env`. Opt-in isolation is PAN-5065.
+- **Codex 0.159.0 HTTP MCP config** — `[mcp_servers.<n>]` with `url = "…"` plus `bearer_token_env_var = "…"` or an
+  `http_headers = { … }` inline table parses as `streamable_http`. `initCodexHome` provisions `type: stdio` entries and,
+  since PAN-5061, `type: http` entries with a `url` (rendered as `url` + `http_headers`); any other entry is skipped.
 <!-- last-verified: 2026-11-04 -->
