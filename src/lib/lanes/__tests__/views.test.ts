@@ -130,4 +130,42 @@ describe('listLaneViews (PAN-4223 WI-5)', () => {
     expect(await listLaneViews({ run: 'memo' }, deps([], now + 2_999))).toBe(first);
     expect(await listLaneViews({ run: 'memo' }, deps([], now + 3_000))).not.toBe(first);
   });
+
+  it('flags a superseded, ended, reported builder i1 as reapable, pointing at i2; i2 is never reapable (view-reapable.ac1)', async () => {
+    root('reap-root');
+    lane('reap-i1', 'reap-root', 'reap', 'k', 'builder', join(TEST_HOME, 'lanes', 'reap-k'));
+    lane('reap-i2', 'reap-root', 'reap', 'k', 'builder', join(TEST_HOME, 'lanes', 'reap-k-i2'));
+    await writeWorkerReport('conv-reap-i1', { body: 'done', git: { head: 'abc1234', branch: 'reap/k' } });
+    markConversationEnded('reap-i1');
+
+    const views = await listLaneViews({ run: 'reap' }, deps());
+    const byName = Object.fromEntries(views.map((view) => [view.name, view]));
+    expect(byName['reap-i1']).toMatchObject({ reapable: true, supersededBy: 'reap-i2' });
+    expect(byName['reap-i2']).toMatchObject({ reapable: false, supersededBy: null });
+  });
+
+  it('still flags i1 reapable under a parent-narrowed filter, since the rule runs over every row of the (run, key) (view-reapable.ac2)', async () => {
+    root('reap2-root-a');
+    root('reap2-root-b');
+    lane('reap2-i1', 'reap2-root-a', 'reap2', 'k', 'builder', join(TEST_HOME, 'lanes', 'reap2-k'));
+    lane('reap2-i2', 'reap2-root-b', 'reap2', 'k', 'builder', join(TEST_HOME, 'lanes', 'reap2-k-i2'));
+    await writeWorkerReport('conv-reap2-i1', { body: 'done', git: { head: 'def5678', branch: 'reap2/k' } });
+    markConversationEnded('reap2-i1');
+
+    const views = await listLaneViews({ parentName: 'reap2-root-a' }, deps());
+    expect(views.map((view) => view.name)).toEqual(['reap2-i1']);
+    expect(views[0]).toMatchObject({ reapable: true, supersededBy: 'reap2-i2' });
+  });
+
+  it('never flags an archived lane as reapable (view-reapable.ac3)', async () => {
+    root('reap3-root');
+    lane('reap3-i1', 'reap3-root', 'reap3', 'k', 'builder', join(TEST_HOME, 'lanes', 'reap3-k'));
+    lane('reap3-i2', 'reap3-root', 'reap3', 'k', 'builder', join(TEST_HOME, 'lanes', 'reap3-k-i2'));
+    await writeWorkerReport('conv-reap3-i1', { body: 'done', git: { head: 'fed9876', branch: 'reap3/k' } });
+    archiveConversation('reap3-i1');
+
+    const views = await listLaneViews({ run: 'reap3' }, deps([{ name: 'reap3-i1', sessionAlive: true }]));
+    const byName = Object.fromEntries(views.map((view) => [view.name, view]));
+    expect(byName['reap3-i1']).toMatchObject({ archived: true, reapable: false, supersededBy: null });
+  });
 });
