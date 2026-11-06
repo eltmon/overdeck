@@ -12,6 +12,9 @@
  * Every tool call travels to the paired machine with the connector token over a link channel
  * (`channel-api.ts`). The tool list is the shared one minus `list_machines`, and the three start
  * tools lose their `machine` and `needs` arguments: a connector reaches only its paired machine.
+ *
+ * Both modes label their traffic `connector_http` or `connector_stdio` for MCP usage telemetry
+ * (PAN-5083); connector surfaces dedupe in memory and never write a file under `~/.overdeck`.
  */
 import { timingSafeEqual } from 'node:crypto';
 import { createServer, type IncomingMessage, type Server as HttpServer, type ServerResponse } from 'node:http';
@@ -20,6 +23,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 
 import { setRtcDialer } from '../../anywhere/channel/open.js';
+import { mcpUsageTelemetry, observeMcpTransport, type McpUsageLabel, type McpUsageTelemetry } from '../../telemetry/mcp.js';
 import type { DashboardApi } from '../dashboard-api.js';
 import { ALL_TOOLS, createOverdeckMcpServer } from '../server.js';
 import { errorResult, type OverdeckTool } from '../tool.js';
@@ -98,15 +102,20 @@ function readBody(req: IncomingMessage, res: ServerResponse): Promise<Buffer | n
   });
 }
 
+const CONNECTOR_HTTP_LABEL: McpUsageLabel = { surface: 'connector_http', auth: 'connector', callerKey: 'connector_http' };
+const CONNECTOR_STDIO_LABEL: McpUsageLabel = { surface: 'connector_stdio', auth: 'connector', callerKey: 'connector_stdio' };
+
 export async function startConnectorHttp(input: {
   port: number;
   localToken: string;
   api: DashboardApi;
   scopes: readonly string[];
   health(): ConnectorHealth;
+  usage?: McpUsageTelemetry;
 }): Promise<{ host: string; port: number; close(): Promise<void> }> {
   const expected = Buffer.from(input.localToken, 'utf8');
   const tools = connectorTools();
+  const usage = input.usage ?? mcpUsageTelemetry;
 
   const handle = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
     const path = new URL(req.url ?? '/', 'http://127.0.0.1').pathname;
@@ -136,7 +145,9 @@ export async function startConnectorHttp(input: {
       sendJson(res, 400, { jsonrpc: '2.0', error: { code: -32700, message: 'Parse error' }, id: null });
       return;
     }
-    const server = createOverdeckMcpServer({ api: input.api, scopes: input.scopes, isAgent: false }, tools);
+    const protocolHeader = req.headers['mcp-protocol-version'];
+    usage.noteRequest(CONNECTOR_HTTP_LABEL, parsed, typeof protocolHeader === 'string' ? protocolHeader : undefined);
+    const server = createOverdeckMcpServer({ api: input.api, scopes: input.scopes, isAgent: false }, tools, { label: CONNECTOR_HTTP_LABEL, telemetry: usage });
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
     res.on('close', () => {
       void transport.close();
@@ -178,13 +189,17 @@ export async function serveConnectorStdio(input: {
   scopes: readonly string[];
   stdin: NodeJS.ReadableStream;
   stdout: NodeJS.WritableStream;
+  usage?: McpUsageTelemetry;
 }): Promise<void> {
-  const server = createOverdeckMcpServer({ api: input.api, scopes: input.scopes, isAgent: false }, connectorTools());
+  const usage = input.usage ?? mcpUsageTelemetry;
+  const server = createOverdeckMcpServer({ api: input.api, scopes: input.scopes, isAgent: false }, connectorTools(), { label: CONNECTOR_STDIO_LABEL, telemetry: usage });
   const closed = new Promise<void>((resolve) => {
     input.stdin.once('end', resolve);
     input.stdin.once('close', resolve);
   });
-  await server.connect(new StdioServerTransport(input.stdin as NodeJS.ReadStream, input.stdout as NodeJS.WriteStream));
+  const transport = new StdioServerTransport(input.stdin as NodeJS.ReadStream, input.stdout as NodeJS.WriteStream);
+  observeMcpTransport(transport, CONNECTOR_STDIO_LABEL, usage);
+  await server.connect(transport);
   await closed;
   await server.close();
 }
