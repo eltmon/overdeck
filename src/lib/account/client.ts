@@ -3,16 +3,20 @@
  * flow, the PKCE authorization-code exchange (PAN-4960), `/v1/me` and device revocation
  * (PRD PAN-4330 W-3, D-2, D-3, D-5).
  *
- * Every poll wait is a `setTimeout` promise so fake timers in tests drive them; nothing here
- * waits on real wall-clock time. No error message or thrown value ever includes the device
- * token. This module imports only Node built-ins so the standalone `pan account` CLI can load
- * it without the dashboard or Effect runtime layers.
+ * Every poll wait and device-code retry wait is a `setTimeout` promise so fake timers in tests
+ * drive them; nothing here waits on real wall-clock time. No error message or thrown value ever
+ * includes the device token, device code, authorization code or PKCE verifier: `describeError`
+ * redacts them, fetch's cause included. This module imports only Node built-ins so the
+ * standalone `pan account` CLI can load it without the dashboard or Effect runtime layers.
  */
 
 export const DEFAULT_ACCOUNT_BASE_URL = 'https://account.overdeck.ai';
 
 const PLATFORM_ARCH_RE = /^(linux|darwin|win32)-(x64|arm64)$/;
 const LOCAL_HTTP_HOSTS = new Set(['127.0.0.1', 'localhost', '[::1]']);
+
+/** Waits between device-code attempts after a thrown (network) error: 3 attempts in all. */
+const DEVICE_CODE_RETRY_DELAYS_MS = [1_000, 2_000];
 
 export class AccountClientError extends Error {}
 
@@ -87,8 +91,25 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function describeError(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+/** Node's fetch reports every network failure as `fetch failed` and puts the reason in `cause`. */
+function describeCause(cause: unknown): string | null {
+  if (typeof cause !== 'object' || cause === null) return null;
+  const { code, message } = cause as { code?: unknown; message?: unknown };
+  const parts = [typeof code === 'string' ? code : '', typeof message === 'string' ? message : ''].filter((part) => part !== '');
+  return parts.length > 0 ? parts.join(': ') : null;
+}
+
+/** `secrets` are the request's sensitive values; each is replaced in the whole result, cause included. */
+function describeError(error: unknown, secrets: readonly string[] = []): string {
+  let text = String(error);
+  if (error instanceof Error) {
+    const cause = describeCause(error.cause);
+    text = cause === null ? error.message : `${error.message} (${cause})`;
+  }
+  for (const secret of secrets) {
+    if (secret !== '') text = text.replaceAll(secret, '[redacted]');
+  }
+  return text;
 }
 
 async function postForm(baseUrl: string, path: string, body: URLSearchParams, doFetch: typeof fetch): Promise<Response> {
@@ -106,11 +127,17 @@ export async function requestDeviceCode(
   opts: ClientOptions = {},
 ): Promise<DeviceCode> {
   const doFetch = opts.fetch ?? fetch;
-  let res: Response;
-  try {
-    res = await postForm(baseUrl, '/oauth/device/code', new URLSearchParams({ platform: input.platform, environment_id: input.environmentId }), doFetch);
-  } catch (error) {
-    throw new AccountClientError(`Cannot reach ${baseUrl}: ${describeError(error)}`);
+  const form = new URLSearchParams({ platform: input.platform, environment_id: input.environmentId });
+  let res: Response | undefined;
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      res = await postForm(baseUrl, '/oauth/device/code', form, doFetch);
+      break;
+    } catch (error) {
+      const delayMs = DEVICE_CODE_RETRY_DELAYS_MS[attempt];
+      if (delayMs === undefined) throw new AccountClientError(`Cannot reach ${baseUrl}: ${describeError(error)}`);
+      await sleep(delayMs);
+    }
   }
   if (!res.ok) {
     throw new AccountClientError(`Cannot start sign-in at ${baseUrl}: HTTP ${res.status}`);
@@ -169,7 +196,7 @@ export async function pollForToken(
       );
     } catch (error) {
       consecutiveFailures += 1;
-      if (consecutiveFailures >= 3) return { ok: false, reason: 'unreachable', detail: describeError(error) };
+      if (consecutiveFailures >= 3) return { ok: false, reason: 'unreachable', detail: describeError(error, [code.deviceCode]) };
       waitSeconds = interval;
       continue;
     }
@@ -235,7 +262,7 @@ export async function exchangeAuthorizationCode(
       doFetch,
     );
   } catch (error) {
-    return { ok: false, reason: 'unreachable', detail: describeError(error) };
+    return { ok: false, reason: 'unreachable', detail: describeError(error, [input.code, input.codeVerifier]) };
   }
   if (res.status >= 500) {
     return { ok: false, reason: 'unreachable', detail: `HTTP ${res.status}` };
@@ -257,7 +284,7 @@ export async function getMe(baseUrl: string, token: string, opts: ClientOptions 
   try {
     res = await doFetch(`${baseUrl}/v1/me`, { headers: { Authorization: `Bearer ${token}` } });
   } catch (error) {
-    return { ok: false, kind: 'unreachable', detail: describeError(error) };
+    return { ok: false, kind: 'unreachable', detail: describeError(error, [token]) };
   }
   if (res.status === 401) {
     const body = (await res.json().catch(() => ({}))) as { error?: string };
@@ -280,7 +307,7 @@ export async function revokeDevice(baseUrl: string, token: string, deviceId: str
       headers: { Authorization: `Bearer ${token}` },
     });
   } catch (error) {
-    return { ok: false, detail: describeError(error) };
+    return { ok: false, detail: describeError(error, [token]) };
   }
   if (res.status === 204 || res.status === 401 || res.status === 404) {
     return { ok: true, status: res.status };

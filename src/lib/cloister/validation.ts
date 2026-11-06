@@ -53,10 +53,13 @@ function formatGateOutput(stdout: string, stderr: string): string {
   return [stdout, stderr].filter(Boolean).join('\n--- stderr ---\n');
 }
 
-function buildQualityGateEnv(gateEnv: Record<string, string> | undefined): NodeJS.ProcessEnv {
+function buildQualityGateEnv(
+  gateEnv: Record<string, string> | undefined,
+  workspaceEnv?: Record<string, string>,
+): NodeJS.ProcessEnv {
   const env = { ...process.env };
   for (const key of DASHBOARD_RUNTIME_ENV_KEYS) {
-    if (!Object.prototype.hasOwnProperty.call(gateEnv ?? {}, key)) {
+    if (!Object.prototype.hasOwnProperty.call(gateEnv ?? {}, key) && !Object.prototype.hasOwnProperty.call(workspaceEnv ?? {}, key)) {
       delete env[key];
     }
   }
@@ -74,7 +77,9 @@ function buildQualityGateEnv(gateEnv: Record<string, string> | undefined): NodeJ
   // gate may still opt back in via gate.env. The skip mechanism lives in
   // scripts/build-post-cli.mjs (PAN-1659). Release/publish builds the index
   // through a separate path (build-for-publish.mjs) that never sets this.
-  return { SKIP_DOCS_INDEX: '1', ...env, ...gateEnv };
+  // PAN-5062: workspaceEnv (the opted-in workspace .env) sits between the host
+  // env and gate.env, so a gate can still override a workspace-wide default.
+  return { SKIP_DOCS_INDEX: '1', ...env, ...workspaceEnv, ...gateEnv };
 }
 
 /**
@@ -179,6 +184,9 @@ export interface QualityGateRunOptions {
   vmName?: string;
   /** Template placeholders for resolving container names (e.g., {{FEATURE_FOLDER}}) */
   placeholders?: TemplatePlaceholders;
+  /** PAN-5062: the opted-in workspace .env, merged into host gates only —
+   *  container and remote (fly ssh) gates never see it. */
+  workspaceEnv?: Record<string, string>;
   /** PAN-2487: mirror of the human-readable gate progress lines (start/pass/fail
    *  per gate), e.g. into the per-issue ship log so the UI can show live progress. */
   onLog?: (line: string) => void;
@@ -325,6 +333,12 @@ export async function runQualityGates(
       ? replacePlaceholders(gate.command, opts.placeholders)
       : gate.command;
 
+    // PAN-5062: gate.env values accept the same {{...}} placeholders as
+    // gate.command, e.g. DBT_SCHEMA: "dev_{{FEATURE_IDENT}}".
+    const gateEnv = gate.env && opts.placeholders
+      ? Object.fromEntries(Object.entries(gate.env).map(([k, v]) => [k, replacePlaceholders(v, opts.placeholders!)]))
+      : gate.env;
+
     // For remote workspaces, build and validate the SSH command BEFORE entering
     // the try/catch so validation errors propagate as real errors (not gate failures).
     const isRemote = opts.isRemote && opts.vmName;
@@ -388,8 +402,8 @@ export async function runQualityGates(
       // so map the gate.path (e.g., 'fe') to the container's working directory.
       const containerWorkdir = gate.path ? `/workspaces/feature/${gate.path}` : '/workspaces/feature';
       // Pass gate.env as -e flags so env vars reach the container process
-      const envFlags = gate.env
-        ? Object.entries(gate.env).map(([k, v]) => `-e ${k}="${v}"`).join(' ')
+      const envFlags = gateEnv
+        ? Object.entries(gateEnv).map(([k, v]) => `-e ${k}="${v}"`).join(' ')
         : '';
       resolvedCommand = `docker exec ${envFlags} -w "${containerWorkdir}" "${containerName}" ${command}`;
       console.log(`[quality-gate] Running in container: ${containerName} (workdir: ${containerWorkdir})`);
@@ -453,7 +467,9 @@ export async function runQualityGates(
 
         // When running in container, don't set host cwd (irrelevant)
         const useHostCwd = !isRemote && !(gate.container && gate.container_name);
-        const env = buildQualityGateEnv(gate.env);
+        // PAN-5062: workspaceEnv merges into host gates only — container (-e
+        // flags, computed above) and remote (fly ssh) gates never see it.
+        const env = buildQualityGateEnv(gateEnv, useHostCwd ? opts.workspaceEnv : undefined);
         if (admission) env.OVERDECK_GATE_ADMITTED = '1';
         const execPromise = execAsync(resolvedCommand, {
           cwd: useHostCwd ? cwd : undefined,
