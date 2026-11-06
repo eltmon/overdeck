@@ -684,3 +684,9 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
 
 - All 29 work items (PAN-4930 to PAN-4958) merged, deployed in 4753858b36c and closed out; the epic is closed. The operator still owns publishing the integration packages to external registries (D-5).
 - Today's substrate fixes from this run: PAN-4993 (convergence false positive), PAN-5003 (merge door re-rebase), PAN-5011 (composer lock on idle Herdr agents), PAN-5015 (lost verdicts on GraphQL errors), PAN-5020 (last-verified line conflicts), PAN-5036 (scheduler skip reasons), PAN-5042 (PR listing flaps). Open: PAN-5007 (operator restart hold), PAN-5054 (ACCEPTANCE.md union merge), PAN-5046 (phone link churn).
+
+## 2026-11-06 resume after crash
+
+- Session restored after an unexpected process end; cadence re-armed. PAN-5068, PAN-5074, PAN-5083, PAN-5084 had merged meanwhile; deployed build 228e16c09e0 (main CI green at 802f65e) and closed all four. PAN-5069, PAN-5061, PAN-5064 were deployed and closed before the crash (build 03cb283a2aa).
+- Mistake to avoid: `gh issue list --search "<title words>" --limit 1` returned an old issue (PAN-4208), and `pan start` ran on it. Always start by the number `gh issue create` printed, never by a search.
+- Disk: 2.0 GiB free after the reload build. Close-outs plus `docker image prune -a` / `docker volume prune` brought it to 7.5 GiB, still under the 10 GiB start floor. Big holders: ~/.overdeck/transcript-preservation 53G (never touch), ~/.overdeck/agents 26G (conv-* dirs 0.5-0.8G each), pnpm store 12G (v10 + v11; `pnpm` shim is broken under nvm Node 22, so `pnpm store prune` fails), ~/.cache/huggingface 9.5G, restic cache 5.2G (never). Operator decision needed for anything larger.
