@@ -71,7 +71,9 @@ Both commands run the same Herdr setup:
 - **Session server.** One headless `herdr --session <session> server` per
   Overdeck home. On a systemd host it runs as the user unit
   `<session>-herdr.service` — `overdeck-herdr.service` for the default home.
-  Elsewhere it is started detached, logging to
+  The unit sets `OOMPolicy=continue`: when the kernel kills one process in a
+  pane for lack of memory, only that process dies, and the server and every
+  other agent keep running. Elsewhere it is started detached, logging to
   `~/.overdeck/logs/herdr-<session>.log`. `pan up` also makes sure this server
   is running.
 - **Integrations.** Herdr integrations report an agent's lifecycle to Herdr

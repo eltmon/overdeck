@@ -133,10 +133,16 @@ the session server runs. All three skip under an explicit tmux policy, `CI`, Vit
 | --- | --- | --- |
 | Binary | `~/.local/bin/herdr` | Vendor installer (`https://herdr.dev/install.sh`); stable channel. `pan install` updates when `https://herdr.dev/latest.json` is newer; `pan sync` only when no session server runs for this home. |
 | Config | `~/.config/herdr/config.toml` | `[session] resume_agents_on_restore = false`, edited line by line, checked by `herdr config check`, reloaded with `server reload-config`. |
-| Session server | `<session>-herdr.service` (`overdeck-herdr.service` for the default home) | systemd user unit, else a detached `herdr --session <session> server` logging to `~/.overdeck/logs/herdr-<session>.log`. |
+| Session server | `<session>-herdr.service` (`overdeck-herdr.service` for the default home) | systemd user unit with `OOMPolicy=continue` and `ManagedOOMPreference=avoid`, else a detached `herdr --session <session> server` logging to `~/.overdeck/logs/herdr-<session>.log`. |
 | Integrations | pilot set `pi`, `omp`, `kimi` (≥ 0.14.0), `opencode` | Installed only when the harness binary resolves. `claude`, `codex`, `hermes` are never installed or removed. |
 
 Nothing ever stops or restarts a running session server — a restart closes every agent pane.
+
+Every pane runs in the unit's cgroup. Under systemd's default `OOMPolicy=stop`, the kernel OOM-killing any
+one pane process stopped the whole unit, and `KillMode=control-group` then killed every pane (2026-11-06:
+one 660 MB OBS browser process took down every conversation). The unit sets `OOMPolicy=continue`, so only
+the killed process dies. `pan install`/`pan sync` rewrite the unit and run `daemon-reload`, which applies
+the policy to a running server without restarting it.
 `pan doctor` reports `Terminal backend`, `Herdr binary`, `Herdr server`, `Herdr config`, and one
 `Herdr integration: <target>` row per target.
 
