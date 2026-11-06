@@ -9,9 +9,6 @@ import { exitCli } from '../exit.js';
 import chalk from 'chalk';
 import type { Command } from 'commander';
 import { Effect } from 'effect';
-import { existsSync, readFileSync } from 'fs';
-import { join } from 'path';
-import { homedir } from 'os';
 import { userInfo } from 'os';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
@@ -21,6 +18,7 @@ import { resolveBareNumericId } from '../../lib/issue-id.js';
 import { mapGitHubStateToCanonical, type CanonicalState } from '../../core/state-mapping.js';
 import { acceptFlagFor, canAcceptDodMisses, DOD_ROWS, type DodRowId } from '../../lib/lifecycle/dod.js';
 import { isTrackerIssueClosed } from '../../lib/cloister/issue-closed.js';
+import { resolveGitHubIssue } from '../../lib/tracker-utils.js';
 import { createDeaconEventClient } from '../../lib/cloister/deacon-event-client.js';
 import { getDashboardApiUrl } from '../../lib/config.js';
 
@@ -128,26 +126,6 @@ export function registerCloseCommand(program: Command): void {
     'Record a residue disposition (PAN-3396): close stale convention PRs/MRs, skip the DoD gate with verified evidence, and mark terminal without merge claim. Operator-conversation only; cannot be combined with --abandon or --accept-* flags',
   );
   command.action((id, options) => closeOutCommand(id, options));
-}
-
-function getGitHubConfig(): { owner: string; repo: string; prefix: string } | null {
-  const envFile = join(homedir(), '.overdeck.env');
-  if (!existsSync(envFile)) return null;
-
-  const content = readFileSync(envFile, 'utf-8');
-  const reposMatch = content.match(/GITHUB_REPOS=(.+)/);
-  if (!reposMatch) return null;
-
-  const repoStr = reposMatch[1].trim();
-  // Format: owner/repo:PREFIX or owner/repo
-  const parts = repoStr.split(',')[0]; // Take first repo
-  if (!parts) return null;
-
-  const [ownerRepo, prefix] = parts.split(':');
-  const [owner, repo] = ownerRepo.split('/');
-  if (!owner || !repo) return null;
-
-  return { owner, repo, prefix: prefix || repo.toUpperCase().replace(/-CLI$/, '').replace(/-/g, '') };
 }
 
 async function readGitHubCanonicalState(owner: string, repo: string, number: number): Promise<CanonicalState> {
@@ -305,25 +283,13 @@ export async function closeOutCommand(id: string, options: CloseOutOptions): Pro
     return exitCli(1);
   }
 
-  // Determine tracker type
-  const isGitHub = issueUpper.startsWith('PAN-');
-  let owner: string | undefined;
-  let repo: string | undefined;
-  let number: number | undefined;
-
-  if (isGitHub) {
-    const ghConfig = getGitHubConfig();
-    if (ghConfig) {
-      owner = ghConfig.owner;
-      repo = ghConfig.repo;
-      number = parseInt(issueId.replace(/^PAN-/i, ''), 10);
-    } else {
-      // Fallback for PAN- issues
-      owner = 'eltmon';
-      repo = 'overdeck';
-      number = parseInt(issueId.replace(/^PAN-/i, ''), 10);
-    }
-  }
+  // Determine tracker type. Same resolver as `pan start` and the dashboard
+  // close-out, so custom-prefix GitHub projects resolve too (PAN-2628).
+  const gh = resolveGitHubIssue(issueId);
+  const isGitHub = gh.isGitHub;
+  const owner = gh.isGitHub ? gh.owner : undefined;
+  const repo = gh.isGitHub ? gh.repo : undefined;
+  const number = gh.isGitHub ? gh.number : undefined;
 
   let canonicalState: CanonicalState | null = null;
   let canonicalStateError: string | null = null;
@@ -364,6 +330,13 @@ export async function closeOutCommand(id: string, options: CloseOutOptions): Pro
     console.log(chalk.gray('  3. Clean up workspace and agent state'));
     console.log(chalk.gray('  4. Close the tracker issue and clear review status'));
     console.log();
+
+    // PAN-2628: with no TTY, readline never answers and Node exits 13 on the
+    // unsettled top-level await. Refuse clearly instead.
+    if (!process.stdin.isTTY) {
+      console.error(chalk.red('Close-out needs confirmation: run it in an interactive terminal or pass --force.'));
+      return exitCli(1);
+    }
 
     const readline = await import('readline');
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
