@@ -10,6 +10,11 @@ Desktop, another agent harness, a chat bot) can list conversations, read one,
 send a message, start a conversation or a worker, and answer prompts that wait
 on you. It reaches this machine and the machines it is linked to (see Fleet reach).
 
+Overdeck's anonymous telemetry records which MCP surface, protocol revision and
+client family opened a session and which tools were called, at most once a day
+each, never names, versions, tokens or arguments. See
+[Telemetry](/configuration/telemetry) to turn it off.
+
 Every agent Overdeck launches on Claude Code, Codex, `acp` or `opencode` gets
 this server with its own token (see [Agents get these tools](#agents-get-these-tools)),
 and outside tools and bots reach it with a token you create. It is separate
