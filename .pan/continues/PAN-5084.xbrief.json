@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5084",
   "created": "2026-11-06T04:10:40.261Z",
-  "updated": "2026-11-06T06:32:58.139Z",
+  "updated": "2026-11-06T06:33:12.500Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -188,6 +188,10 @@
     "browser-install-kind.ac3": {
       "status": "completed",
       "doneAt": "2026-11-06T06:32:58.139Z"
+    },
+    "settings-ui-disabled-reason.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-06T06:33:12.499Z"
     }
   }
 }
