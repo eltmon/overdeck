@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5094",
   "created": "2026-11-06T17:38:04.566Z",
-  "updated": "2026-11-06T18:47:35.309Z",
+  "updated": "2026-11-06T18:48:04.875Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -118,6 +118,10 @@
     "owner-door-disk.ac3": {
       "status": "completed",
       "doneAt": "2026-11-06T18:47:35.309Z"
+    },
+    "reapable-rule.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-06T18:48:04.874Z"
     }
   }
 }
