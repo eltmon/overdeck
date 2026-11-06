@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-06T23:22:09.135460Z · model: claude-opus-5-5 · open: 870_
+_Last sequenced: 2026-11-06T23:25:05.717050Z · model: claude-opus-5-5 · open: 868_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -24,8 +24,6 @@ _Last sequenced: 2026-11-06T23:22:09.135460Z · model: claude-opus-5-5 · open: 
 | 17 | PAN-4675 | S | critical | ok |  |  | One transient gh label timeout aborts post-merge lifecycle; merge door replies Already merged, so the issue can never close. |
 | 18 | PAN-4705 | S | high | ok |  |  | quality-gate-admission test leaks a poller past afterEach rmSync; unhandled ENOENT fails unrelated PR CI shards. |
 | 19 | PAN-4746 | S | high | ok |  |  | CI test shard flakes on ENOTEMPTY: afterEach rmSync races an unawaited snapshot write; reds unrelated PRs (seen on #4745). |
-| 20 | PAN-5094 | M | high | ok |  |  | pan lane start skips the disk floor and superseded lanes are never reaped; one gauntlet run filled / with 31 lanes (~45 GiB). |
-| 21 | PAN-5093 | M | high | ok |  |  | Disk hit 17 MB unnoticed (embeddings.db burst too); no alert below 5/2 GiB risks SQLite/JSONL truncation. Add Needs-you + push. |
 | 22 | PAN-4572 | M | medium | ok |  |  | Residual re-render offenders PAN-4560 profiled but left: unmemoized deck rows, App 5 s poll, clock/selector identity bugs. |
 | 23 | PAN-4625 | S | high | ok |  |  | CI relay debounces a later failed check on the same head, so agents never see a failing test shard; lands after PAN-4534 (same file) |
 | 24 | PAN-4586 | XS | critical | ok |  |  | Herdr pane.read nests text under result.read; every Overdeck pane-text reader gets '' — detection, inventory, resume all blind |
@@ -954,14 +952,6 @@ New since the prior pass. A latent race in the PAN-4546 admission test fails who
 
 New flaky-test bug: a background membership-snapshot write races the test's teardown rmSync and turned an unrelated PR's CI shard red. Ranked next to PAN-4705, the same leaked-async-work-vs-teardown pattern, because each red shard costs a PR a rerun on the path to merge.
 
-### PAN-5094 (rank 20)
-
-New node placed just above PAN-5093: this is the prevention half of the 2026-11-06 disk incident (lane launches bypass reserveDiskFloor and pile up unreaped), while PAN-5093 is the detection half, and the fix plus tests and docs is fully specified.
-
-### PAN-5093 (rank 21)
-
-Rank held at 20: the 2026-11-06 owner comment adds scope rather than changing priority. It traces the second drop to the dashboard writing the conversation-search embeddings.db (sqlite-vec growth to ~4 GB) and a stale 2.4 GB copy at the default path, so the alert hints should show index size and the fix should decide on the stale copy. The issue stays a well-specified, high-impact substrate bug below the pipeline-unblocking criticals.
-
 ### PAN-4572 (rank 22)
 
 PAN-4560 merged (closed completed 2026-10-20), so this follow-up is now unblocked; rank held at 19 near the top tier because its offenders are already measured and file-referenced.
@@ -1198,6 +1188,14 @@ New since the prior run (filed by the PAN-4532 plan critic). recoverStalledRevie
 
 Triage: verify whether blocking-choice-menu detection is wired to the current liveness/health surface. Rank held.
 
+### PAN-3205 (rank 81)
+
+New this pass. The deployment gate's queue message is unusually good — it names the holders, the queue age, and warns against forcing — and it promises a 'next verification boundary' trigger that does not exist. Every holder cleared and the deploy never fired; the live build stayed stale for 35 minutes until a manual reload. A correct-sounding instruction that cannot happen is worse than no message.
+
+### PAN-3118 (rank 82)
+
+Triage: verify "running at $0.00 with no capacity fallback" against the current liveness definition. Rank held.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1205,10 +1203,10 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-06T23:22:09.135460Z",
+  "generatedAt": "2026-11-06T23:25:05.717050Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 870,
+  "openCount": 868,
   "nodes": [
     {
       "issue": "PAN-5001",
@@ -1454,32 +1452,6 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "dependsOn": [],
       "why": "CI test shard flakes on ENOTEMPTY: afterEach rmSync races an unawaited snapshot write; reds unrelated PRs (seen on #4745).",
       "rationale": "New flaky-test bug: a background membership-snapshot write races the test's teardown rmSync and turned an unrelated PR's CI shard red. Ranked next to PAN-4705, the same leaked-async-work-vs-teardown pattern, because each red shard costs a PR a rerun on the path to merge.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5094",
-      "rank": 20,
-      "size": "M",
-      "importance": "high",
-      "score": 80,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan lane start skips the disk floor and superseded lanes are never reaped; one gauntlet run filled / with 31 lanes (~45 GiB).",
-      "rationale": "New node placed just above PAN-5093: this is the prevention half of the 2026-11-06 disk incident (lane launches bypass reserveDiskFloor and pile up unreaped), while PAN-5093 is the detection half, and the fix plus tests and docs is fully specified.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5093",
-      "rank": 21,
-      "size": "M",
-      "importance": "high",
-      "score": 78,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Disk hit 17 MB unnoticed (embeddings.db burst too); no alert below 5/2 GiB risks SQLite/JSONL truncation. Add Needs-you + push.",
-      "rationale": "Rank held at 20: the 2026-11-06 owner comment adds scope rather than changing priority. It traces the second drop to the dashboard writing the conversation-search embeddings.db (sqlite-vec growth to ~4 GB) and a stale 2.4 GB copy at the default path, so the alert hints should show index size and the fix should decide on the stale copy. The issue stays a well-specified, high-impact substrate bug below the pipeline-unblocking criticals.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13162,34 +13134,6 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
-    },
-    {
-      "from": "PAN-3811",
-      "to": "PAN-5093",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
-    },
-    {
-      "from": "PAN-5048",
-      "to": "PAN-5093",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.4
-    },
-    {
-      "from": "PAN-3771",
-      "to": "PAN-5093",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.3
-    },
-    {
-      "from": "PAN-5093",
-      "to": "PAN-5094",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
     },
     {
       "from": "PAN-5095",
