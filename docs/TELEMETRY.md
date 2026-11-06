@@ -24,9 +24,70 @@ Use any of these controls:
 3. Set `OVERDECK_TELEMETRY=0` or `OVERDECK_TELEMETRY=false` in the process
    environment.
 
-The environment variable wins over the YAML setting. Disabled telemetry does
-not initialize either PostHog SDK and makes server, CLI, frontend, exception,
-and feature-flag operations local no-ops.
+`resolveTelemetryState()` (`src/lib/telemetry/config.ts`) is the one door for
+effective state. Six rows, first match wins:
+
+| Row | Check | Result |
+| --- | --- | --- |
+| 1 | `OVERDECK_TELEMETRY=0` or `OVERDECK_TELEMETRY=false` | off, reason `environment` |
+| 2 | `telemetry.enabled: false` in config | off, reason `config` |
+| 3 | `OVERDECK_TELEMETRY=1` or `OVERDECK_TELEMETRY=true` | on |
+| 4 | Running in CI (see Automatic exclusions below) | off, reason `ci` |
+| 5 | A temporary Overdeck home (see Automatic exclusions below) | off, reason `temporary_home` |
+| 6 | None of the above | on |
+
+`OVERDECK_TELEMETRY=1` only turns telemetry back on when an automatic
+exclusion (row 4 or 5) would otherwise disable it. It never overrides an
+explicit opt-out: `OVERDECK_TELEMETRY=0` (row 1) and `telemetry.enabled: false`
+(row 2) both still win.
+
+Disabled telemetry does not initialize either PostHog SDK and makes server,
+CLI, frontend, exception, and feature-flag operations local no-ops.
+
+## Automatic exclusions
+
+Two environments are excluded from telemetry by default, without any
+configuration:
+
+- **CI runs.** Any process where `CI` is set to a truthy value (anything but
+  empty, `0`, or `false`).
+- **Temporary Overdeck homes.** An `OVERDECK_HOME` that resolves (symlinks
+  included) inside `os.tmpdir()`, `/tmp`, or `~/.overdeck/tmp` — the homes test
+  harnesses and throwaway scripts create per run.
+
+`detectTelemetryAutoExclusion()` (`src/lib/telemetry/environment.ts`) makes
+this decision from injectable inputs only, so it is unit-tested without
+touching the real filesystem or environment. The reason it returns —
+`ci` or `temporary_home` — is surfaced as `telemetry.disabledBy` from the
+Settings API and shown in **Settings → Telemetry**.
+
+Vitest (`VITEST` set) and `NODE_ENV=test` still block telemetry unconditionally,
+as they did before automatic exclusions existed — a belt-and-braces check
+inside `AnalyticsService`, independent of `resolveTelemetryState()`. Every CI
+workflow (`ci.yml`, `windows-smoke.yml`) and every test harness that spawns a
+real server or CLI process additionally sets `OVERDECK_TELEMETRY=0` itself, so
+a CI run or test process never relies on the auto-exclusion alone.
+
+## Install kind
+
+Every event also carries `install_kind`, one of `user`, `remote_vm`,
+`dev_checkout`, or `container`. `resolveInstallKind()`
+(`src/lib/telemetry/install-kind.ts`) resolves it in this order, each probe
+wrapped so a permission error falls through rather than throwing:
+
+1. A marker file at `${OVERDECK_HOME}/install-kind`, when its trimmed content
+   is one of the four values above.
+2. `dev_checkout`, when `isDevMode()` detects a `src/` directory next to the
+   installed package — true for a source checkout, including the dashboard
+   this repository runs via `pan reload`.
+3. `container`, when `/.dockerenv` or `/run/.containerenv` exists.
+4. `user` otherwise.
+
+Fly machine provisioning (PAN-5084) writes the `remote_vm` marker right after
+the identity file, before `pan serve` starts, so every throwaway Fly VM
+reports as a disposable install rather than a new one. The browser gets
+`install_kind` from `/api/settings` and registers it as a PostHog super
+property alongside the install ID.
 
 ## Anonymous install identity
 
@@ -199,11 +260,11 @@ queue wait or execution exceeds one second. Use the lane, wait time, run time,
 and queue depth to distinguish worker congestion from a slow operation. These
 raw timings stay in local logs and are not sent as anonymous telemetry.
 
-Node events also receive the anonymous install ID and the centrally stamped
-`$process_person_profile: false`, platform, architecture, Overdeck version, and
-client type. The frontend registers the same install ID and configures PostHog
-for identified-only person profiles, so anonymous product events do not create
-person profiles.
+Node events also receive the anonymous install ID, the install kind, and the
+centrally stamped `$process_person_profile: false`, platform, architecture,
+Overdeck version, and client type. The frontend registers the same install ID
+and install kind and configures PostHog for identified-only person profiles,
+so anonymous product events do not create person profiles.
 
 ## Error tracking and source maps
 
