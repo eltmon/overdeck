@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5084",
   "created": "2026-11-06T04:10:40.261Z",
-  "updated": "2026-11-06T06:07:09.378Z",
+  "updated": "2026-11-06T06:07:17.962Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -68,6 +68,11 @@
       "claimedBy": "agent-pan-5084",
       "claimedAt": "2026-11-06T06:04:56.737Z",
       "doneAt": "2026-11-06T06:07:09.378Z"
+    },
+    "harness-telemetry-off": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5084",
+      "claimedAt": "2026-11-06T06:07:17.962Z"
     }
   }
 }
