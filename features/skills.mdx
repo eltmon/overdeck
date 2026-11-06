@@ -196,19 +196,29 @@ See the [Claude skill creator](/cli/core-commands) or use `/pan-skill-creator` f
 
 Skills can be distributed via:
 
-1. **Project-specific** - Store in `.overdeck/skills/` in your repo
+1. **Project skills** — commit them to `.pan/skills/<name>/` in the project repo. See [Project skills](#project-skills).
 2. **User-specific** - Store in `~/.overdeck/skills/` (synced to AI tools)
-3. **Team-shared** - Commit to version control and share via git
-4. **Public packages** - Distribute via npm or GitHub
+3. **Third-party skill repositories** — register them as a [skill pack](/features/skill-packs) with `pan skills pack add`; to publish your own, see [Authoring a skill pack](/guides/skill-pack-authoring).
+4. **Overdeck's bundled skills** ship in `sync-sources/skills/` and reach every machine through `pan sync`.
+
+### Project skills
+
+Project skills live at `<projectRoot>/.pan/skills/<name>/` in the project's own repo. The catalog lists them last, so a project skill with the same name as a skill in `~/.overdeck/skills`, `~/.claude/skills` or `~/.agents/skills` is listed as that other skill instead. Project skills never appear on the global Skills page — only in that project's settings and its issues.
+
+Overdeck copies `.pan/skills/<name>/` into `<workspace>/.claude/skills/<name>/` once, when the workspace manager creates an issue workspace (planning, the dashboard, swarm, or PR adoption). Two cases copy nothing:
+
+- `pan workspace create` for a project with no `workspace:` block in `projects.yaml` — the CLI fallback does not copy project skills.
+- An existing workspace — `pan workspace update`, `pan sync-main` and `pan sync` never copy project skills into it.
+
+A target directory that already exists is never overwritten, and bundled skills are copied first, so a project skill with the same name as a bundled skill is skipped and the bundled skill wins.
+
+Only Claude Code sessions whose working directory is the issue workspace see project skills: work agents, and a `pan handoff --issue` successor. Codex and Pi agents do not receive project skills, and a conversation started outside the issue workspace does not see them either.
 
 ### Syncing Skills
 
 ```bash
 # Sync all skills to Claude Code (~/.claude/skills) and Codex/Pi (~/.agents/skills)
 pan sync
-
-# Only sync skills (skip agents, hooks)
-pan sync --skills-only
 
 # Verify sync status
 pan sync --dry-run
@@ -243,7 +253,7 @@ The pipeline depends on these 11 skills, so they are always on and cannot be ove
 |-------|-----------|
 | Global | `~/.overdeck/config.yaml`, under `skills.overrides` (`<skill>: false`) |
 | Project | `~/.overdeck/projects.yaml`, under `projects.<key>.skill_overrides` |
-| Issue | `<planHome>/.pan/skill-overrides/<ISSUE>.yaml` in the project's plan home, committed and pushed on `main` as `chore(workspace): skill overrides for <ISSUE>` |
+| Issue | `<planHome>/.pan/skill-overrides/<ISSUE>.yaml`, committed in the plan home on its checked-out branch (normally `main`) and pushed to that branch's upstream; if the push fails, `pan skills set` prints `push pending: <reason>` and the commit stays local |
 | Conversation | `conversations.skill_overrides` (JSON) in `~/.overdeck/overdeck.db`; the conversation's launcher rereads it at every launch |
 
 Clearing the last override for an issue deletes its file and commits the deletion. Skills that exist only in a project's `.pan/skills/` directory are **project skills**: they appear in that project's settings and its issues, never on the global Skills page.
@@ -275,7 +285,7 @@ Overrides are resolved when Overdeck launches an agent. They apply to Overdeck-m
 - Claude Code launches receive `--settings '{"skillOverrides":{"<skill>":"off"}}'`, which hides every copy of the skill by name.
 - Codex launches get `[[skills.config]] name = "<skill>" enabled = false` entries in the agent's own `$CODEX_HOME/config.toml`.
 
-Overrides do not apply to other harnesses, to remote (Fly) launches, or to sessions you start yourself outside Overdeck. If the override step fails at launch, the agent starts with every skill and the launcher prints a warning.
+Overrides and packs do not apply to Pi, other harnesses, remote (Fly) launches, or sessions you start outside Overdeck. A Pi conversation accepts the dialog's Skills choices and `pan handoff --skill/--pack`, but Pi never applies them. If the override step fails at launch, the agent starts with every skill and the launcher prints a warning. See the [Skill settings reference](/configuration/skills) for every config key.
 
 `pan sync` still installs every skill everywhere; hiding happens per launch, and no skill files are copied, moved, or deleted.
 

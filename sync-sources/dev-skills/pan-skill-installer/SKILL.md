@@ -3,7 +3,7 @@ name: pan-skill-installer
 description: Install an external skill or Claude Code plugin into Overdeck's bundled distribution so pan sync ships it to every Overdeck user
 triggers:
   - install this skill for all overdeck users
-  - bundle this plugin
+  - ship this plugin with overdeck
   - distribute this skill via pan sync
   - add this plugin to overdeck
   - install skill from github
@@ -18,6 +18,12 @@ Overdeck user (or to Overdeck dev machines only).
 
 ## Step 1 — Identify what you're installing
 
+To use a third-party skill repository on your own machine, without shipping
+it to every Overdeck user, register it as a skill pack instead:
+`pan skills pack add <id> <url> --ref <ref>`. Packs are pinned to a commit
+and are off until you turn them on. See `features/skill-packs.mdx` and
+`guides/skill-pack-authoring.mdx`.
+
 Fetch or inspect the source first. The artifact type determines the mechanism:
 
 | Artifact | How to recognize it | Distribution mechanism |
@@ -25,6 +31,7 @@ Fetch or inspect the source first. The artifact type determines the mechanism:
 | **Plain skill** | A directory with `SKILL.md` (plus optional scripts/references) | Copy into `sync-sources/skills/<name>/` |
 | **Dev-only skill** | Same shape, but only useful on an overdeck source checkout | Copy into `sync-sources/dev-skills/<name>/` |
 | **Claude Code plugin** | A repo with `.claude-plugin/marketplace.json`, installed via `/plugin install` — often has its own runtime (TypeScript, MCP servers, commands) | Add an entry to `sync-sources/plugins.json` |
+| **Third-party skill repo, for use rather than distribution** | A skill repository you want on your own machine only, not shipped to every user | `pan skills pack add` |
 
 A plugin can NOT be flattened into a skill: it carries slash commands and a
 runtime that only Claude Code's plugin system can load. Conversely, a plain
@@ -94,5 +101,5 @@ receive it on their next `pan install` / `pan sync` after release.
 ## Related
 
 - `/pan-skill-creator` — authoring a NEW skill from scratch (shapes, frontmatter, lint rules)
-- `/pan-sync` — how the sync pipeline distributes bundles to each harness
+- `/pan-sync` — how the sync pipeline distributes bundled skills to each harness
 - `docs/SKILLS-CONVENTION.md` — wrapper-skill naming rules and the lint that enforces them

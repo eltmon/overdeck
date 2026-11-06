@@ -1,0 +1,278 @@
+{
+  "version": "1",
+  "issueId": "PAN-5064",
+  "created": "2026-11-05T22:52:07.107Z",
+  "updated": "2026-11-06T00:07:58.154Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-05T23:46Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-11-05T23:46:47.955Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-05T23:53:29.422Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-06T00:07Z] ci-monitor → FAILED — seq 2",
+      "timestamp": "2026-11-06T00:07:58.154Z"
+    }
+  ],
+  "items": {
+    "skills-page-fixes": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5064",
+      "claimedAt": "2026-11-05T22:52:07.107Z",
+      "doneAt": "2026-11-05T22:53:19.653Z"
+    },
+    "skill-packs-page-fixes": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5064",
+      "claimedAt": "2026-11-05T22:53:23.475Z",
+      "doneAt": "2026-11-05T22:55:26.965Z"
+    },
+    "skill-packs-dev-guide-fixes": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5064",
+      "claimedAt": "2026-11-05T22:55:31.225Z",
+      "doneAt": "2026-11-05T22:57:10.773Z"
+    },
+    "skills-cli-ref-fixes": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5064",
+      "claimedAt": "2026-11-05T22:57:15.107Z",
+      "doneAt": "2026-11-05T22:59:45.847Z"
+    },
+    "usage-md-fixes": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5064",
+      "claimedAt": "2026-11-05T22:59:49.578Z",
+      "doneAt": "2026-11-05T23:00:38.542Z"
+    },
+    "handoff-pack-help-text": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5064",
+      "claimedAt": "2026-11-05T23:00:43.536Z",
+      "doneAt": "2026-11-05T23:08:51.734Z"
+    },
+    "pack-authoring-guide": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5064",
+      "claimedAt": "2026-11-05T23:08:55.743Z",
+      "doneAt": "2026-11-05T23:10:10.957Z"
+    },
+    "skill-config-reference": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5064",
+      "claimedAt": "2026-11-05T23:10:15.960Z",
+      "doneAt": "2026-11-05T23:11:35.411Z"
+    },
+    "docs-nav-entries": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5064",
+      "claimedAt": "2026-11-05T23:11:40.002Z",
+      "doneAt": "2026-11-05T23:12:13.099Z"
+    },
+    "skill-installer-skill-update": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5064",
+      "claimedAt": "2026-11-05T23:12:19.187Z",
+      "doneAt": "2026-11-05T23:12:59.489Z"
+    },
+    "skill-creator-skill-update": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5064",
+      "claimedAt": "2026-11-05T23:13:04.272Z",
+      "doneAt": "2026-11-05T23:14:48.572Z"
+    },
+    "skill-bundle-term-alignment": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5064",
+      "claimedAt": "2026-11-05T23:14:54.209Z",
+      "doneAt": "2026-11-05T23:17:22.821Z"
+    },
+    "skills-page-fixes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:26:59.809Z"
+    },
+    "skills-page-fixes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:27:17.195Z"
+    },
+    "skills-page-fixes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:27:33.305Z"
+    },
+    "skills-page-fixes.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:27:48.346Z"
+    },
+    "skill-packs-page-fixes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:28:03.836Z"
+    },
+    "skill-packs-page-fixes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:28:18.820Z"
+    },
+    "skill-packs-page-fixes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:28:35.169Z"
+    },
+    "skill-packs-page-fixes.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:28:51.540Z"
+    },
+    "skill-packs-page-fixes.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:29:07.206Z"
+    },
+    "skill-packs-dev-guide-fixes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:29:22.465Z"
+    },
+    "skill-packs-dev-guide-fixes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:29:38.313Z"
+    },
+    "skill-packs-dev-guide-fixes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:29:53.800Z"
+    },
+    "skill-packs-dev-guide-fixes.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:30:09.592Z"
+    },
+    "skills-cli-ref-fixes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:30:25.943Z"
+    },
+    "skills-cli-ref-fixes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:30:42.650Z"
+    },
+    "skills-cli-ref-fixes.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:31:00.233Z"
+    },
+    "skills-cli-ref-fixes.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:31:17.213Z"
+    },
+    "usage-md-fixes.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:31:32.175Z"
+    },
+    "usage-md-fixes.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:31:47.443Z"
+    },
+    "handoff-pack-help-text.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:32:14.412Z"
+    },
+    "handoff-pack-help-text.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:32:30.265Z"
+    },
+    "handoff-pack-help-text.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:32:45.286Z"
+    },
+    "handoff-pack-help-text.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:33:00.579Z"
+    },
+    "pack-authoring-guide.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:33:15.218Z"
+    },
+    "pack-authoring-guide.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:33:29.280Z"
+    },
+    "pack-authoring-guide.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:33:44.183Z"
+    },
+    "pack-authoring-guide.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:33:59.646Z"
+    },
+    "pack-authoring-guide.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:34:15.532Z"
+    },
+    "skill-config-reference.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:34:31.374Z"
+    },
+    "skill-config-reference.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:34:46.016Z"
+    },
+    "skill-config-reference.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:35:01.055Z"
+    },
+    "docs-nav-entries.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:35:16.836Z"
+    },
+    "docs-nav-entries.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:35:33.626Z"
+    },
+    "skill-installer-skill-update.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:35:50.252Z"
+    },
+    "skill-installer-skill-update.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:36:07.192Z"
+    },
+    "skill-creator-skill-update.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:36:23.741Z"
+    },
+    "skill-creator-skill-update.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:36:38.835Z"
+    },
+    "skill-bundle-term-alignment.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:36:55.495Z"
+    },
+    "skill-bundle-term-alignment.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:37:11.600Z"
+    },
+    "skill-bundle-term-alignment.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-05T23:37:28.058Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-11-05T23:46:47Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-5064\n\n# Review — PAN-5064\n## Verdict: CHANGES REQUESTED — PR #5075 body lacks `Closes #4769` (required by the xBRIEF) and the PRD AC-11 mismatch table, so PAN-4769 stays open after merge\n\n## Context\n- Run ID: agent-pan-5064-review-abb1f313\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-5064/.pan/review/agent-pan-5064-review-abb1f313/context.json\n- Branch / workspace: feature/pan-5064 / /home/eltmon/Projects/overdeck/workspaces/feature-pan-5064\n- PR: https://github.com/eltmon/overdeck/pull/5075 (head abb1f3138c5, matches reviewed HEAD)\n- HEAD reviewed: abb1f3138c50c7ccd5071fa0e85040a8d559c781\n- Base: origin/main merge-base 5ff981f25cd (local `main` is stale; diff taken against origin/main merge-base). Prior cycle: none.\n\nThe file changes themselves are accurate and complete. Every PRD grep passes. Every factual claim I traced matches the code. The only blocker is PR metadata that the plan explicitly requires.\n\n## Blocking Findings\n\n### [requirements] PR body is missing `Closes #4769` (xBRIEF) and the mismatch table (PRD AC-11) — PR #5075 body\n- Severity: ! MUST\n- Classification / requirement scope: implementation defect (deliverable incomplete); in_pr_scope.\n- Trigger and changed-code connection: The xBRIEF spec the work agent executed from requires `Closes #4769` in two places: the decision at spec line 72 (\"PR closes #4769\") and the `skill-packs-page-fixes` item action (\"PR body: Closes #4769\"). The manifest's `acceptanceCriteria` is empty, and the spec has no mismatch-table AC, so the table requirement comes only from the PRD. `.pan/drafts/PAN-5064.md` AC-11: \"The PR description has a table with mismatches 1-17 and the work item that fixes each. None is rejected.\" PRD WI-2 step 8 repeats the `Closes #4769` requirement. The PRD \"Follow-ups\" section also says the PR description should link [PAN-5066](https://github.com/eltmon/overdeck/issues/5066) and [PAN-5067](https://github.com/eltmon/overdeck/issues/5067).\n- Expected / observed / impact: The expected body has a 17-row mismatch table, `Closes #4769`, and links to PAN-5066 and PAN-5067. The actual body (`gh pr view 5075 --json body`) is 16 lines: `**Issue:** #5064` and the 12-item checklist. It has no table, no `Closes #4769`, and no follow-up links. Impact: [PAN-4769](https://github.com/eltmon/overdeck/issues/4769) is still OPEN (`gh issue view 4769`). Its fix is in this PR (`features/skill-packs.mdx`: the \"Whole-pack toggles have no conversation level\" sentence and the reworded \"Removing gstack\" paragraph), but merging will not close it. Reviewers also lose the AC-11 traceability that the plan uses to show that none of the 17 mismatches was rejected.\n- Evidence: `gh pr view 5075 --json body -q .body | grep -n '4769\\|5066\\|5067\\|ismatch'` returns nothing. Limitation: none.\n- Fix: Edit the PR body (`gh pr edit 5075 --body-file …`). Add the mismatch table (#1-17 → WI, per the PRD \"Mismatch → work item map\"), a `Closes #4769` line, and links to PAN-5066 and PAN-5067. No file changes are needed.\n\n## Non-blocking Findings\n\n### [correctness] `commit` writer column lists `sync`, which never writes it — `configuration/skills.mdx:57`\n- Severity: ~ SHOULD\n- Classification: implementation defect (doc inaccuracy), in_pr_scope (new page).\n- The table says `pan skills pack add|update|sync` writes `commit`. `syncPack` (`src/lib/skill-packs/sources.ts`) never calls `writePackEntry`; only `addPack`, `updatePack`, `enablePackBrowser` and `disablePackBrowser` do. The same page says at lines 62-63 that sync \"never moves its `commit`\", so the page contradicts itself. PRD F-20 lists the writers as `add|update|browser|remove`. Fix: change the cell to `pan skills pack add|update`. The `browser` row already names its own writer.\n\n### [correctness] gc exit condition narrowed from \"read or parsed\" to \"fails to parse\" — `cli/skills-commands.mdx` (pack gc section)\n- Severity: ~ SHOULD\n- Classification: implementation defect (unrequested edit that loses accuracy), in_pr_scope.\n- `readPackRegistry` returns `readable: false` in four cases: a read error other than ENOENT (`readTextOrEmpty` rethrows inside the `try`), YAML errors, and a non-map `skills.packs`. `skillsPackGcCommand` exits 1 on `!registry.readable`. So the old wording \"cannot be read or parsed\" was correct. `features/skill-packs.mdx` still says \"cannot be read or parsed\", so the two pages now disagree. This edit is not in the PRD's WI-4. Fix: restore \"cannot be read or parsed\".\n\n### [requirements] License fallback wording implies `LICENSE.md` is tried after an unmatched `LICENSE` — `guides/skill-pack-authoring.mdx:103-108`\n- Severity: ? MAY\n- Classification: specification-adjacent wording, in_pr_scope.\n- `readLicense` returns on the first non-blank line of `LICENSE`, even when no token matches, so `LICENSE.md` is read only when `LICENSE` is absent or blank. The text \"the first non-blank line of `LICENSE`, then `LICENSE.md`\" can read as a fallback. PRD D-1 lists this as a known gap that PAN-5067 tracks. One clause (\"`LICENSE.md` is read only when there is no `LICENSE`\") would make the guide match the behavior.\n\n### [requirements] Over-general \"breaks the YAML is read as if empty\" — `configuration/skills.mdx:17-18`\n- Severity: ? MAY\n- A broken issue file and a broken `config.yaml` read as empty for the pack registry and for reads. But `pan skills set` on a broken global `config.yaml` exits 1 with `cannot parse <path>` (`store.ts`), as `cli/skills-commands.mdx` now documents. Consider scoping the sentence to reads.\n\n### [style] `pan-skill-creator` says the name rule applies \"everywhere else\" — `sync-sources/skills/pan-skill-creator/SKILL.md`\n- Severity: ? MAY\n- `^[a-z0-9][a-z0-9-]*$` is the pack adapter's `SKILL_NAME_PATTERN`. It is not a rule for every skill home. Suggest \"the pack rule\".\n\n## Coverage\n\n### Changed-file ledger\n| File | Status | Notes |\n| --- | --- | --- |\n| guides/skill-pack-authoring.mdx (HIGH) | reviewed | Traced F-1 to F-14 against `adapters.ts` (`detectAdapter`, `scanSkillDirs` depth 4 via `walk(start,1)`/`depth < PLAIN_MAX_DEPTH`, `claudePluginSkillDirs` string/array/other, `toRepoRelative`, `readPluginJson` strict only for claude-plugin, `readSkillFrontmatter`, `SKILL_NAME_PATTERN` drop and dedupe, `readLicense`, `notAppliedLabels`), `mount.ts` (`copyWithoutSymlinks`; the mount writes its own `plugin.json` with `name: pack.id`, so the example's `\"skills\": \"skills\"` is safe), `launcher-lines.ts` `appliesTo`, `skillsLaunchSettingsCommand` exit 2, `skillsPackAddCommand` url/ref defaults, and F-14 (the `conversation-forks.ts` fork route calls `resolveConversationSkillFlags` with no harness condition). Example commands are valid (`pan skills set --help`). One ? advisory. |\n| configuration/skills.mdx (MED) | reviewed | Keys checked against `sources.ts` (`toEntry`/`writePackEntry`, `browser === true`), `sageox/config.ts`, `sageox/binding.ts`, `deft/project-mode.ts`, `store.ts`. One ~ and one ? advisory. |\n| configuration/harnesses.mdx (MED) | reviewed | One-line cross-reference wording; matches WI-12. |\n| cli/skills-commands.mdx | reviewed | Error strings exist in `store.ts`/`conversation-flags.ts`. Deft `use/back/save/show` flags match `--help`. gc narrowing ~ advisory. |\n| features/conversations.mdx | reviewed | `--skill`/`--pack` rows match F-13, F-14 and F-16. |\n| features/skill-packs.mdx | reviewed | Every WI-2 step is present, PAN-4769 items 1-2 included, and the `#running-an-issue-on-deft` and `#what-is-not-applied` anchors exist. |\n| features/skills.mdx | reviewed | Project skills match `catalog.ts` root order, `mergePanSkillsIntoWorkspace` (no overwrite; only caller `workspace-manager/create.ts`, after `mergeSkillsIntoWorkspace`), and the `workspace-create.ts` fallback. |\n| packages/contracts/src/composer-commands.generated.ts | reviewed | Regenerated. `lint:slash-commands` passes. |\n| reference/harness-landscape.mdx | reviewed | Cross-reference wording. |\n| reference/template-conversations.mdx | reviewed | \"skill set\" rename. `pan bundle`/`skill-bundles/` identifiers kept (non-goal respected). |\n| src/cli/index.ts | reviewed | Only the `--pack` help string changed (D-5 wording). No behavior change. |\n| docs.json | reviewed | Two nav entries added at the PRD positions. |\n| docs/HARNESSES.md | reviewed | Cross-reference wording. |\n| docs/SKILL-PACKS.md | reviewed | The add-flow sageox steps match `addPack` order (preview → consent → render/ox build → write). `syncPack` and the browser flows match. The gstack `optIn` note matches `readPackManifest`. |\n| docs/USAGE.md | reviewed | `pack add` signature matches `skillsPackAddCommand`. Deft verbs match `--help`. |\n| sync-sources/dev-skills/pan-skill-installer/SKILL.md | reviewed | Trigger replaced, pack paragraph and table row added. |\n| sync-sources/skills/pan-skill-creator/SKILL.md | reviewed | New \"Where the skill goes\" section. One ? advisory. |\n| sync-sources/skills/pan-sync/SKILL.md | reviewed | Two noun renames. No command lines changed. |\n| .pan/drafts/PAN-5064.md | reviewed (as requirements source) | Plan artifact. |\n| .pan/specs/…PAN-5064….xbrief.json | reviewed (as requirements source) | Plan artifact. Its decision says the PR closes #4769. |\n| .pan/continues/PAN-5064.xbrief.json | not applicable | Plan runtime state. |\n\n### Dimensions\n- **Correctness:** The docs were traced claim by claim to code. Two ~ inaccuracies and three ? wording issues are listed above. The one code edit is a string literal.\n- **Security:** No trust boundary changes. This is docs plus one help string. No secrets in the examples, and the example URLs are placeholders inside code.\n- **Performance:** Not applicable. No runtime code changed.\n- **Requirements/UX:** All FR-1 to FR-10 and NFR-1 to NFR-3 content is met in files. AC-11 (PR description) is unmet, and so is the spec's \"Closes #4769\" requirement (blocking). Non-goals were respected: `src/` changes are limited to `src/cli/index.ts`, `changelog.mdx` is untouched, \"bundled\" is kept, and the `pan bundle` identifiers are kept.\n\n### AC → evidence\n| AC | Result | Evidence |\n| --- | --- | --- |\n| AC-1 | met | WI-1 greps: 0,0,0,0,1,1 |\n| AC-2 | met | WI-2 greps: 0,1,1,1,0,1. Subsection names the dialog and `pan handoff --pack`. |\n| AC-3 | met | WI-3 greps: 0,0,0,2,1,2 |\n| AC-4 | met | WI-4 greps: 0,1,4 |\n| AC-5 | met | WI-5 greps: 0,1 |\n| AC-6 | met | `lint:slash-commands` ✓; `handoff --help` shows `non-opt-in`; typecheck covered by `overdeck/test` gate pass |\n| AC-7 | met | Page exists with sections 1-9. Greps: 1,10,2,1 |\n| AC-8 | met | All seven keys present |\n| AC-9 | met | `docs lint passed (87 docs files, 79 published pages)`; nav check exit 0 |\n| AC-10 | met | Skill greps pass; CI `lint-group (skills)` pass on HEAD; `grep -rni 'skill bundle'` hits only the allowed lines |\n| AC-11 | **unmet** | The PR body has no mismatch table |\n| AC-12 | met | `git diff --name-only origin/main...HEAD -- src/` → `src/cli/index.ts` only |\n\nSecond pass: I rechecked the MDX placeholder rule (NFR-1) with a script over the new and edited `.mdx` prose. It found no bare angle-bracket placeholders or `$` in changed lines. The only hits were pre-existing `<ThemedImage>` components and pre-existing multi-line inline code at `cli/skills-commands.mdx` lines 159 and 301, outside the diff hunks.\n\n## Verification\n- `node scripts/lint-docs.js` → `docs lint passed`.\n- `npm run lint:slash-commands` → `✓ composer-command manifest matches the CLI registry`.\n- `node dist/cli/index.js handoff --help` → `--pack` shows \"Turn on every non-opt-in skill…\".\n- All PRD WI greps were run (results in the AC table).\n- CI on PR head abb1f3138c5 (`gh pr checks 5075`): lint, lint-group (core/effect/skills/state), build (22), integrations, the clean-install smoke test, the prompt trailer gate and `overdeck/test` (typecheck+lint) pass. test-shard 1/2/4, test-e2e and the flake lane were **pending** at review time, so they are unverified. This is a low-risk change: docs plus one help string, with the regenerated manifest verified.\n- `lint:effect-diagnostics`: covered by CI `lint-group (effect)` pass on exact HEAD. Not run separately.\n- Full test suite was not run (per role).\n\n## Scope Note\nThe blocker is PR metadata only. The fix is a `gh pr edit` with no new commit. It does not invalidate this review's file-level approval.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-5064/.pan/review/agent-pan-5064-review-abb1f313/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-5064 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 2,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-06T00:07:58Z",
+      "markdownBody": "# CI Failure Feedback for PAN-5064\n\nPull request: https://github.com/eltmon/overdeck/pull/5075 (head `606b9b19`)\n\nSource: check_run:test-shard (2/4)\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\n## Failing checks (1)\n\n### test-shard (2/4)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/127613593139/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/42132789072/job/127613593139  \n```\nrunning.\nThe latest test that might've caused the error is \"admits waiters in FIFO order and holds the next waiter until release\". It might mean one of the following:\n- The error was thrown, while Vitest was running this test.\n- If the error occurred after the test had been completed, this was the last documented test before it was thrown.\n\n##[error]Process completed with exit code 1.\nPost job cleanup.\n[command]/usr/bin/git version\ngit version 2.56.0\nTemporarily overriding HOME='/home/runner/work/_temp/ca867705-a955-4730-8415-3f6248f7a6b3' before making global git config changes\nAdding repository directory to the temporary git global config as a safe directory\n[command]/usr/bin/git config --global --add safe.directory /home/runner/work/overdeck/overdeck\n[command]/usr/bin/git config --local --name-only --get-regexp core\\.sshCommand\n[command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'core\\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\"\n[command]/usr/bin/git config --local --name-only --get-regexp http\\.https\\:\\/\\/github\\.com\\/\\.extraheader\nhttp.https://github.com/.extraheader\n[command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader\n[command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'http\\.https\\:\\/\\/github\\.com\\/\\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\"\n[command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\\.gitdir:\n[command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url\nCleaning up orphan processes\n##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-node@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    }
+  ],
+  "agentModel": "claude-opus-5-5"
+}

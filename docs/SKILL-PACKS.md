@@ -9,7 +9,11 @@ pack add` to a mounted skill, the adapter contract, and how to add a known
 pack or write a new adapter. For the operator-facing feature — the quickstart,
 the pack catalog, the trust model, and the fork runbook — see
 [features/skill-packs.mdx](../features/skill-packs.mdx). For every CLI flag,
-see [cli/skills-commands.mdx](../cli/skills-commands.mdx).
+see [cli/skills-commands.mdx](../cli/skills-commands.mdx). For what makes a
+third-party repository a valid pack, see
+[guides/skill-pack-authoring.mdx](../guides/skill-pack-authoring.mdx). For
+every config key, see
+[configuration/skills.mdx](../configuration/skills.mdx).
 
 ## Module map
 
@@ -155,19 +159,41 @@ Fork contract and ledger: [docs/SAGEOX-FORK.md](SAGEOX-FORK.md). User guide:
    `~/.overdeck/packs/<id>/<commit>/`, honoring the known pack's `pluginRoot`.
 3. The adapter reads the manifest (`readPackManifest`).
 4. For `gstack-runtime` only: `assertRenderable`, then a render preview.
-5. The consent prompt asks to trust the commit (`--yes` is required without a
+5. For `sageox` only: `oxBuildPreview` adds the build to the preview.
+6. The consent prompt asks to trust the commit (`--yes` is required without a
    TTY).
-6. For `gstack-runtime` only: `renderRuntimePack` runs the fork's pack-mode
-   setup.
-7. `writePackEntry` writes the registry entry.
-8. At launch, the launcher runs the hidden `pan skills launch-settings` step.
-9. It calls `loadSkillOverrideLayers` and `listPackCatalog`.
-10. `resolveLaunchPackSelection` resolves each pack skill's on/off state and
+7. For `gstack-runtime` only: `renderRuntimePack` runs the fork's pack-mode
+   setup. For `sageox` only: `buildPackOx` runs the build (`addPack` in
+   `sources.ts`).
+8. `writePackEntry` writes the registry entry.
+9. At launch, the launcher runs the hidden `pan skills launch-settings` step.
+10. It calls `loadSkillOverrideLayers` and `listPackCatalog`.
+11. `resolveLaunchPackSelection` resolves each pack skill's on/off state and
     collects warnings.
-11. `buildMount` builds the content-addressed mount.
-12. Claude Code: `linkClaudeMount`, then the launch passes `--plugin-dir
+12. `buildMount` builds the content-addressed mount.
+13. Claude Code: `linkClaudeMount`, then the launch passes `--plugin-dir
     <launch link>`. Codex: `writeCodexPackBlock` writes the `overdeck-packs`
     local marketplace into the agent's `CODEX_HOME`.
+
+### Update
+
+`updatePack`: fetch; resolve the ref or `--ref`; extract; read the manifest;
+diff against the trusted commit (added, removed and changed skills, new
+capabilities); return without asking when the commit and ref are unchanged;
+preview the render, browser and ox build; consent; render, build the browser
+runtime when consent is recorded, build ox; `writePackEntry` with the new ref
+and commit.
+
+### Sync
+
+`syncPack`: fetch; extract the trusted commit (never moves it); for
+`gstack-runtime`, render, and build a missing browser runtime when consent is
+recorded; for `sageox`, build `ox` without asking.
+
+### Browser
+
+`enablePackBrowser` / `disablePackBrowser`: a second consent; build into
+`~/.overdeck/packs/gstack/browser`; record `browser: true`. Off clears it.
 
 ## Adapter contract
 
@@ -181,9 +207,11 @@ fields each adapter fills in — see their type definitions in `adapters.ts`.
 - **`deft-readonly`** — reads `content/skills/deft-directive-<name>/`,
   filtered to the read-only allowlist `DEFT_READONLY_SKILLS`; its mount
   transform inserts the host notice into every mounted `SKILL.md`.
-- **`gstack-runtime`** — reads from the render; skills are classified by
-  `GSTACK_SKILL_MAP`, and its mount transform reads from the render instead of
-  the raw checkout.
+- **`gstack-runtime`** — reads the manifest from the extraction
+  (`packExtractDir`, in `listPackCatalog` and `addPack`); skills are
+  classified by `GSTACK_SKILL_MAP`; only the mount reads the render
+  (`resolveLaunchPackSelection` sets `root` to `packRenderDir` for
+  `gstack-runtime`), and its mount transform applies there.
 
 ## `KnownPack` fields
 
@@ -196,20 +224,28 @@ fields each adapter fills in — see their type definitions in `adapters.ts`.
 | `pluginRoot` | Repo-relative directory holding the plugin (manifest, skills, agents, hooks, license); default the repo root | `pstack` |
 | `ref` | Ref `pan skills pack add <id>` pins when `--ref` is omitted (a tag, branch, or 40-hex commit) | `pstack`, `sageox` |
 | `mountExtras` | Plugin-root-relative files or directories the mount copies next to `skills/` | `pstack` |
-| `optIn` | Skill names that are opt-in: the pack toggle never turns them on | `mattpocock`, `sageox`, `gstack`, `pstack` |
+| `optIn` | Skill names that are opt-in: the pack toggle never turns them on | `mattpocock`, `sageox`, `pstack` |
 | `disclosure` | One-line statement of what leaves the machine, shown on the pack row | `sageox`, `gstack` |
+
+`gstack` ignores the `optIn` field: `readPackManifest` takes its opt-ins from
+`GSTACK_OPT_IN_SKILLS` and `GSTACK_BROWSER_OPT_IN_SKILLS` (`gstack.ts`)
+instead.
 
 ## Adding a known pack
 
 1. Add a `KNOWN_PACKS` entry in `adapters.ts`.
 2. Choose an adapter.
 3. Set `optIn` for every skill that writes files Overdeck owns, or reaches
-   paid, cloud, or push actions.
+   paid, cloud, or push actions. For `gstack`, opt-ins belong in
+   `GSTACK_OPT_IN_SKILLS` / `GSTACK_BROWSER_OPT_IN_SKILLS` (`gstack.ts`), not
+   in `optIn`.
 4. Set `ref` only when a fixed commit is the right default.
 5. Set `pluginRoot`, `skillsRoot`, or `mountExtras` as needed.
 6. Add a `disclosure` if anything leaves the machine.
-7. If the pack is shown in the dashboard, update its `ADD_COMMAND` literal
-   (`src/dashboard/frontend/src/components/skills/SkillPacksSection.tsx`).
+7. The dashboard's empty state shows one hard-coded example command,
+   `ADD_COMMAND` in
+   `src/dashboard/frontend/src/components/skills/SkillPacksSection.tsx`;
+   change it only if the example should name the new pack.
 8. Add tests in `src/lib/skill-packs/__tests__/adapters.test.ts` and
    `sources.test.ts`.
 9. Add a catalog row and a `### <pack>` section to
@@ -255,8 +291,11 @@ fields each adapter fills in — see their type definitions in `adapters.ts`.
 ## Hidden launch step
 
 `pan skills launch-settings --harness <h> --cwd <dir> [--issue <id>]
-[--conversation <tmuxSession>] [--codex-home <dir>] [--plugin-link <path>]`
-(`src/cli/commands/skills.ts:632-637`).
+[--conversation <tmuxSession>] [--codex-home <dir>] [--plugin-link <path>]`,
+registered in `registerSkillsCommands` (`skills.command('launch-settings'`)
+and handled by `skillsLaunchSettingsCommand` in
+`src/cli/commands/skills.ts`. The step exits 2 for any harness except
+`claude-code` and `codex`.
 
 ## Tests
 

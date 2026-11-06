@@ -410,9 +410,9 @@ pan skills set --pack <id> on|off|inherit [--project <key> | --issue <id>]
 pan skills set <pack>/<skill> on|off|inherit [--project <key> | --issue <id>]
 
 # Register, update, inspect, and cache skill packs pinned to a commit
-pan skills pack add <id> <url> --ref <ref> [--adapter plain|claude-plugin|deft-readonly|gstack-runtime] [--browser] [--yes]
-pan skills pack add gstack https://github.com/eltmon/gstack --ref main   # gstack runtime pack (needs bun)
-pan skills pack add gstack https://github.com/eltmon/gstack --ref main --browser   # plus the browser runtime (asks twice)
+pan skills pack add <id> [url] [--ref <ref>] [--adapter plain|claude-plugin|deft-readonly|gstack-runtime] [--browser] [--yes]   # known packs default the url; pstack and sageox also default the ref
+pan skills pack add gstack --ref main   # gstack runtime pack (needs bun)
+pan skills pack add gstack --ref main --browser   # plus the browser runtime (asks twice)
 pan skills pack browser <id> [on|off] [--yes]   # build or remove gstack's browser, design and PDF runtime
 pan skills pack update <id> [--ref <ref>] [--yes]
 pan skills pack list [--json] [--offline]
@@ -424,6 +424,12 @@ pan skills pack gc [--max-age-days <n>]
 pan skills deft status [--project <key>] [--json]
 pan skills deft enable --project <key> [--yes]
 pan skills deft disable --project <key>
+
+# Run one issue on Deft Directive's pipeline
+pan skills deft use <issue> [--start] [--json]
+pan skills deft back <issue> [--json]
+pan skills deft save <issue>
+pan skills deft show <issue> [--json]
 ```
 
 ### Release Commands

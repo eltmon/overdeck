@@ -48,7 +48,7 @@ Overdeck names a pack skill `pack/skill`, for example `mattpocock/grilling`. You
 
 ### Turning packs and pack skills on
 
-Pack skills are **off** until you turn them on. You can turn on a whole pack or single skills, at the same three levels as other skills:
+Pack skills are **off** until you turn them on. You can turn on a whole pack or single skills, at the same levels as other skills: global, project, issue, and conversation.
 
 ```bash
 pan skills set --pack mattpocock on                      # the whole pack, globally
@@ -56,7 +56,7 @@ pan skills set --pack mattpocock off --issue PAN-12      # off for one issue
 pan skills set mattpocock/grilling on --project myapp    # one skill in one project
 ```
 
-For a pack skill, Overdeck checks the levels from narrowest to widest. At each level, a value for the skill itself beats that level's pack toggle, and the first level with any value decides. With no value anywhere, the skill is off.
+A conversation value for a pack skill wins first. Whole-pack toggles have no conversation level. Below the conversation level, Overdeck checks the levels from narrowest to widest. At each level, a value for the skill itself beats that level's pack toggle, and the first level with any value decides. With no value anywhere, the skill is off.
 
 | Global | Project | Issue | Result |
 |--------|---------|-------|--------|
@@ -67,6 +67,21 @@ For a pack skill, Overdeck checks the levels from narrowest to widest. At each l
 | pack on | — | — | `setup-matt-pocock-skills` off (opt-in) |
 
 **Opt-in skills** are skills that change files Overdeck owns, such as `setup-matt-pocock-skills`, which edits `CLAUDE.md`/`AGENTS.md` and writes tracker docs. The pack toggle never turns them on; only a value for that skill does.
+
+### For one conversation
+
+A conversation can carry its own pack values, the narrowest level of all. In the dashboard, open **New conversation with options…**; its **Skills** section shows a summary (`{on} of {total} skills on`) with a **Customize** button. Customizing lists pack skills grouped by pack, each with **Inherit / On / Off** — there is no whole-pack toggle at this level, only per-skill values.
+
+From the CLI, `pan handoff` has the same reach:
+
+```bash
+pan handoff self --pack mattpocock "<focus>"         # turn on every non-opt-in skill of the pack
+pan handoff self --skill mattpocock/grilling "<focus>"  # turn on one pack skill
+```
+
+`--pack` is a snapshot taken at creation: it writes one explicit `on` value per non-opt-in skill the pack has at that moment. A skill a later `pan skills pack update` adds to the pack is not in that snapshot, and falls back to the normal chain (pack toggles, then off).
+
+Conversation pack values apply only to Claude Code and Codex. Pi stores the values on the conversation row like any other harness, but a Pi launch never reads them.
 
 ## Trust and safety
 
@@ -89,7 +104,7 @@ Pack mattpocock
 Adding a pack trusts this commit and enables nothing. Turn it on with: pan skills set --pack mattpocock on
 ```
 
-Adding a pack trusts the resolved commit and turns nothing on. In a terminal, Overdeck asks `Trust this commit? [y/N]`. Without a terminal, pass `--yes`; otherwise nothing is written. The pack id must match `[a-z0-9][a-z0-9-]*` and cannot be a core skill name. Overdeck picks the adapter itself (the known-pack default, else `claude-plugin` when the repo has `.claude-plugin/plugin.json`, otherwise `plain`); pass `--adapter plain|claude-plugin|deft-readonly|gstack-runtime` to choose. A repository cannot register a pack by committing a file; only `pan skills pack add` can.
+Adding a pack trusts the resolved commit and turns nothing on. In a terminal, Overdeck asks `Trust this commit? [y/N]`. Without a terminal, pass `--yes`; otherwise nothing is written. The pack id must match `[a-z0-9][a-z0-9-]*` and cannot be a core skill name. Overdeck picks the adapter itself (the known-pack default, else `claude-plugin` when the repo has `.claude-plugin/plugin.json`, otherwise `plain`); pass `--adapter plain|claude-plugin|deft-readonly|gstack-runtime` to choose. See [Authoring a skill pack](/guides/skill-pack-authoring) for what makes a repository a valid pack. A repository cannot register a pack by committing a file; only `pan skills pack add` can.
 
 For a known pack (`mattpocock`, `pstack`, `gstack`, `deft`, `sageox`) the url is optional. `pstack` and `sageox` also have a default ref, so `pan skills pack add pstack` and `pan skills pack add sageox` are enough; the others need `--ref`.
 
@@ -128,7 +143,7 @@ pan skills pack update mattpocock            # re-resolve the ref
 pan skills pack update mattpocock --ref v1.3.0
 ```
 
-`update` prints the preview again with the skills added, removed, and changed since the trusted commit, plus any capabilities that are new. It moves the trusted commit only after you confirm. `pan skills pack list` shows when the ref has moved (`update available`); `--offline` skips that network check.
+`update` prints the preview again with the skills added, removed, and changed since the trusted commit, plus any capabilities that are new. It moves the trusted commit only after you confirm. `pan skills pack list` shows `update available` only for a pack pinned to a tag or branch; a ref that is a 40-character commit never shows it (`packUpdateAvailable` in `src/lib/skill-packs/sources.ts`). `pstack` and `sageox` default to commit refs, so to move them, run `pan skills pack update <id> --ref <new commit or branch>`. `--offline` skips that network check.
 
 ### Fork-first policy
 
@@ -334,7 +349,7 @@ The browser skills start a browse daemon per project. It keeps its port, token a
 pan skills pack remove gstack
 ```
 
-`remove` deletes `~/.overdeck/packs/gstack/` (renders, state, extractions and the git cache), every mount that contains gstack, the launch links that leaves dangling, and the gstack copy in every Codex agent's plugin cache. A running agent that used gstack loses its gstack skills until its next launch. `remove` does not delete the `.gstack/` or `.gstack-worktrees/` dirs that skills wrote in your projects; it prints each one it finds under a registered project, with the `rm -rf` command. `remove` and `pan skills pack browser gstack off` also print each live browse daemon in a registered project as `Browse daemon still running in <project>: pid <n> — stop with: kill -INT <n>` (a headless daemon ignores a plain `kill`); they never stop one. `pan skills pack gc` also removes renders of commits other than the trusted one once no linked launch uses them and they are older than `--max-age-days` (using a render resets its age), and the `render/`, `state/` and `browser/` dirs of packs that are no longer registered once all are older than `--max-age-days`. If `config.yaml` cannot be read or parsed, gc removes nothing and exits 1, because it cannot tell which packs are registered. If removing a mount or cache fails, `remove` names it and exits 1; run it again to retry.
+`remove` deletes `~/.overdeck/packs/gstack/` (renders, state, extractions and the git cache), every mount that contains gstack, the launch links that leaves dangling, and the gstack copy in every Codex agent's plugin cache. `remove` deletes the mounts a running agent is using, and the next launch has no gstack skills either: run `pan skills pack add gstack --ref main` again to get them back. `remove` does not delete the `.gstack/` or `.gstack-worktrees/` dirs that skills wrote in your projects; it prints each one it finds under a registered project, with the `rm -rf` command. `remove` and `pan skills pack browser gstack off` also print each live browse daemon in a registered project as `Browse daemon still running in <project>: pid <n> — stop with: kill -INT <n>` (a headless daemon ignores a plain `kill`); they never stop one. `pan skills pack gc` also removes renders of commits other than the trusted one once no linked launch uses them and they are older than `--max-age-days` (using a render resets its age), and the `render/`, `state/` and `browser/` dirs of packs that are no longer registered once all are older than `--max-age-days`. If `config.yaml` cannot be read or parsed, gc removes nothing and exits 1, because it cannot tell which packs are registered. If removing a mount or cache fails, `remove` names it and exits 1; run it again to retry.
 
 #### Limits
 
@@ -644,6 +659,8 @@ When the `sageox` pack is registered, `pan doctor` adds a **SageOx (ox)** row. I
 
 ## Where state lives and when changes apply
 
+See the [Skill settings reference](/configuration/skills) for every config key.
+
 ### Where pack state is stored
 
 | What | Stored in |
@@ -664,7 +681,7 @@ The cache lives in `~/.overdeck/packs/` and can be rebuilt at any time, except t
 
 ### When pack changes apply
 
-Packs apply to Overdeck-managed **Claude Code** and **Codex** sessions at their next launch, like other skill changes. Claude Code receives the pack as `--plugin-dir`; Codex gets a local `overdeck-packs` plugin marketplace in the agent's own `$CODEX_HOME`. Remote (Fly) launches and other harnesses get no packs. A launch never touches the network: if the trusted commit is not cached, the launch skips that pack and prints `run pan skills pack sync <id>`. If Claude Code also has the same upstream plugin installed, the dashboard warns that its skills will appear twice.
+Packs apply to Overdeck-managed **Claude Code** and **Codex** sessions at their next launch, like other skill changes. Claude Code receives the pack as `--plugin-dir`; Codex gets a local `overdeck-packs` plugin marketplace in the agent's own `$CODEX_HOME`. Remote (Fly) launches and other harnesses get no packs. Pi gets no packs: it accepts `pan handoff --pack` and the dialog's Skills choices, but never applies them. A launch never touches the network: if the trusted commit is not cached, the launch skips that pack and prints `run pan skills pack sync <id>`. If Claude Code also has the same upstream plugin installed, the dashboard warns that its skills will appear twice. See [Authoring a skill pack](/guides/skill-pack-authoring) for what a mount contains.
 
 In the dashboard, packs appear above the skill list on the Skills page, in project settings, and in the issue view. The dashboard can turn packs on and off but not add them; it shows the `pan skills pack add` command instead.
 
@@ -686,4 +703,4 @@ In the dashboard, packs appear above the skill list on the Skills page, in proje
 
 ## Terminology: skill packs and skill bundles
 
-Skill packs are the built feature described on this page. [Template Conversations](/reference/template-conversations) describes a separate, unbuilt proposal (PAN-1357, the proposed `bundle` verb) that also uses the words "skill bundle." Per-conversation skill values (PAN-4486), set in the **New conversation with options…** dialog or by `pan handoff --skill/--pack`, already cover part of that proposal: a conversation can turn on pack skills for itself. See [Template Conversations](/reference/template-conversations) and [Conversations](/features/conversations).
+The noun "skill bundle" means skill pack, everywhere in Overdeck's docs and skills. The adjective "bundled" (shipped with Overdeck, in `sync-sources/`) is unrelated — a bundled skill or a bundled rule is one Overdeck ships, not a skill pack. [Template Conversations](/reference/template-conversations) describes a separate, unbuilt proposal (PAN-1357) that calls its curated group a "skill set," not a skill bundle. Per-conversation skill values (PAN-4486), set in the **New conversation with options…** dialog or by `pan handoff --skill/--pack`, already cover part of that proposal: a conversation can turn on pack skills for itself. See [Template Conversations](/reference/template-conversations) and [Conversations](/features/conversations).
