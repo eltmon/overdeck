@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5100",
   "created": "2026-11-06T23:08:04.192Z",
-  "updated": "2026-11-06T23:46:54.801Z",
+  "updated": "2026-11-06T23:46:59.873Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -44,6 +44,11 @@
       "claimedBy": "agent-pan-5100",
       "claimedAt": "2026-11-06T23:41:44.034Z",
       "doneAt": "2026-11-06T23:46:54.800Z"
+    },
+    "wi6-phone-boot": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5100",
+      "claimedAt": "2026-11-06T23:46:59.873Z"
     }
   }
 }
