@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5084",
   "created": "2026-11-06T04:10:40.261Z",
-  "updated": "2026-11-06T06:33:12.500Z",
+  "updated": "2026-11-06T06:33:28.058Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -192,6 +192,10 @@
     "settings-ui-disabled-reason.ac1": {
       "status": "completed",
       "doneAt": "2026-11-06T06:33:12.499Z"
+    },
+    "settings-ui-disabled-reason.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-06T06:33:28.057Z"
     }
   }
 }
