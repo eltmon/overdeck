@@ -1,11 +1,12 @@
 /**
- * `pan lane start | list | wait | report | stop | reap` (.pan/drafts/pan-4223.md
- * WI-8, FR-2, FR-11 to FR-15, FR-23, FR-24, D12, D13, D17).
+ * `pan lane start | list | wait | report | stop | reap | disk-check`
+ * (.pan/drafts/pan-4223.md WI-8, FR-2, FR-11 to FR-15, FR-23, FR-24, D12, D13,
+ * D17; PAN-5094 FR-9 adds `disk-check`).
  *
  * The CLI is a thin client: `start`, `list`, `stop` and `reap` go through the
- * dashboard API (one creation path, FR-2); `report` and `wait` run the lane
- * cores locally, as `pan worker` does. `wait` and `report` use the
- * `pan worker` exit codes:
+ * dashboard API (one creation path, FR-2); `report`, `wait` and `disk-check`
+ * run the lane cores locally, as `pan worker` does. `wait`, `report` and
+ * `disk-check` use the `pan worker` exit codes:
  *
  *   0  report with status `done`
  *   4  report with status `blocked` or `failed`
@@ -27,6 +28,7 @@ import type { Command } from 'commander';
 import { exitCli } from '../exit.js';
 import { getDashboardApiUrl } from '../../lib/config.js';
 import type { WaitOptions, WaitOutcome } from '../../lib/agents/worker/wait.js';
+import type { LaneDiskCheck } from '../../lib/lanes/disk.js';
 import { criticChain, formatCriticChain, type PairingRow } from '../../lib/lanes/pairing.js';
 import type { LaneReportInput } from '../../lib/lanes/report.js';
 import type { LaneView } from '../../lib/lanes/views.js';
@@ -59,6 +61,8 @@ export interface LaneCliDeps {
   waitForLane: (name: string, options: WaitOptions) => Promise<WaitOutcome>;
   waitForLaneSet: (filter: LaneSetFilter, options: LaneSetOptions) => Promise<LaneSetOutcome>;
   reportLane: (input: LaneReportInput, env: NodeJS.ProcessEnv) => Promise<string>;
+  /** FR-9: the local disk-floor check. Default: checkLaneDisk. */
+  checkDisk: (input: { project?: string; path?: string }) => Promise<LaneDiskCheck>;
   now: () => number;
   sleep: (ms: number) => Promise<void>;
   stdout: (text: string) => void;
@@ -108,6 +112,7 @@ export function defaultLaneCliDeps(): LaneCliDeps {
     waitForLane: async (name, options) => (await import('../../lib/lanes/wait.js')).waitForLane(name, options),
     waitForLaneSet: async (filter, options) => (await import('../../lib/lanes/wait.js')).waitForLaneSet(filter, options),
     reportLane: async (input, env) => (await import('../../lib/lanes/report.js')).reportLane(input, env),
+    checkDisk: async (input) => (await import('../../lib/lanes/disk.js')).checkLaneDisk(input),
     now: Date.now,
     sleep: (ms) => new Promise((done) => setTimeout(done, ms)),
     stdout: (text) => { process.stdout.write(text.endsWith('\n') ? text : `${text}\n`); },
@@ -607,10 +612,51 @@ export async function laneReapCommand(ref: string, options: { park?: boolean; ke
   return WORKER_EXIT.done;
 }
 
+const DISK_CHECK_GIB = 1024 ** 3;
+
+export interface LaneDiskCheckOptions {
+  project?: string;
+  path?: string;
+}
+
+/** FR-9: not lanes, so `pan lane reap` cannot remove them; name them for `git worktree remove`. */
+function notLanesLine(unregistered: readonly string[]): string | null {
+  if (unregistered.length === 0) return null;
+  return `Not lanes (no lane row, so pan lane reap cannot remove them): ${unregistered.join(', ')}. `
+    + 'Remove each with git worktree remove <dir> once its work is merged or saved.';
+}
+
+export async function laneDiskCheckCommand(options: LaneDiskCheckOptions, deps: LaneCliDeps): Promise<number> {
+  if (options.project && options.path) {
+    deps.stderr('Pass at most one of --project <key> or --path <dir>.');
+    return WORKER_EXIT.usage;
+  }
+  let check: LaneDiskCheck;
+  try {
+    check = await deps.checkDisk(options);
+  } catch (error) {
+    deps.stderr(error instanceof Error ? error.message : String(error));
+    return WORKER_EXIT.usage;
+  }
+  const notLanes = notLanesLine(check.unregistered);
+
+  if (check.refusal) {
+    deps.stderr(check.refusal);
+    if (notLanes) deps.stdout(notLanes);
+    return WORKER_EXIT.blocked;
+  }
+  deps.stdout(check.availableBytes === null
+    ? `Disk ok: could not read free space on ${check.path}, so there is nothing to compare.`
+    : `Disk ok: ${(check.availableBytes / DISK_CHECK_GIB).toFixed(1)} GiB free on the filesystem holding ${check.path}; `
+      + `a new lane needs ${(check.bytes / DISK_CHECK_GIB).toFixed(1)} GiB; the safety floor is 10.0 GiB.`);
+  if (notLanes) deps.stdout(notLanes);
+  return WORKER_EXIT.done;
+}
+
 export function registerLaneCommands(program: Command, deps: () => LaneCliDeps = defaultLaneCliDeps): void {
   const lane = program
     .command('lane')
-    .description('Gauntlet lanes: launch, list, show, wait on, report from, stop and reap lane conversations');
+    .description('Gauntlet lanes: launch, list, show, wait on, report from, stop, reap and disk-check lane conversations');
 
   lane
     .command('start')
@@ -690,4 +736,11 @@ export function registerLaneCommands(program: Command, deps: () => LaneCliDeps =
     .option('--park', 'Save uncommitted work to a verified patch before removing a dirty worktree')
     .option('--keep', 'Keep the conversation listed instead of archiving it')
     .action(async (ref: string, options: { park?: boolean; keep?: boolean }) => exitCli(await laneReapCommand(ref, options, deps())));
+
+  lane
+    .command('disk-check')
+    .description('Check the disk floor before launching lanes or creating a worktree (exit 0 room, 4 disk low, 1 error)')
+    .option('--project <key>', 'Check the project\'s lanes root with the cost of one new lane, and list directories there that are not lanes')
+    .option('--path <dir>', 'Check the filesystem holding this directory (default: the current directory)')
+    .action(async (options: LaneDiskCheckOptions) => exitCli(await laneDiskCheckCommand(options, deps())));
 }

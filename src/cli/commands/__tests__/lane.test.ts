@@ -5,7 +5,9 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import type { WaitOutcome } from '../../../lib/agents/worker/wait.js';
+import type { LaneDiskCheck } from '../../../lib/lanes/disk.js';
 import {
+  laneDiskCheckCommand,
   laneListCommand,
   laneReapCommand,
   laneStartCommand,
@@ -13,6 +15,10 @@ import {
   MISSING_LANE_PARENT_MESSAGE,
   type LaneCliDeps,
 } from '../lane.js';
+
+function diskCheck(overrides: Partial<LaneDiskCheck> = {}): LaneDiskCheck {
+  return { path: '/home/u/Projects/lexerra-lanes', bytes: 0, availableBytes: 100 * 1024 ** 3, refusal: null, unregistered: [], ...overrides };
+}
 
 function json(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -45,6 +51,7 @@ function harness(overrides: Partial<LaneCliDeps> = {}) {
     waitForLane: vi.fn(async (): Promise<WaitOutcome> => ({ kind: 'timeout' })),
     waitForLaneSet: vi.fn(async () => ({ kind: 'timeout' as const, cursor: '' })),
     reportLane: vi.fn(async () => 'lane hotel/663 report 1: done'),
+    checkDisk: vi.fn(async () => diskCheck()),
     now: () => now,
     sleep: vi.fn(async (ms: number) => { now += ms; }),
     stdout: (text) => { out.push(text); },
@@ -212,5 +219,49 @@ describe('pan lane reap and list', () => {
     expect(await laneListCommand({ run: 'hotel' }, deps)).toBe(0);
     expect(out[0]).toMatch(/^ID\s+RUN\/KEY\s+ROLE\s+MACHINE\s+ITER\s+ACTIVITY\s+REPORT\s+FOR\s+VERDICT\s+BRANCH@SHA\s+AHEAD\s+DIRTY\s+MODEL\s+COST$/);
     expect(out[1]).toMatch(/^42\s+hotel\/663\s+builder\s+-\s+2\s+archived\s+#1 done\s+-\s+-\s+-\s+claude-opus-5-5\s+\$1\.50$/);
+  });
+});
+
+describe('pan lane disk-check (PAN-5094 disk-check-verb)', () => {
+  it('exits 1 when both --project and --path are passed, without calling checkDisk', async () => {
+    const { deps } = harness();
+    expect(await laneDiskCheckCommand({ project: 'lexerra', path: '/tmp/x' }, deps)).toBe(1);
+    expect(deps.checkDisk).not.toHaveBeenCalled();
+  });
+
+  it('exits 1 and prints the error when checkDisk throws (ac3)', async () => {
+    const { deps, err } = harness({ checkDisk: vi.fn(async () => { throw new Error('Unknown project: ghost'); }) });
+    expect(await laneDiskCheckCommand({ project: 'ghost' }, deps)).toBe(1);
+    expect(err).toEqual(['Unknown project: ghost']);
+  });
+
+  it('prints the refusal on stderr and exits 4 when the check refuses (ac3)', async () => {
+    const { deps, err } = harness({ checkDisk: vi.fn(async () => diskCheck({ refusal: 'Disk low — only 5.0 GiB free …' })) });
+    expect(await laneDiskCheckCommand({ project: 'lexerra' }, deps)).toBe(4);
+    expect(err).toEqual(['Disk low — only 5.0 GiB free …']);
+  });
+
+  it('prints a Disk ok line on stdout and exits 0 when there is room (ac3)', async () => {
+    const { deps, out } = harness({ checkDisk: vi.fn(async () => diskCheck({ path: '/p/lanes', bytes: 2 * 1024 ** 3, availableBytes: 50 * 1024 ** 3 })) });
+    expect(await laneDiskCheckCommand({ project: 'lexerra' }, deps)).toBe(0);
+    expect(out).toEqual(['Disk ok: 50.0 GiB free on the filesystem holding /p/lanes; a new lane needs 2.0 GiB; the safety floor is 10.0 GiB.']);
+  });
+
+  it('prints a could-not-read line when availableBytes is null', async () => {
+    const { deps, out } = harness({ checkDisk: vi.fn(async () => diskCheck({ path: '/p/lanes', availableBytes: null })) });
+    expect(await laneDiskCheckCommand({ path: '/p/lanes' }, deps)).toBe(0);
+    expect(out).toEqual(['Disk ok: could not read free space on /p/lanes, so there is nothing to compare.']);
+  });
+
+  it('prints the Not lanes line naming each unregistered directory, on both the ok and refused paths (ac4)', async () => {
+    const ok = harness({ checkDisk: vi.fn(async () => diskCheck({ unregistered: ['/p/lanes/a', '/p/lanes/b'] })) });
+    expect(await laneDiskCheckCommand({ project: 'lexerra' }, ok.deps)).toBe(0);
+    expect(ok.out[1]).toBe('Not lanes (no lane row, so pan lane reap cannot remove them): /p/lanes/a, /p/lanes/b. '
+      + 'Remove each with git worktree remove <dir> once its work is merged or saved.');
+
+    const refused = harness({ checkDisk: vi.fn(async () => diskCheck({ refusal: 'Disk low — …', unregistered: ['/p/lanes/c'] })) });
+    expect(await laneDiskCheckCommand({ project: 'lexerra' }, refused.deps)).toBe(4);
+    expect(refused.out).toEqual(['Not lanes (no lane row, so pan lane reap cannot remove them): /p/lanes/c. '
+      + 'Remove each with git worktree remove <dir> once its work is merged or saved.']);
   });
 });

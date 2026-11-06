@@ -6,11 +6,15 @@
  * failed one releases it at once. All work is async (the doors run in the
  * dashboard server).
  */
-import { reserveDiskFloor, type DiskReservation } from '../disk-floor.js';
+import { readdir, realpath, stat } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
+
+import { previewDiskFloor, readAvailableBytes, reserveDiskFloor, type DiskReservation } from '../disk-floor.js';
 import type { LaneRole } from '../overdeck/conversations.js';
 import { listProjectsAsync } from '../projects.js';
 import { estimateWorkspaceDiskCost } from '../workspace/disk-cost.js';
-import type { LaneConfig } from './config.js';
+import { resolveLaneConfig, type LaneConfig } from './config.js';
+import { listAllLaneRows } from './lane-rows.js';
 import { LaneLaunchError } from './types.js';
 
 export const LANE_DISK_LOW_CODE = 'disk-low';
@@ -73,4 +77,72 @@ export function holdLaneDisk(reservation: DiskReservation, holdMs: number = LANE
     void reservation.release().catch(() => undefined);
   }, holdMs);
   timer.unref?.();
+}
+
+export interface LaneDiskCheck {
+  path: string;
+  /** Bytes the next lane would add (0 without a project). */
+  bytes: number;
+  /** null when statfs failed (admission admits then). */
+  availableBytes: number | null;
+  /** Refusal text; null when there is room. */
+  refusal: string | null;
+  /** Directories under the lanes root no lane row uses (only with a project). */
+  unregistered: string[];
+}
+
+export interface LaneDiskCheckDeps extends LaneDiskDeps {
+  resolveConfig?: (project: string) => Promise<LaneConfig>;
+  /** cwd of every local lane row, archived included. Default from listAllLaneRows({}). */
+  laneCwds?: () => Promise<string[]>;
+}
+
+async function pathExists(path: string): Promise<boolean> {
+  return stat(path).then(() => true, () => false);
+}
+
+async function defaultLaneCwds(): Promise<string[]> {
+  return (await listAllLaneRows({})).filter((row) => row.local).map((row) => row.cwd);
+}
+
+/** D13: directories under `lanesRoot` no lane row (archived included) has as its cwd; a missing root lists nothing. */
+async function unregisteredLaneDirs(lanesRoot: string, laneCwds: () => Promise<string[]>): Promise<string[]> {
+  let entries;
+  try {
+    entries = await readdir(lanesRoot, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  const cwds = await laneCwds();
+  const realCwds = new Set(await Promise.all(cwds.map((cwd) => realpath(cwd).catch(() => cwd))));
+  const result: string[] = [];
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const dirPath = join(lanesRoot, entry.name);
+    const real = await realpath(dirPath).catch(() => dirPath);
+    if (!realCwds.has(real)) result.push(dirPath);
+  }
+  return result;
+}
+
+/** FR-9: the floor check the gauntlet skill runs before a launch wave or a self-made worktree. */
+export async function checkLaneDisk(input: { project?: string; path?: string }, deps: LaneDiskCheckDeps = {}): Promise<LaneDiskCheck> {
+  const read = deps.read ?? readAvailableBytes;
+  let path: string;
+  let bytes = 0;
+  let unregistered: string[] = [];
+  if (input.project) {
+    const config = await (deps.resolveConfig ?? resolveLaneConfig)(input.project);
+    path = (await pathExists(config.lanesRoot)) ? config.lanesRoot : config.projectPath;
+    bytes = await (deps.estimate ?? laneWorktreeBytes)(config);
+    unregistered = await unregisteredLaneDirs(config.lanesRoot, deps.laneCwds ?? defaultLaneCwds);
+  } else {
+    path = resolve(input.path ?? process.cwd());
+  }
+  const refusal = await previewDiskFloor(
+    { path, bytes },
+    { ...(deps.read ? { read: deps.read } : {}), ...(deps.ledgerDir ? { ledgerDir: deps.ledgerDir } : {}) },
+  );
+  const availableBytes = await read(path).catch(() => null);
+  return { path, bytes, availableBytes, refusal, unregistered };
 }

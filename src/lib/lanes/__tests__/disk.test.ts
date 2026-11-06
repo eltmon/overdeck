@@ -3,7 +3,7 @@
  * fake read and fake estimate — never the host's real free space (NFR-2).
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -11,12 +11,14 @@ import { DISK_LOW_HELD_PREFIX } from '../../disk-floor.js';
 import type { LaneConfig } from '../config.js';
 import {
   admitLaneDisk,
+  checkLaneDisk,
   holdLaneDisk,
   LANE_DISK_HOLD_MS,
   LANE_DISK_LOW_CODE,
   LANE_WORKTREE_MIN_BYTES,
   laneLaunchBytes,
   laneWorktreeBytes,
+  type LaneDiskCheckDeps,
   type LaneDiskDeps,
 } from '../disk.js';
 import { LaneLaunchError } from '../types.js';
@@ -189,5 +191,70 @@ describe('holdLaneDisk', () => {
     );
     await c.release();
     expect(existsSync(ledgerDir)).toBe(true);
+  });
+});
+
+describe('checkLaneDisk', () => {
+  let root: string;
+
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), 'lane-disk-check-'));
+    mkdirSync(join(root, 'a'));
+    mkdirSync(join(root, 'b'));
+  });
+
+  afterEach(() => {
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('lists directories not held by a lane row, with room and the estimate as bytes (ac1)', async () => {
+    const deps: LaneDiskCheckDeps = {
+      ledgerDir,
+      resolveConfig: vi.fn(async () => config({ lanesRoot: root })),
+      laneCwds: vi.fn(async () => [join(root, 'a')]),
+      read: async () => 100 * GIB,
+      estimate: async () => 1 * GIB,
+    };
+
+    const result = await checkLaneDisk({ project: 'lexerra' }, deps);
+
+    expect(result).toMatchObject({ path: root, bytes: 1 * GIB, refusal: null, unregistered: [join(root, 'b')] });
+  });
+
+  it('refuses below the floor with the same bytes (ac1)', async () => {
+    const deps: LaneDiskCheckDeps = {
+      ledgerDir,
+      resolveConfig: vi.fn(async () => config({ lanesRoot: root })),
+      laneCwds: vi.fn(async () => [join(root, 'a')]),
+      read: async () => 5 * GIB,
+      estimate: async () => 1 * GIB,
+    };
+
+    const result = await checkLaneDisk({ project: 'lexerra' }, deps);
+
+    expect(result.refusal?.startsWith(DISK_LOW_HELD_PREFIX)).toBe(true);
+  });
+
+  it('falls back to the project path, and lists nothing unregistered, when the lanes root does not exist', async () => {
+    const missingRoot = join(root, 'does-not-exist');
+    const deps: LaneDiskCheckDeps = {
+      ledgerDir,
+      resolveConfig: vi.fn(async () => config({ lanesRoot: missingRoot, projectPath: root })),
+      read: async () => 100 * GIB,
+      estimate: async () => 1 * GIB,
+    };
+
+    const result = await checkLaneDisk({ project: 'lexerra' }, deps);
+
+    expect(result.path).toBe(root);
+    expect(result.unregistered).toEqual([]);
+  });
+
+  it('returns a null availableBytes and a null refusal for a path that does not exist, without a project (ac2)', async () => {
+    const missing = join(root, 'ghost', 'deeper');
+
+    const result = await checkLaneDisk({ path: missing }, { ledgerDir });
+
+    expect(result).toMatchObject({ path: missing, bytes: 0, availableBytes: null, refusal: null, unregistered: [] });
   });
 });
