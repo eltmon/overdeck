@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5094",
   "created": "2026-11-06T17:38:04.566Z",
-  "updated": "2026-11-06T18:24:52.333Z",
+  "updated": "2026-11-06T18:28:55.248Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -52,9 +52,10 @@
       "doneAt": "2026-11-06T18:24:45.583Z"
     },
     "wait-reapable-hint": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5094",
-      "claimedAt": "2026-11-06T18:24:52.332Z"
+      "claimedAt": "2026-11-06T18:24:52.332Z",
+      "doneAt": "2026-11-06T18:28:55.247Z"
     }
   }
 }
