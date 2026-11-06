@@ -139,10 +139,23 @@ export async function checkLaneDisk(input: { project?: string; path?: string }, 
   } else {
     path = resolve(input.path ?? process.cwd());
   }
+  // CodeRabbit (PR #5098): read once and reuse it for both the floor decision and the
+  // reported availableBytes, so they never disagree (a second read could fail or differ).
+  let availableBytes: number | null;
+  try {
+    availableBytes = await read(path);
+  } catch {
+    availableBytes = null;
+  }
   const refusal = await previewDiskFloor(
     { path, bytes },
-    { ...(deps.read ? { read: deps.read } : {}), ...(deps.ledgerDir ? { ledgerDir: deps.ledgerDir } : {}) },
+    {
+      read: async () => {
+        if (availableBytes === null) throw new Error('read failed');
+        return availableBytes;
+      },
+      ...(deps.ledgerDir ? { ledgerDir: deps.ledgerDir } : {}),
+    },
   );
-  const availableBytes = await read(path).catch(() => null);
   return { path, bytes, availableBytes, refusal, unregistered };
 }

@@ -374,29 +374,45 @@ describe('launchLane disk floor (PAN-5094)', () => {
     expect(deps.cpuPressure).not.toHaveBeenCalled();
   });
 
-  it('releases the disk lease after a successful launch and after one that fails in git.addBranchWorktree (home-door-disk.ac3)', async () => {
+  it('holds the disk lease after a successful launch, but releases it at once after one that fails in git.addBranchWorktree (home-door-disk.ac3, CodeRabbit #4496531317)', async () => {
     const { deps } = harness();
     const parent = root();
 
+    const beforeOk = new Set(leaseFiles());
     await launchLane(request(parent, { key: 'disk-ok' }), deps);
-    expect(leaseFiles()).toHaveLength(0);
+    expect(leaseFiles().filter((file) => !beforeOk.has(file))).toHaveLength(1);
 
+    const beforeFail = new Set(leaseFiles());
     const failing = { ...deps, git: { ...deps.git, addBranchWorktree: vi.fn(async () => { throw new Error('worktree failed'); }) } };
     await expect(launchLane(request(parent, { key: 'disk-fail' }), failing)).rejects.toThrow('worktree failed');
-    expect(leaseFiles()).toHaveLength(0);
+    expect(leaseFiles().filter((file) => !beforeFail.has(file))).toHaveLength(0);
   });
 
-  it('resolves with the launch result even when the disk reservation release() rejects (home-door-disk.ac3)', async () => {
+  it('rejects with the launch error, not a release error, when a failed launch\'s disk release also rejects (home-door-disk.ac3)', async () => {
     const { deps } = harness();
     const parent = root();
     reserveDiskFloor.mockImplementationOnce(async () => ({
       ok: true,
       reservation: { release: () => Promise.reject(new Error('release boom')) },
     }));
+    const failing = { ...deps, git: { ...deps.git, addBranchWorktree: vi.fn(async () => { throw new Error('worktree failed'); }) } };
 
-    const result = await launchLane(request(parent, { key: 'disk-release-fail' }), deps);
+    await expect(launchLane(request(parent, { key: 'disk-release-fail' }), failing)).rejects.toThrow('worktree failed');
+  });
 
-    expect(result.cwd).toBe(join(LANES_ROOT, 'hotel-disk-release-fail'));
+  it('holds two concurrent successful launches\' leases so a third is refused before any worktree call (FR-5 overlap)', async () => {
+    const { deps, git } = harness();
+    deps.disk = { read: vi.fn(async () => 30 * GIB), estimate: vi.fn(async () => 8 * GIB) };
+    const parent = root();
+
+    await launchLane(request(parent, { key: 'overlap-a' }), deps);
+    await launchLane(request(parent, { key: 'overlap-b' }), deps);
+    git.addBranchWorktree.mockClear();
+
+    const error = await rejection(launchLane(request(parent, { key: 'overlap-c' }), deps));
+
+    expect(error.status).toBe(507);
+    expect(git.addBranchWorktree).not.toHaveBeenCalled();
   });
 });
 

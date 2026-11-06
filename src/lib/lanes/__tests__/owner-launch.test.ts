@@ -259,12 +259,23 @@ describe('launchOwnedLane (PAN-4638 WI-2)', () => {
     expect(error.code).toBe('disk-low');
   });
 
-  it('releases the disk lease after a successful launch (owner-door-disk.ac3)', async () => {
+  it('holds the disk lease after a successful launch (owner-door-disk.ac3, CodeRabbit #4496531330)', async () => {
     const { deps } = harness();
 
+    const before = new Set(leaseFiles());
     await launchOwnedLane(spec(), CONTEXT, deps);
 
-    expect(leaseFiles()).toHaveLength(0);
+    expect(leaseFiles().filter((file) => !before.has(file))).toHaveLength(1);
+  });
+
+  it('releases the disk lease at once when the launch fails in git.addBranchWorktree', async () => {
+    const { deps, git } = harness();
+    git.addBranchWorktree.mockImplementation(async () => { throw new Error('worktree failed'); });
+
+    const before = new Set(leaseFiles());
+    await expect(launchOwnedLane(spec(), CONTEXT, deps)).rejects.toThrow('worktree failed');
+
+    expect(leaseFiles().filter((file) => !before.has(file))).toHaveLength(0);
   });
 });
 

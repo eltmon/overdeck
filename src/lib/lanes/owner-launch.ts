@@ -36,7 +36,7 @@ import {
 import type { RuntimeName } from '../runtimes/types.js';
 import { resolveLaneConfig } from './config.js';
 import { laneContract } from './contract.js';
-import { admitLaneDisk, type LaneDiskDeps } from './disk.js';
+import { admitLaneDisk, holdLaneDisk, type LaneDiskDeps } from './disk.js';
 import {
   gitFailure,
   isValidLaneEffort,
@@ -278,5 +278,14 @@ export async function launchOwnedLane(spec: OwnerLaneSpec, context: OwnerLaneCon
       await undoCreate();
       throw error;
     }
-  }).finally(() => disk.release().catch(() => undefined));
+  }).then(
+    (result) => {
+      holdLaneDisk(disk);
+      return result;
+    },
+    async (error: unknown) => {
+      await disk.release().catch(() => undefined);
+      throw error;
+    },
+  );
 }

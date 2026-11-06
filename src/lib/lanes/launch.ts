@@ -49,7 +49,7 @@ import {
 import type { RuntimeName } from '../runtimes/types.js';
 import { resolveLaneConfig, type LaneConfig } from './config.js';
 import { laneContract, type LaneAnswering } from './contract.js';
-import { admitLaneDisk, type LaneDiskDeps } from './disk.js';
+import { admitLaneDisk, holdLaneDisk, type LaneDiskDeps } from './disk.js';
 import { distinctLaneCwds, laneIterations } from './iteration.js';
 import { listAllLaneRows, type LaneRow } from './lane-rows.js';
 import { pairBuilder, type PairingRow } from './pairing.js';
@@ -685,7 +685,16 @@ export async function launchLane(request: LaneLaunchRequest, deps: LaneLaunchDep
       await undoCreate();
       throw error;
     }
-  }).finally(() => disk?.release().catch(() => undefined));
+  }).then(
+    (result) => {
+      if (disk) holdLaneDisk(disk);
+      return result;
+    },
+    async (error: unknown) => {
+      await disk?.release().catch(() => undefined);
+      throw error;
+    },
+  );
 }
 
 interface OwnerLaunchPlan {
