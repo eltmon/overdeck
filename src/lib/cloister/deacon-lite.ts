@@ -139,33 +139,47 @@ export function setAgentStatusChangedNotifier(fn: AgentStatusChangedNotifier | n
  * already recorded (PAN-5074). Nothing writes a dead agent's state.json off
  * `running` (the supervisor's exit appends `agent.stopped` only), so without
  * this the same death was reported on every 60s tick — ~50k events/day.
- * In memory by design: a deacon child restart reports each still-dead
- * agent once more.
+ * In memory by design; across a deacon child restart the event log answers
+ * instead (`recordedStopAt`).
  */
 const reportedDeadAgents = new Map<string, string>();
+
+/**
+ * PAN-5074: when this process last saw each `running` agent alive (epoch ms).
+ * A death report older than that is from before the agent came back.
+ */
+const lastSeenAliveAt = new Map<string, number>();
 
 function launchGeneration(agent: AgentState): string {
   return `${agent.startedAt}|${agent.lastResumeAt ?? ''}`;
 }
 
 /**
- * PAN-5074: when the agent's stop is already recorded, its epoch ms, else
- * null. Since PAN-3917 a normal stop (planning finalize, abort, wipe) is
- * recorded only as an event and leaves `state.json` at `running`, so the
- * label `listAgentStates` filters on says nothing about a death (PAN-4210).
+ * PAN-5074: when the agent's end is already recorded, its epoch ms, else
+ * null. Since PAN-3917 a deliberate stop (planning finalize, an operator stop
+ * or pause) is recorded only as an event and leaves `state.json` at
+ * `running`, so the label `listAgentStates` filters on says nothing about a
+ * death (PAN-4210). A death this deacon (or the one before a restart) already
+ * reported for this launch counts too, unless the agent was seen alive since.
  * A failed read returns null, which reports the death as before.
  */
 function recordedStopAt(agent: AgentState): number | null {
   try {
-    return readRecordedAgentStopAt(agent);
+    return readRecordedAgentStopAt(agent, { reports: { notBefore: lastSeenAliveAt.get(agent.id) } });
   } catch (err) {
     console.error(`[deacon-lite] Failed to read the lifecycle events of ${agent.id}:`, err);
     return null;
   }
 }
 
+function markSeenAlive(agentId: string): void {
+  reportedDeadAgents.delete(agentId);
+  lastSeenAliveAt.set(agentId, Date.now());
+}
+
 export function __resetReportedDeadAgentsForTests(): void {
   reportedDeadAgents.clear();
+  lastSeenAliveAt.clear();
 }
 
 export async function reconcileAgentLiveness(): Promise<string[]> {
@@ -182,10 +196,13 @@ export async function reconcileAgentLiveness(): Promise<string[]> {
   for (const id of reportedDeadAgents.keys()) {
     if (!runningIds.has(id)) reportedDeadAgents.delete(id);
   }
+  for (const id of lastSeenAliveAt.keys()) {
+    if (!runningIds.has(id)) lastSeenAliveAt.delete(id);
+  }
 
   for (const agent of runningAgents) {
     if (liveIds.has(agent.id)) {
-      reportedDeadAgents.delete(agent.id);
+      markSeenAlive(agent.id);
       continue;
     }
     // Absence from the inventory is not yet a death: on tmux it can be a probe
@@ -196,7 +213,7 @@ export async function reconcileAgentLiveness(): Promise<string[]> {
     // indeterminate verdict leaves the cache as it is.
     const verdict = await isAlive(agent.id);
     if (verdict.alive) {
-      reportedDeadAgents.delete(agent.id);
+      markSeenAlive(agent.id);
       continue;
     }
     if (!isConfirmedDead(verdict)) continue;
@@ -206,7 +223,7 @@ export async function reconcileAgentLiveness(): Promise<string[]> {
     const stoppedAt = recordedStopAt(agent);
     if (stoppedAt !== null) {
       reportedDeadAgents.set(agent.id, generation);
-      actions.push(`reconcileAgentLiveness: ${agent.id} already stopped at ${new Date(stoppedAt).toISOString()}; not reported dead`);
+      actions.push(`reconcileAgentLiveness: ${agent.id} already recorded stopped at ${new Date(stoppedAt).toISOString()}; not reported dead`);
       continue;
     }
     const reason = `absent from the ${inventory.backend} inventory; ${verdict.reason}`;

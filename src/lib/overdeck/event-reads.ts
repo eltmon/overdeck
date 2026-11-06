@@ -60,23 +60,31 @@ function eventMillis(timestamp: number | string): number {
   return typeof timestamp === 'number' ? timestamp : Date.parse(timestamp);
 }
 
+/** How many lifecycle rows to read back past deacon-lite's own death reports. */
+const LIFECYCLE_LOOKBACK_ROWS = 8;
+
 /**
- * PAN-5074: when the agent's stop is already recorded for its current launch,
- * the stop's epoch ms; otherwise null.
+ * PAN-5074: when the agent's end is already recorded for its current launch,
+ * the epoch ms it was recorded; otherwise null.
  *
- * Since PAN-3917 a deliberate stop (planning finalize, abort, wipe) is
- * recorded only as an `agent.status_changed` event to `stopped`; the
- * `state.json` status label stays `running`. That stop counts when it is the
- * agent's latest lifecycle event, is not deacon-lite's own death report (the
- * `agent.heartbeat_dead` + `agent.status_changed` pair, which must not hide a
- * later death), and is not older than the launch generation (`startedAt`,
- * `lastResumeAt`). `agent.stopped`, the supervisor's exit observation, is
- * neither a launch nor a deliberate stop and is skipped. `beforeSequence`
- * limits the read to events older than that sequence.
+ * Since PAN-3917 a deliberate stop (planning finalize, an operator stop or
+ * pause) is recorded only as an `agent.status_changed` event to `stopped`;
+ * the `state.json` status label stays `running`. Such a stop counts when it
+ * is the latest lifecycle event once deacon-lite's own death reports
+ * (`agent.heartbeat_dead`, alone or followed by `agent.status_changed` to
+ * `stopped`) are read past. A report never hides an earlier stop. With
+ * `reports`, a report counts too when it is not older than `reports.notBefore`
+ * (when the caller last saw the agent alive), so a deacon restart does not
+ * report the same death again. Every counted event must also be at or after
+ * the launch generation (`startedAt`, `lastResumeAt`).
+ *
+ * `agent.stopped` is skipped: the supervisor writes it when a harness exits,
+ * a crash included, so it must not silence a death. `beforeSequence` limits
+ * the read to older events.
  */
 export function readRecordedAgentStopAt(
   agent: { id: string; startedAt?: string; lastResumeAt?: string },
-  opts: { beforeSequence?: number } = {},
+  opts: { beforeSequence?: number; reports?: { notBefore?: number } } = {},
 ): number | null {
   const rows = getOverdeckDatabase().prepare(`
     SELECT type, timestamp, json_extract(payload, '$.status') AS status
@@ -86,13 +94,27 @@ export function readRecordedAgentStopAt(
       AND (type <> 'agent.status_changed' OR json_extract(payload, '$.status') IN ('running', 'stopped'))
       AND sequence < ?
     ORDER BY sequence DESC
-    LIMIT 2
-  `).all(agent.id, opts.beforeSequence ?? Number.MAX_SAFE_INTEGER) as LifecycleRow[];
-  const [latest, previous] = rows;
-  if (latest?.type !== 'agent.status_changed' || latest.status !== 'stopped') return null;
-  if (previous?.type === 'agent.heartbeat_dead') return null;
-  const stoppedAt = eventMillis(latest.timestamp);
-  if (!Number.isFinite(stoppedAt)) return null;
-  const bounds = [Date.parse(agent.startedAt ?? ''), Date.parse(agent.lastResumeAt ?? '')].filter(Number.isFinite);
-  return bounds.every((bound) => stoppedAt >= bound) ? stoppedAt : null;
+    LIMIT ?
+  `).all(agent.id, opts.beforeSequence ?? Number.MAX_SAFE_INTEGER, LIFECYCLE_LOOKBACK_ROWS) as LifecycleRow[];
+  const generation = [Date.parse(agent.startedAt ?? ''), Date.parse(agent.lastResumeAt ?? '')];
+  const recordedAt = (row: LifecycleRow, notBefore?: number): number | null => {
+    const at = eventMillis(row.timestamp);
+    const bounds = [...generation, notBefore ?? Number.NaN].filter(Number.isFinite);
+    return Number.isFinite(at) && bounds.every((bound) => at >= bound) ? at : null;
+  };
+  const isStop = (row: LifecycleRow | undefined) => row?.type === 'agent.status_changed' && row.status === 'stopped';
+  let index = 0;
+  while (index < rows.length) {
+    const row = rows[index]!;
+    const reportRows = row.type === 'agent.heartbeat_dead' ? 1
+      : isStop(row) && rows[index + 1]?.type === 'agent.heartbeat_dead' ? 2 : 0;
+    if (reportRows === 0) break;
+    if (opts.reports) {
+      const at = recordedAt(row, opts.reports.notBefore);
+      if (at !== null) return at;
+    }
+    index += reportRows;
+  }
+  const latest = rows[index];
+  return latest && isStop(latest) ? recordedAt(latest) : null;
 }

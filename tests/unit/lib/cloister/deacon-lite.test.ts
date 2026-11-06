@@ -372,10 +372,10 @@ describe('deacon-lite', () => {
 
         const actions = await reconcileAgentLiveness();
 
-        expect(mocks.readRecordedAgentStopAt).toHaveBeenCalledWith(planning);
+        expect(mocks.readRecordedAgentStopAt).toHaveBeenCalledWith(planning, { reports: { notBefore: undefined } });
         expect(notifier).not.toHaveBeenCalled();
         expect(actions).toEqual([
-          'reconcileAgentLiveness: planning-pan-1 already stopped at 2026-09-18T11:30:00.000Z; not reported dead',
+          'reconcileAgentLiveness: planning-pan-1 already recorded stopped at 2026-09-18T11:30:00.000Z; not reported dead',
         ]);
         setAgentStoppedNotifier(null);
       });
@@ -406,6 +406,29 @@ describe('deacon-lite', () => {
         await reconcileAgentLiveness();
 
         expect(mocks.readRecordedAgentStopAt).toHaveBeenCalledTimes(1);
+        expect(notifier).toHaveBeenCalledWith('agent-pan-1');
+        setAgentStoppedNotifier(null);
+      });
+
+      it('passes when it last saw the agent alive, so an older death report does not count', async () => {
+        mocks.listAgentStates.mockReturnValue([workAgent()]);
+        const notifier = vi.fn();
+        setAgentStoppedNotifier(notifier);
+
+        // Tick 1: alive at 12:00.
+        await reconcileAgentLiveness();
+        expect(mocks.readRecordedAgentStopAt).not.toHaveBeenCalled();
+
+        // Tick 2, a minute later: dead.
+        await vi.advanceTimersByTimeAsync(60_000);
+        mocks.liveAgentInventory.mockResolvedValue(inventory([]));
+        mocks.isAlive.mockResolvedValue({ alive: false, reason: 'no-session' });
+        await reconcileAgentLiveness();
+
+        expect(mocks.readRecordedAgentStopAt).toHaveBeenCalledWith(
+          expect.objectContaining({ id: 'agent-pan-1' }),
+          { reports: { notBefore: Date.parse('2026-09-18T12:00:00.000Z') } },
+        );
         expect(notifier).toHaveBeenCalledWith('agent-pan-1');
         setAgentStoppedNotifier(null);
       });

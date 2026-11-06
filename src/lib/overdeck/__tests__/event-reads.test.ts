@@ -92,9 +92,30 @@ describe('agent event read door', () => {
     });
 
     it("does not count deacon-lite's own death report as a recorded stop", () => {
+      insertEvent(odb, 'agent.started', Date.parse(STARTED), { agentId: 'planning-pan-5069' });
       insertEvent(odb, 'agent.heartbeat_dead', FINALIZED, { agentId: 'planning-pan-5069' });
       stopped(FINALIZED);
       expect(readRecordedAgentStopAt(planning)).toBeNull();
+    });
+
+    it("reads past deacon-lite's death reports to an earlier finalize stop", () => {
+      stopped(FINALIZED);
+      for (const offset of [40_000, 100_000]) {
+        insertEvent(odb, 'agent.heartbeat_dead', FINALIZED + offset, { agentId: 'planning-pan-5069' });
+        stopped(FINALIZED + offset);
+      }
+      expect(readRecordedAgentStopAt(planning)).toBe(FINALIZED);
+    });
+
+    // After a deacon restart: the earlier report of this launch covers it.
+    it('counts an earlier death report only when asked, and not before notBefore', () => {
+      const REPORTED = Date.parse('2026-11-05T23:50:00.000Z');
+      insertEvent(odb, 'agent.heartbeat_dead', REPORTED, { agentId: 'planning-pan-5069' });
+      stopped(REPORTED);
+      expect(readRecordedAgentStopAt(planning)).toBeNull();
+      expect(readRecordedAgentStopAt(planning, { reports: {} })).toBe(REPORTED);
+      expect(readRecordedAgentStopAt(planning, { reports: { notBefore: REPORTED + 60_000 } })).toBeNull();
+      expect(readRecordedAgentStopAt({ ...planning, lastResumeAt: '2026-11-05T23:55:00.000Z' }, { reports: {} })).toBeNull();
     });
 
     it("skips the supervisor's exit observation and other agents' events", () => {
@@ -110,7 +131,7 @@ describe('agent event read door', () => {
       stopped(FINALIZED + 40_000);
       const heartbeat = odb.raw().prepare(`SELECT sequence FROM events WHERE type = 'agent.heartbeat_dead'`).get() as { sequence: number };
       expect(readRecordedAgentStopAt(planning, { beforeSequence: heartbeat.sequence })).toBe(FINALIZED);
-      expect(readRecordedAgentStopAt(planning)).toBeNull();
+      expect(readRecordedAgentStopAt(planning, { beforeSequence: 1 })).toBeNull();
     });
   });
 });
