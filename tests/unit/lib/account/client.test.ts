@@ -287,3 +287,155 @@ describe('revokeDevice', () => {
     expect(await revokeDevice(BASE_URL, TOKEN, 'device-1', { fetch: fetchMock })).toEqual({ ok: false, detail: 'offline' });
   });
 });
+
+describe('describeError via revokeDevice (PAN-5068)', () => {
+  it('appends the cause code and message', async () => {
+    const fetchMock = vi.fn().mockRejectedValueOnce(new TypeError('fetch failed', { cause: { code: 'ECONNRESET', message: 'socket hang up' } }));
+    expect(await revokeDevice(BASE_URL, TOKEN, 'device-1', { fetch: fetchMock })).toEqual({
+      ok: false,
+      detail: 'fetch failed (ECONNRESET: socket hang up)',
+    });
+  });
+
+  it('appends only the code when the cause has no message', async () => {
+    const fetchMock = vi.fn().mockRejectedValueOnce(new TypeError('fetch failed', { cause: { code: 'UND_ERR_CONNECT_TIMEOUT' } }));
+    expect(await revokeDevice(BASE_URL, TOKEN, 'device-1', { fetch: fetchMock })).toEqual({
+      ok: false,
+      detail: 'fetch failed (UND_ERR_CONNECT_TIMEOUT)',
+    });
+  });
+
+  it('appends only the message when the cause has no code', async () => {
+    const fetchMock = vi.fn().mockRejectedValueOnce(new TypeError('fetch failed', { cause: { message: 'socket hang up' } }));
+    expect(await revokeDevice(BASE_URL, TOKEN, 'device-1', { fetch: fetchMock })).toEqual({
+      ok: false,
+      detail: 'fetch failed (socket hang up)',
+    });
+  });
+
+  it('drops an unusable cause (no string code, empty message)', async () => {
+    const fetchMock = vi.fn().mockRejectedValueOnce(new TypeError('fetch failed', { cause: { code: 42, message: '' } }));
+    expect(await revokeDevice(BASE_URL, TOKEN, 'device-1', { fetch: fetchMock })).toEqual({ ok: false, detail: 'fetch failed' });
+  });
+
+  it('leaves the message bare when there is no cause', async () => {
+    const fetchMock = vi.fn().mockRejectedValueOnce(new TypeError('fetch failed'));
+    expect(await revokeDevice(BASE_URL, TOKEN, 'device-1', { fetch: fetchMock })).toEqual({ ok: false, detail: 'fetch failed' });
+  });
+
+  it('redacts the authorization code and PKCE verifier in exchangeAuthorizationCode, and the device token in revokeDevice', async () => {
+    const input = { code: 'odc_code', codeVerifier: 'v'.repeat(43), redirectUri: 'http://127.0.0.1:3011/oauth/account/callback' };
+    const codeFetch = vi.fn().mockRejectedValueOnce(
+      new TypeError('fetch failed', {
+        cause: { code: 'ECONNRESET', message: `request for ${input.code} with ${input.codeVerifier}` },
+      }),
+    );
+    const codeResult = await exchangeAuthorizationCode(BASE_URL, input, { fetch: codeFetch });
+    expect(codeResult.ok).toBe(false);
+    expect((codeResult as { detail: string }).detail).toContain('ECONNRESET');
+    expect((codeResult as { detail: string }).detail).toContain('[redacted]');
+    expect((codeResult as { detail: string }).detail).not.toContain(input.code);
+    expect((codeResult as { detail: string }).detail).not.toContain(input.codeVerifier);
+
+    const tokenFetch = vi.fn().mockRejectedValueOnce(new TypeError('fetch failed', { cause: { message: `rejected TOKEN ${TOKEN}` } }));
+    const tokenResult = await revokeDevice(BASE_URL, TOKEN, 'device-1', { fetch: tokenFetch });
+    expect(tokenResult).toEqual({ ok: false, detail: expect.stringContaining('[redacted]') });
+    expect((tokenResult as { detail: string }).detail).not.toContain(TOKEN);
+  });
+});
+
+describe('requestDeviceCode retry (PAN-5068)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function deviceCodeResponse(): Response {
+    return new Response(
+      JSON.stringify({
+        device_code: 'oddc_code',
+        user_code: 'ABCD-EFGH',
+        verification_uri: `${BASE_URL}/activate`,
+        verification_uri_complete: `${BASE_URL}/activate?user_code=ABCDEFGH`,
+        expires_in: 900,
+        interval: 5,
+      }),
+      { status: 200 },
+    );
+  }
+
+  function fetchFailed(code: string): TypeError {
+    return new TypeError('fetch failed', { cause: { code, message: 'socket hang up' } });
+  }
+
+  it('recovers after one failure', async () => {
+    const fetchMock = vi.fn().mockRejectedValueOnce(fetchFailed('ECONNRESET')).mockResolvedValueOnce(deviceCodeResponse());
+    const promise = requestDeviceCode(BASE_URL, { platform: 'linux-x64', environmentId: 'env-1' }, { fetch: fetchMock });
+
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(999);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    await expect(promise).resolves.toEqual({
+      deviceCode: 'oddc_code',
+      userCode: 'ABCD-EFGH',
+      verificationUri: `${BASE_URL}/activate`,
+      verificationUriComplete: `${BASE_URL}/activate?user_code=ABCDEFGH`,
+      expiresIn: 900,
+      interval: 5,
+    });
+  });
+
+  it('backs off 1 s then 2 s', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValueOnce(fetchFailed('ECONNRESET'))
+      .mockRejectedValueOnce(fetchFailed('ECONNRESET'))
+      .mockResolvedValueOnce(deviceCodeResponse());
+    const promise = requestDeviceCode(BASE_URL, { platform: 'linux-x64', environmentId: 'env-1' }, { fetch: fetchMock });
+
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(1999);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+
+    await expect(promise).resolves.toBeDefined();
+  });
+
+  it('throws with the last cause after three failures', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValueOnce(fetchFailed('ENOTFOUND'))
+      .mockRejectedValueOnce(fetchFailed('ENOTFOUND'))
+      .mockRejectedValueOnce(fetchFailed('ECONNRESET'));
+    const promise = requestDeviceCode(BASE_URL, { platform: 'linux-x64', environmentId: 'env-1' }, { fetch: fetchMock });
+
+    const settled = expect(promise).rejects.toThrow(AccountClientError);
+    await vi.advanceTimersByTimeAsync(3000);
+    await settled;
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    const error = await promise.catch((err: unknown) => err as Error);
+    expect(error.message).toBe('Cannot reach https://account.test: fetch failed (ECONNRESET: socket hang up)');
+    expect(error.message).not.toContain('ENOTFOUND');
+  });
+
+  it('does not retry an HTTP 503', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(new Response('', { status: 503 }));
+    const promise = requestDeviceCode(BASE_URL, { platform: 'linux-x64', environmentId: 'env-1' }, { fetch: fetchMock });
+
+    const settled = expect(promise).rejects.toThrow('Cannot start sign-in at https://account.test: HTTP 503');
+    await vi.advanceTimersByTimeAsync(5000);
+    await settled;
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});

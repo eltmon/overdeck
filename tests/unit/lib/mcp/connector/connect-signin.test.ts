@@ -202,7 +202,10 @@ describe('ensureSignedIn (PAN-5069 FR-3)', () => {
     const failing = (async () => {
       throw new Error('ECONNREFUSED');
     }) as typeof fetch;
-    const result = await ensureSignedIn(options(), recordingIo(), { fetch: failing });
-    expect(result).toMatchObject({ ok: false, status: { status: 'retry', code: 'network' } });
+    const result = ensureSignedIn(options(), recordingIo(), { fetch: failing });
+    // requestDeviceCode retries twice (1 s, then 2 s) before it gives up (PAN-5068).
+    await advanceAfterPolling(1_000);
+    await advanceAfterPolling(2_000);
+    expect(await result).toMatchObject({ ok: false, status: { status: 'retry', code: 'network' } });
   });
 });

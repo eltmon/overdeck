@@ -224,7 +224,7 @@ Operator-only. No agent runs any of the commands below; the custom-domain route 
 
 `pan account login | status | logout` (PAN-4330) is the machine-side client, in `src/lib/account/` (`client.ts` for the HTTP calls, `store.ts` for the token file) plus `src/cli/commands/account/`. Sign-in is optional: nothing else in the CLI reads the token file.
 
-- `login` runs the device flow, prints `verification_uri` from the device-code response (never a hardcoded host) and the user code, polls for the token, calls `GET /v1/me`, and writes `${OVERDECK_HOME}/account.json` (mode `0600`).
+- `login` runs the device flow, prints `verification_uri` from the device-code response (never a hardcoded host) and the user code, polls for the token, calls `GET /v1/me`, and writes `${OVERDECK_HOME}/account.json` (mode `0600`). The device-code request is retried after a network error (3 attempts, waiting 1 s then 2 s; an HTTP error response is not retried), and every network-error message from `client.ts` appends fetch's cause code and message, for example `fetch failed (ECONNRESET: socket hang up)`.
 - `status` reports the signed-in GitHub login, this device, and access status from a fresh `GET /v1/me`; `--json` omits the token.
 - `logout` calls `DELETE /v1/devices/<deviceId>` and deletes the token file whether or not the revoke succeeded.
 
