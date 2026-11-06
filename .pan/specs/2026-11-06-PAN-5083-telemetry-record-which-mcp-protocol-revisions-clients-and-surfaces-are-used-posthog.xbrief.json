@@ -4,17 +4,17 @@
     "created": "2026-11-06T03:50:45Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5083: Telemetry: record which MCP protocol revisions, clients and surfaces are used (PostHog)",
-    "updated": "2026-11-06T03:57:28.805Z"
+    "updated": "2026-11-06T03:58:42.483Z"
   },
   "plan": {
     "id": "pan-5083",
     "title": "Telemetry: record which MCP protocol revisions, clients and surfaces are used (PostHog)",
-    "status": "proposed",
+    "status": "running",
     "uid": "e4a9a572-454e-487a-99eb-a2ce9ed6d292",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-06T03:50:45Z",
-    "updated": "2026-11-06T03:57:28.805Z",
+    "updated": "2026-11-06T03:58:42.483Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5083",
@@ -738,5 +738,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
