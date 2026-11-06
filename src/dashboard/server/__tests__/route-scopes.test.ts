@@ -4,6 +4,7 @@
  * table does not list needs `admin`.
  */
 import { describe, expect, it } from 'vitest';
+import { TELEMETRY_PROPERTY_DOMAINS } from '@overdeck/contracts';
 
 import { NO_LOSS_MATRIX } from '../../../../tests/unit/lib/overdeck/no-loss-matrix.js';
 import { requiredScopeFor, ROUTE_SCOPES, WS_TERMINAL_SCOPE } from '../route-scopes.js';
@@ -67,5 +68,16 @@ describe('route-scope table (PAN-2351)', () => {
     expect(requiredScopeFor('POST', '/api/conversations/@desk/conv-a/schedules')).toBe('tell');
     expect(requiredScopeFor('PUT', '/api/conversations/conv-a/schedules/3')).toBe('admin');
     expect(requiredScopeFor('DELETE', '/api/conversations/conv-a/schedules')).toBe('admin');
+  });
+
+  it('lists every scoped path as a telemetry client route (PAN-5100)', () => {
+    const clientRoutes: readonly string[] = TELEMETRY_PROPERTY_DOMAINS.client_route;
+    for (const row of ROUTE_SCOPES) {
+      expect(clientRoutes, row.path).toContain(row.path);
+    }
+  });
+
+  it('lets a read:state credential read the telemetry client config', () => {
+    expect(requiredScopeFor('GET', '/api/telemetry/client-config')).toBe('read:state');
   });
 });
