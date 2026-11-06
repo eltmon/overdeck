@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5084",
   "created": "2026-11-06T04:10:40.261Z",
-  "updated": "2026-11-06T06:21:57.715Z",
+  "updated": "2026-11-06T06:26:01.125Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -80,6 +80,10 @@
       "claimedBy": "agent-pan-5084",
       "claimedAt": "2026-11-06T06:19:13.767Z",
       "doneAt": "2026-11-06T06:21:57.714Z"
+    },
+    "install-kind-domain.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-06T06:26:01.124Z"
     }
   }
 }
