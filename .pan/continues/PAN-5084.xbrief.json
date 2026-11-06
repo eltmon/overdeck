@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5084",
   "created": "2026-11-06T04:10:40.261Z",
-  "updated": "2026-11-06T06:26:49.451Z",
+  "updated": "2026-11-06T06:27:04.929Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -96,6 +96,10 @@
     "install-kind-resolver.ac1": {
       "status": "completed",
       "doneAt": "2026-11-06T06:26:49.451Z"
+    },
+    "install-kind-resolver.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-06T06:27:04.928Z"
     }
   }
 }
