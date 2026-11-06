@@ -32,7 +32,7 @@ import {
 import { ModelId } from './settings.js';
 import type { Role } from './agents.js';
 import { tieredExecutionConfigForSave, validateTieredExecutionSettings, type ApiTieredExecutionConfig } from './settings-api-tiered-execution.js';
-import { telemetrySettingsFromConfig, validateApiTelemetryConfig, type ApiTelemetryConfig } from './settings-api-telemetry.js';
+import { mergeApiTelemetrySettings, telemetrySettingsFromConfig, validateApiTelemetryConfig, type ApiTelemetryConfig } from './settings-api-telemetry.js';
 import { jevToggleProblems } from './jev/settings-validation.js';
 import type { RuntimeName } from './runtimes/types.js';
 import { getBuiltInDefaultHarness } from './providers.js';
@@ -40,7 +40,6 @@ import { defaultBackgroundAiFeatures, type BackgroundAiFeature } from './backgro
 import { hasModelCapability, MODEL_DEPRECATIONS, resolveModelId } from './model-capabilities.js';
 import { isEffortLevel } from '@overdeck/contracts';
 import { effortConfigErrors } from './agents/effort-support.js';
-import { telemetryEnvironmentForcesOff } from './telemetry/config.js';
 import { synchronizeAnalyticsServices } from './telemetry/service.js';
 import { ensureOperatorHash } from './telemetry/operator-hash.js';
 import { invalidateRemoteAccessConfig, readRemoteAccessConfig } from './remote-access/config.js';
@@ -1152,13 +1151,7 @@ async function updateSettingsApi(updates: Partial<ApiSettingsConfig>): Promise<A
       ...current.tracker_keys,
       ...updates.tracker_keys,
     },
-    telemetry: {
-      enabled: updates.telemetry?.enabled ?? current.telemetry?.enabled ?? true,
-      effectiveEnabled: !telemetryEnvironmentForcesOff() && (updates.telemetry?.enabled ?? current.telemetry?.enabled ?? true),
-      installId: current.telemetry?.installId,
-      operatorGrouping: updates.telemetry?.operatorGrouping ?? current.telemetry?.operatorGrouping ?? false,
-      ...(current.telemetry?.operatorHash ? { operatorHash: current.telemetry.operatorHash } : {}),
-    },
+    telemetry: mergeApiTelemetrySettings(current.telemetry, updates.telemetry),
     experimental: {
       ...current.experimental,
       ...updates.experimental,
