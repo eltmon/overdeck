@@ -217,8 +217,47 @@ describe('pan lane reap and list', () => {
     const { deps, fetchMock, out } = harness();
     fetchMock.mockResolvedValue(json(200, { generatedAt: 'now', lanes: [lane] }));
     expect(await laneListCommand({ run: 'hotel' }, deps)).toBe(0);
-    expect(out[0]).toMatch(/^ID\s+RUN\/KEY\s+ROLE\s+MACHINE\s+ITER\s+ACTIVITY\s+REPORT\s+FOR\s+VERDICT\s+BRANCH@SHA\s+AHEAD\s+DIRTY\s+MODEL\s+COST$/);
-    expect(out[1]).toMatch(/^42\s+hotel\/663\s+builder\s+-\s+2\s+archived\s+#1 done\s+-\s+-\s+-\s+claude-opus-5-5\s+\$1\.50$/);
+    expect(out[0]).toMatch(/^ID\s+RUN\/KEY\s+ROLE\s+MACHINE\s+ITER\s+ACTIVITY\s+REAPABLE\s+REPORT\s+FOR\s+VERDICT\s+BRANCH@SHA\s+AHEAD\s+DIRTY\s+MODEL\s+COST$/);
+    expect(out[1]).toMatch(/^42\s+hotel\/663\s+builder\s+-\s+2\s+archived\s+-\s+#1 done\s+-\s+-\s+-\s+claude-opus-5-5\s+\$1\.50$/);
+  });
+});
+
+describe('pan lane list --reapable (PAN-5094 list-reapable)', () => {
+  function lanes() {
+    return [
+      { id: 1, name: 'reap-i1', run: 'hotel', key: '663', role: 'builder', iteration: 1, activity: 'stopped', archived: false, reapable: true, report: null, git: null, model: null, costUsd: null },
+      { id: 2, name: 'reap-i2', run: 'hotel', key: '663', role: 'builder', iteration: 2, activity: 'idle', archived: false, reapable: false, report: null, git: null, model: null, costUsd: null },
+    ];
+  }
+
+  it('shows REAPABLE after ACTIVITY with yes for a reapable lane (ac1)', async () => {
+    const { deps, fetchMock, out } = harness();
+    fetchMock.mockResolvedValue(json(200, { generatedAt: 'now', lanes: lanes() }));
+    expect(await laneListCommand({ run: 'hotel' }, deps)).toBe(0);
+    expect(out[1]).toMatch(/^1\s+hotel\/663\s+builder\s+-\s+1\s+stopped\s+yes\s+-/);
+    expect(out[2]).toMatch(/^2\s+hotel\/663\s+builder\s+-\s+2\s+idle\s+-\s+-/);
+  });
+
+  it('--reapable prints only reapable lanes, and --reapable --json prints only those as JSON (ac2)', async () => {
+    const { deps, fetchMock, out } = harness();
+    fetchMock.mockResolvedValue(json(200, { generatedAt: 'now', lanes: lanes() }));
+    expect(await laneListCommand({ run: 'hotel', reapable: true }, deps)).toBe(0);
+    expect(out).toHaveLength(2);
+    expect(out[1]).toMatch(/^1\s+hotel\/663/);
+
+    const jsonRun = harness();
+    jsonRun.fetchMock.mockResolvedValue(json(200, { generatedAt: 'now', lanes: lanes() }));
+    expect(await laneListCommand({ run: 'hotel', reapable: true, json: true }, jsonRun.deps)).toBe(0);
+    const printed = JSON.parse(jsonRun.out[0]!) as Array<{ name: string }>;
+    expect(printed.map((lane) => lane.name)).toEqual(['reap-i1']);
+  });
+
+  it('prints "No reapable lanes." on stderr and exits 0 when the filter leaves none (ac3)', async () => {
+    const { deps, fetchMock, out, err } = harness();
+    fetchMock.mockResolvedValue(json(200, { generatedAt: 'now', lanes: [lanes()[1]] }));
+    expect(await laneListCommand({ run: 'hotel', reapable: true }, deps)).toBe(0);
+    expect(out).toHaveLength(0);
+    expect(err).toEqual(['No reapable lanes.']);
   });
 });
 

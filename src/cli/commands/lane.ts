@@ -304,7 +304,7 @@ function verdictCell(verdict: { verdict?: string; value?: string; defects: numbe
 
 function laneTable(lanes: LaneView[]): string[] {
   const rows = [
-    ['ID', 'RUN/KEY', 'ROLE', 'MACHINE', 'ITER', 'ACTIVITY', 'REPORT', 'FOR', 'VERDICT', 'BRANCH@SHA', 'AHEAD', 'DIRTY', 'MODEL', 'COST'],
+    ['ID', 'RUN/KEY', 'ROLE', 'MACHINE', 'ITER', 'ACTIVITY', 'REAPABLE', 'REPORT', 'FOR', 'VERDICT', 'BRANCH@SHA', 'AHEAD', 'DIRTY', 'MODEL', 'COST'],
     ...lanes.map((lane) => [
       lane.id === null ? lane.name : String(lane.id),
       `${lane.run}/${lane.key}`,
@@ -312,6 +312,7 @@ function laneTable(lanes: LaneView[]): string[] {
       lane.machine ? `${lane.machine.label}${lane.machine.reachable ? '' : ' (offline)'}` : '-',
       String(lane.iteration),
       lane.archived ? 'archived' : lane.activity,
+      lane.reapable ? 'yes' : '-',
       lane.report ? `#${lane.report.seq} ${lane.report.status}` : '-',
       lane.criticOf ? `${lane.criticOf.key} i${lane.criticOf.iteration}` : '',
       lane.role === 'builder' ? verdictCell(lane.latestVerdict) : verdictCell(lane.verdict),
@@ -326,7 +327,7 @@ function laneTable(lanes: LaneView[]): string[] {
   return rows.map((cells) => cells.map((cell, column) => cell.padEnd(widths[column]!)).join('  ').trimEnd());
 }
 
-export async function laneListCommand(options: { run?: string; parent?: string; json?: boolean }, deps: LaneCliDeps): Promise<number> {
+export async function laneListCommand(options: { run?: string; parent?: string; reapable?: boolean; json?: boolean }, deps: LaneCliDeps): Promise<number> {
   const params = new URLSearchParams();
   if (options.run) params.set('run', options.run);
   if (options.parent) params.set('parent', options.parent);
@@ -342,15 +343,16 @@ export async function laneListCommand(options: { run?: string; parent?: string; 
     return WORKER_EXIT.usage;
   }
   const lanes = (answer.body?.lanes ?? []) as LaneView[];
+  const shown = options.reapable ? lanes.filter((lane) => lane.reapable) : lanes;
   if (options.json) {
-    deps.stdout(JSON.stringify(lanes, null, 2));
+    deps.stdout(JSON.stringify(shown, null, 2));
     return WORKER_EXIT.done;
   }
-  if (lanes.length === 0) {
-    deps.stderr('No lanes.');
+  if (shown.length === 0) {
+    deps.stderr(options.reapable ? 'No reapable lanes.' : 'No lanes.');
     return WORKER_EXIT.done;
   }
-  for (const line of laneTable(lanes)) deps.stdout(line);
+  for (const line of laneTable(shown)) deps.stdout(line);
   return WORKER_EXIT.done;
 }
 
@@ -690,8 +692,9 @@ export function registerLaneCommands(program: Command, deps: () => LaneCliDeps =
     .description('List lanes with their activity, newest report, git facts and cost')
     .option('--run <key>', 'Only this run\'s lanes')
     .option('--parent <conv>', 'Only lanes launched by this conversation')
+    .option('--reapable', 'Only lanes a newer iteration superseded that pan lane reap can remove now')
     .option('--json', 'Print JSON')
-    .action(async (options: { run?: string; parent?: string; json?: boolean }) => exitCli(await laneListCommand(options, deps())));
+    .action(async (options: { run?: string; parent?: string; reapable?: boolean; json?: boolean }) => exitCli(await laneListCommand(options, deps())));
 
   lane
     .command('show [lane]')
