@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5094",
   "created": "2026-11-06T17:38:04.566Z",
-  "updated": "2026-11-06T18:57:59.145Z",
+  "updated": "2026-11-06T18:58:20.932Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -202,6 +202,10 @@
     "docs-lanes-reference.ac1": {
       "status": "completed",
       "doneAt": "2026-11-06T18:57:59.145Z"
+    },
+    "docs-lanes-reference.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-06T18:58:20.931Z"
     }
   }
 }
