@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5083",
   "created": "2026-11-06T03:58:56.829Z",
-  "updated": "2026-11-06T04:41:23.894Z",
+  "updated": "2026-11-06T04:41:40.626Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -96,6 +96,10 @@
     "mcp-classifier.ac5": {
       "status": "completed",
       "doneAt": "2026-11-06T04:41:23.893Z"
+    },
+    "mcp-tracker.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-06T04:41:40.626Z"
     }
   }
 }
