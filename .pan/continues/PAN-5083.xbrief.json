@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5083",
   "created": "2026-11-06T03:58:56.829Z",
-  "updated": "2026-11-06T04:47:22.238Z",
+  "updated": "2026-11-06T04:47:39.469Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -176,6 +176,10 @@
     "mcp-privacy-test.ac2": {
       "status": "completed",
       "doneAt": "2026-11-06T04:47:22.238Z"
+    },
+    "mcp-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-06T04:47:39.468Z"
     }
   }
 }
