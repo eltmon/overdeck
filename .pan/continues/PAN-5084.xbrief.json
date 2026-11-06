@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5084",
   "created": "2026-11-06T04:10:40.261Z",
-  "updated": "2026-11-06T06:33:43.782Z",
+  "updated": "2026-11-06T06:34:00.846Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -200,6 +200,10 @@
     "settings-ui-disabled-reason.ac3": {
       "status": "completed",
       "doneAt": "2026-11-06T06:33:43.782Z"
+    },
+    "ci-workflows-telemetry-off.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-06T06:34:00.845Z"
     }
   }
 }
