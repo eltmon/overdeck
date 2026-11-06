@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5083",
   "created": "2026-11-06T03:58:56.829Z",
-  "updated": "2026-11-06T03:58:56.829Z",
+  "updated": "2026-11-06T04:07:47.546Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,10 @@
   "sessionHistory": [],
   "items": {
     "contract-schema": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5083",
-      "claimedAt": "2026-11-06T03:58:56.829Z"
+      "claimedAt": "2026-11-06T03:58:56.829Z",
+      "doneAt": "2026-11-06T04:07:47.546Z"
     }
   }
 }
