@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5084",
   "created": "2026-11-06T04:10:40.261Z",
-  "updated": "2026-11-06T06:26:18.329Z",
+  "updated": "2026-11-06T06:26:33.664Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -88,6 +88,10 @@
     "install-kind-domain.ac2": {
       "status": "completed",
       "doneAt": "2026-11-06T06:26:18.329Z"
+    },
+    "install-kind-domain.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-06T06:26:33.664Z"
     }
   }
 }
