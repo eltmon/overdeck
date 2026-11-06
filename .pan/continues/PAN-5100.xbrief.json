@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5100",
   "created": "2026-11-06T23:08:04.192Z",
-  "updated": "2026-11-06T23:34:45.099Z",
+  "updated": "2026-11-06T23:41:38.437Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,9 +34,10 @@
       "doneAt": "2026-11-06T23:34:40.792Z"
     },
     "wi4b-door-consent": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5100",
-      "claimedAt": "2026-11-06T23:34:45.099Z"
+      "claimedAt": "2026-11-06T23:34:45.099Z",
+      "doneAt": "2026-11-06T23:41:38.437Z"
     }
   }
 }
