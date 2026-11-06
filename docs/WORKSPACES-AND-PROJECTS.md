@@ -584,6 +584,13 @@ A workspace costs disk in two phases:
   its `down -v` teardown, which frees the old volume. Both containerize doors —
   `POST /api/workspaces/:issueId/containerize` (host plus stack) and
   `WorkspaceService.containerize` (stack) — admit before they build.
+- **Lane phase (PAN-5094)** — a `pan lane start` worktree is the same kind of
+  disk-heavy phase. `admitLaneDisk` (`src/lib/lanes/disk.ts`) admits it at the
+  lane's lanes root; `launchLane` calls it for a lane on this machine and
+  `launchOwnedLane` for one on the owner machine a `--machine` launch runs on.
+  Bytes reserved: `max(estimateWorkspaceDiskCost(project).hostBytes, 2 GiB)`
+  for a launch that creates a new worktree, 0 for `--reuse` or role `play`
+  (still checked, never bypassed). The label is `lane:<run>/<key>/<role>`.
 
 A phase is admitted when
 

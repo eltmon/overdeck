@@ -3,7 +3,7 @@
  * temp OVERDECK_HOME; injected git, runtime start, CPU check and config.
  */
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -33,6 +33,11 @@ const CONTEXT = { projectKey: 'lex-owner', startedBy: 'env-home' };
 
 const CPU_CALM = { saturated: false, signal: 'psi-some-avg60' as const, reading: 10, threshold: 50, psiSomeAvg10: 8 };
 const CPU_SATURATED = { saturated: true, signal: 'psi-some-avg60' as const, reading: 55, threshold: 50, psiSomeAvg10: 60 };
+const GIB = 1024 ** 3;
+const LEDGER_DIR = join(process.env.OVERDECK_HOME, 'disk-reservations');
+function leaseFiles(): string[] {
+  return existsSync(LEDGER_DIR) ? readdirSync(LEDGER_DIR).filter((name) => name.endsWith('.json')) : [];
+}
 
 function config(): LaneConfig {
   return {
@@ -63,6 +68,7 @@ function harness(commits: readonly string[] = ['main', 'abc1234']) {
     homeDir: () => TEST_HOME,
     tmpRoot: TMP_ROOT,
     cpuPressure: vi.fn(async () => CPU_CALM),
+    disk: { read: vi.fn(async () => 1024 ** 4), estimate: vi.fn(async () => 0) },
   } satisfies Deps;
   return { deps, git };
 }
@@ -228,6 +234,48 @@ describe('launchOwnedLane (PAN-4638 WI-2)', () => {
     const error = await rejection(launchOwnedLane(spec({ reuseCwd: PROJECT_PATH }), CONTEXT, deps));
     expect(error.status).toBe(400);
     expect(error.message).toContain('is not inside the lanes root');
+  });
+
+  it('rejects a builder spec with 507 disk-low below the floor, creating no worktree or row (owner-door-disk.ac1)', async () => {
+    const { deps, git } = harness();
+    deps.disk = { read: vi.fn(async () => 5 * GIB), estimate: vi.fn(async () => 0) };
+    const lane = spec();
+
+    const error = await rejection(launchOwnedLane(lane, CONTEXT, deps));
+
+    expect(error.status).toBe(507);
+    expect(error.code).toBe('disk-low');
+    expect(git.addBranchWorktree).not.toHaveBeenCalled();
+    expect(getConversationByName(lane.name)).toBeNull();
+  });
+
+  it('still rejects with 507 when spec.force is true (owner-door-disk.ac2)', async () => {
+    const { deps } = harness();
+    deps.disk = { read: vi.fn(async () => 5 * GIB), estimate: vi.fn(async () => 0) };
+
+    const error = await rejection(launchOwnedLane(spec({ force: true }), CONTEXT, deps));
+
+    expect(error.status).toBe(507);
+    expect(error.code).toBe('disk-low');
+  });
+
+  it('holds the disk lease after a successful launch (owner-door-disk.ac3, CodeRabbit #4496531330)', async () => {
+    const { deps } = harness();
+
+    const before = new Set(leaseFiles());
+    await launchOwnedLane(spec(), CONTEXT, deps);
+
+    expect(leaseFiles().filter((file) => !before.has(file))).toHaveLength(1);
+  });
+
+  it('releases the disk lease at once when the launch fails in git.addBranchWorktree', async () => {
+    const { deps, git } = harness();
+    git.addBranchWorktree.mockImplementation(async () => { throw new Error('worktree failed'); });
+
+    const before = new Set(leaseFiles());
+    await expect(launchOwnedLane(spec(), CONTEXT, deps)).rejects.toThrow('worktree failed');
+
+    expect(leaseFiles().filter((file) => !before.has(file))).toHaveLength(0);
   });
 });
 
