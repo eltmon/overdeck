@@ -240,15 +240,18 @@ sends nothing.
 Dedupe:
 
 - `mcp_session_seen` is sent at most once per UTC day per surface, client,
-  protocol revision and credential kind on each install.
+  protocol revision and credential kind on each install. Connector surfaces
+  are the exception: see the last bullet.
 - `mcp_tool_called` is sent at most once per UTC day per surface, client and
-  tool. It carries no count, no arguments and no result; unknown or hidden tool
+  tool, with the same connector exception. It carries no count, no arguments and no result; unknown or hidden tool
   names send nothing.
 - Process memory is the first check. The dashboard and `pan mcp serve`
   surfaces also keep the keys sent today in `~/.overdeck/telemetry-mcp-seen.json`,
   because every agent session runs its own `pan mcp serve`. Two processes
   that write at the same moment can send one duplicate.
-- Connector surfaces dedupe in memory only and never write that file.
+- Connector surfaces dedupe in memory only and never write that file, so the
+  daily limit holds per connector process. A connector that restarts during
+  the day can send the same key again.
 
 With telemetry off, no MCP event is sent and `telemetry-mcp-seen.json` is
 neither read nor written.
