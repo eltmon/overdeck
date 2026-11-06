@@ -27,6 +27,8 @@ export const TELEMETRY_EVENT_NAMES = [
   "phone_removed",
   "anywhere_channel_opened",
   "relay_usage_sampled",
+  "mcp_session_seen",
+  "mcp_tool_called",
 ] as const
 
 export type TelemetryEventName = typeof TELEMETRY_EVENT_NAMES[number]
@@ -117,6 +119,61 @@ const TELEMETRY_GITHUB_CALLERS = [
 /** PAN-5016: route kinds (ROUTE_KINDS in ./machines) plus `stored`, the stored-route probe phase. */
 const TELEMETRY_CHANNEL_ROUTES = ["lan", "tailnet", "ssh", "public", "direct", "relay", "stored"] as const satisfies readonly ((typeof ROUTE_KINDS)[number] | "stored")[]
 
+/** PAN-5083: the Overdeck MCP tool names (ALL_TOOLS in src/lib/mcp/server.ts); a unit test keeps them in step. */
+const TELEMETRY_MCP_TOOLS = [
+  "answer_agent_permission",
+  "answer_agent_plan",
+  "answer_codex_approval",
+  "answer_pane_choice",
+  "answer_permission",
+  "answer_pi_ask",
+  "answer_plan",
+  "answer_question",
+  "delegate_task",
+  "delete_scheduled",
+  "done",
+  "handoff",
+  "interrupt_conversation",
+  "lane_report",
+  "lane_start",
+  "lane_status",
+  "lane_stop",
+  "lane_wait",
+  "link_machine",
+  "link_machine_wait",
+  "link_pull_request",
+  "list_conversations",
+  "list_machines",
+  "list_pending_input",
+  "list_pull_request_watches",
+  "list_scheduled",
+  "list_workers",
+  "memory_add",
+  "memory_search",
+  "read_conversation",
+  "request_secret",
+  "schedule_message",
+  "schedule_recurring",
+  "search_conversations",
+  "secret_wait",
+  "send_message",
+  "start_conversation",
+  "start_issue",
+  "start_worker",
+  "stop_conversation",
+  "task_block",
+  "task_cancel",
+  "task_claim",
+  "task_done",
+  "task_status",
+  "task_wait",
+  "unwatch_pull_request",
+  "update_scheduled",
+  "wait_job",
+  "watch_pull_request",
+  "worker_report",
+] as const
+
 export const TELEMETRY_PROPERTY_DOMAINS = {
   agent_spawn_mode: ["spawn-and-send", "spawn-work-and-send"],
   answer_type: ["custom", "selection", "note", "selection+note"],
@@ -163,6 +220,11 @@ export const TELEMETRY_PROPERTY_DOMAINS = {
   link_failure_reason: ["bad_pairing_url", "unreachable", "pairing_refused", "unsupported", "identity_mismatch", "exchange_failed", "grant_refused", "offline", "approval_refused", "approval_failed", "other"],
   link_method: ["pairing_code", "ssh", "fly", "directory_approval", "other"],
   link_side: ["requester", "approver"],
+  mcp_auth: ["agent_token", "oauth", "access_token", "connector"],
+  mcp_client: ["claude_code", "codex", "cursor", "vscode", "chatgpt", "grok", "hermes", "openclaw", "gemini", "opencode", "kimi", "overdeck_connector", "other"],
+  mcp_protocol: ["2026-07-28", "2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05", "2024-10-07", "other"],
+  mcp_surface: ["dashboard_http", "public_http", "stdio", "connector_http", "connector_stdio"],
+  mcp_tool: TELEMETRY_MCP_TOOLS,
   merge_kind: ["pipeline"],
   model_family: ["claude", "gpt", "gemini", "kimi", "minimax", "glm", "mimo", "other"],
   phone_removed_by: ["operator", "phone"],
@@ -240,6 +302,8 @@ export const TELEMETRY_EVENT_CATALOG = {
   phone_removed: { by: "phone_removed_by" },
   anywhere_channel_opened: { route: "channel_route", ok: "boolean", error_class: "channel_error_class" },
   relay_usage_sampled: { bytes: "relay_bytes_bucket" },
+  mcp_session_seen: { mcp_surface: "mcp_surface", mcp_protocol: "mcp_protocol", mcp_client: "mcp_client", mcp_auth: "mcp_auth" },
+  mcp_tool_called: { mcp_surface: "mcp_surface", mcp_client: "mcp_client", mcp_tool: "mcp_tool" },
 } as const satisfies Record<TelemetryEventName, Record<string, TelemetryPropertyDomainName>>
 
 type TelemetryPropertyValue<Domain extends TelemetryPropertyDomainName> =
@@ -282,6 +346,8 @@ export type PhonePairedProperties = EventProperties<"phone_paired">
 export type PhoneRemovedProperties = EventProperties<"phone_removed">
 export type AnywhereChannelOpenedProperties = EventProperties<"anywhere_channel_opened">
 export type RelayUsageSampledProperties = EventProperties<"relay_usage_sampled">
+export type McpSessionSeenProperties = EventProperties<"mcp_session_seen">
+export type McpToolCalledProperties = EventProperties<"mcp_tool_called">
 export type TelemetryQuotaPointsBucket = TelemetryPropertyValue<"quota_points_bucket">
 export type TelemetryQuotaRemainingBucket = TelemetryPropertyValue<"quota_remaining_bucket">
 export type TelemetryGitHubCaller = TelemetryPropertyValue<"github_caller">
@@ -291,6 +357,11 @@ export type TelemetryLinkFailureReason = TelemetryPropertyValue<"link_failure_re
 export type TelemetryChannelRoute = TelemetryPropertyValue<"channel_route">
 export type TelemetryChannelErrorClass = TelemetryPropertyValue<"channel_error_class">
 export type TelemetryRelayBytesBucket = TelemetryPropertyValue<"relay_bytes_bucket">
+export type TelemetryMcpSurface = TelemetryPropertyValue<"mcp_surface">
+export type TelemetryMcpProtocol = TelemetryPropertyValue<"mcp_protocol">
+export type TelemetryMcpClient = TelemetryPropertyValue<"mcp_client">
+export type TelemetryMcpAuth = TelemetryPropertyValue<"mcp_auth">
+export type TelemetryMcpTool = TelemetryPropertyValue<"mcp_tool">
 
 /** PAN-4264: GitHub quota points as a coarse bucket (raw counts are never sent). */
 export function bucketQuotaPoints(points: number): TelemetryQuotaPointsBucket {

@@ -109,6 +109,8 @@ the public contract and lists every allowed value.
 | `phone_removed` | `by=phone_removed_by` | A phone's pairing with this machine was revoked. |
 | `anywhere_channel_opened` | `route=channel_route; ok=boolean; error_class=channel_error_class` | The link supervisor's channel outcome for a linked machine changed (at most one per change per link). |
 | `relay_usage_sampled` | `bytes=relay_bytes_bucket` | At most hourly: bytes this machine relayed since the previous sample. |
+| `mcp_session_seen` | `mcp_surface=mcp_surface; mcp_protocol=mcp_protocol; mcp_client=mcp_client; mcp_auth=mcp_auth` | At most once per day per surface, client, protocol revision and credential kind: an MCP client opened a session. |
+| `mcp_tool_called` | `mcp_surface=mcp_surface; mcp_client=mcp_client; mcp_tool=mcp_tool` | At most once per day per surface, client and tool: an MCP client called an Overdeck tool. |
 
 | Domain | Allowed values |
 | --- | --- |
@@ -131,6 +133,11 @@ the public contract and lists every allowed value.
 | `link_failure_reason` | `bad_pairing_url`, `unreachable`, `pairing_refused`, `unsupported`, `identity_mismatch`, `exchange_failed`, `grant_refused`, `offline`, `approval_refused`, `approval_failed`, `other` |
 | `link_method` | `pairing_code`, `ssh`, `fly`, `directory_approval`, `other` |
 | `link_side` | `requester`, `approver` |
+| `mcp_auth` | `agent_token`, `oauth`, `access_token`, `connector` |
+| `mcp_client` | `claude_code`, `codex`, `cursor`, `vscode`, `chatgpt`, `grok`, `hermes`, `openclaw`, `gemini`, `opencode`, `kimi`, `overdeck_connector`, `other` |
+| `mcp_protocol` | `2026-07-28`, `2025-11-25`, `2025-06-18`, `2025-03-26`, `2024-11-05`, `2024-10-07`, `other` |
+| `mcp_surface` | `dashboard_http`, `public_http`, `stdio`, `connector_http`, `connector_stdio` |
+| `mcp_tool` | `answer_agent_permission`, `answer_agent_plan`, `answer_codex_approval`, `answer_pane_choice`, `answer_permission`, `answer_pi_ask`, `answer_plan`, `answer_question`, `delegate_task`, `delete_scheduled`, `done`, `handoff`, `interrupt_conversation`, `lane_report`, `lane_start`, `lane_status`, `lane_stop`, `lane_wait`, `link_machine`, `link_machine_wait`, `link_pull_request`, `list_conversations`, `list_machines`, `list_pending_input`, `list_pull_request_watches`, `list_scheduled`, `list_workers`, `memory_add`, `memory_search`, `read_conversation`, `request_secret`, `schedule_message`, `schedule_recurring`, `search_conversations`, `secret_wait`, `send_message`, `start_conversation`, `start_issue`, `start_worker`, `stop_conversation`, `task_block`, `task_cancel`, `task_claim`, `task_done`, `task_status`, `task_wait`, `unwatch_pull_request`, `update_scheduled`, `wait_job`, `watch_pull_request`, `worker_report` |
 | `merge_kind` | `pipeline` |
 | `model_family` | `claude`, `gpt`, `gemini`, `kimi`, `minimax`, `glm`, `mimo`, `other` |
 | `phone_removed_by` | `operator`, `phone` |
@@ -175,6 +182,99 @@ role it played.
 No Anywhere event carries a machine label, environment id, token id, URL, key,
 client id or raw byte count. Every value comes from a closed domain above, and
 the same opt-out covers these events as every other event.
+
+## MCP events
+
+Overdeck's MCP tool module is served on five surfaces, and each event names
+the one it came from in `mcp_surface`:
+
+- `dashboard_http`: `POST /mcp` on the dashboard, reached on loopback, LAN or
+  tailnet. Managed agents, Copy MCP URL tokens and OAuth sign-ins land here.
+- `public_http`: the same route reached through Tailscale Funnel (Public MCP),
+  identified by the `Tailscale-Funnel-Request` header.
+- `stdio`: `pan mcp serve`.
+- `connector_http` and `connector_stdio`: `pan mcp connector serve` in HTTP
+  mode and with `--stdio`.
+
+`mcp_session_seen` is sent for a message that identifies a session: an
+`initialize` request, or any request whose `params._meta` carries the
+2026-07-28 keys `io.modelcontextprotocol/protocolVersion` or
+`io.modelcontextprotocol/clientInfo`. A plain `tools/call` that carries only
+the `MCP-Protocol-Version` header sends no session event.
+
+`mcp_protocol` is the revision the client asked for, not the one the server
+answered: the `initialize` request's `params.protocolVersion`, else the
+`_meta` protocol key, else the header. A value outside the domain reads
+`other`. The current SDK refuses a 2026-07-28 HTTP request with 400 before any
+server code runs, so the HTTP surfaces read the raw body and header before the
+SDK transport. A 2026-07-28 request is recorded even though it is refused.
+
+`mcp_client` is the client family, taken from `clientInfo.name` and lower-cased.
+The first matching rule wins:
+
+| Name contains | `mcp_client` |
+| --- | --- |
+| cursor | cursor |
+| codex | codex |
+| claude-code, claude code | claude_code |
+| visual studio code, vscode, vs code | vscode |
+| chatgpt, openai | chatgpt |
+| grok | grok |
+| hermes | hermes |
+| openclaw | openclaw |
+| gemini | gemini |
+| opencode | opencode |
+| kimi | kimi |
+| overdeck | overdeck_connector |
+
+Any other name, a missing name, or a name over 200 characters reads `other`. A
+session message without a name uses the client last seen from the same caller.
+The raw client name, version, title and website are never sent.
+
+`mcp_auth` is the credential kind. An OAuth sign-in reads `oauth`, an agent
+token reads `agent_token`, and any other token (Copy MCP URL, `pan token
+create`) reads `access_token`. Both connector surfaces read `connector`. A
+request without a valid credential is refused before it is observed, so it
+sends nothing.
+
+Dedupe:
+
+- `mcp_session_seen` is sent at most once per UTC day per surface, client,
+  protocol revision and credential kind on each install. Connector surfaces
+  are the exception: see the last bullet.
+- `mcp_tool_called` is sent at most once per UTC day per surface, client and
+  tool, with the same connector exception. It carries no count, no arguments and no result; unknown or hidden tool
+  names send nothing.
+- Process memory is the first check. The dashboard and `pan mcp serve`
+  surfaces also keep the keys sent today in `~/.overdeck/telemetry-mcp-seen.json`,
+  because every agent session runs its own `pan mcp serve`. Two processes
+  that write at the same moment can send one duplicate.
+- Connector surfaces dedupe in memory only and never write that file, so the
+  daily limit holds per connector process. A connector that restarts during
+  the day can send the same key again.
+
+With telemetry off, no MCP event is sent and `telemetry-mcp-seen.json` is
+neither read nor written.
+
+### MCP usage dashboard (PostHog)
+
+Create an "MCP usage" dashboard in PostHog project 514675 once events arrive,
+with three insights:
+
+1. **Installs by protocol revision:** trend of `mcp_session_seen`, unique users
+   (`distinct_id`), weekly, broken down by `mcp_protocol`, last 90 days.
+2. **Installs by client family:** the same trend, broken down by `mcp_client`.
+3. **Installs by surface:** the same trend, broken down by `mcp_surface`.
+
+The same question in HogQL:
+
+```sql
+SELECT properties.mcp_protocol AS protocol, count(DISTINCT distinct_id) AS installs
+FROM events
+WHERE event = 'mcp_session_seen' AND timestamp > now() - INTERVAL 30 DAY
+GROUP BY protocol
+ORDER BY installs DESC
+```
 
 ## Hosted services
 
@@ -234,6 +334,8 @@ No production feature is controlled by a PostHog flag yet.
 - Node product events, exception capture, and flag evaluation use
   `src/lib/telemetry/service.ts`; no other production module imports
   `posthog-node` or sends directly to PostHog.
+- `src/lib/telemetry/mcp.ts` is the only MCP telemetry door: every surface
+  and the `tools/call` handler record through it.
 - `src/lib/telemetry/posthog-read.ts` is the only PostHog read door (the
   `pan doctor github-quota` remote view); it sends the `operatorHash` as a
   HogQL placeholder value, never inside the SQL.

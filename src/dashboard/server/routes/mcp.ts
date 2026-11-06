@@ -18,6 +18,10 @@
  * own Bearer token, so the route-scope table judges every tool call and a
  * revoked token fails its next request. The token travels only in the
  * `Authorization` header (NFR-4).
+ *
+ * An authenticated request is labelled `dashboard_http`, or `public_http` over
+ * Funnel, and noted for MCP usage telemetry before the SDK transport runs, so a
+ * protocol revision the transport refuses is still recorded (PAN-5083).
  */
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import { Effect, Layer } from 'effect';
@@ -27,6 +31,8 @@ import { getDashboardLoopbackApiUrl } from '../../../lib/config.js';
 import { getInternalToken } from '../../../lib/internal-token.js';
 import { createFetchDashboardApi, type DashboardApi } from '../../../lib/mcp/dashboard-api.js';
 import { createOverdeckMcpServer, hasAgentId } from '../../../lib/mcp/server.js';
+import { mcpUsageTelemetry, type McpUsageLabel, type McpUsageTelemetry } from '../../../lib/telemetry/mcp.js';
+import { mcpAuthForToken } from '../../../lib/telemetry/mcp-classify.js';
 import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
 import { credentialScopes, dashboardDeviceTokenFromHeaders, isTailscaleFunnelRequest, resolveDashboardCredential } from './dashboard-auth.js';
@@ -35,6 +41,8 @@ import { getHeaderFromMap, validateOriginHeaders, type HeaderMap } from './origi
 
 export interface McpRouteDeps {
   makeApi(token: string): DashboardApi;
+  /** PAN-5083: MCP usage telemetry; defaults to the process tracker. */
+  usage?: McpUsageTelemetry;
 }
 
 const NO_STORE = { 'Cache-Control': 'no-store' };
@@ -58,9 +66,16 @@ async function serveMcpRequest(
   isAgent: boolean,
   headers: Headers,
   body: string,
+  label: McpUsageLabel,
 ) {
+  const usage = deps.usage ?? mcpUsageTelemetry;
+  try {
+    usage.noteRequest(label, JSON.parse(body), headers.get('mcp-protocol-version') ?? undefined);
+  } catch {
+    // An unparsable body is the transport's to refuse; telemetry skips it.
+  }
   const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
-  const server = createOverdeckMcpServer({ api: deps.makeApi(token), scopes, isAgent });
+  const server = createOverdeckMcpServer({ api: deps.makeApi(token), scopes, isAgent }, undefined, { label, telemetry: usage });
   try {
     await server.connect(transport);
     const webResponse = await transport.handleRequest(new Request('http://localhost/mcp', { method: 'POST', headers, body }));
@@ -109,8 +124,13 @@ export function makeMcpRouteLayer(deps: McpRouteDeps) {
       if (isTailscaleFunnelRequest(headers) && !credential.oauthClientId) {
         return jsonResponse({ error: PUBLIC_OAUTH_ONLY }, { status: 403, headers: NO_STORE });
       }
+      const label: McpUsageLabel = {
+        surface: isTailscaleFunnelRequest(headers) ? 'public_http' : 'dashboard_http',
+        auth: mcpAuthForToken(credential),
+        callerKey: credential.oauthClientId ?? credential.tokenId,
+      };
       const body = yield* request.text;
-      return yield* Effect.promise(() => serveMcpRequest(deps, token, credential.scopes, hasAgentId(credential), headersOf(request), body));
+      return yield* Effect.promise(() => serveMcpRequest(deps, token, credential.scopes, hasAgentId(credential), headersOf(request), body, label));
     })),
   );
 

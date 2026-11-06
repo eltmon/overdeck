@@ -2,7 +2,8 @@
  * PAN-4649 W-9: `pan mcp serve`. Token refusals use the real registry in a
  * temporary OVERDECK_HOME; a valid token serves tools/list over PassThrough
  * stdio, and stdout carries only JSON-RPC lines. PAN-4927 W-MCP1: the token
- * may also come from a 0600 `OVERDECK_MCP_TOKEN_FILE`.
+ * may also come from a 0600 `OVERDECK_MCP_TOKEN_FILE`. PAN-5083 W-6: the
+ * stdio transport is observed for MCP usage telemetry before it attaches.
  */
 import { chmod, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -15,6 +16,7 @@ vi.mock('../../../src/lib/config.js', () => ({ getDashboardApiUrl: () => 'http:/
 
 const { _resetAccessTokensForTests, _settleAccessTokenWritesForTests, createAccessToken, revokeAccessToken } = await import('../../../src/lib/access-tokens.js');
 const { runMcpServe } = await import('../../../src/cli/commands/mcp.js');
+const { McpUsageTelemetry } = await import('../../../src/lib/telemetry/mcp.js');
 
 const originalHome = process.env.OVERDECK_HOME;
 let home: string;
@@ -173,5 +175,40 @@ describe('pan mcp serve (PAN-4649 W-9)', () => {
     const path = await tokenFile('', 0o600);
     await expect(runMcpServe(io({ OVERDECK_MCP_TOKEN_FILE: path }))).resolves.toBe(1);
     expect(stderr.join('\n')).toContain('OVERDECK_MCP_TOKEN_FILE is empty');
+  });
+});
+
+describe('pan mcp serve usage telemetry (PAN-5083 W-6)', () => {
+  function tracked() {
+    const capture = vi.fn();
+    const usage = new McpUsageTelemetry({ analytics: () => ({ capture }), enabled: () => true, ledgerFile: () => join(home, 'telemetry-mcp-seen.json') });
+    return { capture, usage };
+  }
+
+  it('records one stdio session for an initialize written before the transport attaches', async () => {
+    const { token } = await createAccessToken({ name: 'mcp', scopes: ['read:conversations'], kind: 'token' });
+    const { capture, usage } = tracked();
+    const { serving, names } = await exchangeToolsList(Object.assign(io({ OVERDECK_MCP_TOKEN: token }), { usage }));
+    await expect(names).resolves.toEqual(['list_conversations', 'search_conversations', 'read_conversation', 'list_scheduled', 'list_pending_input']);
+    await expect(serving).resolves.toBe(0);
+    await usage.settled();
+
+    expect(capture.mock.calls).toEqual([
+      ['mcp_session_seen', { mcp_surface: 'stdio', mcp_protocol: '2025-06-18', mcp_client: 'other', mcp_auth: 'access_token' }],
+    ]);
+  });
+
+  it('labels an agent token as agent_token', async () => {
+    const { token } = await createAccessToken({
+      name: 'agent', scopes: ['read:conversations'], kind: 'token', agentId: 'agent-pan-1', agentKind: 'agent', role: 'work',
+    });
+    const { capture, usage } = tracked();
+    const { serving } = await exchangeToolsList(Object.assign(io({ OVERDECK_MCP_TOKEN: token }), { usage }));
+    await expect(serving).resolves.toBe(0);
+    await usage.settled();
+
+    expect(capture.mock.calls).toEqual([
+      ['mcp_session_seen', { mcp_surface: 'stdio', mcp_protocol: '2025-06-18', mcp_client: 'other', mcp_auth: 'agent_token' }],
+    ]);
   });
 });

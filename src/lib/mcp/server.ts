@@ -12,13 +12,18 @@
  * unknown one. It uses the low-level SDK `Server` with hand-written JSON
  * Schemas (D-4649-12).
  *
- * This module imports only Node built-ins, the SDK, `../access-tokens.js` and
- * its own files; it never imports dashboard server code.
+ * A labelled server also records `mcp_tool_called` through
+ * `../telemetry/mcp.js` (PAN-5083); an unlabelled one records nothing.
+ *
+ * This module imports only Node built-ins, the SDK, `../access-tokens.js`,
+ * `../telemetry/mcp.js` and its own files; it never imports dashboard server
+ * code.
  */
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 
 import { scopeSatisfies } from '../access-tokens.js';
+import { mcpUsageTelemetry, type McpUsageLabel, type McpUsageTelemetry } from '../telemetry/mcp.js';
 import { errorResult, type McpToolContext, type OverdeckTool } from './tool.js';
 import { APPROVE_TOOLS } from './tools-approve.js';
 import { DELEGATE_TOOLS } from './tools-delegate.js';
@@ -47,7 +52,11 @@ export function visibleTools(ctx: Pick<McpToolContext, 'scopes' | 'isAgent'>, to
   return tools.filter((tool) => scopeSatisfies(ctx.scopes, tool.scope) && (tool.audience === 'any' || ctx.isAgent));
 }
 
-export function createOverdeckMcpServer(ctx: McpToolContext, tools: readonly OverdeckTool[] = ALL_TOOLS): Server {
+export function createOverdeckMcpServer(
+  ctx: McpToolContext,
+  tools: readonly OverdeckTool[] = ALL_TOOLS,
+  usage?: { label: McpUsageLabel; telemetry?: McpUsageTelemetry },
+): Server {
   const server = new Server({ name: MCP_SERVER_NAME, version: MCP_SERVER_VERSION }, { capabilities: { tools: {} } });
   const visible = visibleTools(ctx, tools);
   const byName = new Map(visible.map((tool) => [tool.name, tool]));
@@ -59,6 +68,7 @@ export function createOverdeckMcpServer(ctx: McpToolContext, tools: readonly Ove
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const tool = byName.get(request.params.name);
     if (!tool) return errorResult(`Unknown tool ${request.params.name}`);
+    if (usage) (usage.telemetry ?? mcpUsageTelemetry).noteToolCall(usage.label, tool.name, request.params);
     try {
       return await tool.run(request.params.arguments ?? {}, ctx);
     } catch (error: unknown) {

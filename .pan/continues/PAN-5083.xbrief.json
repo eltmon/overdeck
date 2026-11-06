@@ -1,0 +1,220 @@
+{
+  "version": "1",
+  "issueId": "PAN-5083",
+  "created": "2026-11-06T03:58:56.829Z",
+  "updated": "2026-11-06T04:55:22.291Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-06T04:54Z] coderabbit → FINDINGS — seq 1",
+      "timestamp": "2026-11-06T04:54:47.322Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-06T04:55Z] ci-monitor → FAILED — seq 2",
+      "timestamp": "2026-11-06T04:55:22.291Z"
+    }
+  ],
+  "items": {
+    "contract-schema": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5083",
+      "claimedAt": "2026-11-06T03:58:56.829Z",
+      "doneAt": "2026-11-06T04:07:47.546Z"
+    },
+    "mcp-classifier": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5083",
+      "claimedAt": "2026-11-06T04:07:59.564Z",
+      "doneAt": "2026-11-06T04:09:50.635Z"
+    },
+    "mcp-tracker": {
+      "status": "completed",
+      "doneAt": "2026-11-06T04:12:46.400Z"
+    },
+    "server-tool-hook": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5083",
+      "claimedAt": "2026-11-06T04:12:52.224Z",
+      "doneAt": "2026-11-06T04:14:23.244Z"
+    },
+    "dashboard-route-labels": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5083",
+      "claimedAt": "2026-11-06T04:14:28.039Z",
+      "doneAt": "2026-11-06T04:18:25.594Z"
+    },
+    "stdio-serve-labels": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5083",
+      "claimedAt": "2026-11-06T04:18:27.060Z",
+      "doneAt": "2026-11-06T04:20:11.222Z"
+    },
+    "connector-labels": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5083",
+      "claimedAt": "2026-11-06T04:20:12.829Z",
+      "doneAt": "2026-11-06T04:22:12.562Z"
+    },
+    "mcp-privacy-test": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5083",
+      "claimedAt": "2026-11-06T04:22:14.044Z",
+      "doneAt": "2026-11-06T04:25:16.797Z"
+    },
+    "mcp-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5083",
+      "claimedAt": "2026-11-06T04:25:18.245Z",
+      "doneAt": "2026-11-06T04:35:49.698Z"
+    },
+    "contract-schema.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-06T04:38:55.368Z"
+    },
+    "contract-schema.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-06T04:39:13.894Z"
+    },
+    "contract-schema.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-06T04:39:32.055Z"
+    },
+    "contract-schema.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-06T04:39:48.481Z"
+    },
+    "mcp-classifier.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-06T04:40:06.105Z"
+    },
+    "mcp-classifier.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-06T04:40:25.681Z"
+    },
+    "mcp-classifier.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-06T04:40:45.371Z"
+    },
+    "mcp-classifier.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-06T04:41:04.598Z"
+    },
+    "mcp-classifier.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-06T04:41:23.893Z"
+    },
+    "mcp-tracker.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-06T04:41:40.626Z"
+    },
+    "mcp-tracker.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-06T04:41:56.996Z"
+    },
+    "mcp-tracker.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-06T04:42:13.528Z"
+    },
+    "mcp-tracker.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-06T04:42:30.402Z"
+    },
+    "mcp-tracker.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-06T04:42:49.662Z"
+    },
+    "server-tool-hook.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-06T04:43:08.392Z"
+    },
+    "server-tool-hook.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-06T04:43:26.239Z"
+    },
+    "server-tool-hook.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-06T04:43:44.232Z"
+    },
+    "dashboard-route-labels.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-06T04:44:02.912Z"
+    },
+    "dashboard-route-labels.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-06T04:44:21.038Z"
+    },
+    "dashboard-route-labels.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-06T04:44:38.578Z"
+    },
+    "dashboard-route-labels.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-06T04:44:56.624Z"
+    },
+    "stdio-serve-labels.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-06T04:45:15.682Z"
+    },
+    "stdio-serve-labels.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-06T04:45:34.178Z"
+    },
+    "stdio-serve-labels.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-06T04:45:52.808Z"
+    },
+    "connector-labels.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-06T04:46:11.997Z"
+    },
+    "connector-labels.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-06T04:46:30.619Z"
+    },
+    "connector-labels.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-06T04:46:47.673Z"
+    },
+    "mcp-privacy-test.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-06T04:47:05.440Z"
+    },
+    "mcp-privacy-test.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-06T04:47:22.238Z"
+    },
+    "mcp-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-06T04:47:39.468Z"
+    },
+    "mcp-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-06T04:47:57.449Z"
+    },
+    "mcp-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-06T04:48:14.646Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "coderabbit",
+      "outcome": "findings",
+      "timestamp": "2026-11-06T04:54:47Z",
+      "markdownBody": "# CodeRabbit findings for PAN-5083 (PR #5085)\n\nCodeRabbit posted 1 inline finding(s). CodeRabbit is advisory: nothing waits for these,\nbut each one gets an answer, either a fix or a reply with your reason.\n\n- Thread 4489164596 · docs/TELEMETRY.md:243 [Minor]: Qualify the daily limit for connector surfaces.\n  https://github.com/eltmon/overdeck/pull/5085#discussion_r4489164596\n\n## What to do\n\n1. Read each thread (open its link, or the code at the path and line).\n2. If you agree with a finding, fix it.\n3. If you reject a finding, reply on its thread with your reason:\n   `gh api repos/eltmon/overdeck/pulls/5085/comments/<thread id>/replies -f body=\"<reason>\"`\n4. If you changed code: run the quality gates on what you touched, commit, push, then run `pan review request PAN-5083`.\n   If you only replied, you are done.\n5. If PR #5085 has already merged when you read this, nothing more lands on it: open a follow-up issue\n   for the findings you agree with instead of pushing."
+    },
+    {
+      "seq": 2,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-06T04:55:21Z",
+      "markdownBody": "# CI Failure Feedback for PAN-5083\n\nPull request: https://github.com/eltmon/overdeck/pull/5085 (head `3360e740`)\n\nSource: check_run:test-shard (3/4)\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\n## Failing checks (1)\n\n### test-shard (3/4)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/127718311416/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/42164694255/job/127718311416  \n```\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/contracts/telemetry-schema.test.ts\u001b[2m > \u001b[22mtelemetry event schema\u001b[2m > \u001b[22mexports all twenty-five telemetry event names\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/contracts/telemetry-schema.test.ts\u001b[2m > \u001b[22mtelemetry event schema\u001b[2m > \u001b[22mexports all twenty-five telemetry event names\n\u001b[31m\u001b[1mAssertionError\u001b[22m: expected [ 'dashboard_tab_viewed', …(26) ] to deeply equal [ 'dashboard_tab_viewed', …(24) ]\u001b[39m\n\n\u001b[32m- Expected\u001b[39m\n\u001b[31m+ Received\u001b[39m\n\n\u001b[33m@@ -22,6 +22,8 @@\u001b[39m\n\u001b[2m    \"machine_link_failed\",\u001b[22m\n\u001b[2m    \"phone_paired\",\u001b[22m\n\u001b[2m    \"phone_removed\",\u001b[22m\n\u001b[2m    \"anywhere_channel_opened\",\u001b[22m\n\u001b[2m    \"relay_usage_sampled\",\u001b[22m\n\u001b[31m+   \"mcp_session_seen\",\u001b[39m\n\u001b[31m+   \"mcp_tool_called\",\u001b[39m\n\u001b[2m  ]\u001b[22m\n\n\u001b[36m \u001b[2m❯\u001b[22m tests/unit/contracts/telemetry-schema.test.ts:\u001b[2m54:35\u001b[22m\u001b[39m\n    \u001b[90m 52|\u001b[39m \u001b[34mdescribe\u001b[39m(\u001b[32m'telemetry event schema'\u001b[39m\u001b[33m,\u001b[39m () \u001b[33m=>\u001b[39m {\n    \u001b[90m 53|\u001b[39m   \u001b[34mit\u001b[39m(\u001b[32m'exports all twenty-five telemetry event names'\u001b[39m\u001b[33m,\u001b[39m () \u001b[33m=>\u001b[39m {\n    \u001b[90m 54|\u001b[39m     \u001b[34mexpect\u001b[39m(\u001b[33mTELEMETRY_EVENT_NAMES\u001b[39m)\u001b[33m.\u001b[39m\u001b[34mtoEqual\u001b[39m(\u001b[33mEXPECTED_EVENTS\u001b[39m)\u001b[33m;\u001b[39m\n    \u001b[90m   |\u001b[39m                                   \u001b[31m^\u001b[39m\n    \u001b[90m 55|\u001b[39m   })\u001b[33m;\u001b[39m\n    \u001b[90m 56|\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\u001b[22m\u001b[39m\n\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m1 failed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[1m\u001b[32m620 passed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[33m1 skipped\u001b[39m\u001b[90m (622)\u001b[39m\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    }
+  ]
+}
