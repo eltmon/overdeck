@@ -19,7 +19,7 @@ A notification for four kinds of item:
 | **Question** | An agent or conversation asks an AskUserQuestion, or a `pan ask` decision is waiting for you. |
 | **Approval needed** | A plan waits for approval, or a permission prompt waits in an agent or conversation. |
 | **Finished** | A work agent ran `pan done` (verification started), or an issue merged. |
-| **Failed** | An agent stopped responding, a merge failed, a stalled review escalated, or a conflict repair escalated. An agent that ended normally, such as a planning agent after its plan is finalized, does not notify. |
+| **Failed** | An agent stopped responding, a merge failed, a stalled review escalated, a conflict repair escalated, or free disk space dropped below the alert or critical level (PAN-5093). An agent that ended normally, such as a planning agent after its plan is finalized, does not notify. |
 
 Each item notifies once, when it first appears. When you answer it and a new
 question arrives later, that new question notifies again. A dashboard restart
@@ -155,7 +155,8 @@ In the app's Settings, below the Notifications switch:
   **Failures** and **Agent stopped responding**. **Agent questions** covers
   the **Question** row and **Finished work** covers the **Finished** row,
   each unchanged. Turning a type off stops that one kind of notification;
-  every other kind still arrives.
+  every other kind still arrives. A low-disk-space push (PAN-5093) follows
+  the **Failures** switch, same as a merge failure.
 
 Your machine applies pause and the muted types before sealing a notification,
 so a filtered notification never reaches connect.overdeck.ai, Apple or Google

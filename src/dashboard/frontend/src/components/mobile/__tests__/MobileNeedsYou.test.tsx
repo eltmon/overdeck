@@ -177,6 +177,64 @@ describe('MobileNeedsYou', () => {
     expect(screen.queryByRole('button', { name: 'Open' })).not.toBeInTheDocument();
   });
 
+  it('PAN-5093: renders the disk alert text with the biggest holder, no Open or Answer', () => {
+    decisions = [{
+      id: 'disk-alert',
+      source: 'agent',
+      label: 'Disk low',
+      kinds: ['diskLow'],
+      since: '2026-11-06T17:00:00.000Z',
+      blocking: false,
+      diskAlert: {
+        level: 'warning',
+        path: '/home/op/.overdeck',
+        availableBytes: 4.1 * 1024 ** 3,
+        totalBytes: 100 * 1024 ** 3,
+        warningBytes: 5 * 1024 ** 3,
+        criticalBytes: 2 * 1024 ** 3,
+        since: '2026-11-06T17:00:00.000Z',
+        checkedAt: '2026-11-06T17:00:30.000Z',
+        measuring: false,
+        holders: {
+          measuredAt: '2026-11-06T17:00:30.000Z',
+          incomplete: false,
+          holders: [
+            { label: '~/.overdeck/transcript-preservation', path: '/home/op/.overdeck/transcript-preservation', bytes: 53 * 1024 ** 3 },
+          ],
+        },
+      },
+    }] as Decision[];
+    render(<MobileNeedsYou subjectId={null} />);
+    expect(screen.getByText('4.1 GiB free · biggest: ~/.overdeck/transcript-preservation 53.0 GiB · free space on the desktop')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Open' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Answer' })).not.toBeInTheDocument();
+  });
+
+  it('PAN-5093: omits the "biggest" part when holders are null', () => {
+    decisions = [{
+      id: 'disk-alert',
+      source: 'agent',
+      label: 'Disk low',
+      kinds: ['diskLow'],
+      since: '2026-11-06T17:00:00.000Z',
+      blocking: false,
+      diskAlert: {
+        level: 'warning',
+        path: '/home/op/.overdeck',
+        availableBytes: 4.1 * 1024 ** 3,
+        totalBytes: 100 * 1024 ** 3,
+        warningBytes: 5 * 1024 ** 3,
+        criticalBytes: 2 * 1024 ** 3,
+        since: '2026-11-06T17:00:00.000Z',
+        checkedAt: '2026-11-06T17:00:30.000Z',
+        measuring: true,
+        holders: null,
+      },
+    }] as Decision[];
+    render(<MobileNeedsYou subjectId={null} />);
+    expect(screen.getByText('4.1 GiB free · free space on the desktop')).toBeInTheDocument();
+  });
+
   it('shows the server error under the card and un-marks the question', async () => {
     decisions = [auq('a1', 'agent', 't1', ['Yes'])];
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ error: 'boom' }), { status: 500 })));

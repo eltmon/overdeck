@@ -9,6 +9,7 @@ import type { BackgroundAiFeature } from '../background-ai/registry.js';
 import type { TieredExecutionConfig, ValidatedTieredExecutionConfig } from '../agents/tier-table-types.js';
 import type { TerminalBackendName } from '../terminal-backends/types.js';
 import type { CpuResourcesConfig, CpuResourcesYamlConfig } from './schema-cpu.js';
+import type { DiskResourcesConfig, DiskResourcesYamlConfig } from './schema-disk.js';
 import type { DashboardYamlConfig, NormalizedDashboardConfig } from './schema-dashboard.js';
 import type { NormalizedOllamaConfig, YamlOllamaConfig } from './ollama.js';
 
@@ -417,8 +418,8 @@ export interface RoleConfig {
 
 export type RolesConfig = Partial<Record<Role, RoleConfig>>;
 
-/** PAN-4311 CPU keys live in schema-cpu.ts. */
-export interface ResourcesConfig extends CpuResourcesYamlConfig {
+/** PAN-4311 CPU keys live in schema-cpu.ts; PAN-5093 disk keys live in schema-disk.ts. */
+export interface ResourcesConfig extends CpuResourcesYamlConfig, DiskResourcesYamlConfig {
   /** Available RAM threshold that triggers a warning state/guardrail (GiB) */
   memory_warn_gb?: number;
   /** Available RAM threshold that blocks spawns / marks critical state (GiB) */
@@ -975,8 +976,8 @@ export interface NormalizedConfig {
     batchWindowSeconds: number;
   };
 
-  /** Resource thresholds (normalised, never undefined); PAN-4311 CPU fields in schema-cpu.ts */
-  resources: CpuResourcesConfig & {
+  /** Resource thresholds (normalised, never undefined); PAN-4311 CPU fields in schema-cpu.ts; PAN-5093 disk fields in schema-disk.ts */
+  resources: CpuResourcesConfig & DiskResourcesConfig & {
     memoryWarnGb: number;
     memoryBlockGb: number;
     agentWarnCount: number;

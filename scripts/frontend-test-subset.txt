@@ -102,6 +102,7 @@ src/components/__tests__/AgentRequestCard.test.tsx
 src/components/__tests__/AskUserQuestionDialog.test.tsx
 src/components/__tests__/DecisionsPanel.test.tsx
 src/components/__tests__/DegradedModeBanner.test.tsx
+src/components/__tests__/DiskAlertCard.test.tsx
 src/components/__tests__/GitHubQuotaPill.test.tsx
 src/components/__tests__/GitHubRateLimitBanner.test.tsx
 src/components/__tests__/McpSignInCard.test.tsx

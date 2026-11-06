@@ -1,0 +1,189 @@
+{
+  "version": "1",
+  "issueId": "PAN-5093",
+  "created": "2026-11-06T17:35:39.830Z",
+  "updated": "2026-11-06T19:32:48.779Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "config-keys": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5093",
+      "claimedAt": "2026-11-06T17:35:39.830Z",
+      "doneAt": "2026-11-06T17:47:41.268Z"
+    },
+    "alert-core": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5093",
+      "claimedAt": "2026-11-06T17:48:14.067Z",
+      "doneAt": "2026-11-06T18:03:29.265Z"
+    },
+    "holders": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5093",
+      "claimedAt": "2026-11-06T18:03:39.956Z",
+      "doneAt": "2026-11-06T18:08:19.902Z"
+    },
+    "alert-service": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5093",
+      "claimedAt": "2026-11-06T18:08:28.186Z",
+      "doneAt": "2026-11-06T18:21:18.265Z"
+    },
+    "disk-alert-route": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5093",
+      "claimedAt": "2026-11-06T18:21:23.858Z",
+      "doneAt": "2026-11-06T18:25:21.873Z"
+    },
+    "desktop-card": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5093",
+      "claimedAt": "2026-11-06T18:25:27.201Z",
+      "doneAt": "2026-11-06T18:35:22.279Z"
+    },
+    "phone-line": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5093",
+      "claimedAt": "2026-11-06T18:35:27.918Z",
+      "doneAt": "2026-11-06T18:38:15.125Z"
+    },
+    "docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5093",
+      "claimedAt": "2026-11-06T18:38:21.050Z",
+      "doneAt": "2026-11-06T18:40:29.181Z"
+    },
+    "config-keys.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-06T19:19:40.392Z"
+    },
+    "config-keys.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-06T19:20:58.824Z"
+    },
+    "config-keys.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-06T19:21:19.791Z"
+    },
+    "config-keys.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-06T19:21:41.248Z"
+    },
+    "alert-core.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-06T19:22:06.539Z"
+    },
+    "alert-core.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-06T19:22:27.406Z"
+    },
+    "alert-core.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-06T19:22:48.941Z"
+    },
+    "alert-core.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-06T19:23:10.026Z"
+    },
+    "holders.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-06T19:23:36.582Z"
+    },
+    "holders.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-06T19:23:56.490Z"
+    },
+    "holders.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-06T19:24:16.645Z"
+    },
+    "holders.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-06T19:24:36.854Z"
+    },
+    "alert-service.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-06T19:25:01.999Z"
+    },
+    "alert-service.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-06T19:25:23.115Z"
+    },
+    "alert-service.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-06T19:25:43.711Z"
+    },
+    "alert-service.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-06T19:26:05.093Z"
+    },
+    "alert-service.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-06T19:26:26.177Z"
+    },
+    "alert-service.ac6": {
+      "status": "completed",
+      "doneAt": "2026-11-06T19:26:50.128Z"
+    },
+    "disk-alert-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-06T19:27:47.451Z"
+    },
+    "disk-alert-route.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-06T19:28:07.476Z"
+    },
+    "disk-alert-route.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-06T19:28:27.860Z"
+    },
+    "desktop-card.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-06T19:28:47.857Z"
+    },
+    "desktop-card.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-06T19:29:14.604Z"
+    },
+    "desktop-card.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-06T19:29:35.543Z"
+    },
+    "desktop-card.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-06T19:29:59.563Z"
+    },
+    "desktop-card.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-06T19:30:26.131Z"
+    },
+    "desktop-card.ac6": {
+      "status": "completed",
+      "doneAt": "2026-11-06T19:30:54.127Z"
+    },
+    "phone-line.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-06T19:31:21.589Z"
+    },
+    "phone-line.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-06T19:31:45.457Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-06T19:32:05.790Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-06T19:32:27.986Z"
+    },
+    "docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-06T19:32:48.778Z"
+    }
+  }
+}

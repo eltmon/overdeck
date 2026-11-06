@@ -26,7 +26,11 @@ export type PendingInputKind =
   /** PAN-4942 — an agent asked the operator to link a machine (link_machine). */
   | 'machineLink'
   /** PAN-4946 — an MCP client is waiting on an OAuth sign-in approval decision. */
-  | 'mcpSignIn';
+  | 'mcpSignIn'
+  /** PAN-5093 — free disk on the Overdeck home's filesystem is below the warning threshold. */
+  | 'diskLow'
+  /** PAN-5093 — free disk is below the critical threshold; writes may fail soon. */
+  | 'diskCritical';
 
 /** Short label for a single kind (used in tooltips, joined by comma). */
 export const PENDING_INPUT_KIND_LABEL: Record<string, string> = {
@@ -43,6 +47,8 @@ export const PENDING_INPUT_KIND_LABEL: Record<string, string> = {
   secretRequest: 'Secret requested',
   machineLink: 'Machine link requested',
   mcpSignIn: 'MCP sign-in waiting',
+  diskLow: 'Disk space low',
+  diskCritical: 'Disk space critical',
 };
 
 /** PAN-4371 — replaces "Answer the agent" when Jev read the turn end with confidence. */

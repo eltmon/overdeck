@@ -24,6 +24,8 @@ import {
   type PendingInputSource,
 } from './store';
 import { fetchWithTimeout } from './apiFetch';
+import { DISK_ALERT_QUERY_KEY, fetchDiskAlert } from './diskAlert';
+import type { DiskAlertSnapshot } from '@overdeck/contracts';
 import { formatIssueRef } from './issueLabel';
 import type { PendingPaneChoice } from './paneChoice';
 import type { TerminalPendingPermission } from '../components/TerminalPermissionDialog';
@@ -135,6 +137,8 @@ export interface Decision {
     | { id: string; kind: 'machine-link'; hint: string; agentId: string; expiresAt: string };
   /** PAN-4946 — set on an MCP OAuth sign-in waiting for a decision. */
   mcpSignIn?: McpSignInApproval;
+  /** PAN-5093 — set on the disk alert decision; the card ignores `source`. */
+  diskAlert?: DiskAlertSnapshot;
 }
 
 /**
@@ -167,6 +171,8 @@ const BLOCKING_KINDS = new Set([
   'machineLink',
   // PAN-4946 — an MCP client cannot proceed until its sign-in is approved or denied.
   'mcpSignIn',
+  // PAN-5093 — free disk is critical; writes can fail mid-write soon.
+  'diskCritical',
 ]);
 
 export function isBlockingDecision(kinds: ReadonlyArray<string>): boolean {
@@ -242,6 +248,21 @@ export function mcpSignInDecisions(rows: ReadonlyArray<McpSignInApproval>): Deci
     blocking: true,
     mcpSignIn: row,
   }));
+}
+
+/** PAN-5093 — the disk alert as one Needs-you item; none at level `ok` or missing. */
+export function diskAlertDecisions(snapshot: DiskAlertSnapshot | null): Decision[] {
+  if (!snapshot || snapshot.level === 'ok') return [];
+  const critical = snapshot.level === 'critical';
+  return [{
+    id: 'disk-alert',
+    source: 'agent',
+    label: critical ? 'Disk critical' : 'Disk low',
+    kinds: [critical ? 'diskCritical' : 'diskLow'],
+    since: snapshot.since ?? snapshot.checkedAt ?? '',
+    blocking: critical,
+    diskAlert: snapshot,
+  }];
 }
 
 /** PAN-4651 D-4651-15 — `GET /api/fleet/needs-you`: what waits on the operator on each online linked machine. */
@@ -377,6 +398,15 @@ export function useDecisions(): Decision[] {
     refetchInterval: 5000,
   });
 
+  // PAN-5093 — fetchDiskAlert throws on failure, so a rejected refetch keeps
+  // the last successful snapshot instead of hiding an active alert.
+  const { data: diskAlert } = useQuery({
+    queryKey: DISK_ALERT_QUERY_KEY,
+    queryFn: ({ signal }) => fetchDiskAlert(signal),
+    refetchInterval: 10_000,
+    retry: false,
+  });
+
   // PAN-4946 — only a root viewer (this machine's own session or the internal
   // token) can decide an MCP sign-in; a paired device never polls for one.
   const { data: anywhereStatus } = useQuery({
@@ -441,6 +471,7 @@ export function useDecisions(): Decision[] {
     }
 
     out.push(...agentRequestDecisions(Array.isArray(agentRequestRows) ? agentRequestRows : []));
+    out.push(...diskAlertDecisions(diskAlert ?? null));
     // PAN-4946 review — a disabled query still returns its last cached rows
     // (`enabled: false` only stops refetching), so a viewer that just dropped
     // from root to device could otherwise still see a stale approval's detail.
@@ -456,5 +487,5 @@ export function useDecisions(): Decision[] {
       return a.since.localeCompare(b.since);
     });
     return out;
-  }, [agentSubjects, convRows, fleetMachines, agentRequestRows, mcpSignInApprovals, canSeeMcpSignIns, titleByIssueId]);
+  }, [agentSubjects, convRows, fleetMachines, agentRequestRows, mcpSignInApprovals, canSeeMcpSignIns, titleByIssueId, diskAlert]);
 }

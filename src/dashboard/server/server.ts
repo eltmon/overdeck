@@ -146,6 +146,7 @@ import { adminRouteLayer } from './routes/admin.js';
 import { prereqsRouteLayer } from './routes/prereqs.js';
 import { cliproxyRouteLayer } from './routes/cliproxy.js';
 import { githubQuotaRouteLayer } from './routes/github-quota.js';
+import { diskAlertRouteLayer } from './routes/disk-alert.js';
 import { ttsRouteLayer } from './routes/tts.js';
 import { webhooksRouteLayer } from './routes/webhooks.js';
 import { triggerHooksRouteLayer } from './routes/trigger-hooks.js';
@@ -441,6 +442,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   prereqsRouteLayer,
   cliproxyRouteLayer,
   githubQuotaRouteLayer,
+  diskAlertRouteLayer,
   ttsRouteLayer,
   webhooksRouteLayer,
   triggerHooksRouteLayer,
