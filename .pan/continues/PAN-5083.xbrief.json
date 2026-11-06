@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5083",
   "created": "2026-11-06T03:58:56.829Z",
-  "updated": "2026-11-06T04:45:52.809Z",
+  "updated": "2026-11-06T04:46:11.998Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -156,6 +156,10 @@
     "stdio-serve-labels.ac3": {
       "status": "completed",
       "doneAt": "2026-11-06T04:45:52.808Z"
+    },
+    "connector-labels.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-06T04:46:11.997Z"
     }
   }
 }
