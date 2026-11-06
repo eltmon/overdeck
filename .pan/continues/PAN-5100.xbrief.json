@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5100",
   "created": "2026-11-06T23:08:04.192Z",
-  "updated": "2026-11-06T23:24:12.743Z",
+  "updated": "2026-11-06T23:24:18.419Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -20,6 +20,11 @@
       "claimedBy": "agent-pan-5100",
       "claimedAt": "2026-11-06T23:19:06.612Z",
       "doneAt": "2026-11-06T23:24:12.742Z"
+    },
+    "wi3-client-config-route": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5100",
+      "claimedAt": "2026-11-06T23:24:18.419Z"
     }
   }
 }
