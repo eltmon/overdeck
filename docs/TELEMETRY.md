@@ -109,6 +109,8 @@ the public contract and lists every allowed value.
 | `phone_removed` | `by=phone_removed_by` | A phone's pairing with this machine was revoked. |
 | `anywhere_channel_opened` | `route=channel_route; ok=boolean; error_class=channel_error_class` | The link supervisor's channel outcome for a linked machine changed (at most one per change per link). |
 | `relay_usage_sampled` | `bytes=relay_bytes_bucket` | At most hourly: bytes this machine relayed since the previous sample. |
+| `mcp_session_seen` | `mcp_surface=mcp_surface; mcp_protocol=mcp_protocol; mcp_client=mcp_client; mcp_auth=mcp_auth` | At most once per day per surface, client, protocol revision and credential kind: an MCP client opened a session. |
+| `mcp_tool_called` | `mcp_surface=mcp_surface; mcp_client=mcp_client; mcp_tool=mcp_tool` | At most once per day per surface, client and tool: an MCP client called an Overdeck tool. |
 
 | Domain | Allowed values |
 | --- | --- |
@@ -131,6 +133,11 @@ the public contract and lists every allowed value.
 | `link_failure_reason` | `bad_pairing_url`, `unreachable`, `pairing_refused`, `unsupported`, `identity_mismatch`, `exchange_failed`, `grant_refused`, `offline`, `approval_refused`, `approval_failed`, `other` |
 | `link_method` | `pairing_code`, `ssh`, `fly`, `directory_approval`, `other` |
 | `link_side` | `requester`, `approver` |
+| `mcp_auth` | `agent_token`, `oauth`, `access_token`, `connector` |
+| `mcp_client` | `claude_code`, `codex`, `cursor`, `vscode`, `chatgpt`, `grok`, `hermes`, `openclaw`, `gemini`, `opencode`, `kimi`, `overdeck_connector`, `other` |
+| `mcp_protocol` | `2026-07-28`, `2025-11-25`, `2025-06-18`, `2025-03-26`, `2024-11-05`, `2024-10-07`, `other` |
+| `mcp_surface` | `dashboard_http`, `public_http`, `stdio`, `connector_http`, `connector_stdio` |
+| `mcp_tool` | `answer_agent_permission`, `answer_agent_plan`, `answer_codex_approval`, `answer_pane_choice`, `answer_permission`, `answer_pi_ask`, `answer_plan`, `answer_question`, `delegate_task`, `delete_scheduled`, `done`, `handoff`, `interrupt_conversation`, `lane_report`, `lane_start`, `lane_status`, `lane_stop`, `lane_wait`, `link_machine`, `link_machine_wait`, `link_pull_request`, `list_conversations`, `list_machines`, `list_pending_input`, `list_pull_request_watches`, `list_scheduled`, `list_workers`, `memory_add`, `memory_search`, `read_conversation`, `request_secret`, `schedule_message`, `schedule_recurring`, `search_conversations`, `secret_wait`, `send_message`, `start_conversation`, `start_issue`, `start_worker`, `stop_conversation`, `task_block`, `task_cancel`, `task_claim`, `task_done`, `task_status`, `task_wait`, `unwatch_pull_request`, `update_scheduled`, `wait_job`, `watch_pull_request`, `worker_report` |
 | `merge_kind` | `pipeline` |
 | `model_family` | `claude`, `gpt`, `gemini`, `kimi`, `minimax`, `glm`, `mimo`, `other` |
 | `phone_removed_by` | `operator`, `phone` |
