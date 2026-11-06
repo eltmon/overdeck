@@ -36,6 +36,7 @@ describe('buildServerEnv (PAN-4774 WI-3)', () => {
       OVERDECK_DASHBOARD_URL: 'http://127.0.0.1:4100',
       DASHBOARD_URL: 'http://127.0.0.1:4100',
       OVERDECK_TERMINAL_BACKEND: 'tmux',
+      OVERDECK_TELEMETRY: '0',
       OVERDECK_TMUX_SOCKET_NAME: 'odk-b-77',
       OVERDECK_DISABLE_DEACON: '1',
       OVERDECK_ANYWHERE_SUPERVISOR: '1',

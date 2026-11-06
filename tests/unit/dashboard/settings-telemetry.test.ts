@@ -2,6 +2,8 @@ import { parse } from 'yaml';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mergeConfigs } from '../../../src/lib/config-yaml.js';
 import { loadSettingsApi, saveSettingsApi } from '../../../src/lib/settings-api.js';
+import { validateApiTelemetryConfig } from '../../../src/lib/settings-api-telemetry.js';
+import { detectTelemetryAutoExclusion } from '../../../src/lib/telemetry/environment.js';
 import {
   getAnalyticsService,
   synchronizeAnalyticsServices,
@@ -9,6 +11,7 @@ import {
 
 const loadConfigSyncMock = vi.hoisted(() => vi.fn());
 const getOrCreateInstallIdMock = vi.hoisted(() => vi.fn(() => '123e4567-e89b-42d3-a456-426614174000'));
+const getInstallKindMock = vi.hoisted(() => vi.fn(() => 'user'));
 const writeFileMock = vi.hoisted(() => vi.fn(async () => undefined));
 const captureMock = vi.hoisted(() => vi.fn());
 const captureExceptionMock = vi.hoisted(() => vi.fn());
@@ -37,6 +40,15 @@ vi.mock('../../../src/lib/config-yaml.js', async (importOriginal) => {
 vi.mock('../../../src/lib/telemetry/install-id.js', () => ({
   getOrCreateInstallId: getOrCreateInstallIdMock,
 }));
+
+vi.mock('../../../src/lib/telemetry/install-kind.js', () => ({
+  getInstallKind: getInstallKindMock,
+}));
+
+vi.mock('../../../src/lib/telemetry/environment.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/lib/telemetry/environment.js')>();
+  return { ...actual, detectTelemetryAutoExclusion: vi.fn(() => null) };
+});
 
 vi.mock('fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs/promises')>();
@@ -67,6 +79,8 @@ describe('settings telemetry', () => {
     loadConfigSyncMock.mockReset();
     getOrCreateInstallIdMock.mockClear();
     vi.clearAllMocks();
+    getInstallKindMock.mockReturnValue('user');
+    vi.mocked(detectTelemetryAutoExclusion).mockReturnValue(null);
     useTelemetryConfig();
     writeFileMock.mockImplementation(async (_path, content) => {
       const written = parse(String(content)) as { telemetry?: { enabled?: boolean } };
@@ -93,6 +107,7 @@ describe('settings telemetry', () => {
       enabled: true,
       effectiveEnabled: true,
       installId: '123e4567-e89b-42d3-a456-426614174000',
+      installKind: 'user',
       operatorGrouping: false,
     });
   });
@@ -170,8 +185,50 @@ describe('settings telemetry', () => {
     expect(loadSettingsApi().telemetry).toEqual({
       enabled: true,
       effectiveEnabled: false,
+      disabledBy: 'environment',
       installId: '123e4567-e89b-42d3-a456-426614174000',
+      installKind: 'user',
       operatorGrouping: false,
     });
+  });
+
+  it('reports disabledBy ci on load, carried through an unrelated save (PAN-5084)', async () => {
+    vi.mocked(detectTelemetryAutoExclusion).mockReturnValue('ci');
+    useTelemetryConfig(true);
+
+    expect(loadSettingsApi().telemetry).toEqual({
+      enabled: true,
+      effectiveEnabled: false,
+      disabledBy: 'ci',
+      installId: '123e4567-e89b-42d3-a456-426614174000',
+      installKind: 'user',
+      operatorGrouping: false,
+    });
+
+    const settings = loadSettingsApi();
+    settings.tmux = { config_mode: 'inherit-user' };
+    await saveSettingsApi(settings);
+
+    expect(loadSettingsApi().telemetry).toMatchObject({
+      effectiveEnabled: false,
+      disabledBy: 'ci',
+    });
+  });
+
+  it('reports disabledBy temporary_home from the environment detector', () => {
+    vi.mocked(detectTelemetryAutoExclusion).mockReturnValue('temporary_home');
+    useTelemetryConfig(true);
+
+    expect(loadSettingsApi().telemetry).toMatchObject({
+      effectiveEnabled: false,
+      disabledBy: 'temporary_home',
+    });
+  });
+
+  it('rejects an unrecognized installKind, and accepts a valid installKind with disabledBy', () => {
+    expect(validateApiTelemetryConfig({ enabled: true, installKind: 'laptop' })).toEqual(
+      expect.arrayContaining([expect.stringContaining('telemetry.installKind')]),
+    );
+    expect(validateApiTelemetryConfig({ enabled: true, installKind: 'user', disabledBy: 'ci' })).toEqual([]);
   });
 });

@@ -2,6 +2,7 @@ import posthog, { type CaptureResult, type Properties } from 'posthog-js';
 import type {
   TelemetryCountBucket,
   TelemetryEventName,
+  TelemetryInstallKind,
   TelemetryPropertiesFor,
 } from '@overdeck/contracts';
 
@@ -10,6 +11,8 @@ interface TelemetrySettingsResponse {
     enabled?: boolean;
     effectiveEnabled?: boolean;
     installId?: string;
+    /** PAN-5084: what kind of install reported telemetry. */
+    installKind?: TelemetryInstallKind;
     /** PAN-4264: present only when operator grouping is on and a hash exists. */
     operatorHash?: string;
   };
@@ -125,6 +128,9 @@ export async function initTelemetry(): Promise<void> {
     });
     if (settings.telemetry?.installId) {
       posthog.register({ install_id: settings.telemetry.installId });
+    }
+    if (settings.telemetry?.installKind) {
+      posthog.register({ install_kind: settings.telemetry.installKind });
     }
     // PAN-4264: the server sends operatorHash only while operator grouping is
     // on. posthog-js persists super properties (localStorage + cookie), so an

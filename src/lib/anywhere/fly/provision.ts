@@ -40,6 +40,7 @@ import { DEFAULT_FLY_APP, defaultFlyImage, type FlyProvider } from '../../remote
 import { createFlyProviderFromConfig } from '../../remote/index.js';
 import { generateEphemeralWatchdogScript, REMOTE_HOST_HEARTBEAT_PATH, writeRemoteFile } from '../../remote/remote-agents.js';
 import { REMOTE_PAN_DIR, shellQuote } from '../../remote/remote-tmux.js';
+import { INSTALL_KIND_FILENAME } from '../../telemetry/install-kind.js';
 import { type HomeCodexState, prepareFlyCodex, readHomeCodexState } from './codex-auth.js';
 import { detached, FlyMachineError, INSTALL_POLL, pollUntil } from './provision-shared.js';
 
@@ -250,6 +251,9 @@ async function prepareMachine(
   await run(`mkdir -p ${shellQuote(overdeckHome)}`, `Creating ${overdeckHome}`);
   await deps.writeRemoteFile(machineName, identityPath, `${JSON.stringify(identity, null, 2)}\n`);
   await run(`chmod 600 ${shellQuote(identityPath)}`, 'Protecting the identity file');
+  // PAN-5084: mark this install as a throwaway remote VM so telemetry can
+  // separate it from real adoption.
+  await deps.writeRemoteFile(machineName, `${overdeckHome}/${INSTALL_KIND_FILENAME}`, 'remote_vm\n');
 
   // 6. Credentials and Claude Code settings. Without Claude credentials a Claude Code
   // machine cannot run its conversation, so that fails here; a Codex machine only logs

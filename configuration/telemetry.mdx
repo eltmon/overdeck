@@ -32,13 +32,29 @@ For process-level control, set:
 OVERDECK_TELEMETRY=0
 ```
 
-`OVERDECK_TELEMETRY=false` is equivalent. The environment variable takes
-precedence over the YAML setting, so it can enforce opt-out for services,
-containers, or CI without changing a user's configuration file.
+`OVERDECK_TELEMETRY=false` is equivalent, and `OVERDECK_TELEMETRY=0` wins over
+every other setting, so it can enforce opt-out for services, containers, or CI
+without changing a user's configuration file.
 
 When telemetry is disabled, Overdeck does not initialize PostHog in the
 browser, server, or CLI. Event capture, exception capture, and feature-flag
 reads make no PostHog network requests.
+
+## Where Overdeck turns telemetry off for you
+
+Two environments are excluded from telemetry automatically, with no
+configuration needed:
+
+- **CI runs** — any process with a truthy `CI` environment variable.
+- **Temporary Overdeck homes** — an `OVERDECK_HOME` under `os.tmpdir()`,
+  `/tmp`, or `~/.overdeck/tmp`, the kind test harnesses and throwaway scripts
+  create per run.
+
+**Settings → Telemetry** shows the specific reason ("Disabled in CI",
+"Disabled for a temporary Overdeck home") when one of these applies.
+`OVERDECK_TELEMETRY=1` re-enables telemetry only when one of these two
+automatic exclusions would otherwise turn it off — it never overrides an
+explicit `telemetry.enabled: false` in your config or `OVERDECK_TELEMETRY=0`.
 
 ## Anonymous install ID
 
@@ -91,6 +107,9 @@ file. The key is never shown in the Settings UI.
 - Coarse project and active-agent count buckets
 - Pipeline stage, harness, and model-family enums
 - Platform, architecture, Overdeck version, and client type
+- Install kind (`user`, `remote_vm`, `dev_checkout`, or `container`), so CI
+  runs, throwaway Fly VMs, and dev checkouts can be told apart from real
+  installs
 - Hourly, bucketed GitHub API points per Overdeck subsystem and the lowest
   remaining GitHub budget (`github_quota_sample`), a throttled notice when
   GitHub rate-limits a call (`github_rate_limited`), and a daily

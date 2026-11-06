@@ -97,6 +97,9 @@ export const TELEMETRY_CLI_VERBS = [
 
 const TELEMETRY_HARNESSES = ["claude-code", "ohmypi", "codex", "acp", "kimi-code", "opencode", "muse", "prime-agent"] as const satisfies readonly Harness[]
 
+/** PAN-5084: what kind of install reported an event — distinguishes real adoption from CI/test/VM churn. */
+export const TELEMETRY_INSTALL_KINDS = ["user", "remote_vm", "dev_checkout", "container"] as const
+
 /**
  * PAN-4264: GitHub quota callers as telemetry values (`-` → `_`). Mirrors
  * `GITHUB_QUOTA_CALLERS` in ./github-quota; a unit test keeps them in step.
@@ -217,6 +220,7 @@ export const TELEMETRY_PROPERTY_DOMAINS = {
   fork_kind: ["summary", "handoff", "plain"],
   github_caller: TELEMETRY_GITHUB_CALLERS,
   harness: TELEMETRY_HARNESSES,
+  install_kind: TELEMETRY_INSTALL_KINDS,
   link_failure_reason: ["bad_pairing_url", "unreachable", "pairing_refused", "unsupported", "identity_mismatch", "exchange_failed", "grant_refused", "offline", "approval_refused", "approval_failed", "other"],
   link_method: ["pairing_code", "ssh", "fly", "directory_approval", "other"],
   link_side: ["requester", "approver"],
@@ -357,6 +361,7 @@ export type TelemetryLinkFailureReason = TelemetryPropertyValue<"link_failure_re
 export type TelemetryChannelRoute = TelemetryPropertyValue<"channel_route">
 export type TelemetryChannelErrorClass = TelemetryPropertyValue<"channel_error_class">
 export type TelemetryRelayBytesBucket = TelemetryPropertyValue<"relay_bytes_bucket">
+export type TelemetryInstallKind = TelemetryPropertyValue<"install_kind">
 export type TelemetryMcpSurface = TelemetryPropertyValue<"mcp_surface">
 export type TelemetryMcpProtocol = TelemetryPropertyValue<"mcp_protocol">
 export type TelemetryMcpClient = TelemetryPropertyValue<"mcp_client">

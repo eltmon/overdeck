@@ -76,4 +76,8 @@ describe('telemetry event schema', () => {
     for (const kind of ROUTE_KINDS) expect(channelRoutes).toContain(kind);
     expect(channelRoutes).toContain('stored');
   });
+
+  it('restricts install_kind to the four recognized install kinds', () => {
+    expect(TELEMETRY_PROPERTY_DOMAINS.install_kind).toEqual(['user', 'remote_vm', 'dev_checkout', 'container']);
+  });
 });

@@ -6,6 +6,7 @@ import type { TelemetryEventName, TelemetryPropertiesFor } from '@overdeck/contr
 import { packageRoot } from '../paths.js';
 import { resolveTelemetryEnabled } from './config.js';
 import { getOrCreateInstallId } from './install-id.js';
+import { getInstallKind } from './install-kind.js';
 import { getOperatorHashIfEnabled } from './operator-hash.js';
 
 const DEFAULT_POSTHOG_API_KEY = 'phc_pwvHeDutnCmAm8tZh5hRaQ7mMoho3T9gb4t4qRjK2Zjt';
@@ -84,6 +85,7 @@ export class AnalyticsService {
           arch: process.arch,
           overdeckVersion: getOverdeckVersion(),
           clientType: this.clientType,
+          install_kind: getInstallKind(),
           // PAN-4264: opt-in pseudonymous grouping of one operator's installs.
           ...(operatorHash ? { operatorHash } : {}),
         },
@@ -113,6 +115,7 @@ export class AnalyticsService {
           arch: process.arch,
           overdeckVersion: getOverdeckVersion(),
           clientType: this.clientType,
+          install_kind: getInstallKind(),
           ...(operatorHash ? { operatorHash } : {}),
         },
       );

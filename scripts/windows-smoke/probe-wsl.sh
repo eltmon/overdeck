@@ -44,6 +44,7 @@ STEPS_FILE="$WORK/steps.jsonl"
 : > "$STEPS_FILE"
 CLONE="$HOME/w/proj"
 export NO_COLOR=1
+export OVERDECK_TELEMETRY=0  # PAN-5084
 
 # ---- helpers ----------------------------------------------------------------
 

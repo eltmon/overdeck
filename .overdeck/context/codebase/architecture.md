@@ -44,7 +44,11 @@ terminal backend (Herdr by default, tmux when `terminal.backend: tmux`).
   that imports `posthog-node` and applies the opt-out; the browser door is
   `src/dashboard/frontend/src/lib/telemetry.ts`. PAN-5016 adds `anywhere.ts` for Anywhere events;
   the phone app and the `services/` Workers send nothing (phone: PAN-5021).
-  `mcp.ts` + `mcp-classify.ts` for MCP usage (PAN-5083); HTTP surfaces observe before the SDK transport.
+  `config.ts`'s `resolveTelemetryState()` is the one door for effective
+  on/off/`disabledBy`, combining the env override, config, and
+  `environment.ts`'s CI/temporary-home auto-exclusion with `install-kind.ts`'s
+  per-process install kind (PAN-5084). `mcp.ts` + `mcp-classify.ts` for MCP
+  usage (PAN-5083); HTTP surfaces observe before the SDK transport.
 - `agents.ts` is now a thin barrel over `src/lib/agents/` — `spawn.ts` (`spawnAgent`,
   `spawnRun`), `spawn-prep.ts` (`buildAgentLaunchConfig`, tier spawn params),
   `staffing.ts` (the single staffing resolver, PAN-2397), `resolve-tier.ts` +

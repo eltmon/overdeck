@@ -201,6 +201,8 @@ function serverEnv(home, port) {
     OVERDECK_DISABLE_DEACON: '1',
     OVERDECK_ANYWHERE_SUPERVISOR: '1',
     OVERDECK_NO_RESUME: '1',
+    // PAN-5084: test servers are not installs.
+    OVERDECK_TELEMETRY: '0',
     // Only the `direct` route can link the two dashboards.
     OVERDECK_ANYWHERE_NO_ADVERTISE: '1',
   };

@@ -1,0 +1,241 @@
+{
+  "version": "1",
+  "issueId": "PAN-5084",
+  "created": "2026-11-06T04:10:40.261Z",
+  "updated": "2026-11-06T06:36:17.943Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "install-kind-domain": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5084",
+      "claimedAt": "2026-11-06T04:10:40.261Z",
+      "doneAt": "2026-11-06T04:27:49.691Z"
+    },
+    "install-kind-resolver": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5084",
+      "claimedAt": "2026-11-06T04:28:02.351Z",
+      "doneAt": "2026-11-06T04:41:24.588Z"
+    },
+    "stamp-node-install-kind": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5084",
+      "claimedAt": "2026-11-06T04:41:44.700Z",
+      "doneAt": "2026-11-06T04:54:00.015Z"
+    },
+    "fly-remote-vm-marker": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5084",
+      "claimedAt": "2026-11-06T04:54:08.577Z",
+      "doneAt": "2026-11-06T05:06:02.354Z"
+    },
+    "env-exclusion-detector": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5084",
+      "claimedAt": "2026-11-06T05:06:10.017Z",
+      "doneAt": "2026-11-06T05:17:36.319Z"
+    },
+    "resolve-telemetry-state": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5084",
+      "claimedAt": "2026-11-06T05:17:44.208Z",
+      "doneAt": "2026-11-06T05:29:23.393Z"
+    },
+    "settings-api-telemetry-fields": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5084",
+      "claimedAt": "2026-11-06T05:29:33.712Z",
+      "doneAt": "2026-11-06T05:42:31.111Z"
+    },
+    "browser-install-kind": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5084",
+      "claimedAt": "2026-11-06T05:42:38.692Z",
+      "doneAt": "2026-11-06T05:53:36.370Z"
+    },
+    "settings-ui-disabled-reason": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5084",
+      "claimedAt": "2026-11-06T05:53:45.066Z",
+      "doneAt": "2026-11-06T06:04:49.359Z"
+    },
+    "ci-workflows-telemetry-off": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5084",
+      "claimedAt": "2026-11-06T06:04:56.737Z",
+      "doneAt": "2026-11-06T06:07:09.378Z"
+    },
+    "harness-telemetry-off": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5084",
+      "claimedAt": "2026-11-06T06:07:17.962Z",
+      "doneAt": "2026-11-06T06:19:02.699Z"
+    },
+    "telemetry-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5084",
+      "claimedAt": "2026-11-06T06:19:13.767Z",
+      "doneAt": "2026-11-06T06:21:57.714Z"
+    },
+    "install-kind-domain.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-06T06:26:01.124Z"
+    },
+    "install-kind-domain.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-06T06:26:18.329Z"
+    },
+    "install-kind-domain.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-06T06:26:33.664Z"
+    },
+    "install-kind-resolver.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-06T06:26:49.451Z"
+    },
+    "install-kind-resolver.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-06T06:27:04.928Z"
+    },
+    "install-kind-resolver.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-06T06:27:20.776Z"
+    },
+    "install-kind-resolver.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-06T06:27:36.256Z"
+    },
+    "stamp-node-install-kind.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-06T06:27:52.567Z"
+    },
+    "stamp-node-install-kind.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-06T06:28:08.445Z"
+    },
+    "stamp-node-install-kind.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-06T06:28:24.479Z"
+    },
+    "fly-remote-vm-marker.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-06T06:28:40.939Z"
+    },
+    "fly-remote-vm-marker.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-06T06:28:56.919Z"
+    },
+    "env-exclusion-detector.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-06T06:29:12.777Z"
+    },
+    "env-exclusion-detector.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-06T06:29:29.379Z"
+    },
+    "env-exclusion-detector.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-06T06:29:45.632Z"
+    },
+    "env-exclusion-detector.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-06T06:30:00.746Z"
+    },
+    "resolve-telemetry-state.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-06T06:30:18.519Z"
+    },
+    "resolve-telemetry-state.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-06T06:30:36.534Z"
+    },
+    "resolve-telemetry-state.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-06T06:30:54.687Z"
+    },
+    "resolve-telemetry-state.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-06T06:31:12.889Z"
+    },
+    "settings-api-telemetry-fields.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-06T06:31:29.171Z"
+    },
+    "settings-api-telemetry-fields.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-06T06:31:44.844Z"
+    },
+    "settings-api-telemetry-fields.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-06T06:31:59.659Z"
+    },
+    "settings-api-telemetry-fields.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-06T06:32:14.760Z"
+    },
+    "browser-install-kind.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-06T06:32:30.321Z"
+    },
+    "browser-install-kind.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-06T06:32:44.202Z"
+    },
+    "browser-install-kind.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-06T06:32:58.139Z"
+    },
+    "settings-ui-disabled-reason.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-06T06:33:12.499Z"
+    },
+    "settings-ui-disabled-reason.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-06T06:33:28.057Z"
+    },
+    "settings-ui-disabled-reason.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-06T06:33:43.782Z"
+    },
+    "ci-workflows-telemetry-off.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-06T06:34:00.845Z"
+    },
+    "ci-workflows-telemetry-off.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-06T06:34:17.062Z"
+    },
+    "ci-workflows-telemetry-off.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-06T06:34:32.742Z"
+    },
+    "harness-telemetry-off.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-06T06:34:48.766Z"
+    },
+    "harness-telemetry-off.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-06T06:35:05.853Z"
+    },
+    "harness-telemetry-off.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-06T06:35:24.644Z"
+    },
+    "telemetry-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-06T06:35:42.865Z"
+    },
+    "telemetry-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-06T06:36:00.443Z"
+    },
+    "telemetry-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-06T06:36:17.943Z"
+    }
+  }
+}

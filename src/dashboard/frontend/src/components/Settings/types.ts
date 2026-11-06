@@ -257,7 +257,11 @@ export interface SettingsConfig {
   telemetry?: {
     enabled: boolean;
     effectiveEnabled?: boolean;
+    /** PAN-5084: why effectiveEnabled is false; omitted when telemetry is on. */
+    disabledBy?: 'environment' | 'config' | 'ci' | 'temporary_home';
     installId?: string;
+    /** PAN-5084: what kind of install reported telemetry. */
+    installKind?: 'user' | 'remote_vm' | 'dev_checkout' | 'container';
     /** PAN-4264: send a pseudonymous operatorHash so one operator's installs group. */
     operatorGrouping?: boolean;
     operatorHash?: string;

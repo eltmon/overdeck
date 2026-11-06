@@ -13,6 +13,17 @@ function shortInstallId(installId: string | undefined): string {
   return `${installId.slice(0, 8)}…${installId.slice(-4)}`;
 }
 
+type TelemetryDisabledReason = NonNullable<SettingsConfig['telemetry']>['disabledBy'];
+
+/** PAN-5084: label the specific reason telemetry is forced off. */
+function forcedOffLabel(disabledBy: TelemetryDisabledReason): string {
+  switch (disabledBy) {
+    case 'ci': return 'Disabled in CI';
+    case 'temporary_home': return 'Disabled for a temporary Overdeck home';
+    default: return 'Disabled by OVERDECK_TELEMETRY';
+  }
+}
+
 export function TelemetrySection({ formData, saveStatus, onSettingsChange }: TelemetrySectionProps) {
   const configuredEnabled = formData.telemetry?.enabled !== false;
   const effectiveEnabled = formData.telemetry?.effectiveEnabled ?? configuredEnabled;
@@ -98,7 +109,7 @@ export function TelemetrySection({ formData, saveStatus, onSettingsChange }: Tel
       </div>
 
       <p className="px-4 mt-3 text-xs text-muted-foreground" data-testid="telemetry-status">
-        {forcedOff ? 'Disabled by OVERDECK_TELEMETRY' : effectiveEnabled ? 'Enabled' : 'Disabled'} · Install ID {shortInstallId(formData.telemetry?.installId)}
+        {forcedOff ? forcedOffLabel(formData.telemetry?.disabledBy) : effectiveEnabled ? 'Enabled' : 'Disabled'} · Install ID {shortInstallId(formData.telemetry?.installId)}
       </p>
 
       <div className="grid gap-4 md:grid-cols-2 mt-5 px-4">
@@ -126,7 +137,7 @@ export function TelemetrySection({ formData, saveStatus, onSettingsChange }: Tel
           <pre className="rounded-md border border-border bg-muted/30 px-3 py-2 whitespace-pre-wrap">{`telemetry:\n  enabled: ${configuredEnabled ? 'true' : 'false'}\n  operator_grouping: ${operatorGrouping ? 'true' : 'false'}`}</pre>
           <code className="rounded-md border border-border bg-muted/30 px-3 py-2">OVERDECK_TELEMETRY=0</code>
         </div>
-        <p>Changes apply on the next dashboard load. The environment variable can only force telemetry off.</p>
+        <p>Changes apply on the next dashboard load. OVERDECK_TELEMETRY=0 forces telemetry off. OVERDECK_TELEMETRY=1 only turns it back on in CI or a temporary Overdeck home; it never overrides this switch.</p>
       </div>
     </section>
   );

@@ -29,6 +29,9 @@ vi.mock('../../../../src/lib/telemetry/config.js', () => ({
 vi.mock('../../../../src/lib/telemetry/install-id.js', () => ({
   getOrCreateInstallId: vi.fn(() => '123e4567-e89b-42d3-a456-426614174000'),
 }));
+vi.mock('../../../../src/lib/telemetry/install-kind.js', () => ({
+  getInstallKind: vi.fn(() => 'container'),
+}));
 
 const originalVitest = process.env.VITEST;
 const originalNodeEnv = process.env.NODE_ENV;
@@ -97,6 +100,7 @@ describe('AnalyticsService', () => {
         arch: process.arch,
         overdeckVersion: expect.any(String),
         clientType: 'server',
+        install_kind: 'container',
       }),
     });
   });
@@ -156,6 +160,7 @@ describe('AnalyticsService', () => {
       action: 'pipeline_transition',
       $process_person_profile: false,
       clientType: 'server',
+      install_kind: 'container',
     }));
     expect(JSON.stringify([sanitized, properties])).not.toContain('PAN-2599');
     expect(JSON.stringify([sanitized, properties])).not.toContain('/home/alice');

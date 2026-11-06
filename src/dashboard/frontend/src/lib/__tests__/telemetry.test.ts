@@ -91,6 +91,50 @@ describe('frontend telemetry wrapper', () => {
     expect(posthogMock.register).toHaveBeenCalledWith({ install_id: 'install-id' });
   });
 
+  // PAN-5084: install_kind separates real adoption from CI/test/VM churn.
+  it('registers install_kind when the server sends one', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        telemetry: { enabled: true, installId: 'install-id', installKind: 'dev_checkout' },
+      }),
+    })));
+    const { initTelemetry } = await import('../telemetry');
+
+    await initTelemetry();
+
+    expect(posthogMock.register).toHaveBeenCalledWith({ install_kind: 'dev_checkout' });
+  });
+
+  it('never registers an install_kind key when the server sends none', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ telemetry: { enabled: true, installId: 'install-id' } }),
+    })));
+    const { initTelemetry } = await import('../telemetry');
+
+    await initTelemetry();
+
+    expect(posthogMock.register).not.toHaveBeenCalledWith(
+      expect.objectContaining({ install_kind: expect.anything() }),
+    );
+  });
+
+  it('never calls posthog.init or register when effectiveEnabled is false, even with an installKind', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        telemetry: { enabled: true, effectiveEnabled: false, installId: 'install-id', installKind: 'container' },
+      }),
+    })));
+    const { initTelemetry } = await import('../telemetry');
+
+    await initTelemetry();
+
+    expect(posthogMock.init).not.toHaveBeenCalled();
+    expect(posthogMock.register).not.toHaveBeenCalled();
+  });
+
   it('strips SDK-added routes, referrers, campaigns, and raw exception fields', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => ({
       ok: true,

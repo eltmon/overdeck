@@ -1,0 +1,905 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-06T03:56:48Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5084: Telemetry: CI runs, test homes and throwaway VMs report as new installs (5,818 of 5,824 ids are one-day ghosts)",
+    "updated": "2026-11-06T04:10:21.405Z"
+  },
+  "plan": {
+    "id": "pan-5084",
+    "title": "Telemetry: CI runs, test homes and throwaway VMs report as new installs (5,818 of 5,824 ids are one-day ghosts)",
+    "status": "running",
+    "uid": "8e55ea6d-79e4-4541-85a9-4c625e7a485d",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-06T03:56:48Z",
+    "updated": "2026-11-06T04:10:21.405Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5084",
+        "label": "PAN-5084",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/pan-5084.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "telemetry",
+      "posthog",
+      "ci",
+      "privacy"
+    ],
+    "metadata": {
+      "sizeJustification": "About 30 files across 10 path prefixes, but most items are one-line env additions at harness spawn sites plus their tests and docs. The gate change (CI and temp-home exclusion), the env wiring and the install_kind tag fix one data-quality defect together: shipping the gate without the wiring leaves the <repo>/.tmp smoke homes and WSL leg minting ids, and shipping either without install_kind leaves the post-deploy PostHog filter with nothing to filter on. Each item is still independently reviewable and the DAG lets them run in parallel.",
+      "canonicalFilename": "2026-11-06-PAN-5084-telemetry-ci-runs-test-homes-and-throwaway-vms-report-as-new-installs-5-818-of-5-824-ids-are-one-day-ghosts.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "PostHog shows 5,824 distinct install ids in 30 days and only 6 were active on two or more days. Every fresh OVERDECK_HOME mints a new install id, and telemetry is off only under Vitest, NODE_ENV=test or OVERDECK_TELEMETRY=0. ci.yml and windows-smoke.yml never set OVERDECK_TELEMETRY=0, so every CI job that boots the server or runs the CLI, every agent test stack with an isolated home and every throwaway Fly VM reports as a new install, and the dashboards cannot show real adoption.",
+      "Proposal": "Add automatic exclusions (CI env set; Overdeck home inside os.tmpdir(), /tmp or ~/.overdeck/tmp) to the one effective-state door resolveTelemetryEnabled() via a new resolveTelemetryState() with a fixed six-row precedence (env off > config off > OVERDECK_TELEMETRY=1 > CI > temp home > on), so Node, the Settings API and the browser all follow it. Set OVERDECK_TELEMETRY=0 in ci.yml, windows-smoke.yml, the WSL probe script and every test harness that spawns a server or CLI. Stamp a closed-enum install_kind (user, remote_vm, dev_checkout, container) on every Node event and exception and as a browser super property; Fly provisioning writes a remote_vm marker file. Settings names the forced-off reason. Document everything in docs/TELEMETRY.md and configuration/telemetry.mdx.",
+      "NonGoals": "- Configuring the PostHog project internal-user filter or the usage dashboards (post-deploy Flywheel step)\n- Deduplicating, deleting or backfilling historical ghost ids in PostHog\n- Any change to install-id minting, the telemetry-id file name or its repair lock\n- Tagging src/lib/remote/ work-agent VMs (they do not run pan telemetry paths)\n- Detecting FLY_*, Kubernetes or container= env vars for install kind\n- Browser-side CI detection (the browser follows effectiveEnabled)\n- Phone app telemetry (PAN-5021)\n- Changing telemetryBlockedForProcess() in service.ts\n- Adding install_kind to TELEMETRY_EVENT_CATALOG or changing any event's typed properties\n- Letting OVERDECK_TELEMETRY=1 override telemetry.enabled: false or OVERDECK_TELEMETRY=0\n- Raising any file-size allowlist cap"
+    },
+    "autoDecisions": [
+      {
+        "summary": "OVERDECK_TELEMETRY=1 cancels both automatic exclusions (CI and temporary home) but never overrides telemetry.enabled: false or OVERDECK_TELEMETRY=0.",
+        "rationale": "An explicit user opt-out must not be beaten by a flag that exists for fixtures; fatal-process.test.ts spawns a tmpdir-home child with OVERDECK_TELEMETRY=1 under CI=true and expects capture, so =1 must beat both exclusions."
+      },
+      {
+        "summary": "The exclusions live in resolveTelemetryEnabled()/resolveTelemetryState() in config.ts, not in telemetryBlockedForProcess() in service.ts.",
+        "rationale": "The Settings API effectiveEnabled and the browser's initTelemetry only see resolveTelemetryEnabled; a service.ts gate would leave the browser SDK sending from CI dashboards."
+      },
+      {
+        "summary": "CI/temp-home detection is a separate pure module src/lib/telemetry/environment.ts with injected inputs.",
+        "rationale": "The Vitest setup sets OVERDECK_HOME to a temp dir and GitHub sets CI=true, so suites that run the real resolver need a mockable seam; the detector gets direct tests."
+      },
+      {
+        "summary": "Treat /tmp as a temporary root on POSIX in addition to os.tmpdir() and ~/.overdeck/tmp.",
+        "rationale": "Agent shells set TMPDIR to ~/.overdeck/tmp/..., so os.tmpdir() is not /tmp there, yet agents have created literal /tmp test homes."
+      },
+      {
+        "summary": "remote_vm comes only from an Overdeck-written marker file ${OVERDECK_HOME}/install-kind; no FLY_* env sniffing; the marker accepts any of the four values.",
+        "rationale": "The issue scopes remote_vm to Overdeck-provisioned machines; a user self-hosting on Fly is a real user. Accepting any domain value costs no extra code."
+      },
+      {
+        "summary": "dev_checkout reuses the existing isDevMode() (src/ next to packageRoot), so the operator's pan reload generation dashboards report dev_checkout.",
+        "rationale": "One existing source-checkout test; the operator's own machines are exactly what the PostHog internal filter should drop."
+      },
+      {
+        "summary": "container = /.dockerenv or /run/.containerenv only; precedence remote_vm > dev_checkout > container > user.",
+        "rationale": "Simplest reliable Docker/Podman signal; the more specific kinds win (a devcontainer source checkout is dev_checkout)."
+      },
+      {
+        "summary": "install_kind is a centrally stamped property and a TELEMETRY_PROPERTY_DOMAINS entry, not a TELEMETRY_EVENT_CATALOG property.",
+        "rationale": "Matches platform/arch/clientType; adding it to the catalog would change all 25 event types and call sites."
+      },
+      {
+        "summary": "Add disabledBy to the Settings API and show the real reason in the Settings status line.",
+        "rationale": "Without it, a CI or temp-home dashboard would claim 'Disabled by OVERDECK_TELEMETRY', and the footer's 'can only force telemetry off' becomes false."
+      },
+      {
+        "summary": "probe-wsl.sh exports OVERDECK_TELEMETRY=0 itself.",
+        "rationale": "windows-smoke.yml sets no WSLENV, so neither workflow env nor CI reaches the wsl-bash shell."
+      },
+      {
+        "summary": "The scripts/anywhere/*-smoke.mjs scripts get explicit OVERDECK_TELEMETRY=0 (kept in scope rather than moved to NonGoals).",
+        "rationale": "Their homes are <repo>/.tmp/..., outside every temp root, and the issue explicitly asks for OVERDECK_TELEMETRY=0 where test harnesses spawn the server or CLI."
+      },
+      {
+        "summary": "Keep one issue and set plan.metadata.sizeJustification instead of splitting into sibling issues.",
+        "rationale": "The surface is wide but shallow (one-line env additions plus tests and docs) and the halves only fix the data together."
+      }
+    ],
+    "items": [
+      {
+        "id": "install-kind-domain",
+        "title": "Add the install_kind domain to the telemetry contract",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-06T03:56:48Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-5084",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/telemetry.ts",
+            "docs/TELEMETRY.md",
+            "tests/unit/contracts/telemetry-schema.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run build:contracts:incremental",
+            "npx vitest run tests/unit/contracts/telemetry-schema.test.ts tests/unit/telemetry-docs.test.ts"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "contracts build completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. In packages/contracts/src/telemetry.ts export `TELEMETRY_INSTALL_KINDS = [\"user\",\"remote_vm\",\"dev_checkout\",\"container\"] as const`, add `install_kind: TELEMETRY_INSTALL_KINDS` to TELEMETRY_PROPERTY_DOMAINS (after `harness`), and export `type TelemetryInstallKind = TelemetryPropertyValue<\"install_kind\">`. Do NOT add install_kind to TELEMETRY_EVENT_CATALOG. In the same commit add the domain-table row `| \\`install_kind\\` | \\`user\\`, \\`remote_vm\\`, \\`dev_checkout\\`, \\`container\\` |` to docs/TELEMETRY.md after the `harness` row (the drift test parses that table). Add a schema test asserting the exact four values. Run `npm run build:contracts:incremental` so root tsc sees the new export."
+        },
+        "items": [
+          {
+            "id": "install-kind-domain.ac1",
+            "title": "Given the contract, when telemetry-schema.test.ts runs, then TELEMETRY_PROPERTY_DOMAINS.install_kind equals ['user','remote_vm','dev_checkout','container'] and the test passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "install-kind-domain.ac2",
+            "title": "Given docs/TELEMETRY.md, when telemetry-docs.test.ts runs, then the domain table includes the install_kind row and the drift test passes with zero diff",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "install-kind-domain.ac3",
+            "title": "TELEMETRY_EVENT_CATALOG is unchanged: `git diff origin/main -- packages/contracts/src/telemetry.ts` shows no line added inside the TELEMETRY_EVENT_CATALOG object",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "install-kind-resolver",
+        "title": "Create the install-kind resolver module",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-06T03:56:48Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5084",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/telemetry/install-kind.ts",
+            "tests/unit/lib/telemetry/install-kind.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/telemetry/install-kind.test.ts"
+          ],
+          "expected_outputs": [
+            "install-kind.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. New src/lib/telemetry/install-kind.ts exporting INSTALL_KIND_FILENAME = 'install-kind', interface InstallKindProbe { overdeckHome; exists; readFile; isDevCheckout }, resolveInstallKind(probe = defaultProbe()) and a per-process cached getInstallKind(). Order: marker file `${overdeckHome}/install-kind` trimmed content when it is one of TELEMETRY_INSTALL_KINDS -> 'dev_checkout' when isDevMode() (src/lib/paths.ts) -> 'container' when /.dockerenv or /run/.containerenv exists -> 'user'. Every probe call is wrapped in try/catch so the function never throws. Tests use injected probes only (no real fs)."
+        },
+        "items": [
+          {
+            "id": "install-kind-resolver.ac1",
+            "title": "Given a marker containing 'remote_vm\\n' and isDevCheckout true, when resolveInstallKind runs, then it returns 'remote_vm'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "install-kind-resolver.ac2",
+            "title": "Given a marker containing 'bogus', when resolveInstallKind runs with isDevCheckout true, then it ignores the marker and returns 'dev_checkout'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "install-kind-resolver.ac3",
+            "title": "Given no marker, not a dev checkout, and exists('/.dockerenv') or exists('/run/.containerenv') true, then it returns 'container'; with neither it returns 'user'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "install-kind-resolver.ac4",
+            "title": "Given readFile and exists probes that throw EACCES, when resolveInstallKind runs, then it returns a value and does not throw",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stamp-node-install-kind",
+        "title": "Stamp install_kind on every Node event and exception",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-06T03:56:48Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5084",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/telemetry/service.ts",
+            "tests/unit/lib/telemetry/service.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/telemetry/service.test.ts tests/unit/lib/telemetry/flag-door.test.ts tests/unit/lib/telemetry/github-telemetry-privacy.test.ts"
+          ],
+          "expected_outputs": [
+            "all three test files pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. In service.ts import getInstallKind from './install-kind.js' and add `install_kind: getInstallKind(),` after `clientType: this.clientType,` in both capture() and captureException() property objects (inside the existing try). Keep the './config.js' import exactly `import { resolveTelemetryEnabled } from './config.js';` (three suites mock config.js with only that export). In service.test.ts mock install-kind.js (`getInstallKind: vi.fn(() => 'container')`) and assert install_kind on a capture and a captureException call."
+        },
+        "items": [
+          {
+            "id": "stamp-node-install-kind.ac1",
+            "title": "Given telemetry is enabled, when AnalyticsService.capture('server_boot', ...) runs, then the PostHog capture call's properties include install_kind: 'container' (mocked)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stamp-node-install-kind.ac2",
+            "title": "Given telemetry is enabled, when captureException runs, then the PostHog captureException call's properties include install_kind",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stamp-node-install-kind.ac3",
+            "title": "service.ts still imports only resolveTelemetryEnabled from ./config.js: `grep -c \"from './config.js'\" src/lib/telemetry/service.ts` returns 1 and that line names only resolveTelemetryEnabled",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fly-remote-vm-marker",
+        "title": "Write the remote_vm install-kind marker during Fly provisioning",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-06T03:56:48Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5084",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/anywhere/fly/provision.ts",
+            "src/lib/anywhere/fly/__tests__/provision.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/anywhere/fly/__tests__/provision.test.ts"
+          ],
+          "expected_outputs": [
+            "provision.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. Import INSTALL_KIND_FILENAME from '../../telemetry/install-kind.js'. In provisionFlyMachine step 5, directly after `await run(`chmod 600 ${shellQuote(identityPath)}`, 'Protecting the identity file');`, add `await deps.writeRemoteFile(machineName, `${overdeckHome}/${INSTALL_KIND_FILENAME}`, 'remote_vm\\n');` with a PAN-5084 comment. In provision.test.ts assert the file content and that the write event precedes the first event containing 'pan serve'."
+        },
+        "items": [
+          {
+            "id": "fly-remote-vm-marker.ac1",
+            "title": "Given a provision run against the fake API, when it completes, then h.files.get('/.overdeck/install-kind') equals 'remote_vm\\n'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fly-remote-vm-marker.ac2",
+            "title": "Given the recorded events, when the test inspects order, then 'write:/.overdeck/install-kind' appears before the first event containing 'pan serve'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "env-exclusion-detector",
+        "title": "Create the pure CI and temporary-home exclusion detector",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-06T03:56:48Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5084",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/telemetry/environment.ts",
+            "tests/unit/lib/telemetry/environment.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/telemetry/environment.test.ts"
+          ],
+          "expected_outputs": [
+            "environment.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. New src/lib/telemetry/environment.ts exporting type TelemetryAutoExclusion = 'ci' | 'temporary_home', interface TelemetryEnvironmentInputs { env; overdeckHome; temporaryRoots; realpath }, telemetryEnvironmentForcesOn(env = process.env) (true for trimmed lowercase '1' or 'true') and detectTelemetryAutoExclusion(inputs = defaultInputs()). CI counts when env.CI trimmed is non-empty and lowercase not '0'/'false'; CI is checked first. Temporary home: containment via path.relative: inside = !isAbsolute(rel) && rel !== '..' && !rel.startsWith('..' + sep) (rel '' is inside; never rel.startsWith('..'), which misses children named like '..smoke-123') over {resolve, realpath} of both home and each root, realpath failures fall back to the resolved form. defaultInputs: env process.env, overdeckHome getOverdeckHome(), temporaryRoots [os.tmpdir(), join(getCanonicalOverdeckHome(), 'tmp'), plus '/tmp' when not win32], realpath realpathSync. All tests inject inputs."
+        },
+        "items": [
+          {
+            "id": "env-exclusion-detector.ac1",
+            "title": "Given env CI 'true' or '1', when detectTelemetryAutoExclusion runs, then it returns 'ci'; given CI '0', 'false' or '' and a non-temp home it returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "env-exclusion-detector.ac2",
+            "title": "Given home '/tmp/odk-a-1', '/tmp/..smoke-123' or a home equal to a root, then it returns 'temporary_home'; given home '/tmpfoo/x' with root '/tmp' it returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "env-exclusion-detector.ac3",
+            "title": "Given home '/var/folders/ab/T/x', root '/var/folders/ab/T' and a realpath mapping both to '/private/var/...', then it returns 'temporary_home'; given realpath throwing, it still decides from the resolved paths",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "env-exclusion-detector.ac4",
+            "title": "Given OVERDECK_TELEMETRY '1', 'true' or ' TRUE ', telemetryEnvironmentForcesOn returns true; given '0', 'yes' or unset it returns false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "resolve-telemetry-state",
+        "title": "Add resolveTelemetryState with the six-row precedence table",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-06T03:56:48Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5084",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/telemetry/config.ts",
+            "tests/unit/lib/telemetry/config.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/telemetry/config.test.ts tests/unit/lib/telemetry/fatal-process.test.ts"
+          ],
+          "expected_outputs": [
+            "both test files pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4"
+          ],
+          "foundationFor": [
+            "settings-api-telemetry-fields",
+            "settings-ui-disabled-reason",
+            "telemetry-docs"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. Rewrite src/lib/telemetry/config.ts: keep telemetryEnvironmentForcesOff(); add type TelemetryDisabledReason = 'environment' | 'config' | 'ci' | 'temporary_home', interface TelemetryState { enabled; disabledBy? }, and resolveTelemetryState(configuredEnabled?: boolean) applying, first match wins: OVERDECK_TELEMETRY=0/false -> off 'environment' (checked before the config read; read YAML lazily as `configuredEnabled ?? loadConfigSync().config.telemetry?.enabled !== false` AFTER this row, never in a default parameter); config false -> off 'config'; telemetryEnvironmentForcesOn() -> on; detectTelemetryAutoExclusion() 'ci'/'temporary_home' -> off with that reason; else on. resolveTelemetryEnabled() returns resolveTelemetryState().enabled. In config.test.ts mock '../../../../src/lib/telemetry/environment.js' (spread the actual module, detectTelemetryAutoExclusion: vi.fn(() => null)) so the existing tests keep meaning under the temp-home Vitest setup and CI=true, then add one test per precedence row."
+        },
+        "items": [
+          {
+            "id": "resolve-telemetry-state.ac1",
+            "title": "Given detectTelemetryAutoExclusion returns 'ci' and OVERDECK_TELEMETRY unset, when resolveTelemetryState runs, then it returns { enabled: false, disabledBy: 'ci' }; with 'temporary_home' it returns disabledBy 'temporary_home'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolve-telemetry-state.ac2",
+            "title": "Given exclusion 'ci' and OVERDECK_TELEMETRY=1, then it returns { enabled: true }; given config enabled false and OVERDECK_TELEMETRY=1, then it returns { enabled: false, disabledBy: 'config' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolve-telemetry-state.ac3",
+            "title": "Given OVERDECK_TELEMETRY=0 and exclusion 'ci', or OVERDECK_TELEMETRY=0 with loadConfigSync throwing, then resolveTelemetryState returns disabledBy 'environment'; given resolveTelemetryState(false), it returns disabledBy 'config' without consulting the YAML",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolve-telemetry-state.ac4",
+            "title": "Given fatal-process.test.ts spawns a child with a tmpdir home and OVERDECK_TELEMETRY=1, when it runs, then the child still posts the sanitized exception and the test passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-api-telemetry-fields",
+        "title": "Return disabledBy and installKind from the Settings API through one door",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-06T03:56:48Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-5084",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/settings-api-telemetry.ts",
+            "src/lib/settings-api.ts",
+            "tests/unit/dashboard/settings-telemetry.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/settings-telemetry.test.ts",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "settings-telemetry.test.ts passes",
+            "lint:file-size passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. ApiTelemetryConfig gains optional disabledBy (TelemetryDisabledReason) and installKind (TelemetryInstallKind); validateApiTelemetryConfig accepts both when they are strings in their domains (the UI posts them back on save). telemetrySettingsFromConfig uses resolveTelemetryState() for effectiveEnabled + disabledBy (omitted when enabled) and getInstallKind() for installKind. Add mergeApiTelemetrySettings(current, updates) to settings-api-telemetry.ts building the save-response block (enabled from updates ?? current ?? true; effectiveEnabled/disabledBy from resolveTelemetryState(enabled); installId and installKind from current; operatorGrouping from updates ?? current ?? false; operatorHash from current). In settings-api.ts replace the 7-line inline telemetry block at ~1155-1161 (anchor `effectiveEnabled: !telemetryEnvironmentForcesOff()`) with `telemetry: mergeApiTelemetrySettings(current.telemetry, updates.telemetry),`, add the helper to the line-35 import and delete the line-43 telemetryEnvironmentForcesOff import. In settings-telemetry.test.ts mock environment.js (detect -> null by default) and install-kind.js (getInstallKind -> 'user'), update the two full-object toEqual expectations, and add the ci/temporary_home/validation cases."
+        },
+        "items": [
+          {
+            "id": "settings-api-telemetry-fields.ac1",
+            "title": "Given exclusion 'ci' and telemetry configured on, when loadSettingsApi() runs, then telemetry equals { enabled: true, effectiveEnabled: false, disabledBy: 'ci', installId, installKind: 'user', operatorGrouping: false }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-api-telemetry-fields.ac2",
+            "title": "Given exclusion 'temporary_home', when saveSettingsApi persists an unrelated change, then the save response's telemetry has effectiveEnabled false and disabledBy 'temporary_home', matching the load response",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-api-telemetry-fields.ac3",
+            "title": "Given a settings payload with telemetry.installKind 'laptop', when validated, then validation rejects it; with installKind 'user' and disabledBy 'ci' it accepts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-api-telemetry-fields.ac4",
+            "title": "src/lib/settings-api.ts has fewer lines than on origin/main and no longer references telemetryEnvironmentForcesOff (`grep -c telemetryEnvironmentForcesOff src/lib/settings-api.ts` returns 0)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "browser-install-kind",
+        "title": "Register install_kind as a browser super property",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-06T03:56:48Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5084",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/telemetry.ts",
+            "src/dashboard/frontend/src/lib/__tests__/telemetry.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/lib/__tests__/telemetry.test.ts"
+          ],
+          "expected_outputs": [
+            "telemetry.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. Add `installKind?: TelemetryInstallKind` (type import from @overdeck/contracts) to TelemetrySettingsResponse.telemetry. After the existing `posthog.register({ install_id: ... })` block add a separate `if (settings.telemetry?.installKind) posthog.register({ install_kind: settings.telemetry.installKind });` so the existing exact `{ install_id }` assertion stays valid. Add tests for present, absent, and effectiveEnabled false."
+        },
+        "items": [
+          {
+            "id": "browser-install-kind.ac1",
+            "title": "Given /api/settings returns installKind 'dev_checkout' with telemetry enabled, when initTelemetry runs, then posthog.register is called with { install_kind: 'dev_checkout' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "browser-install-kind.ac2",
+            "title": "Given /api/settings returns no installKind, when initTelemetry runs, then posthog.register is never called with an object containing an install_kind key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "browser-install-kind.ac3",
+            "title": "Given effectiveEnabled false, when initTelemetry runs, then posthog.init and posthog.register are not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-ui-disabled-reason",
+        "title": "Show the forced-off reason in Settings and correct the override footer",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-06T03:56:48Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5084",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/types.ts",
+            "src/dashboard/frontend/src/components/Settings/sections/TelemetrySection.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/__tests__/TelemetrySection.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/Settings/sections/__tests__/TelemetrySection.test.tsx"
+          ],
+          "expected_outputs": [
+            "TelemetrySection.test.tsx passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. In Settings types.ts telemetry block add disabledBy?: 'environment' | 'config' | 'ci' | 'temporary_home' and installKind?: 'user' | 'remote_vm' | 'dev_checkout' | 'container'. In TelemetrySection.tsx map forced-off reasons to labels: ci -> 'Disabled in CI', temporary_home -> 'Disabled for a temporary Overdeck home', environment or missing -> 'Disabled by OVERDECK_TELEMETRY'; Enabled/Disabled unchanged otherwise. Replace the footer sentence 'The environment variable can only force telemetry off.' with 'OVERDECK_TELEMETRY=0 forces telemetry off. OVERDECK_TELEMETRY=1 only turns it back on in CI or a temporary Overdeck home; it never overrides this switch.' Follow pan-style-guide (no new colors or badges)."
+        },
+        "items": [
+          {
+            "id": "settings-ui-disabled-reason.ac1",
+            "title": "Given telemetry configured on with effectiveEnabled false and disabledBy 'ci', when TelemetrySection renders, then the telemetry-status text contains 'Disabled in CI'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-ui-disabled-reason.ac2",
+            "title": "Given disabledBy 'temporary_home', then the status contains 'Disabled for a temporary Overdeck home'; given disabledBy 'environment' or no disabledBy, then it contains 'Disabled by OVERDECK_TELEMETRY'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-ui-disabled-reason.ac3",
+            "title": "Given any state, when the section renders, then the footer text contains 'OVERDECK_TELEMETRY=1' and no longer contains 'can only force telemetry off'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ci-workflows-telemetry-off",
+        "title": "Turn telemetry off in the CI and Windows smoke workflows",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-06T03:56:48Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "infra",
+          "issueLabel": "pan-5084",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".github/workflows/ci.yml",
+            ".github/workflows/windows-smoke.yml",
+            "scripts/windows-smoke/probe-wsl.sh"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n \"OVERDECK_TELEMETRY: '0'\" .github/workflows/ci.yml .github/workflows/windows-smoke.yml",
+            "grep -n 'export OVERDECK_TELEMETRY=0' scripts/windows-smoke/probe-wsl.sh",
+            "bash -n scripts/windows-smoke/probe-wsl.sh"
+          ],
+          "expected_outputs": [
+            "each grep prints exactly one matching line per file",
+            "bash -n exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10. ci.yml: add `OVERDECK_TELEMETRY: '0'` (with a PAN-5084 comment) to the existing top-level `env:` block after `SKIP_DOCS_INDEX: '1'`. windows-smoke.yml: add a top-level `env:` block with `OVERDECK_TELEMETRY: '0'` between `permissions:` and `jobs:`. probe-wsl.sh: add `export OVERDECK_TELEMETRY=0  # PAN-5084` right after `export NO_COLOR=1` (line 46), because step env does not cross into wsl-bash. Do not write a test that reads these files (lint:source-introspection). Workflow pushes may need the SSH remote (gh OAuth lacks the workflow scope)."
+        },
+        "items": [
+          {
+            "id": "ci-workflows-telemetry-off.ac1",
+            "title": "Given ci.yml, when parsed, then its top-level env block contains OVERDECK_TELEMETRY: '0' alongside SKIP_DOCS_INDEX: '1' and no job-level env was removed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-workflows-telemetry-off.ac2",
+            "title": "Given windows-smoke.yml, when parsed, then a top-level env block before jobs: contains OVERDECK_TELEMETRY: '0'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-workflows-telemetry-off.ac3",
+            "title": "Given probe-wsl.sh, when `bash -n` runs, then it exits 0 and the script exports OVERDECK_TELEMETRY=0 on the line after export NO_COLOR=1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "harness-telemetry-off",
+        "title": "Set OVERDECK_TELEMETRY=0 in every test harness that spawns a server or CLI",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-06T03:56:48Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-5084",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/tests/fixtures/isolated-dashboard.ts",
+            "src/dashboard/frontend/tests/system-health-pill.spec.ts",
+            "src/dashboard/frontend/tests/health-page.spec.ts",
+            "tests/helpers/anywhere/two-dashboards.ts",
+            "tests/helpers/anywhere/__tests__/two-dashboards.test.ts",
+            "scripts/anywhere/two-machine-smoke.mjs",
+            "scripts/anywhere/ssh-machine-smoke.mjs",
+            "scripts/anywhere/directory-smoke.mjs"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/helpers/anywhere/__tests__/two-dashboards.test.ts",
+            "node --check scripts/anywhere/two-machine-smoke.mjs && node --check scripts/anywhere/ssh-machine-smoke.mjs && node --check scripts/anywhere/directory-smoke.mjs",
+            "grep -c \"OVERDECK_TELEMETRY: '0'\" src/dashboard/frontend/tests/fixtures/isolated-dashboard.ts src/dashboard/frontend/tests/system-health-pill.spec.ts src/dashboard/frontend/tests/health-page.spec.ts tests/helpers/anywhere/two-dashboards.ts scripts/anywhere/two-machine-smoke.mjs scripts/anywhere/ssh-machine-smoke.mjs scripts/anywhere/directory-smoke.mjs"
+          ],
+          "expected_outputs": [
+            "two-dashboards.test.ts passes",
+            "each node --check exits 0",
+            "grep prints count 1 for each of the seven files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-11. Add `OVERDECK_TELEMETRY: '0',` with a `// PAN-5084: test servers are not installs.` comment to: isolated-dashboard.ts spawn env (next to `OVERDECK_TERMINAL_BACKEND: 'tmux',`, before the trailing `...env`); the startThrowawayDashboard spawn env in src/dashboard/frontend/tests/system-health-pill.spec.ts and src/dashboard/frontend/tests/health-page.spec.ts (next to `OVERDECK_TERMINAL_BACKEND: 'tmux',`; their <repo>/.tmp-pan-2647-* homes are outside every temp root); two-dashboards.ts buildServerEnv return object (next to `OVERDECK_TERMINAL_BACKEND: 'tmux',`); and each serverEnv() in scripts/anywhere/two-machine-smoke.mjs, ssh-machine-smoke.mjs and directory-smoke.mjs next to `OVERDECK_DISABLE_DEACON: '1',` and before any `...extra` spread. Extend the two-dashboards.test.ts ac1 toMatchObject with OVERDECK_TELEMETRY: '0'."
+        },
+        "items": [
+          {
+            "id": "harness-telemetry-off.ac1",
+            "title": "Given buildServerEnv(BASE, opts), when it returns, then the env contains OVERDECK_TELEMETRY: '0' and the ac1 test asserts it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "harness-telemetry-off.ac2",
+            "title": "Given each of isolated-dashboard.ts, system-health-pill.spec.ts, health-page.spec.ts and the three smoke scripts, when grepped, then `OVERDECK_TELEMETRY: '0'` appears exactly once in each file's server spawn env",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "harness-telemetry-off.ac3",
+            "title": "Given the isolated-dashboard fixture, when a caller passes env { OVERDECK_TELEMETRY: '1' }, then the caller value wins because the default precedes the ...env spread",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "telemetry-docs",
+        "title": "Document automatic exclusions, the override and install_kind",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-06T03:56:48Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5084",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/TELEMETRY.md",
+            "configuration/telemetry.mdx",
+            ".overdeck/context/codebase/architecture.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/telemetry-docs.test.ts",
+            "npm run lint:docs",
+            "npm run lint:last-verified"
+          ],
+          "expected_outputs": [
+            "telemetry-docs.test.ts passes",
+            "lint:docs and lint:last-verified pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-14"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-12. docs/TELEMETRY.md: replace 'The environment variable wins over the YAML setting.' with the six-row precedence table and the OVERDECK_TELEMETRY=1 sentence; add '## Automatic exclusions' (CI, temporary homes os.tmpdir()/'/tmp'/~/.overdeck/tmp, reason codes returned as telemetry.disabledBy and shown in Settings, Vitest/NODE_ENV=test still block, CI workflows and harnesses set OVERDECK_TELEMETRY=0) and '## Install kind' (four values, resolution order marker -> isDevMode -> /.dockerenv or /run/.containerenv -> user, Fly provisioning writes remote_vm, pan reload dashboards report dev_checkout, browser gets it from /api/settings); add install kind to the 'Node events also receive' paragraph. Never add a row in the event-table shape. configuration/telemetry.mdx: a 'Where Overdeck turns telemetry off for you' subsection (CI, temporary homes, OVERDECK_TELEMETRY=1 never beats telemetry.enabled: false) and an install-kind bullet under 'What is sent'. architecture.md telemetry bullet: one sentence naming resolveTelemetryState as the one effective-state door and install-kind.ts; leave the last-verified footer unchanged."
+        },
+        "items": [
+          {
+            "id": "telemetry-docs.ac1",
+            "title": "Given docs/TELEMETRY.md, when read, then it contains a '## Automatic exclusions' heading, a '## Install kind' heading, and a precedence table whose rows name environment, config, OVERDECK_TELEMETRY=1, ci and temporary_home in that order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "telemetry-docs.ac2",
+            "title": "Given configuration/telemetry.mdx, when read, then it states that OVERDECK_TELEMETRY=1 re-enables telemetry only in CI or a temporary home and never overrides telemetry.enabled: false, and lists install_kind under what is sent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "telemetry-docs.ac3",
+            "title": "Given the edited docs, when telemetry-docs.test.ts, lint:docs and lint:last-verified run, then all three pass and the architecture.md footer still reads exactly `<!-- last-verified: 2026-11-04 -->`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "install-kind-domain",
+        "to": "install-kind-resolver",
+        "type": "blocks"
+      },
+      {
+        "from": "install-kind-domain",
+        "to": "browser-install-kind",
+        "type": "blocks"
+      },
+      {
+        "from": "install-kind-domain",
+        "to": "telemetry-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "install-kind-resolver",
+        "to": "stamp-node-install-kind",
+        "type": "blocks"
+      },
+      {
+        "from": "install-kind-resolver",
+        "to": "fly-remote-vm-marker",
+        "type": "blocks"
+      },
+      {
+        "from": "install-kind-resolver",
+        "to": "settings-api-telemetry-fields",
+        "type": "blocks"
+      },
+      {
+        "from": "env-exclusion-detector",
+        "to": "resolve-telemetry-state",
+        "type": "blocks"
+      },
+      {
+        "from": "resolve-telemetry-state",
+        "to": "settings-api-telemetry-fields",
+        "type": "blocks"
+      },
+      {
+        "from": "resolve-telemetry-state",
+        "to": "telemetry-docs",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}
