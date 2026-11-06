@@ -33,6 +33,8 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   { method: 'GET', path: '/api/agent-directory', scope: 'read:state' },
   { method: 'GET', path: '/api/flywheel/status', scope: 'read:state' },
   { method: 'GET', path: '/api/pipeline/membership', scope: 'read:state' },
+  // PAN-5093: the phone's Needs-you shows the disk alert.
+  { method: 'GET', path: '/api/disk-alert', scope: 'read:state' },
   // PAN-5045: the phone groups its conversation list by project with the desktop's resolver.
   { method: 'GET', path: '/api/registered-projects', scope: 'read:state' },
   { method: 'GET', path: '/api/conversations', scope: 'read:conversations' },
