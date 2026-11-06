@@ -7,7 +7,7 @@
  * dashboard server).
  */
 import { readdir, realpath, stat } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 
 import { previewDiskFloor, readAvailableBytes, reserveDiskFloor, type DiskReservation } from '../disk-floor.js';
 import type { LaneRole } from '../overdeck/conversations.js';
@@ -101,6 +101,22 @@ async function pathExists(path: string): Promise<boolean> {
   return stat(path).then(() => true, () => false);
 }
 
+/**
+ * FR-9: the target itself when it exists, else the nearest existing ancestor —
+ * so a lanes root (or --path target) on another filesystem that has not been
+ * created yet is checked on the filesystem it will be created on, never on
+ * the project's or the current directory's filesystem.
+ */
+async function nearestExistingDir(target: string): Promise<string> {
+  let candidate = target;
+  while (!(await pathExists(candidate))) {
+    const parent = dirname(candidate);
+    if (parent === candidate) return candidate;
+    candidate = parent;
+  }
+  return candidate;
+}
+
 async function defaultLaneCwds(): Promise<string[]> {
   return (await listAllLaneRows({})).filter((row) => row.local).map((row) => row.cwd);
 }
@@ -133,11 +149,11 @@ export async function checkLaneDisk(input: { project?: string; path?: string }, 
   let unregistered: string[] = [];
   if (input.project) {
     const config = await (deps.resolveConfig ?? resolveLaneConfig)(input.project);
-    path = (await pathExists(config.lanesRoot)) ? config.lanesRoot : config.projectPath;
+    path = await nearestExistingDir(config.lanesRoot);
     bytes = await (deps.estimate ?? laneWorktreeBytes)(config);
     unregistered = await unregisteredLaneDirs(config.lanesRoot, deps.laneCwds ?? defaultLaneCwds);
   } else {
-    path = resolve(input.path ?? process.cwd());
+    path = await nearestExistingDir(resolve(input.path ?? process.cwd()));
   }
   // CodeRabbit (PR #5098): read once and reuse it for both the floor decision and the
   // reported availableBytes, so they never disagree (a second read could fail or differ).

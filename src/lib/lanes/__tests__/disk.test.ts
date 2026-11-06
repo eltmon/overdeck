@@ -235,26 +235,36 @@ describe('checkLaneDisk', () => {
     expect(result.refusal?.startsWith(DISK_LOW_HELD_PREFIX)).toBe(true);
   });
 
-  it('falls back to the project path, and lists nothing unregistered, when the lanes root does not exist', async () => {
-    const missingRoot = join(root, 'does-not-exist');
+  it('previews a cold cross-mount lanes root at its nearest existing ancestor, never the project path (FR-9)', async () => {
+    const mountDir = join(root, 'mount');
+    mkdirSync(mountDir);
+    const lanesRoot = join(mountDir, 'lanes');
+    const projectPath = join(root, 'project');
     const deps: LaneDiskCheckDeps = {
       ledgerDir,
-      resolveConfig: vi.fn(async () => config({ lanesRoot: missingRoot, projectPath: root })),
-      read: async () => 100 * GIB,
+      resolveConfig: vi.fn(async () => config({ lanesRoot, projectPath })),
+      read: async (path: string) => (path === mountDir ? 5 * GIB : 100 * GIB),
       estimate: async () => 1 * GIB,
     };
 
     const result = await checkLaneDisk({ project: 'lexerra' }, deps);
 
-    expect(result.path).toBe(root);
+    expect(result.path).toBe(mountDir);
+    expect(result.refusal?.startsWith(DISK_LOW_HELD_PREFIX)).toBe(true);
     expect(result.unregistered).toEqual([]);
   });
 
-  it('returns a null availableBytes and a null refusal for a path that does not exist, without a project (ac2)', async () => {
-    const missing = join(root, 'ghost', 'deeper');
+  it('walks a missing --path target up to its nearest existing ancestor (FR-9)', async () => {
+    const missing = join(root, 'missing', 'deeper');
 
-    const result = await checkLaneDisk({ path: missing }, { ledgerDir });
+    const result = await checkLaneDisk({ path: missing }, { ledgerDir, read: async () => 100 * GIB });
 
-    expect(result).toMatchObject({ path: missing, bytes: 0, availableBytes: null, refusal: null, unregistered: [] });
+    expect(result.path).toBe(root);
+  });
+
+  it('returns a null availableBytes and a null refusal when read throws, without a project (ac2)', async () => {
+    const result = await checkLaneDisk({ path: root }, { ledgerDir, read: async () => { throw new Error('statfs failed'); } });
+
+    expect(result).toMatchObject({ path: root, bytes: 0, availableBytes: null, refusal: null, unregistered: [] });
   });
 });
