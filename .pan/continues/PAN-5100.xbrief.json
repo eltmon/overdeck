@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-5100",
+  "created": "2026-11-06T23:08:04.192Z",
+  "updated": "2026-11-06T23:08:04.192Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "wi1-contract": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5100",
+      "claimedAt": "2026-11-06T23:08:04.191Z"
+    }
+  }
+}
