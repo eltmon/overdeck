@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5100",
   "created": "2026-11-06T23:08:04.192Z",
-  "updated": "2026-11-07T00:25:40.112Z",
+  "updated": "2026-11-07T00:27:09.691Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -90,6 +90,10 @@
       "claimedBy": "agent-pan-5100",
       "claimedAt": "2026-11-07T00:18:38.320Z",
       "doneAt": "2026-11-07T00:22:08.645Z"
+    },
+    "wi1-contract.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-07T00:27:09.691Z"
     }
   }
 }
