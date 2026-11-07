@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5100",
   "created": "2026-11-06T23:08:04.192Z",
-  "updated": "2026-11-07T00:31:20.947Z",
+  "updated": "2026-11-07T00:31:39.252Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -146,6 +146,10 @@
     "wi4-browser-door.ac2": {
       "status": "completed",
       "doneAt": "2026-11-07T00:31:20.947Z"
+    },
+    "wi4-browser-door.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-07T00:31:39.252Z"
     }
   }
 }
