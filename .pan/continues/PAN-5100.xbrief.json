@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5100",
   "created": "2026-11-06T23:08:04.192Z",
-  "updated": "2026-11-07T00:37:37.997Z",
+  "updated": "2026-11-07T00:37:56.737Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -226,6 +226,10 @@
     "wi8-phone-observer.ac2": {
       "status": "completed",
       "doneAt": "2026-11-07T00:37:37.996Z"
+    },
+    "wi9a-link-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-07T00:37:56.736Z"
     }
   }
 }
