@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5100",
   "created": "2026-11-06T23:08:04.192Z",
-  "updated": "2026-11-07T00:29:24.200Z",
+  "updated": "2026-11-07T00:29:43.243Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -122,6 +122,10 @@
     "wi2-client-config-builder.ac4": {
       "status": "completed",
       "doneAt": "2026-11-07T00:29:24.200Z"
+    },
+    "wi3-client-config-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-07T00:29:43.243Z"
     }
   }
 }
