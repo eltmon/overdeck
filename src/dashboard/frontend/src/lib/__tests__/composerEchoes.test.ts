@@ -283,3 +283,58 @@ describe('reconcileComposerEchoes pasted and merged prompts (PAN-4305)', () => {
     expect(result.optimistic).toEqual([local]);
   });
 });
+
+describe('reconcileComposerEchoes attachment messages rewritten for non-Claude harnesses (PAN-5087)', () => {
+  const A = '/home/op/.overdeck/conversation-attachments/c1/a.png';
+  const B = '/home/op/.overdeck/conversation-attachments/c1/b.png';
+
+  it('clears a bubble whose @path references the server rewrote into a file list', () => {
+    const local = optimisticMessage({ text: `@${A}\n@${B} We want duels to be the core`, createdAt: '2026-11-06T12:39:00.000Z' });
+    const record: ChatMessage = {
+      id: 'codex-user-1',
+      role: 'user',
+      text: `Use the Read tool to inspect these attached files:\n- ${A}\n- ${B}\n\nMessage:\nWe want duels to be the core`,
+      createdAt: '2026-11-06T12:39:01.000Z',
+    };
+
+    const result = reconcileComposerEchoes(makeState([local]), [record]);
+
+    expect(result.optimistic).toEqual([]);
+    expect(result.consumedEchoIds).toContain('codex-user-1');
+  });
+
+  it('clears an attachment-only bubble from the failed outbox', () => {
+    const failed: FailedMessage = {
+      id: 'failed-1',
+      text: `@${A}`,
+      createdAt: '2026-11-06T12:39:00.000Z',
+      kind: 'prompt',
+      error: 'No transcript record after 4 minutes.',
+      notFoundInTranscript: true,
+    };
+    const record: ChatMessage = {
+      id: 'codex-user-2',
+      role: 'user',
+      text: `Use the Read tool to inspect these attached files, then describe what you see:\n- ${A}`,
+      createdAt: '2026-11-06T12:39:01.000Z',
+    };
+
+    const result = reconcileComposerEchoes(makeState([], [failed]), [record]);
+
+    expect(result.failed).toEqual([]);
+  });
+
+  it('keeps the bubble when the record is missing one of its attachment paths', () => {
+    const local = optimisticMessage({ text: `@${A} @${B} hello`, createdAt: '2026-11-06T12:39:00.000Z' });
+    const record: ChatMessage = {
+      id: 'codex-user-3',
+      role: 'user',
+      text: `Use the Read tool to inspect these attached files:\n- ${A}\n\nMessage:\nhello`,
+      createdAt: '2026-11-06T12:39:01.000Z',
+    };
+
+    const result = reconcileComposerEchoes(makeState([local]), [record]);
+
+    expect(result.optimistic).toEqual([local]);
+  });
+});

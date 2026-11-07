@@ -14,6 +14,21 @@ interface EchoState {
 
 const normalizeWs = (text: string) => text.replace(/\s+/g, ' ').trim();
 
+const ATTACHMENT_REF = /@(\/\S+)/g;
+
+/**
+ * PAN-5087: harnesses without native attachments get each `@<path>` reference
+ * rewritten into a "Use the Read tool…" file list (transformMessageForHarness),
+ * so the record matches when it holds every path and the remaining text.
+ */
+function containsRewrittenAttachments(recordText: string, localText: string): boolean {
+  const paths = [...localText.matchAll(ATTACHMENT_REF)].map((match) => match[1]!);
+  if (paths.length === 0) return false;
+  const record = normalizeWs(recordText);
+  return paths.every((path) => record.includes(path))
+    && record.includes(normalizeWs(localText.replace(ATTACHMENT_REF, '')));
+}
+
 /**
  * Four passes over the still-unmatched entries (PAN-4247, PAN-4305): (1) match
  * each new user echo 1:1, retaining IDs across partial snapshots and failed
@@ -23,7 +38,8 @@ const normalizeWs = (text: string) => text.replace(/\s+/g, ' ').trim();
  * one queued message that matches neither bubble individually, also with
  * whitespace collapsed; (3) for what's still left, check whether its full
  * text is contained in a later user record (a merged queued prompt whose
- * extra content defeats an exact or joined-run match); (4) for what's still
+ * extra content defeats an exact or joined-run match), or whose `@path`
+ * references a non-Claude harness rewrote into a file list; (4) for what's still
  * left after that, check whether it instead routed into a running subagent. A
  * later main-transcript echo still wins over a subagent match, since pass (4)
  * never removes the entry from `optimistic`.
@@ -106,7 +122,7 @@ export function reconcileComposerEchoes<T extends EchoState>(
         if (used.has(message.id) && !claimedByContainment.has(message.id)) return false;
         if (message.clientMessageId && local.clientMessageId) return false;
         if (Date.parse(message.createdAt) < Date.parse(local.createdAt)) return false;
-        return normalizeWs(message.text).includes(localNorm);
+        return normalizeWs(message.text).includes(localNorm) || containsRewrittenAttachments(message.text, local.text);
       });
       if (!hit) continue;
       used.add(hit.id);
