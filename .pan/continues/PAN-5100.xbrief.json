@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5100",
   "created": "2026-11-06T23:08:04.192Z",
-  "updated": "2026-11-07T00:42:03.507Z",
+  "updated": "2026-11-07T00:42:46.432Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -282,6 +282,10 @@
     "wi11-docs.ac4": {
       "status": "completed",
       "doneAt": "2026-11-07T00:42:03.506Z"
+    },
+    "wi1-contract.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-07T00:42:46.432Z"
     }
   }
 }
