@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5100",
   "created": "2026-11-06T23:08:04.192Z",
-  "updated": "2026-11-07T00:41:06.589Z",
+  "updated": "2026-11-07T00:41:25.058Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -270,6 +270,10 @@
     "wi11-docs.ac1": {
       "status": "completed",
       "doneAt": "2026-11-07T00:41:06.589Z"
+    },
+    "wi11-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-07T00:41:25.058Z"
     }
   }
 }
