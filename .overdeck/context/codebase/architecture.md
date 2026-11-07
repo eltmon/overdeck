@@ -43,7 +43,9 @@ terminal backend (Herdr by default, tmux when `terminal.backend: tmux`).
   `tests/unit/telemetry-docs.test.ts`); `service.ts` (`AnalyticsService`) is the only Node module
   that imports `posthog-node` and applies the opt-out; the browser door is
   `src/dashboard/frontend/src/lib/telemetry.ts`. PAN-5016 adds `anywhere.ts` for Anywhere events;
-  the phone app and the `services/` Workers send nothing (phone: PAN-5021).
+  `requestFailures.ts` reports failed `/api/`/`/events/` requests on both clients, and the phone
+  app boots telemetry from `GET /api/telemetry/client-config` and reports `phone_link_state`
+  (PAN-5100). The `services/` Workers send nothing.
   `config.ts`'s `resolveTelemetryState()` is the one door for effective
   on/off/`disabledBy`, combining the env override, config, and
   `environment.ts`'s CI/temporary-home auto-exclusion with `install-kind.ts`'s

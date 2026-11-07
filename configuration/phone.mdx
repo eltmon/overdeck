@@ -138,6 +138,21 @@ close the app or switch machines. Signing out resets it to System. The
 lock-screen Live Activity and notifications follow the phone's own
 appearance.
 
+## Diagnostics
+
+When the machine you open has anonymous telemetry on, the Overdeck app
+installed from an app store sends anonymous diagnostics to PostHog so the
+maintainers can fix what is actually failing: failed API routes and their
+status class, your phone's link health (failures, drops, and recoveries),
+and app crashes without their messages. Events carry the machine's anonymous
+install id, the platform, and the app version — never conversation content,
+names, labels, URLs, or your GitHub identity. See
+[Anonymous telemetry](/configuration/telemetry) for the full list of what is
+and is not sent.
+
+Turning telemetry off in the machine's **Settings → Telemetry** reaches the
+phone the next time it successfully connects to that machine.
+
 ## Remove a phone
 
 On the machine, open Settings → Anywhere → Paired devices and select

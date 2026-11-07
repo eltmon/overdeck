@@ -87,7 +87,10 @@ Fly machine provisioning (PAN-5084) writes the `remote_vm` marker right after
 the identity file, before `pan serve` starts, so every throwaway Fly VM
 reports as a disposable install rather than a new one. The browser gets
 `install_kind` from `/api/settings` and registers it as a PostHog super
-property alongside the install ID.
+property alongside the install ID, together with `client` (`desktop` or
+`phone`), `platform` (`web`, `ios`, or `android`), `app_version` (phone
+only), and `build_commit` (when the machine's build has one). Every browser
+event, including `$exception`, carries these super properties.
 
 ## Anonymous install identity
 
@@ -360,8 +363,68 @@ event they sent would sit next to an identity. The user docs
 (`configuration/telemetry.mdx`) also promise that account ids and GitHub logins
 are never sent.
 
-The phone app sends no telemetry yet. [PAN-5021](https://github.com/eltmon/overdeck/issues/5021)
-tracks adding it, with its own switch and store privacy declarations.
+## Client request failures and the phone
+
+[PAN-5100](https://github.com/eltmon/overdeck/issues/5100) adds `client_request_failed`
+(both clients) and `phone_link_state` (phone only), so a failed read, a crash,
+or a dropped link reaches PostHog instead of only an on-screen error message.
+
+### The request-failure observer
+
+`src/dashboard/frontend/src/lib/requestFailures.ts` wraps `fetch` once, on the
+desktop in `main.tsx` and on the phone in `apps/mobile/src/main.tsx` after the
+channel shims install (so it sees the shimmed `fetch`). It reports only
+same-origin `/api/` and `/events/` requests that resolve with HTTP status
+≥ 400 or reject (network error, timeout, or abort); a 2xx response and a
+cross-host URL (PostHog itself) are never reported.
+
+`route` is the closed route template (for example `/api/conversations/:id`),
+and `route_area` is the first path segment after `/api/` — both from a fixed,
+tested list, so an id or an unknown admin path can never leak into an event.
+A desktop admin route the phone cannot call still reports `route: other` with
+its real `route_area`, which is how a phone 403 on an admin route becomes
+diagnostic signal: it reports `client_request_failed` with `status: 403` and
+marks a scope gap the phone UI still has (D-20), not noise to filter out.
+`status` is the exact 4xx/5xx code when it is one of the common ones, else
+`other_4xx` / `other_5xx`, or `network` / `timeout` / `aborted` for a
+rejection. At most one `client_request_failed` per (`route`, `route_area`,
+`status`) per 60 seconds per page load — a reload starts the throttle again.
+Unlike the issue's original ask, the event carries no `query_key_root`: the
+fetch wrapper cannot see which React Query call triggered a request, and
+`route` already names the endpoint.
+
+### Phone consent
+
+The phone has no telemetry switch of its own. It reads
+`GET /api/telemetry/client-config` (scope `read:state`) after the machine
+view mounts, and initializes PostHog only when the answer's
+`effectiveEnabled` is `true`. It caches the last answer per machine in
+`localStorage` under `overdeck.telemetry.<environmentId>` and initializes
+from a cached "on" immediately at mount, so a link that is down from the
+start is still reported. Turning telemetry off on a machine reaches the
+phone only on its next successful connection to that machine, since the
+answer travels over the same link telemetry would report on.
+
+### Identity
+
+The phone shares the machine's install id (`bootstrap.distinctID`) and uses
+in-memory PostHog persistence, so opening another machine never carries one
+machine's id into another's events. The desktop keeps its own anonymous
+browser `distinct_id`. Both clients register `client`, `platform`,
+`app_version` (phone), `build_commit`, `install_id`, and `install_kind` as
+super properties (see "Install kind" above); `operatorHash` follows the same
+register/unregister rule as the desktop.
+
+### `phone_link_state`
+
+The phone's link to the open machine reports `state`: `failed` (a dial
+failed, at most once per `reason` per 60 seconds), `dropped` (the connection
+phase left `live`, `reason` is `resume` within 5 seconds of a foreground
+resume, else the new phase name), `recovered` (the phase returned to `live`,
+with a bucketed `recover_time`), or `route_changed` (the link's direct/relay
+route changed). Only the currently open machine is ever reported, even though
+the same connection also opens links to every paired machine for
+notification-preference sync.
 
 ## Local DB job diagnostics
 
@@ -404,6 +467,9 @@ No production feature is controlled by a PostHog flag yet.
 - Browser product events import only
   `src/dashboard/frontend/src/lib/telemetry.ts`; no component imports
   `posthog-js` directly.
+- `src/dashboard/frontend/src/lib/requestFailures.ts` is the only door that
+  reports a failed `fetch`; it calls `capture()` in the door above rather
+  than importing `posthog-js` itself.
 - Node product events, exception capture, and flag evaluation use
   `src/lib/telemetry/service.ts`; no other production module imports
   `posthog-node` or sends directly to PostHog.
