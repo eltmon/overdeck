@@ -104,4 +104,15 @@ describe('native project config', () => {
     expect([...marketing]).toEqual(['1.0']);
     expect([...build]).toEqual(['1']);
   });
+
+  it('declares anonymous telemetry collection without tracking (PAN-5100 WI-10)', () => {
+    const plist = read('ios/App/App/PrivacyInfo.xcprivacy');
+    expect(plist).toContain('<key>NSPrivacyTracking</key>\n\t<false/>');
+    for (const dataType of ['NSPrivacyCollectedDataTypeProductInteraction', 'NSPrivacyCollectedDataTypeCrashData']) {
+      const entryMatch = new RegExp(
+        `<string>${dataType}</string>[\\s\\S]*?NSPrivacyCollectedDataTypeLinked</key>\\s*<false/>[\\s\\S]*?NSPrivacyCollectedDataTypeTracking</key>\\s*<false/>[\\s\\S]*?NSPrivacyCollectedDataTypePurposes</key>\\s*<array>\\s*<string>NSPrivacyCollectedDataTypePurposeAnalytics</string>`,
+      );
+      expect(plist).toMatch(entryMatch);
+    }
+  });
 });
