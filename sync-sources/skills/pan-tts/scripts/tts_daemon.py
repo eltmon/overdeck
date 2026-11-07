@@ -411,6 +411,18 @@ def play_audio(audio: np.ndarray, volume: float = 1.0) -> None:
             raise
 
 
+# Qwen3-TTS sometimes never emits its end token and keeps generating: a 5 s chunk came out as 50.6 s of whispering and
+# babble on a live stream (2026-11-07; viewers heard "creepy whispers", "Japanese/ASMR"). Normal speech runs 12-16
+# characters per second, so audio much longer than the text can need is a runaway: synthesize once more, and if the
+# second take runs away too, keep only the plausible length.
+RUNAWAY_CPS = 9.0  # slower than any real delivery
+RUNAWAY_PAD_S = 4.0
+
+
+def runaway_limit(text: str) -> float:
+    return RUNAWAY_PAD_S + len(text) / RUNAWAY_CPS
+
+
 def worker() -> None:
     while True:
         try:
@@ -437,6 +449,20 @@ def worker() -> None:
                 job.get("mode", "custom"),
                 job.get("embedding"),
             )
+            limit = runaway_limit(job["text"])
+            if len(audio) / SAMPLE_RATE > limit:
+                log(f"runaway take: {len(audio) / SAMPLE_RATE:.1f}s for {len(job['text'])} chars "
+                    f"(limit {limit:.1f}s); synthesizing again")
+                audio = synthesize(
+                    job["text"],
+                    job["voice"],
+                    job["instruct"],
+                    job.get("mode", "custom"),
+                    job.get("embedding"),
+                )
+                if len(audio) / SAMPLE_RATE > limit:
+                    log(f"runaway again: {len(audio) / SAMPLE_RATE:.1f}s; trimmed to {limit:.1f}s")
+                    audio = audio[: int(limit * SAMPLE_RATE)]
             gen_secs = time.time() - t0
             dur = len(audio) / SAMPLE_RATE
             log(
