@@ -152,13 +152,26 @@ The launcher icons and splash images are generated from the Overdeck mark
 
 - **Collected:** the GitHub account id and login used to sign in, the device label and platform, a
   random install id, the APNs or FCM push token, and relay byte counts for relay-plan accounts.
-- **Not collected:** conversation content, notification text, analytics, ads data, location and
-  contacts. The app contains no analytics, crash-reporting or ads SDK.
+- **Collected (anonymous, only when the opened machine's telemetry is on):** failed API routes and
+  their HTTP status (exact for common codes, otherwise the status class), link failures and
+  recoveries, crash events without messages. Sent to PostHog (us.i.posthog.com). When operator
+  grouping is on, these events also carry `operatorHash`, so they are linked to the operator's
+  GitHub account like the other data below.
+- **Not collected:** conversation content, notification text, ads data, location and contacts. The
+  app contains no ads SDK.
 - **Encrypted in transit:** yes. Conversation content and notification text are end-to-end
   encrypted between the phone and the operator's machines; Apple, Google, Cloudflare and Overdeck
   see only ciphertext.
 - **Deletion:** account.overdeck.ai → Delete account. Signing out on the phone removes its push
   token.
+
+Before uploading the first build containing this telemetry change:
+
+- [ ] Update App Store Connect App Privacy: Other Diagnostic Data and Crash Data, linked to the
+      user, not tracking, purpose Analytics.
+- [ ] Update the Play Console Data safety form: App activity and Crash logs, not shared, optional
+      per machine setting.
+- [ ] Update `overdeck.ai/privacy/app` in `eltmon/overdeck-landing`.
 
 ### Export compliance (step A6)
 

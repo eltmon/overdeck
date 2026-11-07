@@ -87,7 +87,10 @@ Fly machine provisioning (PAN-5084) writes the `remote_vm` marker right after
 the identity file, before `pan serve` starts, so every throwaway Fly VM
 reports as a disposable install rather than a new one. The browser gets
 `install_kind` from `/api/settings` and registers it as a PostHog super
-property alongside the install ID.
+property alongside the install ID, together with `client` (`desktop` or
+`phone`), `platform` (`web`, `ios`, or `android`), `app_version` (phone
+only), and `build_commit` (when the machine's build has one). Every browser
+event, including `$exception`, carries these super properties.
 
 ## Anonymous install identity
 
@@ -172,6 +175,8 @@ the public contract and lists every allowed value.
 | `relay_usage_sampled` | `bytes=relay_bytes_bucket` | At most hourly: bytes this machine relayed since the previous sample. |
 | `mcp_session_seen` | `mcp_surface=mcp_surface; mcp_protocol=mcp_protocol; mcp_client=mcp_client; mcp_auth=mcp_auth` | At most once per day per surface, client, protocol revision and credential kind: an MCP client opened a session. |
 | `mcp_tool_called` | `mcp_surface=mcp_surface; mcp_client=mcp_client; mcp_tool=mcp_tool` | At most once per day per surface, client and tool: an MCP client called an Overdeck tool. |
+| `client_request_failed` | `client=telemetry_client; route=client_route; route_area=client_route_area; method=http_method; status=request_status` | A phone or browser request to the machine's API failed (at most one per route, area and status per minute per page load). |
+| `phone_link_state` | `state=link_state; reason=link_reason; route=link_route; recover_time=recovery_bucket` | The phone's link to the machine failed, dropped, recovered or changed route. |
 
 | Domain | Allowed values |
 | --- | --- |
@@ -182,6 +187,8 @@ the public contract and lists every allowed value.
 | `channel_error_class` | `none`, `unreachable`, `identity_refused`, `unknown_peer`, `unsupported`, `no_relay_plan`, `descriptor_failed`, `wrong_machine`, `heartbeat_failed`, `revoked` |
 | `channel_route` | `lan`, `tailnet`, `ssh`, `public`, `direct`, `relay`, `stored` |
 | `cli_verb` | `abort`, `approve`, `backlog`, `backup`, `clean`, `context`, `destroy`, `dev`, `diff`, `doctor`, `done`, `down`, `edit`, `finalize`, `fork`, `handoff`, `health`, `init`, `issues`, `kill`, `list`, `migrate`, `mode`, `open`, `pause`, `pending`, `plan`, `project`, `projects`, `recover`, `reload`, `reopen`, `request`, `reset`, `restart`, `restore`, `resume`, `review`, `scope`, `serve`, `show`, `skills`, `spawn-reviewer`, `staffing`, `start`, `status`, `strike`, `sync`, `sync-main`, `tell`, `unarchive-conversation`, `unpause`, `untroubled`, `up`, `update`, `validate`, `wipe`, `write-sequence`, `other` |
+| `client_route` | `/api/activity`, `/api/agent-directory`, `/api/agent-requests`, `/api/agents`, `/api/agents/:id/answer-question`, `/api/agents/:id/message`, `/api/agents/:id/permissions/:requestId/respond`, `/api/agents/:id/plan-action`, `/api/agents/:id/tell`, `/api/connectors/self`, `/api/conversations`, `/api/conversations/:id`, `/api/conversations/:id/codex-approval`, `/api/conversations/:id/pane-choice`, `/api/conversations/:id/permission`, `/api/conversations/:id/pi-ask-answer`, `/api/conversations/:name/abort`, `/api/conversations/:name/about`, `/api/conversations/:name/attachments/:file`, `/api/conversations/:name/bookmarks`, `/api/conversations/:name/compact`, `/api/conversations/:name/delete-image`, `/api/conversations/:name/diffs`, `/api/conversations/:name/diffs/:turnId`, `/api/conversations/:name/kickoff`, `/api/conversations/:name/message`, `/api/conversations/:name/message-locator`, `/api/conversations/:name/messages`, `/api/conversations/:name/plan-action`, `/api/conversations/:name/preview-ports`, `/api/conversations/:name/pull-requests`, `/api/conversations/:name/pull-requests/sync`, `/api/conversations/:name/release`, `/api/conversations/:name/release/complete`, `/api/conversations/:name/release/transfer/:transferId`, `/api/conversations/:name/release/undo`, `/api/conversations/:name/resume`, `/api/conversations/:name/scheduled-messages`, `/api/conversations/:name/scheduled-messages/:id`, `/api/conversations/:name/schedules`, `/api/conversations/:name/schedules/:id`, `/api/conversations/:name/stop`, `/api/conversations/:name/switch-model`, `/api/conversations/:name/thinking-level`, `/api/conversations/:name/tool-body/:toolUseId`, `/api/conversations/:name/upload-image`, `/api/conversations/pending-input`, `/api/costs/request-digest`, `/api/costs/summary`, `/api/disk-alert`, `/api/fleet/conversations`, `/api/fleet/issues/:id/activity`, `/api/fleet/issues/:id/start`, `/api/fleet/machines`, `/api/fleet/needs-you`, `/api/fleet/placement`, `/api/fleet/search`, `/api/fleet/workers`, `/api/fleet/workers/:id/stop`, `/api/flywheel/status`, `/api/issues`, `/api/lanes`, `/api/lanes/:name`, `/api/lanes/:name/stop`, `/api/machines/conversations`, `/api/machines/heartbeat`, `/api/machines/issue-activity`, `/api/machines/needs-you`, `/api/machines/projects`, `/api/machines/projects/:key/file`, `/api/machines/projects/:key/source`, `/api/machines/self`, `/api/machines/work/conversations`, `/api/machines/work/issues/:id/start`, `/api/machines/work/lanes`, `/api/machines/work/lanes/:name/reap`, `/api/machines/work/lanes/:name/status`, `/api/machines/work/projects`, `/api/machines/work/projects/:jobId`, `/api/machines/work/workers`, `/api/needs-you`, `/api/palette/search`, `/api/phones/self`, `/api/phones/self/notification-preferences`, `/api/phones/self/push-key`, `/api/pipeline/membership`, `/api/pull-requests`, `/api/pull-requests/conversations`, `/api/registered-projects`, `/api/self/done`, `/api/self/handoff`, `/api/self/jobs/:id`, `/api/self/jobs/:id/wait`, `/api/self/lanes`, `/api/self/lanes/report`, `/api/self/lanes/wait`, `/api/self/machine-link-requests`, `/api/self/machine-link-requests/:id/wait`, `/api/self/memory/facts`, `/api/self/memory/search`, `/api/self/pull-request-watches`, `/api/self/pull-request-watches/:id`, `/api/self/pull-requests`, `/api/self/secret-requests`, `/api/self/secret-requests/:id/wait`, `/api/self/tasks/block`, `/api/self/tasks/claim`, `/api/self/tasks/done`, `/api/self/worker-report`, `/api/self/workers`, `/api/self/workers/:id`, `/api/self/workers/:id/wait`, `/api/settings/resolved`, `/api/telemetry/client-config`, `/api/versions/self`, `/api/versions/self/update`, `/api/workers`, `/api/workers/:id/status`, `/api/workers/:id/stop`, `/events/stream`, `/events/version`, `other` |
+| `client_route_area` | `access-tokens`, `account`, `activity`, `admin`, `agent-directory`, `agent-requests`, `agents`, `anywhere`, `artifacts`, `autopreso`, `backlog`, `boot-reconciliation`, `cache`, `cache-status`, `claude-code`, `cliproxy`, `cloister`, `color-themes`, `command-deck`, `commands`, `confirmations`, `connectors`, `context`, `conversations`, `costs`, `dashboard`, `deacon`, `deft`, `deploy`, `dev`, `devices`, `diffs`, `directory`, `discovered-sessions`, `disk-alert`, `effort`, `environment`, `events`, `fleet`, `flywheel`, `fs`, `git-activity`, `github-quota`, `godview`, `health`, `hooks`, `internal`, `issues`, `jev`, `joins`, `knowledge-viewer`, `lanes`, `linear-mcp-auth`, `linked-conversations`, `machines`, `mcp`, `mcp-oauth`, `memory`, `merge-queue`, `merge-train`, `metrics`, `model-presets`, `models`, `needs-you`, `no-resume-mode`, `orders`, `pairing`, `palette`, `parked`, `phones`, `pipeline`, `planning`, `prereqs`, `project-mappings`, `projects`, `pull-requests`, `push`, `rally`, `registered-projects`, `registry`, `remote`, `resources`, `restart-gate`, `resume-all`, `review`, `self`, `session-trees`, `settings`, `shadow`, `share-probe`, `shares`, `show`, `skills`, `specialists`, `system`, `tailscale`, `telemetry`, `terminals`, `tiered`, `tracker-status`, `trackers`, `triggers`, `tts`, `update`, `vault`, `velocity`, `version`, `versions`, `voice`, `webhooks`, `workers`, `workspace-registry`, `workspace-stack-health`, `workspaces`, `other` |
 | `close_out_variant` | `card`, `inspector` |
 | `count_bucket` | `0`, `1-2`, `3-5`, `6-10`, `11+` |
 | `dashboard_tab` | `home`, `pipeline`, `kanban`, `command-deck`, `agents`, `flywheel`, `orders`, `backlog`, `resources`, `knowledge`, `skills`, `context`, `health`, `activity`, `metrics`, `costs`, `autopreso`, `settings`, `god-view`, `deacon`, `sessions`, `awaiting-merge`, `workspace-new`, `project-new`, `workspace` |
@@ -191,10 +198,14 @@ the public contract and lists every allowed value.
 | `fork_kind` | `summary`, `handoff`, `plain` |
 | `github_caller` | `pipeline_membership`, `pr_cache`, `pr_sync`, `ci_repair`, `issue_poller`, `close_out`, `tracker_client`, `app_rest`, `quota_sampler`, `agent`, `pr_adoption`, `other` |
 | `harness` | `claude-code`, `ohmypi`, `codex`, `acp`, `kimi-code`, `opencode`, `muse`, `prime-agent` |
+| `http_method` | `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `other` |
 | `install_kind` | `user`, `remote_vm`, `dev_checkout`, `container` |
 | `link_failure_reason` | `bad_pairing_url`, `unreachable`, `pairing_refused`, `unsupported`, `identity_mismatch`, `exchange_failed`, `grant_refused`, `offline`, `approval_refused`, `approval_failed`, `other` |
 | `link_method` | `pairing_code`, `ssh`, `fly`, `directory_approval`, `other` |
+| `link_reason` | `none`, `offline`, `no_path`, `unreachable`, `removed`, `pairing_refused`, `identity_mismatch`, `unsupported`, `channel_failed`, `delayed`, `restarting`, `unauthorized`, `resume`, `other` |
+| `link_route` | `direct`, `relay`, `unknown` |
 | `link_side` | `requester`, `approver` |
+| `link_state` | `failed`, `dropped`, `recovered`, `route_changed` |
 | `mcp_auth` | `agent_token`, `oauth`, `access_token`, `connector` |
 | `mcp_client` | `claude_code`, `codex`, `cursor`, `vscode`, `chatgpt`, `grok`, `hermes`, `openclaw`, `gemini`, `opencode`, `kimi`, `overdeck_connector`, `other` |
 | `mcp_protocol` | `2026-07-28`, `2025-11-25`, `2025-06-18`, `2025-03-26`, `2024-11-05`, `2024-10-07`, `other` |
@@ -208,7 +219,10 @@ the public contract and lists every allowed value.
 | `quota_points_bucket` | `0`, `1-49`, `50-199`, `200-499`, `500-999`, `1000-2499`, `2500+` |
 | `quota_remaining_bucket` | `0`, `1-99`, `100-499`, `500-999`, `1000-2499`, `2500+`, `unknown` |
 | `rate_limit_kind` | `primary`, `secondary` |
+| `recovery_bucket` | `none`, `under_1s`, `1s-4s`, `5s-14s`, `15s-59s`, `60s+` |
 | `relay_bytes_bucket` | `under_1mb`, `1mb-9mb`, `10mb-99mb`, `100mb-999mb`, `1gb+` |
+| `request_status` | `400`, `401`, `403`, `404`, `408`, `409`, `413`, `422`, `429`, `other_4xx`, `500`, `502`, `503`, `504`, `other_5xx`, `network`, `timeout`, `aborted` |
+| `telemetry_client` | `phone`, `desktop` |
 
 Raw counts and timings are never sent; GitHub quota points and remaining
 values are sent only as the buckets above. Pipeline attribution is emitted only
@@ -349,8 +363,68 @@ event they sent would sit next to an identity. The user docs
 (`configuration/telemetry.mdx`) also promise that account ids and GitHub logins
 are never sent.
 
-The phone app sends no telemetry yet. [PAN-5021](https://github.com/eltmon/overdeck/issues/5021)
-tracks adding it, with its own switch and store privacy declarations.
+## Client request failures and the phone
+
+[PAN-5100](https://github.com/eltmon/overdeck/issues/5100) adds `client_request_failed`
+(both clients) and `phone_link_state` (phone only), so a failed read, a crash,
+or a dropped link reaches PostHog instead of only an on-screen error message.
+
+### The request-failure observer
+
+`src/dashboard/frontend/src/lib/requestFailures.ts` wraps `fetch` once, on the
+desktop in `main.tsx` and on the phone in `apps/mobile/src/main.tsx` after the
+channel shims install (so it sees the shimmed `fetch`). It reports only
+same-origin `/api/` and `/events/` requests that resolve with HTTP status
+≥ 400 or reject (network error, timeout, or abort); a 2xx response and a
+cross-host URL (PostHog itself) are never reported.
+
+`route` is the closed route template (for example `/api/conversations/:id`),
+and `route_area` is the first path segment after `/api/` — both from a fixed,
+tested list, so an id or an unknown admin path can never leak into an event.
+A desktop admin route the phone cannot call still reports `route: other` with
+its real `route_area`, which is how a phone 403 on an admin route becomes
+diagnostic signal: it reports `client_request_failed` with `status: 403` and
+marks a scope gap the phone UI still has (D-20), not noise to filter out.
+`status` is the exact 4xx/5xx code when it is one of the common ones, else
+`other_4xx` / `other_5xx`, or `network` / `timeout` / `aborted` for a
+rejection. At most one `client_request_failed` per (`route`, `route_area`,
+`status`) per 60 seconds per page load — a reload starts the throttle again.
+Unlike the issue's original ask, the event carries no `query_key_root`: the
+fetch wrapper cannot see which React Query call triggered a request, and
+`route` already names the endpoint.
+
+### Phone consent
+
+The phone has no telemetry switch of its own. It reads
+`GET /api/telemetry/client-config` (scope `read:state`) after the machine
+view mounts, and initializes PostHog only when the answer's
+`effectiveEnabled` is `true`. It caches the last answer per machine in
+`localStorage` under `overdeck.telemetry.<environmentId>` and initializes
+from a cached "on" immediately at mount, so a link that is down from the
+start is still reported. Turning telemetry off on a machine reaches the
+phone only on its next successful connection to that machine, since the
+answer travels over the same link telemetry would report on.
+
+### Identity
+
+The phone shares the machine's install id (`bootstrap.distinctID`) and uses
+in-memory PostHog persistence, so opening another machine never carries one
+machine's id into another's events. The desktop keeps its own anonymous
+browser `distinct_id`. Both clients register `client`, `platform`,
+`app_version` (phone), `build_commit`, `install_id`, and `install_kind` as
+super properties (see "Install kind" above); `operatorHash` follows the same
+register/unregister rule as the desktop.
+
+### `phone_link_state`
+
+The phone's link to the open machine reports `state`: `failed` (a dial
+failed, at most once per `reason` per 60 seconds), `dropped` (the connection
+phase left `live`, `reason` is `resume` within 5 seconds of a foreground
+resume, else the new phase name), `recovered` (the phase returned to `live`,
+with a bucketed `recover_time`), or `route_changed` (the link's direct/relay
+route changed). Only the currently open machine is ever reported, even though
+the same connection also opens links to every paired machine for
+notification-preference sync.
 
 ## Local DB job diagnostics
 
@@ -393,6 +467,9 @@ No production feature is controlled by a PostHog flag yet.
 - Browser product events import only
   `src/dashboard/frontend/src/lib/telemetry.ts`; no component imports
   `posthog-js` directly.
+- `src/dashboard/frontend/src/lib/requestFailures.ts` is the only door that
+  reports a failed `fetch`; it calls `capture()` in the door above rather
+  than importing `posthog-js` itself.
 - Node product events, exception capture, and flag evaluation use
   `src/lib/telemetry/service.ts`; no other production module imports
   `posthog-node` or sends directly to PostHog.

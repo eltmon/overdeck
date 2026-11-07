@@ -37,6 +37,8 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   { method: 'GET', path: '/api/disk-alert', scope: 'read:state' },
   // PAN-5045: the phone groups its conversation list by project with the desktop's resolver.
   { method: 'GET', path: '/api/registered-projects', scope: 'read:state' },
+  // PAN-5100: the phone reads the machine's telemetry setting.
+  { method: 'GET', path: '/api/telemetry/client-config', scope: 'read:state' },
   { method: 'GET', path: '/api/conversations', scope: 'read:conversations' },
   // PAN-4835: the Needs-you feed, explicit so it never depends on the `:id` pattern below.
   { method: 'GET', path: '/api/conversations/pending-input', scope: 'read:conversations' },

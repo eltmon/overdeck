@@ -1,17 +1,58 @@
 /**
  * The phone screens for the current machine (PAN-4837 FR-8, D-9). `MobileApp` runs unchanged; the
  * channel shims carry its requests. The query client mirrors the frontend's `main.tsx` options. The
- * frontend's boot-time settings and theme reconciles and telemetry are not run: they read admin
- * routes (PAN-4835 H-4).
+ * frontend's boot-time settings and theme reconciles are not run: they read admin routes (PAN-4835
+ * H-4). Telemetry boots from the phone-readable client config instead (PAN-5100).
  */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { Component, useEffect, useState, type ReactNode } from 'react';
 
 import { ImageLightboxHost } from '../../../../src/dashboard/frontend/src/components/chat/ImageLightbox';
 import { DialogProvider } from '../../../../src/dashboard/frontend/src/components/DialogProvider';
 import MobileApp from '../../../../src/dashboard/frontend/src/components/mobile/MobileApp';
 import { installQueryRecovery } from '../../../../src/dashboard/frontend/src/lib/queryRecovery';
+import { captureException } from '../../../../src/dashboard/frontend/src/lib/telemetry';
+import { currentMachineId } from './store';
+import { bootPhoneTelemetry } from './telemetry';
 import { UpdatingBanner } from './UpdatingBanner';
+
+/**
+ * PAN-5100 WI-7: a crash inside `MobileApp` captures `$exception` and shows a
+ * manual-reload fallback. Not `RootErrorBoundary` from `recovery.tsx`: that
+ * one polls the machine and reloads on module errors, which the phone does
+ * not want.
+ */
+export class PhoneErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
+  state = { hasError: false };
+
+  static getDerivedStateFromError(): { hasError: boolean } {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: unknown): void {
+    try {
+      captureException(error, { action: 'frontend_unhandled_error', trigger: 'root_error_boundary' });
+    } catch {
+      // Telemetry must never break the fallback.
+    }
+  }
+
+  render(): ReactNode {
+    if (!this.state.hasError) return this.props.children;
+    return (
+      <div className="flex min-h-full flex-col items-center justify-center gap-3 p-6 text-center">
+        <p className="text-sm text-muted-foreground">Something went wrong on this screen.</p>
+        <button
+          type="button"
+          onClick={() => location.reload()}
+          className="min-h-11 rounded-sm border border-border px-3 text-sm font-medium text-foreground"
+        >
+          Reload
+        </button>
+      </div>
+    );
+  }
+}
 
 function isNetworkError(error: unknown): boolean {
   if (!(error instanceof TypeError)) return false;
@@ -45,17 +86,28 @@ interface MachineViewProps {
 export function MachineView({ label, onMachines }: MachineViewProps) {
   const [queryClient] = useState(createQueryClient);
   useEffect(() => installQueryRecovery(queryClient), [queryClient]);
+  useEffect(() => {
+    const id = currentMachineId();
+    if (!id) return;
+    let off = () => {};
+    void bootPhoneTelemetry({ environmentId: id }).then((unsubscribe) => {
+      off = unsubscribe;
+    });
+    return () => off();
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>
       <DialogProvider>
-        <MobileApp
-          headerSlot={
-            <button type="button" onClick={onMachines} className="min-h-11 px-2 text-sm font-medium text-foreground">
-              {label} ▾
-            </button>
-          }
-        />
+        <PhoneErrorBoundary>
+          <MobileApp
+            headerSlot={
+              <button type="button" onClick={onMachines} className="min-h-11 px-2 text-sm font-medium text-foreground">
+                {label} ▾
+              </button>
+            }
+          />
+        </PhoneErrorBoundary>
         <ImageLightboxHost />
         <UpdatingBanner />
       </DialogProvider>
