@@ -11,8 +11,9 @@ import { type Connection, createConnection } from './connection';
 import { createDirectory, type ShellDirectory } from './directory';
 import { resetTransport } from '../../../../src/dashboard/frontend/src/lib/wsTransport';
 import { deriveConnectionPhase, useConnectionState } from '../../../../src/dashboard/frontend/src/lib/connectionState';
-import { installResumeHandler } from './lifecycle';
+import { installResumeHandler, lastResumedAt } from './lifecycle';
 import { installLinkRecovery } from './linkRecovery';
+import { installLinkTelemetry } from './linkTelemetry';
 import { createLiveActivityController, type LiveActivityController, liveActivityEnabled, setLiveActivityEnabled } from './liveActivity';
 import { MachinesScreen } from './MachinesScreen';
 import { MachineView } from './MachineView';
@@ -224,7 +225,19 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
       platform: shellPlatform(),
     });
     const meter = createRelayMeter((bytes) => directory.client.send({ type: 'relay-usage', bytes }));
-    const connection = createConnection({ directory, meter });
+    const linkTelemetry = installLinkTelemetry({
+      currentEnvironmentId: currentMachineId,
+      onSessionChange,
+      lastDialError,
+      subscribePhase: (listener) => useConnectionState.subscribe((s) => listener(deriveConnectionPhase(s))),
+      currentPhase: () => deriveConnectionPhase(useConnectionState.getState()),
+      lastResumedAt,
+    });
+    const connection = createConnection({
+      directory,
+      meter,
+      onLinkOpened: (id, route) => linkTelemetry.routeOpened(id, route),
+    });
     const platform = shellPlatform();
     const push = pushSupported() ? startPush({ directory: directory.client, platform }) : null;
     const prefsSync = pushSupported()
@@ -265,6 +278,7 @@ export default function ShellApp({ navigate = (path) => location.assign(path) }:
     return () => {
       uninstallResume();
       uninstallLinkRecovery();
+      linkTelemetry.uninstall();
       push?.stop();
       prefsSync?.stop();
       liveActivity.dispose();
