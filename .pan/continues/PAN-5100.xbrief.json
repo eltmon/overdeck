@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5100",
   "created": "2026-11-06T23:08:04.192Z",
-  "updated": "2026-11-07T00:18:32.511Z",
+  "updated": "2026-11-07T00:18:38.320Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -80,6 +80,11 @@
       "claimedBy": "agent-pan-5100",
       "claimedAt": "2026-11-07T00:14:27.748Z",
       "doneAt": "2026-11-07T00:18:32.511Z"
+    },
+    "wi11-docs": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5100",
+      "claimedAt": "2026-11-07T00:18:38.320Z"
     }
   }
 }
