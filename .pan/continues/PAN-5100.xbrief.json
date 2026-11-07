@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5100",
   "created": "2026-11-06T23:08:04.192Z",
-  "updated": "2026-11-07T00:32:54.612Z",
+  "updated": "2026-11-07T00:33:14.131Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -166,6 +166,10 @@
     "wi4b-door-consent.ac3": {
       "status": "completed",
       "doneAt": "2026-11-07T00:32:54.612Z"
+    },
+    "wi4b-door-consent.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-07T00:33:14.131Z"
     }
   }
 }
