@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5100",
   "created": "2026-11-06T23:08:04.192Z",
-  "updated": "2026-11-07T00:39:49.636Z",
+  "updated": "2026-11-07T00:40:08.549Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -254,6 +254,10 @@
     "wi9b-link-reporter.ac5": {
       "status": "completed",
       "doneAt": "2026-11-07T00:39:49.636Z"
+    },
+    "wi10-store-privacy.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-07T00:40:08.548Z"
     }
   }
 }
