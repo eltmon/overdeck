@@ -1,12 +1,11 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-07T01:31:18.032739Z · model: claude-opus-5-5 · open: 868_
+_Last sequenced: 2026-11-07T01:43:33.740240Z · model: claude-opus-5-5 · open: 867_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-5001 | S | critical | ok |  |  | Closed-issue reaper re-checks 426 reaped issues every minute and drains the 5k/hr GitHub App quota; in pipeline. |
-| 2 | PAN-5100 | L | high | ok |  |  | Phone app sends no telemetry and failed reads are swallowed; route all client errors to PostHog under opt-in. In pipeline. |
 | 3 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
 | 4 | PAN-5090 | XS | critical | ok |  |  | Herdr unit lacks OOMPolicy=continue: one OOM-killed pane child stops the service and kills every conversation; seen twice. |
 | 5 | PAN-4995 | S | high | ok |  |  | pan review request verifies a half-adopted workspace; its main merge trips adoption's head check -> false Needs-you on handoff PRs |
@@ -867,7 +866,7 @@ _Last sequenced: 2026-11-07T01:31:18.032739Z · model: claude-opus-5-5 · open: 
 | 862 | PAN-4594 | M | low | ok |  | PAN-4590 | Dashboard Semgrep controls: Settings security section, per-project sast override, findings in issue view; after PAN-4590. |
 | 863 | PAN-4593 | L | low | needs-refinement |  | PAN-4590 | Semgrep Platform/Guardian tier; operator decisions (offer Guardian? contact Semgrep first?) still open — refine before work. |
 | 864 | PAN-5022 | L | medium | ok |  |  | Phone app: relay notification preferences to offline machines via the directory, and drop muted pushes on the phone. |
-| 865 | PAN-5021 | M | low | needs-refinement |  | PAN-5100 | Superseded in design by in-pipeline PAN-5100 (machine setting, machine install id); re-scope or close once 5100 lands. |
+| 865 | PAN-5021 | M | low | needs-refinement |  |  | PAN-5100 landed phone telemetry with conflicting decisions; re-scope to any remaining gap or close as superseded. |
 | 866 | PAN-5029 | M | medium | needs-refinement |  |  | Grok Build Tailscale reach can't work: pan mcp serve verifies tokens only against its own machine. Needs a design choice. |
 | 867 | PAN-5078 | XL | low | ok |  |  | Parked: add xAI's Grok Build CLI as a harness over ACP (stdio agent, resumable sessions). |
 | 868 | PAN-4842 | S | medium | ok |  |  | Phone app W-DOC: phone-app.mdx and updates to Anywhere, push, tailscale and service docs; finished last. |
@@ -879,10 +878,6 @@ _Last sequenced: 2026-11-07T01:31:18.032739Z · model: claude-opus-5-5 · open: 
 ### PAN-5001 (rank 1)
 
 New in-pipeline substrate bug: the deacon close-out sweep alone exhausted the GitHub App REST pool, which pauses every tracker read and write across the pipeline. Pinned at the free top slot; the fix (skip already-reaped residue for 6h, no overlapping deacon-lite sweeps) is small and well specified.
-
-### PAN-5100 (rank 2)
-
-New issue already in the pipeline, so it is pinned near the top: substrate-improvement label sets a high floor, and the decisions and acceptance criteria are fully specified, so condition is ok.
 
 ### PAN-5013 (rank 3)
 
@@ -1196,6 +1191,10 @@ New this pass. The deployment gate's queue message is unusually good — it name
 
 Triage: verify "running at $0.00 with no capacity fallback" against the current liveness definition. Rank held.
 
+### PAN-3106 (rank 83)
+
+New this pass. shouldHoldForUat is consulted on exactly one merge path, so every other path merges a ready issue without asking whether its project holds for UAT — verified at code level on a real MIN-901 merge. This defeats the batch-train model directly: issues merge one at a time before a generation can assemble them.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1203,10 +1202,10 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-07T01:31:18.032739Z",
+  "generatedAt": "2026-11-07T01:43:33.740240Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 868,
+  "openCount": 867,
   "nodes": [
     {
       "issue": "PAN-5001",
@@ -1218,19 +1217,6 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "dependsOn": [],
       "why": "Closed-issue reaper re-checks 426 reaped issues every minute and drains the 5k/hr GitHub App quota; in pipeline.",
       "rationale": "New in-pipeline substrate bug: the deacon close-out sweep alone exhausted the GitHub App REST pool, which pauses every tracker read and write across the pipeline. Pinned at the free top slot; the fix (skip already-reaped residue for 6h, no overlapping deacon-lite sweeps) is small and well specified.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5100",
-      "rank": 2,
-      "size": "L",
-      "importance": "high",
-      "score": 74,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Phone app sends no telemetry and failed reads are swallowed; route all client errors to PostHog under opt-in. In pipeline.",
-      "rationale": "New issue already in the pipeline, so it is pinned near the top: substrate-improvement label sets a high floor, and the decisions and acceptance criteria are fully specified, so condition is ok.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11928,11 +11914,9 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "importance": "low",
       "score": 25,
       "condition": "needs-refinement",
-      "dependsOn": [
-        "PAN-5100"
-      ],
-      "why": "Superseded in design by in-pipeline PAN-5100 (machine setting, machine install id); re-scope or close once 5100 lands.",
-      "rationale": "Rank held but importance and score lowered: a 2026-11-06 comment from PAN-5100 planning says 5100 ships phone telemetry with conflicting decisions and asks to re-scope or close this issue after 5100 lands.",
+      "dependsOn": [],
+      "why": "PAN-5100 landed phone telemetry with conflicting decisions; re-scope to any remaining gap or close as superseded.",
+      "rationale": "Dependency PAN-5100 closed as completed on 2026-11-07, so the blocking edge is dropped; rank holds and condition stays needs-refinement until it is re-scoped or closed.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13176,13 +13160,6 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.4
-    },
-    {
-      "from": "PAN-5100",
-      "to": "PAN-5021",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 0.9
     }
   ]
 }
