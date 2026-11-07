@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5100",
   "created": "2026-11-06T23:08:04.192Z",
-  "updated": "2026-11-07T00:38:15.349Z",
+  "updated": "2026-11-07T00:38:34.929Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -234,6 +234,10 @@
     "wi9a-link-route.ac2": {
       "status": "completed",
       "doneAt": "2026-11-07T00:38:15.348Z"
+    },
+    "wi9b-link-reporter.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-07T00:38:34.928Z"
     }
   }
 }
