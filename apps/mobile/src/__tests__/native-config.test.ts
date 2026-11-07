@@ -105,12 +105,15 @@ describe('native project config', () => {
     expect([...build]).toEqual(['1']);
   });
 
-  it('declares anonymous telemetry collection without tracking (PAN-5100 WI-10)', () => {
+  it('declares anonymous telemetry collection, linked to the user, without tracking (PAN-5100 WI-10)', () => {
     const plist = read('ios/App/App/PrivacyInfo.xcprivacy');
     expect(plist).toContain('<key>NSPrivacyTracking</key>\n\t<false/>');
-    for (const dataType of ['NSPrivacyCollectedDataTypeProductInteraction', 'NSPrivacyCollectedDataTypeCrashData']) {
+    // Linked true: operatorHash (when operator grouping is on) rides as a super
+    // property on every PostHog event, including these diagnostic and crash
+    // events, so they can be matched back to a GitHub account.
+    for (const dataType of ['NSPrivacyCollectedDataTypeOtherDiagnosticData', 'NSPrivacyCollectedDataTypeCrashData']) {
       const entryMatch = new RegExp(
-        `<string>${dataType}</string>[\\s\\S]*?NSPrivacyCollectedDataTypeLinked</key>\\s*<false/>[\\s\\S]*?NSPrivacyCollectedDataTypeTracking</key>\\s*<false/>[\\s\\S]*?NSPrivacyCollectedDataTypePurposes</key>\\s*<array>\\s*<string>NSPrivacyCollectedDataTypePurposeAnalytics</string>`,
+        `<string>${dataType}</string>[\\s\\S]*?NSPrivacyCollectedDataTypeLinked</key>\\s*<true/>[\\s\\S]*?NSPrivacyCollectedDataTypeTracking</key>\\s*<false/>[\\s\\S]*?NSPrivacyCollectedDataTypePurposes</key>\\s*<array>\\s*<string>NSPrivacyCollectedDataTypePurposeAnalytics</string>`,
       );
       expect(plist).toMatch(entryMatch);
     }

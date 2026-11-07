@@ -88,7 +88,12 @@ export function MachineView({ label, onMachines }: MachineViewProps) {
   useEffect(() => installQueryRecovery(queryClient), [queryClient]);
   useEffect(() => {
     const id = currentMachineId();
-    if (id) void bootPhoneTelemetry({ environmentId: id });
+    if (!id) return;
+    let off = () => {};
+    void bootPhoneTelemetry({ environmentId: id }).then((unsubscribe) => {
+      off = unsubscribe;
+    });
+    return () => off();
   }, []);
 
   return (

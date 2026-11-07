@@ -138,6 +138,15 @@ describe('installLinkTelemetry', () => {
     expect(report).toHaveBeenCalledWith({ state: 'dropped', reason: 'delayed', route: 'direct', recover_time: 'none' });
   });
 
+  it('reports nothing for a drop or recovery while no machine is open', () => {
+    const { report, emitPhase } = setup({ currentEnvironmentId: () => null });
+
+    emitPhase('delayed');
+    emitPhase('live');
+
+    expect(report).not.toHaveBeenCalled();
+  });
+
   it('stops reporting once uninstalled', () => {
     const { report, telemetry, fail } = setup();
     telemetry.uninstall();

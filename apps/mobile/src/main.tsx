@@ -23,6 +23,9 @@ void import('../../../src/dashboard/frontend/src/lib/requestFailures')
   .then(({ installRequestFailureObserver }) => {
     installRequestFailureObserver({ client: 'phone' });
   })
+  .catch(() => {
+    // Telemetry must never block boot: continue without the observer.
+  })
   .then(() => import('./shell/ShellApp'))
   .then(({ default: ShellApp }) => {
     createRoot(document.getElementById('root')!).render(<ShellApp />);

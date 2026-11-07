@@ -381,6 +381,17 @@ describe('frontend telemetry wrapper', () => {
       expect(posthogMock.captureException).not.toHaveBeenCalled();
     });
 
+    it('drops an exception raised after disableTelemetry() before any load, instead of sending it on a later on', async () => {
+      const { initTelemetryFromConfig, disableTelemetry, captureException } = await import('../telemetry');
+      vi.stubEnv('MODE', 'production');
+
+      disableTelemetry();
+      captureException(new Error('boom'), { action: 'merge' });
+      initTelemetryFromConfig({ enabled: true }, CONTEXT);
+
+      expect(posthogMock.captureException).not.toHaveBeenCalled();
+    });
+
     it('unregisters operatorHash on a loaded door given an "on" config without one', async () => {
       const { initTelemetryFromConfig } = await import('../telemetry');
       initTelemetryFromConfig({ enabled: true, operatorHash: 'deadbeefdeadbeef' }, CONTEXT);

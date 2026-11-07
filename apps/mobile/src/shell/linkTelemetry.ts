@@ -117,6 +117,13 @@ export function installLinkTelemetry(deps: LinkTelemetryDeps): LinkTelemetry {
   let dropReason: TelemetryLinkReason | null = null;
 
   const unsubscribePhase = deps.subscribePhase((phase) => {
+    if (deps.currentEnvironmentId() === null) {
+      // No machine is open (PAN-5100 D-15): never report a drop/recovery for it.
+      previousPhase = phase;
+      dropAt = null;
+      dropReason = null;
+      return;
+    }
     const timestamp = now();
     if (previousPhase === 'live' && phase !== 'live' && DROP_REASONS.has(phase)) {
       const resumedAt = deps.lastResumedAt();

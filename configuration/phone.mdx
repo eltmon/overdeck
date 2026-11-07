@@ -143,7 +143,8 @@ appearance.
 When the machine you open has anonymous telemetry on, the Overdeck app
 installed from an app store sends anonymous diagnostics to PostHog so the
 maintainers can fix what is actually failing: failed API routes and their
-status class, your phone's link health (failures, drops, and recoveries),
+HTTP status (exact for common codes, otherwise the status class), your
+phone's link health (failures, drops, and recoveries),
 and app crashes without their messages. Events carry the machine's anonymous
 install id, the platform, and the app version — never conversation content,
 names, labels, URLs, or your GitHub identity. See

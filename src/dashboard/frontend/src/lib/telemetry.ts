@@ -260,11 +260,12 @@ export function initTelemetryFromConfig(config: TelemetryInitConfig, context: Te
 
 /** Opt out and stop capturing (D-10). Safe to call when not loaded. */
 export function disableTelemetry(): void {
-  if (!loaded) return;
-  try {
-    posthog.opt_out_capturing();
-  } catch {
-    // Telemetry must never throw.
+  if (loaded) {
+    try {
+      posthog.opt_out_capturing();
+    } catch {
+      // Telemetry must never throw.
+    }
   }
   consent = 'off';
   pendingExceptions.length = 0;
