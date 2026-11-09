@@ -16,6 +16,7 @@ describe('getClaudeModelFlag (PAN-4160)', () => {
 
   it('passes known IDs through as their full API IDs', () => {
     expect(getClaudeModelFlag('claude-opus-5-5')).toBe('claude-opus-5-5');
+    expect(getClaudeModelFlag('claude-fable-5-2')).toBe('claude-fable-5-2');
     expect(getClaudeModelFlag('claude-fable-5-1')).toBe('claude-fable-5-1');
   });
 
