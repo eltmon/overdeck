@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5103",
   "created": "2026-11-09T22:25:19.629Z",
-  "updated": "2026-11-09T22:48:00.812Z",
+  "updated": "2026-11-09T22:51:46.902Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,9 +34,10 @@
       "doneAt": "2026-11-09T22:47:54.586Z"
     },
     "fable-52-frontend-pickers": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5103",
-      "claimedAt": "2026-11-09T22:48:00.811Z"
+      "claimedAt": "2026-11-09T22:48:00.811Z",
+      "doneAt": "2026-11-09T22:51:46.902Z"
     }
   }
 }
