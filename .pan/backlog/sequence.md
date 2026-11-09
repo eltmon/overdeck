@@ -1,11 +1,12 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-09T20:27:19.629958Z · model: claude-opus-5-5 · open: 867_
+_Last sequenced: 2026-11-09T22:16:36.419346Z · model: claude-opus-5-5 · open: 868_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-5001 | S | critical | ok |  |  | Closed-issue reaper re-checks 426 reaped issues every minute and drains the 5k/hr GitHub App quota; in pipeline. |
+| 2 | PAN-5103 | M | high | ok |  |  | Add Claude Fable 5.2 to catalog, pricing, capability and defaults, then NPM release; operator wants it shipped today. In pipeline. |
 | 3 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
 | 4 | PAN-5090 | XS | critical | ok |  |  | Herdr unit lacks OOMPolicy=continue: one OOM-killed pane child stops the service and kills every conversation; seen twice. |
 | 5 | PAN-4995 | S | high | ok |  |  | pan review request verifies a half-adopted workspace; its main merge trips adoption's head check -> false Needs-you on handoff PRs |
@@ -879,6 +880,10 @@ _Last sequenced: 2026-11-09T20:27:19.629958Z · model: claude-opus-5-5 · open: 
 
 New in-pipeline substrate bug: the deacon close-out sweep alone exhausted the GitHub App REST pool, which pauses every tracker read and write across the pipeline. Pinned at the free top slot; the fix (skip already-reaped residue for 6h, no overlapping deacon-lite sweeps) is small and well specified.
 
+### PAN-5103 (rank 2)
+
+New in-pipeline issue filed today with an operator ship-today priority. It follows the PAN-4327 Sonnet 5.5 rollout template step for step, carries verified model facts and file lists, and is cheaper and better than Fable 5.1, so every Fable default moves. Pinned at the free rank-2 slot below the reaper quota fix; no open dependencies.
+
 ### PAN-5013 (rank 3)
 
 Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat Herdr's done state, which means the harness is alive and waiting, as no live agent. Derived issue state feeds pickup and respawn, so a wrong answer here can launch duplicate agents. Small, well-located fix, so it takes the rank-2 slot freed by the closure of PAN-4998.
@@ -1191,10 +1196,6 @@ New this pass. The deployment gate's queue message is unusually good — it name
 
 Triage: verify "running at $0.00 with no capacity fallback" against the current liveness definition. Rank held.
 
-### PAN-3106 (rank 83)
-
-New this pass. shouldHoldForUat is consulted on exactly one merge path, so every other path merges a ready issue without asking whether its project holds for UAT — verified at code level on a real MIN-901 merge. This defeats the batch-train model directly: issues merge one at a time before a generation can assemble them.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1202,10 +1203,10 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-09T20:27:19.629958Z",
+  "generatedAt": "2026-11-09T22:16:36.419346Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 867,
+  "openCount": 868,
   "nodes": [
     {
       "issue": "PAN-5001",
@@ -1217,6 +1218,19 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "dependsOn": [],
       "why": "Closed-issue reaper re-checks 426 reaped issues every minute and drains the 5k/hr GitHub App quota; in pipeline.",
       "rationale": "New in-pipeline substrate bug: the deacon close-out sweep alone exhausted the GitHub App REST pool, which pauses every tracker read and write across the pipeline. Pinned at the free top slot; the fix (skip already-reaped residue for 6h, no overlapping deacon-lite sweeps) is small and well specified.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5103",
+      "rank": 2,
+      "size": "M",
+      "importance": "high",
+      "score": 84,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Add Claude Fable 5.2 to catalog, pricing, capability and defaults, then NPM release; operator wants it shipped today. In pipeline.",
+      "rationale": "New in-pipeline issue filed today with an operator ship-today priority. It follows the PAN-4327 Sonnet 5.5 rollout template step for step, carries verified model facts and file lists, and is cheaper and better than Fable 5.1, so every Fable default moves. Pinned at the free rank-2 slot below the reaper quota fix; no open dependencies.",
       "gate": "auto",
       "planning": "auto"
     },
