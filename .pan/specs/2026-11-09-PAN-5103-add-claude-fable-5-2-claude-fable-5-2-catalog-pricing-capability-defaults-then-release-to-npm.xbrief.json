@@ -1,0 +1,565 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-09T22:22:01Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5103: Add Claude Fable 5.2 (claude-fable-5-2): catalog, pricing, capability, defaults, then release to NPM",
+    "updated": "2026-11-09T22:23:37.913Z"
+  },
+  "plan": {
+    "id": "pan-5103",
+    "title": "Add Claude Fable 5.2 (claude-fable-5-2): catalog, pricing, capability, defaults, then release to NPM",
+    "status": "proposed",
+    "uid": "739848fb-7309-4f5b-b56b-7b915e99bedc",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-09T22:22:01Z",
+    "updated": "2026-11-09T22:23:37.913Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5103",
+        "label": "PAN-5103",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5103.md",
+        "label": "PRD",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5104",
+        "label": "PAN-5104 (cost hook bundle follow-up)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "models",
+      "anthropic",
+      "fable",
+      "catalog",
+      "cost",
+      "dashboard",
+      "docs"
+    ],
+    "metadata": {
+      "sizeJustification": "Mechanical model addition across the catalog, cost, compaction and dashboard layers plus docs (about 30 files including tests). Splitting into sibling issues would force several releases for one model launch the operator wants shipped today in one PR, the same call PAN-4327 (Sonnet 5.5) made.",
+      "canonicalFilename": "2026-11-09-PAN-5103-add-claude-fable-5-2-claude-fable-5-2-catalog-pricing-capability-defaults-then-release-to-npm.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Anthropic released Claude Fable 5.2 (claude-fable-5-2) on 2026-11-09: 1M context, 128K output, $8/$40 per million tokens, cheaper and faster than Fable 5.1. Overdeck does not know the ID, so it is missing from every picker, the cost tables price it as Fable 5 via the prefix fallback, the session parser folds it into Fable 5, and the PAN-4359 launch gate has no Claude Code minimum for it.",
+      "Proposal": "Add claude-fable-5-2 everywhere claude-fable-5-1 is registered (diff template: commit 780357f9882, Haiku 5.5): the AnthropicModel union, an AUDITED_MODEL_ADDITIONS row placed first among Anthropic models (blend 24, 1M, 128K output, low..max effort, supportsSamplingParams false, minClaudeCodeVersion 2.1.321 verified by probing 2.1.293/2.1.319/2.1.321), capability class frontier, provider maps, an exact DEFAULT_PRICING row, a parser branch before the 5.1 check, a 1.2M-char compaction budget, Fable-family friendly names, and the three dashboard model lists. Keep Fable 5.1 selectable as the previous Fable. No default moves, because no code default names Fable 5.1; only two rationale comments change. Document the model and add an unreleased v0.75.0 changelog entry. The Flywheel releases v0.75.0 after merge.",
+      "NonGoals": "- Releasing to npm; the Flywheel runs pan release stable --version 0.75.0 after merge, green main CI and deploy\n- Upgrading this host's Claude Code; that is a post-merge operator/Flywheel step through the PAN-4359 upgrade path, never npm install -g from the work agent\n- Rebuilding sync-sources/hooks/record-cost-event.js (tracked in PAN-5104)\n- Fast-mode pricing (speed: \"fast\", $16/$80) and the Foundry claude-fable-5-2-fast deployment ID\n- Batch-API pricing\n- Changing any default model, preset value, workhorse slot or role fallback, or adding a hardcoded model fallback\n- Changing the operator's live ~/.overdeck/config.yaml\n- Adding a Fable 5.1 compaction budget row\n- Editing src/lib/__tests__/fixtures/pre-opencode-model-catalog.json\n- Renaming Fable 5.1's displayName"
+    },
+    "autoDecisions": [
+      {
+        "summary": "minClaudeCodeVersion for claude-fable-5-2 is '2.1.321'.",
+        "rationale": "Probed 2026-11-09: 2.1.293 reports unrecognized_model and a 200K window; 2.1.319 still reports unrecognized_model and costBasis unknown; 2.1.320 was never published; 2.1.321 reports a 1M window, costBasis list and no warning. The issue's rule selects the oldest version without unrecognized_model and with a 1M window."
+      },
+      {
+        "summary": "No default flips; only the presets.ts:168 comment and the model-presets.mdx:105 rationale change to name Fable 5.2.",
+        "rationale": "git grep shows no code default, preset value or role fallback whose value is claude-fable-5-1, frontier models are banned as defaults (TieredExecutionSection.tsx:44), and Fable 5.2 has no Overdeck eval while costing 2x Opus 5.5."
+      },
+      {
+        "summary": "Do not rebuild the stale cost hook bundle in this PR; filed PAN-5104.",
+        "rationale": "A rebuild drags a 1 MB diff of every src/lib change since 2026-10-01 into a model-launch PR (see PAN-2699). The issue's cost acceptance is satisfied by src/lib/cost.ts and its tests, which the reconciler and dashboard read paths use."
+      },
+      {
+        "summary": "The work agent does not upgrade the host's Claude Code.",
+        "rationale": "It is a host-wide side effect outside the workspace; tests do not need it and no configured model triggers the PAN-4359 refusal. The operator or Flywheel uses the dashboard Upgrade Claude Code button after merge."
+      },
+      {
+        "summary": "Fable 5.2's capability row goes directly before claude-fable-5-1 in AUDITED_MODEL_ADDITIONS, with skill scores copied verbatim from Fable 5.1.",
+        "rationale": "Additions spread first, so this makes Fable 5.2 the first Anthropic row in the Settings catalog API as the issue requires; inheriting the previous family baseline until benchmarked is the existing convention."
+      },
+      {
+        "summary": "Friendly names cover Fable 5.2, 5.1 and 5; the compaction budget adds only Fable 5.2.",
+        "rationale": "getFriendlyModelName has no Fable branch, and naming only 5.2 would leave its siblings as raw IDs (display-only change). A Fable 5.1 compaction row would change 5.1's existing behavior, which the issue does not ask for."
+      },
+      {
+        "summary": "Changelog uses an Unreleased v0.75.0 block in the RELEASING.md format, without a PR link.",
+        "rationale": "The release step sets the date, adds the other merged entries and PR links; the work agent does not know its PR number when writing the entry."
+      }
+    ],
+    "items": [
+      {
+        "id": "fable-52-catalog-entry",
+        "title": "Register claude-fable-5-2 in the model ID union, capability table and provider maps",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-09T22:22:01Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5103",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/settings.ts",
+            "src/lib/model-capability-additions.ts",
+            "src/lib/model-capability-class.ts",
+            "src/lib/model-fallback.ts",
+            "src/lib/providers.ts",
+            "src/lib/__tests__/model-capabilities.test.ts",
+            "src/lib/__tests__/model-catalog-audit.test.ts",
+            "src/lib/__tests__/settings-model-catalog.test.ts",
+            "src/lib/__tests__/claude-model-flag.test.ts",
+            "tests/lib/settings.test.ts",
+            "tests/lib/model-fallback.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/model-capabilities.test.ts src/lib/__tests__/model-catalog-audit.test.ts src/lib/__tests__/settings-model-catalog.test.ts src/lib/__tests__/claude-model-flag.test.ts tests/lib/settings.test.ts tests/lib/model-fallback.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "all six named test files pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-6",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-5103.md WI-1 exactly, in ONE commit (the ModelId union change breaks typecheck until MODEL_CAPABILITIES and MODEL_PROVIDERS have the key). Add 'claude-fable-5-2' before 'claude-fable-5-1' in AnthropicModel (settings.ts:6), getAvailableModels() list (settings.ts ~206), MODEL_CAPABILITY_CLASSES ('frontier'), MODEL_PROVIDERS ('anthropic'), and both providers.ts arrays (lines 98, 476). Add the AUDITED_MODEL_ADDITIONS row from the PRD directly before 'claude-fable-5-1' (costPer1MTokens 24, contextWindow 1000000, maxOutputTokens 128000, effort low..max, supportsSamplingParams false, minClaudeCodeVersion '2.1.321', skills copied verbatim from Fable 5.1). Replace Fable 5.1 notes with the 'Previous Fable generation; superseded by Fable 5.2 (2026-11-09). ...' text; leave its displayName. Update the six tests as listed in WI-1 step 7; never edit fixtures/pre-opencode-model-catalog.json."
+        },
+        "items": [
+          {
+            "id": "fable-52-catalog-entry.ac1",
+            "title": "Given the catalog, when getAvailableModelsApi() runs, then anthropic[0] equals { id: 'claude-fable-5-2', name: 'Claude Fable 5.2 (1M context)', contextWindow: 1000000, effortLevels: ['low','medium','high','xhigh','max'], costPer1MTokens: 24 } and its index is lower than claude-fable-5-1's (settings-model-catalog.test.ts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fable-52-catalog-entry.ac2",
+            "title": "MODEL_CAPABILITIES['claude-fable-5-2'] returns minClaudeCodeVersion '2.1.321', maxOutputTokens 128000 and supportsSamplingParams false, modelSupportsSamplingParams('claude-fable-5-2') returns false, and capabilityClassOf('claude-fable-5-2') returns 'frontier' (model-capabilities.test.ts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fable-52-catalog-entry.ac3",
+            "title": "getClaudeModelFlag('claude-fable-5-2') returns 'claude-fable-5-2' and getModelsByProvider('anthropic') contains 'claude-fable-5-2' with length 14 (claude-model-flag.test.ts, model-fallback.test.ts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fable-52-catalog-entry.ac4",
+            "title": "The Fable 5.1 capability row preserves displayName 'Claude Fable 5.1', its notes now begin 'Previous Fable generation; superseded by Fable 5.2', and git diff shows the no-loss fixture JSON file unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fable-52-cost-pricing",
+        "title": "Add the claude-fable-5-2 row to DEFAULT_PRICING",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-09T22:22:01Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5103",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cost.ts",
+            "tests/lib/cost.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/cost.test.ts"
+          ],
+          "expected_outputs": [
+            "tests/lib/cost.test.ts passes including the new Fable 5.2 cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-5103.md WI-2: insert { provider: 'anthropic', model: 'claude-fable-5-2', inputPer1k: 0.008, outputPer1k: 0.040, cacheReadPer1k: 0.0002, cacheWrite5mPer1k: 0.010, cacheWrite1hPer1k: 0.016, currency: 'USD' } with its comment directly before the claude-fable-5-1 row of DEFAULT_PRICING, and add the cost tests listed (use toBeCloseTo(x, 6))."
+        },
+        "items": [
+          {
+            "id": "fable-52-cost-pricing.ac1",
+            "title": "getPricing('anthropic', 'claude-fable-5-2') returns a row whose model is 'claude-fable-5-2' (not the claude-fable-5 prefix fallback), and getPricing('anthropic', 'claude-fable-5-1') still returns model 'claude-fable-5-1'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fable-52-cost-pricing.ac2",
+            "title": "calculateCost with that pricing returns 48 for 1,000,000 input + 1,000,000 output tokens and 0.2 for 1,000,000 cache-read tokens only",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fable-52-cost-pricing.ac3",
+            "title": "calculateCost with that pricing returns 10 for 1,000,000 cacheWriteTokens with cacheTTL '5m' and 16 with cacheTTL '1h'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fable-52-cost-normalization",
+        "title": "Keep claude-fable-5-2 distinct in normalizeModelName",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-09T22:22:01Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5103",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cost-parsers/jsonl-parser.ts",
+            "tests/lib/cost-parsers/jsonl-parser.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/cost-parsers/jsonl-parser.test.ts"
+          ],
+          "expected_outputs": [
+            "jsonl-parser.test.ts passes including the new Fable cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-5103.md WI-3: add a fable-5-2 / fable-5.2 / fable.5.2 branch BEFORE the existing fable-5-1 check in normalizeModelName (jsonl-parser.ts ~148), turning the 5.1 check into an else-if, then add the parser test."
+        },
+        "items": [
+          {
+            "id": "fable-52-cost-normalization.ac1",
+            "title": "normalizeModelName returns model 'claude-fable-5-2' for 'claude-fable-5-2', 'anthropic.claude-fable-5-2' and 'claude-fable-5.2'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fable-52-cost-normalization.ac2",
+            "title": "normalizeModelName still returns 'claude-fable-5-1' for 'claude-fable-5-1' and 'claude-fable-5' for 'claude-fable-5'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fable-52-compaction-budget",
+        "title": "Give claude-fable-5-2 the 1M-window compaction chunk budget",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-09T22:22:01Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "backend",
+          "issueLabel": "pan-5103",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/conversations/smart-compaction.ts",
+            "tests/lib/conversations/smart-compaction.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/conversations/smart-compaction.test.ts"
+          ],
+          "expected_outputs": [
+            "smart-compaction.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-5103.md WI-4: add 'claude-fable-5-2': 1_200_000 directly before the 'claude-fable-5' row of CHUNK_BUDGET_CHARS_BY_MODEL. Do NOT add a Fable 5.1 row. Add the assertion to the getChunkBudgetChars describe block."
+        },
+        "items": [
+          {
+            "id": "fable-52-compaction-budget.ac1",
+            "title": "getChunkBudgetChars('claude-fable-5-2') returns 1_200_000",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fable-52-compaction-budget.ac2",
+            "title": "getChunkBudgetChars('claude-fable-5-1') still returns the 300_000 default, so no Fable 5.1 row is added to CHUNK_BUDGET_CHARS_BY_MODEL",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fable-52-frontend-pickers",
+        "title": "List Fable 5.2 first in the three dashboard model lists",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-09T22:22:01Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5103",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/modelCatalog.ts",
+            "src/dashboard/frontend/src/components/chat/ModelPicker.tsx",
+            "src/dashboard/frontend/src/components/shared/ModelPicker/ModelPicker.tsx",
+            "src/dashboard/frontend/src/components/shared/ModelPicker/ModelPicker.test.ts",
+            "src/dashboard/frontend/src/components/Settings/__tests__/fable-52-catalog.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend test -- src/components/shared/ModelPicker/ModelPicker.test.ts src/components/Settings/__tests__/fable-52-catalog.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both frontend test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-5103.md WI-5: add the Fable 5.2 row (label 'Claude Fable 5.2 (1M context)', $24/1M, low..max effort) before Fable 5.1 in Settings/modelCatalog.ts MODELS_BY_PROVIDER, chat/ModelPicker.tsx (ClaudeModelId, MODEL_EFFORT_SUPPORT, FALLBACK_GROUPS) and shared/ModelPicker/ModelPicker.tsx FALLBACK_GROUPS; change the Fable 5.1 Settings description to 'Previous Fable: 1M context, $10 in / $50 out'. Add the shared picker test and the new Settings/__tests__/fable-52-catalog.test.ts."
+        },
+        "items": [
+          {
+            "id": "fable-52-frontend-pickers.ac1",
+            "title": "MODELS_BY_PROVIDER.anthropic.models[0] renders id 'claude-fable-5-2', name 'Claude Fable 5.2 (1M context)' and costPer1MTokens 24, and the Fable 5.1 row's description starts with 'Previous Fable'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fable-52-frontend-pickers.ac2",
+            "title": "The shared FALLBACK_GROUPS anthropic group returns 'claude-fable-5-2' at index 0 with costPer1MTokens 24, before 'claude-fable-5-1'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fable-52-frontend-pickers.ac3",
+            "title": "MODEL_EFFORT_SUPPORT['claude-fable-5-2'] in chat/ModelPicker.tsx equals ['low','medium','high','xhigh','max'] and the chat FALLBACK_GROUPS row shows costDisplay '$24/1M'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fable-family-friendly-names",
+        "title": "Name Fable 5.2, 5.1 and 5 in getFriendlyModelName",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-09T22:22:01Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "frontend",
+          "issueLabel": "pan-5103",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/dashboard-utils.ts",
+            "src/dashboard/frontend/src/lib/__tests__/dashboard-utils.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend test -- src/lib/__tests__/dashboard-utils.test.ts"
+          ],
+          "expected_outputs": [
+            "dashboard-utils.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-5103.md WI-6: insert the three Fable lines (5.2, then 5.1, then bare 'fable' -> 'Fable 5') right after the '// Anthropic models' comment in getFriendlyModelName, then add the test."
+        },
+        "items": [
+          {
+            "id": "fable-family-friendly-names.ac1",
+            "title": "getFriendlyModelName returns 'Fable 5.2' for 'claude-fable-5-2', 'Fable 5.1' for 'claude-fable-5-1' and 'Fable 5' for 'claude-fable-5'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fable-family-friendly-names.ac2",
+            "title": "getFriendlyModelName still returns 'Opus 5.5' for 'claude-opus-5-5' and 'Sonnet 5.5' for 'claude-sonnet-5-5'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fable-52-docs",
+        "title": "Document Fable 5.2, its prices and its Claude Code 2.1.321 minimum",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-09T22:22:01Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5103",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/harnesses.mdx",
+            "docs/MODEL-CONTEXT-AUDIT.md",
+            "docs/MODEL_ROUTING.md",
+            "configuration/model-presets.mdx",
+            "src/lib/model-presets/presets.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "git grep -n \"claude-fable-5-2\\|Fable 5.2\" -- configuration/harnesses.mdx docs/MODEL-CONTEXT-AUDIT.md docs/MODEL_ROUTING.md configuration/model-presets.mdx src/lib/model-presets/presets.ts",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "git grep prints at least one match in each of the five files",
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-5103.md WI-7: add the Fable 5.2 bullet and the 2.1.321 table row to configuration/harnesses.mdx and fix its line ~1246 sentence; add Fable 5.2 to docs/MODEL-CONTEXT-AUDIT.md (table row line 9 and a Sources line) and docs/MODEL_ROUTING.md line 43; change model-presets.mdx line 105 to 'Fable 5.2 has no Overdeck eval and costs 2× Opus 5.5.' and the presets.ts:168 comment to name Fable 5.2. Dollars in .mdx as &#36;, no em dashes in new text, no value changes in presets.ts."
+        },
+        "items": [
+          {
+            "id": "fable-52-docs.ac1",
+            "title": "configuration/harnesses.mdx renders a 'Claude Fable 5.2 (`claude-fable-5-2`) | 2.1.321' row in the Claude Code version requirements table and a picker bullet stating &#36;8/M input, &#36;40/M output and the 2.1.321 requirement",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fable-52-docs.ac2",
+            "title": "docs/MODEL-CONTEXT-AUDIT.md contains Fable 5.2 in the 1,000,000-token row and a Sources line with its $8/$40/$0.20 prices, and docs/MODEL_ROUTING.md line 43 contains 'Fable 5.2/5.1/5'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fable-52-docs.ac3",
+            "title": "configuration/model-presets.mdx contains 'Fable 5.2 has no Overdeck eval and costs 2× Opus 5.5', and the presets.ts:168 comment contains 'Fable 5.2' while git diff shows no non-comment line changed in presets.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fable-52-docs.ac4",
+            "title": "npm run lint:docs exits 0 and the new docs text contains no em dash character",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fable-52-changelog",
+        "title": "Add the unreleased v0.75.0 changelog entry for Fable 5.2",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-09T22:22:01Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5103",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "changelog.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "git grep -n 'label=\"v0.75.0\"' changelog.mdx",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "exactly one v0.75.0 label line",
+            "lint:docs exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-5103.md WI-8: insert the Unreleased v0.75.0 <Update> block above v0.74.0 (below the RELEASE STEP comment) with the Fable 5.2 bullet, or add only the bullet if an Unreleased v0.75.0+ block already exists. Dollars as &#36;, no em dashes."
+        },
+        "items": [
+          {
+            "id": "fable-52-changelog.ac1",
+            "title": "changelog.mdx contains exactly one <Update label=\"v0.75.0\" description=\"Unreleased\" tags={[\"Upcoming\"]}> block (or the pre-existing unreleased block) whose #### New list has a Claude Fable 5.2 bullet naming claude-fable-5-2, &#36;8/M input, &#36;40/M output and Claude Code 2.1.321",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fable-52-changelog.ac2",
+            "title": "npm run lint:docs exits 0 and the bullet contains no em dash character",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": []
+  },
+  "status": "proposed"
+}
