@@ -47,7 +47,8 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
   anthropic: {
     name: 'Anthropic',
     models: [
-      { id: 'claude-fable-5-1' as ModelId, name: 'Claude Fable 5.1 (1M context)', icon: Gem, tier: 'premium', costPer1MTokens: 30, capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Current model; see provider documentation for availability and pricing.' },
+      { id: 'claude-fable-5-2' as ModelId, name: 'Claude Fable 5.2 (1M context)', icon: Gem, tier: 'premium', costPer1MTokens: 24, capabilities: ['reasoning', 'code', 'vision', 'agentic', 'large-context'], description: 'Current Fable (November 2026): 1M context, 128K output, low to max effort; $8 in / $40 out; needs Claude Code 2.1.321+' },
+      { id: 'claude-fable-5-1' as ModelId, name: 'Claude Fable 5.1 (1M context)', icon: Gem, tier: 'premium', costPer1MTokens: 30, capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Previous Fable: 1M context, $10 in / $50 out' },
       { id: 'claude-fable-5' as ModelId, name: 'Claude Fable 5 (1M context)', icon: Gem, tier: 'premium', costPer1MTokens: 30, capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Mythos-class flagship — long-horizon autonomous work, low→max effort. ~2× Opus pricing ($10 in / $50 out).' },
       { id: 'claude-opus-5-5' as ModelId, name: 'Claude Opus 5.5 (1M context)', icon: Gem, tier: 'premium', costPer1MTokens: 12, capabilities: ['reasoning', 'code', 'vision', 'agentic', 'large-context'], description: 'Current Opus (September 2026) — long-running agentic coding, 128K output, always-on thinking, low→max effort' },
       { id: 'claude-opus-5' as ModelId, name: 'Claude Opus 5 (1M context)', icon: Gem, tier: 'premium', costPer1MTokens: 15, capabilities: ['reasoning', 'code', 'vision', 'agentic', 'large-context'], description: 'Previous Opus (July 2026) — near-Fable-5 capability at half the cost, 1M context, low→max effort' },
