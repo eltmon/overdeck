@@ -102,7 +102,7 @@ Every effort a preset sets is `high`, the recommended default. No preset sets
 
 | Setting | Value | Why |
 | --- | --- | --- |
-| `workhorses.expensive` | `claude-opus-5-5` | The strongest evaluated Claude model. Fable 5.1 has no Overdeck eval and costs 2.5× Opus 5.5. |
+| `workhorses.expensive` | `claude-opus-5-5` | The strongest evaluated Claude model. Fable 5.2 has no Overdeck eval and costs 2× Opus 5.5. |
 | `workhorses.mid` | `claude-opus-5-5` | `work`, `test`, `ship` and `worker` run on `mid`. The eval found no reason to move it: Sonnet 5.5 matched Opus only on single-turn, tool-less probes. |
 | `workhorses.cheap` | `claude-haiku-4-5` | Cheap slot for trivial tiers. Haiku 4.5 has no effort control, so the preset sets no effort where it runs. |
 | `roles.review.model` | `workhorse:expensive` | E2 review recall, 2026-09-29: Opus 5.5 found the known blocker 30/60 times vs Sonnet 5.5's 10/60 (any severity, 3 reps × 20 cases). By majority per case, 11/20 vs 3/20; sign test 8–0, p ≈ 0.008. Review is pinned to the expensive slot so it stays on Opus even if you move `mid`. |

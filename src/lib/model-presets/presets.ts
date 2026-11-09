@@ -165,7 +165,7 @@ const ANTHROPIC_TIER_BANDS: ModelPreset['tierBands'] = {
   // Haiku 4.5 has no effort control, so the cheap band sets no effort.
   trivial: { model: WORKHORSE.cheap },
   'simple-medium': { model: WORKHORSE.mid, effort: HIGH },
-  // D16: expert uses the expensive slot too; no eval covers Fable 5.1.
+  // D16: expert uses the expensive slot too; no eval covers Fable 5.2.
   complex: { model: WORKHORSE.expensive, effort: HIGH },
 };
 

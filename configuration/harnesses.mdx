@@ -64,6 +64,12 @@ A steer never falls back silently to a queued message. A harness without steer a
   [Local models (Ollama)](/configuration/local-models).
 - Works with both subscription auth (Claude Code OAuth) and API-key auth.
 - All role runs (`plan`, `work`, `review`, `test`, `ship`) default here.
+- The model picker includes Claude Fable 5.2 (`claude-fable-5-2`): 1M context,
+  128K maximum output, always-on adaptive thinking, and low through max effort.
+  API pricing is &#36;8/M input, &#36;40/M output and &#36;0.20/M cache reads, which
+  is cheaper than Fable 5.1 (&#36;10/M and &#36;50/M). It requires Claude Code
+  2.1.321 or newer; older versions treat it as an unrecognized model. Fable 5.1
+  stays selectable as the previous Fable. No default uses Fable 5.2.
 - The model picker includes Claude Opus 5.5 (`claude-opus-5-5`): 1M context,
   128K maximum output, always-on adaptive thinking, and low through max effort.
   API pricing is &#36;4/M input and &#36;20/M output; subscription availability depends
@@ -142,6 +148,7 @@ before every `claude-code` launch:
 
 | Model | Minimum Claude Code |
 | --- | --- |
+| Claude Fable 5.2 (`claude-fable-5-2`) | 2.1.321 |
 | Claude Fable 5.1 (`claude-fable-5-1`) | 2.1.255 |
 | Claude Sonnet 5.5 (`claude-sonnet-5-5`) | 2.1.284 |
 | Claude Haiku 5.5 (`claude-haiku-5-5`) | 2.1.293 |
@@ -1243,7 +1250,7 @@ Model pickers show the configured session context beside each model. This budget
 
 Astra and GPT 5.6 Sol, Terra, and Luna default to **272K**. The explicit GPT 5.6 **372K** variants opt into a larger budget. Managed Codex sessions pass this budget and default to **High** reasoning effort. A dashboard effort change on Codex app-server or Kimi ACP applies after the runtime accepts it, starting with subsequent turns. Terminal-only routes use their launch setting and native terminal controls.
 
-Fable 5.1 supports **1M** context and requires **Claude Code 2.1.255 or newer**. Model availability and extended-context access still depend on your provider and subscription. Kimi K3 offers separate **256K** and **1M** choices; K2.7 Code uses **256K** and does not offer adjustable reasoning effort; K2.8 Preview (`kimi-code/kimi-for-coding`) uses **1M** and offers low/high/max.
+Fable 5.2 supports **1M** context and requires **Claude Code 2.1.321 or newer**; Fable 5.1 requires **2.1.255 or newer**. Model availability and extended-context access still depend on your provider and subscription. Kimi K3 offers separate **256K** and **1M** choices; K2.7 Code uses **256K** and does not offer adjustable reasoning effort; K2.8 Preview (`kimi-code/kimi-for-coding`) uses **1M** and offers low/high/max.
 
 Subscription usage allowances are not API token prices. A larger window can consume more of your allowance, but API long-input multipliers should not be read as subscription-credit multipliers.
 
