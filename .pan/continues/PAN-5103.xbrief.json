@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5103",
   "created": "2026-11-09T22:25:19.629Z",
-  "updated": "2026-11-09T23:12:54.780Z",
+  "updated": "2026-11-09T23:13:10.792Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -112,6 +112,10 @@
     "fable-52-frontend-pickers.ac3": {
       "status": "completed",
       "doneAt": "2026-11-09T23:12:54.780Z"
+    },
+    "fable-family-friendly-names.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-09T23:13:10.792Z"
     }
   }
 }
