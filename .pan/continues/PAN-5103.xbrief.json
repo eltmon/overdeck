@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5103",
   "created": "2026-11-09T22:25:19.629Z",
-  "updated": "2026-11-09T23:14:31.068Z",
+  "updated": "2026-11-09T23:14:47.001Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -136,6 +136,10 @@
     "fable-52-docs.ac4": {
       "status": "completed",
       "doneAt": "2026-11-09T23:14:31.068Z"
+    },
+    "fable-52-changelog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-09T23:14:47.000Z"
     }
   }
 }
