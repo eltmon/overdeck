@@ -73,6 +73,26 @@ describe('cost module', () => {
       expect(cacheCost).toBe(0.1);
     });
 
+    it('should price claude-fable-5-2 at its 2026-11-09 launch rates, distinct from claude-fable-5-1', () => {
+      const pricing = getPricing('anthropic', 'claude-fable-5-2');
+      expect(pricing).toBeDefined();
+      expect(pricing?.model).toBe('claude-fable-5-2');
+
+      const cost = calculateCost({ inputTokens: 1_000_000, outputTokens: 1_000_000 }, pricing!);
+      expect(cost).toBeCloseTo(48, 6);
+
+      const cacheReadCost = calculateCost({ inputTokens: 0, outputTokens: 0, cacheReadTokens: 1_000_000 }, pricing!);
+      expect(cacheReadCost).toBeCloseTo(0.2, 6);
+
+      const cacheWrite5mCost = calculateCost({ inputTokens: 0, outputTokens: 0, cacheWriteTokens: 1_000_000, cacheTTL: '5m' }, pricing!);
+      expect(cacheWrite5mCost).toBeCloseTo(10, 6);
+
+      const cacheWrite1hCost = calculateCost({ inputTokens: 0, outputTokens: 0, cacheWriteTokens: 1_000_000, cacheTTL: '1h' }, pricing!);
+      expect(cacheWrite1hCost).toBeCloseTo(16, 6);
+
+      expect(getPricing('anthropic', 'claude-fable-5-1')?.model).toBe('claude-fable-5-1');
+    });
+
     it('should price claude-haiku-5-5 at its prompts-up-to-100K rates', () => {
       const pricing = getPricing('anthropic', 'claude-haiku-5-5');
       expect(pricing).toBeDefined();
