@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5103",
   "created": "2026-11-09T22:25:19.629Z",
-  "updated": "2026-11-09T22:40:17.903Z",
+  "updated": "2026-11-09T22:40:24.414Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -20,6 +20,11 @@
       "claimedBy": "agent-pan-5103",
       "claimedAt": "2026-11-09T22:37:19.599Z",
       "doneAt": "2026-11-09T22:40:17.902Z"
+    },
+    "fable-52-cost-normalization": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5103",
+      "claimedAt": "2026-11-09T22:40:24.414Z"
     }
   }
 }
