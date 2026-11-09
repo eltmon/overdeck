@@ -34,6 +34,33 @@ export const AUDITED_MODEL_ADDITIONS = {
   'kimi-code/k3.1-pro': { model: 'kimi-code/k3.1-pro', provider: 'kimi', displayName: 'Kimi K3.1 Pro (1M)', costPer1MTokens: 6, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'], contextWindow: 1048576, skills: { 'code-generation': 95, 'code-review': 93, debugging: 93, planning: 90, documentation: 90, testing: 90, security: 85, performance: 88, synthesis: 94, speed: 70, 'context-length': 100 }, notes: 'Native kimi-code harness alias (maxContextSize=1048576, supportEfforts low/high/max per `kimi provider list --json`, kimi 2.0.2, 2026-11-02). Canonical effort levels; src/lib/kimi-effort.ts translates to native low/high/max.' },
   'kimi-code/k3.1-pro-highspeed': { model: 'kimi-code/k3.1-pro-highspeed', provider: 'kimi', displayName: 'Kimi K3.1 Pro Highspeed (1M)', costPer1MTokens: 12, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'], contextWindow: 1048576, skills: { 'code-generation': 95, 'code-review': 93, debugging: 93, planning: 90, documentation: 90, testing: 90, security: 85, performance: 88, synthesis: 94, speed: 88, 'context-length': 100 }, notes: 'Native kimi-code harness alias (maxContextSize=1048576, supportEfforts low/high/max per `kimi provider list --json`, kimi 2.0.2, 2026-11-02). Canonical effort levels; src/lib/kimi-effort.ts translates to native low/high/max.' },
 
+  'claude-fable-5-2': {
+    model: 'claude-fable-5-2',
+    provider: 'anthropic',
+    displayName: 'Claude Fable 5.2',
+    // Equal input/output blend of $8/M in, $40/M out; exact cache rates live in cost.ts.
+    costPer1MTokens: 24,
+    contextWindow: 1000000,
+    maxOutputTokens: 128000,
+    skills: {
+      'code-generation': 99,
+      'code-review': 99,
+      debugging: 99,
+      planning: 99,
+      documentation: 97,
+      testing: 96,
+      security: 99,
+      performance: 95,
+      synthesis: 99,
+      speed: 42,
+      'context-length': 95,
+    },
+    effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
+    supportsSamplingParams: false,
+    minClaudeCodeVersion: '2.1.321',
+    notes: 'Released 2026-11-09. Requires Claude Code 2.1.321 or newer (2.1.319 and older treat it as an unrecognized model). Native 1M context, 128K max output. Adaptive thinking always on; API default effort high, Claude Code default medium. Forced tool_choice and non-default temperature/top_p/top_k return 400. API $8/M input, $40/M output, $0.20/M cache read, $10/M 5m and $16/M 1h cache write. Fast mode is the request field speed: "fast" at $16/$80 (not modeled here). Skill scores inherit the Fable 5.1 baseline until benchmarked.',
+  },
+
   'claude-fable-5-1': {
     model: 'claude-fable-5-1',
     provider: 'anthropic',
@@ -57,7 +84,7 @@ export const AUDITED_MODEL_ADDITIONS = {
     effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
     supportsSamplingParams: false,
     minClaudeCodeVersion: '2.1.255',
-    notes: 'Fable 5.1 requires Claude Code 2.1.255 or newer. Native 1M context; always-adaptive thinking, High default. API input $10/M, output $50/M, cache read $0.25/M.',
+    notes: 'Previous Fable generation; superseded by Fable 5.2 (2026-11-09). Requires Claude Code 2.1.255 or newer. Native 1M context; always-adaptive thinking, High default. API input $10/M, output $50/M, cache read $0.25/M.',
   },
 
   'claude-sonnet-5-5': {

@@ -192,6 +192,7 @@ describe('model capabilities', () => {
 
   // PAN-4327: Sonnet 5+, Opus 4.7+ and Fable reject non-default sampling params.
   it.each([
+    'claude-fable-5-2',
     'claude-fable-5-1',
     'claude-fable-5',
     'claude-opus-5-5',
@@ -213,6 +214,22 @@ describe('model capabilities', () => {
     'not-a-model',
   ])('modelSupportsSamplingParams returns true for %s', (model) => {
     expect(modelSupportsSamplingParams(model)).toBe(true);
+  });
+
+  it('registers Claude Fable 5.2 as a frontier 1M-context model superseding Fable 5.1', () => {
+    const fable52 = MODEL_CAPABILITIES['claude-fable-5-2'];
+    expect(fable52).toMatchObject({
+      model: 'claude-fable-5-2',
+      provider: 'anthropic',
+      displayName: 'Claude Fable 5.2',
+      contextWindow: 1000000,
+      maxOutputTokens: 128000,
+      effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
+      supportsSamplingParams: false,
+      minClaudeCodeVersion: '2.1.321',
+      costPer1MTokens: 24,
+    });
+    expect(capabilityClassOf('claude-fable-5-2')).toBe('frontier');
   });
 
   it('registers Claude Haiku 5.5 as a small 1M-context model alongside Haiku 4.5', () => {

@@ -90,6 +90,9 @@ export const DEFAULT_PRICING: ModelPricing[] = [
   // getPricing() falls back to a prefix match, which would otherwise price jev-1.13-free as paid.
   { provider: 'custom', model: 'jev-1.13', inputPer1k: 0.000042, outputPer1k: 0, currency: 'USD' },
   { provider: 'custom', model: 'jev-1.13-free', inputPer1k: 0, outputPer1k: 0, currency: 'USD' },
+  // Anthropic - Fable 5.2 (2026-11-09): $8/M input, $40/M output, $0.20/M cache
+  // read (0.025x input, as on Fable 5.1), $10/M 5m and $16/M 1h cache write.
+  { provider: 'anthropic', model: 'claude-fable-5-2', inputPer1k: 0.008, outputPer1k: 0.040, cacheReadPer1k: 0.0002, cacheWrite5mPer1k: 0.010, cacheWrite1hPer1k: 0.016, currency: 'USD' },
   // Anthropic - Fable 5 (Mythos-class flagship): $10/M input, $50/M output. Cache
   // rates mirror Anthropic's standard ratios (read 0.1×, write-5m 1.25×, write-1h 2× of input).
   { provider: 'anthropic', model: 'claude-fable-5-1', inputPer1k: 0.010, outputPer1k: 0.050, cacheReadPer1k: 0.00025, cacheWrite5mPer1k: 0.0125, cacheWrite1hPer1k: 0.020, currency: 'USD' },

@@ -10,6 +10,18 @@ This page starts at v0.60.0, the release that removed Overdeck's state layer. Ol
 
 {/* RELEASE STEP: before tagging vX.Y.Z, add a new <Update label="vX.Y.Z" description="YYYY-MM-DD"> block at the top with the user-facing changes since the previous tag, and point its compare link at the new tag. See docs/RELEASING.md "Update the public changelog". If a new model needs a newer Claude Code, say so and confirm its minClaudeCodeVersion is set. */}
 
+<Update label="v0.75.0" description="Unreleased" tags={["Upcoming"]}>
+  ## Upcoming release
+
+  Drafted from the changes merged to `main` since v0.74.0. The date is set when the release is tagged.
+
+  #### New
+
+  - **Claude Fable 5.2:** Anthropic's `claude-fable-5-2` is in the model pickers, the Settings catalog and the cost tables (&#36;8/M input, &#36;40/M output, &#36;0.20/M cache reads, 1M context). It is cheaper than Fable 5.1, which stays selectable. Fable 5.2 needs Claude Code 2.1.321 or newer: use the dashboard's **Upgrade Claude Code** button or run `npm install -g @anthropic-ai/claude-code@latest`. No default model changes.
+
+  [Compare v0.74.0...v0.75.0](https://github.com/eltmon/overdeck/compare/v0.74.0...v0.75.0)
+</Update>
+
 <Update label="v0.74.0" description="2026-11-04">
   #### New
 

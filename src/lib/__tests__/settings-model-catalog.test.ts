@@ -5,6 +5,13 @@ import { getAvailableModelsApi as compatibilityExport } from '../settings-api.js
 
 // Captured by executing the catalog functions from 7346a85bec0 before extraction.
 const previousCatalog = JSON.parse(readFileSync(new URL('./fixtures/pre-opencode-model-catalog.json', import.meta.url), 'utf8'));
+const fable52 = {
+  id: 'claude-fable-5-2',
+  name: 'Claude Fable 5.2 (1M context)',
+  contextWindow: 1000000,
+  effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
+  costPer1MTokens: 24,
+};
 const opus55 = {
   id: 'claude-opus-5-5',
   name: 'Claude Opus 5.5 (1M context)',
@@ -99,7 +106,7 @@ const expectedPreviousCatalog = {
 function withoutOpus55<T extends { anthropic: Array<{ id: string }>; openai: Array<{ id: string }>; google: Array<{ id: string }>; meta: Array<{ id: string }>; kimi: Array<{ id: string }>; mimo: Array<{ id: string }>; minimax: Array<{ id: string }>; zai: Array<{ id: string }> }>(catalog: T): T {
   return {
     ...catalog,
-    anthropic: catalog.anthropic.filter((model) => ![opus55.id, sonnet55.id, haiku55.id].includes(model.id)),
+    anthropic: catalog.anthropic.filter((model) => ![fable52.id, opus55.id, sonnet55.id, haiku55.id].includes(model.id)),
     openai: catalog.openai.filter((model) => !gpt6AdditionIds.has(model.id)),
     google: catalog.google.filter((model) => ![geminiArgon.id, gemini36FlashId, gemini31FlashLiteId].includes(model.id)),
     meta: catalog.meta.filter((model) => model.id !== museWonderId),
@@ -113,6 +120,8 @@ function withoutOpus55<T extends { anthropic: Array<{ id: string }>; openai: Arr
 describe('model catalog no-loss audit', () => {
   it('preserves every previous provider, ordered model, display name, price and effort field', () => {
     const { opencode, 'opencode-go': go, ...existing } = getAvailableModelsApi();
+    expect(existing.anthropic[0]).toEqual(fable52);
+    expect(existing.anthropic.findIndex((model) => model.id === fable52.id)).toBeLessThan(existing.anthropic.findIndex((model) => model.id === 'claude-fable-5-1'));
     expect(existing.anthropic.find((model) => model.id === opus55.id)).toEqual(opus55);
     expect(existing.anthropic.find((model) => model.id === sonnet55.id)).toEqual(sonnet55);
     expect(existing.anthropic.findIndex((model) => model.id === sonnet55.id)).toBeLessThan(existing.anthropic.findIndex((model) => model.id === 'claude-sonnet-5'));
@@ -154,6 +163,7 @@ describe('model catalog no-loss audit', () => {
     const { opencode, 'opencode-go': goModels, ...existing } = getAvailableModelsApi([zen, go]);
     expect(opencode).toEqual([zen]);
     expect(goModels).toEqual([go]);
+    expect(existing.anthropic.find((model) => model.id === fable52.id)).toEqual(fable52);
     expect(existing.anthropic.find((model) => model.id === opus55.id)).toEqual(opus55);
     expect(existing.anthropic.find((model) => model.id === sonnet55.id)).toEqual(sonnet55);
     expect(existing.anthropic.find((model) => model.id === haiku55.id)).toEqual(haiku55);

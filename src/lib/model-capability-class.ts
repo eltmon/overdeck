@@ -11,6 +11,7 @@ export type ModelCapabilityClass = 'frontier' | 'workhorse' | 'small';
  * literal id first and only hops MODEL_DEPRECATIONS for ids with no row. */
 export const MODEL_CAPABILITY_CLASSES: Readonly<Record<string, ModelCapabilityClass>> = {
   // frontier
+  'claude-fable-5-2': 'frontier',
   'claude-fable-5-1': 'frontier',
   'claude-fable-5': 'frontier',
   'claude-opus-5-5': 'frontier',
