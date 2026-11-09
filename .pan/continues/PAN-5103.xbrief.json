@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5103",
   "created": "2026-11-09T22:25:19.629Z",
-  "updated": "2026-11-09T23:11:35.813Z",
+  "updated": "2026-11-09T23:11:51.830Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -92,6 +92,10 @@
     "fable-52-cost-normalization.ac2": {
       "status": "completed",
       "doneAt": "2026-11-09T23:11:35.812Z"
+    },
+    "fable-52-compaction-budget.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-09T23:11:51.830Z"
     }
   }
 }
