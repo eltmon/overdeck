@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5103",
   "created": "2026-11-09T22:25:19.629Z",
-  "updated": "2026-11-09T22:54:38.125Z",
+  "updated": "2026-11-09T22:58:02.797Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -46,9 +46,10 @@
       "doneAt": "2026-11-09T22:54:33.643Z"
     },
     "fable-52-docs": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5103",
-      "claimedAt": "2026-11-09T22:54:38.125Z"
+      "claimedAt": "2026-11-09T22:54:38.125Z",
+      "doneAt": "2026-11-09T22:58:02.797Z"
     }
   }
 }
