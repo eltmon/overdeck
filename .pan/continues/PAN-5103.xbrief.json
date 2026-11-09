@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5103",
   "created": "2026-11-09T22:25:19.629Z",
-  "updated": "2026-11-09T23:12:07.838Z",
+  "updated": "2026-11-09T23:12:23.593Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -100,6 +100,10 @@
     "fable-52-compaction-budget.ac2": {
       "status": "completed",
       "doneAt": "2026-11-09T23:12:07.838Z"
+    },
+    "fable-52-frontend-pickers.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-09T23:12:23.593Z"
     }
   }
 }
