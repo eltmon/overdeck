@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-09T22:16:36.419346Z · model: claude-opus-5-5 · open: 868_
+_Last sequenced: 2026-11-09T22:25:45.200353Z · model: claude-opus-5-5 · open: 869_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -24,6 +24,7 @@ _Last sequenced: 2026-11-09T22:16:36.419346Z · model: claude-opus-5-5 · open: 
 | 17 | PAN-4675 | S | critical | ok |  |  | One transient gh label timeout aborts post-merge lifecycle; merge door replies Already merged, so the issue can never close. |
 | 18 | PAN-4705 | S | high | ok |  |  | quality-gate-admission test leaks a poller past afterEach rmSync; unhandled ENOENT fails unrelated PR CI shards. |
 | 19 | PAN-4746 | S | high | ok |  |  | CI test shard flakes on ENOTEMPTY: afterEach rmSync races an unawaited snapshot write; reds unrelated PRs (seen on #4745). |
+| 20 | PAN-5104 | XS | high | ok |  | PAN-5103 | Stale cost hook bundle prices Fable 5.1/5.2 at Fable 5 rates and the reconciler never corrects it; rebuild after PAN-5103. |
 | 22 | PAN-4572 | M | medium | ok |  |  | Residual re-render offenders PAN-4560 profiled but left: unmemoized deck rows, App 5 s poll, clock/selector identity bugs. |
 | 23 | PAN-4625 | S | high | ok |  |  | CI relay debounces a later failed check on the same head, so agents never see a failing test shard; lands after PAN-4534 (same file) |
 | 24 | PAN-4586 | XS | critical | ok |  |  | Herdr pane.read nests text under result.read; every Overdeck pane-text reader gets '' — detection, inventory, resume all blind |
@@ -952,6 +953,10 @@ New since the prior pass. A latent race in the PAN-4546 admission test fails who
 
 New flaky-test bug: a background membership-snapshot write races the test's teardown rmSync and turned an unrelated PR's CI shard red. Ranked next to PAN-4705, the same leaked-async-work-vs-teardown pattern, because each red shard costs a PR a rerun on the path to merge.
 
+### PAN-5104 (rank 20)
+
+New issue: live cost rows for Fable 5.1 (and 5.2 once PAN-5103 lands) are recorded at wrong cache-read and token rates and never reconciled, so it slots into the free rank 20 as an XS fix sequenced right after PAN-5103 adds the 5.2 pricing row.
+
 ### PAN-4572 (rank 22)
 
 PAN-4560 merged (closed completed 2026-10-20), so this follow-up is now unblocked; rank held at 19 near the top tier because its offenders are already measured and file-referenced.
@@ -1192,10 +1197,6 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
 
 New this pass. The deployment gate's queue message is unusually good — it names the holders, the queue age, and warns against forcing — and it promises a 'next verification boundary' trigger that does not exist. Every holder cleared and the deploy never fired; the live build stayed stale for 35 minutes until a manual reload. A correct-sounding instruction that cannot happen is worse than no message.
 
-### PAN-3118 (rank 82)
-
-Triage: verify "running at $0.00 with no capacity fallback" against the current liveness definition. Rank held.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1203,10 +1204,10 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-09T22:16:36.419346Z",
+  "generatedAt": "2026-11-09T22:25:45.200353Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 868,
+  "openCount": 869,
   "nodes": [
     {
       "issue": "PAN-5001",
@@ -11996,6 +11997,21 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "rationale": "PAN-4835 merged in #4894, which clears its only dependency; rank held because the Anywhere phone epic is low-impact relative to substrate work above it.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-5104",
+      "rank": 20,
+      "size": "XS",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-5103"
+      ],
+      "why": "Stale cost hook bundle prices Fable 5.1/5.2 at Fable 5 rates and the reconciler never corrects it; rebuild after PAN-5103.",
+      "rationale": "New issue: live cost rows for Fable 5.1 (and 5.2 once PAN-5103 lands) are recorded at wrong cache-read and token rates and never reconciled, so it slots into the free rank 20 as an XS fix sequenced right after PAN-5103 adds the 5.2 pricing row.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13174,6 +13190,13 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.4
+    },
+    {
+      "from": "PAN-5103",
+      "to": "PAN-5104",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.8
     }
   ]
 }
