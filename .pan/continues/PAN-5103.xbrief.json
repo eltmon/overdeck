@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5103",
   "created": "2026-11-09T22:25:19.629Z",
-  "updated": "2026-11-09T23:10:08.919Z",
+  "updated": "2026-11-09T23:10:26.893Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -72,6 +72,10 @@
     "fable-52-catalog-entry.ac4": {
       "status": "completed",
       "doneAt": "2026-11-09T23:10:08.919Z"
+    },
+    "fable-52-cost-pricing.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-09T23:10:26.893Z"
     }
   }
 }
