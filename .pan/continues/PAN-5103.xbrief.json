@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5103",
   "created": "2026-11-09T22:25:19.629Z",
-  "updated": "2026-11-09T22:44:52.743Z",
+  "updated": "2026-11-09T22:47:54.586Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -28,9 +28,10 @@
       "doneAt": "2026-11-09T22:44:47.518Z"
     },
     "fable-52-compaction-budget": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5103",
-      "claimedAt": "2026-11-09T22:44:52.743Z"
+      "claimedAt": "2026-11-09T22:44:52.743Z",
+      "doneAt": "2026-11-09T22:47:54.586Z"
     }
   }
 }
