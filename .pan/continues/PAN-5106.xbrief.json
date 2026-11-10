@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5106",
   "created": "2026-11-10T14:09:58.025Z",
-  "updated": "2026-11-10T15:06:10.990Z",
+  "updated": "2026-11-10T15:06:29.243Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -68,6 +68,10 @@
     "ember-long-context-tier.ac1": {
       "status": "completed",
       "doneAt": "2026-11-10T15:06:10.989Z"
+    },
+    "ember-long-context-tier.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T15:06:29.242Z"
     }
   }
 }
