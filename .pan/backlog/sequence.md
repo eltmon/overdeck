@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-10T16:00:02.640517Z · model: claude-opus-5-5 · open: 872_
+_Last sequenced: 2026-11-10T16:13:19.874480Z · model: claude-opus-5-5 · open: 872_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -1207,7 +1207,7 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-10T16:00:02.640517Z",
+  "generatedAt": "2026-11-10T16:13:19.874480Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 872,
