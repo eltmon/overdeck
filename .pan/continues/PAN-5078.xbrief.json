@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5078",
   "created": "2026-11-10T14:48:32.729Z",
-  "updated": "2026-11-10T17:57:54.745Z",
+  "updated": "2026-11-10T17:58:15.455Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -320,6 +320,10 @@
     "cli-harness-lists.ac1": {
       "status": "completed",
       "doneAt": "2026-11-10T17:57:54.745Z"
+    },
+    "cli-harness-lists.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:58:15.455Z"
     }
   }
 }
