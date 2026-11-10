@@ -808,4 +808,9 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
 - **Codex 0.159.0 HTTP MCP config** — `[mcp_servers.<n>]` with `url = "…"` plus `bearer_token_env_var = "…"` or an
   `http_headers = { … }` inline table parses as `streamable_http`. `initCodexHome` provisions `type: stdio` entries and,
   since PAN-5061, `type: http` entries with a `url` (rendered as `url` + `http_headers`); any other entry is skipped.
+- **`pan_run_with_timeout` and `pan_llm_rate_check` have no callers** — both live in
+  `sync-sources/hooks/pan-hook-lib.sh`; their only user, `work-agent-stop-hook`, was deleted in
+  `7b953449633` (PAN-3917). Only `tests/scripts/pan-hook-lib-guards*.test.ts` exercise them. Before
+  PAN-5117, the pure-bash fallback watchdog could orphan a `/bin/sleep` that held the caller's stdout
+  open for up to 5 s when the parent signalled it between a fork and `sleep_pid=$!`.
 <!-- last-verified: 2026-11-04 -->
