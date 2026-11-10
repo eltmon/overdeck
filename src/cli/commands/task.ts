@@ -6,6 +6,9 @@
  * branch, committed by this verb. There is no record, no task door, and no
  * sequence to compare against: `pan task done` is corroborated by git — a
  * commit carrying the `Item: <id>` trailer on a branch that has been pushed.
+ * `pan task done <issue> <item...>` takes one or more ids and records all of
+ * them in one continue commit, or none of them if any id's trailer or push
+ * check fails (PAN-5118).
  */
 
 import { join } from 'node:path';
@@ -19,7 +22,7 @@ import { getDispatchableItems } from '../../lib/xbrief/dag.js';
 import { readWorkspacePlanSync } from '../../lib/xbrief/io.js';
 import {
   ItemNotVerifiable,
-  markItemDone,
+  markItemsDone,
   readContinueState,
   setItemStatus,
   type ContinueItemState,
@@ -166,30 +169,50 @@ export function issueRepoRoots(issueId: string, workspacePath: string, planHome:
   return [...new Set([...roots, planHome])];
 }
 
-export async function runTaskDone(issue: string, itemId: string, options: TaskOptions): Promise<void> {
+/**
+ * The refusal for ids git cannot corroborate. One id keeps the pre-PAN-5118
+ * wording exactly. Several ids put every missing-trailer id on one line, so a
+ * large refusal stays inside the self-job runner's 16 KiB stderr tail.
+ */
+function notDoneMessage(itemIds: readonly string[], repoRoots: readonly string[], error: ItemNotVerifiable): string {
+  if (itemIds.length === 1) {
+    const [itemId] = itemIds;
+    const reason = error.failures[0]?.reason ?? error.message;
+    return `${itemId} is not done yet: ${reason}.\n`
+      + `Nothing was written. Commit the work with a body line "Item: ${itemId}", push the branch, then run this again.`;
+  }
+  const missing = error.failures.filter((failure) => failure.kind === 'missing-trailer').flatMap((failure) => failure.itemIds);
+  const unpushed = error.failures.filter((failure) => failure.kind === 'unpushed');
+  const failing = new Set(error.failures.flatMap((failure) => failure.itemIds));
+  return [
+    `${failing.size} of ${itemIds.length} items are not done yet. Nothing was written.`,
+    ...(missing.length > 0 ? [`  - No commit in ${repoRoots.join(', ')} carries the line "Item: <id>" for: ${missing.join(', ')}`] : []),
+    ...unpushed.map((failure) => `  - ${failure.reason}`),
+    ...(error.failures.length === 0 ? [`  - ${error.message}`] : []),
+    'Commit the missing work with one body line "Item: <id>" per id, push the branch, then run this again.',
+  ].join('\n');
+}
+
+export async function runTaskDone(issue: string, itemIds: readonly string[], options: TaskOptions): Promise<void> {
   const { issueId, planHome, workspacePath } = resolveTaskContext(issue);
+  const ids = [...new Set(itemIds)];
+  const repoRoots = issueRepoRoots(issueId, workspacePath, planHome);
   const lockPath = await taskStateLockPath(planHome);
-  let state: ContinueItemState;
+  let states: Record<string, ContinueItemState>;
   try {
-    state = await withTaskStateLock(lockPath, async () => {
-      const result = await markItemDone(planHome, issueId, itemId, {
-        requireTrailer: `Item: ${itemId}`,
-        requirePushed: true,
-        repoRoots: issueRepoRoots(issueId, workspacePath, planHome),
-      });
+    states = await withTaskStateLock(lockPath, async () => {
+      const result = await markItemsDone(planHome, issueId, ids, { requirePushed: true, repoRoots });
       await commitContinue(planHome, issueId);
       return result;
     });
   } catch (error) {
-    if (error instanceof ItemNotVerifiable) {
-      throw new Error(
-        `${itemId} is not done yet: ${error.message}.\n`
-        + `Nothing was written. Commit the work with a body line "Item: ${itemId}", push the branch, then run this again.`,
-      );
-    }
+    if (error instanceof ItemNotVerifiable) throw new Error(notDoneMessage(ids, repoRoots, error));
     throw error;
   }
-  print({ itemId, ...state }, options.json);
+  const results = ids.map((itemId) => ({ itemId, ...states[itemId] }));
+  if (results.length === 1) print(results[0], options.json);
+  else if (options.json) console.log(JSON.stringify(results, null, 2));
+  else for (const result of results) console.log(`${result.itemId}\t${result.status}`);
 }
 
 export async function runTaskStatus(
@@ -253,9 +276,9 @@ export function registerTaskCommands(program: Command): void {
   task.command('claim <issue> <item>').option('--json', 'Print JSON')
     .option('--steal', 'Claim even when a running agent holds this item or an overlapping one (foreman/operator override)')
     .action(async (issue, item, options) => taskAction(() => runTaskClaim(issue, item, options)));
-  task.command('done <issue> <item>').option('--json', 'Print JSON')
-    .description('Record an item as done. Requires a commit carrying "Item: <item>" on a pushed branch.')
-    .action(async (issue, item, options) => taskAction(() => runTaskDone(issue, item, options)));
+  task.command('done <issue> <items...>').option('--json', 'Print JSON')
+    .description('Record one or more items as done in one continue commit. Each id needs a commit carrying "Item: <id>" on a pushed branch; if any id lacks one, nothing is written.')
+    .action(async (issue, items, options) => taskAction(() => runTaskDone(issue, items, options)));
   task.command('block <issue> <item>').option('--json', 'Print JSON')
     .option('--on <refs...>', 'Issues or PRs this item waits on (PAN-123, #45, owner/repo#45, PR URL); Overdeck wakes the agent when all have merged')
     .action(async (issue, item, options) => taskAction(() => runTaskBlock(issue, item, options)));
