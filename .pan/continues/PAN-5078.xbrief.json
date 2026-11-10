@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5078",
   "created": "2026-11-10T14:48:32.729Z",
-  "updated": "2026-11-10T15:54:03.829Z",
+  "updated": "2026-11-10T15:54:09.847Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -74,6 +74,11 @@
       "claimedBy": "agent-pan-5078",
       "claimedAt": "2026-11-10T15:51:53.547Z",
       "doneAt": "2026-11-10T15:54:03.828Z"
+    },
+    "cli-harness-lists": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5078",
+      "claimedAt": "2026-11-10T15:54:09.847Z"
     }
   }
 }
