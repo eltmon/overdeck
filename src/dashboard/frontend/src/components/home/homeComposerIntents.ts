@@ -18,6 +18,7 @@ export const HOME_AGENT_LABELS: Record<Harness, string> = {
   'kimi-code': 'Kimi Code',
   muse: 'Muse Code',
   'prime-agent': 'Prime Agent',
+  grok: 'Grok Build',
 };
 
 export function buildHomeIntents(opts: {
