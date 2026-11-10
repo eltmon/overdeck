@@ -189,7 +189,7 @@ The integration is verified with Muse Code 1.0.2; Muse Ember was checked with
 Muse Code 1.4.15.
 
 Enable **Meta (Muse)** in Settings → Providers, then choose a model in the
-model picker. All four use a 1,048,576-token context window:
+model picker. All five use a 1,048,576-token context window:
 
 | Model ID | Input / million tokens | Cached input / million tokens | Output / million tokens |
 | --- | --- | --- | --- |
@@ -197,23 +197,28 @@ model picker. All four use a 1,048,576-token context window:
 | `muse-spark-1.3` | &#36;1.25 | &#36;0.15 | &#36;4.25 |
 | `muse-spark-1.3-contributor` | &#36;0.10 | &#36;0.002 | &#36;0.20 |
 | `muse-ember-1.0` | &#36;0.10 | &#36;0.004 | &#36;0.50 |
+| `muse-wonder-full-1.0` | Subscription | Subscription | Subscription |
 
 Muse Ember bills a request with more than 200K input tokens (cached tokens
 included) at &#36;0.30 / &#36;0.012 / &#36;1.50 per million tokens, and
 Overdeck's cost tracking applies that rate per request.
 
-Muse Wonder, Muse Spark 1.3 and Muse Ember accept `max` effort and
-Contributor stops at `xhigh`; Overdeck still sends at most `xhigh` (see the
-effort table).
+Muse Wonder, Muse Spark 1.3, Muse Ember and Muse Wonder Full accept `max`
+effort and Contributor stops at `xhigh`; Overdeck still sends at most `xhigh`
+(see the effort table).
 
 Muse Wonder (`muse-wonder-1.0`) is Meta's frontier model, released on
-2026-10-12. Muse Wonder Full is not in the picker yet: Meta offers it only on
-the Muse Code Power Usage and Maximum Usage plans and has not published its
-model ID.
+2026-10-12.
 
 Muse Ember (`muse-ember-1.0`), released on 2026-11-09, is Meta's low-cost
 Standard model. It has no Contributor tier, and Meta's docs support only the
 full ID, not a bare `muse-ember` alias.
+
+Muse Wonder Full (`muse-wonder-full-1.0`) is available only on the Muse Code
+Power Usage (&#36;50/mo) and Maximum Usage (&#36;200/mo) plans. It is not served by
+the Meta Model API, so it has no per-token price; the picker and cost tables
+mark it as a subscription model. Real acceptance against those plans has not
+been verified in this repository.
 
 The Contributor tier requires contributing prompts and completions for model
 training. Choose it explicitly when that data use fits your work. Standard

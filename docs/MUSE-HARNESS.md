@@ -1,22 +1,28 @@
 # Muse Code integration
 
 The canonical harness ID is `muse`; the provider ID is `meta`. Only
-`muse-wonder-1.0`, `muse-spark-1.3`, `muse-spark-1.3-contributor` and
-`muse-ember-1.0` route to this harness. No Muse model is selected as an
-implicit fallback. Contributor is an explicit choice because its discounted
-price requires contributing training data.
+`muse-wonder-1.0`, `muse-spark-1.3`, `muse-spark-1.3-contributor`,
+`muse-ember-1.0` and `muse-wonder-full-1.0` route to this harness. No Muse
+model is selected as an implicit fallback. Contributor is an explicit choice
+because its discounted price requires contributing training data.
 
 `muse-wonder-1.0` (Muse Wonder, released 2026-10-12) is Meta's frontier model.
 Its ID and prices were read from the Muse Code 1.4.7 catalog and the Meta Model
-API model list. Meta publishes no Contributor tier for Wonder. Muse Wonder Full
-is not supported yet: it is available only on the Muse Code Power Usage and
-Maximum Usage plans, and Meta has not published its model ID.
+API model list. Meta publishes no Contributor tier for Wonder.
 
 `muse-ember-1.0` (Muse Ember, released 2026-11-09) is Meta's low-cost Standard
 model, with no Contributor tier. Its ID was checked against the Muse Code
 1.4.15 catalog, which Muse Code fetches from Meta at startup, so no minimum
 Muse Code version applies. Prices come from Meta's pricing page because the
 Muse Code catalog carries no cost for Ember.
+
+`muse-wonder-full-1.0` (Muse Wonder Full) is available only on the Muse Code
+Power Usage ($50/mo) and Maximum Usage ($200/mo) plans; it is not served by
+the Meta Model API, so it has no per-token price and no `cost.ts` pricing row
+(`getPricing()` returns `null` for it, and cost tracking records $0). It is
+absent from the Muse Code 1.4.15 catalog on hosts without a Power/Maximum
+plan, and this project has not verified real acceptance against that plan, so
+no minimum Muse Code version is recorded.
 
 ## Launch and context
 
