@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5111",
   "created": "2026-11-10T15:51:44.994Z",
-  "updated": "2026-11-10T17:00:01.962Z",
+  "updated": "2026-11-10T17:00:23.772Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -156,6 +156,10 @@
     "service-history-wiring.ac4": {
       "status": "completed",
       "doneAt": "2026-11-10T17:00:01.961Z"
+    },
+    "history-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:00:23.771Z"
     }
   }
 }
