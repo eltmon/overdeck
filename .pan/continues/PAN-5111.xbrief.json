@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5111",
   "created": "2026-11-10T15:51:44.994Z",
-  "updated": "2026-11-10T16:54:20.625Z",
+  "updated": "2026-11-10T16:54:40.685Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -100,6 +100,10 @@
     "history-store.ac5": {
       "status": "completed",
       "doneAt": "2026-11-10T16:54:20.624Z"
+    },
+    "answer-note-registry.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T16:54:40.685Z"
     }
   }
 }
