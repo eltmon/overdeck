@@ -368,7 +368,14 @@ export interface MarkItemDoneOptions {
   repoRoots?: readonly string[];
 }
 
-export class ItemNotVerifiable extends Error {}
+export class ItemNotVerifiable extends Error {
+  constructor(
+    message: string,
+    public readonly failures: readonly ItemVerificationFailure[] = [],
+  ) {
+    super(message);
+  }
+}
 
 /** Escape a literal string for use inside a POSIX extended regular expression. */
 function escapeRegExp(value: string): string {
@@ -453,4 +460,84 @@ export async function markItemDone(
     },
   }));
   return next.items![itemId];
+}
+
+export interface MarkItemsDoneOptions {
+  /** When true, each corroborating repository's branch must not be ahead of its upstream. */
+  requirePushed: boolean;
+  /** Repository roots to search for each id's `Item: <id>` commit; the plan home alone by default. */
+  repoRoots?: readonly string[];
+}
+
+/** One reason a set of ids cannot be completed: a missing trailer (one id) or an unpushed repository (every id it corroborates). */
+export interface ItemVerificationFailure {
+  readonly kind: 'missing-trailer' | 'unpushed';
+  readonly itemIds: readonly string[];
+  readonly reason: string;
+}
+
+/**
+ * Record every id as done, but only once git corroborates each one: a commit in
+ * one of the issue's repositories carries the exact line `Item: <id>`, and (when
+ * required) that repository's branch is not ahead of its upstream. Every id is
+ * checked before anything is written; any failure throws one ItemNotVerifiable
+ * listing all of them, and nothing is written. On success all ids land in one
+ * continue-file write with a shared doneAt.
+ */
+export async function markItemsDone(
+  planHome: string,
+  issueId: string,
+  itemIds: readonly string[],
+  options: MarkItemsDoneOptions,
+): Promise<Record<string, ContinueItemState>> {
+  const ids = [...new Set(itemIds)];
+  if (ids.length === 0) throw new Error('markItemsDone needs at least one item id');
+  const repoRoots = options.repoRoots?.length ? [...new Set(options.repoRoots)] : [planHome];
+  const failures: ItemVerificationFailure[] = [];
+  const idsByRoot = new Map<string, string[]>();
+  for (const id of ids) {
+    let corroborating: string | null = null;
+    for (const root of repoRoots) {
+      if (await hasTrailerCommit(root, `Item: ${id}`)) {
+        corroborating = root;
+        break;
+      }
+    }
+    if (!corroborating) {
+      failures.push({
+        kind: 'missing-trailer',
+        itemIds: [id],
+        reason: `no commit in ${repoRoots.join(', ')} carries the trailer "Item: ${id}" — commit the work for ${id} first`,
+      });
+      continue;
+    }
+    idsByRoot.set(corroborating, [...(idsByRoot.get(corroborating) ?? []), id]);
+  }
+  if (options.requirePushed) {
+    for (const [root, rootIds] of idsByRoot) {
+      try {
+        const ahead = await unpushedCommitCount(root); // runs once per root (NFR-1)
+        if (ahead > 0) {
+          failures.push({
+            kind: 'unpushed',
+            itemIds: rootIds,
+            reason: `the branch in ${root} is ${ahead} commit(s) ahead of its upstream — push before completing ${rootIds.join(', ')}`,
+          });
+        }
+      } catch (error) {
+        if (!(error instanceof ItemNotVerifiable)) throw error;
+        failures.push({ kind: 'unpushed', itemIds: rootIds, reason: error.message }); // the no-upstream case
+      }
+    }
+  }
+  if (failures.length > 0) {
+    throw new ItemNotVerifiable(failures.map((failure) => failure.reason).join('\n'), failures);
+  }
+  const doneAt = new Date().toISOString();
+  const next = updateContinueState(planHome, issueId, (state) => {
+    const items = { ...(state.items ?? {}) };
+    for (const id of ids) items[id] = { ...(items[id] ?? {}), status: 'completed', doneAt };
+    return { ...state, items };
+  });
+  return Object.fromEntries(ids.map((id) => [id, next.items![id]]));
 }
