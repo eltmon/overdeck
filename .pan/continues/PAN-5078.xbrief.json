@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5078",
   "created": "2026-11-10T14:48:32.729Z",
-  "updated": "2026-11-10T18:05:47.662Z",
+  "updated": "2026-11-10T18:06:10.336Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -416,6 +416,10 @@
     "turn-usage-transcript.ac4": {
       "status": "completed",
       "doneAt": "2026-11-10T18:05:47.661Z"
+    },
+    "grok-cost-collector.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T18:06:10.336Z"
     }
   }
 }
