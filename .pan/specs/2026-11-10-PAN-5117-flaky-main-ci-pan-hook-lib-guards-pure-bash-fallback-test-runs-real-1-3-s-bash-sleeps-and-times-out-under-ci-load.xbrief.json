@@ -4,17 +4,17 @@
     "created": "2026-11-10T17:38:01Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5117: Flaky main CI: pan-hook-lib-guards 'pure-bash fallback' test runs real 1-3 s bash sleeps and times out under CI load",
-    "updated": "2026-11-10T17:48:58.947Z"
+    "updated": "2026-11-10T17:50:20.205Z"
   },
   "plan": {
     "id": "pan-5117",
     "title": "Flaky main CI: pan-hook-lib-guards 'pure-bash fallback' test runs real 1-3 s bash sleeps and times out under CI load",
-    "status": "proposed",
+    "status": "running",
     "uid": "daa3b3e9-ab14-42fb-b861-8df3bb7cdf24",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-10T17:38:01Z",
-    "updated": "2026-11-10T17:48:58.947Z",
+    "updated": "2026-11-10T17:50:20.205Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5117",
@@ -323,5 +323,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
