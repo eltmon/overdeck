@@ -10,6 +10,22 @@ This page starts at v0.60.0, the release that removed Overdeck's state layer. Ol
 
 {/* RELEASE STEP: before tagging vX.Y.Z, add a new <Update label="vX.Y.Z" description="YYYY-MM-DD"> block at the top with the user-facing changes since the previous tag, and point its compare link at the new tag. See docs/RELEASING.md "Update the public changelog". If a new model needs a newer Claude Code, say so and confirm its minClaudeCodeVersion is set. */}
 
+<Update label="v0.77.0" description="Unreleased" tags={["Upcoming"]}>
+  ## Upcoming release
+
+  Drafted from the changes merged to `main` since v0.76.0. The date is set when the release is tagged.
+
+  #### New
+
+  - **Recent notifications:** Settings → Anywhere → Phone notifications lists the last 50 notifications Overdeck sent, where each went, and whether the question is still waiting, was answered from Overdeck, or was answered or withdrawn elsewhere. ([PAN-5111](https://github.com/eltmon/overdeck/issues/5111))
+
+  #### Improved
+
+  - **Can't reach rows in Needs you:** when this machine cannot read a linked machine's Needs you, the desktop and the phone show `Can't reach <machine>; it may have items waiting.` until a fetch succeeds. ([PAN-5111](https://github.com/eltmon/overdeck/issues/5111))
+
+  [Compare v0.76.0...v0.77.0](https://github.com/eltmon/overdeck/compare/v0.76.0...v0.77.0)
+</Update>
+
 <Update label="v0.76.0" description="2026-11-10">
   #### New
 
