@@ -157,6 +157,10 @@ describe('every registered runtime declares its capabilities (PAN-4562 AC1)', ()
       for (const key of contracts.HARNESS_CAPABILITY_KEYS) expect(capabilities[key], `${runtime.name}.${key}`).not.toBeUndefined();
     }
   });
+
+  it('registers the Grok Build ACP runtime (PAN-5078)', () => {
+    expect(getGlobalRegistry().get('grok')?.name).toBe('grok');
+  });
 });
 
 describe('harness update data (PAN-4654 D-6)', () => {

@@ -5,7 +5,7 @@ import { materializeManagedLaunchContext, type ManagedLaunchContextOptions } fro
 export function materializeAcpContextFile(
   agentDir: string,
   workspace: string,
-  harness: 'acp' | 'opencode' = 'acp',
+  harness: 'acp' | 'opencode' | 'grok' = 'acp',
   opts: ManagedLaunchContextOptions = {},
 ): string {
   const contextPath = join(agentDir, 'acp-context.md');
