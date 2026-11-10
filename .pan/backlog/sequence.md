@@ -1,12 +1,11 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-10T19:31:06.458612Z · model: claude-opus-5-5 · open: 870_
+_Last sequenced: 2026-11-10T19:32:40.290774Z · model: claude-opus-5-5 · open: 869_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-5001 | S | critical | ok |  |  | Closed-issue reaper re-checks 426 reaped issues every minute and drains the 5k/hr GitHub App quota; in pipeline. |
-| 2 | PAN-5117 | S | critical | ok |  |  | In pipeline: real-sleep bash fallback test times out under CI load and turns main red; move it to a .slow test file. |
 | 3 | PAN-5118 | S | high | ok |  |  | In pipeline: pan task done takes one item and commits each call; 48-85 AC sub-items cost 20-40 min of push loops. |
 | 4 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
 | 5 | PAN-5090 | XS | critical | ok |  |  | Herdr unit lacks OOMPolicy=continue: one OOM-killed pane child stops the service and kills every conversation; seen twice. |
@@ -882,10 +881,6 @@ _Last sequenced: 2026-11-10T19:31:06.458612Z · model: claude-opus-5-5 · open: 
 
 New in-pipeline substrate bug: the deacon close-out sweep alone exhausted the GitHub App REST pool, which pauses every tracker read and write across the pipeline. Pinned at the free top slot; the fix (skip already-reaped residue for 6h, no overlapping deacon-lite sweeps) is small and well specified.
 
-### PAN-5117 (rank 2)
-
-New since the prior run and already in the pipeline. A flaky test on main turns main red, and a red main silently empties the merge gate for every other issue, so this substrate fix ranks in the top tier. It takes the free rank-2 slot without displacing other pinned work.
-
 ### PAN-5118 (rank 3)
 
 New in-pipeline substrate issue, pinned at the free slot after the other in-pipeline work: runTaskDone commits the continue file once per item, so agents closing dozens of acceptance-criterion sub-items pay one pre-push hook run per sub-item before opening a PR. The fix (variadic items, one commit) is small, well specified and speeds every work agent.
@@ -1198,6 +1193,10 @@ New since the prior run (filed by the PAN-4532 plan critic). recoverStalledRevie
 
 Triage: verify whether blocking-choice-menu detection is wired to the current liveness/health surface. Rank held.
 
+### PAN-3205 (rank 81)
+
+New this pass. The deployment gate's queue message is unusually good — it names the holders, the queue age, and warns against forcing — and it promises a 'next verification boundary' trigger that does not exist. Every holder cleared and the deploy never fired; the live build stayed stale for 35 minutes until a manual reload. A correct-sounding instruction that cannot happen is worse than no message.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1205,10 +1204,10 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-10T19:31:06.458612Z",
+  "generatedAt": "2026-11-10T19:32:40.290774Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 870,
+  "openCount": 869,
   "nodes": [
     {
       "issue": "PAN-5001",
@@ -1220,19 +1219,6 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "dependsOn": [],
       "why": "Closed-issue reaper re-checks 426 reaped issues every minute and drains the 5k/hr GitHub App quota; in pipeline.",
       "rationale": "New in-pipeline substrate bug: the deacon close-out sweep alone exhausted the GitHub App REST pool, which pauses every tracker read and write across the pipeline. Pinned at the free top slot; the fix (skip already-reaped residue for 6h, no overlapping deacon-lite sweeps) is small and well specified.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5117",
-      "rank": 2,
-      "size": "S",
-      "importance": "critical",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline: real-sleep bash fallback test times out under CI load and turns main red; move it to a .slow test file.",
-      "rationale": "New since the prior run and already in the pipeline. A flaky test on main turns main red, and a red main silently empties the merge gate for every other issue, so this substrate fix ranks in the top tier. It takes the free rank-2 slot without displacing other pinned work.",
       "gate": "auto",
       "planning": "auto"
     },
