@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type * as EffectAcpSchema from 'effect-acp/schema';
 import {
   buildGrokAcpSpawnInput,
+  extractGrokTurnUsage,
   GROK_EFFORT_CONFIG_ID,
   resolveGrokAuthMethodId,
   translateGrokAcpModelId,
@@ -69,5 +70,47 @@ describe('Grok Build ACP provider support (PAN-5078)', () => {
       expect(resolveAcpProviderSupport(provider).effortConfigId).toBeUndefined();
       expect(resolveAcpProviderSupport(provider).harness).toBeUndefined();
     }
+  });
+});
+
+// Synthetic copy of the grok-4.6 probe result (PRD finding 4); no account fields.
+const grokPromptResponse = {
+  stopReason: 'end_turn',
+  _meta: {
+    modelId: 'grok-4.6',
+    usage: {
+      inputTokens: 31793,
+      outputTokens: 32,
+      cachedReadTokens: 640,
+      cacheCreationTokens: 0,
+      reasoningTokens: 31,
+      costUsdTicks: 628180000,
+      modelUsage: { 'grok-4.6-build': { inputTokens: 31793, outputTokens: 32 } },
+    },
+  },
+} as unknown as EffectAcpSchema.PromptResponse;
+
+describe('Grok Build turn usage (PAN-5078)', () => {
+  it('maps the prompt result usage to uncached input, cache reads and the reported cost', () => {
+    const usage = extractGrokTurnUsage(grokPromptResponse);
+    expect(usage).toMatchObject({
+      model: 'grok/grok-4.6',
+      inputTokens: 31153,
+      outputTokens: 32,
+      cacheReadTokens: 640,
+      cacheWriteTokens: 0,
+      reasoningTokens: 31,
+    });
+    expect(usage?.costUsd).toBeCloseTo(0.062818, 10);
+  });
+
+  it('returns undefined when the result carries no usage', () => {
+    expect(extractGrokTurnUsage({ stopReason: 'end_turn', _meta: { modelId: 'grok-4.6' } } as unknown as EffectAcpSchema.PromptResponse)).toBeUndefined();
+    expect(extractGrokTurnUsage({ stopReason: 'end_turn' } as EffectAcpSchema.PromptResponse)).toBeUndefined();
+  });
+
+  it('is wired only for the grok provider', () => {
+    expect(resolveAcpProviderSupport('grok').extractTurnUsage).toBe(extractGrokTurnUsage);
+    expect(resolveAcpProviderSupport('kimi').extractTurnUsage).toBeUndefined();
   });
 });

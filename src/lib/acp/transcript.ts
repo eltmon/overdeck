@@ -20,6 +20,20 @@ export interface AcpTranscriptToolCallState {
   readonly data: Record<string, unknown>;
 }
 
+/** Token counts and cost an ACP agent reported for one prompt turn (PAN-5078 D9). */
+export interface AcpTurnUsage {
+  /** Overdeck model id, e.g. "grok/grok-4.6". */
+  readonly model: string;
+  /** Uncached input tokens: the reported input minus cache reads. */
+  readonly inputTokens: number;
+  readonly outputTokens: number;
+  readonly cacheReadTokens: number;
+  readonly cacheWriteTokens: number;
+  readonly reasoningTokens?: number;
+  /** Vendor-reported turn cost in USD, when the agent reports one. */
+  readonly costUsd?: number;
+}
+
 export interface AcpTranscriptEntry {
   readonly timestamp: string;
   readonly role: AcpTranscriptRole;
@@ -35,6 +49,7 @@ export interface AcpTranscriptEntry {
    */
   readonly event?: "prompt_queued" | "prompt_failed" | "prompt_stalled" | "turn_completed";
   readonly stopReason?: AcpTranscriptStopReason;
+  readonly usage?: AcpTurnUsage;
 }
 
 export type AcpTranscriptEntryInput = Omit<AcpTranscriptEntry, "timestamp"> & {
@@ -113,6 +128,7 @@ export class AcpTranscriptWriter {
       ...(entry.promptId ? { promptId: entry.promptId } : {}),
       ...(entry.event ? { event: entry.event } : {}),
       ...(entry.stopReason ? { stopReason: entry.stopReason } : {}),
+      ...(entry.usage ? { usage: entry.usage } : {}),
     };
     this.pending = this.pending.then(async () => {
       await mkdir(dirname(this.path), { recursive: true });

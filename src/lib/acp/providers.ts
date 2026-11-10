@@ -1,3 +1,5 @@
+import type * as EffectAcpSchema from "effect-acp/schema";
+
 import {
   buildOpenCodeAcpSpawnInput,
   makeOpenCodeAcpRuntime,
@@ -7,6 +9,7 @@ import {
 
 import {
   buildGrokAcpSpawnInput,
+  extractGrokTurnUsage,
   GROK_EFFORT_CONFIG_ID,
   makeGrokAcpRuntime,
   resolveGrokAuthMethodId,
@@ -19,6 +22,7 @@ import {
   resolveKimiAuthMethodId,
   translateKimiAcpModelId,
 } from "./kimi.js";
+import type { AcpTurnUsage } from "./transcript.js";
 
 const openCodeSupport = {
   buildSpawnInput: buildOpenCodeAcpSpawnInput,
@@ -43,6 +47,7 @@ const ACP_PROVIDER_SUPPORT = {
     translateModelId: translateGrokAcpModelId,
     effortConfigId: GROK_EFFORT_CONFIG_ID,
     harness: "grok",
+    extractTurnUsage: extractGrokTurnUsage,
   },
 } as const;
 
@@ -52,6 +57,8 @@ interface AcpProviderSupportOptions {
   readonly effortConfigId?: string;
   /** Harness recorded in the session index; absent means "acp". */
   readonly harness?: "acp" | "opencode" | "grok";
+  /** Turn usage and cost from a `session/prompt` result, copied to the turn_completed transcript entry. */
+  readonly extractTurnUsage?: (response: EffectAcpSchema.PromptResponse) => AcpTurnUsage | undefined;
 }
 
 export type AcpProviderName = keyof typeof ACP_PROVIDER_SUPPORT;

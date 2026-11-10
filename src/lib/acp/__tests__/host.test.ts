@@ -47,6 +47,7 @@ interface StubRuntimeOptions {
   readonly configOptions?: EffectAcpSchema.SessionConfigOption[];
   readonly configError?: Error;
   readonly assistantResponse?: string;
+  readonly promptMeta?: Record<string, unknown>;
   /** Streamed as ACP `agent_thought_chunk` updates before the assistant response. */
   readonly thoughtResponse?: ReadonlyArray<string>;
   readonly updateDuringStart?: string;
@@ -162,7 +163,7 @@ async function makeStubRuntime(options: StubRuntimeOptions = {}): Promise<StubRu
             rawPayload: {},
           });
         }
-        return { stopReason: "end_turn" as const };
+        return { stopReason: "end_turn" as const, ...(options.promptMeta ? { _meta: options.promptMeta } : {}) };
       }),
     cancel: Effect.void,
     getConfigOptions: Effect.succeed(options.configOptions ?? []),
@@ -619,6 +620,31 @@ describe("AcpHost", () => {
       status: 200, body: { ok: true, effort: "xhigh" },
     });
     expect(stub.order.at(-1)).toBe("config:reasoning_effort:xhigh");
+  });
+
+  it.each([["grok", true], ["kimi", false]] as const)("records turn usage on turn_completed for %s: %s (PAN-5078)", async (provider, recorded) => {
+    const overdeckHome = await makeHome();
+    const promptMeta = { modelId: "grok-4.6", usage: { inputTokens: 1640, outputTokens: 32, cachedReadTokens: 640, cacheCreationTokens: 0, costUsdTicks: 21520000 } };
+    const stub = await makeStubRuntime({ promptMeta, configOptions: [{
+      id: "reasoning_effort", name: "Reasoning effort", type: "select", currentValue: "high",
+      options: [{ value: "high", name: "High" }],
+    }] });
+    const host = new AcpHost({ agentId: `agent-usage-${provider}`, provider,
+      workspace: process.cwd(), model: provider === "grok" ? "grok/grok-4.6" : "kimi-k2.6", effort: "high",
+      overdeckHome, runtime: stub.runtime });
+    hosts.push(host);
+    await host.start();
+    await host.handleOp({ op: "message", content: "hello" });
+    await host.waitForIdle();
+
+    const entries = await readTranscriptEntries(join(overdeckHome, "agents", `agent-usage-${provider}`, "acp-session.jsonl"));
+    const completed = entries.find((entry) => entry.event === "turn_completed");
+    if (recorded) {
+      expect(completed?.usage).toMatchObject({ model: "grok/grok-4.6", inputTokens: 1000, outputTokens: 32, cacheReadTokens: 640, cacheWriteTokens: 0 });
+    } else {
+      expect(completed).toBeDefined();
+      expect(completed).not.toHaveProperty("usage");
+    }
   });
 
   it("rejects a Grok launch without an effort (PAN-5078)", async () => {

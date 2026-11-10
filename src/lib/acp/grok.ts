@@ -12,6 +12,7 @@ import {
   type AcpSessionRuntimeOptions,
   type AcpSpawnInput,
 } from "./session-runtime.js";
+import type { AcpTurnUsage } from "./transcript.js";
 
 export interface GrokAcpRuntimeInput extends Omit<AcpSessionRuntimeOptions, "authMethodId" | "spawn"> {
   readonly childProcessSpawner: ChildProcessSpawner.ChildProcessSpawner["Service"];
@@ -76,3 +77,35 @@ export const makeGrokAcpRuntime = (
     );
     return yield* Effect.service(AcpSessionRuntime).pipe(Effect.provide(context));
   });
+
+const finiteNumber = (value: unknown): number | undefined =>
+  typeof value === "number" && Number.isFinite(value) ? value : undefined;
+
+/**
+ * Grok returns turn usage in the `session/prompt` result's `_meta.usage`
+ * (a Grok extension; ACP's own `usage` is the fallback). `costUsdTicks` is in
+ * units of 1e-10 USD and already includes the >=200K-prompt double rate.
+ * `modelUsage` is keyed by internal ids (`grok-4.6-build`), so the model comes
+ * from `_meta.modelId`.
+ */
+export function extractGrokTurnUsage(response: EffectAcpSchema.PromptResponse): AcpTurnUsage | undefined {
+  const meta = response._meta ?? undefined;
+  const raw = (meta?.usage ?? response.usage ?? undefined) as Record<string, unknown> | undefined;
+  const modelId = meta?.modelId;
+  if (!raw || typeof modelId !== "string" || modelId.length === 0) return undefined;
+  const input = finiteNumber(raw.inputTokens);
+  const output = finiteNumber(raw.outputTokens);
+  if (input === undefined || output === undefined) return undefined;
+  const cacheRead = finiteNumber(raw.cachedReadTokens) ?? 0;
+  const reasoning = finiteNumber(raw.reasoningTokens);
+  const ticks = finiteNumber(raw.costUsdTicks);
+  return {
+    model: `grok/${modelId}`,
+    inputTokens: Math.max(0, input - cacheRead),
+    outputTokens: output,
+    cacheReadTokens: cacheRead,
+    cacheWriteTokens: finiteNumber(raw.cacheCreationTokens) ?? 0,
+    ...(reasoning !== undefined ? { reasoningTokens: reasoning } : {}),
+    ...(ticks !== undefined ? { costUsd: ticks / 1e10 } : {}),
+  };
+}
