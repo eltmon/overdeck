@@ -33,4 +33,4 @@ it('retries after Retry-After delay', async () => {
 - Drop `maxForks` to 1 to mask an OOM — that serializes the whole suite.
 - Raise `--max-old-space-size` to paper over a leak in test scaffolding.
 
-If a test must wait for real wall-clock delay (genuine I/O timing, flake-hunt reproducers), put it in a separate file tagged `@slow` and excluded from the default run.
+If a test must wait for real wall-clock delay (genuine I/O timing, flake-hunt reproducers), put it in a separate `<name>.slow.test.ts` file; `vitest.config.ts` excludes those from the default run unless `VITEST_INCLUDE_SLOW=1`.
