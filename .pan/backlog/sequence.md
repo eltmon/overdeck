@@ -1,12 +1,13 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-10T18:04:30.105602Z · model: claude-opus-5-5 · open: 870_
+_Last sequenced: 2026-11-10T18:33:41.917926Z · model: claude-opus-5-5 · open: 871_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-5001 | S | critical | ok |  |  | Closed-issue reaper re-checks 426 reaped issues every minute and drains the 5k/hr GitHub App quota; in pipeline. |
 | 2 | PAN-5117 | S | critical | ok |  |  | In pipeline: real-sleep bash fallback test times out under CI load and turns main red; move it to a .slow test file. |
+| 3 | PAN-5118 | S | high | ok |  |  | In pipeline: pan task done takes one item and commits each call; 48-85 AC sub-items cost 20-40 min of push loops. |
 | 4 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
 | 5 | PAN-5090 | XS | critical | ok |  |  | Herdr unit lacks OOMPolicy=continue: one OOM-killed pane child stops the service and kills every conversation; seen twice. |
 | 6 | PAN-4995 | S | high | ok |  |  | pan review request verifies a half-adopted workspace; its main merge trips adoption's head check -> false Needs-you on handoff PRs |
@@ -869,8 +870,8 @@ _Last sequenced: 2026-11-10T18:04:30.105602Z · model: claude-opus-5-5 · open: 
 | 863 | PAN-4594 | M | low | ok |  | PAN-4590 | Dashboard Semgrep controls: Settings security section, per-project sast override, findings in issue view; after PAN-4590. |
 | 864 | PAN-4593 | L | low | needs-refinement |  | PAN-4590 | Semgrep Platform/Guardian tier; operator decisions (offer Guardian? contact Semgrep first?) still open — refine before work. |
 | 865 | PAN-5022 | L | medium | ok |  |  | Phone app: relay notification preferences to offline machines via the directory, and drop muted pushes on the phone. |
+| 866 | PAN-5021 | M | low | needs-refinement |  |  | PAN-5100 landed phone telemetry with conflicting decisions; re-scope to any remaining gap or close as superseded. |
 | 867 | PAN-5078 | XL | low | ok |  |  | Parked: add xAI's Grok Build CLI as a harness over ACP (stdio agent, resumable sessions). |
-| 867 | PAN-5021 | M | low | needs-refinement |  |  | PAN-5100 landed phone telemetry with conflicting decisions; re-scope to any remaining gap or close as superseded. |
 | 868 | PAN-5029 | M | medium | needs-refinement |  |  | Grok Build Tailscale reach can't work: pan mcp serve verifies tokens only against its own machine. Needs a design choice. |
 | 869 | PAN-4842 | S | medium | ok |  |  | Phone app W-DOC: phone-app.mdx and updates to Anywhere, push, tailscale and service docs; finished last. |
 | 870 | PAN-4851 | S | low | needs-refinement |  |  | Open question: opt-in Overdeck reviewer for Deft-pipeline issues; operator says low priority, do not plan or start without them |
@@ -885,6 +886,10 @@ New in-pipeline substrate bug: the deacon close-out sweep alone exhausted the Gi
 ### PAN-5117 (rank 2)
 
 New since the prior run and already in the pipeline. A flaky test on main turns main red, and a red main silently empties the merge gate for every other issue, so this substrate fix ranks in the top tier. It takes the free rank-2 slot without displacing other pinned work.
+
+### PAN-5118 (rank 3)
+
+New in-pipeline substrate issue, pinned at the free slot after the other in-pipeline work: runTaskDone commits the continue file once per item, so agents closing dozens of acceptance-criterion sub-items pay one pre-push hook run per sub-item before opening a PR. The fix (variadic items, one commit) is small, well specified and speeds every work agent.
 
 ### PAN-5013 (rank 4)
 
@@ -1194,10 +1199,6 @@ New since the prior run (filed by the PAN-4532 plan critic). recoverStalledRevie
 
 Triage: verify whether blocking-choice-menu detection is wired to the current liveness/health surface. Rank held.
 
-### PAN-3205 (rank 81)
-
-New this pass. The deployment gate's queue message is unusually good — it names the holders, the queue age, and warns against forcing — and it promises a 'next verification boundary' trigger that does not exist. Every holder cleared and the deploy never fired; the live build stayed stale for 35 minutes until a manual reload. A correct-sounding instruction that cannot happen is worse than no message.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1205,10 +1206,10 @@ New this pass. The deployment gate's queue message is unusually good — it name
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-10T18:04:30.105602Z",
+  "generatedAt": "2026-11-10T18:33:41.917926Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 870,
+  "openCount": 871,
   "nodes": [
     {
       "issue": "PAN-5001",
@@ -1220,6 +1221,32 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "dependsOn": [],
       "why": "Closed-issue reaper re-checks 426 reaped issues every minute and drains the 5k/hr GitHub App quota; in pipeline.",
       "rationale": "New in-pipeline substrate bug: the deacon close-out sweep alone exhausted the GitHub App REST pool, which pauses every tracker read and write across the pipeline. Pinned at the free top slot; the fix (skip already-reaped residue for 6h, no overlapping deacon-lite sweeps) is small and well specified.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5117",
+      "rank": 2,
+      "size": "S",
+      "importance": "critical",
+      "score": 84,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline: real-sleep bash fallback test times out under CI load and turns main red; move it to a .slow test file.",
+      "rationale": "New since the prior run and already in the pipeline. A flaky test on main turns main red, and a red main silently empties the merge gate for every other issue, so this substrate fix ranks in the top tier. It takes the free rank-2 slot without displacing other pinned work.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5118",
+      "rank": 3,
+      "size": "S",
+      "importance": "high",
+      "score": 80,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline: pan task done takes one item and commits each call; 48-85 AC sub-items cost 20-40 min of push loops.",
+      "rationale": "New in-pipeline substrate issue, pinned at the free slot after the other in-pipeline work: runTaskDone commits the continue file once per item, so agents closing dozens of acceptance-criterion sub-items pay one pre-push hook run per sub-item before opening a PR. The fix (variadic items, one commit) is small, well specified and speeds every work agent.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -4077,6 +4104,19 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "dependsOn": [],
       "why": "Attachment messages on every non-Claude harness never match their transcript echo and land in the failed outbox after 4 min.",
       "rationale": "Affects every Codex, Pi and Kimi conversation that sends an attachment: the message was delivered but the UI says it failed, which invites duplicate resends. Cause and fix location are verified.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5116",
+      "rank": 227,
+      "size": "S",
+      "importance": "high",
+      "score": 68,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "restart-all closes the pane but the launcher ignores SIGHUP, so the old ACP host and agent child keep running; stop runtime first.",
+      "rationale": "New bug found during PAN-5078 verification: a process leak on every ACP conversation restart-all. Clear root cause and fix; ranked beside other ACP and leaked-process bugs (PAN-4575, PAN-3510).",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11937,14 +11977,14 @@ New this pass. The deployment gate's queue message is unusually good — it name
     },
     {
       "issue": "PAN-5021",
-      "rank": 867,
+      "rank": 866,
       "size": "M",
       "importance": "low",
       "score": 25,
       "condition": "needs-refinement",
       "dependsOn": [],
       "why": "PAN-5100 landed phone telemetry with conflicting decisions; re-scope to any remaining gap or close as superseded.",
-      "rationale": "Dependency PAN-5100 closed as completed on 2026-11-07, so the blocking edge is dropped; rank holds and condition stays needs-refinement until it is re-scoped or closed.",
+      "rationale": "Rank shared slot 867 with in-pipeline PAN-5078 in the prior run; moved to the free slot 866 with no change in impact.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11996,32 +12036,6 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "dependsOn": [],
       "why": "Phone app: let phone credentials reach linked machines (fleet Needs-you, linked-conv proxy, /ws/linked); PAN-4835 merged.",
       "rationale": "PAN-4835 merged in #4894, which clears its only dependency; rank held because the Anywhere phone epic is low-impact relative to substrate work above it.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5117",
-      "rank": 2,
-      "size": "S",
-      "importance": "critical",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline: real-sleep bash fallback test times out under CI load and turns main red; move it to a .slow test file.",
-      "rationale": "New since the prior run and already in the pipeline. A flaky test on main turns main red, and a red main silently empties the merge gate for every other issue, so this substrate fix ranks in the top tier. It takes the free rank-2 slot without displacing other pinned work.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5116",
-      "rank": 227,
-      "size": "S",
-      "importance": "high",
-      "score": 68,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "restart-all closes the pane but the launcher ignores SIGHUP, so the old ACP host and agent child keep running; stop runtime first.",
-      "rationale": "New bug found during PAN-5078 verification: a process leak on every ACP conversation restart-all. Clear root cause and fix; ranked beside other ACP and leaked-process bugs (PAN-4575, PAN-3510).",
       "gate": "auto",
       "planning": "auto"
     }
@@ -13209,6 +13223,13 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
+    },
+    {
+      "from": "PAN-5118",
+      "to": "PAN-4219",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.4
     }
   ]
 }
