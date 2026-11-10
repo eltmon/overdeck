@@ -62,6 +62,12 @@ describe('PushPanel (PAN-2354)', () => {
     await waitFor(() => expect(deletePushSubscription).toHaveBeenCalledWith('s1'));
   });
 
+  it('renders the Recent notifications section (PAN-5111)', async () => {
+    renderPanel();
+    expect(await screen.findByRole('heading', { name: 'Recent notifications' })).toBeTruthy();
+    expect(await screen.findByText('No notifications sent yet.')).toBeTruthy();
+  });
+
   it('renders the ntfy topic hint and never the full topic', async () => {
     renderPanel();
     expect(await screen.findByText('ntfy: ntfy.example.net · topic deck…')).toBeTruthy();
