@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5107",
   "created": "2026-11-10T14:32:45.039Z",
-  "updated": "2026-11-10T14:55:46.450Z",
+  "updated": "2026-11-10T14:56:04.242Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -114,6 +114,10 @@
     "settings-delete-dialog.ac5": {
       "status": "completed",
       "doneAt": "2026-11-10T14:55:46.450Z"
+    },
+    "settings-delete-dialog.ac6": {
+      "status": "completed",
+      "doneAt": "2026-11-10T14:56:04.242Z"
     }
   }
 }
