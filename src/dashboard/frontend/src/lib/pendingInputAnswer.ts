@@ -11,7 +11,9 @@
  *      with `{ toolUseId, answers }` (PAN-3766 — a pi ask modal holds the
  *      session's input; a queued message is swallowed).
  *   4. any other conversation → `POST /api/conversations/:id/message` with the
- *      "Operator answered the pending question…" prose.
+ *      "Operator answered the pending question…" prose, plus `answersToolUseId`
+ *      when the question's id is known. The field lets the server record the
+ *      answer for push history (PAN-5111).
  *
  * The desktop dialog host and the phone Needs-you card both call it, so the
  * endpoints, bodies and headers stay identical across surfaces.
@@ -72,7 +74,7 @@ export function buildPendingAnswerRequest(target: PendingAnswerTarget): PendingA
   const composed = `Operator answered the pending question${answers.length > 1 ? 's' : ''}:\n\n${lines.join('\n\n')}`;
   return {
     url: `/api/conversations/${encodeURIComponent(id)}/message`,
-    body: { message: composed },
+    body: toolUseId ? { message: composed, answersToolUseId: toolUseId } : { message: composed },
   };
 }
 

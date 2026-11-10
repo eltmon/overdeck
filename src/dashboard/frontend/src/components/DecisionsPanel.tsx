@@ -17,6 +17,7 @@ import { describePendingInput } from '../lib/pendingInput';
 import { getPendingQuestionTitle } from '../lib/pipeline-state';
 import { AgentRequestCard } from './AgentRequestCard';
 import { DiskAlertCard } from './DiskAlertCard';
+import { UnreachableMachineCard } from './UnreachableMachineCard';
 import { HarnessUpdateCard } from './HarnessUpdateCard';
 import { McpSignInCard } from './McpSignInCard';
 import { AwaitingInputIndicator } from './AwaitingInputIndicator';
@@ -149,6 +150,9 @@ function Group({ title, hint, decisions, onOpenSubject }: { title: string; hint:
         // never an agent waiting on an answer.
         d.diskAlert
           ? <DiskAlertCard key="disk-alert" decision={d} />
+          // PAN-5111 — a linked machine this machine cannot reach; nothing to answer here.
+          : d.unreachableMachine
+          ? <UnreachableMachineCard key={`unreachable:${d.id}`} decision={d} />
           // PAN-5108 — a failed harness update has its own card: nothing to answer or open.
           : d.harnessUpdate
           ? <HarnessUpdateCard key={`harness-update:${d.id}`} decision={d} />
@@ -169,9 +173,11 @@ export function DecisionsPanel({ onOpenSubject }: { onOpenSubject?: (d: Decision
   // PAN-5093 — the disk alert is never an agent waiting on an answer, so it
   // gets its own group and never "Blocking work"'s hint, even at critical.
   // PAN-5108 — a failed harness update is machine state too.
-  const system = decisions.filter((d) => d.diskAlert || d.harnessUpdate);
-  const blocking = decisions.filter((d) => d.blocking && !d.diskAlert && !d.harnessUpdate);
-  const waiting = decisions.filter((d) => !d.blocking && !d.diskAlert && !d.harnessUpdate);
+  // PAN-5111 — so is an unreachable linked machine.
+  const isSystem = (d: Decision) => Boolean(d.diskAlert || d.harnessUpdate || d.unreachableMachine);
+  const system = decisions.filter(isSystem);
+  const blocking = decisions.filter((d) => d.blocking && !isSystem(d));
+  const waiting = decisions.filter((d) => !d.blocking && !isSystem(d));
 
   if (decisions.length === 0) {
     return (

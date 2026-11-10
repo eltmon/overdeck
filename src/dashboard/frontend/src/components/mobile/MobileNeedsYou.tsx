@@ -157,6 +157,10 @@ function QuestionCard({ decision, pending, error, onError }: {
 }
 
 function ReadOnlyAction({ decision }: { decision: Decision }) {
+  // PAN-5111: this machine cannot fetch that machine's Needs-You; its own items may be waiting.
+  if (decision.unreachableMachine) {
+    return <p className="px-4 pb-3 text-xs text-muted-foreground">{`Can't reach ${decision.unreachableMachine.label}; it may have items waiting.`}</p>;
+  }
   // PAN-5093 — disk space is freed on the machine itself; the phone shows the numbers only.
   if (decision.diskAlert) return <p className="px-4 pb-3 text-xs text-muted-foreground">{diskAlertPhoneText(decision.diskAlert)}</p>;
   // PAN-5108 D16 — a failed harness update retries by itself; the phone shows a read-only line.

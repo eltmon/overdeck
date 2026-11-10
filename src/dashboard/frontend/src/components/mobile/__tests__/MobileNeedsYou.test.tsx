@@ -257,6 +257,26 @@ describe('MobileNeedsYou', () => {
     expect(screen.getByText('4.1 GiB free · free space on the desktop')).toBeInTheDocument();
   });
 
+  it('PAN-5111: shows a Can\'t reach row with no Open or Send button', () => {
+    const row = { environmentId: 'env-air', label: 'Edwards-MacBook-Air.local', since: '2026-11-10T11:00:00.000Z', reason: 'answered 500' };
+    decisions = [{
+      id: 'unreachable:env-air',
+      source: 'agent',
+      label: "Can't reach Edwards-MacBook-Air.local",
+      kinds: ['machineUnreachable'],
+      since: row.since,
+      blocking: false,
+      machineLabel: row.label,
+      unreachableMachine: row,
+    }] as Decision[];
+    render(<MobileNeedsYou subjectId={null} />);
+    expect(screen.getByText("Can't reach Edwards-MacBook-Air.local")).toBeInTheDocument();
+    expect(screen.getByText("Can't reach machine")).toBeInTheDocument();
+    expect(screen.getByText("Can't reach Edwards-MacBook-Air.local; it may have items waiting.")).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Open' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Send' })).not.toBeInTheDocument();
+  });
+
   it('shows the server error under the card and un-marks the question', async () => {
     decisions = [auq('a1', 'agent', 't1', ['Yes'])];
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ error: 'boom' }), { status: 500 })));
@@ -277,7 +297,7 @@ describe('MobileNeedsYou', () => {
     });
     expect(lastCall(fetchMock)).toEqual({
       url: '/api/conversations/c1/message',
-      body: { message: 'Operator answered the pending question:\n\nQ: Question for c1?\nA: Use the other branch' },
+      body: { message: 'Operator answered the pending question:\n\nQ: Question for c1?\nA: Use the other branch', answersToolUseId: 't3' },
     });
   });
 });

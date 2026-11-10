@@ -274,6 +274,7 @@ const TELEMETRY_CLIENT_ROUTES = [
   "/api/pipeline/membership",
   "/api/pull-requests",
   "/api/pull-requests/conversations",
+  "/api/push/history",
   "/api/registered-projects",
   "/api/self/done",
   "/api/self/handoff",

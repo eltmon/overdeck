@@ -122,6 +122,8 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   { method: 'GET', path: '/api/fleet/needs-you', scope: 'read:conversations' },
   // PAN-4944 (PAN-4927 W-APPR1): this machine's Needs-You for list_pending_input.
   { method: 'GET', path: '/api/needs-you', scope: 'read:conversations' },
+  // PAN-5111: the last 50 pushes sent, for Settings and paired phones.
+  { method: 'GET', path: '/api/push/history', scope: 'read:conversations' },
   // PAN-4651 WI-21: palette search across linked machines.
   { method: 'GET', path: '/api/fleet/search', scope: 'read:conversations' },
   // PAN-4651 WI-22: which machine is working on an issue.

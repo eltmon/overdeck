@@ -42,3 +42,45 @@ export interface PushProvider {
   hasTargets(): Promise<boolean>;
   send(notification: NeedsYouNotification): Promise<ProviderSendOutcome[]>;
 }
+
+/** PAN-5111: one provider target's result, as stored. Never carries provider detail text (D-4). */
+export interface PushDelivery {
+  provider: string;
+  target: string;
+  ok: boolean;
+  /** A ProviderSendOutcome reason code, or 'error' for a rejected provider. */
+  reason?: string;
+  status?: number;
+}
+
+/** PAN-5111: one delivered push as written to `push-sent.jsonl`. Holds `title`, never `body` (D-4). */
+export interface PushSentRecord {
+  id: string;
+  ts: string;
+  kind: NeedsYouKind;
+  category: NeedsYouCategory;
+  /** The notification tag: `auq:…`, `plan:…`, `perm:…`, `journal:…`, `dead:…`, `summary`, `test`. */
+  key: string;
+  /** `agent:<id>` or `conv:<name>`; null for edge, summary and test pushes. */
+  subject: string | null;
+  title: string;
+  issueId: string | null;
+  url: string;
+  deliveries: PushDelivery[];
+}
+
+export type PushResolutionOutcome = 'answered' | 'resolved-without-answer';
+
+export interface PushResolutionRecord {
+  id: string;
+  ts: string;
+  outcome: PushResolutionOutcome;
+}
+
+/** PAN-5111: what the dispatcher writes to and adopts from. */
+export interface PushHistorySink {
+  recordSent(record: PushSentRecord): void;
+  recordResolution(record: PushResolutionRecord): void;
+  /** D-8: newest unresolved entry id for `key` (and `subject` for non-`auq:`/`plan:` keys); memory only. */
+  openEntryIdFor(subject: string, key: string): { id: string; ts: string } | null;
+}

@@ -75,6 +75,7 @@ src/components/Settings/anywhere/__tests__/PairedPhonesList.test.tsx
 src/components/Settings/anywhere/__tests__/PublicMcpPanel.test.tsx
 src/components/Settings/anywhere/__tests__/PublicMcpSharedCache.test.tsx
 src/components/Settings/anywhere/__tests__/PushPanel.test.tsx
+src/components/Settings/anywhere/__tests__/RecentNotifications.test.tsx
 src/components/Settings/anywhere/__tests__/SetUpPhoneAppPanel.test.tsx
 src/components/Settings/anywhere/__tests__/SetUpPhoneDialog.test.tsx
 src/components/Settings/anywhere/__tests__/TriggersPanel.test.tsx

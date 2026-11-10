@@ -26,6 +26,20 @@ describe('buildPendingAnswerRequest', () => {
       toolUseId: 'tu-3',
     })).toEqual({
       url: '/api/conversations/conv-1/message',
+      body: { message: 'Operator answered the pending question:\n\nQ: Ready?\nA: Ship it', answersToolUseId: 'tu-3' },
+    });
+  });
+
+  it('omits answersToolUseId when the question id is unknown (PAN-5111)', () => {
+    const request = buildPendingAnswerRequest({
+      kind: 'conv',
+      id: 'conv-1',
+      answers: ['Ship it'],
+      questions: [{ question: 'Ready?' }],
+      harness: 'claude-code',
+    });
+    expect(request).toEqual({
+      url: '/api/conversations/conv-1/message',
       body: { message: 'Operator answered the pending question:\n\nQ: Ready?\nA: Ship it' },
     });
   });

@@ -17,7 +17,12 @@ This page starts at v0.60.0, the release that removed Overdeck's state layer. Ol
 
   #### New
 
+  - **Recent notifications:** Settings → Anywhere → Phone notifications lists the last 50 notifications Overdeck sent, where each went, and whether the question is still waiting, was answered from Overdeck, or was answered or withdrawn elsewhere. ([PAN-5111](https://github.com/eltmon/overdeck/issues/5111))
   - **Coding-agent CLIs stay up to date:** Overdeck now updates npm-installed Claude Code, Codex CLI and OpenCode in the background once a day, and updates Claude Code before a launch that needs a newer version, so a new model no longer stops at "needs Claude Code X or newer". Running sessions keep their version. Turn it off in Settings, Coding Agents, or with `harnesses.auto_update: false`. See [Harnesses](/configuration/harnesses).
+
+  #### Improved
+
+  - **Can't reach rows in Needs you:** when this machine cannot read a linked machine's Needs you, the desktop and the phone show `Can't reach <machine>; it may have items waiting.` until a fetch succeeds. ([PAN-5111](https://github.com/eltmon/overdeck/issues/5111))
 
   #### Fixed
 

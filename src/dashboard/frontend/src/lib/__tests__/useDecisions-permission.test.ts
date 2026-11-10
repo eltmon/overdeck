@@ -36,7 +36,7 @@ function permissionRow(name: string, since: string, agentLabel = 'Subagent: Rese
 function renderWithRows<T>(hook: () => T, rows: ConversationPendingInputRow[]) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
   queryClient.setQueryData(['conv-ask-user-question'], rows);
-  queryClient.setQueryData(['fleet-needs-you'], []); // PAN-4651: no linked machines
+  queryClient.setQueryData(['fleet-needs-you'], { machines: [], unreachable: [] }); // PAN-4651: no linked machines
   // Seed every other query useDecisions runs, so the test-setup fetch guard sees no request.
   queryClient.setQueryData(['agent-requests'], []); // PAN-4941
   queryClient.setQueryData(['anywhere-status'], { viewer: { kind: 'root-session' } }); // PAN-4946

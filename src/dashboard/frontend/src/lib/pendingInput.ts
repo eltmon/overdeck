@@ -31,6 +31,8 @@ export type PendingInputKind =
   | 'diskLow'
   /** PAN-5093 — free disk is below the critical threshold; writes may fail soon. */
   | 'diskCritical'
+  /** PAN-5111 — this machine could not fetch a linked machine's Needs-You. */
+  | 'machineUnreachable'
   /** PAN-5108 — the daily background update of a coding-agent CLI failed. */
   | 'harnessUpdateFailed';
 
@@ -51,6 +53,7 @@ export const PENDING_INPUT_KIND_LABEL: Record<string, string> = {
   mcpSignIn: 'MCP sign-in waiting',
   diskLow: 'Disk space low',
   diskCritical: 'Disk space critical',
+  machineUnreachable: "Can't reach machine",
   harnessUpdateFailed: 'Coding agent update failed',
 };
 

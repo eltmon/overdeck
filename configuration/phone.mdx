@@ -125,6 +125,14 @@ allow notifications. A notification opens the question it is about, or the
 Needs-you list. See [Push notifications](/configuration/push-notifications) for
 what is sent and how it is encrypted.
 
+A notification for a question that is no longer waiting opens Needs you with
+"This question was already answered." When this machine cannot read a linked
+machine's list, Needs you shows
+`Can't reach <machine>; it may have items waiting.` Open that machine from the
+machine list to see its items. The browser phone view (`/m`) shows this row as soon as the machine runs the new
+version; the installed Overdeck app shows it after its next app update,
+because the app bundles its own copy of the screens.
+
 The phone app's service worker only shows notifications. It never stores
 pages, so the phone always shows the current state of the machine.
 
