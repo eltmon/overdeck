@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5108",
   "created": "2026-11-10T15:18:20.585Z",
-  "updated": "2026-11-10T16:23:38.064Z",
+  "updated": "2026-11-10T16:23:55.297Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -142,6 +142,10 @@
     "plan-npm-field.ac2": {
       "status": "completed",
       "doneAt": "2026-11-10T16:23:38.064Z"
+    },
+    "auto-update-gate.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T16:23:55.297Z"
     }
   }
 }
