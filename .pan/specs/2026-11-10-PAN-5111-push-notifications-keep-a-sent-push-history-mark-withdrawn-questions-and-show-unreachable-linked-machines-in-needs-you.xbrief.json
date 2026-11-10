@@ -1,0 +1,1013 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-10T15:45:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5111: Push notifications: keep a sent-push history, mark withdrawn questions, and show unreachable linked machines in Needs you",
+    "updated": "2026-11-10T15:50:09.400Z"
+  },
+  "plan": {
+    "id": "pan-5111",
+    "title": "Push notifications: keep a sent-push history, mark withdrawn questions, and show unreachable linked machines in Needs you",
+    "status": "proposed",
+    "uid": "69b21e86-661f-434c-aafe-e6ca02237d7d",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-10T15:45:00Z",
+    "updated": "2026-11-10T15:50:09.400Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5111",
+        "label": "PAN-5111",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/pan-5111.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "push",
+      "needs-you",
+      "anywhere",
+      "linked-machines",
+      "settings",
+      "phone"
+    ],
+    "metadata": {
+      "sizeJustification": "The operator filed one incident fix (PAN-5111) with one acceptance list covering push history, withdrawn questions and unreachable machines. The plan splits it into two vertical slices (A: push history, items 1-7; B: unreachable machines, items 8-11) that share no source files and no edges, so the work agent can run them in parallel. About 42 files: most are the test file each item carries, and the subsystem count is inflated because every top-level doc page (configuration/*.mdx, changelog.mdx, docs/*.md) counts as its own subsystem.",
+      "canonicalFilename": "2026-11-10-PAN-5111-push-notifications-keep-a-sent-push-history-mark-withdrawn-questions-and-show-unreachable-linked-machines-in-needs-you.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "On 2026-11-10 the operator got two needs-you pushes while Needs you was empty. Overdeck keeps sent pushes only in memory, records nothing when a pushed question leaves without an answer, and shows no sign when it cannot fetch a linked machine's Needs-You (only dashboard.log has it). The phone cannot read fleet Needs-You at all (403 through the channel).",
+      "Proposal": "Slice A: a push history module appends sent and resolved lines to ~/.overdeck/logs/push-sent.jsonl (5 MiB rotation); the dispatcher records every delivered push with per-provider outcomes and, 10 s after a pushed auq:/plan:/perm: key leaves its last owner, records answered (an Overdeck answer door noted it) or resolved-without-answer; GET /api/push/history (read:conversations) serves the last 50 with a derived state; Settings -> Anywhere -> Phone notifications shows Recent notifications with Waiting / Answered / Answered or withdrawn and Open links. Slice B: the linked Needs-You sync remembers fetch failures; GET /api/fleet/needs-you adds unreachable[] for non-offline links with a failure and serves a paired phone that list only; desktop and phone Needs you show \"Can't reach <machine>; it may have items waiting.\" Docs cover both. See .pan/drafts/pan-5111.md.",
+      "NonGoals": "- No change to which pushes are sent, their wording, dedup or rate limit.\n- No resolution tracking across a dashboard restart beyond the derived state (D-8).\n- No answer notes for plan approvals, permission prompts or the pi ask modal; no edits to src/dashboard/server/routes/conversations.ts.\n- No change to refuseFleetRequest; linked machines and connectors still cannot read fleet Needs-You.\n- The phone does not receive other machines' Needs-you rows.\n- No Can't reach signal in MCP tools, the CLI or the phone Live Activity count.\n- No retry or polling added to the linked Needs-You sync.\n- No history export, search, delete or retention setting.\n- No question text (notification body or preview) is ever written to the history file."
+    },
+    "autoDecisions": [
+      {
+        "summary": "'Settings -> Notifications' maps to Settings -> Anywhere -> Phone notifications (PushPanel); the list is a new RecentNotifications component at its bottom.",
+        "rationale": "PushPanel is the only push settings surface; the desktop Notifications block is browser event toggles."
+      },
+      {
+        "summary": "History is append-only JSONL with 'sent' and 'resolved' lines joined by a per-entry UUID, folded at read time; rotation renames to push-sent.jsonl.1 at 5 MiB and loads read .1 then the current file.",
+        "rationale": "Keys repeat (perm:pending per subject, re-pushes), so only an id joins reliably; reading both files keeps 'last 50' across a rotation."
+      },
+      {
+        "summary": "Every delivered push is recorded (questions, approvals, edges, summaries, Send test); primed, filtered, rate-limited and active-elsewhere items are not.",
+        "rationale": "The issue asks for every push sent; undelivered items were never sent."
+      },
+      {
+        "summary": "History stores title, never body or publicTitle; deliveries keep provider, target, ok, reason and status only (no provider detail or rejection message); a push that reached no target is not recorded.",
+        "rationale": "D-8 of PAN-2354 keeps question text off disk; provider detail can carry raw request errors, URLs or tokens (plan critique round 1)."
+      },
+      {
+        "summary": "'answered' only when an Overdeck answer door (agent answer-question after a successful delivery, conversation message whose answersToolUseId is verified pending, Codex app-server approval after its id check) noted the verified auq: key inside the push's answer window; every other departure, including all plan: and perm: keys, is 'resolved-without-answer' shown as 'Answered or withdrawn'. pi ask is skipped.",
+        "rationale": "A terminal answer and a withdrawn question look identical to the dashboard; the issue's own label covers both. Plan-action routes carry no toolUseId; ohmypi support is being removed."
+      },
+      {
+        "summary": "Answer notes are non-consuming timestamps matched against an answer window (delivery to departure + 10 s, closed early by a re-push); resolutions wait 10 s and dispose() records them at once.",
+        "rationale": "Removes the transcript/answer race and stops a re-pushed key from crediting the wrong push (plan critique round 1)."
+      },
+      {
+        "summary": "Entry state is derived at read time: resolved line; else tracked or pending now => open; else resolved-without-answer once the service is warm (60 s and one conversation scan); else null. The dispatcher re-adopts open entries for primed keys after a restart. The conversation scan keeps running without targets while it tracks conversation entries (notify: false).",
+        "rationale": "Overdeck stores no status it can derive; a restart must not label a still-pending question withdrawn, and losing all targets must not freeze an entry at Waiting (plan critique round 1)."
+      },
+      {
+        "summary": "GET /api/push/history is scoped read:conversations and mirrors PAN-5093's route coupling (ROUTE_SCOPES, no-loss matrix, TELEMETRY_CLIENT_ROUTES, docs/TELEMETRY.md).",
+        "rationale": "The issue names the scope and the no-loss row; telemetry.ts says its list holds every ROUTE_SCOPES path."
+      },
+      {
+        "summary": "A Can't reach row needs a recorded Needs-You fetch failure whose last attempt is at most 60 minutes old, on a link that is not revoked or hidden; no offline filter; 404 and success clear it; prune drops it.",
+        "rationale": "The logged incident is a flapping link (online/connecting/offline per link-supervisor.ts), so an offline filter would make the row blink; fetches repeat on every connect and heartbeat, keeping a live failure fresh, while a switched-off machine stops producing attempts and expires within an hour. A machine that goes offline without a failed fetch still adds nothing (PAN-4651 NFR-2)."
+      },
+      {
+        "summary": "The row is non-blocking, joins the desktop System group, and counts in the Needs-you count.",
+        "rationale": "It is not an agent waiting on an answer, like the disk alert it sits beside."
+      },
+      {
+        "summary": "A paired phone channel caller may read GET /api/fleet/needs-you but gets only { machines: [], unreachable }; all other channel callers are still refused; refuseFleetRequest is unchanged.",
+        "rationale": "The issue requires the row on the phone, which today gets 403; the phone cannot open other machines' rows anyway. Same pattern as fleetSpawnGate's connector exception (PAN-4950 D-5)."
+      },
+      {
+        "summary": "Keep both slices in one issue with plan.metadata.sizeJustification instead of filing a sibling issue.",
+        "rationale": "The operator filed one incident fix with one acceptance list; the slices share no files or edges so they run in parallel."
+      }
+    ],
+    "items": [
+      {
+        "id": "history-store",
+        "title": "Add the push history module that appends and folds push-sent.jsonl",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T15:45:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5111",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/push/types.ts",
+            "src/lib/push/push-history.ts",
+            "tests/unit/lib/push/push-history.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/push/push-history.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "push-history.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-5",
+            "NFR-1",
+            "NFR-2"
+          ],
+          "foundationFor": [
+            "dispatcher-history",
+            "service-history-wiring",
+            "history-route"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Add PushDelivery (provider, target, ok, reason?, status?; no detail), PushSentRecord, PushResolutionOutcome, PushResolutionRecord and PushHistorySink (recordSent, recordResolution, openEntryIdFor) to src/lib/push/types.ts. Create src/lib/push/push-history.ts exporting PUSH_HISTORY_FILE, PUSH_HISTORY_MAX_BYTES (5 MiB), PUSH_HISTORY_RECENT_LIMIT (50), PushEntryState, PushHistoryEntry, PushHistory (adds recent, ready, flush), createPushHistory({ dir?, maxBytes? }), getPushHistory() (singleton under join(getOverdeckHome(),'logs')), PushStateContext and pushEntryState(entry, ctx). JSONL lines carry v:1 and type 'sent'|'resolved' joined by id (D-2). Memory updates synchronously; writes go through one promise chain (lazy load of .1 then current file; newest 200 sent kept; rotate by rename past maxBytes (D-5); appendFile 0o600 after mkdir 0o700). recordSent writes only the listed fields and drops any extra property such as detail (D-4). openEntryIdFor returns the newest unresolved entry for the key (and subject for perm: keys). pushEntryState follows D-8 (resolution; tracked or pending => open; warm => resolved-without-answer; else null). No *Sync calls; errors logged, never thrown."
+        },
+        "items": [
+          {
+            "id": "history-store.ac1",
+            "title": "Given a recordSent call, when the queue flushes, then push-sent.jsonl contains one line with id, ts, kind, category, key, subject, title, issueId, url and deliveries and no body field",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "history-store.ac2",
+            "title": "Given a delivery passed with detail 'token=SENTINEL-SECRET', when the queue flushes, then the file does not contain SENTINEL-SECRET",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "history-store.ac3",
+            "title": "Given a small maxBytes, when an append would cross it, then the file is renamed to push-sent.jsonl.1 and recent() on a fresh instance returns entries from both files newest first",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "history-store.ac4",
+            "title": "Given an unresolved entry for key auq:t1, then openEntryIdFor returns its id, and after a resolved line for it, openEntryIdFor returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "history-store.ac5",
+            "title": "pushEntryState returns null for a journal: key and for an untracked, not pending, not warm entry, 'open' when tracked or pending, the stored outcome when resolved, and 'resolved-without-answer' when warm",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "answer-note-registry",
+        "title": "Add the in-memory operator answer note registry with time windows",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T15:45:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5111",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/push/operator-answers.ts",
+            "tests/unit/lib/push/operator-answers.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/push/operator-answers.test.ts"
+          ],
+          "expected_outputs": [
+            "operator-answers.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2, D-7. Create src/lib/push/operator-answers.ts exporting noteOperatorAnswer(key, now?), operatorAnsweredBetween(key, fromMs, toMs, now?) (non-consuming) and resetOperatorAnswers() for tests. Map<key, number[]> of note times; at most 10 times per key; drop times older than 24 h on every call; at most 500 keys (evict the oldest-inserted key); ignore an empty key."
+        },
+        "items": [
+          {
+            "id": "answer-note-registry.ac1",
+            "title": "Given a note at t=1000, when operatorAnsweredBetween is called with [500, 1500], then it returns true, and with [1001, 2000] it returns false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "answer-note-registry.ac2",
+            "title": "Given the same window queried twice, then both calls return true (notes are never consumed)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "answer-note-registry.ac3",
+            "title": "Given a note older than 24 h, then operatorAnsweredBetween returns false; given 501 keys, then the oldest key returns false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "answer-door-hooks",
+        "title": "Record verified operator answer notes at the agent answer, conversation message and Codex approval doors",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T15:45:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5111",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/agents/permissions.ts",
+            "src/lib/overdeck/conversation-message.ts",
+            "src/lib/overdeck/conversation-delivery.ts",
+            "src/dashboard/frontend/src/lib/pendingInputAnswer.ts",
+            "src/dashboard/server/routes/__tests__/agent-answer-operator-decision.test.ts",
+            "src/lib/overdeck/__tests__/conversation-delivery.test.ts",
+            "src/lib/overdeck/__tests__/conversation-message-input-target.test.ts",
+            "src/dashboard/frontend/src/lib/__tests__/pendingInputAnswer.test.ts",
+            "src/dashboard/frontend/src/components/mobile/__tests__/MobileNeedsYou.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/agent-answer-operator-decision.test.ts src/lib/overdeck/__tests__/conversation-delivery.test.ts src/lib/overdeck/__tests__/conversation-message-input-target.test.ts",
+            "cd src/dashboard/frontend && npx vitest run src/lib/__tests__/pendingInputAnswer.test.ts src/components/mobile/__tests__/MobileNeedsYou.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the three server test files pass",
+            "pendingInputAnswer.test.ts and MobileNeedsYou.test.tsx pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3, D-6. Notes name only the question a door verified and delivered to, after delivery succeeded. (1) permissions.ts handlePostAgentAnswerQuestion: plain branch keeps deliverAgentMessage's result and notes `auq:${questionSet.toolId}` only when delivery.ok; operator-decision branch notes after its !result.ok refusal; HTTP responses unchanged; Deft branches no note. (2) conversation-message.ts: rename the body to non-exported deliverConversationMessage; the exported handleConversationMessage checks before delivery that body.answersToolUseId is in getPendingQuestions(sessionFile) (resolveSessionFile from deps; false on any error) and notes it only when verified and response.status < 300. (3) conversation-delivery.ts handleConversationCodexApproval: app-server branch only, after postCodexAppServerOp and the id check, note `auq:${expectedToolUseId}`. (4) frontend pendingInputAnswer.ts sends answersToolUseId with the /message body when toolUseId is set. Update the exact-body assertion in MobileNeedsYou.test.tsx (about line 258) and any other test pinning 'Operator answered the pending question'. Do NOT edit src/dashboard/server/routes/conversations.ts."
+        },
+        "items": [
+          {
+            "id": "answer-door-hooks.ac1",
+            "title": "Given an agent answer whose delivery returns ok, then a note exists for auq:<matched toolId>; given deliverAgentMessage returning { ok: false }, then no note exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "answer-door-hooks.ac2",
+            "title": "Given a plain agent question answered with a stale toolUseId, then the note names the question actually answered and no note exists for the stale id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "answer-door-hooks.ac3",
+            "title": "Given a conversation message whose answersToolUseId is pending and delivery succeeds, then a note exists; given a stale answersToolUseId, then no note exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "answer-door-hooks.ac4",
+            "title": "Given a Codex app-server approval with the matching id, then a note exists for auq:<expectedToolUseId>; given a mismatched id, then the handler returns 409 and no note exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "answer-door-hooks.ac5",
+            "title": "buildPendingAnswerRequest for a claude-code conversation with toolUseId returns a body containing answersToolUseId, and without toolUseId a body without it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dispatcher-history",
+        "title": "Make the dispatcher record delivered pushes and resolve departed keys inside answer windows",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T15:45:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-5111",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/push/dispatcher.ts",
+            "tests/unit/lib/push/dispatcher.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/push/dispatcher.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "dispatcher.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ],
+          "foundationFor": [
+            "service-history-wiring"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4, D-3, D-4, D-7, D-8, D-8a. Optional deps history?: PushHistorySink, wasAnswered?: (key, fromMs, toMs) => boolean, newId?. Export RESOLVE_GRACE_MS = 10_000; add trackedIds(), isPending(subject, key), tracksConversations() and observeSubject(subject, items, { notify? }). fanOut builds deliveries with provider, target, ok, reason, status only (rejected provider => ok:false reason 'error'; never detail or message). deliver records a sent record only when deliveries.length > 0, else drops the tracked id. Track delivered keys with deliveredAt; a re-push closes earlier scheduled windows (windowEnd = now). Primed items adopt history.openEntryIdFor(subject, key). notify:false processes departures only. Departure (unique key: last owner gone; else per subject) schedules resolveNow after RESOLVE_GRACE_MS with windowEnd = departure + grace; resolveNow uses wasAnswered(key, deliveredAt, windowEnd). dispose() runs scheduled resolutions at once. Edges/summary/sendNow record subject null and never resolve. Fake timers in tests."
+        },
+        "items": [
+          {
+            "id": "dispatcher-history.ac1",
+            "title": "Given a delivered question and a rejected provider whose error contains SENTINEL-SECRET, then one sent record is recorded with ok:false reason 'error' for that provider and no stored field contains SENTINEL-SECRET",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dispatcher-history.ac2",
+            "title": "Given a primed item, a filtered kind, a rate-limited item, and a push whose providers return no outcomes, then no sent record is recorded",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dispatcher-history.ac3",
+            "title": "Given an auq: key owned by two subjects, when both drop it and 10 s pass, then exactly one resolution is recorded, and none before the second owner drops it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dispatcher-history.ac4",
+            "title": "Given leave, re-push and an answer note before the first timer fires, then the first entry resolves 'resolved-without-answer' and the second resolves 'answered' after it leaves",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dispatcher-history.ac5",
+            "title": "Given a primed key with an open history entry, when it departs, then a resolution is recorded for that entry's id; given observeSubject with notify false, then a new key is not pushed and a tracked departure still resolves; given dispose() during the grace, then the resolution is recorded at once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "service-history-wiring",
+        "title": "Wire history, answer windows and the no-target departure scan into the push service",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T15:45:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5111",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/needs-you-push-service.ts",
+            "src/dashboard/server/services/__tests__/needs-you-push-service.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/needs-you-push-service.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "needs-you-push-service.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5, D-8, D-8a. startNeedsYouPushService deps gain history?: PushHistory (default getPushHistory()) and now?; call void history.ready(); pass history and wasAnswered: operatorAnsweredBetween to the dispatcher; ServiceState keeps history, startedAt, scanCompleted. scanConversations runs when hasTargets() or dispatcher.tracksConversations(), passes { notify } (notify = hasTargets) to both observeSubject calls, and sets scanCompleted after a pass. The sendTestPush fallback gets history. Export WARM_AFTER_MS = 60_000, PushHistoryView and getPushHistoryView(limit = 50) building PushStateContext (trackedIds, isPending, warm = scanCompleted && now - startedAt >= WARM_AFTER_MS)."
+        },
+        "items": [
+          {
+            "id": "service-history-wiring.ac1",
+            "title": "Given a conversation question delivered through the service, when getPushHistoryView() runs, then the entry has state 'open', and after the feed drops it, 10 s pass and the service is warm, then state 'resolved-without-answer'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "service-history-wiring.ac2",
+            "title": "Given noteOperatorAnswer('auq:<id>') before the departure, then getPushHistoryView() returns state 'answered'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "service-history-wiring.ac3",
+            "title": "Given the providers report no targets after a push, when the tracked question leaves the feed, then a resolution is recorded and a new question in the feed records no sent line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "service-history-wiring.ac4",
+            "title": "Given a restart while the question is still pending (primed), then getPushHistoryView() returns state 'open' for the old entry and its later departure records a resolution for that id; an untracked, not-pending entry before warm returns state null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "history-route",
+        "title": "Serve the last 50 pushes at GET /api/push/history",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T15:45:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-5111",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/push.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "packages/contracts/src/telemetry.ts",
+            "docs/TELEMETRY.md",
+            "src/dashboard/server/routes/__tests__/push-routes.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/push-routes.test.ts tests/unit/contracts/telemetry-client-route.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts tests/unit/telemetry-docs.test.ts tests/unit/contracts/telemetry-schema.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the five test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6, D-9. Add pushHistoryRoute (GET /api/push/history, rejectUnauthorizedDashboardRequest, no-store, body { entries: await getPushHistoryView() }) to pushRouteLayer and fix the push.ts header (only this route is in ROUTE_SCOPES). Add the read:conversations row to route-scopes.ts after /api/needs-you with a PAN-5111 comment. Add the OUT_OF_SCOPE no-loss-matrix row after POST /api/push/test. Insert \"/api/push/history\" into TELEMETRY_CLIENT_ROUTES between \"/api/pull-requests/conversations\" and \"/api/registered-projects\", and the same path at the same position in docs/TELEMETRY.md's client_route row."
+        },
+        "items": [
+          {
+            "id": "history-route.ac1",
+            "title": "Given an authorized request, when GET /api/push/history runs, then it returns 200 with an entries array and Cache-Control no-store",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "history-route.ac2",
+            "title": "requiredScopeFor('GET', '/api/push/history') returns 'read:conversations'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "history-route.ac3",
+            "title": "NO_LOSS_MATRIX contains a 'GET /api/push/history' http row, and TELEMETRY_CLIENT_ROUTES and docs/TELEMETRY.md both list /api/push/history",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "recent-notifications-ui",
+        "title": "Show Recent notifications in Settings -> Anywhere -> Phone notifications",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T15:45:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5111",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/push/pushApi.ts",
+            "src/dashboard/frontend/src/components/Settings/anywhere/RecentNotifications.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/PushPanel.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/RecentNotifications.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/Settings/anywhere/__tests__/RecentNotifications.test.tsx src/components/Settings/anywhere/__tests__/PushPanel.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "RecentNotifications.test.tsx and PushPanel.test.tsx pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7, D-1. pushApi.ts: PushHistoryEntry type mirroring PushHistoryView, PUSH_HISTORY_QUERY_KEY, loadPushHistory(). New RecentNotifications.tsx (10 s refetch): section data-component='recent-notifications', h4 'Recent notifications', empty text 'No notifications sent yet.', each li data-push-id with title, relative time, delivery text ('Delivered to N' | 'Not delivered', plus ', N failed (reason status)') and state text (none for null; open 'Waiting', answered 'Answered', resolved-without-answer 'Answered or withdrawn' with the PRD tooltip), and an Open link built with decisionSubjectPath/navigateToDecisionSubject (conv:<name> => conversation; agent subject or null with issueId => issue). Mount it as the last child of PushPanel. Add src/components/Settings/anywhere/__tests__/RecentNotifications.test.tsx to scripts/frontend-test-subset.txt in sorted position. No em dashes in strings."
+        },
+        "items": [
+          {
+            "id": "recent-notifications-ui.ac1",
+            "title": "Given history entries with each state, when RecentNotifications renders, then the texts 'Waiting', 'Answered' and 'Answered or withdrawn' appear on their rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "recent-notifications-ui.ac2",
+            "title": "Given an entry with two ok deliveries, then its row shows 'Delivered to 2'; given one failed delivery with reason gone and status 410, then it shows 'Not delivered, 1 failed (gone 410)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "recent-notifications-ui.ac3",
+            "title": "Given an entry with subject 'conv:my-conv', then its row has an Open link with href '/conv/my-conv'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "recent-notifications-ui.ac4",
+            "title": "Given an empty history, then the section renders 'No notifications sent yet.' and PushPanel renders the Recent notifications heading",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "recent-notifications-ui.ac5",
+            "title": "scripts/frontend-test-subset.txt contains src/components/Settings/anywhere/__tests__/RecentNotifications.test.tsx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "link-failure-tracking",
+        "title": "Remember each linked machine's Needs-You fetch failure until a success, 404 or prune",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T15:45:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5111",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/linked-needs-you-sync.ts",
+            "src/dashboard/server/__tests__/linked-needs-you-sync.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/linked-needs-you-sync.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "linked-needs-you-sync.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8, D-10. Export LinkedNeedsYouFailure { since, lastAttemptAt, reason } (ISO strings); add deps.now (default Date.now) and failureFor(environmentId) to LinkedNeedsYouSync. fetchOnce: thrown fetch records the error message; 404 clears; other non-200 records `answered <status>`; malformed body records 'sent a malformed Needs-You feed'; a stored feed clears. A repeated failure keeps the first since and moves lastAttemptAt. prune also clears failures. Keep every existing deps.log call; update the header."
+        },
+        "items": [
+          {
+            "id": "link-failure-tracking.ac1",
+            "title": "Given a fetch that throws 'Secure channel did not open', when onConnect runs, then failureFor returns that reason with ISO since and lastAttemptAt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "link-failure-tracking.ac2",
+            "title": "Given a second failure, then since keeps the first failure's time and lastAttemptAt moves; given a later 200 feed, then failureFor returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "link-failure-tracking.ac3",
+            "title": "Given a 404 answer, then failureFor returns null; given a 500 answer, then the reason is 'answered 500'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "link-failure-tracking.ac4",
+            "title": "Given prune([]), then failureFor returns null for the pruned link",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fleet-unreachable-route",
+        "title": "Return unreachable links from fleet Needs-You and let a paired phone read that list",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T15:45:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-5111",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/dashboard/server/routes/fleet-awareness.ts",
+            "src/dashboard/server/__tests__/linked-needs-you-sync.test.ts",
+            "src/dashboard/server/__tests__/fleet-needs-you-unreachable.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/linked-needs-you-sync.test.ts src/dashboard/server/__tests__/fleet-needs-you-unreachable.test.ts src/dashboard/server/__tests__/fleet-connector.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the three test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ],
+          "foundationFor": [
+            "unreachable-desktop-row",
+            "unreachable-phone-row"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9, D-10, D-12 (auth surface). FleetAwarenessDeps gains optional needsYouFailure (default currentLinkedNeedsYou()?.failureFor(env) ?? null) and optional now (default Date.now). Export UNREACHABLE_FRESH_MS = 3_600_000 and UnreachableMachine. buildFleetNeedsYou returns { machines, unreachable }: machines unchanged; unreachable lists links that are not revoked (record or status state), not hidden, and have a failure whose lastAttemptAt is at most UNREACHABLE_FRESH_MS old, in store order. Do NOT filter on 'offline': a flapping link moves online/connecting/offline and the row must not blink (D-10). The route body: if channelOfRequest(request) !== null and resolveRequestCredential(request)?.kind === 'phone', run rejectUnauthorizedDashboardRequest and answer { machines: [], unreachable }; otherwise refuseFleetRequest as today. refuseFleetRequest itself is unchanged. Update the header (NFR-2 amended). Update the existing 'offline link contributes no rows' expectation to include unreachable: []. New route test follows fleet-connector.test.ts (mocked channelOfRequest, createAccessToken)."
+        },
+        "items": [
+          {
+            "id": "fleet-unreachable-route.ac1",
+            "title": "Given an online link and an offline link, each with a failure 5 minutes old, when buildFleetNeedsYou runs, then unreachable contains both with environmentId, label, since and reason",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fleet-unreachable-route.ac2",
+            "title": "Given a failure whose lastAttemptAt is 61 minutes old, a revoked link and a hidden link, then none appears in unreachable",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fleet-unreachable-route.ac3",
+            "title": "Given a phone token through a mocked channel, when GET /api/fleet/needs-you runs, then it returns 200 with machines [] and the unreachable list",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fleet-unreachable-route.ac4",
+            "title": "Given a machine token through a mocked channel, when GET /api/fleet/needs-you runs, then it returns 403 'a linked machine cannot use the fleet routes here'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "unreachable-desktop-row",
+        "title": "Show a Can't reach card in the desktop Needs you System group",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T15:45:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5111",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/useDecisions.ts",
+            "src/dashboard/frontend/src/lib/pendingInput.ts",
+            "src/dashboard/frontend/src/components/UnreachableMachineCard.tsx",
+            "src/dashboard/frontend/src/components/DecisionsPanel.tsx",
+            "src/dashboard/frontend/src/lib/__tests__/useDecisions.fleet.test.tsx",
+            "src/dashboard/frontend/src/components/__tests__/DecisionsPanel.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/lib/__tests__/useDecisions.fleet.test.tsx src/components/__tests__/DecisionsPanel.test.tsx src/components/__tests__/DiskAlertCard.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the three frontend test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10, D-11, D-13. useDecisions.ts: UnreachableMachineRow, FleetNeedsYou; fetchFleetNeedsYou returns { machines, unreachable } (empty arrays on non-OK or error); Decision.unreachableMachine; unreachableMachineDecisions(rows) => { id 'unreachable:<env>', source 'agent', label \"Can't reach <label>\", kinds ['machineUnreachable'], since, blocking false, machineLabel, unreachableMachine }; useDecisions concatenates it after fleetDecisions with an EMPTY_FLEET default. pendingInput.ts: machineUnreachable: \"Can't reach machine\". New UnreachableMachineCard.tsx modeled on DiskAlertCard (data-testid 'unreachable-machine-card', the exact text \"Can't reach <label>; it may have items waiting.\", reason and since meta, 'Open Machines' button calling openSettingsSection('anywhere')). DecisionsPanel: System group includes unreachableMachine; blocking/waiting exclude it; Group renders the card after the diskAlert branch."
+        },
+        "items": [
+          {
+            "id": "unreachable-desktop-row.ac1",
+            "title": "Given one unreachable row, unreachableMachineDecisions returns a non-blocking decision with kinds ['machineUnreachable'] and label \"Can't reach Edwards-MacBook-Air.local\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "unreachable-desktop-row.ac2",
+            "title": "Given a 403 from /api/fleet/needs-you, fetchFleetNeedsYou resolves { machines: [], unreachable: [] }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "unreachable-desktop-row.ac3",
+            "title": "Given a fleet answer with one unreachable machine, when DecisionsPanel renders, then an unreachable-machine-card appears in the System group with the text \"Can't reach Edwards-MacBook-Air.local; it may have items waiting.\" and decisions-count shows 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "unreachable-phone-row",
+        "title": "Show the Can't reach row in the phone Needs you",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T15:45:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5111",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/mobile/MobileNeedsYou.tsx",
+            "src/dashboard/frontend/src/components/mobile/__tests__/MobileNeedsYou.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/mobile/__tests__/MobileNeedsYou.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "MobileNeedsYou.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-11. In ReadOnlyAction, first branch: when decision.unreachableMachine is set, render a muted p with exactly \"Can't reach <label>; it may have items waiting.\" and no button."
+        },
+        "items": [
+          {
+            "id": "unreachable-phone-row.ac1",
+            "title": "Given useDecisions returns one unreachable decision, when MobileNeedsYou renders, then the row shows \"Can't reach Edwards-MacBook-Air.local\", the kind text \"Can't reach machine\", and \"Can't reach Edwards-MacBook-Air.local; it may have items waiting.\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "unreachable-phone-row.ac2",
+            "title": "Given the same row, then it renders no Open, Answer or Send button",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document Recent notifications, the three states and the Can't reach row",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T15:45:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5111",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/push-notifications.mdx",
+            "configuration/phone.mdx",
+            "configuration/linked-machines.mdx",
+            "docs/ANYWHERE-ARCHITECTURE.md",
+            "changelog.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "git diff origin/main...HEAD -- configuration/push-notifications.mdx configuration/phone.mdx configuration/linked-machines.mdx docs/ANYWHERE-ARCHITECTURE.md changelog.mdx | grep '^+[^+]' | grep -c '—' || true"
+          ],
+          "expected_outputs": [
+            "lint:docs completes without errors",
+            "the em dash count prints 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-12. push-notifications.mdx: new '## Recent notifications' section before Troubleshooting (where the list is, the file and its 5 MB rotation to .1, title only and never question text, the states Waiting / Answered / Answered or withdrawn) and a Troubleshooting entry 'A notification arrived but Needs you is empty.' phone.mdx Notifications: sentences on 'This question was already answered.', the Can't reach row, and that the installed app shows the row after its next app update while the browser /m view shows it at deploy. linked-machines.mdx Fleet Needs-You: replace the offline sentence with the D-10 rule and the row text. ANYWHERE-ARCHITECTURE.md 'Projects, Needs-You and search across machines': failure record, unreachable field, phone branch. changelog.mdx: add to an existing Unreleased/Upcoming top block, else create the v0.76.0 Unreleased block in the docs/RELEASING.md format with a New entry (Recent notifications) and an Improved entry (Can't reach rows). No em dashes in added lines."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "configuration/push-notifications.mdx contains a '## Recent notifications' section naming push-sent.jsonl and the labels Waiting, Answered and Answered or withdrawn",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "configuration/linked-machines.mdx and configuration/phone.mdx each contains the text \"Can't reach <machine>; it may have items waiting.\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "docs/ANYWHERE-ARCHITECTURE.md contains a description of failureFor, the unreachable field and the phone branch of GET /api/fleet/needs-you",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac4",
+            "title": "changelog.mdx's top Update block is tagged Upcoming and lists Recent notifications, and the em dash count over added doc lines prints 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "history-store",
+        "to": "dispatcher-history",
+        "type": "blocks"
+      },
+      {
+        "from": "history-store",
+        "to": "service-history-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "answer-note-registry",
+        "to": "answer-door-hooks",
+        "type": "blocks"
+      },
+      {
+        "from": "answer-note-registry",
+        "to": "service-history-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "dispatcher-history",
+        "to": "service-history-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "service-history-wiring",
+        "to": "history-route",
+        "type": "blocks"
+      },
+      {
+        "from": "history-route",
+        "to": "recent-notifications-ui",
+        "type": "informs"
+      },
+      {
+        "from": "link-failure-tracking",
+        "to": "fleet-unreachable-route",
+        "type": "blocks"
+      },
+      {
+        "from": "fleet-unreachable-route",
+        "to": "unreachable-desktop-row",
+        "type": "informs"
+      },
+      {
+        "from": "unreachable-desktop-row",
+        "to": "unreachable-phone-row",
+        "type": "blocks"
+      },
+      {
+        "from": "answer-door-hooks",
+        "to": "unreachable-phone-row",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
