@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5111",
   "created": "2026-11-10T15:51:44.994Z",
-  "updated": "2026-11-10T17:07:44.945Z",
+  "updated": "2026-11-10T17:08:05.205Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -240,6 +240,10 @@
     "unreachable-phone-row.ac2": {
       "status": "completed",
       "doneAt": "2026-11-10T17:07:44.945Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:08:05.204Z"
     }
   }
 }
