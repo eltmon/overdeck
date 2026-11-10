@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5111",
   "created": "2026-11-10T15:51:44.994Z",
-  "updated": "2026-11-10T17:06:08.006Z",
+  "updated": "2026-11-10T17:06:28.395Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -224,6 +224,10 @@
     "unreachable-desktop-row.ac1": {
       "status": "completed",
       "doneAt": "2026-11-10T17:06:08.006Z"
+    },
+    "unreachable-desktop-row.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:06:28.395Z"
     }
   }
 }
