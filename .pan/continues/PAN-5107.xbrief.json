@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5107",
   "created": "2026-11-10T14:32:45.039Z",
-  "updated": "2026-11-10T14:54:14.544Z",
+  "updated": "2026-11-10T14:54:35.142Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -94,6 +94,10 @@
     "account-deletion-module.ac5": {
       "status": "completed",
       "doneAt": "2026-11-10T14:54:14.544Z"
+    },
+    "settings-delete-dialog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T14:54:35.141Z"
     }
   }
 }
