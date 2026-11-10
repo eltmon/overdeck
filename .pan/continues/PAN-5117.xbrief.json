@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5117",
   "created": "2026-11-10T17:52:40.588Z",
-  "updated": "2026-11-10T19:06:50.520Z",
+  "updated": "2026-11-10T19:07:08.543Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -60,6 +60,10 @@
     "add-fast-fallback-case.ac1": {
       "status": "completed",
       "doneAt": "2026-11-10T19:06:50.519Z"
+    },
+    "add-fast-fallback-case.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T19:07:08.542Z"
     }
   }
 }
