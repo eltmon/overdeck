@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5078",
   "created": "2026-11-10T14:48:32.729Z",
-  "updated": "2026-11-10T17:47:50.590Z",
+  "updated": "2026-11-10T17:48:08.133Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -192,6 +192,10 @@
     "runtime-policy-binary.ac2": {
       "status": "completed",
       "doneAt": "2026-11-10T17:47:50.590Z"
+    },
+    "runtime-policy-binary.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:48:08.132Z"
     }
   }
 }
