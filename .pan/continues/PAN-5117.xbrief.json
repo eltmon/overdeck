@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5117",
   "created": "2026-11-10T17:52:40.588Z",
-  "updated": "2026-11-10T19:05:51.730Z",
+  "updated": "2026-11-10T19:06:11.529Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -48,6 +48,10 @@
     "move-wall-clock-cases.ac1": {
       "status": "completed",
       "doneAt": "2026-11-10T19:05:51.730Z"
+    },
+    "move-wall-clock-cases.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T19:06:11.529Z"
     }
   }
 }
