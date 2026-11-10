@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5107",
   "created": "2026-11-10T14:32:45.039Z",
-  "updated": "2026-11-10T14:35:11.175Z",
+  "updated": "2026-11-10T14:35:15.384Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -14,6 +14,11 @@
       "claimedBy": "agent-pan-5107",
       "claimedAt": "2026-11-10T14:32:45.039Z",
       "doneAt": "2026-11-10T14:35:11.175Z"
+    },
+    "account-deletion-module": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5107",
+      "claimedAt": "2026-11-10T14:35:15.383Z"
     }
   }
 }
