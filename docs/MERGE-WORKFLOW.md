@@ -430,7 +430,11 @@ workspace/branches/xBRIEF, and removes the workspace's Docker containers and
 backend (`closeAgentPane` / `closeIssuePanes` in
 [`src/lib/terminal-backends/launch.ts`](../src/lib/terminal-backends/launch.ts)):
 `kill-session` on tmux, `pane.close` on Herdr. A tmux-only kill left every Herdr
-pane alive, and close-out's DoD row 5 then failed on "running agents" (PAN-3947). This must run **at most once per
+pane alive, and close-out's DoD row 5 then failed on "running agents" (PAN-3947).
+After it closes a paused agent's terminal, the handoff records that agent as
+`stopped` (keeping `paused: true` and the close-out reason), so the crash
+watcher does not count the closed pane as a crash and push a false "stopped
+responding" alert (PAN-5112). This must run **at most once per
 merge** — a concurrency guard prevents the handoff from re-triggering itself
 (a missing guard caused a 24,626-call tracker API loop, PAN-328).
 

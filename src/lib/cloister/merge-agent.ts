@@ -340,7 +340,7 @@ export async function postMergeLifecycle(
 
     // 3. Pause work/planning/strike agents and close their terminals to free resources.
     try {
-      const { setAgentPaused, getAgentState } = await import('../agents.js');
+      const { setAgentPaused, getAgentState, markAgentStoppedState, saveAgentState } = await import('../agents.js');
       // A failed backend close must never skip pausing the remaining agents.
       const closeAgentTerminal = async (agentId: string): Promise<boolean> => {
         try {
@@ -387,6 +387,17 @@ export async function postMergeLifecycle(
         if (await closeAgentTerminal(agentId)) {
           console.log(`[merge-agent] ✓ Closed ${agentId} terminal to free resources`);
           logActivity('agent_session_killed', `Freed resources: closed terminal for ${agentId}`);
+          // PAN-5112: this close is the agent's stop. Record it, or the crash
+          // watcher sees a running agent with no pane and pushes a false crash.
+          try {
+            const closed = getAgentState(agentId);
+            if (closed) {
+              markAgentStoppedState(closed, 'system');
+              await Effect.runPromise(saveAgentState(closed));
+            }
+          } catch (err) {
+            console.warn(`[merge-agent] Could not record ${agentId} as stopped: ${err}`);
+          }
         }
       }
     } catch (err) {
