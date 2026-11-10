@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5117",
   "created": "2026-11-10T17:52:40.588Z",
-  "updated": "2026-11-10T19:07:28.157Z",
+  "updated": "2026-11-10T19:07:45.526Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -68,6 +68,10 @@
     "docs-slow-test-convention.ac1": {
       "status": "completed",
       "doneAt": "2026-11-10T19:07:28.156Z"
+    },
+    "docs-slow-test-convention.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T19:07:45.526Z"
     }
   }
 }
