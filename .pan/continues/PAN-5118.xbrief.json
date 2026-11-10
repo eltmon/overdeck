@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5118",
   "created": "2026-11-10T18:32:53.186Z",
-  "updated": "2026-11-10T19:36:44.556Z",
+  "updated": "2026-11-10T19:37:27.789Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -158,6 +158,10 @@
     "docs-task-done-batch.ac4": {
       "status": "completed",
       "doneAt": "2026-11-10T19:36:44.556Z"
+    },
+    "self-jobs-full-stdout.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T19:37:27.789Z"
     }
   }
 }
