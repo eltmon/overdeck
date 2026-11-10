@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5078",
   "created": "2026-11-10T14:48:32.729Z",
-  "updated": "2026-11-10T18:04:19.000Z",
+  "updated": "2026-11-10T18:04:39.295Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -400,6 +400,10 @@
     "frontend-conversation-surfaces.ac3": {
       "status": "completed",
       "doneAt": "2026-11-10T18:04:19.000Z"
+    },
+    "turn-usage-transcript.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T18:04:39.294Z"
     }
   }
 }
