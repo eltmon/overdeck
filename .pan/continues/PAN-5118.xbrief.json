@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5118",
   "created": "2026-11-10T18:32:53.186Z",
-  "updated": "2026-11-10T18:50:09.082Z",
+  "updated": "2026-11-10T18:50:32.937Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -18,6 +18,10 @@
     "batch-verify-lib.ac1": {
       "status": "completed",
       "doneAt": "2026-11-10T18:50:09.082Z"
+    },
+    "batch-verify-lib.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T18:50:32.937Z"
     }
   }
 }
