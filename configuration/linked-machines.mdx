@@ -643,8 +643,11 @@ pan machines add-project laptop overdeck --to desk   # this machine's overdeck, 
 machine, labelled "on <machine>". A conversation on another machine opens through the link;
 an agent there is answered on that machine. The command palette's search adds an
 "On <machine>" group for every online linked machine. `pan machines who PAN-123` lists which
-machines run agents or conversations for an issue. Offline machines add nothing and never
-cause an error.
+machines run agents or conversations for an issue. Offline machines add nothing. When this
+machine cannot fetch the list of an online or connecting machine, Needs you shows
+`Can't reach <machine>; it may have items waiting.` on the desktop and the phone until a fetch
+succeeds. The row goes away after an hour without a failed fetch, for example when that
+machine is switched off.
 
 ## Fleet usage
 

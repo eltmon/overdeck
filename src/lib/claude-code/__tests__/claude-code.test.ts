@@ -271,25 +271,114 @@ describe('requirements', () => {
       await expect(assertClaudeCodeSupportsModel('/usr/local/bin/claude', undefined)).resolves.toBeUndefined();
     });
 
+    const NPM_PLAN = {
+      method: 'npm' as const,
+      argv: ['npm', 'install', '-g', '--prefix', '/usr/local', '@anthropic-ai/claude-code@latest'],
+      display: 'npm install -g --prefix /usr/local @anthropic-ai/claude-code@latest',
+      runnable: true,
+    };
+    const NPM_INSTALL = { method: 'npm' as const, realPath: '/usr/local/lib/node_modules/@anthropic-ai/claude-code/cli.js', npmPrefix: '/usr/local' };
+    const TODAYS_MESSAGE = formatClaudeCodeTooOldMessage({
+      model: 'claude-sonnet-5-5',
+      displayName: 'Claude Sonnet 5.5',
+      installed: '2.1.280',
+      required: '2.1.284',
+      binaryPath: '/usr/local/bin/claude',
+      upgradeCommand: NPM_PLAN.display,
+    });
+
     it('throws ClaudeCodeTooOldError when the installed version is older than the minimum', async () => {
-      await expect(
-        assertClaudeCodeSupportsModel('/usr/local/bin/claude', 'claude-sonnet-5-5', {
-          readVersion: async () => '2.1.280',
-          detectInstall: () => ({ method: 'npm', realPath: '/usr/local/lib/node_modules/@anthropic-ai/claude-code/cli.js', npmPrefix: '/usr/local' }),
-          upgradePlan: async () => ({
-            method: 'npm',
-            argv: ['npm', 'install', '-g', '--prefix', '/usr/local', '@anthropic-ai/claude-code@latest'],
-            display: 'npm install -g --prefix /usr/local @anthropic-ai/claude-code@latest',
-            runnable: true,
-          }),
-          resolveRealPath: async (p) => p,
-        }),
-      ).rejects.toMatchObject({
+      const launchUpdate = vi.fn();
+      const error = await assertClaudeCodeSupportsModel('/usr/local/bin/claude', 'claude-sonnet-5-5', {
+        readVersion: async () => '2.1.280',
+        detectInstall: () => NPM_INSTALL,
+        upgradePlan: async () => NPM_PLAN,
+        resolveRealPath: async (p) => p,
+        autoUpdateEnabled: async () => false,
+        launchUpdate,
+      }).catch((e: unknown) => e);
+      expect(error).toMatchObject({
         name: 'ClaudeCodeTooOldError',
         model: 'claude-sonnet-5-5',
         installed: '2.1.280',
         required: '2.1.284',
       });
+      // PAN-5108 FR-6: with auto-update off the message is byte-identical to today's and nothing runs.
+      expect((error as Error).message).toBe(TODAYS_MESSAGE);
+      expect(launchUpdate).not.toHaveBeenCalled();
+    });
+
+    it('updates once and lets the launch proceed when auto-update is on (PAN-5108 FR-4)', async () => {
+      const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+      const readVersion = vi.fn().mockResolvedValueOnce('2.1.280').mockResolvedValue('2.1.300');
+      const launchUpdate = vi.fn(async (_argv: string[], _pathDir: string, _isSatisfied: () => Promise<boolean>) => ({ kind: 'ran' as const, code: 0, output: '' }));
+
+      await expect(
+        assertClaudeCodeSupportsModel('/usr/local/bin/claude', 'claude-sonnet-5-5', {
+          readVersion,
+          detectInstall: () => NPM_INSTALL,
+          upgradePlan: async () => NPM_PLAN,
+          resolveRealPath: async (p) => p,
+          autoUpdateEnabled: async () => true,
+          launchUpdate,
+        }),
+      ).resolves.toBeUndefined();
+      expect(launchUpdate).toHaveBeenCalledTimes(1);
+      expect(launchUpdate.mock.calls[0]![0]).toEqual(NPM_PLAN.argv);
+      expect(launchUpdate.mock.calls[0]![1]).toBe('/usr/local/bin');
+      expect(readVersion).toHaveBeenLastCalledWith('/usr/local/bin/claude', { refresh: true });
+      log.mockRestore();
+    });
+
+    it('appends the failure sentence when the update fails (PAN-5108 FR-5)', async () => {
+      const error = await assertClaudeCodeSupportsModel('/usr/local/bin/claude', 'claude-sonnet-5-5', {
+        readVersion: async () => '2.1.280',
+        detectInstall: () => NPM_INSTALL,
+        upgradePlan: async () => NPM_PLAN,
+        resolveRealPath: async (p) => p,
+        autoUpdateEnabled: async () => true,
+        launchUpdate: async () => ({ kind: 'ran', code: 1, output: 'npm ERR! EACCES' }),
+      }).catch((e: unknown) => e);
+      expect(error).toMatchObject({ name: 'ClaudeCodeTooOldError', installed: '2.1.280' });
+      const message = (error as Error).message;
+      expect(message.startsWith(TODAYS_MESSAGE)).toBe(true);
+      expect(message).toBe(`${TODAYS_MESSAGE} Overdeck tried to update Claude Code automatically and it failed: npm ERR! EACCES.`);
+    });
+
+    it('checks its own minimum after a run that ran no command, and refuses with a note when still too old (review)', async () => {
+      const error = await assertClaudeCodeSupportsModel('/usr/local/bin/claude', 'claude-sonnet-5-5', {
+        readVersion: async () => '2.1.280',
+        detectInstall: () => NPM_INSTALL,
+        upgradePlan: async () => NPM_PLAN,
+        resolveRealPath: async (p) => p,
+        autoUpdateEnabled: async () => true,
+        launchUpdate: async () => ({ kind: 'already-current' }),
+      }).catch((e: unknown) => e);
+      expect((error as Error).message).toBe(
+        `${TODAYS_MESSAGE} Overdeck found no Claude Code update to run, but the launch binary still reports an older version.`,
+      );
+    });
+
+    it('raises the unchanged refusal and runs nothing for a non-runnable plan (PAN-5108 FR-6)', async () => {
+      const launchUpdate = vi.fn();
+      const plan = { method: 'npm' as const, argv: null, display: 'sudo npm install -g @anthropic-ai/claude-code@latest', runnable: false, reason: 'not-writable' as const };
+      const error = await assertClaudeCodeSupportsModel('/usr/local/bin/claude', 'claude-sonnet-5-5', {
+        readVersion: async () => '2.1.280',
+        detectInstall: () => NPM_INSTALL,
+        upgradePlan: async () => plan,
+        resolveRealPath: async (p) => p,
+        autoUpdateEnabled: async () => true,
+        launchUpdate,
+      }).catch((e: unknown) => e);
+      expect((error as Error).message).toBe(formatClaudeCodeTooOldMessage({
+        model: 'claude-sonnet-5-5',
+        displayName: 'Claude Sonnet 5.5',
+        installed: '2.1.280',
+        required: '2.1.284',
+        binaryPath: '/usr/local/bin/claude',
+        upgradeCommand: plan.display,
+      }));
+      expect(launchUpdate).not.toHaveBeenCalled();
     });
   });
 });

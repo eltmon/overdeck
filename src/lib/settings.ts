@@ -55,7 +55,7 @@ export type CerebrasModel = 'gpt-oss-120b';
 export type MistralModel = 'mistral-large-4-0';
 export type QuantumLlamaModel = 'ql-reason-70b' | 'ql-swift-8b' | 'ql-nano-1b';
 export type OpenCodeModelId = `opencode/${string}` | `opencode-go/${string}`;
-export type MuseModel = 'muse-wonder-1.0' | 'muse-spark-1.3' | 'muse-spark-1.3-contributor';
+export type MuseModel = 'muse-wonder-1.0' | 'muse-spark-1.3' | 'muse-spark-1.3-contributor' | 'muse-ember-1.0' | 'muse-wonder-full-1.0';
 export type ModelId = OpenCodeModelId | MuseModel | AnthropicModel | OpenAIModel | GoogleModel | KimiModel | MiniMaxModel | ZAIModel | MimoModel | NousModel | DashScopeModel | GrokModel | GrokBuildModel | GroqModel | CerebrasModel | MistralModel | QuantumLlamaModel;
 
 // Specialist agent types
@@ -305,7 +305,7 @@ export function getAgentCommand(modelId: ModelId | string): { command: string; a
       args: ['--model', getClaudeModelFlag(modelId)],
     };
   }
-  if (modelId === 'muse-wonder-1.0' || modelId === 'muse-spark-1.3' || modelId === 'muse-spark-1.3-contributor') {
+  if (modelId === 'muse-wonder-1.0' || modelId === 'muse-spark-1.3' || modelId === 'muse-spark-1.3-contributor' || modelId === 'muse-ember-1.0' || modelId === 'muse-wonder-full-1.0') {
     return { command: getHarnessBehavior('muse').executableName, args: ['--model', modelId] };
   }
   // Non-Anthropic direct providers: use claude CLI with the model name as-is.

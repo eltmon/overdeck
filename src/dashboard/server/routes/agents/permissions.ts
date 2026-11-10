@@ -24,6 +24,7 @@ import {
 import { emitActivityEntry } from '../../../../lib/activity-logger.js';
 import { DEFT_ESCALATION_TOOL_ID_PREFIX, DEFT_MENU_TOOL_ID_PREFIX } from '../../../../lib/deft/pending.js';
 import { answerDeftEscalation, answerDeftMenu } from '../../../../lib/deft/pending-answer.js';
+import { noteOperatorAnswer } from '../../../../lib/push/operator-answers.js';
 import { ReadModelService } from '../../read-model.js';
 import { EventStoreService } from '../../services/domain-services.js';
 import { jsonResponse } from '../../http-helpers.js';
@@ -186,6 +187,8 @@ export async function handlePostAgentAnswerQuestion(
     if (!result.ok) {
       return { body: { error: result.failure ?? 'delivery failed', code: 'delivery-failed' }, status: 502 };
     }
+    // PAN-5111: the push history credits this answer to the question it reached.
+    noteOperatorAnswer(`auq:${questionSet.toolId}`);
     const workspace = getAgentState(id)?.workspace;
     const decision = workspace ? readOpenOperatorDecision(workspace) : null;
     if (workspace && decision?.questionId === questionId) {
@@ -202,7 +205,9 @@ export async function handlePostAgentAnswerQuestion(
   }
   const message = `Operator answered the pending question${answers.length > 1 ? 's' : ''}:\n\n${lines.join('\n\n')}`;
 
-  await deliverAgentMessage(id, message, 'ask-user-question-answer');
+  const delivery = await deliverAgentMessage(id, message, 'ask-user-question-answer');
+  // PAN-5111: note the question the handler answered, never a stale caller id.
+  if (delivery.ok) noteOperatorAnswer(`auq:${questionSet.toolId}`);
   return { body: { success: true, agentId: id, delivered: answers.length } };
 }
 

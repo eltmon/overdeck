@@ -88,6 +88,11 @@ import { setConversationEffort } from '../conversations.js';
 import { detectAwaitingInputForAgent } from '../../agent-input-detection.js';
 import { sendRawKeystroke } from '../../tmux.js';
 import { codexConversationPendingInput, handleConversationCodexApproval, handleConversationThinkingLevel } from '../conversation-delivery.js';
+import { operatorAnsweredBetween, resetOperatorAnswers } from '../../push/operator-answers.js';
+
+function noted(key: string): boolean {
+  return operatorAnsweredBetween(key, 0, Number.MAX_SAFE_INTEGER);
+}
 
 function seedAppServerFiles(session = 'conv-test'): void {
   mkdirSync(join(tmpHome, 'agents', session), { recursive: true });
@@ -105,6 +110,7 @@ describe('conversation codex approvals', () => {
     nextResponses = [];
     httpBodies.length = 0;
     vi.clearAllMocks();
+    resetOperatorAnswers();
   });
 
   afterEach(() => {
@@ -198,6 +204,8 @@ describe('conversation codex approvals', () => {
       { op: 'approval', requestId: 71, decision: 'accept' },
     ]);
     expect(sendRawKeystroke).not.toHaveBeenCalled();
+    // PAN-5111: the verified approval is credited in the push history.
+    expect(noted('auq:codex-approval:conv-test:71')).toBe(true);
   });
 
   it('rejects app-server approval decisions for stale request ids', async () => {
@@ -218,6 +226,8 @@ describe('conversation codex approvals', () => {
     expect(response.status).toBe(409);
     expect(httpBodies).toEqual([{ op: 'status' }]);
     expect(sendRawKeystroke).not.toHaveBeenCalled();
+    expect(noted('auq:codex-approval:conv-test:71')).toBe(false);
+    expect(noted('auq:codex-approval:conv-test:72')).toBe(false);
   });
 
   it('preserves the digit-keystroke approval path for tui transport', async () => {
@@ -231,5 +241,7 @@ describe('conversation codex approvals', () => {
     expect(httpBodies).toHaveLength(0);
     expect(sendRawKeystroke).toHaveBeenNthCalledWith(1, 'conv-test', 'Down', 'codex-approval');
     expect(sendRawKeystroke).toHaveBeenNthCalledWith(2, 'conv-test', 'Enter', 'codex-approval');
+    // The terminal menu never checks an id, so it writes no note.
+    expect(noted('auq:codex-approval:conv-test:71')).toBe(false);
   });
 });

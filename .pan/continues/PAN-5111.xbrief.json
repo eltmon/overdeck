@@ -1,0 +1,288 @@
+{
+  "version": "1",
+  "issueId": "PAN-5111",
+  "created": "2026-11-10T15:51:44.994Z",
+  "updated": "2026-11-10T17:18:15.819Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-10T17:18Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-10T17:18:15.819Z"
+    }
+  ],
+  "items": {
+    "history-store": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5111",
+      "claimedAt": "2026-11-10T15:51:44.994Z",
+      "doneAt": "2026-11-10T16:00:01.148Z"
+    },
+    "answer-note-registry": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5111",
+      "claimedAt": "2026-11-10T16:01:00.297Z",
+      "doneAt": "2026-11-10T16:01:20.707Z"
+    },
+    "dispatcher-history": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5111",
+      "claimedAt": "2026-11-10T16:05:35.340Z",
+      "doneAt": "2026-11-10T16:06:00.439Z"
+    },
+    "service-history-wiring": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5111",
+      "claimedAt": "2026-11-10T16:08:45.823Z",
+      "doneAt": "2026-11-10T16:09:03.724Z"
+    },
+    "answer-door-hooks": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5111",
+      "claimedAt": "2026-11-10T16:15:53.514Z",
+      "doneAt": "2026-11-10T16:16:14.615Z"
+    },
+    "history-route": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5111",
+      "claimedAt": "2026-11-10T16:17:49.234Z",
+      "doneAt": "2026-11-10T16:18:09.545Z"
+    },
+    "recent-notifications-ui": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5111",
+      "claimedAt": "2026-11-10T16:21:36.460Z",
+      "doneAt": "2026-11-10T16:21:57.451Z"
+    },
+    "link-failure-tracking": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5111",
+      "claimedAt": "2026-11-10T16:23:18.053Z",
+      "doneAt": "2026-11-10T16:23:37.078Z"
+    },
+    "fleet-unreachable-route": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5111",
+      "claimedAt": "2026-11-10T16:26:11.260Z",
+      "doneAt": "2026-11-10T16:26:30.097Z"
+    },
+    "unreachable-desktop-row": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5111",
+      "claimedAt": "2026-11-10T16:31:32.198Z",
+      "doneAt": "2026-11-10T16:31:52.254Z"
+    },
+    "unreachable-phone-row": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5111",
+      "claimedAt": "2026-11-10T16:32:20.627Z",
+      "doneAt": "2026-11-10T16:32:37.867Z"
+    },
+    "docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5111",
+      "claimedAt": "2026-11-10T16:34:07.108Z",
+      "doneAt": "2026-11-10T16:34:27.199Z"
+    },
+    "history-store.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T16:52:59.145Z"
+    },
+    "history-store.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T16:53:20.519Z"
+    },
+    "history-store.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-10T16:53:38.784Z"
+    },
+    "history-store.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-10T16:53:57.839Z"
+    },
+    "history-store.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-10T16:54:20.624Z"
+    },
+    "answer-note-registry.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T16:54:40.685Z"
+    },
+    "answer-note-registry.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T16:55:00.034Z"
+    },
+    "answer-note-registry.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-10T16:55:21.138Z"
+    },
+    "answer-door-hooks.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T16:55:40.815Z"
+    },
+    "answer-door-hooks.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T16:55:59.595Z"
+    },
+    "answer-door-hooks.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-10T16:56:38.288Z"
+    },
+    "answer-door-hooks.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-10T16:56:57.293Z"
+    },
+    "dispatcher-history.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T16:57:19.722Z"
+    },
+    "dispatcher-history.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T16:57:41.644Z"
+    },
+    "dispatcher-history.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-10T16:58:03.585Z"
+    },
+    "dispatcher-history.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-10T16:58:43.541Z"
+    },
+    "service-history-wiring.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T16:59:23.664Z"
+    },
+    "service-history-wiring.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-10T16:59:43.376Z"
+    },
+    "service-history-wiring.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:00:01.961Z"
+    },
+    "history-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:00:23.771Z"
+    },
+    "history-route.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:00:46.038Z"
+    },
+    "history-route.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:01:06.162Z"
+    },
+    "recent-notifications-ui.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:01:27.378Z"
+    },
+    "recent-notifications-ui.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:01:48.745Z"
+    },
+    "recent-notifications-ui.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:02:08.989Z"
+    },
+    "recent-notifications-ui.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:02:28.228Z"
+    },
+    "recent-notifications-ui.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:02:51.896Z"
+    },
+    "link-failure-tracking.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:03:13.752Z"
+    },
+    "link-failure-tracking.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:03:36.441Z"
+    },
+    "link-failure-tracking.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:03:56.445Z"
+    },
+    "link-failure-tracking.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:04:19.343Z"
+    },
+    "fleet-unreachable-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:04:41.899Z"
+    },
+    "fleet-unreachable-route.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:05:03.264Z"
+    },
+    "fleet-unreachable-route.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:05:23.100Z"
+    },
+    "fleet-unreachable-route.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:05:46.547Z"
+    },
+    "unreachable-desktop-row.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:06:08.006Z"
+    },
+    "unreachable-desktop-row.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:06:28.395Z"
+    },
+    "unreachable-desktop-row.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:06:52.828Z"
+    },
+    "unreachable-phone-row.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:07:17.934Z"
+    },
+    "unreachable-phone-row.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:07:44.945Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:08:05.204Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:08:28.046Z"
+    },
+    "docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:08:46.564Z"
+    },
+    "docs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:09:03.607Z"
+    },
+    "answer-door-hooks.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:09:29.134Z"
+    },
+    "dispatcher-history.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:09:47.344Z"
+    },
+    "service-history-wiring.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:10:06.060Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-10T17:18:15Z",
+      "markdownBody": "# CI Failure Feedback for PAN-5111\n\nPull request: https://github.com/eltmon/overdeck/pull/5115 (head `7b08e49e`)\n\nSource: check_run:test-shard (4/4)\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\n## Failing checks (1)\n\n### test-shard (4/4)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/129991795301/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/42862425963/job/129991795301  \n```\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/lib/agents/delivery-no-loss-audit.test.ts\u001b[2m > \u001b[22mdelivery call-site inventory (W7 no-loss audit)\u001b[2m > \u001b[22mfinds no message-delivery call site missing from the audited list\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/lib/agents/delivery-no-loss-audit.test.ts\u001b[2m > \u001b[22mdelivery call-site inventory (W7 no-loss audit)\u001b[2m > \u001b[22mfinds no message-delivery call site missing from the audited list\n\u001b[31m\u001b[1mAssertionError\u001b[22m: expected [ Array(1) ] to deeply equal []\u001b[39m\n\n\u001b[32m- Expected\u001b[39m\n\u001b[31m+ Received\u001b[39m\n\n\u001b[32m- []\u001b[39m\n\u001b[31m+ [\u001b[39m\n\u001b[31m+   \"dashboard/server/routes/agents/permissions.ts|const delivery = await deliverAgentMessage(id, message, 'ask-user-question-answer');\",\u001b[39m\n\u001b[31m+ ]\u001b[39m\n\n\u001b[36m \u001b[2m❯\u001b[22m tests/unit/lib/agents/delivery-no-loss-audit.test.ts:\u001b[2m122:21\u001b[22m\u001b[39m\n    \u001b[90m120|\u001b[39m       }\n    \u001b[90m121|\u001b[39m     }\n    \u001b[90m122|\u001b[39m     \u001b[34mexpect\u001b[39m(unknown)\u001b[33m.\u001b[39m\u001b[34mtoEqual\u001b[39m([])\u001b[33m;\u001b[39m\n    \u001b[90m   |\u001b[39m                     \u001b[31m^\u001b[39m\n    \u001b[90m123|\u001b[39m   })\u001b[33m;\u001b[39m\n    \u001b[90m124|\u001b[39m })\u001b[33m;\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\u001b[22m\u001b[39m\n\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m1 failed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[1m\u001b[32m625 passed\u001b[39m\u001b[22m\u001b[90m (626)\u001b[39m\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    }
+  ]
+}

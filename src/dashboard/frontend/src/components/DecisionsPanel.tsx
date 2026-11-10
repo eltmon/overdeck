@@ -17,6 +17,8 @@ import { describePendingInput } from '../lib/pendingInput';
 import { getPendingQuestionTitle } from '../lib/pipeline-state';
 import { AgentRequestCard } from './AgentRequestCard';
 import { DiskAlertCard } from './DiskAlertCard';
+import { UnreachableMachineCard } from './UnreachableMachineCard';
+import { HarnessUpdateCard } from './HarnessUpdateCard';
 import { McpSignInCard } from './McpSignInCard';
 import { AwaitingInputIndicator } from './AwaitingInputIndicator';
 import { formatRelativeTime } from '../lib/formatRelativeTime';
@@ -148,6 +150,12 @@ function Group({ title, hint, decisions, onOpenSubject }: { title: string; hint:
         // never an agent waiting on an answer.
         d.diskAlert
           ? <DiskAlertCard key="disk-alert" decision={d} />
+          // PAN-5111 — a linked machine this machine cannot reach; nothing to answer here.
+          : d.unreachableMachine
+          ? <UnreachableMachineCard key={`unreachable:${d.id}`} decision={d} />
+          // PAN-5108 — a failed harness update has its own card: nothing to answer or open.
+          : d.harnessUpdate
+          ? <HarnessUpdateCard key={`harness-update:${d.id}`} decision={d} />
           // PAN-4946 — an MCP sign-in has its own card, checked before agentRequest.
           : d.mcpSignIn
           ? <McpSignInCard key={`mcp-sign-in:${d.id}`} decision={d} />
@@ -164,9 +172,12 @@ export function DecisionsPanel({ onOpenSubject }: { onOpenSubject?: (d: Decision
   const decisions = useDecisions();
   // PAN-5093 — the disk alert is never an agent waiting on an answer, so it
   // gets its own group and never "Blocking work"'s hint, even at critical.
-  const system = decisions.filter((d) => d.diskAlert);
-  const blocking = decisions.filter((d) => d.blocking && !d.diskAlert);
-  const waiting = decisions.filter((d) => !d.blocking && !d.diskAlert);
+  // PAN-5108 — a failed harness update is machine state too.
+  // PAN-5111 — so is an unreachable linked machine.
+  const isSystem = (d: Decision) => Boolean(d.diskAlert || d.harnessUpdate || d.unreachableMachine);
+  const system = decisions.filter(isSystem);
+  const blocking = decisions.filter((d) => d.blocking && !isSystem(d));
+  const waiting = decisions.filter((d) => !d.blocking && !isSystem(d));
 
   if (decisions.length === 0) {
     return (

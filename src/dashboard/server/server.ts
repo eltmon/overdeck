@@ -147,6 +147,7 @@ import { prereqsRouteLayer } from './routes/prereqs.js';
 import { cliproxyRouteLayer } from './routes/cliproxy.js';
 import { githubQuotaRouteLayer } from './routes/github-quota.js';
 import { diskAlertRouteLayer } from './routes/disk-alert.js';
+import { harnessAutoUpdateRouteLayer } from './routes/harness-auto-update.js';
 import { telemetryClientConfigRouteLayer } from './routes/telemetry-client-config.js';
 import { ttsRouteLayer } from './routes/tts.js';
 import { webhooksRouteLayer } from './routes/webhooks.js';
@@ -444,6 +445,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   cliproxyRouteLayer,
   githubQuotaRouteLayer,
   diskAlertRouteLayer,
+  harnessAutoUpdateRouteLayer,
   telemetryClientConfigRouteLayer,
   ttsRouteLayer,
   webhooksRouteLayer,

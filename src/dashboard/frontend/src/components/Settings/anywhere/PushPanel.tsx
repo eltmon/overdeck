@@ -11,6 +11,7 @@ import {
   type PushStatus,
 } from '../../push/pushApi';
 import { TurnOnNotificationsButton } from '../../push/TurnOnNotificationsButton';
+import { RecentNotifications } from './RecentNotifications';
 
 type SubscriptionRow = PushStatus['webpush']['subscriptions'][number];
 
@@ -127,6 +128,7 @@ export function PushPanel() {
           <p data-testid="push-native-line" className="text-xs text-muted-foreground px-4 pt-1">{nativeLine(status.native)}</p>
         </>
       ) : null}
+      <RecentNotifications />
     </div>
   );
 }

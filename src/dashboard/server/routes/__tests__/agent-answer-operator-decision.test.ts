@@ -30,6 +30,11 @@ vi.mock('../agents/shared.js', () => ({
 }));
 
 const { handlePostAgentAnswerQuestion } = await import('../agents/permissions.js');
+const { operatorAnsweredBetween, resetOperatorAnswers } = await import('../../../../lib/push/operator-answers.js');
+
+function noted(key: string): boolean {
+  return operatorAnsweredBetween(key, 0, Number.MAX_SAFE_INTEGER);
+}
 const { readPipelineJournal } = await import('../../../../lib/cloister/pipeline-journal.js');
 const {
   operatorDecisionAsPendingQuestion,
@@ -53,6 +58,7 @@ function ask() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  resetOperatorAnswers();
   workspace = mkdtempSync(join(tmpdir(), 'answer-operator-decision-'));
   mocks.getAgentState.mockReturnValue({ id: agentId, workspace });
 });
@@ -150,5 +156,52 @@ describe('handlePostAgentAnswerQuestion for a Deft escalation (PAN-4849)', () =>
 
     expect(result).toEqual({ status: 200, body: { success: true, agentId, delivered: 1 } });
     expect(mocks.deliverAgentMessage).toHaveBeenCalledWith(agentId, '1. Accept', 'deft-menu-answer');
+  });
+});
+
+describe('handlePostAgentAnswerQuestion answer notes (PAN-5111)', () => {
+  const plainQuestion = (toolId: string) => ({
+    toolId,
+    questions: [{ question: 'Which branch?', options: [{ label: 'main' }, { label: 'next' }] }],
+  });
+
+  it('notes the matched question after a successful delivery', async () => {
+    mocks.getAgentPendingQuestions.mockResolvedValue([plainQuestion('toolu_1')]);
+    mocks.deliverAgentMessage.mockResolvedValue({ ok: true, path: 'tmux' });
+
+    await handlePostAgentAnswerQuestion(agentId, { answers: ['main'], toolUseId: 'toolu_1' });
+
+    expect(noted('auq:toolu_1')).toBe(true);
+  });
+
+  it('writes no note when delivery fails', async () => {
+    mocks.getAgentPendingQuestions.mockResolvedValue([plainQuestion('toolu_1')]);
+    mocks.deliverAgentMessage.mockResolvedValue({ ok: false, path: 'tmux', failure: 'pane gone' });
+
+    const result = await handlePostAgentAnswerQuestion(agentId, { answers: ['main'], toolUseId: 'toolu_1' });
+
+    expect(result.body).toMatchObject({ success: true });
+    expect(noted('auq:toolu_1')).toBe(false);
+  });
+
+  it('notes the question actually answered, not a stale caller id', async () => {
+    mocks.getAgentPendingQuestions.mockResolvedValue([plainQuestion('toolu_live')]);
+    mocks.deliverAgentMessage.mockResolvedValue({ ok: true, path: 'tmux' });
+
+    await handlePostAgentAnswerQuestion(agentId, { answers: ['main'], toolUseId: 'toolu_stale' });
+
+    expect(noted('auq:toolu_live')).toBe(true);
+    expect(noted('auq:toolu_stale')).toBe(false);
+  });
+
+  it('notes an operator decision only after a confirmed delivery', async () => {
+    const decision = ask();
+    mocks.deliverAgentMessage.mockResolvedValueOnce({ ok: false, path: 'tmux', failure: 'pane gone' });
+    await handlePostAgentAnswerQuestion(agentId, { answers: ['Yes'], toolUseId: `operator-decision:${decision.questionId}` });
+    expect(noted(`auq:operator-decision:${decision.questionId}`)).toBe(false);
+
+    mocks.deliverAgentMessage.mockResolvedValueOnce({ ok: true, path: 'tmux' });
+    await handlePostAgentAnswerQuestion(agentId, { answers: ['Yes'], toolUseId: `operator-decision:${decision.questionId}` });
+    expect(noted(`auq:operator-decision:${decision.questionId}`)).toBe(true);
   });
 });

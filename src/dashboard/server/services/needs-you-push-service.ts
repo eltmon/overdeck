@@ -16,6 +16,12 @@
  *
  * Providers: Web Push, optional ntfy, and the Overdeck app (`native`, PAN-4843).
  *
+ * PAN-5111: every delivered push and every resolution of a pushed question or
+ * approval goes to the push history (`~/.overdeck/logs/push-sent.jsonl`), read
+ * back with its derived state by `getPushHistoryView()`. The conversation scan
+ * also runs without a push target while a pushed conversation item is still
+ * tracked, so its departure is recorded (it then pushes nothing new).
+ *
  * Runs in the primary dashboard only; a peer would send every push twice.
  * Nothing here throws into the event-store subscriber.
  */
@@ -34,6 +40,16 @@ import {
 import { createNeedsYouDispatcher, type DispatcherStats, type NeedsYouDispatcher } from '../../../lib/push/dispatcher.js';
 import { createNativePushProvider, nativePushPhones } from '../../../lib/push/native-provider.js';
 import { createNtfyProvider } from '../../../lib/push/ntfy-provider.js';
+import { operatorAnsweredBetween } from '../../../lib/push/operator-answers.js';
+import {
+  getPushHistory,
+  PUSH_HISTORY_RECENT_LIMIT,
+  pushEntryState,
+  type PushEntryState,
+  type PushHistory,
+  type PushHistoryEntry,
+  type PushStateContext,
+} from '../../../lib/push/push-history.js';
 import { listPushSubscriptions } from '../../../lib/push/subscription-store.js';
 import type { ProviderSendOutcome, PushProvider } from '../../../lib/push/types.js';
 import { createWebPushProvider } from '../../../lib/push/webpush-provider.js';
@@ -43,6 +59,12 @@ import { currentDirectoryClient } from './directory-client.js';
 
 export const CONVERSATION_SCAN_INTERVAL_MS = 5_000;
 export const WAKE_DEBOUNCE_MS = 500;
+/** PAN-5111 D-8: unresolved entries read as answered-or-withdrawn only after this long and one scan. */
+export const WARM_AFTER_MS = 60_000;
+
+export interface PushHistoryView extends PushHistoryEntry {
+  state: PushEntryState;
+}
 
 export interface PushStatus {
   enabled: boolean;
@@ -72,6 +94,10 @@ interface ServiceState {
   wakeTimer: ReturnType<typeof setTimeout> | null;
   scanInFlight: boolean;
   conversationSubjects: Set<string>;
+  history: PushHistory;
+  now: () => number;
+  startedAt: number;
+  scanCompleted: boolean;
 }
 
 let state: ServiceState | null = null;
@@ -89,7 +115,11 @@ async function scanConversations(): Promise<void> {
   if (current === null || current.scanInFlight) return;
   current.scanInFlight = true;
   try {
-    if (!(await current.dispatcher.hasTargets())) return;
+    // Adoption (D-8) needs the history loaded before the first observation.
+    await current.history.ready();
+    // D-8a: keep observing departures of tracked items even without a target.
+    const notify = await current.dispatcher.hasTargets();
+    if (!notify && !current.dispatcher.tracksConversations()) return;
     const result = await current.readConversationFeed();
     if (result.status !== undefined || !Array.isArray(result.body)) return;
     const seen = new Set<string>();
@@ -97,13 +127,14 @@ async function scanConversations(): Promise<void> {
       if (!row || typeof row.name !== 'string') continue;
       const { subject, items } = pendingItemsFromConversationRow(row);
       seen.add(subject);
-      current.dispatcher.observeSubject(subject, items);
+      current.dispatcher.observeSubject(subject, items, { notify });
     }
     // Answered items clear, so the next question in that conversation notifies.
     for (const subject of current.conversationSubjects) {
-      if (!seen.has(subject)) current.dispatcher.observeSubject(subject, []);
+      if (!seen.has(subject)) current.dispatcher.observeSubject(subject, [], { notify });
     }
     current.conversationSubjects = seen;
+    current.scanCompleted = true;
   } catch (error) {
     console.warn('[push] conversation scan failed:', error instanceof Error ? error.message : error);
   } finally {
@@ -143,9 +174,20 @@ export function startNeedsYouPushService(deps: {
   store?: Pick<EventStore, 'subscribe'>;
   providers?: PushProvider[];
   stopRecordedBefore?: (agentId: string, sequence: number) => boolean;
+  history?: PushHistory;
+  now?: () => number;
 }): void {
   if (state !== null) return;
-  const dispatcher = createNeedsYouDispatcher({ providers: deps.providers ?? defaultProviders(), readConfig: readPushConfig });
+  const history = deps.history ?? getPushHistory();
+  const now = deps.now ?? Date.now;
+  void history.ready();
+  const dispatcher = createNeedsYouDispatcher({
+    providers: deps.providers ?? defaultProviders(),
+    readConfig: readPushConfig,
+    now,
+    history,
+    wasAnswered: operatorAnsweredBetween,
+  });
   const store = deps.store ?? getEventStore();
 
   const unsubscribe = store.subscribe((event) => {
@@ -175,6 +217,10 @@ export function startNeedsYouPushService(deps: {
     wakeTimer: null,
     scanInFlight: false,
     conversationSubjects: new Set(),
+    history,
+    now,
+    startedAt: now(),
+    scanCompleted: false,
   };
 }
 
@@ -195,7 +241,11 @@ export function pushNeedsYouEdge(notification: EdgeNotification): void {
 
 /** Send a test notification to every target, bypassing dedup and the rate limit. */
 export function sendTestPush(): Promise<ProviderSendOutcome[]> {
-  const dispatcher = state?.dispatcher ?? createNeedsYouDispatcher({ providers: defaultProviders(), readConfig: readPushConfig });
+  const dispatcher = state?.dispatcher ?? createNeedsYouDispatcher({
+    providers: defaultProviders(),
+    readConfig: readPushConfig,
+    history: getPushHistory(),
+  });
   return dispatcher.sendNow({
     kind: 'test',
     category: 'test',
@@ -207,6 +257,18 @@ export function sendTestPush(): Promise<ProviderSendOutcome[]> {
     issueId: null,
     ts: new Date().toISOString(),
   });
+}
+
+/** PAN-5111: the last `limit` pushes, newest first, each with its D-8 state. */
+export async function getPushHistoryView(limit = PUSH_HISTORY_RECENT_LIMIT): Promise<PushHistoryView[]> {
+  const current = state;
+  const history = current?.history ?? getPushHistory();
+  const ctx: PushStateContext = {
+    trackedIds: current?.dispatcher.trackedIds() ?? new Set<string>(),
+    isPending: (subject, key) => current?.dispatcher.isPending(subject, key) ?? false,
+    warm: current !== null && current.scanCompleted && current.now() - current.startedAt >= WARM_AFTER_MS,
+  };
+  return (await history.recent(limit)).map((entry) => ({ ...entry, state: pushEntryState(entry, ctx) }));
 }
 
 function hostOf(url: string): string {

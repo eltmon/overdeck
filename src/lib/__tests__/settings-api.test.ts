@@ -256,6 +256,19 @@ describe('loadSettingsApi', () => {
     expect(loadSettingsApi().dashboard).toEqual({ require_token_mint: true });
   });
 
+  it('reports harnesses.auto_update true when the config has no harnesses block (PAN-5108)', async () => {
+    const { loadSettingsApi } = await import('../settings-api.js');
+
+    expect(loadSettingsApi().harnesses).toEqual({ auto_update: true });
+  });
+
+  it('reports harnesses.auto_update false from the config (PAN-5108)', async () => {
+    mockLoadConfig.mockReturnValue(baseConfig({ harnesses: { autoUpdate: false } }));
+    const { loadSettingsApi } = await import('../settings-api.js');
+
+    expect(loadSettingsApi().harnesses).toEqual({ auto_update: false });
+  });
+
   it('returns seeded workhorses and roles without legacy overrides', async () => {
     const { loadSettingsApi } = await import('../settings-api.js');
     const settings = loadSettingsApi();
@@ -460,6 +473,27 @@ describe('saveSettingsApi', () => {
 
     const written = String(mockWriteFile.mock.calls[0]?.[1]);
     expect(written).toContain('require_token_mint: true');
+  });
+
+  it('writes harnesses.auto_update: false (PAN-5108 FR-2)', async () => {
+    const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
+    const settings = loadSettingsApi();
+
+    await saveSettingsApi({ ...settings, harnesses: { auto_update: false } });
+
+    const written = String(mockWriteFile.mock.calls[0]?.[1]);
+    expect(written).toContain('harnesses:\n  auto_update: false');
+  });
+
+  it('never deletes the harnesses block when a save omits it (PAN-5108 D17)', async () => {
+    mockReadFile.mockResolvedValue('harnesses:\n  auto_update: false\n');
+    const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
+    const settings = loadSettingsApi();
+
+    await saveSettingsApi({ ...settings, harnesses: undefined });
+
+    const written = String(mockWriteFile.mock.calls[0]?.[1]);
+    expect(written).toContain('harnesses:\n  auto_update: false');
   });
 
   it('round-trips config.yaml comments while writing roles, memory settings, and dropping overrides', async () => {
@@ -1299,6 +1333,18 @@ describe('validateSettingsApi', () => {
     });
     expect(result.valid).toBe(false);
     expect(result.errors).toContain('dashboard.require_token_mint must be a boolean');
+  });
+
+  it('rejects a non-boolean harnesses.auto_update (PAN-5108 FR-2)', async () => {
+    const { validateSettingsApi } = await import('../settings-api.js');
+
+    const result = validateSettingsApi({
+      ...validSettings,
+      harnesses: { auto_update: 'yes' as unknown as boolean },
+    });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('harnesses.auto_update must be a boolean');
+    expect(validateSettingsApi({ ...validSettings, harnesses: { auto_update: false } }).valid).toBe(true);
   });
 
   describe('validateSettingsApi Jev toggles (PAN-4508)', () => {

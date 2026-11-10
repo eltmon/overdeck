@@ -1,6 +1,9 @@
+import { mkdtemp, rm } from 'node:fs/promises';
 import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../agent-enrichment-service.js', () => ({ pollEnrichmentNow: vi.fn() }));
 vi.mock('../../../../lib/config-yaml.js', async () => {
@@ -10,6 +13,7 @@ vi.mock('../../../../lib/config-yaml.js', async () => {
 
 const { pollEnrichmentNow } = await import('../agent-enrichment-service.js');
 const {
+  getPushHistoryView,
   startNeedsYouPushService,
   stopNeedsYouPushService,
   wakeNeedsYouPush,
@@ -19,6 +23,8 @@ import type { MachineToDirectoryFrame } from '@overdeck/contracts';
 import type { MachineKeyPair } from '../../../../lib/anywhere/machine-key.js';
 import { openSealed } from '../../../../lib/anywhere/sealed-box.js';
 import { createNativePushProvider, type PushDirectoryPort } from '../../../../lib/push/native-provider.js';
+import { noteOperatorAnswer, resetOperatorAnswers } from '../../../../lib/push/operator-answers.js';
+import { createPushHistory, getPushHistory, type PushHistory } from '../../../../lib/push/push-history.js';
 import type { NeedsYouNotification, PushProvider } from '../../../../lib/push/types.js';
 import type { StoredEvent } from '../../event-store.js';
 
@@ -75,6 +81,12 @@ function seededKeyPair(fill: number): MachineKeyPair {
   sodium.crypto_box_seed_keypair(publicKey, secretKey, Buffer.alloc(32, fill));
   return { publicKey, secretKey };
 }
+
+// The service awaits the history load before its first scan; load the shared
+// singleton (temp OVERDECK_HOME) up front so fake-timer scans never wait on file I/O.
+beforeAll(async () => {
+  await getPushHistory().ready();
+});
 
 describe('needs-you push service (PAN-2354)', () => {
   beforeEach(() => {
@@ -211,5 +223,121 @@ describe('needs-you push service (PAN-2354)', () => {
       const opened = openSealed(Buffer.from(frame.sealed, 'base64'), (phones[index] as (typeof phones)[number]).keys);
       expect(JSON.parse(opened?.toString('utf8') ?? 'null')).toMatchObject({ v: 1, machine: 'env-1', kind: 'question' });
     });
+  });
+});
+
+describe('needs-you push service history (PAN-5111)', () => {
+  const START = Date.parse('2026-11-10T12:00:00.000Z');
+  let dir: string;
+  let history: PushHistory;
+
+  function question(askedAt: string) {
+    return { name: 'my-conv', title: 'My conversation', pendingAskUserQuestion: { toolUseId: 'toolu_h', askedAt, questions: [{ question: 'Q?' }] } };
+  }
+
+  function mutableFeed(initial: unknown[]) {
+    const feed = { rows: initial, read: vi.fn(async () => ({ body: feed.rows })) };
+    return feed;
+  }
+
+  function switchableProvider(): PushProvider & { sent: NeedsYouNotification[]; targets: boolean } {
+    const provider = {
+      name: 'fake',
+      sent: [] as NeedsYouNotification[],
+      targets: true,
+      hasTargets: async () => provider.targets,
+      send: async (n: NeedsYouNotification) => {
+        provider.sent.push(n);
+        return [{ target: 'fake:1', ok: true as const }];
+      },
+    };
+    return provider;
+  }
+
+  async function freshHistory(): Promise<PushHistory> {
+    const h = createPushHistory({ dir });
+    await h.ready();
+    return h;
+  }
+
+  beforeEach(async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(START);
+    resetOperatorAnswers();
+    dir = await mkdtemp(join(tmpdir(), 'push-service-history-'));
+    history = await freshHistory();
+  });
+
+  afterEach(async () => {
+    stopNeedsYouPushService();
+    vi.useRealTimers();
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  it('shows a delivered question open, then answered-or-withdrawn once it leaves and the service is warm', async () => {
+    const feed = mutableFeed([question(new Date(START).toISOString())]);
+    startNeedsYouPushService({ readConversationFeed: feed.read, store: fakeStore().store, providers: [switchableProvider()], history });
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect((await getPushHistoryView()).map((e) => [e.key, e.subject, e.state])).toEqual([['auq:toolu_h', 'conv:my-conv', 'open']]);
+
+    feed.rows = [];
+    await vi.advanceTimersByTimeAsync(60_000);
+    const [entry] = await getPushHistoryView();
+    expect(entry!.resolution?.outcome).toBe('resolved-without-answer');
+    expect(entry!.state).toBe('resolved-without-answer');
+  });
+
+  it('shows answered when the operator answered through Overdeck before the question left', async () => {
+    const feed = mutableFeed([question(new Date(START).toISOString())]);
+    startNeedsYouPushService({ readConversationFeed: feed.read, store: fakeStore().store, providers: [switchableProvider()], history });
+    await vi.advanceTimersByTimeAsync(5_000);
+    noteOperatorAnswer('auq:toolu_h');
+    feed.rows = [];
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect((await getPushHistoryView()).map((e) => e.state)).toEqual(['answered']);
+  });
+
+  it('keeps recording departures without a push target, and pushes nothing new', async () => {
+    const provider = switchableProvider();
+    const feed = mutableFeed([question(new Date(START).toISOString())]);
+    startNeedsYouPushService({ readConversationFeed: feed.read, store: fakeStore().store, providers: [provider], history });
+    await vi.advanceTimersByTimeAsync(5_000);
+
+    provider.targets = false;
+    feed.rows = [{ name: 'my-conv', title: 'My conversation', pendingAskUserQuestion: { toolUseId: 'toolu_new', askedAt: new Date().toISOString(), questions: [] } }];
+    await vi.advanceTimersByTimeAsync(20_000);
+
+    expect(provider.sent.map((n) => n.tag)).toEqual(['auq:toolu_h']);
+    const entries = await history.recent();
+    expect(entries.map((e) => [e.key, e.resolution?.outcome ?? null])).toEqual([['auq:toolu_h', 'resolved-without-answer']]);
+  });
+
+  it('re-adopts an open entry after a restart instead of calling it withdrawn', async () => {
+    const askedAt = new Date(START).toISOString();
+    const feed = mutableFeed([question(askedAt)]);
+    startNeedsYouPushService({ readConversationFeed: feed.read, store: fakeStore().store, providers: [switchableProvider()], history });
+    await vi.advanceTimersByTimeAsync(5_000);
+    await history.flush();
+    const [pushed] = await history.recent();
+    stopNeedsYouPushService();
+
+    // Restart well after the question was asked, so the still-pending item is primed.
+    await vi.advanceTimersByTimeAsync(120_000);
+    const restarted = await freshHistory();
+    const provider = switchableProvider();
+    startNeedsYouPushService({ readConversationFeed: feed.read, store: fakeStore().store, providers: [provider], history: restarted });
+    expect((await getPushHistoryView()).map((e) => e.state)).toEqual([null]);
+
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect((await getPushHistoryView()).map((e) => e.state)).toEqual(['open']);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect((await getPushHistoryView()).map((e) => e.state)).toEqual(['open']);
+    expect(provider.sent).toHaveLength(0);
+
+    feed.rows = [];
+    await vi.advanceTimersByTimeAsync(20_000);
+    const [entry] = await restarted.recent();
+    expect(entry!.id).toBe(pushed!.id);
+    expect(entry!.resolution?.outcome).toBe('resolved-without-answer');
   });
 });

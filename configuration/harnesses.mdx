@@ -26,7 +26,7 @@ skills, MCP, and AGENTS.md — see the [Harness Landscape](/reference/harness-la
 | `acp` | [Kimi Code CLI](https://www.kimi.com/code/docs/en/kimi-code-cli/guides/getting-started.html) (`kimi`) | Opt-in Kimi work | Uses the open Agent Client Protocol over a persistent authenticated host; Kimi is the first wired ACP agent. |
 | `kimi-code` | [Kimi Code CLI](https://www.kimi.com/code/docs/en/kimi-code-cli/guides/getting-started.html) (`kimi`) | Kimi models (built-in default) | Drives Kimi's own native terminal UI directly — no ACP host, no Anthropic-compatibility endpoint. Kimi models only. Set `providerHarnesses.kimi` to `acp` or `claude-code` to opt back out. |
 | `opencode` | [OpenCode](https://opencode.ai) (`opencode`) | OpenCode Go and Zen | Persistent ACP sessions, native credentials, and model discovery; verified with 1.18.31. |
-| `muse` | Muse Code (`muse`) | Meta Muse Spark models | Persistent native terminal sessions with separate Standard and Contributor model choices. |
+| `muse` | Muse Code (`muse`) | Meta Muse models (Wonder, Spark, Ember) | Persistent native terminal sessions with separate Standard and Contributor model choices. |
 | `prime-agent` | [Prime Agent](https://github.com/PrimeIntellect-ai/prime-agent) (`prime-agent`) | Opt-in multi-provider work | RPC mode behind an Overdeck host, with one private Prime daemon per agent; supports 0.8.x. |
 | `grok` | [Grok Build](https://x.ai/cli) (`grok`) | Grok Build sign-in (SuperGrok) | Persistent ACP sessions, sign-in reuse, reported cost; verified with 1.0.77. |
 
@@ -167,6 +167,42 @@ Running sessions keep their current Claude Code. No terminal session was
 created.
 ```
 
+#### Automatic updates
+
+Overdeck keeps npm-installed coding-agent CLIs (Claude Code, Codex CLI and
+OpenCode) up to date by default. It checks 2 minutes after the dashboard
+starts and then once a day. It checks one CLI at a time, and it updates a CLI
+only when npm has a newer version.
+
+When a launch needs a newer Claude Code, Overdeck first runs the Claude Code
+update once (for an npm or a native install), checks the version again, and
+continues the launch if the new version is enough. If the update fails, the
+launch error ends with a sentence that says what failed. Overdeck then waits
+15 minutes before it tries that update again for a launch.
+
+The daily check does not update CLIs that were installed another way (native
+`claude`, Kimi, Homebrew, a root-owned npm prefix, or Windows). The dashboard
+log names the command to run for each of them.
+
+Running agents and conversations keep the version they started with. New
+launches use the new version.
+
+A failed daily update shows in **Needs you** with the error and the command to
+run by hand. Overdeck tries it again at the next daily check.
+
+To turn automatic updates off, open **Settings**, go to **Coding Agents**, and
+switch off **Keep coding-agent CLIs up to date automatically**. Or set it in
+`~/.overdeck/config.yaml`:
+
+```yaml
+harnesses:
+  auto_update: false
+```
+
+The setting applies to the whole machine. A project `.pan.yaml` cannot set it.
+With it off, Overdeck behaves as before: the launch is refused and the
+dashboard shows the **Upgrade Claude Code** banner.
+
 The dashboard shows the same check as a banner in the system notices row
 while any configured model's minimum is unmet. A user-writable npm, native
 (`claude update`), or reachable-`brew` install gets an **Upgrade Claude
@@ -186,24 +222,40 @@ could confuse a shell running `claude` directly.
 Install Muse Code and sign in with `muse login`. For API-key authentication,
 use `muse auth set --api-key-stdin`; Muse owns its credentials. Overdeck uses
 the installed `muse` binary and does not route these models through CLIProxy.
-The integration is verified with Muse Code 1.0.2.
+The integration is verified with Muse Code 1.0.2; Muse Ember was checked with
+Muse Code 1.4.15.
 
 Enable **Meta (Muse)** in Settings → Providers, then choose a model in the
-model picker. All three use a 1,048,576-token context window:
+model picker. All five use a 1,048,576-token context window:
 
 | Model ID | Input / million tokens | Cached input / million tokens | Output / million tokens |
 | --- | --- | --- | --- |
 | `muse-wonder-1.0` | &#36;4.00 | &#36;0.20 | &#36;20.00 |
 | `muse-spark-1.3` | &#36;1.25 | &#36;0.15 | &#36;4.25 |
 | `muse-spark-1.3-contributor` | &#36;0.10 | &#36;0.002 | &#36;0.20 |
+| `muse-ember-1.0` | &#36;0.10 | &#36;0.004 | &#36;0.50 |
+| `muse-wonder-full-1.0` | Subscription | Subscription | Subscription |
 
-Muse Wonder and Muse Spark 1.3 accept `max` effort and Contributor stops at
-`xhigh`; Overdeck still sends at most `xhigh` (see the effort table).
+Muse Ember bills a request with more than 200K input tokens (cached tokens
+included) at &#36;0.30 / &#36;0.012 / &#36;1.50 per million tokens, and
+Overdeck's cost tracking applies that rate per request.
+
+Muse Wonder, Muse Spark 1.3, Muse Ember and Muse Wonder Full accept `max`
+effort and Contributor stops at `xhigh`; Overdeck still sends at most `xhigh`
+(see the effort table).
 
 Muse Wonder (`muse-wonder-1.0`) is Meta's frontier model, released on
-2026-10-12. Muse Wonder Full is not in the picker yet: Meta offers it only on
-the Muse Code Power Usage and Maximum Usage plans and has not published its
-model ID.
+2026-10-12.
+
+Muse Ember (`muse-ember-1.0`), released on 2026-11-09, is Meta's low-cost
+Standard model. It has no Contributor tier, and Meta's docs support only the
+full ID, not a bare `muse-ember` alias.
+
+Muse Wonder Full (`muse-wonder-full-1.0`) is available only on the Muse Code
+Power Usage (&#36;50/mo) and Maximum Usage (&#36;200/mo) plans. It is not served by
+the Meta Model API, so it has no per-token price; the picker and cost tables
+mark it as a subscription model. Real acceptance against those plans has not
+been verified in this repository.
 
 The Contributor tier requires contributing prompts and completions for model
 training. Choose it explicitly when that data use fits your work. Standard
@@ -1075,7 +1127,9 @@ A `claude-code` launch was refused because the configured model's minimum
 Claude Code version is newer than the launch binary. See
 [Claude Code version requirements](#claude-code-version-requirements) — run
 the upgrade command the error names, or click **Upgrade Claude Code** in the
-dashboard banner, then launch again.
+dashboard banner, then launch again. With
+[automatic updates](#automatic-updates) on, Overdeck has already tried the
+update, and the end of the error says what failed.
 
 ## Tradeoffs
 

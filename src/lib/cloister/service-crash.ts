@@ -268,6 +268,11 @@ export async function handleAgentCrash(host: CrashHost, agentId: string): Promis
     console.log(`🔔 Agent ${agentId} was intentionally stopped, skipping restart`);
     return;
   }
+  // PAN-5112: a paused agent is held on purpose; a closed pane is not a crash.
+  if (agentState.paused === true) {
+    console.log(`🔔 Agent ${agentId} is paused (${agentState.pausedReason ?? 'no reason'}), skipping restart`);
+    return;
+  }
   // #4116: only a confirmed death is a crash. An agent the liveness oracle
   // reads alive, or cannot read at all (backend unreachable), is left alone —
   // no crash count, no heartbeat_dead, no mass-death pause.

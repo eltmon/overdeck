@@ -10,6 +10,37 @@ This page starts at v0.60.0, the release that removed Overdeck's state layer. Ol
 
 {/* RELEASE STEP: before tagging vX.Y.Z, add a new <Update label="vX.Y.Z" description="YYYY-MM-DD"> block at the top with the user-facing changes since the previous tag, and point its compare link at the new tag. See docs/RELEASING.md "Update the public changelog". If a new model needs a newer Claude Code, say so and confirm its minClaudeCodeVersion is set. */}
 
+<Update label="v0.77.0" description="Unreleased" tags={["Upcoming"]}>
+  ## Upcoming release
+
+  Drafted from the changes merged to `main` since v0.76.0. The date is set when the release is tagged.
+
+  #### New
+
+  - **Recent notifications:** Settings → Anywhere → Phone notifications lists the last 50 notifications Overdeck sent, where each went, and whether the question is still waiting, was answered from Overdeck, or was answered or withdrawn elsewhere. ([PAN-5111](https://github.com/eltmon/overdeck/issues/5111))
+  - **Coding-agent CLIs stay up to date:** Overdeck now updates npm-installed Claude Code, Codex CLI and OpenCode in the background once a day, and updates Claude Code before a launch that needs a newer version, so a new model no longer stops at "needs Claude Code X or newer". Running sessions keep their version. Turn it off in Settings, Coding Agents, or with `harnesses.auto_update: false`. See [Harnesses](/configuration/harnesses).
+
+  #### Improved
+
+  - **Can't reach rows in Needs you:** when this machine cannot read a linked machine's Needs you, the desktop and the phone show `Can't reach <machine>; it may have items waiting.` until a fetch succeeds. ([PAN-5111](https://github.com/eltmon/overdeck/issues/5111))
+
+  #### Fixed
+
+  - **No more false "stopped responding" push after a PR merges.** The merged work agent is recorded as stopped when its terminal closes, and the crash watcher never counts a paused agent as crashed.
+
+  [Compare v0.76.0...v0.77.0](https://github.com/eltmon/overdeck/compare/v0.76.0...v0.77.0)
+</Update>
+
+<Update label="v0.76.0" description="2026-11-10">
+  #### New
+
+  - **Delete your account from the phone app:** Settings → **Delete account** deletes your overdeck.ai account from inside the Overdeck app. Type `DELETE` to confirm; the phone then signs out. If the request fails, the app stays signed in and offers **Delete on the web**. ([#5109](https://github.com/eltmon/overdeck/pull/5109))
+  - **Muse Ember:** Meta's `muse-ember-1.0` is in the Muse Code model picker, the Settings catalog and the cost tables (&#36;0.10/M input, &#36;0.004/M cached input, &#36;0.50/M output, 1M context). A request over 200K input tokens is billed at &#36;0.30 / &#36;0.012 / &#36;1.50, and cost tracking applies that rate per request. ([#5110](https://github.com/eltmon/overdeck/pull/5110))
+  - **Muse Wonder Full:** `muse-wonder-full-1.0` is in the Muse Code model picker as a subscription-only model, billed through the Power (&#36;50/mo) or Maximum (&#36;200/mo) Muse Code plan rather than per token. ([#5110](https://github.com/eltmon/overdeck/pull/5110))
+
+  [Compare v0.75.0...v0.76.0](https://github.com/eltmon/overdeck/compare/v0.75.0...v0.76.0)
+</Update>
+
 <Update label="v0.75.0" description="2026-11-10">
   #### New
 

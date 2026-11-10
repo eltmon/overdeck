@@ -23,6 +23,7 @@ import {
   isFeatureRegistryClassificationProvider,
   mergeCavemanConfig,
   mergeDashboardConfig,
+  mergeHarnessesConfig,
   mergeDocsConfig,
   mergeRemoteConfig,
   mergeRtkConfig,
@@ -173,6 +174,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     ollama: { ...DEFAULT_CONFIG.ollama },
     jev: { ...DEFAULT_CONFIG.jev },
     security: { semgrep: { ...DEFAULT_CONFIG.security.semgrep } },
+    harnesses: { ...DEFAULT_CONFIG.harnesses },
     enabledProviders: new Set(DEFAULT_CONFIG.enabledProviders),
     providerHarnesses: { ...DEFAULT_CONFIG.providerHarnesses },
     workhorses: { ...DEFAULT_WORKHORSES },
@@ -991,6 +993,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
 
     // Merge dashboard access settings (PAN-4435)
     mergeDashboardConfig(result, config);
+    mergeHarnessesConfig(result, config); // PAN-5108
 
     // Merge conversationSearch configuration
     if (config.conversationSearch) {

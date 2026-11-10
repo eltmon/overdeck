@@ -253,7 +253,34 @@ Conversation titles, question text and previews never reach ntfy.
 - **Removing a subscription.** **Remove** in the Phone notifications panel
   deletes it. On the device itself, it also unsubscribes the browser.
 
+## Recent notifications
+
+Settings → Anywhere → **Phone notifications** lists the last 50 notifications
+Overdeck sent, newest first. Each row shows the title, when it went out, how
+many devices it reached, and why a device failed, if one did. **Open** goes to
+the conversation or issue it was about.
+
+Overdeck keeps this list in `~/.overdeck/logs/push-sent.jsonl`. It starts a new
+file at 5 MB and keeps the previous one as `push-sent.jsonl.1`. The file holds
+each notification's title and delivery result, never the question text.
+
+A question or approval also shows where it stands now:
+
+- **Waiting**: it is still in Needs you.
+- **Answered**: you answered it from Overdeck, on the desktop or the phone.
+- **Answered or withdrawn**: it left Needs you without an answer sent from
+  Overdeck. You answered it in the terminal, or the agent moved on without one.
+
+Right after the dashboard starts, an older question can show no state for up
+to a minute, until Overdeck has checked what is still waiting.
+
 ## Troubleshooting
+
+**A notification arrived but Needs you is empty.** Open **Recent
+notifications** to see what was sent and where the question stands. **Answered
+or withdrawn** means it left Needs you before you got to it. If Needs you shows
+`Can't reach <machine>; it may have items waiting.`, this machine cannot read
+that linked machine's list, so open that machine to see its items.
 
 **There is no Turn on notifications button.** The panel explains why in its
 place:

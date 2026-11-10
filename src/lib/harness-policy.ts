@@ -177,7 +177,7 @@ export function canUseHarness(
   if (harness === 'muse' || isMuseModel) {
     return harness === 'muse' && isMuseModel ? ALLOWED : {
       allowed: false,
-      reason: 'Muse Code supports Meta Muse models. Select a Muse Spark model with the Muse Code harness.',
+      reason: 'Muse Code supports Meta Muse models. Select a Muse model with the Muse Code harness.',
     };
   }
   // Ollama serves the Anthropic Messages API, which only claude-code speaks natively.

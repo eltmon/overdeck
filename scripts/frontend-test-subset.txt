@@ -75,6 +75,7 @@ src/components/Settings/anywhere/__tests__/PairedPhonesList.test.tsx
 src/components/Settings/anywhere/__tests__/PublicMcpPanel.test.tsx
 src/components/Settings/anywhere/__tests__/PublicMcpSharedCache.test.tsx
 src/components/Settings/anywhere/__tests__/PushPanel.test.tsx
+src/components/Settings/anywhere/__tests__/RecentNotifications.test.tsx
 src/components/Settings/anywhere/__tests__/SetUpPhoneAppPanel.test.tsx
 src/components/Settings/anywhere/__tests__/SetUpPhoneDialog.test.tsx
 src/components/Settings/anywhere/__tests__/TriggersPanel.test.tsx
@@ -90,6 +91,7 @@ src/components/Settings/sections/__tests__/AutoSettleIdleRow.test.tsx
 src/components/Settings/sections/__tests__/AutoSettleOnMergeRow.test.tsx
 src/components/Settings/sections/__tests__/CloseOutSection.test.tsx
 src/components/Settings/sections/__tests__/ProviderManagementSection.test.tsx
+src/components/Settings/sections/__tests__/HarnessesSection.test.tsx
 src/components/Settings/sections/__tests__/TelemetrySection.test.tsx
 src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx
 src/components/Settings/sections/__tests__/tiered-crews.test.ts
@@ -106,6 +108,7 @@ src/components/__tests__/DegradedModeBanner.test.tsx
 src/components/__tests__/DiskAlertCard.test.tsx
 src/components/__tests__/GitHubQuotaPill.test.tsx
 src/components/__tests__/GitHubRateLimitBanner.test.tsx
+src/components/__tests__/HarnessUpdateCard.test.tsx
 src/components/__tests__/McpSignInCard.test.tsx
 src/components/__tests__/PanOpenInPicker.remote.test.tsx
 src/components/__tests__/Sidebar.workspacePullRequest.test.tsx

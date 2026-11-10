@@ -48,6 +48,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/restart-gate',                         kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'RestartGate service; read door for the current gate, outside 8 remodel domains' },
   { surface: 'GET /api/github-quota',                         kind: 'http', disposition: 'READ',       door: 'refreshGitHubQuotaSnapshot (PAN-4264); the same snapshot as the read model githubQuota' },
   { surface: 'GET /api/disk-alert',                           kind: 'http', disposition: 'READ',       door: 'getDiskAlertSnapshot (PAN-5093): disk alert level, free bytes and space holders' },
+  { surface: 'GET /api/harness-auto-update',                  kind: 'http', disposition: 'READ',       door: 'getHarnessAutoUpdateSnapshot (PAN-5108): background harness CLI updater state and failures' },
   { surface: 'GET /api/telemetry/client-config',              kind: 'http', disposition: 'READ',       door: 'telemetryClientConfig (PAN-5100): the machine telemetry setting for the phone app' },
 
   // ── admin.ts ──────────────────────────────────────────────────────────────
@@ -813,6 +814,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/push/subscriptions',            kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Needs-you push (PAN-2354); outside 8 remodel domains' },
   { surface: 'DELETE /api/push/subscriptions/:id',      kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Needs-you push (PAN-2354); outside 8 remodel domains' },
   { surface: 'POST /api/push/test',                     kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Needs-you push (PAN-2354); outside 8 remodel domains' },
+  { surface: 'GET /api/push/history',                   kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Needs-you push history (PAN-5111): last 50 sent pushes from logs/push-sent.jsonl' },
   // ── tts.ts ────────────────────────────────────────────────────────────────
   { surface: 'GET /api/tts/status',                       kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'TTS service; outside 8 remodel domains' },
   { surface: 'POST /api/tts/speak',                       kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'TTS service; outside 8 remodel domains' },
