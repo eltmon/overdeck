@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-5118",
+  "created": "2026-11-10T18:32:53.186Z",
+  "updated": "2026-11-10T18:32:53.186Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "batch-verify-lib": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5118",
+      "claimedAt": "2026-11-10T18:32:53.186Z"
+    }
+  }
+}
