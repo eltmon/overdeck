@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5118",
   "created": "2026-11-10T18:32:53.186Z",
-  "updated": "2026-11-10T19:29:37.739Z",
+  "updated": "2026-11-10T19:29:57.888Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -94,6 +94,10 @@
     "cli-variadic-done.ac4": {
       "status": "completed",
       "doneAt": "2026-11-10T19:29:37.738Z"
+    },
+    "cli-variadic-done.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-10T19:29:57.887Z"
     }
   }
 }
