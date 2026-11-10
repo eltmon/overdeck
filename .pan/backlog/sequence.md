@@ -1,13 +1,13 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-10T15:13:37.696629Z · model: claude-opus-5-5 · open: 871_
+_Last sequenced: 2026-11-10T16:29:12.024017Z · model: claude-opus-5-5 · open: 871_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-5001 | S | critical | ok |  |  | Closed-issue reaper re-checks 426 reaped issues every minute and drains the 5k/hr GitHub App quota; in pipeline. |
-| 2 | PAN-5106 | S | high | ok |  |  | Add Muse Ember (muse-ember-1.0), audit Muse catalog drift, release to NPM today; in pipeline, operator ship-today priority. |
 | 3 | PAN-5108 | M | high | ok |  |  | In pipeline: auto-update harness CLIs by default; new models are refused until the operator upgrades Claude Code by hand. |
+| 4 | PAN-5111 | M | high | ok |  |  | In pipeline: record sent pushes, mark withdrawn questions, flag unreachable linked machines in Needs you |
 | 4 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
 | 5 | PAN-5090 | XS | critical | ok |  |  | Herdr unit lacks OOMPolicy=continue: one OOM-killed pane child stops the service and kills every conversation; seen twice. |
 | 6 | PAN-4995 | S | high | ok |  |  | pan review request verifies a half-adopted workspace; its main merge trips adoption's head check -> false Needs-you on handoff PRs |
@@ -24,8 +24,8 @@ _Last sequenced: 2026-11-10T15:13:37.696629Z · model: claude-opus-5-5 · open: 
 | 17 | PAN-4671 | M | high | ok |  |  | CodeRabbit comments posted after the reviewer snapshot merge unseen; deliver late ones to the work agent at merge. Needs handoff. |
 | 18 | PAN-4675 | S | critical | ok |  |  | One transient gh label timeout aborts post-merge lifecycle; merge door replies Already merged, so the issue can never close. |
 | 19 | PAN-4705 | S | high | ok |  |  | quality-gate-admission test leaks a poller past afterEach rmSync; unhandled ENOENT fails unrelated PR CI shards. |
-| 20 | PAN-4746 | S | high | ok |  |  | CI test shard flakes on ENOTEMPTY: afterEach rmSync races an unawaited snapshot write; reds unrelated PRs (seen on #4745). |
-| 21 | PAN-5107 | S | high | ok |  |  | Phone app Settings → Delete account via DELETE /v1/account; App Review 5.1.1(v) blocker for iOS submission; in pipeline. |
+| 20 | PAN-5112 | S | high | ok |  |  | Merge closes the paused work agent's pane but leaves status running, so every merge fires a false 'stopped responding' push. |
+| 21 | PAN-4746 | S | high | ok |  |  | CI test shard flakes on ENOTEMPTY: afterEach rmSync races an unawaited snapshot write; reds unrelated PRs (seen on #4745). |
 | 22 | PAN-5104 | XS | high | ok |  |  | Stale cost hook bundle prices Fable 5.1/5.2 at Fable 5 rates; reconciler never corrects it. Unblocked: PAN-5103 merged. |
 | 23 | PAN-4572 | M | medium | ok |  |  | Residual re-render offenders PAN-4560 profiled but left: unmemoized deck rows, App 5 s poll, clock/selector identity bugs. |
 | 24 | PAN-4625 | S | high | ok |  |  | CI relay debounces a later failed check on the same head, so agents never see a failing test shard; lands after PAN-4534 (same file) |
@@ -870,8 +870,8 @@ _Last sequenced: 2026-11-10T15:13:37.696629Z · model: claude-opus-5-5 · open: 
 | 863 | PAN-4594 | M | low | ok |  | PAN-4590 | Dashboard Semgrep controls: Settings security section, per-project sast override, findings in issue view; after PAN-4590. |
 | 864 | PAN-4593 | L | low | needs-refinement |  | PAN-4590 | Semgrep Platform/Guardian tier; operator decisions (offer Guardian? contact Semgrep first?) still open — refine before work. |
 | 865 | PAN-5022 | L | medium | ok |  |  | Phone app: relay notification preferences to offline machines via the directory, and drop muted pushes on the phone. |
-| 866 | PAN-5021 | M | low | needs-refinement |  |  | PAN-5100 landed phone telemetry with conflicting decisions; re-scope to any remaining gap or close as superseded. |
 | 867 | PAN-5078 | XL | low | ok |  |  | Parked: add xAI's Grok Build CLI as a harness over ACP (stdio agent, resumable sessions). |
+| 867 | PAN-5021 | M | low | needs-refinement |  |  | PAN-5100 landed phone telemetry with conflicting decisions; re-scope to any remaining gap or close as superseded. |
 | 868 | PAN-5029 | M | medium | needs-refinement |  |  | Grok Build Tailscale reach can't work: pan mcp serve verifies tokens only against its own machine. Needs a design choice. |
 | 869 | PAN-4842 | S | medium | ok |  |  | Phone app W-DOC: phone-app.mdx and updates to Anywhere, push, tailscale and service docs; finished last. |
 | 870 | PAN-4851 | S | low | needs-refinement |  |  | Open question: opt-in Overdeck reviewer for Deft-pipeline issues; operator says low priority, do not plan or start without them |
@@ -883,13 +883,13 @@ _Last sequenced: 2026-11-10T15:13:37.696629Z · model: claude-opus-5-5 · open: 
 
 New in-pipeline substrate bug: the deacon close-out sweep alone exhausted the GitHub App REST pool, which pauses every tracker read and write across the pipeline. Pinned at the free top slot; the fix (skip already-reaped residue for 6h, no overlapping deacon-lite sweeps) is small and well specified.
 
-### PAN-5106 (rank 2)
-
-New since the prior run and already in the pipeline with an operator ship-today priority. The body is a complete, file-level brief that follows the PAN-3790 and PAN-5103 template, so it is small and well defined. It takes the free rank-2 slot because in-pipeline work is pinned near the top and is never re-ranked.
-
 ### PAN-5108 (rank 3)
 
 New issue, already in the pipeline, so it is pinned near the top. It removes a launch refusal every user hits after each model release (Fable 5.2 on 2026-11-10), reusing the PAN-4654 update plans and the PAN-4359 version gate.
+
+### PAN-5111 (rank 4)
+
+New since the prior run and already in the pipeline, so it is pinned near the top. The substrate-improvement label sets a high floor: phantom 'needs you' pushes with no record undermine operator trust in the notification path.
 
 ### PAN-5013 (rank 4)
 
@@ -955,13 +955,13 @@ New this pass. addLabel in merge-agent.ts uses Effect.promise, so one gh network
 
 New since the prior pass. A latent race in the PAN-4546 admission test fails whole CI shards with an unhandled ENOENT on PRs that never touch it (seen on #4703), costing verification attempts pipeline-wide. It sits beside PAN-4680, the sibling flake fix, because both keep CI verification honest; the fix is small and scoped to one test file or publishExclusive.
 
-### PAN-4746 (rank 20)
+### PAN-5112 (rank 20)
+
+New substrate-improvement bug with a decided, file-cited fix: merge-agent.ts pauses the work agent and closes its terminal without recording it stopped, so handleAgentCrash() counts it as a crash, emits heartbeat_dead, and the push classifier sends a false failed push after every merge (six on 2026-11-10). The fix records stopped through the normal stop door and adds a paused guard in handleAgentCrash, with tests. It fills the open rank 21 among the high-importance S substrate fixes, so no other rank moves; it is operator noise rather than a pipeline blocker, which keeps it below the critical tier.
+
+### PAN-4746 (rank 21)
 
 New flaky-test bug: a background membership-snapshot write races the test's teardown rmSync and turned an unrelated PR's CI shard red. Ranked next to PAN-4705, the same leaked-async-work-vs-teardown pattern, because each red shard costs a PR a rerun on the path to merge.
-
-### PAN-5107 (rank 21)
-
-New since the prior run and already in the pipeline. The body is a complete, file-level brief: the server route, web fallback, device token and sign-out cleanup all exist, so the work is a Settings row, a two-step confirm, three response paths, tests and docs. It blocks App Review submission for the phone app, so it ranks high, and it takes the free rank-21 slot so no other issue's rank moves.
 
 ### PAN-5104 (rank 22)
 
@@ -1206,7 +1206,7 @@ New since the prior run (filed by the PAN-4532 plan critic). recoverStalledRevie
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-10T15:13:37.696629Z",
+  "generatedAt": "2026-11-10T16:29:12.024017Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 871,
@@ -1225,15 +1225,28 @@ New since the prior run (filed by the PAN-4532 plan critic). recoverStalledRevie
       "planning": "auto"
     },
     {
-      "issue": "PAN-5106",
-      "rank": 2,
-      "size": "S",
+      "issue": "PAN-5108",
+      "rank": 3,
+      "size": "M",
       "importance": "high",
-      "score": 82,
+      "score": 80,
       "condition": "ok",
       "dependsOn": [],
-      "why": "Add Muse Ember (muse-ember-1.0), audit Muse catalog drift, release to NPM today; in pipeline, operator ship-today priority.",
-      "rationale": "New since the prior run and already in the pipeline with an operator ship-today priority. The body is a complete, file-level brief that follows the PAN-3790 and PAN-5103 template, so it is small and well defined. It takes the free rank-2 slot because in-pipeline work is pinned near the top and is never re-ranked.",
+      "why": "In pipeline: auto-update harness CLIs by default; new models are refused until the operator upgrades Claude Code by hand.",
+      "rationale": "New issue, already in the pipeline, so it is pinned near the top. It removes a launch refusal every user hits after each model release (Fable 5.2 on 2026-11-10), reusing the PAN-4654 update plans and the PAN-4359 version gate.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5111",
+      "rank": 4,
+      "size": "M",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline: record sent pushes, mark withdrawn questions, flag unreachable linked machines in Needs you",
+      "rationale": "New since the prior run and already in the pipeline, so it is pinned near the top. The substrate-improvement label sets a high floor: phantom 'needs you' pushes with no record undermine operator trust in the notification path.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1446,8 +1459,21 @@ New since the prior run (filed by the PAN-4532 plan critic). recoverStalledRevie
       "planning": "auto"
     },
     {
-      "issue": "PAN-4746",
+      "issue": "PAN-5112",
       "rank": 20,
+      "size": "S",
+      "importance": "high",
+      "score": 78,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Merge closes the paused work agent's pane but leaves status running, so every merge fires a false 'stopped responding' push.",
+      "rationale": "New substrate-improvement bug with a decided, file-cited fix: merge-agent.ts pauses the work agent and closes its terminal without recording it stopped, so handleAgentCrash() counts it as a crash, emits heartbeat_dead, and the push classifier sends a false failed push after every merge (six on 2026-11-10). The fix records stopped through the normal stop door and adds a paused guard in handleAgentCrash, with tests. It fills the open rank 21 among the high-importance S substrate fixes, so no other rank moves; it is operator noise rather than a pipeline blocker, which keeps it below the critical tier.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4746",
+      "rank": 21,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -11938,8 +11964,20 @@ New since the prior run (filed by the PAN-4532 plan critic). recoverStalledRevie
       "planning": "auto"
     },
     {
+      "issue": "PAN-5078",
+      "rank": 867,
+      "size": "XL",
+      "importance": "low",
+      "score": 34,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Parked: add xAI's Grok Build CLI as a harness over ACP (stdio agent, resumable sessions).",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-5021",
-      "rank": 866,
+      "rank": 867,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -11959,18 +11997,6 @@ New since the prior run (filed by the PAN-4532 plan critic). recoverStalledRevie
       "condition": "needs-refinement",
       "dependsOn": [],
       "why": "Grok Build Tailscale reach can't work: pan mcp serve verifies tokens only against its own machine. Needs a design choice.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5078",
-      "rank": 867,
-      "size": "XL",
-      "importance": "low",
-      "score": 34,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Parked: add xAI's Grok Build CLI as a harness over ACP (stdio agent, resumable sessions).",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12010,32 +12036,6 @@ New since the prior run (filed by the PAN-4532 plan critic). recoverStalledRevie
       "dependsOn": [],
       "why": "Phone app: let phone credentials reach linked machines (fleet Needs-you, linked-conv proxy, /ws/linked); PAN-4835 merged.",
       "rationale": "PAN-4835 merged in #4894, which clears its only dependency; rank held because the Anywhere phone epic is low-impact relative to substrate work above it.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5107",
-      "rank": 21,
-      "size": "S",
-      "importance": "high",
-      "score": 78,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Phone app Settings → Delete account via DELETE /v1/account; App Review 5.1.1(v) blocker for iOS submission; in pipeline.",
-      "rationale": "New since the prior run and already in the pipeline. The body is a complete, file-level brief: the server route, web fallback, device token and sign-out cleanup all exist, so the work is a Settings row, a two-step confirm, three response paths, tests and docs. It blocks App Review submission for the phone app, so it ranks high, and it takes the free rank-21 slot so no other issue's rank moves.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5108",
-      "rank": 3,
-      "size": "M",
-      "importance": "high",
-      "score": 80,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline: auto-update harness CLIs by default; new models are refused until the operator upgrades Claude Code by hand.",
-      "rationale": "New issue, already in the pipeline, so it is pinned near the top. It removes a launch refusal every user hits after each model release (Fable 5.2 on 2026-11-10), reusing the PAN-4654 update plans and the PAN-4359 version gate.",
       "gate": "auto",
       "planning": "auto"
     }
@@ -13216,13 +13216,6 @@ New since the prior run (filed by the PAN-4532 plan critic). recoverStalledRevie
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.4
-    },
-    {
-      "from": "PAN-4823",
-      "to": "PAN-5107",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
     }
   ]
 }
