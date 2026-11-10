@@ -11,6 +11,7 @@ import type { TerminalBackendName } from '../terminal-backends/types.js';
 import type { CpuResourcesConfig, CpuResourcesYamlConfig } from './schema-cpu.js';
 import type { DiskResourcesConfig, DiskResourcesYamlConfig } from './schema-disk.js';
 import type { DashboardYamlConfig, NormalizedDashboardConfig } from './schema-dashboard.js';
+import type { HarnessesYamlConfig, NormalizedHarnessesConfig } from './schema-harnesses.js';
 import type { NormalizedOllamaConfig, YamlOllamaConfig } from './ollama.js';
 
 export type { SubscriptionPlan, AuthMode };
@@ -708,6 +709,7 @@ export interface YamlConfig {
 
   /** Dashboard access settings (PAN-4435). */
   dashboard?: DashboardYamlConfig;
+  harnesses?: HarnessesYamlConfig;
 }
 
 /**
@@ -1046,6 +1048,7 @@ export interface NormalizedConfig {
 
   /** Dashboard access settings (PAN-4435). */
   dashboard?: NormalizedDashboardConfig;
+  harnesses: NormalizedHarnessesConfig;
 }
 
 /**

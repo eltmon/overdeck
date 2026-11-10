@@ -99,7 +99,7 @@ function service(options: { turns?: number; run?: () => Promise<{ code: number; 
     rename: async () => undefined,
     detectClis: async () => [{
       binary: 'claude', label: 'Claude Code', harnesses: ['claude-code'], version: '2.1.0', updatable: true,
-      command: 'claude update', reason: null, binaryPath: '/b/claude', plan: { argv: ['/b/claude', 'update'], display: 'claude update', reason: null },
+      command: 'claude update', reason: null, binaryPath: '/b/claude', plan: { argv: ['/b/claude', 'update'], display: 'claude update', reason: null, npmPackage: null },
     }],
     readVersion: async () => '2.1.5',
     runCommand,

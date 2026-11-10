@@ -35,6 +35,8 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   { method: 'GET', path: '/api/pipeline/membership', scope: 'read:state' },
   // PAN-5093: the phone's Needs-you shows the disk alert.
   { method: 'GET', path: '/api/disk-alert', scope: 'read:state' },
+  // PAN-5108: the phone's Needs-you shows harness update failures.
+  { method: 'GET', path: '/api/harness-auto-update', scope: 'read:state' },
   // PAN-5045: the phone groups its conversation list by project with the desktop's resolver.
   { method: 'GET', path: '/api/registered-projects', scope: 'read:state' },
   // PAN-5100: the phone reads the machine's telemetry setting.

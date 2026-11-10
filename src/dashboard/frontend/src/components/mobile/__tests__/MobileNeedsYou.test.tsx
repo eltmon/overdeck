@@ -177,6 +177,28 @@ describe('MobileNeedsYou', () => {
     expect(screen.queryByRole('button', { name: 'Open' })).not.toBeInTheDocument();
   });
 
+  it('PAN-5108: renders a failed harness update as a read-only line, no Open or Answer', () => {
+    decisions = [{
+      id: 'harness-update:claude',
+      source: 'agent',
+      label: 'Claude Code update failed',
+      kinds: ['harnessUpdateFailed'],
+      since: '2026-11-10T12:01:00.000Z',
+      blocking: false,
+      harnessUpdate: {
+        binary: 'claude',
+        label: 'Claude Code',
+        error: 'npm ERR! code E404',
+        command: 'npm install -g --prefix /p @anthropic-ai/claude-code@latest',
+        failedAt: '2026-11-10T12:01:00.000Z',
+      },
+    }] as Decision[];
+    render(<MobileNeedsYou subjectId={null} />);
+    expect(screen.getByText('Update failed. Overdeck retries at the next daily check.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Open' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Answer' })).toBeNull();
+  });
+
   it('PAN-5093: renders the disk alert text with the biggest holder, no Open or Answer', () => {
     decisions = [{
       id: 'disk-alert',

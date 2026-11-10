@@ -76,6 +76,12 @@ export function mergeDashboardConfig(result: NormalizedConfig, config: YamlConfi
   result.dashboard = { requireTokenMint: dashboard.require_token_mint === true };
 }
 
+/** Merge `harnesses.*` (PAN-5108). Only a literal boolean changes the value; anything else keeps the default. */
+export function mergeHarnessesConfig(result: NormalizedConfig, config: YamlConfig | null): void {
+  const value = config?.harnesses?.auto_update;
+  if (typeof value === 'boolean') result.harnesses = { autoUpdate: value };
+}
+
 /**
  * Merge shadow configuration from multiple sources
  */

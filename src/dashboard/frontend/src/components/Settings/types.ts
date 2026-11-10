@@ -341,5 +341,7 @@ export interface SettingsConfig {
     max_concurrent_agents?: number;
   };
   dashboard?: { require_token_mint?: boolean };
+  /** PAN-5108: machine-wide automatic coding-agent CLI updates (default true). */
+  harnesses?: { auto_update?: boolean };
   tiered_execution?: TieredExecutionConfig;
 }

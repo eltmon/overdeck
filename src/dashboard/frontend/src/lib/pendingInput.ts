@@ -32,7 +32,9 @@ export type PendingInputKind =
   /** PAN-5093 — free disk is below the critical threshold; writes may fail soon. */
   | 'diskCritical'
   /** PAN-5111 — this machine could not fetch a linked machine's Needs-You. */
-  | 'machineUnreachable';
+  | 'machineUnreachable'
+  /** PAN-5108 — the daily background update of a coding-agent CLI failed. */
+  | 'harnessUpdateFailed';
 
 /** Short label for a single kind (used in tooltips, joined by comma). */
 export const PENDING_INPUT_KIND_LABEL: Record<string, string> = {
@@ -52,6 +54,7 @@ export const PENDING_INPUT_KIND_LABEL: Record<string, string> = {
   diskLow: 'Disk space low',
   diskCritical: 'Disk space critical',
   machineUnreachable: "Can't reach machine",
+  harnessUpdateFailed: 'Coding agent update failed',
 };
 
 /** PAN-4371 — replaces "Answer the agent" when Jev read the turn end with confidence. */

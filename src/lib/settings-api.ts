@@ -32,6 +32,7 @@ import {
 import { ModelId } from './settings.js';
 import type { Role } from './agents.js';
 import { tieredExecutionConfigForSave, validateTieredExecutionSettings, type ApiTieredExecutionConfig } from './settings-api-tiered-execution.js';
+import { validateHarnessesSettings, type ApiHarnessesConfig } from './settings-api-harnesses.js';
 import { mergeApiTelemetrySettings, telemetrySettingsFromConfig, validateApiTelemetryConfig, type ApiTelemetryConfig } from './settings-api-telemetry.js';
 import { jevToggleProblems } from './jev/settings-validation.js';
 import type { RuntimeName } from './runtimes/types.js';
@@ -272,6 +273,7 @@ export interface ApiSettingsConfig {
   };
   /** Dashboard access (PAN-4435). `require_token_mint` persists under `dashboard` in config.yaml. */
   dashboard?: { require_token_mint?: boolean };
+  harnesses?: ApiHarnessesConfig; // PAN-5108, global config only
   tiered_execution?: ApiTieredExecutionConfig;
 }
 
@@ -764,6 +766,7 @@ export function loadSettingsApi(): ApiSettingsConfig {
     // D-1: reports the enforced value (raw config.yaml), not the merged
     // config — a project .pan.yaml never reaches enforcement.
     dashboard: { require_token_mint: readRemoteAccessConfig().requireTokenMint },
+    harnesses: { auto_update: config.harnesses?.autoUpdate ?? true },
     tiered_execution: config.tieredExecution,
   };
 }
@@ -865,6 +868,8 @@ async function writeYamlConfigPreservingComments(yamlConfig: YamlConfig): Promis
   if (isRecord(config.dashboard)) {
     setBlockMergePreserving(doc, ['dashboard'], config.dashboard as Record<string, unknown>);
   }
+  // PAN-5108 D17: never delete the block when a PUT omits it, so a stale tab cannot turn auto-update back on.
+  if (isRecord(config.harnesses)) setBlockMergePreserving(doc, ['harnesses'], config.harnesses as Record<string, unknown>);
 
   await writeFile(configPath, doc.toString({ lineWidth: 120 }), 'utf-8');
 }
@@ -1057,6 +1062,7 @@ async function saveSettingsApiPromiseUnlocked(
       : undefined,
     remote: settings.remote,
     dashboard: settings.dashboard,
+    harnesses: settings.harnesses,
     tiered_execution: tieredExecutionConfigForSave(settings.tiered_execution, {
       providerAuth: currentConfig.providerAuth,
       workhorses: { ...currentConfig.workhorses, ...(settings.workhorses ?? {}) },
@@ -1169,6 +1175,7 @@ async function updateSettingsApi(updates: Partial<ApiSettingsConfig>): Promise<A
       ...updates.remote,
     },
     dashboard: { ...current.dashboard, ...updates.dashboard },
+    harnesses: { ...current.harnesses, ...updates.harnesses },
   };
 
   // Save and return
@@ -1344,6 +1351,7 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
       errors.push('dashboard.require_token_mint must be a boolean');
     }
   }
+  validateHarnessesSettings(settings.harnesses, errors);
 
   if (settings.tiered_execution !== undefined) {
     const { config: currentConfig } = loadConfigSync();
