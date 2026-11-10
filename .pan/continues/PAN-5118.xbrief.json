@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5118",
   "created": "2026-11-10T18:32:53.186Z",
-  "updated": "2026-11-10T19:11:59.058Z",
+  "updated": "2026-11-10T19:16:50.971Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -62,9 +62,10 @@
       "doneAt": "2026-11-10T19:11:36.718Z"
     },
     "self-jobs-full-stdout": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5118",
-      "claimedAt": "2026-11-10T19:11:59.058Z"
+      "claimedAt": "2026-11-10T19:11:59.058Z",
+      "doneAt": "2026-11-10T19:16:50.971Z"
     }
   }
 }
