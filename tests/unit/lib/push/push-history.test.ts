@@ -135,6 +135,8 @@ describe('push history (PAN-5111)', () => {
     history.recordSent(sentRecord({ id: 'p1', key: 'perm:pending', subject: 'agent:a' }));
     expect(history.openEntryIdFor('agent:b', 'perm:pending')).toBeNull();
     expect(history.openEntryIdFor('agent:a', 'perm:pending')).toEqual({ id: 'p1', ts: '2026-11-10T12:00:00.000Z' });
+    // Let the queued append land before afterEach removes the directory.
+    await history.flush();
   });
 });
 
