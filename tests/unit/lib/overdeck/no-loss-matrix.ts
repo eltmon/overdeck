@@ -813,6 +813,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/push/subscriptions',            kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Needs-you push (PAN-2354); outside 8 remodel domains' },
   { surface: 'DELETE /api/push/subscriptions/:id',      kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Needs-you push (PAN-2354); outside 8 remodel domains' },
   { surface: 'POST /api/push/test',                     kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Needs-you push (PAN-2354); outside 8 remodel domains' },
+  { surface: 'GET /api/push/history',                   kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'Needs-you push history (PAN-5111): last 50 sent pushes from logs/push-sent.jsonl' },
   // ── tts.ts ────────────────────────────────────────────────────────────────
   { surface: 'GET /api/tts/status',                       kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'TTS service; outside 8 remodel domains' },
   { surface: 'POST /api/tts/speak',                       kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'TTS service; outside 8 remodel domains' },

@@ -10,9 +10,11 @@
  *   records which paired device subscribed so revoking it stops its push.
  * - `DELETE /api/push/subscriptions/:id`
  * - `POST /api/push/test` — send a test notification to every target.
+ * - `GET /api/push/history` — the last 50 pushes sent, newest first, each with
+ *   its derived state (PAN-5111). Titles and delivery codes only.
  *
- * None of these are in ROUTE_SCOPES, so they need `admin`; paired phones hold
- * `admin`. Mutations also pass the usual Origin and CSRF checks. No response is
+ * Only `GET /api/push/history` is in ROUTE_SCOPES (`read:conversations`); the
+ * rest need `admin`; paired phones hold `admin`. Mutations also pass the usual Origin and CSRF checks. No response is
  * cacheable.
  */
 import { Effect, Layer } from 'effect';
@@ -21,7 +23,7 @@ import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstab
 import { addPushSubscription, removePushSubscription } from '../../../lib/push/subscription-store.js';
 import { ensureVapidKeys } from '../../../lib/push/vapid-keys.js';
 import { jsonResponse } from '../http-helpers.js';
-import { getNeedsYouPushStatus, sendTestPush } from '../services/needs-you-push-service.js';
+import { getNeedsYouPushStatus, getPushHistoryView, sendTestPush } from '../services/needs-you-push-service.js';
 import {
   rejectUnauthorizedDashboardRequest,
   rejectUnsafeDashboardMutationRequest,
@@ -123,10 +125,22 @@ const testPushRoute = HttpRouter.add(
   }),
 );
 
+const pushHistoryRoute = HttpRouter.add(
+  'GET',
+  '/api/push/history',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnauthorizedDashboardRequest(request);
+    if (authError) return noStore(authError);
+    return noStore(jsonResponse({ entries: yield* Effect.promise(() => getPushHistoryView()) }));
+  }),
+);
+
 export const pushRouteLayer = Layer.mergeAll(
   vapidPublicKeyRoute,
   pushStatusRoute,
   addSubscriptionRoute,
   removeSubscriptionRoute,
   testPushRoute,
+  pushHistoryRoute,
 );
