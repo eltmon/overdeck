@@ -47,6 +47,7 @@ const MODEL_FOR: Record<RuntimeName, string> = {
   opencode: 'opencode/big-pickle',
   muse: 'muse-spark-1.3',
   'prime-agent': 'gpt-5.4',
+  grok: 'grok/grok-4.7',
 };
 
 /** Unforced hand-copied harness lists (PRD "Unforced hand-copied lists" and the host sites). */
@@ -83,6 +84,40 @@ const PRIME_AGENT_LITERAL_FILES = [
   'src/lib/runtimes/runtime-pane-launch.ts',
   'src/lib/overdeck/cost.ts',
   'src/lib/cloister/pi-cost-reconciler.ts',
+  'src/lib/system-prerequisites.ts',
+  'src/cli/commands/start.ts',
+  'src/cli/commands/strike.ts',
+  'src/cli/commands/worker.ts',
+  'src/cli/commands/artifacts.ts',
+  'src/cli/commands/context-layers.ts',
+] as const;
+
+/**
+ * Unforced hand-copied harness lists that must name grok (PAN-5078 WI-21). Prime-only
+ * cost and transcript-kind plumbing is left out: Grok rides the ACP transcript kind.
+ */
+const GROK_LITERAL_FILES = [
+  'src/lib/agents/tier-table.ts',
+  'src/lib/launcher-generator.ts',
+  'src/lib/config-yaml/schema.ts',
+  'src/lib/config-yaml/merge.ts',
+  'src/lib/config-yaml/roles.ts',
+  'src/lib/settings-api.ts',
+  'src/lib/conversations/harness-discovery.ts',
+  'src/lib/telemetry/pipeline.ts',
+  'src/lib/artifacts/lifecycle.ts',
+  'src/lib/overdeck/planning-sessions.ts',
+  'src/lib/overdeck/conversations.ts',
+  'src/lib/overdeck/conversation-archive.ts',
+  'src/lib/overdeck/conversation-runtime.ts',
+  'src/lib/planning/spawn-planning-session.ts',
+  'src/dashboard/server/routes/agents/spawn-issue.ts',
+  'src/dashboard/server/routes/agents/spawn-helpers.ts',
+  'src/dashboard/server/routes/agents/lifecycle-restart.ts',
+  'src/dashboard/server/routes/context.ts',
+  'src/lib/conversations/transcript-adapter.ts',
+  'src/lib/agents/recovery.ts',
+  'src/lib/context-layers/launch-sources.ts',
   'src/lib/system-prerequisites.ts',
   'src/cli/commands/start.ts',
   'src/cli/commands/strike.ts',
@@ -129,6 +164,17 @@ describe('harness no-loss audit (PAN-3668 WI-22)', () => {
 
   it.each(PRIME_AGENT_LITERAL_FILES)('%s names prime-agent', (file) => {
     expect(readFileSync(join(ROOT, file), 'utf8')).toContain("'prime-agent'");
+  });
+
+  it.each(GROK_LITERAL_FILES)('%s names grok (PAN-5078)', (file) => {
+    expect(readFileSync(join(ROOT, file), 'utf8')).toContain("'grok'");
+  });
+
+  it('lists grok in every CLI --harness help string (PAN-5078)', () => {
+    const source = readFileSync(join(ROOT, CLI_HELP_FILE), 'utf8');
+    const helpStrings = source.match(/Coding-agent harness: [^']*/g) ?? [];
+    expect(helpStrings.length).toBeGreaterThan(0);
+    for (const help of helpStrings) expect(help).toContain('| grok');
   });
 
   it('lists prime-agent in every CLI --harness help string', () => {
