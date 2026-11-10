@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5106",
   "created": "2026-11-10T14:09:58.025Z",
-  "updated": "2026-11-10T14:27:33.585Z",
+  "updated": "2026-11-10T14:34:42.017Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -14,6 +14,11 @@
       "claimedBy": "agent-pan-5106",
       "claimedAt": "2026-11-10T14:09:58.025Z",
       "doneAt": "2026-11-10T14:27:33.585Z"
+    },
+    "ember-long-context-tier": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5106",
+      "claimedAt": "2026-11-10T14:34:42.017Z"
     }
   }
 }
