@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5108",
   "created": "2026-11-10T15:18:20.585Z",
-  "updated": "2026-11-10T16:27:52.405Z",
+  "updated": "2026-11-10T16:28:12.683Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -194,6 +194,10 @@
     "background-service.ac5": {
       "status": "completed",
       "doneAt": "2026-11-10T16:27:52.405Z"
+    },
+    "status-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T16:28:12.682Z"
     }
   }
 }
