@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5106",
   "created": "2026-11-10T14:09:58.025Z",
-  "updated": "2026-11-10T14:34:42.017Z",
+  "updated": "2026-11-10T14:42:02.744Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -19,6 +19,11 @@
       "status": "in_progress",
       "claimedBy": "agent-pan-5106",
       "claimedAt": "2026-11-10T14:34:42.017Z"
+    },
+    "muse-catalog-audit-pins": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5106",
+      "claimedAt": "2026-11-10T14:42:02.744Z"
     }
   }
 }
