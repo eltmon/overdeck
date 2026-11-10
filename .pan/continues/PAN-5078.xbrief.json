@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5078",
   "created": "2026-11-10T14:48:32.729Z",
-  "updated": "2026-11-10T16:31:05.443Z",
+  "updated": "2026-11-10T16:32:20.239Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -130,9 +130,10 @@
       "doneAt": "2026-11-10T16:30:59.177Z"
     },
     "grok-no-loss-audit": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5078",
-      "claimedAt": "2026-11-10T16:31:05.443Z"
+      "claimedAt": "2026-11-10T16:31:05.443Z",
+      "doneAt": "2026-11-10T16:32:20.238Z"
     }
   }
 }
