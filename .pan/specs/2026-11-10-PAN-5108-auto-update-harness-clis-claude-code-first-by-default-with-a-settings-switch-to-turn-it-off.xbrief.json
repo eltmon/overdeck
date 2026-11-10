@@ -1,0 +1,914 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-10T16:30:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5108: Auto-update harness CLIs (Claude Code first) by default, with a Settings switch to turn it off",
+    "updated": "2026-11-10T15:16:57.671Z"
+  },
+  "plan": {
+    "id": "pan-5108",
+    "title": "Auto-update harness CLIs (Claude Code first) by default, with a Settings switch to turn it off",
+    "status": "proposed",
+    "uid": "64309cb9-04fc-4493-b9e3-270ac75a4867",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-10T16:30:00Z",
+    "updated": "2026-11-10T15:16:57.671Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5108",
+        "label": "PAN-5108",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "harness",
+      "claude-code",
+      "auto-update",
+      "settings",
+      "needs-you",
+      "dashboard"
+    ],
+    "metadata": {
+      "sizeJustification": "One feature with one switch: the issue's made decisions require the config key, the Settings switch, the update on refusal in the launch path, the daily background updater, and Needs-you reporting of its failures, so splitting any slice would ship a setting or an updater with no consumer. The surface is 11 small items; 13 of the files are new tests or the CI test-subset list, and the subsystem count is inflated because each doc file and scripts/frontend-test-subset.txt count as their own subsystem. Items that share a file are joined by an edge.",
+      "canonicalFilename": "2026-11-10-PAN-5108-auto-update-harness-clis-claude-code-first-by-default-with-a-settings-switch-to-turn-it-off.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "A new model whose minClaudeCodeVersion is newer than the installed Claude Code is refused at launch (2026-11-10: Fable 5.2 needs 2.1.321, machine had 2.1.293). Every user hits this after each model launch because nothing keeps harness CLIs current.",
+      "Proposal": "Add harnesses.auto_update (default true, machine-wide) with a Settings switch. With it on: (1) a claude-code launch that would be refused runs the runnable Claude Code upgrade plan once through a process-wide update queue, re-checks, and proceeds or raises today's refusal plus the failure; (2) a primary-dashboard service checks npm-installed harness CLIs 2 minutes after boot and every 24 hours, updates outdated ones one at a time, logs one line per outcome, and shows failures in Needs you. With it off, behavior is unchanged. Full detail in .pan/drafts/PAN-5108.md.",
+      "NonGoals": "- Updating the Overdeck package itself; pan updates stay explicit\n- Background updates for non-npm installs (native Claude Code, Kimi, Homebrew, root-owned npm prefix, Windows)\n- Running sudo or any root-owned install\n- Restarting or touching running agent or conversation sessions after an update\n- A cross-process lock between a CLI process and the dashboard\n- An immediate pass when the Settings switch is turned back on\n- Needs-you items for update-on-refusal failures\n- Changes to the Upgrade Claude Code banner or POST /api/claude-code/upgrade\n- A per-harness on/off setting\n- Any new client-side timeout changes for launch requests\n- Any edit to src/dashboard/server/routes/settings.ts or any allowlist cap raise"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Background updater runs only npm-based plans; runnable non-npm plans are skipped and logged",
+        "rationale": "Issue decision 4 scopes to npm-based plans; native Claude Code updates itself, and npm view gives a cheap current-version check."
+      },
+      {
+        "summary": "Update on refusal runs any runnable Claude Code upgrade plan (npm or native), the same command as the existing Upgrade button",
+        "rationale": "Issue decision 3 says 'run the Claude Code update plan'; that plan is already vetted for user-writable installs and never runs sudo."
+      },
+      {
+        "summary": "Added npmPackage: string | null to HarnessUpdatePlan as the npm-based discriminator",
+        "rationale": "The plan had no field that distinguishes the npm branch; a data field avoids parsing argv."
+      },
+      {
+        "summary": "Update commands run with execFile through a new lib module, and fleet 'Update all' moves onto it",
+        "rationale": "The launch hook runs in CLI processes and cannot import a dashboard service; one runner and one queue keep two npm global installs from overlapping in a process."
+      },
+      {
+        "summary": "Process-wide serial update queue keyed by argv; identical requests join; the job re-checks before running",
+        "rationale": "Satisfies 'one update at a time' and 'concurrent launches share one update', and covers an update another process finished first."
+      },
+      {
+        "summary": "Update on refusal: 3-minute timeout and a 15-minute cooldown after a failure",
+        "rationale": "Prevents every launch from rerunning (and waiting on) a failing install; the refusal still reports the remembered error."
+      },
+      {
+        "summary": "harnesses.auto_update is machine-wide: project .pan.yaml cannot set it; hook and service read the global config; a read error means off",
+        "rationale": "A committed project file must not change what a machine installs; when the operator's intent cannot be read, do not install."
+      },
+      {
+        "summary": "The default enablement reader returns false under Vitest",
+        "rationale": "Default-on must never run a real npm install -g from a test that reaches the real launch hook or service."
+      },
+      {
+        "summary": "Needs you is state-based: each pass replaces the failure list; items are non-blocking System items; the phone shows a read-only line",
+        "rationale": "Avoids an error toast loop (issue decision 2) and clears itself when a later pass succeeds or auto-update is off."
+      },
+      {
+        "summary": "Settings switch goes in a new 'Coding Agents' section after Permissions; the YAML write never deletes the harnesses block",
+        "rationale": "No existing section fits; a stale browser tab omitting the block must not silently turn auto-update back on."
+      },
+      {
+        "summary": "A non-runnable plan with auto-update on raises today's refusal unchanged",
+        "rationale": "Its message already shows the manual (sudo or brew) command; nothing was attempted, so there is nothing to append."
+      }
+    ],
+    "items": [
+      {
+        "id": "config-key",
+        "title": "Add the harnesses.auto_update config key (default true, global only)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T16:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5108",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/config-yaml/schema-harnesses.ts",
+            "src/lib/config-yaml/schema.ts",
+            "src/lib/config-yaml/defaults.ts",
+            "src/lib/config-yaml/merge.ts",
+            "src/lib/config-yaml/domain-mergers.ts",
+            "src/lib/config-yaml/load.ts",
+            "src/lib/config-yaml/__tests__/merge-harnesses.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/config-yaml/__tests__/merge-harnesses.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "merge-harnesses.test.ts passes",
+            "typecheck completes without errors",
+            "file-size guard passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. New schema-harnesses.ts with HarnessesYamlConfig/NormalizedHarnessesConfig; YamlConfig.harnesses? and required NormalizedConfig.harnesses in schema.ts (<=4 lines); DEFAULT_CONFIG.harnesses = { autoUpdate: true }; mergeConfigs result initializer clones it and calls mergeHarnessesConfig (new, in domain-mergers.ts) after mergeDashboardConfig (merge.ts <=3 lines); stripProjectSecurity in load.ts also drops harnesses from a project .pan.yaml."
+        },
+        "items": [
+          {
+            "id": "config-key.ac1",
+            "title": "Given no harnesses block, when mergeConfigs() runs, then it returns harnesses.autoUpdate === true and DEFAULT_CONFIG.harnesses.autoUpdate stays true after merging a false value",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-key.ac2",
+            "title": "Given harnesses.auto_update: false in YAML, mergeConfigs() returns autoUpdate false; given auto_update: 'no', it falls back to true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-key.ac3",
+            "title": "stripProjectSecurity({ harnesses: { auto_update: false } }) returns an object without a harnesses key, so a project .pan.yaml never sets the value",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-key.ac4",
+            "title": "bash scripts/lint-file-size.sh exits 0 with schema.ts <= 1114 lines and merge.ts <= 1045 lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-api",
+        "title": "Read and write harnesses.auto_update through the settings API",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T16:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-5108",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/settings-api.ts",
+            "src/lib/settings-api-harnesses.ts",
+            "src/lib/__tests__/settings-api.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/settings-api.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "settings-api.test.ts passes",
+            "typecheck completes without errors",
+            "file-size guard passed with settings-api.ts <= 1508 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. New settings-api-harnesses.ts (ApiHarnessesConfig, validateHarnessesSettings). settings-api.ts gains at most 10 lines: interface field + import, loadSettingsApi returns harnesses.auto_update from config.harnesses?.autoUpdate ?? true, YAML write uses setBlockMergePreserving only when the block is a record (never deletes), API->YAML and updateSettingsApi carry harnesses, validateSettingsApi calls the helper."
+        },
+        "items": [
+          {
+            "id": "settings-api.ac1",
+            "title": "loadSettingsApi() returns harnesses.auto_update true when the mocked config has no harnesses block and false when it has autoUpdate false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-api.ac2",
+            "title": "saveSettingsApi() with harnesses.auto_update false writes YAML containing auto_update: false under harnesses, and a save that omits harnesses preserves an existing harnesses block",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-api.ac3",
+            "title": "validateSettingsApi() rejects harnesses.auto_update 'yes' with the error 'harnesses.auto_update must be a boolean'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-api.ac4",
+            "title": "bash scripts/lint-file-size.sh passes with src/lib/settings-api.ts at most 1508 lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-switch",
+        "title": "Add the Coding Agents Settings section with the auto-update switch",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T16:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5108",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/types.ts",
+            "src/dashboard/frontend/src/components/Settings/sections/HarnessesSection.tsx",
+            "src/dashboard/frontend/src/components/Settings/SettingsPage.tsx",
+            "src/dashboard/frontend/src/components/Settings/settingsPageConstants.ts",
+            "src/dashboard/frontend/src/components/Settings/sections/__tests__/HarnessesSection.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/Settings/sections/__tests__/HarnessesSection.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "HarnessesSection.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. SettingsConfig.harnesses type; new HarnessesSection (id coding-agents, heading 'Coding Agents', row 'Keep coding-agent CLIs up to date automatically' with Toggle, default checked); rendered right after PermissionsSection; nav entry after permissions; test listed in scripts/frontend-test-subset.txt."
+        },
+        "items": [
+          {
+            "id": "settings-switch.ac1",
+            "title": "Given formData without harnesses, the switch renders aria-checked='true' with the label 'Keep coding-agent CLIs up to date automatically'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-switch.ac2",
+            "title": "Given harnesses.auto_update false, the switch renders aria-checked='false'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-switch.ac3",
+            "title": "When the switch is clicked, onSettingsChange receives exactly one call whose argument has harnesses: { auto_update: false }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-switch.ac4",
+            "title": "Settings nav lists 'Coding Agents' directly after 'Permissions' and scripts/frontend-test-subset.txt contains the HarnessesSection test path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "update-runner",
+        "title": "Add the process-wide update queue and execFile update runner in src/lib",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T16:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5108",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/fleet/harness-update-runner.ts",
+            "src/dashboard/server/services/fleet-update-service.ts",
+            "tests/unit/lib/fleet/harness-update-runner.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/fleet/harness-update-runner.test.ts src/dashboard/server/services/__tests__/fleet-update-service.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-13",
+            "NFR-1"
+          ],
+          "foundationFor": [
+            "auto-update-gate",
+            "launch-update",
+            "background-service"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. New harness-update-runner.ts: runHarnessUpdateCommand(argv, {timeoutMs, pathDir}) via execFile with PATH prefix, 16 MiB maxBuffer, 2000-char output tail, never rejects; runExclusiveUpdate(key, job) process-wide serial queue where an identical key joins the queued/running run. fleet-update-service.ts deletes runUpdateCommand and the spawn import and routes its default runCommand through runExclusiveUpdate + runHarnessUpdateCommand."
+        },
+        "items": [
+          {
+            "id": "update-runner.ac1",
+            "title": "When runHarnessUpdateCommand runs an argv, then execFile receives argv[0] as the file and argv.slice(1) as args with no shell option, and PATH starts with pathDir",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "update-runner.ac2",
+            "title": "A failing or timed-out command resolves (never rejects) with a non-zero code and at most the last 2000 characters of output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "update-runner.ac3",
+            "title": "When two runExclusiveUpdate calls share a key while the first is pending, then the job runs once and both resolve with its result; given two different keys, the second job starts only after the first settles",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "update-runner.ac4",
+            "title": "fleet-update-service.ts no longer contains runUpdateCommand or a spawn import, and its singleton runCommand uses runExclusiveUpdate",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "plan-npm-field",
+        "title": "Mark npm-based fleet update plans with npmPackage",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T16:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5108",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/fleet/harness-versions.ts",
+            "tests/unit/lib/fleet/harness-versions.test.ts",
+            "src/dashboard/server/services/__tests__/fleet-update-service.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/fleet/harness-versions.test.ts src/dashboard/server/services/__tests__/fleet-update-service.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. HarnessUpdatePlan gains npmPackage: string | null; both npm-branch returns of harnessUpdatePlan set it to the package, every other return sets null; update toEqual expectations and the fleet test fixture."
+        },
+        "items": [
+          {
+            "id": "plan-npm-field.ac1",
+            "title": "harnessUpdatePlan() for a binary under <prefix>/lib/node_modules/@openai/codex/ returns npmPackage '@openai/codex' for both the writable and the not-writable case",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plan-npm-field.ac2",
+            "title": "harnessUpdatePlan() returns npmPackage null for the updateArgs plan, the Homebrew plan, the Windows plan and the no-plan case",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "auto-update-gate",
+        "title": "Add the global-only enablement reader and the update-on-refusal policy module",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T16:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5108",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/fleet/harness-auto-update.ts",
+            "tests/unit/lib/fleet/harness-auto-update.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/fleet/harness-auto-update.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "harness-auto-update.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-7",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. New harness-auto-update.ts: isHarnessAutoUpdateEnabled (loadGlobalConfigNoMigration, false under process.env.VITEST, false + one warn on read error); runLaunchUpdate(argv, pathDir, isSatisfied, deps) that returns cooldown within 15 min of a remembered failure, else queues via runExclusiveUpdate, re-checks isSatisfied inside the job, runs with a 3-minute timeout, remembers failures and clears them on success; launchUpdateNote(outcome, now) with the three exact sentences from WI-7."
+        },
+        "items": [
+          {
+            "id": "auto-update-gate.ac1",
+            "title": "isHarnessAutoUpdateEnabled returns true for a global config without harnesses, false for auto_update false, false when env.VITEST is set, and false when the config loader rejects",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-update-gate.ac2",
+            "title": "runLaunchUpdate returns already-current and never calls run when isSatisfied resolves true inside the queued job",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-update-gate.ac3",
+            "title": "After a failed run, a call 1 minute later returns cooldown without calling run, and a call 16 minutes later calls run again",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-update-gate.ac4",
+            "title": "launchUpdateNote produces the WI-7 sentence for a failed run containing the output tail, for a code-0 run, and for a cooldown",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "launch-update",
+        "title": "Run the Claude Code update once when a launch would be refused",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T16:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5108",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/claude-code/requirements.ts",
+            "src/lib/claude-code/__tests__/claude-code.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/claude-code/__tests__/claude-code.test.ts src/lib/__tests__/harness-binary.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. ClaudeCodeTooOldErrorArgs.updateNote (appended only when set); deps autoUpdateEnabled and launchUpdate; between upgradePlan() and the throw in assertClaudeCodeSupportsModel, at most 15 lines: when plan.runnable && plan.argv && enabled, runLaunchUpdate with dirname(binaryPath) and a refresh:true version re-check; return when satisfied, else attach launchUpdateNote. Existing refusal test injects autoUpdateEnabled false and asserts the byte-identical message."
+        },
+        "items": [
+          {
+            "id": "launch-update.ac1",
+            "title": "Given auto-update on and Claude Code 2.1.280 below 2.1.284 with a runnable npm plan, when the mocked update succeeds and the re-read version is 2.1.300, then assertClaudeCodeSupportsModel resolves and the update ran once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launch-update.ac2",
+            "title": "Given auto-update on and a failed update with output 'EACCES', the call rejects with ClaudeCodeTooOldError whose message is today's message followed by the failure sentence containing EACCES",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launch-update.ac3",
+            "title": "Given auto-update off, or a plan with runnable false, the call rejects with a message byte-identical to formatClaudeCodeTooOldMessage without a note and no update runs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launch-update.ac4",
+            "title": "Given auto-update on and execFile mocked via vi.mock('node:child_process'), two concurrent refused launches call execFile once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "background-service",
+        "title": "Add the daily background harness CLI updater and its snapshot contract",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T16:30:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-5108",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/harness-auto-update.ts",
+            "packages/contracts/src/index.ts",
+            "src/dashboard/server/services/harness-auto-update-service.ts",
+            "src/dashboard/server/main.ts",
+            "src/dashboard/server/services/__tests__/harness-auto-update-service.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/harness-auto-update-service.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "harness-auto-update-service.test.ts passes",
+            "typecheck completes without errors",
+            "file-size guard passed with main.ts <= 1000 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-9",
+            "FR-10",
+            "NFR-1",
+            "NFR-3"
+          ],
+          "foundationFor": [
+            "status-route",
+            "needs-you-card"
+          ],
+          "parallelSafeReason": "It owns all its files (new service, new contract file, its test) except three lines in main.ts that no other item touches; it consumes the runner, plan field and gate only through their exported functions, which its blockers finish first."
+        },
+        "narrative": {
+          "Action": "PRD WI-8. Contract HarnessAutoUpdateSnapshot/HarnessAutoUpdateFailure in packages/contracts. Service with injected deps: first pass 2 minutes after start, next pass 24 hours after each pass ends (unref'd setTimeout); per pass reads the enable flag, detects CLIs, processes one at a time: skip no-plan / non-npm / unreadable version, npm view latest (60 s), skip current, else runUpdate + refresh version; exactly one log line per outcome, info emit for updated, warn emit for failed, never throws; failures list replaced per pass. main.ts: exactly 3 added lines, start inside if (!isPeerDashboard) after startDiskAlertService."
+        },
+        "items": [
+          {
+            "id": "background-service.ac1",
+            "title": "Given fake timers, no pass runs before 120000 ms, one pass runs after vi.advanceTimersByTimeAsync(120000), and the next runs 24 hours after it ends",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "background-service.ac2",
+            "title": "Given an npm CLI at 2.1.293 and npm latest 2.1.321, when a pass runs, then runUpdate receives its argv once and the log line contains 'running sessions keep 2.1.293'; given a current CLI, a plan with argv null and a plan with npmPackage null, each logs one skip line and runUpdate never runs for them",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "background-service.ac3",
+            "title": "A runUpdate result { code: 1, output: 'E404' } leaves the pass resolved, puts one failure containing E404 in the snapshot, emits a warn entry, and a later pass that finds the CLI current empties failures",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "background-service.ac4",
+            "title": "With two outdated CLIs the second update starts only after the first resolves, and with auto-update off detectClis is never called and failures is empty",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "background-service.ac5",
+            "title": "main.ts is at most 1000 lines and calls startHarnessAutoUpdateService only inside the if (!isPeerDashboard) block",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "status-route",
+        "title": "Serve GET /api/harness-auto-update",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T16:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-5108",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/harness-auto-update.ts",
+            "src/dashboard/server/server.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/__tests__/harness-auto-update-route.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/harness-auto-update-route.test.ts src/dashboard/server/__tests__/route-scopes.test.ts",
+            "npx vitest run --configLoader runner tests/unit/lib/overdeck/no-loss-matrix.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "route test and no-loss matrix tests pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. Route copied from routes/disk-alert.ts returning getHarnessAutoUpdateSnapshot(); layer registered after diskAlertRouteLayer in server.ts; route-scopes row read:state after /api/disk-alert; no-loss-matrix READ row."
+        },
+        "items": [
+          {
+            "id": "status-route.ac1",
+            "title": "GET /api/harness-auto-update returns 200 with enabled null and failures [] when the service is not started",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "status-route.ac2",
+            "title": "ROUTE_SCOPES contains { method: 'GET', path: '/api/harness-auto-update', scope: 'read:state' } and NO_LOSS_MATRIX contains a READ row for 'GET /api/harness-auto-update'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "needs-you-card",
+        "title": "Show harness update failures in Needs you (desktop card and phone line)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T16:30:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5108",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/harnessAutoUpdate.ts",
+            "src/dashboard/frontend/src/lib/useDecisions.ts",
+            "src/dashboard/frontend/src/lib/pendingInput.ts",
+            "src/dashboard/frontend/src/components/HarnessUpdateCard.tsx",
+            "src/dashboard/frontend/src/components/DecisionsPanel.tsx",
+            "src/dashboard/frontend/src/components/mobile/MobileNeedsYou.tsx",
+            "src/dashboard/frontend/src/components/__tests__/HarnessUpdateCard.test.tsx",
+            "src/dashboard/frontend/src/lib/__tests__/useDecisions.test.ts",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/__tests__/HarnessUpdateCard.test.tsx src/lib/__tests__/useDecisions.test.ts src/components/__tests__/DecisionsPanel.test.tsx src/components/mobile/__tests__/MobileNeedsYou.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the four frontend test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10. fetchHarnessAutoUpdate (throws on non-ok, no useDecisions import); harnessUpdateFailed kind + label; harnessUpdateDecisions(snapshot) one non-blocking decision per failure (id harness-update:<binary>); 60 s query in useDecisions; HarnessUpdateCard (label, error tail, retry note, manual command, no buttons) in the System group; phone ReadOnlyAction line 'Update failed. Overdeck retries at the next daily check.'; card test listed in frontend-test-subset.txt."
+        },
+        "items": [
+          {
+            "id": "needs-you-card.ac1",
+            "title": "harnessUpdateDecisions(null) returns [] and a snapshot with failures for claude and codex returns two decisions with ids harness-update:claude and harness-update:codex, kind harnessUpdateFailed and blocking false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "needs-you-card.ac2",
+            "title": "HarnessUpdateCard renders the label, the error tail and the manual command, and renders no button named Answer or Open",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "needs-you-card.ac3",
+            "title": "DecisionsPanel renders a harness update decision under the 'System' group, not under 'Blocking work' or 'Waiting'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "needs-you-card.ac4",
+            "title": "MobileNeedsYou renders 'Update failed. Overdeck retries at the next daily check.' for a harness update decision instead of 'Answer on the desktop'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document automatic CLI updates in harnesses.mdx and the changelog",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T16:30:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5108",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/harnesses.mdx",
+            "changelog.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "lint:docs completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-11. Add '#### Automatic updates' under 'Claude Code version requirements' in configuration/harnesses.mdx (what is updated, when, update on refusal with the 15-minute retry, non-npm installs skipped, running sessions keep their version, failures in Needs you, how to turn off via Settings > Coding Agents or harnesses.auto_update: false, machine-wide); adjust the troubleshooting sentence near line 1005; add the changelog Upcoming entry (create the v0.76.0 Upcoming block per docs/RELEASING.md if none exists). No em dashes in new text."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "configuration/harnesses.mdx contains an '#### Automatic updates' heading, a YAML example with 'harnesses:' and 'auto_update: false', and the Settings path 'Coding Agents'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "changelog.mdx has a top <Update ... tags={[\"Upcoming\"]}> block whose #### New list contains the 'Coding-agent CLIs stay up to date' entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "npm run lint:docs exits 0 and the added lines contain no em dash character",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "config-key",
+        "to": "settings-api",
+        "type": "blocks"
+      },
+      {
+        "from": "config-key",
+        "to": "auto-update-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "update-runner",
+        "to": "auto-update-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "auto-update-gate",
+        "to": "launch-update",
+        "type": "blocks"
+      },
+      {
+        "from": "update-runner",
+        "to": "background-service",
+        "type": "blocks"
+      },
+      {
+        "from": "plan-npm-field",
+        "to": "background-service",
+        "type": "blocks"
+      },
+      {
+        "from": "auto-update-gate",
+        "to": "background-service",
+        "type": "blocks"
+      },
+      {
+        "from": "background-service",
+        "to": "status-route",
+        "type": "blocks"
+      },
+      {
+        "from": "background-service",
+        "to": "needs-you-card",
+        "type": "blocks"
+      },
+      {
+        "from": "settings-switch",
+        "to": "needs-you-card",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
