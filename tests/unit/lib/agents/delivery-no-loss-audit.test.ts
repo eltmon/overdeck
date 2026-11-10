@@ -45,7 +45,8 @@ const KNOWN_CALL_SITES = new Set([
   // for a `pan ask` decision, an operator-decision answer (appended to the
   // journal only when this delivery returns ok).
   'dashboard/server/routes/agents/permissions.ts|const result = await deliverAgentMessage(id, message, \'operator-decision-answer\');',
-  'dashboard/server/routes/agents/permissions.ts|await deliverAgentMessage(id, message, \'ask-user-question-answer\');',
+  // PAN-5111: keeps the result so the push history notes the answer only after a confirmed delivery.
+  'dashboard/server/routes/agents/permissions.ts|const delivery = await deliverAgentMessage(id, message, \'ask-user-question-answer\');',
   'dashboard/server/routes/linear-mcp-auth.ts|yield* Effect.promise(() => messageAgent(',
   'dashboard/server/routes/specialists/legacy-routes.ts|await messageAgent(workAgentId, rebaseMsg);',
   'dashboard/server/routes/workspaces.ts|await messageAgent(agentId, message);',
