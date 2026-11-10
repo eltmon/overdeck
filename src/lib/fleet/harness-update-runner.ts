@@ -6,6 +6,13 @@
  * update path in this process (the background updater, update on refusal and
  * the fleet "Update all" job), so two npm global installs never run at once.
  * A request whose key is already queued or running joins that run.
+ *
+ * Every path shares one key space (a user-writable npm Claude Code install
+ * gives the launch path and the background path the same argv), so every job
+ * yields the same type, `QueuedUpdateResult`, and a joiner from any path can
+ * read it. `null` means the job ran no command because its own pre-check found
+ * nothing to do; a joiner then decides for itself (`runQueuedUpdateCommand`
+ * queues its own run).
  */
 import { execFile } from 'node:child_process';
 
@@ -47,7 +54,9 @@ export function runHarnessUpdateCommand(argv: string[], opts: RunUpdateCommandOp
             resolve({ code: 0, output: tail(output) });
             return;
           }
-          const timedOut = (error as { killed?: boolean }).killed === true;
+          // Node also sets `killed` when it kills the child for a maxBuffer overflow; that is not a timeout.
+          const overflow = (error as { code?: unknown }).code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER';
+          const timedOut = !overflow && (error as { killed?: boolean }).killed === true;
           const message = timedOut ? `timed out after ${Math.round(opts.timeoutMs / 1000)} seconds` : error.message;
           const code = typeof (error as { code?: unknown }).code === 'number' ? (error as { code: number }).code : -1;
           resolve({ code: timedOut ? -1 : code, output: tail(`${output}\n${message}`) });
@@ -61,17 +70,21 @@ export function runHarnessUpdateCommand(argv: string[], opts: RunUpdateCommandOp
   });
 }
 
-const inFlight = new Map<string, Promise<unknown>>();
+/** What a queued job yields: the command's result, or null when the job ran no command. */
+export type QueuedUpdateResult = UpdateCommandResult | null;
+
+const inFlight = new Map<string, Promise<QueuedUpdateResult>>();
 let queueTail: Promise<unknown> = Promise.resolve();
 
 /**
  * Process-wide serial queue (D8). A key already queued or running joins that
- * run; otherwise the job runs after every earlier job settles. A rejected job
- * does not block the next one.
+ * run and receives its result, whichever path started it; otherwise the job
+ * runs after every earlier job settles. A rejected job does not block the
+ * next one.
  */
-export function runExclusiveUpdate<T>(key: string, job: () => Promise<T>): Promise<T> {
+export function runExclusiveUpdate(key: string, job: () => Promise<QueuedUpdateResult>): Promise<QueuedUpdateResult> {
   const existing = inFlight.get(key);
-  if (existing) return existing as Promise<T>;
+  if (existing) return existing;
   const run = queueTail.then(job, job);
   queueTail = run.catch(() => undefined);
   inFlight.set(key, run);
@@ -80,6 +93,19 @@ export function runExclusiveUpdate<T>(key: string, job: () => Promise<T>): Promi
   };
   run.then(clear, clear);
   return run;
+}
+
+/**
+ * Runs `argv` through the queue and always returns a command result. When the
+ * run it joined ran no command (another caller's pre-check skipped it), it
+ * queues its own run once.
+ */
+export async function runQueuedUpdateCommand(argv: string[], opts: RunUpdateCommandOptions): Promise<UpdateCommandResult> {
+  const key = argv.join(' ');
+  const job = (): Promise<QueuedUpdateResult> => runHarnessUpdateCommand(argv, opts);
+  const joined = await runExclusiveUpdate(key, job);
+  if (joined) return joined;
+  return (await runExclusiveUpdate(key, job)) ?? { code: 0, output: 'skipped: another queued update found nothing to install' };
 }
 
 export function _resetUpdateQueueForTests(): void {

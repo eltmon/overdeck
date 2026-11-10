@@ -246,8 +246,9 @@ export async function assertClaudeCodeSupportsModel(
       return compareSemver(current, required) >= 0;
     };
     const outcome = await (deps.launchUpdate ?? runLaunchUpdate)(plan.argv, dirname(binaryPath), satisfied);
-    if (outcome.kind === 'already-current' || (outcome.kind === 'ran' && outcome.code === 0 && (await satisfied()))) {
-      console.log(`[claude-code] updated ${binaryPath} for ${model}; running sessions keep their current Claude Code`);
+    // Decide by this launch's own minimum: the queue may have joined a run another path or launch started (D8).
+    if (outcome.kind !== 'cooldown' && (await satisfied())) {
+      console.log(`[claude-code] ${binaryPath} now satisfies ${model}; running sessions keep their current Claude Code`);
       return;
     }
     updateNote = launchUpdateNote(outcome);

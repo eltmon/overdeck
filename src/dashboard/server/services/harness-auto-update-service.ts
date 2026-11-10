@@ -18,8 +18,7 @@ import type { HarnessAutoUpdateFailure, HarnessAutoUpdateOutcomeKind, HarnessAut
 import { emitActivityEntry, type EmitActivityOptions } from '../../../lib/activity-logger.js';
 import { isHarnessAutoUpdateEnabled } from '../../../lib/fleet/harness-auto-update.js';
 import {
-  runExclusiveUpdate,
-  runHarnessUpdateCommand,
+  runQueuedUpdateCommand,
   UPDATE_OUTPUT_TAIL_CHARS,
   type UpdateCommandResult,
 } from '../../../lib/fleet/harness-update-runner.js';
@@ -67,8 +66,7 @@ function resolveDeps(deps: Partial<HarnessAutoUpdateServiceDeps>): HarnessAutoUp
     isEnabled: deps.isEnabled ?? (() => isHarnessAutoUpdateEnabled()),
     detectClis: deps.detectClis ?? (() => detectHarnessClis({ refresh: true })),
     latestVersion: deps.latestVersion ?? defaultLatestVersion,
-    runUpdate: deps.runUpdate ?? ((argv, pathDir) =>
-      runExclusiveUpdate(argv.join(' '), () => runHarnessUpdateCommand(argv, { timeoutMs: UPDATE_TIMEOUT_MS, pathDir }))),
+    runUpdate: deps.runUpdate ?? ((argv, pathDir) => runQueuedUpdateCommand(argv, { timeoutMs: UPDATE_TIMEOUT_MS, pathDir })),
     readVersion: deps.readVersion ?? ((binaryPath) => readCliVersion(binaryPath, { refresh: true })),
     log: deps.log ?? ((line) => console.log(line)),
     emit: deps.emit ?? emitActivityEntry,

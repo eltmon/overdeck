@@ -9,7 +9,7 @@ import {
   launchUpdateNote,
   runLaunchUpdate,
 } from '../../../../src/lib/fleet/harness-auto-update.js';
-import { _resetUpdateQueueForTests } from '../../../../src/lib/fleet/harness-update-runner.js';
+import { _resetUpdateQueueForTests, runExclusiveUpdate } from '../../../../src/lib/fleet/harness-update-runner.js';
 
 const ARGV = ['/p/bin/npm', 'install', '-g', '--prefix', '/p', '@anthropic-ai/claude-code@latest'];
 const MINUTE = 60_000;
@@ -102,6 +102,48 @@ describe('runLaunchUpdate (PAN-5108 D3, D9, D11)', () => {
     expect(run).toHaveBeenCalledTimes(2);
   });
 
+  it('builds its own outcome when it joins a run another path started (review: cross-path join)', async () => {
+    let finish!: (r: { code: number; output: string }) => void;
+    const gate = new Promise<{ code: number; output: string }>((res) => { finish = res; });
+    const background = runExclusiveUpdate(ARGV.join(' '), () => gate);
+    const run = vi.fn(async () => ({ code: 0, output: '' }));
+
+    const launch = runLaunchUpdate(ARGV, '/p/bin', async () => false, { run, now: () => 0 });
+    finish({ code: 0, output: 'added 1 package' });
+
+    await background;
+    expect(await launch).toEqual({ kind: 'ran', code: 0, output: 'added 1 package' });
+    expect(run).not.toHaveBeenCalled();
+  });
+
+  it('remembers a failure from a joined run for the cooldown', async () => {
+    let finish!: (r: { code: number; output: string }) => void;
+    const gate = new Promise<{ code: number; output: string }>((res) => { finish = res; });
+    void runExclusiveUpdate(ARGV.join(' '), () => gate);
+    const run = vi.fn(async () => ({ code: 0, output: '' }));
+
+    const joined = runLaunchUpdate(ARGV, '/p/bin', async () => false, { run, now: () => 0 });
+    finish({ code: 1, output: 'E404' });
+    await joined;
+
+    expect(await runLaunchUpdate(ARGV, '/p/bin', async () => false, { run, now: () => MINUTE })).toMatchObject({ kind: 'cooldown', error: 'E404' });
+    expect(run).not.toHaveBeenCalled();
+  });
+
+  it('runs its own command when the joined run ran none and this launch is still not satisfied', async () => {
+    let finish!: (r: null) => void;
+    const gate = new Promise<null>((res) => { finish = res; });
+    // Another launch with a lower minimum: its pre-check passed, so its job ran no command.
+    void runExclusiveUpdate(ARGV.join(' '), () => gate);
+    const run = vi.fn(async () => ({ code: 0, output: 'changed 1 package' }));
+
+    const launch = runLaunchUpdate(ARGV, '/p/bin', async () => false, { run, now: () => 0 });
+    finish(null);
+
+    expect(await launch).toEqual({ kind: 'ran', code: 0, output: 'changed 1 package' });
+    expect(run).toHaveBeenCalledTimes(1);
+  });
+
   it('clears the remembered failure after a success', async () => {
     let now = 0;
     const run = vi.fn()
@@ -121,6 +163,12 @@ describe('runLaunchUpdate (PAN-5108 D3, D9, D11)', () => {
 });
 
 describe('launchUpdateNote (PAN-5108 WI-7)', () => {
+  it('names a check that found no update to run', () => {
+    expect(launchUpdateNote({ kind: 'already-current' })).toBe(
+      'Overdeck found no Claude Code update to run, but the launch binary still reports an older version.',
+    );
+  });
+
   it('names a successful update that still left an old version', () => {
     expect(launchUpdateNote({ kind: 'ran', code: 0, output: '' })).toBe(
       'Overdeck updated Claude Code automatically, but the launch binary still reports an older version.',

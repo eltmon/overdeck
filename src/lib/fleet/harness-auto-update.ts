@@ -10,6 +10,7 @@
  */
 import type { ConfigLoadResult } from '../config-yaml/schema.js';
 import {
+  type QueuedUpdateResult,
   runExclusiveUpdate,
   runHarnessUpdateCommand,
   type RunUpdateCommandOptions,
@@ -66,6 +67,13 @@ const failures = new Map<string, { error: string; failedAt: number }>();
 /**
  * Runs `argv` once through the update queue unless `isSatisfied()` already
  * holds or a failure for the same command is inside the cooldown.
+ *
+ * The queue may hand back a run another path started (the background updater,
+ * "Update all", or another launch with a different minimum). Its result is a
+ * plain command result or null, never this launch's outcome, so this function
+ * builds the outcome itself. When the joined run ran no command and this
+ * launch is still not satisfied, it queues its own run once. The caller always
+ * re-checks its own minimum before it continues.
  */
 export async function runLaunchUpdate(
   argv: string[],
@@ -80,14 +88,14 @@ export async function runLaunchUpdate(
   if (failed && now() - failed.failedAt < LAUNCH_UPDATE_RETRY_MS) {
     return { kind: 'cooldown', error: failed.error, failedAt: failed.failedAt };
   }
-  const outcome = await runExclusiveUpdate<LaunchUpdateOutcome>(key, async () => {
-    if (await isSatisfied()) return { kind: 'already-current' };
-    const result = await run(argv, { timeoutMs: LAUNCH_UPDATE_TIMEOUT_MS, pathDir });
-    return { kind: 'ran', ...result };
-  });
+  const job = async (): Promise<QueuedUpdateResult> =>
+    (await isSatisfied()) ? null : run(argv, { timeoutMs: LAUNCH_UPDATE_TIMEOUT_MS, pathDir });
+  let result = await runExclusiveUpdate(key, job);
+  if (result === null && !(await isSatisfied())) result = await runExclusiveUpdate(key, job);
+  const outcome: LaunchUpdateOutcome = result === null ? { kind: 'already-current' } : { kind: 'ran', ...result };
   if (outcome.kind === 'ran' && outcome.code !== 0) {
     failures.set(key, { error: outcome.output || `exited with code ${outcome.code}`, failedAt: now() });
-  } else if (outcome.kind !== 'cooldown') {
+  } else {
     failures.delete(key);
   }
   return outcome;
@@ -109,10 +117,10 @@ function minutesAgo(ms: number): string {
 }
 
 /** The sentence the Claude Code refusal appends after an update on refusal did not make the launch pass. */
-export function launchUpdateNote(
-  outcome: Exclude<LaunchUpdateOutcome, { kind: 'already-current' }>,
-  now: number = Date.now(),
-): string {
+export function launchUpdateNote(outcome: LaunchUpdateOutcome, now: number = Date.now()): string {
+  if (outcome.kind === 'already-current') {
+    return 'Overdeck found no Claude Code update to run, but the launch binary still reports an older version.';
+  }
   if (outcome.kind === 'cooldown') {
     return `Overdeck's automatic update failed ${minutesAgo(now - outcome.failedAt)} and retries after 15 minutes: ${noteTail(outcome.error)}.`;
   }

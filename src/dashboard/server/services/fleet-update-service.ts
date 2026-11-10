@@ -29,7 +29,7 @@ import {
 } from '@overdeck/contracts';
 
 import { emitActivityEntry } from '../../../lib/activity-logger.js';
-import { runExclusiveUpdate, runHarnessUpdateCommand } from '../../../lib/fleet/harness-update-runner.js';
+import { runQueuedUpdateCommand } from '../../../lib/fleet/harness-update-runner.js';
 import { detectHarnessClis, type InstalledHarnessCli, readCliVersion } from '../../../lib/fleet/harness-versions.js';
 import { getOverdeckHome } from '../../../lib/paths.js';
 import { getOverdeckVersion } from '../routes/misc/shared.js';
@@ -377,7 +377,7 @@ export function fleetUpdateService(): FleetUpdateService {
     detectClis: (opts) => detectHarnessClis(opts),
     readVersion: (binaryPath) => readCliVersion(binaryPath, { refresh: true }),
     // PAN-5108 D8: one process-wide update queue shared with the background updater and update on refusal.
-    runCommand: (argv) => runExclusiveUpdate(argv.join(' '), () => runHarnessUpdateCommand(argv, { timeoutMs: UPDATE_TIMEOUT_MS })),
+    runCommand: (argv) => runQueuedUpdateCommand(argv, { timeoutMs: UPDATE_TIMEOUT_MS }),
     countWorkingTurns,
     overdeck: { installMode: currentInstallMode, version: getOverdeckVersion, manager: getUpdateManager },
     restart: restartDashboardDetached,

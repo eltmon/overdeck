@@ -345,6 +345,20 @@ describe('requirements', () => {
       expect(message).toBe(`${TODAYS_MESSAGE} Overdeck tried to update Claude Code automatically and it failed: npm ERR! EACCES.`);
     });
 
+    it('checks its own minimum after a run that ran no command, and refuses with a note when still too old (review)', async () => {
+      const error = await assertClaudeCodeSupportsModel('/usr/local/bin/claude', 'claude-sonnet-5-5', {
+        readVersion: async () => '2.1.280',
+        detectInstall: () => NPM_INSTALL,
+        upgradePlan: async () => NPM_PLAN,
+        resolveRealPath: async (p) => p,
+        autoUpdateEnabled: async () => true,
+        launchUpdate: async () => ({ kind: 'already-current' }),
+      }).catch((e: unknown) => e);
+      expect((error as Error).message).toBe(
+        `${TODAYS_MESSAGE} Overdeck found no Claude Code update to run, but the launch binary still reports an older version.`,
+      );
+    });
+
     it('raises the unchanged refusal and runs nothing for a non-runnable plan (PAN-5108 FR-6)', async () => {
       const launchUpdate = vi.fn();
       const plan = { method: 'npm' as const, argv: null, display: 'sudo npm install -g @anthropic-ai/claude-code@latest', runnable: false, reason: 'not-writable' as const };
