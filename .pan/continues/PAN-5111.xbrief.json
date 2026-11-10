@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5111",
   "created": "2026-11-10T15:51:44.994Z",
-  "updated": "2026-11-10T17:09:03.607Z",
+  "updated": "2026-11-10T17:09:29.134Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -256,6 +256,10 @@
     "docs.ac4": {
       "status": "completed",
       "doneAt": "2026-11-10T17:09:03.607Z"
+    },
+    "answer-door-hooks.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:09:29.134Z"
     }
   }
 }
