@@ -261,6 +261,7 @@ describe('canUseHarness', () => {
   it('keeps the model-level opencode, muse and kimi-code/* rules for prime-agent', () => {
     expect(canUseHarness('prime-agent', 'opencode/big-pickle', 'api-key').allowed).toBe(false)
     expect(canUseHarness('prime-agent', 'muse-spark-1.3', 'api-key').allowed).toBe(false)
+    expect(canUseHarness('prime-agent', 'muse-ember-1.0', 'api-key').allowed).toBe(false)
     expect(canUseHarness('prime-agent', 'kimi-code/k3', 'api-key').allowed).toBe(false)
   })
 
@@ -277,7 +278,7 @@ describe('canUseHarness', () => {
     )
     for (const harness of POLICY_RUNTIME_NAMES) {
       for (const authMode of AUTH_MODES) {
-        for (const model of [...Object.values(MODEL_BY_PROVIDER), 'k3', 'opencode/big-pickle', 'muse-spark-1.3']) {
+        for (const model of [...Object.values(MODEL_BY_PROVIDER), 'k3', 'opencode/big-pickle', 'muse-spark-1.3', 'muse-ember-1.0']) {
           const decision = canUseHarness(harness, model, authMode)
           expect(decision.reason ?? '', `${harness} / ${model}`).not.toContain('no harness-policy decision')
         }

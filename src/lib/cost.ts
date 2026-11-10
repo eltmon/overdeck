@@ -82,10 +82,11 @@ export interface ModelPricing {
 // ============== Pricing Data ==============
 
 export const DEFAULT_PRICING: ModelPricing[] = [
-  // Meta published 1.3 rates, per 1K tokens (2026-09-08).
+  // Meta published Muse rates, per 1K tokens (Spark 2026-09-08, Ember 2026-11-10).
   { provider: 'custom', model: 'muse-wonder-1.0', inputPer1k: 0.004, outputPer1k: 0.02, cacheReadPer1k: 0.0002, currency: 'USD' },
   { provider: 'custom', model: 'muse-spark-1.3', inputPer1k: 0.00125, outputPer1k: 0.00425, cacheReadPer1k: 0.00015, currency: 'USD' },
   { provider: 'custom', model: 'muse-spark-1.3-contributor', inputPer1k: 0.0001, outputPer1k: 0.0002, cacheReadPer1k: 0.000002, currency: 'USD' },
+  { provider: 'custom', model: 'muse-ember-1.0', inputPer1k: 0.0001, outputPer1k: 0.0005, cacheReadPer1k: 0.000004, currency: 'USD' },
   // TypeSafe Jev (PAN-4369): $0.042/Mtok input, output free. The exact -free row is required:
   // getPricing() falls back to a prefix match, which would otherwise price jev-1.13-free as paid.
   { provider: 'custom', model: 'jev-1.13', inputPer1k: 0.000042, outputPer1k: 0, currency: 'USD' },

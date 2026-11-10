@@ -50,7 +50,7 @@ vi.mock('../runtimes/muse-context.js', async (importOriginal) => {
   return { ...actual, materializeMuseContext: vi.fn(async () => '/tmp/fake-muse-context.md') };
 });
 
-const models = ['muse-wonder-1.0', 'muse-spark-1.3', 'muse-spark-1.3-contributor'] as const;
+const models = ['muse-wonder-1.0', 'muse-spark-1.3', 'muse-spark-1.3-contributor', 'muse-ember-1.0'] as const;
 const temporary: string[] = [];
 afterEach(async () => { await Promise.all(temporary.splice(0).map(path => rm(path, { recursive: true, force: true }))); });
 
@@ -69,6 +69,7 @@ describe('Muse model and harness support', () => {
     expect(() => applyFallback(models[0], new Set(['anthropic']), 'claude-sonnet-5')).toThrow('Meta (Muse) is disabled');
     expect(getAvailableModelsApi().meta.find(model => model.id === 'muse-spark-1.3-contributor')?.name).toContain('training data');
     expect(getAvailableModelsApi().meta[0]).toMatchObject({ id: 'muse-wonder-1.0', name: 'Muse Wonder 1.0 (1M context)', costPer1MTokens: 12 });
+    expect(getAvailableModelsApi().meta.at(-1)).toMatchObject({ id: 'muse-ember-1.0', name: 'Muse Ember 1.0 (1M context)', costPer1MTokens: 0.3, harness: 'muse' });
   });
 
   it('preserves opt-in provider settings and Muse-specific context', () => {
@@ -133,6 +134,13 @@ describe('Muse model and harness support', () => {
       overdeckEnv: { agentId: 'agent-muse-test' } })).toThrow('explicit supported Muse');
   });
 
+  it('buildMuseCommand accepts muse-ember-1.0 and clamps max to xhigh', () => {
+    const museEffort = resolveEffort({ explicit: 'max', model: 'muse-ember-1.0', harness: 'muse' }).effort;
+    const script = generateLauncherScript({ role: 'work', workingDir: '/tmp', harness: 'muse',
+      museModel: 'muse-ember-1.0', museEffort, overdeckEnv: { agentId: 'agent-muse-ember-test' } });
+    expect(script).toContain("muse --model 'muse-ember-1.0' --reasoning-effort 'xhigh'");
+  });
+
   it.each(EFFORT_LEVELS)('muse launch argv carries the resolved effort %s (max clamps to xhigh)', level => {
     const museEffort = resolveEffort({ explicit: level, model: 'muse-spark-1.3', harness: 'muse' }).effort;
     const script = generateLauncherScript({ role: 'work', workingDir: '/tmp', harness: 'muse',
@@ -168,7 +176,7 @@ describe('Muse model and harness support', () => {
     const price = getPricing('custom', model)!;
     expect(result?.usage).toEqual({ inputTokens: 500000, outputTokens: 1000000, cacheReadTokens: 500000 });
     expect(result?.cost).toBeCloseTo(500 * price.inputPer1k + 1000 * price.outputPer1k + 500 * price.cacheReadPer1k!);
-    expect(result?.cost).toBeCloseTo({ 'muse-wonder-1.0': 22.1, 'muse-spark-1.3': 4.95, 'muse-spark-1.3-contributor': 0.251 }[model]);
+    expect(result?.cost).toBeCloseTo({ 'muse-wonder-1.0': 22.1, 'muse-spark-1.3': 4.95, 'muse-spark-1.3-contributor': 0.251, 'muse-ember-1.0': 0.552 }[model]);
   });
 
   it('reads real Muse 1.0.2 echo turns without rendering private reasoning or duplicating user intents', async () => {

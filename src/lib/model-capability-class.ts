@@ -89,6 +89,7 @@ export const MODEL_CAPABILITY_CLASSES: Readonly<Record<string, ModelCapabilityCl
   'codestral-latest': 'workhorse',
   'ql-swift-8b': 'workhorse',
   // small
+  'muse-ember-1.0': 'small',
   'claude-haiku-5-5': 'small',
   'claude-haiku-4-5': 'small',
   'gpt-5.6-luna': 'small',
