@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5078",
   "created": "2026-11-10T14:48:32.729Z",
-  "updated": "2026-11-10T17:46:03.337Z",
+  "updated": "2026-11-10T17:46:20.282Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -168,6 +168,10 @@
     "contracts-harness.ac4": {
       "status": "completed",
       "doneAt": "2026-11-10T17:46:03.336Z"
+    },
+    "grok-provider-models.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:46:20.281Z"
     }
   }
 }
