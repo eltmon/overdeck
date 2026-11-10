@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5111",
   "created": "2026-11-10T15:51:44.994Z",
-  "updated": "2026-11-10T17:01:27.379Z",
+  "updated": "2026-11-10T17:01:48.746Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -172,6 +172,10 @@
     "recent-notifications-ui.ac1": {
       "status": "completed",
       "doneAt": "2026-11-10T17:01:27.378Z"
+    },
+    "recent-notifications-ui.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:01:48.745Z"
     }
   }
 }
