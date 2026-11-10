@@ -59,17 +59,19 @@ describe('harnessUpdatePlan (D-7)', () => {
       argv: ['/p/bin/npm', 'install', '-g', '--prefix', '/p', '@openai/codex@latest'],
       display: '/p/bin/npm install -g --prefix /p @openai/codex@latest',
       reason: null,
+      npmPackage: '@openai/codex',
     });
   });
 
   it('falls back to npm on PATH when the prefix has no executable npm', async () => {
     const plan = await harnessUpdatePlan(capabilities('claude-code'), 'claude', '/p/bin/claude', '/p/lib/node_modules/@anthropic-ai/claude-code/cli.js', deps({ isExecutable: async () => false }));
     expect(plan.argv).toEqual(['npm', 'install', '-g', '--prefix', '/p', '@anthropic-ai/claude-code@latest']);
+    expect(plan.npmPackage).toBe('@anthropic-ai/claude-code');
   });
 
   it('a native kimi runs its own upgrade argv', async () => {
     const plan = await harnessUpdatePlan(capabilities('kimi-code'), 'kimi', '/home/u/.kimi-code/bin/kimi', '/home/u/.kimi-code/bin/kimi', deps());
-    expect(plan).toEqual({ argv: ['/home/u/.kimi-code/bin/kimi', 'upgrade', '--yes'], display: 'kimi upgrade --yes', reason: null });
+    expect(plan).toEqual({ argv: ['/home/u/.kimi-code/bin/kimi', 'upgrade', '--yes'], display: 'kimi upgrade --yes', reason: null, npmPackage: null });
   });
 
   it('an unwritable npm prefix gives no argv and the sudo command', async () => {
@@ -77,22 +79,24 @@ describe('harnessUpdatePlan (D-7)', () => {
     expect(plan.argv).toBeNull();
     expect(plan.display).toBe('sudo npm install -g --prefix /usr @openai/codex@latest');
     expect(plan.reason).toContain('not writable');
+    expect(plan.npmPackage).toBe('@openai/codex');
   });
 
   it('a Homebrew install is shown, not run', async () => {
     const plan = await harnessUpdatePlan(capabilities('opencode'), 'opencode', '/opt/homebrew/bin/opencode', '/opt/homebrew/Cellar/opencode/1.18.31/bin/opencode', deps());
-    expect(plan).toEqual({ argv: null, display: 'brew upgrade opencode', reason: 'installed with Homebrew' });
+    expect(plan).toEqual({ argv: null, display: 'brew upgrade opencode', reason: 'installed with Homebrew', npmPackage: null });
   });
 
   it('Windows is never run', async () => {
     const plan = await harnessUpdatePlan(capabilities('codex'), 'codex', 'C:/n/codex', 'C:/n/lib/node_modules/@openai/codex/bin/codex.js', deps({ platform: 'win32' }));
-    expect(plan).toEqual({ argv: null, display: 'codex update', reason: 'Overdeck does not update CLIs on Windows' });
+    expect(plan).toEqual({ argv: null, display: 'codex update', reason: 'Overdeck does not update CLIs on Windows', npmPackage: null });
   });
 
   it.each(['muse', 'prime-agent', 'ohmypi'])('%s declares no update and gets no argv', async (harness) => {
     const plan = await harnessUpdatePlan(capabilities(harness), 'x', '/b/x', '/b/x', deps());
     expect(plan.argv).toBeNull();
     expect(plan.reason).toBe(`Overdeck does not update ${capabilities(harness).binaryLabel}`);
+    expect(plan.npmPackage).toBeNull();
   });
 
   it('prime-agent installed with npm is still not updated (pinned)', async () => {
