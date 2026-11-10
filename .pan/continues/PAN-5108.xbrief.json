@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5108",
   "created": "2026-11-10T15:18:20.585Z",
-  "updated": "2026-11-10T16:29:41.221Z",
+  "updated": "2026-11-10T16:30:01.869Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -214,6 +214,10 @@
     "needs-you-card.ac3": {
       "status": "completed",
       "doneAt": "2026-11-10T16:29:41.221Z"
+    },
+    "needs-you-card.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-10T16:30:01.868Z"
     }
   }
 }
