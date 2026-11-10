@@ -4,17 +4,17 @@
     "created": "2026-11-10T14:34:09Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5078: Grok Build CLI harness: run Overdeck agents and conversations through xAI's grok (ACP)",
-    "updated": "2026-11-10T14:47:10.114Z"
+    "updated": "2026-11-10T14:48:20.610Z"
   },
   "plan": {
     "id": "pan-5078",
     "title": "Grok Build CLI harness: run Overdeck agents and conversations through xAI's grok (ACP)",
-    "status": "proposed",
+    "status": "running",
     "uid": "d03a10b0-6539-4618-82ce-c6f7357e8081",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-10T14:34:09Z",
-    "updated": "2026-11-10T14:47:10.114Z",
+    "updated": "2026-11-10T14:48:20.610Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5078",
@@ -2032,5 +2032,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
