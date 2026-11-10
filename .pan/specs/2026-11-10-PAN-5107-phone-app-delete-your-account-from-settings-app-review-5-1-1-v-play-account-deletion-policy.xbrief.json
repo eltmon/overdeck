@@ -1,0 +1,719 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-10T14:26:19Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5107: Phone app: delete your account from Settings (App Review 5.1.1(v), Play account-deletion policy)",
+    "updated": "2026-11-10T14:30:31.631Z"
+  },
+  "plan": {
+    "id": "pan-5107",
+    "title": "Phone app: delete your account from Settings (App Review 5.1.1(v), Play account-deletion policy)",
+    "status": "proposed",
+    "uid": "f28b9312-a044-4120-8dad-071453dfb9bf",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-10T14:26:19Z",
+    "updated": "2026-11-10T14:30:31.631Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5107",
+        "label": "PAN-5107",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "mobile",
+      "phone-app",
+      "account-deletion",
+      "app-review",
+      "docs"
+    ],
+    "metadata": {
+      "sizeJustification": "One vertical feature in apps/mobile (one new module, two screens, one wiring point) plus its docs; 15 files, 3 subsystems (mobile app, account-service test, docs).",
+      "canonicalFilename": "2026-11-10-PAN-5107-phone-app-delete-your-account-from-settings-app-review-5-1-1-v-play-account-deletion-policy.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Signing in to the phone app creates an overdeck.ai account, and App Review Guideline 5.1.1(v) and Google Play's account-deletion policy require deleting that account from inside the app. The phone app has no way to do it, so the iPhone build cannot go to App Review. The server route DELETE /v1/account already exists.",
+      "Proposal": "Add a Delete account button and a type-DELETE confirm dialog to the phone Settings screen. Confirming calls DELETE ${ACCOUNT_BASE_URL}/v1/account with the device token through CapacitorHttp. On 202 (or 401 account_deleted) the app runs the existing sign-out cleanup with account: null, which skips the device revoke step, and the sign-in screen shows 'Your account is being deleted.' through a sessionStorage notice that survives the reload. On other 401 or 403 it runs the same cleanup and tells the user to finish on the web. On a network error or any other status it stays signed in and offers Delete on the web (Browser.open of ${ACCOUNT_BASE_URL}/account). The deletion copy is duplicated in a no-import mobile module and pinned equal to the account page's by a root test. Docs: RELEASE.md, README.md, configuration/phone.mdx, changelog.mdx Upcoming block, and apps/mobile/acceptance/PAN-5107.md.",
+      "NonGoals": "- No change to any file under services/account/src and no Worker deploy\n- No mobile version bump, build, TestFlight upload or store submission\n- No GitHub-login prompt in the phone confirm step\n- No change to signOut.ts behavior or to the normal Sign out flow\n- No new section in apps/mobile/ACCEPTANCE.md"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Duplicate DELETE_STATEMENT and DELETION_STARTED_MESSAGE in apps/mobile/src/shell/accountDeletionCopy.ts and pin them with a root parity test instead of sharing through @overdeck/contracts.",
+        "rationale": "services/account has no contracts dependency; sharing would change Worker source, which the issue forbids (no Worker change, deploys are operator-only)."
+      },
+      {
+        "summary": "Skip the revoke step by calling signOut({ ...cleanup, account: null }); signOut.ts is unchanged.",
+        "rationale": "signOut uses account only for the revoke step, and the server already revoked every device; a test with the real signOut asserts DELETE /v1/devices is never called."
+      },
+      {
+        "summary": "Carry the signed-out notice across the cleanup reload in sessionStorage key overdeck.signedOutNotice.",
+        "rationale": "The cleanup clears localStorage and reloads; sessionStorage survives the reload and ShellApp already relies on that for LAUNCH_URL_KEY."
+      },
+      {
+        "summary": "Map 401 with error account_deleted to the same 'being deleted' outcome as 202.",
+        "rationale": "lookupDevice answers account_deleted while a deletion job is open, so this is a retry after a lost 202; telling the user to finish on the web would be wrong."
+      },
+      {
+        "summary": "Confirm requires exactly DELETE after trim (case-sensitive), with autoCapitalize characters and autocorrect off.",
+        "rationale": "The issue says type DELETE; the input attributes make phone keyboards produce capitals."
+      },
+      {
+        "summary": "Write acceptance evidence to apps/mobile/acceptance/PAN-5107.md instead of adding a line to ACCEPTANCE.md.",
+        "rationale": "ACCEPTANCE.md and README.md say new evidence goes in acceptance/PAN-<n>.md and nobody adds to ACCEPTANCE.md (PAN-5054 conflicts)."
+      },
+      {
+        "summary": "Create a v0.76.0 Upcoming block in changelog.mdx in the historical shape.",
+        "rationale": "The top block is the released v0.75.0; the issue says create the block when missing; docs/RELEASING.md defines its shape."
+      },
+      {
+        "summary": "15 s connect and read timeouts on the DELETE request.",
+        "rationale": "A hung request must become a visible error with the web fallback, not an endless Deleting state."
+      }
+    ],
+    "items": [
+      {
+        "id": "delete-copy-parity",
+        "title": "Phone account-deletion copy module with a parity test against the account page",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-10T14:26:19Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5107",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/src/shell/accountDeletionCopy.ts",
+            "tests/unit/services/account/phone-delete-copy.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/services/account/phone-delete-copy.test.ts",
+            "npm run typecheck:mobile"
+          ],
+          "expected_outputs": [
+            "phone-delete-copy.test.ts passes with 2 tests",
+            "typecheck:mobile completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-6",
+            "FR-7",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Create apps/mobile/src/shell/accountDeletionCopy.ts with NO imports, exporting DELETE_STATEMENT (exact copy of services/account/src/account-page/page.ts lines 22-23), DELETION_STARTED_MESSAGE = 'Your account is being deleted.' (copy of actions.ts line 19), DELETE_IRREVERSIBLE = \"This can't be undone.\", DELETE_CONFIRM_WORD = 'DELETE', FINISH_ON_WEB_MESSAGE = 'This phone is signed out. Finish deleting your account on the web.'. Create tests/unit/services/account/phone-delete-copy.test.ts that imports both phone constants and the two service constants and asserts toBe equality. Checkpoint: if a lint or the root vitest config refuses the cross-tree import, move the test to apps/mobile/src/shell/__tests__/accountDeletionCopy.test.ts importing the service modules by relative path. Do not edit any file under services/account/src."
+        },
+        "items": [
+          {
+            "id": "delete-copy-parity.ac1",
+            "title": "Given the new module, when npx vitest run tests/unit/services/account/phone-delete-copy.test.ts runs, then it exits 0 because the phone DELETE_STATEMENT equals the account page DELETE_STATEMENT and the phone DELETION_STARTED_MESSAGE equals the account page DELETION_STARTED_MESSAGE",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delete-copy-parity.ac2",
+            "title": "Given the diff, when git diff origin/main --stat -- services/account/src runs, then it produces no output (no Worker source change)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delete-copy-parity.ac3",
+            "title": "Given accountDeletionCopy.ts, when it is read, then it contains no import statement and exports DELETE_CONFIRM_WORD equal to 'DELETE'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "account-deletion-module",
+        "title": "accountDeletion.ts: DELETE /v1/account request, D-5 outcome mapping, cleanup without revoke, sessionStorage notice",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-10T14:26:19Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5107",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "settings-delete-dialog",
+            "signin-notice",
+            "shellapp-wiring"
+          ],
+          "files_scope": [
+            "apps/mobile/src/shell/accountDeletion.ts",
+            "apps/mobile/src/shell/__tests__/accountDeletion.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix apps/mobile test -- src/shell/__tests__/accountDeletion.test.ts",
+            "npm run typecheck:mobile"
+          ],
+          "expected_outputs": [
+            "accountDeletion.test.ts passes",
+            "typecheck:mobile completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Create apps/mobile/src/shell/accountDeletion.ts exporting DELETE_ACCOUNT_TIMEOUT_MS = 15_000, SIGNED_OUT_NOTICE_KEY = 'overdeck.signedOutNotice', types SignedOutNotice ('deletion-requested' | 'finish-on-web'), DeletionAnswer ('requested' | 'token-gone'), DeleteAccountResult ({ ok: true } | { ok: false; message: string }), DeleteAccountDeps { account; cleanup: SignOutDeps; request?; setNotice? }, and functions requestAccountDeletion(account), deleteAccount(deps), writeSignedOutNotice, readSignedOutNotice (returns only the two known values, else null), clearSignedOutNotice (all sessionStorage calls in try/catch), openAccountPage() = Browser.open({ url: `${ACCOUNT_BASE_URL}/account` }). requestAccountDeletion: CapacitorHttp.request DELETE `${ACCOUNT_BASE_URL}/v1/account`, Authorization Bearer account.token, connectTimeout and readTimeout DELETE_ACCOUNT_TIMEOUT_MS; 202 -> 'requested'; 401 whose body error (response.data as object OR JSON string; unreadable = no code) is 'account_deleted' -> 'requested'; other 401 and 403 -> 'token-gone'; any other status throws Error(`overdeck.ai answered HTTP ${status}.`); rejection propagates. deleteAccount: on a thrown request return { ok: false, message } and run nothing; otherwise setNotice('deletion-requested' for requested, 'finish-on-web' for token-gone), then await signOut({ ...deps.cleanup, account: null }) and return { ok: true }. Do not change signOut.ts. Tests mock @capacitor/core and @capacitor/browser like signIn.test.ts lines 4-11, build cleanup deps like signOut.test.ts lines 23-55, and use vi.useFakeTimers in beforeEach / vi.useRealTimers in afterEach (fake-timers repo rule)."
+        },
+        "items": [
+          {
+            "id": "account-deletion-module.ac1",
+            "title": "Given a mocked CapacitorHttp, when requestAccountDeletion runs, then the test asserts it sends method DELETE to `${ACCOUNT_BASE_URL}/v1/account` with Authorization 'Bearer <token>' and connectTimeout and readTimeout of 15000",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-deletion-module.ac2",
+            "title": "Given mocked answers, when requestAccountDeletion runs, then tests prove 202 and 401 {error:'account_deleted'} (object and string body) return 'requested', 401 invalid_token and 403 return 'token-gone', 503 rejects with 'overdeck.ai answered HTTP 503.', and a network rejection propagates",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-deletion-module.ac3",
+            "title": "Given request answers 'requested', when deleteAccount runs with the real signOut, then the recorded calls equal the signOut FR-12 order minus 'DELETE /v1/devices/dev-1', the notice 'deletion-requested' is written, and it returns { ok: true }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-deletion-module.ac4",
+            "title": "Given request answers 'token-gone', when deleteAccount runs, then it writes 'finish-on-web' and runs the same cleanup without the revoke step",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "account-deletion-module.ac5",
+            "title": "Given request rejects with a network error, when deleteAccount runs, then it returns { ok: false, message } with the error text, writes no notice and records no cleanup call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-delete-dialog",
+        "title": "SettingsScreen: Delete account button and type-DELETE confirm dialog",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-10T14:26:19Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5107",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/src/shell/SettingsScreen.tsx",
+            "apps/mobile/src/shell/__tests__/SettingsScreen.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix apps/mobile test -- src/shell/__tests__/SettingsScreen.test.tsx",
+            "npm run typecheck:mobile"
+          ],
+          "expected_outputs": [
+            "SettingsScreen.test.tsx passes including the PAN-5107 describe block",
+            "typecheck:mobile completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-8",
+            "FR-9",
+            "FR-10"
+          ],
+          "acJustification": "Six ACs: five dialog behaviors plus the optional-prop guard that keeps the tree typechecking before shellapp-wiring."
+        },
+        "narrative": {
+          "Action": "PRD WI-3. Add OPTIONAL props onDeleteAccount?: () => Promise<DeleteAccountResult> and onOpenAccountPage?: () => void to SettingsScreenProps (SettingsScreen.tsx lines 155-168), following the optional notifications?/liveActivity? rows in the same file, so ShellApp still typechecks before shellapp-wiring lands. Below the Sign out button (lines 273-283), only when onDeleteAccount is given, add a 'Delete account' button with the same classes as Sign out (text-destructive). It opens DeleteAccountDialog (same file): fixed inset-0 z-50 overlay, panel role=dialog aria-modal=true aria-labelledby its h3 'Delete your account'; then DELETE_STATEMENT, DELETE_IRREVERSIBLE, label 'Type DELETE to confirm' wrapping an input with autoCapitalize='characters' autoCorrect='off' autoComplete='off' spellCheck={false}; after a failure a role=alert paragraph `Couldn't delete your account: ${message} Try again, or delete it on the web.` plus a 'Delete on the web' button calling onOpenAccountPage; then Cancel (closes and clears) and confirm 'Delete account' enabled only when value.trim() === DELETE_CONFIRM_WORD and not busy. On confirm: busy, await onDeleteAccount(); ok:false -> show error, clear busy; ok:true -> stay busy. While busy confirm reads 'Deleting…' and confirm and Cancel are disabled. All touch targets min-h-11. Update line 1 header comment to mention PAN-5107 and update renderSettings in the test file to pass the new props."
+        },
+        "items": [
+          {
+            "id": "settings-delete-dialog.ac1",
+            "title": "Given Settings renders, when the test queries buttons, then a 'Delete account' button renders after 'Sign out' in DOM order and tapping it opens a role=dialog showing DELETE_STATEMENT and \"This can't be undone.\" without calling onDeleteAccount",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-delete-dialog.ac2",
+            "title": "Given the dialog is open, when the field holds '', 'delete' or 'DELET', then the confirm button is disabled, and when it holds 'DELETE' or ' DELETE ', then it is enabled",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-delete-dialog.ac3",
+            "title": "Given 'DELETE' is typed, when confirm is tapped, then onDeleteAccount is called once and the confirm button renders 'Deleting…' disabled",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-delete-dialog.ac4",
+            "title": "Given onDeleteAccount resolves { ok: false, message: 'HTTP 503' }, when confirm is tapped, then the dialog renders a role=alert error and a 'Delete on the web' button whose click calls onOpenAccountPage",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-delete-dialog.ac5",
+            "title": "Given the dialog is open with text typed, when Cancel is tapped, then the dialog is removed and reopening it shows an empty field",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-delete-dialog.ac6",
+            "title": "Given onDeleteAccount is not passed, when Settings renders, then no 'Delete account' button renders and npm run typecheck:mobile exits 0 with ShellApp.tsx unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "signin-notice",
+        "title": "SignInScreen renders the signed-out notice after account deletion",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T14:26:19Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5107",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/src/shell/SignInScreen.tsx",
+            "apps/mobile/src/shell/__tests__/SignInScreen.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix apps/mobile test -- src/shell/__tests__/SignInScreen.test.tsx",
+            "npm run typecheck:mobile"
+          ],
+          "expected_outputs": [
+            "SignInScreen.test.tsx passes",
+            "typecheck:mobile completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. Add optional props notice?: SignedOutNotice | null and onOpenAccountPage?: () => void to SignInScreen. Below the intro paragraph, when notice is set render <p role=\"status\"> with DELETION_STARTED_MESSAGE for 'deletion-requested' or FINISH_ON_WEB_MESSAGE for 'finish-on-web'; for 'finish-on-web' also render a 'Delete on the web' button calling onOpenAccountPage. Create SignInScreen.test.tsx covering both notices, the button, and no notice."
+        },
+        "items": [
+          {
+            "id": "signin-notice.ac1",
+            "title": "Given notice 'deletion-requested', when SignInScreen renders, then a role=status element shows 'Your account is being deleted.' and no 'Delete on the web' button renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "signin-notice.ac2",
+            "title": "Given notice 'finish-on-web', when SignInScreen renders, then it shows FINISH_ON_WEB_MESSAGE and a 'Delete on the web' button whose click calls onOpenAccountPage once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "signin-notice.ac3",
+            "title": "Given no notice, when SignInScreen renders, then no role=status element renders and the Sign in button still renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "shellapp-wiring",
+        "title": "ShellApp wires deleteAccount into Settings and the stored notice into the sign-in screen",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-10T14:26:19Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5107",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/src/shell/ShellApp.tsx",
+            "apps/mobile/src/shell/__tests__/ShellApp.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix apps/mobile test -- src/shell/__tests__/ShellApp.test.tsx",
+            "npm run typecheck:mobile"
+          ],
+          "expected_outputs": [
+            "ShellApp.test.tsx passes including the PAN-5107 describe block",
+            "typecheck:mobile completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. In ShellApp.tsx replace runSignOut (lines 379-393) with a cleanupDeps useCallback returning the same SignOutDeps object (fields unchanged) and runSignOut = useCallback(() => signOut(cleanupDeps()), [cleanupDeps]). Import type SignOutDeps from ./signOut and clearSignedOutNotice, deleteAccount, openAccountPage, readSignedOutNotice from ./accountDeletion. Add const [signedOutNotice] = useState(readSignedOutNotice) and useEffect(() => clearSignedOutNotice(), []) (never clear inside the initializer). Pass notice={signedOutNotice} and onOpenAccountPage={() => void openAccountPage()} to SignInScreen (line 425). Pass onDeleteAccount={() => deleteAccount({ account, cleanup: cleanupDeps() })} and onOpenAccountPage to SettingsScreen (lines 471-475); if TypeScript does not narrow account to non-null inside the arrow, bind a const in that branch, never a non-null assertion. Add a ShellApp.test.tsx describe 'ShellApp account deletion notice (PAN-5107)' modeled on the 'does nothing while signed out' test (line 341). Also add a test that opening Settings from the machine list renders the 'Delete account' button."
+        },
+        "items": [
+          {
+            "id": "shellapp-wiring.ac1",
+            "title": "Given no stored account and sessionStorage 'overdeck.signedOutNotice' = 'deletion-requested', when ShellApp renders, then the sign-in screen shows 'Your account is being deleted.' and the key is absent from sessionStorage afterwards",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "shellapp-wiring.ac4",
+            "title": "Given a signed-in ShellApp on the Settings view, when the test opens Settings, then a 'Delete account' button renders (ShellApp passes onDeleteAccount and onOpenAccountPage)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "shellapp-wiring.ac2",
+            "title": "Given the refactor to cleanupDeps, when npm --prefix apps/mobile test runs signOut.test.ts and ShellApp.test.tsx, then the normal Sign out path still records 'DELETE /v1/devices/dev-1' and every existing test exits green",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "shellapp-wiring.ac3",
+            "title": "Given the change, when npm run typecheck:mobile runs, then it exits 0 and ShellApp.tsx contains no non-null assertion on account",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-release-readme",
+        "title": "apps/mobile RELEASE.md and README.md describe in-app account deletion",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T14:26:19Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5107",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/RELEASE.md",
+            "apps/mobile/README.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'needs in-app account deletion' apps/mobile/README.md apps/mobile/RELEASE.md",
+            "grep -n 'account.overdeck.ai/account' apps/mobile/RELEASE.md"
+          ],
+          "expected_outputs": [
+            "both files report 0 matches",
+            "RELEASE.md shows the Play data-deletion URL"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. RELEASE.md: replace the 'App Store review' paragraph (lines 184-188) with text saying Settings -> Delete account deletes the overdeck.ai account in the app (DELETE /v1/account with the device token, then sign-out); give the App Review notes line 'Settings → Delete account deletes the overdeck.ai account in the app.'; give the Play Console data-deletion URL (Policy → App content → Data deletion) https://account.overdeck.ai/account. Update the Store facts 'Deletion:' bullet (line 165) to name the in-app path and the web path. README.md: add 'account deletion (accountDeletion.ts, PAN-5107)' to the src/shell/ layout row (line 16); delete the 'What it cannot do yet' bullet 'App Store review (beyond TestFlight) needs in-app account deletion.' (line 257); add a '## Account deletion' section after '## Appearance' naming accountDeletion.ts, the status mapping in one or two sentences, the overdeck.signedOutNotice sessionStorage key and the parity test path. No em dashes in added lines."
+        },
+        "items": [
+          {
+            "id": "docs-release-readme.ac1",
+            "title": "Given the docs, when grep -c 'needs in-app account deletion' runs on apps/mobile/README.md and apps/mobile/RELEASE.md, then it prints 0 for both",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-release-readme.ac2",
+            "title": "Given RELEASE.md, when grep runs, then it finds 'Settings → Delete account deletes the overdeck.ai account in the app' and 'https://account.overdeck.ai/account' as the Play data-deletion URL",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-release-readme.ac3",
+            "title": "Given README.md, when grep -n '^## Account deletion' and grep -n 'overdeck.signedOutNotice' run, then both find a match",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-release-readme.ac4",
+            "title": "Given the diff of the two files, when added lines are searched for U+2014, then none contain an em dash",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-phone-mdx",
+        "title": "configuration/phone.mdx gains a Delete your account section",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T14:26:19Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5107",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/phone.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n '^## Delete your account' configuration/phone.mdx"
+          ],
+          "expected_outputs": [
+            "the section heading is found after '## Remove a phone'"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. Add '## Delete your account' after '## Remove a phone' (line 157): in the app-store Overdeck app open Settings, tap Delete account, type DELETE and confirm; deletion signs out every device, removes your machines from the directory and deletes hosted data within 24 hours, and it can't be undone; the phone then signs out and shows 'Your account is being deleted.'; if the phone can't reach overdeck.ai it stays signed in and offers Delete on the web; the account can also be deleted at https://account.overdeck.ai/account. Do not edit the existing em dash in the Diagnostics section; add none."
+        },
+        "items": [
+          {
+            "id": "docs-phone-mdx.ac1",
+            "title": "Given phone.mdx, when grep -n '^## Delete your account' runs, then it finds the heading on a line after '## Remove a phone'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-phone-mdx.ac2",
+            "title": "Given the new section, when read, then it names Settings, Delete account, typing DELETE, 'Your account is being deleted.', Delete on the web and https://account.overdeck.ai/account",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-phone-mdx.ac3",
+            "title": "Given git diff origin/main -- configuration/phone.mdx, when added lines are searched for U+2014, then none contain an em dash",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-changelog",
+        "title": "changelog.mdx Upcoming block with the phone account-deletion entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T14:26:19Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5107",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "changelog.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'tags={\\[\"Upcoming\"\\]}' changelog.mdx"
+          ],
+          "expected_outputs": [
+            "prints 1"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. Insert above '<Update label=\"v0.75.0\" description=\"2026-11-10\">' (line 13) the block: <Update label=\"v0.76.0\" description=\"Unreleased\" tags={[\"Upcoming\"]}>, '## Upcoming release', 'Drafted from the changes merged to `main` since v0.75.0. The date is set when the release is tagged.', '#### New', the bullet '**Delete your account from the phone app:** Settings → **Delete account** deletes your overdeck.ai account from inside the Overdeck app. Type `DELETE` to confirm; the phone then signs out. If overdeck.ai can't be reached, the app offers **Delete on the web**.', and '[Compare v0.75.0...v0.76.0](https://github.com/eltmon/overdeck/compare/v0.75.0...v0.76.0)', then '</Update>'. If an Upcoming block already exists after rebasing, add only the bullet under its '#### New' heading (create the heading if missing) and never a second block."
+        },
+        "items": [
+          {
+            "id": "docs-changelog.ac1",
+            "title": "Given changelog.mdx, when grep -c 'tags={[\"Upcoming\"]}' runs, then it prints exactly 1 and that block precedes the v0.75.0 block",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-changelog.ac2",
+            "title": "Given the Upcoming block, when read, then it contains the 'Delete your account from the phone app' bullet under '#### New'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "acceptance-evidence",
+        "title": "apps/mobile/acceptance/PAN-5107.md evidence and on-device checklist",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-11-10T14:26:19Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5107",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "apps/mobile/acceptance/PAN-5107.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "test -f apps/mobile/acceptance/PAN-5107.md",
+            "git diff origin/main --stat -- apps/mobile/ACCEPTANCE.md"
+          ],
+          "expected_outputs": [
+            "the file exists",
+            "no diff output for ACCEPTANCE.md"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. Create apps/mobile/acceptance/PAN-5107.md shaped like apps/mobile/acceptance/PAN-5100.md: title, one-line summary, '## Per-AC evidence' mapping each plan acceptance criterion to the test file and test name that proves it, and '## On-device check (TestFlight build 6, Flywheel and operator)' with unchecked boxes: open Settings, tap Delete account, type DELETE, confirm, see 'Your account is being deleted.' on the sign-in screen, see the account gone at https://account.overdeck.ai/account. Do not modify apps/mobile/ACCEPTANCE.md."
+        },
+        "items": [
+          {
+            "id": "acceptance-evidence.ac1",
+            "title": "Given the branch, when test -f apps/mobile/acceptance/PAN-5107.md runs, then it exits 0 and the file contains '## Per-AC evidence' and an unchecked on-device checklist",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acceptance-evidence.ac2",
+            "title": "Given the branch, when git diff origin/main --stat -- apps/mobile/ACCEPTANCE.md runs, then it produces no output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "delete-copy-parity",
+        "to": "settings-delete-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "delete-copy-parity",
+        "to": "signin-notice",
+        "type": "blocks"
+      },
+      {
+        "from": "account-deletion-module",
+        "to": "settings-delete-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "account-deletion-module",
+        "to": "signin-notice",
+        "type": "blocks"
+      },
+      {
+        "from": "account-deletion-module",
+        "to": "shellapp-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "settings-delete-dialog",
+        "to": "shellapp-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "signin-notice",
+        "to": "shellapp-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "account-deletion-module",
+        "to": "docs-release-readme",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
