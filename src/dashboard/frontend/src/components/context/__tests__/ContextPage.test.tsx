@@ -129,6 +129,7 @@ function installFetchHandler() {
           acp: `ACP preview: ${content}`,
           muse: `Muse preview: ${content}`,
           opencode: `OpenCode preview: ${content}`,
+          grok: `Grok Build preview: ${content}`,
           'kimi-code': `Kimi preview: ${content}`,
           fullPrompt: `Full injected prompt\n\n${content}\n\nMemory/status/briefing placeholders`,
         },
@@ -238,7 +239,7 @@ describe('ContextPage', () => {
     vi.useRealTimers();
     fireEvent.click(screen.getByRole('button', { name: 'Preview for agent' }));
     const select = screen.getByLabelText('Preview for');
-    for (const [value, text] of [['codex', 'Codex'], ['acp', 'ACP'], ['kimi-code', 'Kimi'], ['muse', 'Muse'], ['opencode', 'OpenCode']]) {
+    for (const [value, text] of [['codex', 'Codex'], ['acp', 'ACP'], ['kimi-code', 'Kimi'], ['muse', 'Muse'], ['opencode', 'OpenCode'], ['grok', 'Grok Build']]) {
       fireEvent.change(select, { target: { value } });
       expect(screen.getByText(`${text} preview: draft instructions`)).toBeVisible();
     }

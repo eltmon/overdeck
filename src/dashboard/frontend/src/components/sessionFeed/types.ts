@@ -15,7 +15,7 @@ export interface ConversationFeedRow {
   issueId: string | null;
   cwd?: string | null;
   title?: string | null;
-  harness?: 'claude-code' | 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent' | null;
+  harness?: 'claude-code' | 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent' | 'grok' | null;
   archivedAt?: string | null;
   messageCount?: number;
   status?: 'active' | 'ended' | null;
