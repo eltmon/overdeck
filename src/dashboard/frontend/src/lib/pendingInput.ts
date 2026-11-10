@@ -30,7 +30,9 @@ export type PendingInputKind =
   /** PAN-5093 — free disk on the Overdeck home's filesystem is below the warning threshold. */
   | 'diskLow'
   /** PAN-5093 — free disk is below the critical threshold; writes may fail soon. */
-  | 'diskCritical';
+  | 'diskCritical'
+  /** PAN-5111 — this machine could not fetch a linked machine's Needs-You. */
+  | 'machineUnreachable';
 
 /** Short label for a single kind (used in tooltips, joined by comma). */
 export const PENDING_INPUT_KIND_LABEL: Record<string, string> = {
@@ -49,6 +51,7 @@ export const PENDING_INPUT_KIND_LABEL: Record<string, string> = {
   mcpSignIn: 'MCP sign-in waiting',
   diskLow: 'Disk space low',
   diskCritical: 'Disk space critical',
+  machineUnreachable: "Can't reach machine",
 };
 
 /** PAN-4371 — replaces "Answer the agent" when Jev read the turn end with confidence. */

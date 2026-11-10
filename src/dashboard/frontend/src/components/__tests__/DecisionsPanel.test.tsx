@@ -317,6 +317,43 @@ describe('DecisionsPanel disk alert (PAN-5093)', () => {
   });
 });
 
+describe('DecisionsPanel unreachable machine (PAN-5111)', () => {
+  const row = {
+    environmentId: 'env-air',
+    label: 'Edwards-MacBook-Air.local',
+    since: '2026-11-10T11:00:00.000Z',
+    reason: 'answered 500',
+  };
+  const unreachableDecision = {
+    id: 'unreachable:env-air',
+    source: 'agent' as const,
+    label: "Can't reach Edwards-MacBook-Air.local",
+    kinds: ['machineUnreachable'],
+    since: row.since,
+    blocking: false,
+    machineLabel: row.label,
+    unreachableMachine: row,
+  };
+
+  it('renders unreachable-machine-card in the System group, never in Waiting', () => {
+    vi.spyOn(useDecisionsModule, 'useDecisions').mockReturnValue([planDecision, unreachableDecision]);
+    renderWithQuery(<DecisionsPanel />);
+
+    const card = screen.getByTestId('unreachable-machine-card');
+    expect(card.textContent).toContain("Can't reach Edwards-MacBook-Air.local; it may have items waiting.");
+    expect(screen.getByText('System').closest('section')?.contains(card)).toBe(true);
+    expect(screen.getByText('Waiting').closest('section')?.textContent).not.toContain("Can't reach");
+  });
+
+  it('opens the Anywhere settings section', async () => {
+    vi.spyOn(useDecisionsModule, 'useDecisions').mockReturnValue([unreachableDecision]);
+    const pushState = vi.spyOn(window.history, 'pushState');
+    renderWithQuery(<DecisionsPanel />);
+    await userEvent.click(screen.getByRole('button', { name: 'Open Machines' }));
+    expect(pushState).toHaveBeenCalledWith({ tab: 'settings' }, '', '/settings');
+  });
+});
+
 describe('DecisionsCount', () => {
   it('counts agents and conversations together', () => {
     vi.spyOn(useDecisionsModule, 'useDecisions').mockReturnValue([agentDecision, conversationDecision, planDecision]);

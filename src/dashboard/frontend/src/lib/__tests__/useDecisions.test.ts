@@ -29,7 +29,7 @@ function renderDecisions(
     defaultOptions: { queries: { retry: false, staleTime: Infinity } },
   });
   queryClient.setQueryData(['conv-ask-user-question'], convRows);
-  queryClient.setQueryData(['fleet-needs-you'], []); // PAN-4651: no linked machines
+  queryClient.setQueryData(['fleet-needs-you'], { machines: [], unreachable: [] }); // PAN-4651: no linked machines
   queryClient.setQueryData(['agent-requests'], agentRequestRows); // PAN-4941
   queryClient.setQueryData(['anywhere-status'], options.anywhereStatus ?? { viewer: { kind: options.viewerKind ?? 'root-session' } }); // PAN-4946
   queryClient.setQueryData(['mcp-oauth-approvals'], options.mcpApprovals ?? []); // PAN-4946
@@ -365,7 +365,7 @@ describe('useDecisions disk alert integration (PAN-5093)', () => {
   it('keeps the diskLow decision after a rejected refetch (WI-6 critique response)', async () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
     queryClient.setQueryData(['conv-ask-user-question'], []);
-    queryClient.setQueryData(['fleet-needs-you'], []);
+    queryClient.setQueryData(['fleet-needs-you'], { machines: [], unreachable: [] });
     queryClient.setQueryData(['agent-requests'], []);
     queryClient.setQueryData(['anywhere-status'], { viewer: { kind: 'root-session' } });
     queryClient.setQueryData(['mcp-oauth-approvals'], []);
