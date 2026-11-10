@@ -89,6 +89,7 @@ src/components/Settings/sections/__tests__/AccessTokensSection.test.tsx
 src/components/Settings/sections/__tests__/AutoSettleIdleRow.test.tsx
 src/components/Settings/sections/__tests__/AutoSettleOnMergeRow.test.tsx
 src/components/Settings/sections/__tests__/CloseOutSection.test.tsx
+src/components/Settings/sections/__tests__/ProviderManagementSection.test.tsx
 src/components/Settings/sections/__tests__/TelemetrySection.test.tsx
 src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx
 src/components/Settings/sections/__tests__/tiered-crews.test.ts
