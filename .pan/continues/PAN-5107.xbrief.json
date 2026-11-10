@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5107",
   "created": "2026-11-10T14:32:45.039Z",
-  "updated": "2026-11-10T14:52:44.289Z",
+  "updated": "2026-11-10T14:53:04.667Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -74,6 +74,10 @@
     "delete-copy-parity.ac3": {
       "status": "completed",
       "doneAt": "2026-11-10T14:52:44.289Z"
+    },
+    "account-deletion-module.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T14:53:04.667Z"
     }
   }
 }
