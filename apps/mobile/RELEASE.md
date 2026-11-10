@@ -162,8 +162,8 @@ The launcher icons and splash images are generated from the Overdeck mark
 - **Encrypted in transit:** yes. Conversation content and notification text are end-to-end
   encrypted between the phone and the operator's machines; Apple, Google, Cloudflare and Overdeck
   see only ciphertext.
-- **Deletion:** account.overdeck.ai → Delete account. Signing out on the phone removes its push
-  token.
+- **Deletion:** in the app, Settings → Delete account, or on the web, account.overdeck.ai → Delete
+  account. Signing out on the phone removes its push token.
 
 Before uploading the first build containing this telemetry change:
 
@@ -183,6 +183,9 @@ in `Info.plist`, so App Store Connect asks on the first build.
 
 ### App Store review
 
-TestFlight internal testing works today. Submitting to the App Store itself (beyond TestFlight)
-needs in-app account deletion (App Review Guideline 5.1.1(v)), because signing in creates an
-overdeck.ai account. The app does not have it yet.
+TestFlight internal testing works today. Settings → Delete account deletes the overdeck.ai
+account in the app (`DELETE /v1/account` with the device token, then sign-out), satisfying App
+Review Guideline 5.1.1(v) and Google Play's account-deletion policy.
+
+- App Review notes: "Settings → Delete account deletes the overdeck.ai account in the app."
+- Play Console: Policy → App content → Data deletion → https://account.overdeck.ai/account
