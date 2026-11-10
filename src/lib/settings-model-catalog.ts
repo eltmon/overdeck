@@ -1,8 +1,10 @@
-/** Model picker catalog, including installed OpenCode Go and Zen models. */
-import type { ModelId } from './settings.js';
+/** Model picker catalog, including installed OpenCode Go and Zen models and signed-in Grok Build models. */
+import { GROK_BUILD_MODELS, type ModelId } from './settings.js';
 import type { RuntimeName } from './runtimes/types.js';
 import { MODEL_CAPABILITIES, MODEL_DEPRECATIONS } from './model-capabilities.js';
 import { discoverOpenCodeModels } from './opencode-models.js';
+import { resolveHarnessBinary } from './harness-binary.js';
+import { readGrokSignIn } from './grok-sign-in.js';
 
 type AvailableModel = {
   id: ModelId;
@@ -16,7 +18,7 @@ type AvailableModel = {
   /** Display name without any harness suffix — pickers compose row labels from it. */
   baseName?: string;
 };
-type AvailableModelsApi = Record<'anthropic' | 'openai' | 'google' | 'minimax' | 'zai' | 'kimi' | 'mimo' | 'openrouter' | 'nous' | 'dashscope' | 'meta' | 'opencode' | 'opencode-go', AvailableModel[]>;
+type AvailableModelsApi = Record<'anthropic' | 'openai' | 'google' | 'minimax' | 'zai' | 'kimi' | 'mimo' | 'openrouter' | 'nous' | 'dashscope' | 'meta' | 'opencode' | 'opencode-go' | 'grok', AvailableModel[]>;
 
 function annotateKimiAvailableModel(modelId: string, entry: AvailableModel, effortLevels: readonly string[] | undefined): AvailableModel {
   if (modelId.startsWith('kimi-code/')) {
@@ -36,10 +38,11 @@ function annotateKimiAvailableModel(modelId: string, entry: AvailableModel, effo
   };
 }
 
-export function getAvailableModelsApi(openCodeModels: readonly AvailableModel[] = []): AvailableModelsApi {
+export function getAvailableModelsApi(openCodeModels: readonly AvailableModel[] = [], grokModels: readonly AvailableModel[] = []): AvailableModelsApi {
   const result: AvailableModelsApi = {
     opencode: openCodeModels.filter((model) => model.id.startsWith('opencode/')),
     'opencode-go': openCodeModels.filter((model) => model.id.startsWith('opencode-go/')),
+    grok: [...grokModels],
     anthropic: [],
     openai: [],
     google: [],
@@ -115,10 +118,36 @@ export function getAvailableModelsApi(openCodeModels: readonly AvailableModel[] 
   return result;
 }
 
-export async function getAvailableModelsWithOpenCodeApi(): Promise<AvailableModelsApi> {
-  const models = await discoverOpenCodeModels().catch((error) => {
-    console.warn('[settings] OpenCode model discovery failed:', error instanceof Error ? error.message : String(error));
+/** Grok Build models appear only when the grok CLI is installed and signed in (PAN-5078 D8). */
+async function availableGrokModels(): Promise<AvailableModel[]> {
+  try {
+    if (!await resolveHarnessBinary('grok')) return [];
+    if (!(await readGrokSignIn()).signedIn) return [];
+  } catch (error) {
+    console.warn('[settings] Grok Build availability check failed:', error instanceof Error ? error.message : String(error));
     return [];
+  }
+  return GROK_BUILD_MODELS.map((id) => {
+    const capability = MODEL_CAPABILITIES[id];
+    return {
+      id,
+      name: capability.displayName,
+      baseName: capability.displayName,
+      costPer1MTokens: capability.costPer1MTokens,
+      contextWindow: capability.contextWindow,
+      harness: 'grok',
+      effortLevels: capability.effortLevels,
+    };
   });
-  return getAvailableModelsApi(models);
+}
+
+export async function getAvailableModelsWithOpenCodeApi(): Promise<AvailableModelsApi> {
+  const [models, grokModels] = await Promise.all([
+    discoverOpenCodeModels().catch((error) => {
+      console.warn('[settings] OpenCode model discovery failed:', error instanceof Error ? error.message : String(error));
+      return [];
+    }),
+    availableGrokModels(),
+  ]);
+  return getAvailableModelsApi(models, grokModels);
 }
