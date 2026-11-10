@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5107",
   "created": "2026-11-10T14:32:45.039Z",
-  "updated": "2026-11-10T15:01:24.456Z",
+  "updated": "2026-11-10T15:01:41.127Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -186,6 +186,10 @@
     "acceptance-evidence.ac1": {
       "status": "completed",
       "doneAt": "2026-11-10T15:01:24.456Z"
+    },
+    "acceptance-evidence.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T15:01:41.127Z"
     }
   }
 }
