@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5111",
   "created": "2026-11-10T15:51:44.994Z",
-  "updated": "2026-11-10T17:00:23.772Z",
+  "updated": "2026-11-10T17:00:46.038Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -160,6 +160,10 @@
     "history-route.ac1": {
       "status": "completed",
       "doneAt": "2026-11-10T17:00:23.771Z"
+    },
+    "history-route.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:00:46.038Z"
     }
   }
 }
