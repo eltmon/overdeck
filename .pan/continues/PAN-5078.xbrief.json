@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5078",
   "created": "2026-11-10T14:48:32.729Z",
-  "updated": "2026-11-10T16:32:26.488Z",
+  "updated": "2026-11-10T16:39:15.588Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -136,9 +136,10 @@
       "doneAt": "2026-11-10T16:32:20.238Z"
     },
     "grok-replay-fixtures": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5078",
-      "claimedAt": "2026-11-10T16:32:26.488Z"
+      "claimedAt": "2026-11-10T16:32:26.488Z",
+      "doneAt": "2026-11-10T16:39:15.587Z"
     }
   }
 }
