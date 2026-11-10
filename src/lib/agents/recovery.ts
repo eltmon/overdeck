@@ -143,7 +143,7 @@ export function resolveRecoveryResumeSessionId(agentId: string, harness: Runtime
   }
   // Prime Agent (PAN-3668): the host records its session id in sessions.json; the
   // resumed launch reads the session file from the pointer and verifies the id (D7).
-  if (harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code' && harness !== 'opencode' && harness !== 'prime-agent') return undefined;
+  if (harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code' && harness !== 'opencode' && harness !== 'grok' && harness !== 'prime-agent') return undefined;
   const state = getAgentState(agentId);
   const resolutionState = state
     ? { ...state, harness }
@@ -651,7 +651,7 @@ export async function recoverAgent(
     return { action: 'respawned', state };
   }
 
-  if (recoveryHarness === 'acp' || recoveryHarness === 'opencode' || recoveryHarness === 'muse' || recoveryHarness === 'prime-agent') {
+  if (recoveryHarness === 'acp' || recoveryHarness === 'opencode' || recoveryHarness === 'grok' || recoveryHarness === 'muse' || recoveryHarness === 'prime-agent') {
     const resumeSessionId = resolveRecoveryResumeSessionId(normalizedId, recoveryHarness);
     const { launcherContent, providerEnv: acpProviderEnv } = await buildAgentLaunchConfig({
       agentId: normalizedId,

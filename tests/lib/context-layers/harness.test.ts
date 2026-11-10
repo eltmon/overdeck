@@ -102,6 +102,13 @@ describe('validateTemplate', () => {
     expect(renderForHarness('{{#harness:grok}}grok only{{/harness:grok}}', 'grok')).toContain('grok only');
   });
 
+  it('renders grok blocks and drops opencode blocks for a Grok launch (PAN-5078)', () => {
+    const rendered = renderForHarness('shared\n{{#harness:grok}}grok block{{/harness:grok}}\n{{#harness:opencode}}opencode block{{/harness:opencode}}', 'grok');
+    expect(rendered).toContain('shared');
+    expect(rendered).toContain('grok block');
+    expect(rendered).not.toContain('opencode block');
+  });
+
   it('warns — but does not error — on an unknown harness name', () => {
     const v = validateTemplate('{{#harness:cursor}}x{{/harness:cursor}}');
     expect(v.ok).toBe(true);
