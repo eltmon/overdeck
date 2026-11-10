@@ -1,13 +1,12 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-10T18:01:44.977799Z · model: claude-opus-5-5 · open: 871_
+_Last sequenced: 2026-11-10T18:03:44.782110Z · model: claude-opus-5-5 · open: 870_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-5001 | S | critical | ok |  |  | Closed-issue reaper re-checks 426 reaped issues every minute and drains the 5k/hr GitHub App quota; in pipeline. |
 | 2 | PAN-5117 | S | critical | ok |  |  | In pipeline: real-sleep bash fallback test times out under CI load and turns main red; move it to a .slow test file. |
-| 4 | PAN-5111 | M | high | ok |  |  | In pipeline: record sent pushes, mark withdrawn questions, flag unreachable linked machines in Needs you |
 | 4 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
 | 5 | PAN-5090 | XS | critical | ok |  |  | Herdr unit lacks OOMPolicy=continue: one OOM-killed pane child stops the service and kills every conversation; seen twice. |
 | 6 | PAN-4995 | S | high | ok |  |  | pan review request verifies a half-adopted workspace; its main merge trips adoption's head check -> false Needs-you on handoff PRs |
@@ -887,10 +886,6 @@ New in-pipeline substrate bug: the deacon close-out sweep alone exhausted the Gi
 
 New since the prior run and already in the pipeline. A flaky test on main turns main red, and a red main silently empties the merge gate for every other issue, so this substrate fix ranks in the top tier. It takes the free rank-2 slot without displacing other pinned work.
 
-### PAN-5111 (rank 4)
-
-New since the prior run and already in the pipeline, so it is pinned near the top. The substrate-improvement label sets a high floor: phantom 'needs you' pushes with no record undermine operator trust in the notification path.
-
 ### PAN-5013 (rank 4)
 
 Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat Herdr's done state, which means the harness is alive and waiting, as no live agent. Derived issue state feeds pickup and respawn, so a wrong answer here can launch duplicate agents. Small, well-located fix, so it takes the rank-2 slot freed by the closure of PAN-4998.
@@ -1199,6 +1194,10 @@ New since the prior run (filed by the PAN-4532 plan critic). recoverStalledRevie
 
 Triage: verify whether blocking-choice-menu detection is wired to the current liveness/health surface. Rank held.
 
+### PAN-3205 (rank 81)
+
+New this pass. The deployment gate's queue message is unusually good — it names the holders, the queue age, and warns against forcing — and it promises a 'next verification boundary' trigger that does not exist. Every holder cleared and the deploy never fired; the live build stayed stale for 35 minutes until a manual reload. A correct-sounding instruction that cannot happen is worse than no message.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1206,10 +1205,10 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-10T18:01:44.977799Z",
+  "generatedAt": "2026-11-10T18:03:44.782110Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 871,
+  "openCount": 870,
   "nodes": [
     {
       "issue": "PAN-5001",
@@ -1221,19 +1220,6 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "dependsOn": [],
       "why": "Closed-issue reaper re-checks 426 reaped issues every minute and drains the 5k/hr GitHub App quota; in pipeline.",
       "rationale": "New in-pipeline substrate bug: the deacon close-out sweep alone exhausted the GitHub App REST pool, which pauses every tracker read and write across the pipeline. Pinned at the free top slot; the fix (skip already-reaped residue for 6h, no overlapping deacon-lite sweeps) is small and well specified.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5111",
-      "rank": 4,
-      "size": "M",
-      "importance": "high",
-      "score": 72,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline: record sent pushes, mark withdrawn questions, flag unreachable linked machines in Needs you",
-      "rationale": "New since the prior run and already in the pipeline, so it is pinned near the top. The substrate-improvement label sets a high floor: phantom 'needs you' pushes with no record undermine operator trust in the notification path.",
       "gate": "auto",
       "planning": "auto"
     },
