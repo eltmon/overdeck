@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5108",
   "created": "2026-11-10T15:18:20.585Z",
-  "updated": "2026-11-10T16:17:59.256Z",
+  "updated": "2026-11-10T16:18:36.421Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -78,6 +78,10 @@
     "config-key.ac1": {
       "status": "completed",
       "doneAt": "2026-11-10T16:17:59.256Z"
+    },
+    "config-key.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-10T16:18:36.420Z"
     }
   }
 }
