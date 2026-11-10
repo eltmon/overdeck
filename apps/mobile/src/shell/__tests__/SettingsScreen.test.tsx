@@ -296,7 +296,7 @@ describe('SettingsScreen delete account (PAN-5107)', () => {
     fireEvent.change(within(dialog).getByLabelText('Type DELETE to confirm'), { target: { value: 'DELETE' } });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Delete account' }));
     const alert = await within(dialog).findByRole('alert');
-    expect(alert.textContent).toBe("Couldn't delete your account: HTTP 503 Try again, or delete it on the web.");
+    expect(alert.textContent).toBe("Couldn't delete your account: HTTP 503. Try again, or delete it on the web.");
     fireEvent.click(within(dialog).getByRole('button', { name: 'Delete on the web' }));
     expect(onOpenAccountPage).toHaveBeenCalledTimes(1);
   });

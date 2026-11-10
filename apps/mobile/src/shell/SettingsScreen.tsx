@@ -241,7 +241,7 @@ function DeleteAccountDialog({
         {error ? (
           <div className="flex flex-col gap-2">
             <p role="alert" className="text-sm text-destructive">
-              {`Couldn't delete your account: ${error} Try again, or delete it on the web.`}
+              {`Couldn't delete your account: ${error.replace(/[.\s]+$/, '')}. Try again, or delete it on the web.`}
             </p>
             <button
               type="button"

@@ -236,7 +236,8 @@ Settings → Delete account (PAN-5107, `src/shell/accountDeletion.ts`) sends `DE
 with the device token, then runs the normal sign-out cleanup. A 202 or a 401 `account_deleted`
 answer maps to the deletion-started outcome; any other 401 or 403 maps to finish-on-web, telling
 the user to delete it at account.overdeck.ai instead; the sign-out that follows either outcome
-skips the revoke-device step, since the server has already revoked every device. The outcome
+skips the revoke-device step. After a 202, the server has already revoked every device; after
+finish-on-web, this phone's token is already refused. The outcome
 survives the sign-out reload as `overdeck.signedOutNotice` in `sessionStorage`, read once by
 `ShellApp` for the sign-in screen. Its two copy strings are pinned equal to the account service's
 by `tests/unit/services/account/phone-delete-copy.test.ts`.
