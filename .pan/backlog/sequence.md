@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-10T14:11:36.049144Z · model: claude-opus-5-5 · open: 869_
+_Last sequenced: 2026-11-10T14:20:31.390295Z · model: claude-opus-5-5 · open: 870_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -25,6 +25,7 @@ _Last sequenced: 2026-11-10T14:11:36.049144Z · model: claude-opus-5-5 · open: 
 | 18 | PAN-4705 | S | high | ok |  |  | quality-gate-admission test leaks a poller past afterEach rmSync; unhandled ENOENT fails unrelated PR CI shards. |
 | 19 | PAN-4746 | S | high | ok |  |  | CI test shard flakes on ENOTEMPTY: afterEach rmSync races an unawaited snapshot write; reds unrelated PRs (seen on #4745). |
 | 20 | PAN-5104 | XS | high | ok |  |  | Stale cost hook bundle prices Fable 5.1/5.2 at Fable 5 rates; reconciler never corrects it. Unblocked: PAN-5103 merged. |
+| 21 | PAN-5107 | S | high | ok |  |  | Phone app Settings → Delete account via DELETE /v1/account; App Review 5.1.1(v) blocker for iOS submission; in pipeline. |
 | 22 | PAN-4572 | M | medium | ok |  |  | Residual re-render offenders PAN-4560 profiled but left: unmemoized deck rows, App 5 s poll, clock/selector identity bugs. |
 | 23 | PAN-4625 | S | high | ok |  |  | CI relay debounces a later failed check on the same head, so agents never see a failing test shard; lands after PAN-4534 (same file) |
 | 24 | PAN-4586 | XS | critical | ok |  |  | Herdr pane.read nests text under result.read; every Overdeck pane-text reader gets '' — detection, inventory, resume all blind |
@@ -957,6 +958,10 @@ New flaky-test bug: a background membership-snapshot write races the test's tear
 
 Its only dependency, PAN-5103 (Fable 5.2 rollout), closed as completed, so the XS rebuild is unblocked; rank held at 20 because it is a cost-accuracy fix, not pipeline substrate.
 
+### PAN-5107 (rank 21)
+
+New since the prior run and already in the pipeline. The body is a complete, file-level brief: the server route, web fallback, device token and sign-out cleanup all exist, so the work is a Settings row, a two-step confirm, three response paths, tests and docs. It blocks App Review submission for the phone app, so it ranks high, and it takes the free rank-21 slot so no other issue's rank moves.
+
 ### PAN-4572 (rank 22)
 
 PAN-4560 merged (closed completed 2026-10-20), so this follow-up is now unblocked; rank held at 19 near the top tier because its offenders are already measured and file-referenced.
@@ -1193,10 +1198,6 @@ New since the prior run (filed by the PAN-4532 plan critic). recoverStalledRevie
 
 Triage: verify whether blocking-choice-menu detection is wired to the current liveness/health surface. Rank held.
 
-### PAN-3205 (rank 81)
-
-New this pass. The deployment gate's queue message is unusually good — it names the holders, the queue age, and warns against forcing — and it promises a 'next verification boundary' trigger that does not exist. Every holder cleared and the deploy never fired; the live build stayed stale for 35 minutes until a manual reload. A correct-sounding instruction that cannot happen is worse than no message.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1204,10 +1205,10 @@ New this pass. The deployment gate's queue message is unusually good — it name
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-10T14:11:36.049144Z",
+  "generatedAt": "2026-11-10T14:20:31.390295Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 869,
+  "openCount": 870,
   "nodes": [
     {
       "issue": "PAN-5001",
@@ -12010,6 +12011,19 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "rationale": "PAN-4835 merged in #4894, which clears its only dependency; rank held because the Anywhere phone epic is low-impact relative to substrate work above it.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-5107",
+      "rank": 21,
+      "size": "S",
+      "importance": "high",
+      "score": 78,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Phone app Settings → Delete account via DELETE /v1/account; App Review 5.1.1(v) blocker for iOS submission; in pipeline.",
+      "rationale": "New since the prior run and already in the pipeline. The body is a complete, file-level brief: the server route, web fallback, device token and sign-out cleanup all exist, so the work is a Settings row, a two-step confirm, three response paths, tests and docs. It blocks App Review submission for the phone app, so it ranks high, and it takes the free rank-21 slot so no other issue's rank moves.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13188,6 +13202,13 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.4
+    },
+    {
+      "from": "PAN-4823",
+      "to": "PAN-5107",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
     }
   ]
 }
