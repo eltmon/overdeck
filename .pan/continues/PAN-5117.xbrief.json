@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5117",
   "created": "2026-11-10T17:52:40.588Z",
-  "updated": "2026-11-10T19:04:22.744Z",
+  "updated": "2026-11-10T19:05:00.126Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -36,6 +36,10 @@
     "fix-watchdog-trap.ac1": {
       "status": "completed",
       "doneAt": "2026-11-10T19:04:22.743Z"
+    },
+    "fix-watchdog-trap.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T19:05:00.126Z"
     }
   }
 }
