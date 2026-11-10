@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5078",
   "created": "2026-11-10T14:48:32.729Z",
-  "updated": "2026-11-10T18:00:53.201Z",
+  "updated": "2026-11-10T18:01:10.862Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -356,6 +356,10 @@
     "picker-availability.ac3": {
       "status": "completed",
       "doneAt": "2026-11-10T18:00:53.200Z"
+    },
+    "doctor-grok.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T18:01:10.862Z"
     }
   }
 }
