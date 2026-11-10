@@ -1,11 +1,12 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-10T13:38:45.773371Z · model: claude-opus-5-5 · open: 868_
+_Last sequenced: 2026-11-10T13:57:42.624781Z · model: claude-opus-5-5 · open: 869_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-5001 | S | critical | ok |  |  | Closed-issue reaper re-checks 426 reaped issues every minute and drains the 5k/hr GitHub App quota; in pipeline. |
+| 2 | PAN-5106 | S | high | ok |  |  | Add Muse Ember (muse-ember-1.0), audit Muse catalog drift, release to NPM today; in pipeline, operator ship-today priority. |
 | 3 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
 | 4 | PAN-5090 | XS | critical | ok |  |  | Herdr unit lacks OOMPolicy=continue: one OOM-killed pane child stops the service and kills every conversation; seen twice. |
 | 5 | PAN-4995 | S | high | ok |  |  | pan review request verifies a half-adopted workspace; its main merge trips adoption's head check -> false Needs-you on handoff PRs |
@@ -880,6 +881,10 @@ _Last sequenced: 2026-11-10T13:38:45.773371Z · model: claude-opus-5-5 · open: 
 
 New in-pipeline substrate bug: the deacon close-out sweep alone exhausted the GitHub App REST pool, which pauses every tracker read and write across the pipeline. Pinned at the free top slot; the fix (skip already-reaped residue for 6h, no overlapping deacon-lite sweeps) is small and well specified.
 
+### PAN-5106 (rank 2)
+
+New since the prior run and already in the pipeline with an operator ship-today priority. The body is a complete, file-level brief that follows the PAN-3790 and PAN-5103 template, so it is small and well defined. It takes the free rank-2 slot because in-pipeline work is pinned near the top and is never re-ranked.
+
 ### PAN-5013 (rank 3)
 
 Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat Herdr's done state, which means the harness is alive and waiting, as no live agent. Derived issue state feeds pickup and respawn, so a wrong answer here can launch duplicate agents. Small, well-located fix, so it takes the rank-2 slot freed by the closure of PAN-4998.
@@ -1192,10 +1197,6 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
 
 New this pass. The deployment gate's queue message is unusually good — it names the holders, the queue age, and warns against forcing — and it promises a 'next verification boundary' trigger that does not exist. Every holder cleared and the deploy never fired; the live build stayed stale for 35 minutes until a manual reload. A correct-sounding instruction that cannot happen is worse than no message.
 
-### PAN-3118 (rank 82)
-
-Triage: verify "running at $0.00 with no capacity fallback" against the current liveness definition. Rank held.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1203,10 +1204,10 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-10T13:38:45.773371Z",
+  "generatedAt": "2026-11-10T13:57:42.624781Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 868,
+  "openCount": 869,
   "nodes": [
     {
       "issue": "PAN-5001",
@@ -1218,6 +1219,19 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "dependsOn": [],
       "why": "Closed-issue reaper re-checks 426 reaped issues every minute and drains the 5k/hr GitHub App quota; in pipeline.",
       "rationale": "New in-pipeline substrate bug: the deacon close-out sweep alone exhausted the GitHub App REST pool, which pauses every tracker read and write across the pipeline. Pinned at the free top slot; the fix (skip already-reaped residue for 6h, no overlapping deacon-lite sweeps) is small and well specified.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5106",
+      "rank": 2,
+      "size": "S",
+      "importance": "high",
+      "score": 82,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Add Muse Ember (muse-ember-1.0), audit Muse catalog drift, release to NPM today; in pipeline, operator ship-today priority.",
+      "rationale": "New since the prior run and already in the pipeline with an operator ship-today priority. The body is a complete, file-level brief that follows the PAN-3790 and PAN-5103 template, so it is small and well defined. It takes the free rank-2 slot because in-pipeline work is pinned near the top and is never re-ranked.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1439,6 +1453,19 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "dependsOn": [],
       "why": "CI test shard flakes on ENOTEMPTY: afterEach rmSync races an unawaited snapshot write; reds unrelated PRs (seen on #4745).",
       "rationale": "New flaky-test bug: a background membership-snapshot write races the test's teardown rmSync and turned an unrelated PR's CI shard red. Ranked next to PAN-4705, the same leaked-async-work-vs-teardown pattern, because each red shard costs a PR a rerun on the path to merge.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5104",
+      "rank": 20,
+      "size": "XS",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Stale cost hook bundle prices Fable 5.1/5.2 at Fable 5 rates; reconciler never corrects it. Unblocked: PAN-5103 merged.",
+      "rationale": "Its only dependency, PAN-5103 (Fable 5.2 rollout), closed as completed, so the XS rebuild is unblocked; rank held at 20 because it is a cost-accuracy fix, not pipeline substrate.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11981,19 +12008,6 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "dependsOn": [],
       "why": "Phone app: let phone credentials reach linked machines (fleet Needs-you, linked-conv proxy, /ws/linked); PAN-4835 merged.",
       "rationale": "PAN-4835 merged in #4894, which clears its only dependency; rank held because the Anywhere phone epic is low-impact relative to substrate work above it.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5104",
-      "rank": 20,
-      "size": "XS",
-      "importance": "high",
-      "score": 72,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Stale cost hook bundle prices Fable 5.1/5.2 at Fable 5 rates; reconciler never corrects it. Unblocked: PAN-5103 merged.",
-      "rationale": "Its only dependency, PAN-5103 (Fable 5.2 rollout), closed as completed, so the XS rebuild is unblocked; rank held at 20 because it is a cost-accuracy fix, not pipeline substrate.",
       "gate": "auto",
       "planning": "auto"
     }
