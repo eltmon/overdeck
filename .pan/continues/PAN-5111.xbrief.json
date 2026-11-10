@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5111",
   "created": "2026-11-10T15:51:44.994Z",
-  "updated": "2026-11-10T16:57:19.723Z",
+  "updated": "2026-11-10T16:57:41.644Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -132,6 +132,10 @@
     "dispatcher-history.ac1": {
       "status": "completed",
       "doneAt": "2026-11-10T16:57:19.722Z"
+    },
+    "dispatcher-history.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T16:57:41.644Z"
     }
   }
 }
