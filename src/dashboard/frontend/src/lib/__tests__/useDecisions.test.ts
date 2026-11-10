@@ -379,6 +379,11 @@ describe('harnessUpdateDecisions (PAN-5108)', () => {
     expect(harnessUpdateDecisions(harnessSnapshot([]))).toEqual([]);
   });
 
+  it('returns no decision, without throwing, for a response in another shape (e2e catch-all, older peer)', () => {
+    expect(harnessUpdateDecisions({} as unknown as HarnessAutoUpdateSnapshot)).toEqual([]);
+    expect(harnessUpdateDecisions({ failures: null } as unknown as HarnessAutoUpdateSnapshot)).toEqual([]);
+  });
+
   it('returns one non-blocking decision per failing binary', () => {
     const decisions = harnessUpdateDecisions(harnessSnapshot([CLAUDE_FAILURE, CODEX_FAILURE]));
     expect(decisions.map((d) => d.id)).toEqual(['harness-update:claude', 'harness-update:codex']);

@@ -270,7 +270,8 @@ export function diskAlertDecisions(snapshot: DiskAlertSnapshot | null): Decision
 
 /** PAN-5108 — one non-blocking Needs-you item per CLI whose last daily background update failed. */
 export function harnessUpdateDecisions(snapshot: HarnessAutoUpdateSnapshot | null): Decision[] {
-  if (!snapshot) return [];
+  // A server that answers in another shape (an older peer, a catch-all route) must not crash Needs you.
+  if (!snapshot || !Array.isArray(snapshot.failures)) return [];
   return snapshot.failures.map((failure) => ({
     id: `harness-update:${failure.binary}`,
     source: 'agent',
