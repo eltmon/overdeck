@@ -124,6 +124,24 @@ describe('pan start --harness flag (PAN-636)', () => {
     expect(stderrSpy).not.toHaveBeenCalled()
   })
 
+  it('accepts --harness grok with a Grok Build model (PAN-5078)', async () => {
+    const { __testInternals } = await import('../start.js')
+    await expect(
+      __testInternals.resolveExplicitHarnessFlag('grok', 'grok/grok-4.6'),
+    ).resolves.toBe('grok')
+    expect(exitSpy).not.toHaveBeenCalled()
+    expect(stderrSpy).not.toHaveBeenCalled()
+  })
+
+  it('lists grok in the pan start --harness help (PAN-5078)', async () => {
+    const { Command } = await import('commander')
+    const { registerStartCommand } = await import('../start-register.js')
+    const program = new Command()
+    registerStartCommand(program)
+    const start = program.commands.find((command) => command.name() === 'start')
+    expect(start?.helpInformation()).toContain('| grok')
+  })
+
   it('refuses a below-floor GPT-6 model on --harness codex before any spawn work (PAN-4363)', async () => {
     codexPolicyMocks.resolveCodexPolicyContext.mockResolvedValue({ codexCliVersion: '0.153.4' })
     const { __testInternals } = await import('../start.js')

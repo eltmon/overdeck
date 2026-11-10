@@ -58,7 +58,7 @@ import {
 
 export const WORKER_EXIT = { done: 0, usage: 1, noReport: 2, timeout: 3, blocked: 4 } as const;
 
-const HARNESSES: readonly RuntimeName[] = ['claude-code', 'codex', 'acp', 'kimi-code', 'opencode', 'muse', 'prime-agent'];
+const HARNESSES: readonly RuntimeName[] = ['claude-code', 'codex', 'acp', 'kimi-code', 'opencode', 'muse', 'prime-agent', 'grok'];
 
 export interface WorkerCliDeps {
   startWorker: (options: StartWorkerOptions) => Promise<StartedWorker>;
