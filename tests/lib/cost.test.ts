@@ -715,3 +715,22 @@ describe('cost module', () => {
     });
   });
 });
+
+describe('Grok Build CLI pricing (PAN-5078)', () => {
+  it('matches grok-4.7-build-fast before the grok-4.7 prefix', () => {
+    expect(getPricing('custom', 'grok-4.7-build-fast')?.inputPer1k).toBe(0.004);
+    expect(getPricing('custom', 'grok-4.7-build-fast')?.outputPer1k).toBe(0.012);
+    expect(getPricing('custom', 'grok-4.7')?.inputPer1k).toBe(0.002);
+  });
+
+  it('reproduces the costUsdTicks Grok reported for a grok-4.6 turn', () => {
+    // 628180000 ticks × 1e-10 USD = $0.062818 for 31153 uncached / 640 cached / 32 output tokens.
+    const pricing = getPricing('custom', 'grok-4.6');
+    expect(pricing).not.toBeNull();
+    expect(calculateCost({ inputTokens: 31153, cacheReadTokens: 640, outputTokens: 32 }, pricing!)).toBeCloseTo(0.062818, 6);
+  });
+
+  it('prices grok-4.5 at the grok-4.6 rates', () => {
+    expect(getPricing('custom', 'grok-4.5')).toMatchObject({ inputPer1k: 0.002, outputPer1k: 0.006, cacheReadPer1k: 0.0005 });
+  });
+});

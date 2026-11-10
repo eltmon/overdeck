@@ -190,7 +190,12 @@ export const DEFAULT_PRICING: ModelPricing[] = [
   // Mistral Large 4 (docs.mistral.ai/models/mistral-large-4-0, Public Preview)
   { provider: 'custom', model: 'mistral-large-4-0', inputPer1k: 0.0007, outputPer1k: 0.0021, cacheReadPer1k: 0.00007, currency: 'USD' },
   // xAI Grok (docs.x.ai/docs/models). <200K-prompt rates; the >=200K double rate is in capability notes.
+  // grok-4.7-build-fast sits above grok-4.7: getPricing prefix-matches in table order.
+  // 4.7-build-fast and 4.6 rates verified against Grok's costUsdTicks (PAN-5078); 4.5 is within 0.3%.
+  { provider: 'custom', model: 'grok-4.7-build-fast', inputPer1k: 0.004, outputPer1k: 0.012, cacheReadPer1k: 0.001, currency: 'USD' },
   { provider: 'custom', model: 'grok-4.7', inputPer1k: 0.002, outputPer1k: 0.006, cacheReadPer1k: 0.0005, currency: 'USD' },
+  { provider: 'custom', model: 'grok-4.6', inputPer1k: 0.002, outputPer1k: 0.006, cacheReadPer1k: 0.0005, currency: 'USD' },
+  { provider: 'custom', model: 'grok-4.5', inputPer1k: 0.002, outputPer1k: 0.006, cacheReadPer1k: 0.0005, currency: 'USD' },
   { provider: 'custom', model: 'grok-4.3', inputPer1k: 0.00125, outputPer1k: 0.0025, cacheReadPer1k: 0.0002, currency: 'USD' },
   // Z.AI GLM, verified 2026-11-02 against docs.z.ai/guides/overview/pricing (cached-input storage is limited-time free).
   { provider: 'custom', model: 'glm-5.3-flashx', inputPer1k: 0.00037, outputPer1k: 0.00125, cacheReadPer1k: 0.000075, currency: 'USD' },
