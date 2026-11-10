@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5118",
   "created": "2026-11-10T18:32:53.186Z",
-  "updated": "2026-11-10T19:35:06.746Z",
+  "updated": "2026-11-10T19:35:51.111Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -142,6 +142,10 @@
     "work-prompts-ac-batch.ac4": {
       "status": "completed",
       "doneAt": "2026-11-10T19:35:06.745Z"
+    },
+    "docs-task-done-batch.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T19:35:51.110Z"
     }
   }
 }
