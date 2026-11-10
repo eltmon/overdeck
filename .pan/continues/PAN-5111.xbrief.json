@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5111",
   "created": "2026-11-10T15:51:44.994Z",
-  "updated": "2026-11-10T16:09:03.724Z",
+  "updated": "2026-11-10T16:15:53.514Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,6 +32,11 @@
       "claimedBy": "agent-pan-5111",
       "claimedAt": "2026-11-10T16:08:45.823Z",
       "doneAt": "2026-11-10T16:09:03.724Z"
+    },
+    "answer-door-hooks": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5111",
+      "claimedAt": "2026-11-10T16:15:53.514Z"
     }
   }
 }
