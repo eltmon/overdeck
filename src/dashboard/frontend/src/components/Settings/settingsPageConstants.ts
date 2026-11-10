@@ -54,6 +54,7 @@ export const SETTINGS_NAV_ITEMS: NavItem[] = [
   { id: 'model-routing', label: 'Model Routing', icon: Route },
   { id: 'providers', label: 'Providers', icon: Key },
   { id: 'permissions', label: 'Permissions', icon: ShieldCheck },
+  { id: 'coding-agents', label: 'Coding Agents', icon: Terminal },
   { id: 'tiered-execution', label: 'Tiered Execution', icon: Route },
   { id: 'swarming', label: 'Swarming', icon: GitBranch },
   { id: 'cloister', label: 'Cloister', icon: Flag },

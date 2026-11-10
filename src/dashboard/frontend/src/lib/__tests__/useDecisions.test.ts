@@ -3,11 +3,12 @@ import { renderHook } from '@testing-library/react';
 import { createElement, type ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { DiskAlertSnapshot } from '@overdeck/contracts';
+import type { DiskAlertSnapshot, HarnessAutoUpdateSnapshot } from '@overdeck/contracts';
 import { useDashboardStore } from '../store';
 import { describePendingInput } from '../pendingInput';
 import { DISK_ALERT_QUERY_KEY } from '../diskAlert';
-import { type AgentRequestRow, diskAlertDecisions, isBlockingDecision, useDecisions } from '../useDecisions';
+import { HARNESS_AUTO_UPDATE_QUERY_KEY } from '../harnessAutoUpdate';
+import { type AgentRequestRow, diskAlertDecisions, harnessUpdateDecisions, isBlockingDecision, useDecisions } from '../useDecisions';
 import type { McpSignInApproval } from '../../components/Settings/anywhere/anywhereApi';
 
 interface RenderDecisionsOptions {
@@ -18,6 +19,8 @@ interface RenderDecisionsOptions {
   anywhereStatus?: unknown;
   /** PAN-5093: the cached `/api/disk-alert` snapshot. */
   diskAlert?: DiskAlertSnapshot | null;
+  /** PAN-5108: the cached `/api/harness-auto-update` snapshot. */
+  harnessAutoUpdate?: HarnessAutoUpdateSnapshot | null;
 }
 
 function renderDecisions(
@@ -34,6 +37,7 @@ function renderDecisions(
   queryClient.setQueryData(['anywhere-status'], options.anywhereStatus ?? { viewer: { kind: options.viewerKind ?? 'root-session' } }); // PAN-4946
   queryClient.setQueryData(['mcp-oauth-approvals'], options.mcpApprovals ?? []); // PAN-4946
   queryClient.setQueryData(DISK_ALERT_QUERY_KEY, options.diskAlert ?? null); // PAN-5093
+  queryClient.setQueryData(HARNESS_AUTO_UPDATE_QUERY_KEY, options.harnessAutoUpdate ?? null); // PAN-5108
 
   return renderHook(() => useDecisions(), {
     wrapper: ({ children }: { children: ReactNode }) =>
@@ -353,6 +357,49 @@ describe('diskAlertDecisions (PAN-5093)', () => {
   it('returns one blocking diskCritical decision at critical', () => {
     const [decision] = diskAlertDecisions(diskSnapshot({ level: 'critical' }));
     expect(decision).toMatchObject({ id: 'disk-alert', kinds: ['diskCritical'], blocking: true });
+  });
+});
+
+function harnessSnapshot(failures: HarnessAutoUpdateSnapshot['failures']): HarnessAutoUpdateSnapshot {
+  return { enabled: true, running: false, lastRunAt: '2026-11-10T12:02:00.000Z', nextRunAt: '2026-11-11T12:02:00.000Z', failures };
+}
+
+const CLAUDE_FAILURE = {
+  binary: 'claude',
+  label: 'Claude Code',
+  error: 'npm ERR! code E404',
+  command: 'npm install -g --prefix /p @anthropic-ai/claude-code@latest',
+  failedAt: '2026-11-10T12:01:00.000Z',
+};
+const CODEX_FAILURE = { ...CLAUDE_FAILURE, binary: 'codex', label: 'Codex CLI', command: 'npm install -g --prefix /p @openai/codex@latest' };
+
+describe('harnessUpdateDecisions (PAN-5108)', () => {
+  it('returns no decision for a null snapshot or one without failures', () => {
+    expect(harnessUpdateDecisions(null)).toEqual([]);
+    expect(harnessUpdateDecisions(harnessSnapshot([]))).toEqual([]);
+  });
+
+  it('returns no decision, without throwing, for a response in another shape (e2e catch-all, older peer)', () => {
+    expect(harnessUpdateDecisions({} as unknown as HarnessAutoUpdateSnapshot)).toEqual([]);
+    expect(harnessUpdateDecisions({ failures: null } as unknown as HarnessAutoUpdateSnapshot)).toEqual([]);
+  });
+
+  it('returns one non-blocking decision per failing binary', () => {
+    const decisions = harnessUpdateDecisions(harnessSnapshot([CLAUDE_FAILURE, CODEX_FAILURE]));
+    expect(decisions.map((d) => d.id)).toEqual(['harness-update:claude', 'harness-update:codex']);
+    expect(decisions[0]).toMatchObject({
+      label: 'Claude Code update failed',
+      kinds: ['harnessUpdateFailed'],
+      blocking: false,
+      since: CLAUDE_FAILURE.failedAt,
+      harnessUpdate: CLAUDE_FAILURE,
+    });
+    expect(decisions[1]!.blocking).toBe(false);
+  });
+
+  it('surfaces the failures from the cached snapshot through useDecisions', () => {
+    const { result } = renderDecisions([], [], { harnessAutoUpdate: harnessSnapshot([CLAUDE_FAILURE]) });
+    expect(result.current.some((d) => d.kinds.includes('harnessUpdateFailed'))).toBe(true);
   });
 });
 

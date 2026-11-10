@@ -7,6 +7,8 @@ import { renderHook } from '@testing-library/react';
 import { createElement, type ReactNode } from 'react';
 import { beforeEach, describe, expect, it } from 'vitest';
 
+import { DISK_ALERT_QUERY_KEY } from '../diskAlert';
+import { HARNESS_AUTO_UPDATE_QUERY_KEY } from '../harnessAutoUpdate';
 import { useDashboardStore } from '../store';
 import { useDecisions, usePendingInputSubjects, type ConversationPendingInputRow } from '../useDecisions';
 
@@ -35,6 +37,12 @@ function renderWithRows<T>(hook: () => T, rows: ConversationPendingInputRow[]) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
   queryClient.setQueryData(['conv-ask-user-question'], rows);
   queryClient.setQueryData(['fleet-needs-you'], []); // PAN-4651: no linked machines
+  // Seed every other query useDecisions runs, so the test-setup fetch guard sees no request.
+  queryClient.setQueryData(['agent-requests'], []); // PAN-4941
+  queryClient.setQueryData(['anywhere-status'], { viewer: { kind: 'root-session' } }); // PAN-4946
+  queryClient.setQueryData(['mcp-oauth-approvals'], []); // PAN-4946
+  queryClient.setQueryData(DISK_ALERT_QUERY_KEY, null); // PAN-5093
+  queryClient.setQueryData(HARNESS_AUTO_UPDATE_QUERY_KEY, null); // PAN-5108
   return renderHook(hook, {
     wrapper: ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: queryClient }, children),
   });

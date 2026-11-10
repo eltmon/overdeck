@@ -317,6 +317,35 @@ describe('DecisionsPanel disk alert (PAN-5093)', () => {
   });
 });
 
+describe('DecisionsPanel harness update failure (PAN-5108)', () => {
+  const failure = {
+    binary: 'claude',
+    label: 'Claude Code',
+    error: 'npm ERR! code E404',
+    command: 'npm install -g --prefix /p @anthropic-ai/claude-code@latest',
+    failedAt: '2026-11-10T12:01:00.000Z',
+  };
+  const harnessDecision = {
+    id: 'harness-update:claude',
+    source: 'agent' as const,
+    label: 'Claude Code update failed',
+    kinds: ['harnessUpdateFailed'],
+    since: failure.failedAt,
+    blocking: false,
+    harnessUpdate: failure,
+  };
+
+  it('renders harness-update-card in the System group, not under Waiting', () => {
+    vi.spyOn(useDecisionsModule, 'useDecisions').mockReturnValue([agentDecision, harnessDecision]);
+    renderWithQuery(<DecisionsPanel />);
+
+    expect(screen.getByTestId('harness-update-card')).toBeTruthy();
+    const systemGroup = screen.getByText('System').closest('section');
+    expect(systemGroup?.textContent).toContain('Claude Code update failed');
+    expect(screen.getByText('Blocking work').closest('section')?.textContent).not.toContain('Claude Code update failed');
+  });
+});
+
 describe('DecisionsCount', () => {
   it('counts agents and conversations together', () => {
     vi.spyOn(useDecisionsModule, 'useDecisions').mockReturnValue([agentDecision, conversationDecision, planDecision]);

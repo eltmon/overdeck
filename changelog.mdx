@@ -15,6 +15,10 @@ This page starts at v0.60.0, the release that removed Overdeck's state layer. Ol
 
   Drafted from the changes merged to `main` since v0.76.0. The date is set when the release is tagged.
 
+  #### New
+
+  - **Coding-agent CLIs stay up to date:** Overdeck now updates npm-installed Claude Code, Codex CLI and OpenCode in the background once a day, and updates Claude Code before a launch that needs a newer version, so a new model no longer stops at "needs Claude Code X or newer". Running sessions keep their version. Turn it off in Settings, Coding Agents, or with `harnesses.auto_update: false`. See [Harnesses](/configuration/harnesses).
+
   #### Fixed
 
   - **No more false "stopped responding" push after a PR merges.** The merged work agent is recorded as stopped when its terminal closes, and the crash watcher never counts a paused agent as crashed.
