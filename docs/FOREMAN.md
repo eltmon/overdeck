@@ -76,7 +76,8 @@ Every worker, whichever way it was dispatched, follows the same loop:
    after `pan done` (PAN-3965).
 3. One commit with the trailer `Item: <item-id>`, on the worker's current
    branch — its item branch `<feature-branch>-<item-id>` (or the feature
-   branch for a `--shared` pane).
+   branch for a `--shared` pane). Add one body line `Item: <item-id>.acN`
+   for each acceptance criterion of the item.
 4. Hand back: report the commit sha and branch to the foreman — an
    in-harness subagent does this in its final result; a `pan spawn` pane does
    it with `pan tell <foreman-agent-id>`.
@@ -85,7 +86,7 @@ Every worker, whichever way it was dispatched, follows the same loop:
 
 A worker never calls `pan done`. `pan task done` looks for the trailer on
 the issue workspace's feature branch and checks that branch is pushed
-(`markItemDone`, `src/lib/xbrief/continue-state.ts`), so it can only succeed
+(`markItemsDone`, `src/lib/xbrief/continue-state.ts`), so it can only succeed
 after integration.
 
 ## Foreman-only responsibilities
@@ -94,8 +95,8 @@ after integration.
   issue workspace with
   `git log --format=%H -E --grep='^Item: <item-id>[[:space:]]*$' <feature-branch>..<feature-branch>-<item-id>`,
   cherry-pick or merge it onto the feature branch (re-add the `Item:`
-  trailer if you squash; nothing to pick for a `--shared` worker), `git
-  push`, then `pan task done <id> <item-id>`.
+  lines if you squash; nothing to pick for a `--shared` worker), `git
+  push`, then close the item and its ACs in one call: `pan task done <id> <item-id> <item-id>.ac1 <item-id>.ac2 ...`.
 - **Own messaging.** Only the foreman's own pane, the worker's parent (for a
   `pan worker run` worker), or an operator, may `pan tell` a worker pane — a worker pane refuses a prompt from anywhere
   else (backend-enforced). Workers do not message each other; route

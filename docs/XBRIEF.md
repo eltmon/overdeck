@@ -8,6 +8,8 @@ The xBRIEF checklist is the task source of truth. Completion state lives in `.pa
 
 Agents use the smallest loop: `pan task next`, `pan task claim <item-id>`, implement and push the change, then `pan task done <item-id>`. `pan task done` verifies the pushed commit carries the `Item:` trailer before recording completion in the continue file. `pan task claim` refuses (exit 1, nothing written) when a running agent holds the item, or holds another item whose `files_scope` overlaps it — a low-confidence `files_scope` on either side counts as overlap, since Overdeck can't prove the two touch different files. Liveness is read live at claim time, never leased or cached. Two concurrent `pan task claim` processes on the same item are serialized by the task-state lock, so exactly one wins; the loser rereads the plan and selects the next dispatchable item. `--steal` is the foreman/operator override for both refusal kinds — a worker should never pass it.
 
+`pan task done` takes several ids at once, for example `pan task done <issue> <item-id> <item-id>.ac1 <item-id>.ac2`; it records all of them with one continue commit, or none of them if any id lacks its own `Item: <id>` line.
+
 ## xBRIEF v0.8
 
 Upstream renamed the specification repository to `deftai/xBRIEF` on 2026-06-26, then released xBRIEF v0.8 on 2026-06-30. Overdeck emits the current `xBRIEFInfo` envelope and `.xbrief.json` filenames while retaining explicit read compatibility for older documents.

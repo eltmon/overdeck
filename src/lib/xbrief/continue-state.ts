@@ -7,7 +7,7 @@
  * record, no status-override map on a state branch, and nothing derivable is
  * stored here.
  *
- * `markItemDone` refuses to record a completion that git cannot corroborate:
+ * `markItemsDone` refuses to record a completion that git cannot corroborate:
  * a commit on the current branch must carry the `Item: <id>` trailer, and the
  * branch must not be ahead of its upstream.
  */
@@ -355,20 +355,14 @@ export function claimItem(
   return next.items![itemId];
 }
 
-export interface MarkItemDoneOptions {
-  /** Trailer line a commit on the current branch must carry, e.g. `Item: w1-plan-home`. */
-  requireTrailer: string;
-  /** When true, the branch must not be ahead of its upstream. */
-  requirePushed: boolean;
-  /**
-   * Repository roots to search for the corroborating commit. A polyrepo
-   * workspace has one per repo and the item's work may live in any of them;
-   * the plan home alone is the default.
-   */
-  repoRoots?: readonly string[];
+export class ItemNotVerifiable extends Error {
+  constructor(
+    message: string,
+    public readonly failures: readonly ItemVerificationFailure[] = [],
+  ) {
+    super(message);
+  }
 }
-
-export class ItemNotVerifiable extends Error {}
 
 /** Escape a literal string for use inside a POSIX extended regular expression. */
 function escapeRegExp(value: string): string {
@@ -408,49 +402,82 @@ async function unpushedCommitCount(repoRoot: string): Promise<number> {
   return Number.parseInt(stdout.trim(), 10) || 0;
 }
 
+export interface MarkItemsDoneOptions {
+  /** When true, each corroborating repository's branch must not be ahead of its upstream. */
+  requirePushed: boolean;
+  /** Repository roots to search for each id's `Item: <id>` commit; the plan home alone by default. */
+  repoRoots?: readonly string[];
+}
+
+/** One reason a set of ids cannot be completed: a missing trailer (one id) or an unpushed repository (every id it corroborates). */
+export interface ItemVerificationFailure {
+  readonly kind: 'missing-trailer' | 'unpushed';
+  readonly itemIds: readonly string[];
+  readonly reason: string;
+}
+
 /**
- * Record an item as done, but only once git corroborates it: a commit in one of
- * the issue's repositories carries the `Item: <id>` trailer, and (when
- * required) THAT repository's branch is not ahead of its upstream. A polyrepo
- * issue carries its work in whichever repo the item touched, so every repo root
- * is searched; the continue file is written in the plan home either way. Throws
- * {@link ItemNotVerifiable} otherwise and writes nothing.
+ * Record every id as done, but only once git corroborates each one: a commit in
+ * one of the issue's repositories carries the exact line `Item: <id>`, and (when
+ * required) that repository's branch is not ahead of its upstream. Every id is
+ * checked before anything is written; any failure throws one ItemNotVerifiable
+ * listing all of them, and nothing is written. On success all ids land in one
+ * continue-file write with a shared doneAt.
  */
-export async function markItemDone(
+export async function markItemsDone(
   planHome: string,
   issueId: string,
-  itemId: string,
-  options: MarkItemDoneOptions,
-): Promise<ContinueItemState> {
+  itemIds: readonly string[],
+  options: MarkItemsDoneOptions,
+): Promise<Record<string, ContinueItemState>> {
+  const ids = [...new Set(itemIds)];
+  if (ids.length === 0) throw new Error('markItemsDone needs at least one item id');
   const repoRoots = options.repoRoots?.length ? [...new Set(options.repoRoots)] : [planHome];
-  let corroborating: string | null = null;
-  for (const root of repoRoots) {
-    if (await hasTrailerCommit(root, options.requireTrailer)) {
-      corroborating = root;
-      break;
+  const failures: ItemVerificationFailure[] = [];
+  const idsByRoot = new Map<string, string[]>();
+  for (const id of ids) {
+    let corroborating: string | null = null;
+    for (const root of repoRoots) {
+      if (await hasTrailerCommit(root, `Item: ${id}`)) {
+        corroborating = root;
+        break;
+      }
     }
-  }
-  if (!corroborating) {
-    throw new ItemNotVerifiable(
-      `no commit in ${repoRoots.join(', ')} carries the trailer "${options.requireTrailer}" `
-      + `— commit the work for ${itemId} first`,
-    );
+    if (!corroborating) {
+      failures.push({
+        kind: 'missing-trailer',
+        itemIds: [id],
+        reason: `no commit in ${repoRoots.join(', ')} carries the trailer "Item: ${id}" — commit the work for ${id} first`,
+      });
+      continue;
+    }
+    idsByRoot.set(corroborating, [...(idsByRoot.get(corroborating) ?? []), id]);
   }
   if (options.requirePushed) {
-    const ahead = await unpushedCommitCount(corroborating);
-    if (ahead > 0) {
-      throw new ItemNotVerifiable(
-        `the branch in ${corroborating} is ${ahead} commit(s) ahead of its upstream — push before completing ${itemId}`,
-      );
+    for (const [root, rootIds] of idsByRoot) {
+      try {
+        const ahead = await unpushedCommitCount(root); // runs once per root (NFR-1)
+        if (ahead > 0) {
+          failures.push({
+            kind: 'unpushed',
+            itemIds: rootIds,
+            reason: `the branch in ${root} is ${ahead} commit(s) ahead of its upstream — push before completing ${rootIds.join(', ')}`,
+          });
+        }
+      } catch (error) {
+        if (!(error instanceof ItemNotVerifiable)) throw error;
+        failures.push({ kind: 'unpushed', itemIds: rootIds, reason: error.message }); // the no-upstream case
+      }
     }
   }
+  if (failures.length > 0) {
+    throw new ItemNotVerifiable(failures.map((failure) => failure.reason).join('\n'), failures);
+  }
   const doneAt = new Date().toISOString();
-  const next = updateContinueState(planHome, issueId, (state) => ({
-    ...state,
-    items: {
-      ...(state.items ?? {}),
-      [itemId]: { ...(state.items?.[itemId] ?? {}), status: 'completed', doneAt },
-    },
-  }));
-  return next.items![itemId];
+  const next = updateContinueState(planHome, issueId, (state) => {
+    const items = { ...(state.items ?? {}) };
+    for (const id of ids) items[id] = { ...(items[id] ?? {}), status: 'completed', doneAt };
+    return { ...state, items };
+  });
+  return Object.fromEntries(ids.map((id) => [id, next.items![id]]));
 }

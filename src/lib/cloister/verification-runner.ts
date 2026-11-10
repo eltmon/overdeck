@@ -801,7 +801,7 @@ export async function runVerificationForIssueInProcess(
 
       const feedbackBody = shouldEscalateVerificationFailure(cycles, failedCheck, newCycleCount)
         ? `VERIFICATION STUCK for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${failedCheck}\n\n${summary}\n\n${buildFinalFailureInstructions(issueId)}`
-        : `VERIFICATION FAILED for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${failedCheck}\n\n${summary}\n\nComplete each listed item with \`pan task done ${issueId} <item>\` after committing and pushing its implementation, then resubmit the review request.`;
+        : `VERIFICATION FAILED for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${failedCheck}\n\n${summary}\n\nGive every listed id its own \`Item: <id>\` body line on a pushed commit, then close them all in one call: \`pan task done ${issueId} ${itemIds.join(' ')}\`. Then resubmit the review request.`;
 
       try {
         const fileResult = await writeFeedbackFile({

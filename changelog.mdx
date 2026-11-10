@@ -23,6 +23,7 @@ This page starts at v0.60.0, the release that removed Overdeck's state layer. Ol
   #### Improved
 
   - **Can't reach rows in Needs you:** when this machine cannot read a linked machine's Needs you, the desktop and the phone show `Can't reach <machine>; it may have items waiting.` until a fetch succeeds. ([PAN-5111](https://github.com/eltmon/overdeck/issues/5111))
+  - **Close an item and its acceptance criteria in one call:** `pan task done <issue> <item> <item>.ac1 <item>.ac2 ...` and the `task_done` tool's `itemIds` take many ids at once. They record every id with one commit, or none of them and name each one that lacks its `Item:` line, so a plan with 85 acceptance criteria no longer costs 85 commits and pushes. ([PAN-5118](https://github.com/eltmon/overdeck/issues/5118))
 
   #### Fixed
 

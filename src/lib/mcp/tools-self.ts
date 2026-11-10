@@ -61,15 +61,25 @@ const taskClaim: OverdeckTool = {
 const taskDone: OverdeckTool = {
   name: 'task_done',
   description:
-    'Mark a checklist item done after its commit, with a body line "Item: <itemId>", is pushed (runs pan task done). Answers status "done" with exitCode and stdout, or status "running" with next: call next. A non-zero exitCode means pan refused; stderr says why.',
+    'Mark checklist items done after their commit is pushed (runs pan task done). Each id needs a body line "Item: <id>" on a pushed commit; put the item and its acceptance-criterion ids (<item>.ac1, <item>.ac2, ...) on the item\'s commit and close them all with one call through itemIds. If any id lacks its line, nothing is recorded and stderr names each one. Answers status "done" with exitCode and stdout, or status "running" with next: call next. A non-zero exitCode means pan refused; stderr says why.',
   scope: 'tell',
   audience: 'agent',
   inputSchema: {
     type: 'object',
-    properties: { itemId: { type: 'string', description: 'The checklist item id to mark done.' } },
-    required: ['itemId'],
+    properties: {
+      itemId: { type: 'string', description: 'One checklist item id to mark done.' },
+      itemIds: { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 500, description: 'Several checklist item ids to mark done in one call, for example an item and its <item>.acN ids.' },
+    },
   },
   async run(args, ctx) {
+    const itemIds = args['itemIds'];
+    if (itemIds !== undefined) {
+      if (args['itemId'] !== undefined) return errorResult('pass itemId or itemIds, not both');
+      if (!Array.isArray(itemIds) || itemIds.length === 0 || itemIds.some((value) => typeof value !== 'string')) {
+        return errorResult('itemIds must be a non-empty list of strings');
+      }
+      return postSelf(ctx, '/api/self/tasks/done', { itemIds });
+    }
     const itemId = requiredString(args, 'itemId');
     if (!itemId.ok) return itemId.error;
     return postSelf(ctx, '/api/self/tasks/done', { itemId: itemId.value });
