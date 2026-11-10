@@ -191,8 +191,28 @@ describe('Muse model and harness support', () => {
     const result = summarizeMuseRecords(records, '/sessions/root/session.jsonl');
     const price = getPricing('custom', model)!;
     expect(result?.usage).toEqual({ inputTokens: 500000, outputTokens: 1000000, cacheReadTokens: 500000 });
-    expect(result?.cost).toBeCloseTo(500 * price.inputPer1k + 1000 * price.outputPer1k + 500 * price.cacheReadPer1k!);
-    expect(result?.cost).toBeCloseTo({ 'muse-wonder-1.0': 22.1, 'muse-spark-1.3': 4.95, 'muse-spark-1.3-contributor': 0.251, 'muse-ember-1.0': 0.552 }[model]);
+    const tierMultiplier = model === 'muse-ember-1.0' ? 3 : 1;
+    expect(result?.cost).toBeCloseTo((500 * price.inputPer1k + 1000 * price.outputPer1k + 500 * price.cacheReadPer1k!) * tierMultiplier);
+    expect(result?.cost).toBeCloseTo({ 'muse-wonder-1.0': 22.1, 'muse-spark-1.3': 4.95, 'muse-spark-1.3-contributor': 0.251, 'muse-ember-1.0': 1.656 }[model]);
+  });
+
+  it('applies the Muse Ember long-context tier per request, not per session', () => {
+    const metadata = { id: 'metadata', payload_type: 'runtime.session.metadata', payload: { record: { model_id: 'muse-ember-1.0' } } };
+    const baseRateEvents = [1, 2].map(n => ({
+      id: `completion-${n}`, payload_type: 'runtime.session', payload: { kind: 'run', event: {
+        kind: 'model_completed', usage: { input_tokens: 150000, output_tokens: 1000, cached_tokens: 0 },
+      } },
+    }));
+    const baseRateRecords = parseMuseRecords([metadata, ...baseRateEvents].map(record => JSON.stringify(record)).join('\n') + '\n');
+    // Two 150K-input requests each stay under the 200K tier threshold: 2 * (150 * 0.0001 + 1 * 0.0005) = 0.031.
+    expect(summarizeMuseRecords(baseRateRecords, '/sessions/root/session.jsonl')?.cost).toBeCloseTo(2 * (150 * 0.0001 + 1 * 0.0005), 6);
+
+    const tieredEvent = { id: 'completion-tiered', payload_type: 'runtime.session', payload: { kind: 'run', event: {
+      kind: 'model_completed', usage: { input_tokens: 300000, output_tokens: 1000, cached_tokens: 100000 },
+    } } };
+    const tieredRecords = parseMuseRecords([metadata, tieredEvent].map(record => JSON.stringify(record)).join('\n') + '\n');
+    // One 300K-input (100K cached) request crosses the tier: 3 * (200 * 0.0001 + 1 * 0.0005 + 100 * 0.000004) = 0.0627.
+    expect(summarizeMuseRecords(tieredRecords, '/sessions/root/session.jsonl')?.cost).toBeCloseTo(3 * (200 * 0.0001 + 1 * 0.0005 + 100 * 0.000004), 6);
   });
 
   it('reads real Muse 1.0.2 echo turns without rendering private reasoning or duplicating user intents', async () => {

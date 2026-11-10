@@ -272,13 +272,22 @@ export function calculateCost(usage: TokenUsage, pricing: ModelPricing): number 
     cacheMultiplier = 5;
   }
 
+  // Muse Ember (>200K): Meta bills the whole request at 3x every component
+  // ($0.30/$1.50 in/out, $0.012 cached per MTok against $0.10/$0.50/$0.004).
+  if (pricing.model === 'muse-ember-1.0'
+      && totalInputTokens > 200000) {
+    inputMultiplier = 3;
+    outputMultiplier = 3;
+    cacheMultiplier = 3;
+  }
+
   // Input tokens
   cost += (usage.inputTokens / 1000) * pricing.inputPer1k * inputMultiplier;
 
   // Output tokens
   cost += (usage.outputTokens / 1000) * pricing.outputPer1k * outputMultiplier;
 
-  // Cache read tokens (only the Haiku 5.5 tier above multiplies them)
+  // Cache read tokens (only the Haiku 5.5 and Muse Ember tiers above multiply them)
   if (usage.cacheReadTokens && pricing.cacheReadPer1k) {
     cost += (usage.cacheReadTokens / 1000) * pricing.cacheReadPer1k * cacheMultiplier;
   }
