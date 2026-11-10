@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5106",
   "created": "2026-11-10T14:09:58.025Z",
-  "updated": "2026-11-10T14:43:02.456Z",
+  "updated": "2026-11-10T14:44:20.680Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -27,9 +27,10 @@
       "claimedAt": "2026-11-10T14:42:02.744Z"
     },
     "ember-dashboard-catalog": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5106",
-      "claimedAt": "2026-11-10T14:43:02.456Z"
+      "claimedAt": "2026-11-10T14:43:02.456Z",
+      "doneAt": "2026-11-10T14:44:20.679Z"
     }
   }
 }
