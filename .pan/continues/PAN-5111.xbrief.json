@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5111",
   "created": "2026-11-10T15:51:44.994Z",
-  "updated": "2026-11-10T16:01:00.297Z",
+  "updated": "2026-11-10T16:01:20.708Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -16,9 +16,10 @@
       "doneAt": "2026-11-10T16:00:01.148Z"
     },
     "answer-note-registry": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5111",
-      "claimedAt": "2026-11-10T16:01:00.297Z"
+      "claimedAt": "2026-11-10T16:01:00.297Z",
+      "doneAt": "2026-11-10T16:01:20.707Z"
     }
   }
 }
