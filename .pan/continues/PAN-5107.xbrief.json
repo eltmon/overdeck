@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5107",
   "created": "2026-11-10T14:32:45.039Z",
-  "updated": "2026-11-10T14:47:55.253Z",
+  "updated": "2026-11-10T14:48:01.197Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -44,6 +44,11 @@
       "claimedBy": "agent-pan-5107",
       "claimedAt": "2026-11-10T14:46:08.843Z",
       "doneAt": "2026-11-10T14:47:55.252Z"
+    },
+    "docs-phone-mdx": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5107",
+      "claimedAt": "2026-11-10T14:48:01.197Z"
     }
   }
 }
