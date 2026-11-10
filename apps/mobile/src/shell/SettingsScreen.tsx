@@ -1,4 +1,4 @@
-/** Settings (PAN-4837 C-8): the account, notifications (PAN-4838 FR-4, PAN-4840 FR-9, PAN-5019 WI-9), paired machines, the Live Activity switch (PAN-4839), the app version and sign out. */
+/** Settings (PAN-4837 C-8): the account, notifications (PAN-4838 FR-4, PAN-4840 FR-9, PAN-5019 WI-9), paired machines, the Live Activity switch (PAN-4839), the app version, delete account (PAN-5107) and sign out. */
 import {
   PHONE_NOTIFICATION_CATEGORIES,
   type PhoneNotificationCategory,
@@ -8,6 +8,8 @@ import {
 import { useState } from 'react';
 
 import type { PushPermission } from '../native/push';
+import type { DeleteAccountResult } from './accountDeletion';
+import { DELETE_CONFIRM_WORD, DELETE_IRREVERSIBLE, DELETE_STATEMENT } from './accountDeletionCopy';
 import { APPEARANCES, type Appearance } from './appearance';
 import { APP_VERSION } from './config';
 import { isPaused, type PauseChoice } from './notificationPrefs';
@@ -52,6 +54,10 @@ interface SettingsScreenProps {
   /** The phone's System/Light/Dark appearance setting (PAN-5041). */
   appearance: Appearance;
   onAppearanceChange(appearance: Appearance): void;
+  /** Deletes the overdeck.ai account and signs out; absent hides the Delete account button (PAN-5107). */
+  onDeleteAccount?: () => Promise<DeleteAccountResult>;
+  /** Opens the account page on overdeck.ai in the system browser (PAN-5107). */
+  onOpenAccountPage?: () => void;
 }
 
 const APPEARANCE_LABEL: Record<Appearance, string> = { system: 'System', light: 'Light', dark: 'Dark' };
@@ -101,8 +107,11 @@ export function SettingsScreen({
   notifications,
   appearance,
   onAppearanceChange,
+  onDeleteAccount,
+  onOpenAccountPage,
 }: SettingsScreenProps) {
   const [signingOut, setSigningOut] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   return (
     <section
@@ -168,7 +177,110 @@ export function SettingsScreen({
       >
         {signingOut ? 'Signing out…' : 'Sign out'}
       </button>
+      {onDeleteAccount ? (
+        <button
+          type="button"
+          onClick={() => setDeleteDialogOpen(true)}
+          className="min-h-11 w-full rounded-sm border border-border px-3 text-sm font-medium text-destructive"
+        >
+          Delete account
+        </button>
+      ) : null}
+      {deleteDialogOpen && onDeleteAccount ? (
+        <DeleteAccountDialog
+          onConfirm={onDeleteAccount}
+          onOpenAccountPage={onOpenAccountPage}
+          onClose={() => setDeleteDialogOpen(false)}
+        />
+      ) : null}
     </section>
+  );
+}
+
+function DeleteAccountDialog({
+  onConfirm,
+  onOpenAccountPage,
+  onClose,
+}: {
+  onConfirm: () => Promise<DeleteAccountResult>;
+  onOpenAccountPage?: () => void;
+  onClose: () => void;
+}) {
+  const [value, setValue] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const canConfirm = value.trim() === DELETE_CONFIRM_WORD && !busy;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="delete-account-title"
+        className="flex w-full max-w-sm flex-col gap-3 rounded-sm bg-background p-4"
+      >
+        <h3 id="delete-account-title" className="text-base font-medium text-foreground">
+          Delete your account
+        </h3>
+        <p className="text-sm text-foreground">{DELETE_STATEMENT}</p>
+        <p className="text-sm font-medium text-destructive">{DELETE_IRREVERSIBLE}</p>
+        <label className="flex flex-col gap-1 text-sm text-foreground">
+          Type DELETE to confirm
+          <input
+            type="text"
+            value={value}
+            disabled={busy}
+            onChange={(event) => setValue(event.target.value)}
+            autoCapitalize="characters"
+            autoCorrect="off"
+            autoComplete="off"
+            spellCheck={false}
+            className="min-h-11 rounded-sm border border-border px-3 text-sm text-foreground disabled:opacity-50"
+          />
+        </label>
+        {error ? (
+          <div className="flex flex-col gap-2">
+            <p role="alert" className="text-sm text-destructive">
+              {`Couldn't delete your account: ${error} Try again, or delete it on the web.`}
+            </p>
+            <button
+              type="button"
+              onClick={() => onOpenAccountPage?.()}
+              className="min-h-11 w-full rounded-sm border border-border px-3 text-sm font-medium text-foreground"
+            >
+              Delete on the web
+            </button>
+          </div>
+        ) : null}
+        <div className="flex gap-2">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onClose}
+            className="min-h-11 flex-1 rounded-sm border border-border px-3 text-sm font-medium text-foreground disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={!canConfirm}
+            onClick={() => {
+              setBusy(true);
+              setError(null);
+              void onConfirm().then((result) => {
+                if (!result.ok) {
+                  setError(result.message);
+                  setBusy(false);
+                }
+              });
+            }}
+            className="min-h-11 flex-1 rounded-sm border border-border px-3 text-sm font-medium text-destructive disabled:opacity-50"
+          >
+            {busy ? 'Deleting…' : 'Delete account'}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
