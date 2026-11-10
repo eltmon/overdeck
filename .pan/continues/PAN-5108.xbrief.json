@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5108",
   "created": "2026-11-10T15:18:20.585Z",
-  "updated": "2026-11-10T16:28:31.536Z",
+  "updated": "2026-11-10T16:28:55.194Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -202,6 +202,10 @@
     "status-route.ac2": {
       "status": "completed",
       "doneAt": "2026-11-10T16:28:31.535Z"
+    },
+    "needs-you-card.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T16:28:55.193Z"
     }
   }
 }
