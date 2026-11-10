@@ -1,12 +1,11 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-10T13:37:26.114920Z · model: claude-opus-5-5 · open: 869_
+_Last sequenced: 2026-11-10T13:38:45.773371Z · model: claude-opus-5-5 · open: 868_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-5001 | S | critical | ok |  |  | Closed-issue reaper re-checks 426 reaped issues every minute and drains the 5k/hr GitHub App quota; in pipeline. |
-| 2 | PAN-5103 | M | high | ok |  |  | Add Claude Fable 5.2 to catalog, pricing, capability and defaults, then NPM release; operator wants it shipped today. In pipeline. |
 | 3 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
 | 4 | PAN-5090 | XS | critical | ok |  |  | Herdr unit lacks OOMPolicy=continue: one OOM-killed pane child stops the service and kills every conversation; seen twice. |
 | 5 | PAN-4995 | S | high | ok |  |  | pan review request verifies a half-adopted workspace; its main merge trips adoption's head check -> false Needs-you on handoff PRs |
@@ -24,7 +23,7 @@ _Last sequenced: 2026-11-10T13:37:26.114920Z · model: claude-opus-5-5 · open: 
 | 17 | PAN-4675 | S | critical | ok |  |  | One transient gh label timeout aborts post-merge lifecycle; merge door replies Already merged, so the issue can never close. |
 | 18 | PAN-4705 | S | high | ok |  |  | quality-gate-admission test leaks a poller past afterEach rmSync; unhandled ENOENT fails unrelated PR CI shards. |
 | 19 | PAN-4746 | S | high | ok |  |  | CI test shard flakes on ENOTEMPTY: afterEach rmSync races an unawaited snapshot write; reds unrelated PRs (seen on #4745). |
-| 20 | PAN-5104 | XS | high | ok |  | PAN-5103 | Stale cost hook bundle prices Fable 5.1/5.2 at Fable 5 rates and the reconciler never corrects it; rebuild after PAN-5103. |
+| 20 | PAN-5104 | XS | high | ok |  |  | Stale cost hook bundle prices Fable 5.1/5.2 at Fable 5 rates; reconciler never corrects it. Unblocked: PAN-5103 merged. |
 | 22 | PAN-4572 | M | medium | ok |  |  | Residual re-render offenders PAN-4560 profiled but left: unmemoized deck rows, App 5 s poll, clock/selector identity bugs. |
 | 23 | PAN-4625 | S | high | ok |  |  | CI relay debounces a later failed check on the same head, so agents never see a failing test shard; lands after PAN-4534 (same file) |
 | 24 | PAN-4586 | XS | critical | ok |  |  | Herdr pane.read nests text under result.read; every Overdeck pane-text reader gets '' — detection, inventory, resume all blind |
@@ -881,10 +880,6 @@ _Last sequenced: 2026-11-10T13:37:26.114920Z · model: claude-opus-5-5 · open: 
 
 New in-pipeline substrate bug: the deacon close-out sweep alone exhausted the GitHub App REST pool, which pauses every tracker read and write across the pipeline. Pinned at the free top slot; the fix (skip already-reaped residue for 6h, no overlapping deacon-lite sweeps) is small and well specified.
 
-### PAN-5103 (rank 2)
-
-New in-pipeline issue filed today with an operator ship-today priority. It follows the PAN-4327 Sonnet 5.5 rollout template step for step, carries verified model facts and file lists, and is cheaper and better than Fable 5.1, so every Fable default moves. Pinned at the free rank-2 slot below the reaper quota fix; no open dependencies.
-
 ### PAN-5013 (rank 3)
 
 Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat Herdr's done state, which means the harness is alive and waiting, as no live agent. Derived issue state feeds pickup and respawn, so a wrong answer here can launch duplicate agents. Small, well-located fix, so it takes the rank-2 slot freed by the closure of PAN-4998.
@@ -955,7 +950,7 @@ New flaky-test bug: a background membership-snapshot write races the test's tear
 
 ### PAN-5104 (rank 20)
 
-New issue: live cost rows for Fable 5.1 (and 5.2 once PAN-5103 lands) are recorded at wrong cache-read and token rates and never reconciled, so it slots into the free rank 20 as an XS fix sequenced right after PAN-5103 adds the 5.2 pricing row.
+Its only dependency, PAN-5103 (Fable 5.2 rollout), closed as completed, so the XS rebuild is unblocked; rank held at 20 because it is a cost-accuracy fix, not pipeline substrate.
 
 ### PAN-4572 (rank 22)
 
@@ -1197,6 +1192,10 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
 
 New this pass. The deployment gate's queue message is unusually good — it names the holders, the queue age, and warns against forcing — and it promises a 'next verification boundary' trigger that does not exist. Every holder cleared and the deploy never fired; the live build stayed stale for 35 minutes until a manual reload. A correct-sounding instruction that cannot happen is worse than no message.
 
+### PAN-3118 (rank 82)
+
+Triage: verify "running at $0.00 with no capacity fallback" against the current liveness definition. Rank held.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1204,10 +1203,10 @@ New this pass. The deployment gate's queue message is unusually good — it name
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-10T13:37:26.114920Z",
+  "generatedAt": "2026-11-10T13:38:45.773371Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 869,
+  "openCount": 868,
   "nodes": [
     {
       "issue": "PAN-5001",
@@ -1219,19 +1218,6 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "dependsOn": [],
       "why": "Closed-issue reaper re-checks 426 reaped issues every minute and drains the 5k/hr GitHub App quota; in pipeline.",
       "rationale": "New in-pipeline substrate bug: the deacon close-out sweep alone exhausted the GitHub App REST pool, which pauses every tracker read and write across the pipeline. Pinned at the free top slot; the fix (skip already-reaped residue for 6h, no overlapping deacon-lite sweeps) is small and well specified.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5103",
-      "rank": 2,
-      "size": "M",
-      "importance": "high",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Add Claude Fable 5.2 to catalog, pricing, capability and defaults, then NPM release; operator wants it shipped today. In pipeline.",
-      "rationale": "New in-pipeline issue filed today with an operator ship-today priority. It follows the PAN-4327 Sonnet 5.5 rollout template step for step, carries verified model facts and file lists, and is cheaper and better than Fable 5.1, so every Fable default moves. Pinned at the free rank-2 slot below the reaper quota fix; no open dependencies.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12005,11 +11991,9 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "importance": "high",
       "score": 72,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-5103"
-      ],
-      "why": "Stale cost hook bundle prices Fable 5.1/5.2 at Fable 5 rates and the reconciler never corrects it; rebuild after PAN-5103.",
-      "rationale": "New issue: live cost rows for Fable 5.1 (and 5.2 once PAN-5103 lands) are recorded at wrong cache-read and token rates and never reconciled, so it slots into the free rank 20 as an XS fix sequenced right after PAN-5103 adds the 5.2 pricing row.",
+      "dependsOn": [],
+      "why": "Stale cost hook bundle prices Fable 5.1/5.2 at Fable 5 rates; reconciler never corrects it. Unblocked: PAN-5103 merged.",
+      "rationale": "Its only dependency, PAN-5103 (Fable 5.2 rollout), closed as completed, so the XS rebuild is unblocked; rank held at 20 because it is a cost-accuracy fix, not pipeline substrate.",
       "gate": "auto",
       "planning": "auto"
     }
@@ -13190,13 +13174,6 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.4
-    },
-    {
-      "from": "PAN-5103",
-      "to": "PAN-5104",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.8
     }
   ]
 }
