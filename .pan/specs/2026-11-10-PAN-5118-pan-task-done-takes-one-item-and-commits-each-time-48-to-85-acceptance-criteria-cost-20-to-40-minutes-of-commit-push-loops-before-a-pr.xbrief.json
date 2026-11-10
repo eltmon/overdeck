@@ -1,0 +1,680 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-10T18:16:54Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5118: pan task done takes one item and commits each time: 48 to 85 acceptance criteria cost 20 to 40 minutes of commit+push loops before a PR",
+    "updated": "2026-11-10T18:31:25.939Z"
+  },
+  "plan": {
+    "id": "pan-5118",
+    "title": "pan task done takes one item and commits each time: 48 to 85 acceptance criteria cost 20 to 40 minutes of commit+push loops before a PR",
+    "status": "proposed",
+    "uid": "b6377d9f-410d-4c92-bcca-f150dbcb63c9",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-10T18:16:54Z",
+    "updated": "2026-11-10T18:31:25.939Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5118",
+        "label": "PAN-5118",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5118.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "cli",
+      "xbrief",
+      "task-state",
+      "mcp",
+      "work-prompt"
+    ],
+    "narratives": {
+      "Problem": "pan task done takes one id and makes one continue commit per call. markItemDone refuses while the corroborating repo is ahead of its upstream, and in a single-repo project the previous call's continue commit makes it ahead, so agents push between calls. Closing 48 to 85 acceptance-criterion sub-items cost 20 to 40 minutes of commit and pre-push hook loops (PAN-5100, PAN-5078).",
+      "Proposal": "Replace markItemDone with markItemsDone, which verifies every id's own \"Item: <id>\" line and the push state of each corroborating repo once, collects every failure, and writes all ids in one continue-file write. pan task done takes <items...> and commits the continue file once; the self route and MCP task_done tool accept itemIds (up to 500). The work prompts tell agents to put the item and its <item>.acN trailer lines on the item commit and close them all in one call. Docs and changelog describe the multi-id form. Full detail: .pan/drafts/PAN-5118.md.",
+      "NonGoals": "- No change to pan task claim, block, unblock, reopen or cancel, or to the task_claim and task_block tools.\n- No new HTTP route and no new pan verb.\n- No change to the pan done preflight or its \"Incomplete plan items\" text.\n- No new check that an id exists in the xBRIEF.\n- No change to the trailer rule: each id still needs its own exact \"Item: <id>\" line; parent evidence never covers an AC sub-item.\n- No change to how pan task show and pan task next treat AC sub-items.\n- No edits to harness-native memory files under ~/.claude/.\n- No new Mintlify reference page for pan task.\n- No sync twin or wrapper kept beside markItemsDone (markItemDone is removed).\n- No change to the stdout tail of any self-job verb other than task-done, and no change to the stderr tail.\n- No lint for stale single-id pan task done examples."
+    },
+    "autoDecisions": [
+      {
+        "summary": "The \"pan task CLI reference page\" the issue names does not exist; update sync-sources/skills/pan-task/SKILL.md and docs/XBRIEF.md instead and create no new page.",
+        "rationale": "ls reference/ and git grep over *.mdx find no pan task page; those two files hold the pan task reference text agents and readers use today."
+      },
+      {
+        "summary": "Keep itemId on POST /api/self/tasks/done and add itemIds capped at 500.",
+        "rationale": "Every current caller keeps working, no new route needs a no-loss-matrix row, and 500 covers the largest plan seen (117 AC sub-items on PAN-4223)."
+      },
+      {
+        "summary": "Replace markItemDone with markItemsDone rather than keeping both.",
+        "rationale": "CLAUDE.md Key Invariants: one variant per operation in src/lib; only task.ts and two test files call markItemDone."
+      },
+      {
+        "summary": "Leave the pan done \"Incomplete plan items\" refusal text unchanged.",
+        "rationale": "Keeps the change inside the fix the issue lists; the prompts now teach the one-call close."
+      },
+      {
+        "summary": "Keep the existing reason strings (which contain em dashes) for the single-id path.",
+        "rationale": "The issue requires the single-id form to work unchanged; the no-em-dash rule applies to new doc text."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "One CLI verb contract (pan task done taking many ids) surfaces in the lib verifier, the CLI, the self route, the MCP tool, the work prompts and the docs. Each surface is a small edit (16 files, about 6 short items), and splitting them into sibling issues would ship a route and tool that send ids the CLI rejects, or prompts that teach a form the CLI lacks.",
+      "canonicalFilename": "2026-11-10-PAN-5118-pan-task-done-takes-one-item-and-commits-each-time-48-to-85-acceptance-criteria-cost-20-to-40-minutes-of-commit-push-loops-before-a-pr.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "batch-verify-lib",
+        "title": "Add markItemsDone: verify every id, then write once",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T18:16:54Z",
+        "metadata": {
+          "issueLabel": "pan-5118",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "backend",
+          "requiresInspection": true,
+          "foundationFor": [
+            "cli-variadic-done"
+          ],
+          "files_scope": [
+            "src/lib/xbrief/continue-state.ts",
+            "tests/unit/lib/xbrief/continue-state.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/xbrief/continue-state.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "continue-state.test.ts passes, including the four new markItemsDone tests",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-7",
+            "NFR-1",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD .pan/drafts/PAN-5118.md work item 1 and decisions D-1, D-2, D-3 exactly. In src/lib/xbrief/continue-state.ts ADD, below markItemDone (lines 358-456, anchor \"export async function markItemDone(\"), MarkItemsDoneOptions { requirePushed; repoRoots? }, the ItemVerificationFailure { kind: \"missing-trailer\" | \"unpushed\"; itemIds; reason } type, ItemNotVerifiable(message, failures = []) and markItemsDone(planHome, issueId, itemIds, options) as shown in the PRD After snippet: dedupe ids, find each id's corroborating root via hasTrailerCommit(root, `Item: ${id}`), collect one failure per id without a trailer, run unpushedCommitCount once per corroborating root and collect one failure per unpushed root listing every id it corroborates (catch the no-upstream ItemNotVerifiable into a failure), throw one ItemNotVerifiable with reasons joined by \"\\n\" when any failure exists, otherwise write all ids in one updateContinueState with a shared doneAt and return a Record<id, ContinueItemState>. Keep the existing reason strings byte-identical for one id. Leave markItemDone and MarkItemDoneOptions in place in this item so task.ts still compiles; item cli-variadic-done switches the caller and deletes them. In tests/unit/lib/xbrief/continue-state.test.ts convert every markItemDone call to markItemsDone(planHome, ISSUE, [ITEM], { requirePushed, repoRoots? }) and read results by id, then add the four new real-git tests named in the PRD. Do not touch task.ts in this item."
+        },
+        "items": [
+          {
+            "id": "batch-verify-lib.ac1",
+            "title": "Given one pushed commit whose body carries \"Item: w1-plan-home\", \"Item: w1-plan-home.ac1\" and \"Item: w1-plan-home.ac2\", when markItemsDone runs with those three ids, readItemStatuses returns all three as completed and all three doneAt values are equal.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "batch-verify-lib.ac2",
+            "title": "Given a pushed commit that lacks the lines for w1-plan-home.ac2 and w1-plan-home.ac3, when markItemsDone runs with four ids, it rejects with ItemNotVerifiable whose failures itemIds equal [[\"w1-plan-home.ac2\"],[\"w1-plan-home.ac3\"]] and the continue file does not exist.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "batch-verify-lib.ac3",
+            "title": "Given a commit carrying three ids that is not pushed, when markItemsDone runs, it rejects with exactly one failure whose itemIds list all three ids and whose reason contains \"ahead of its upstream\".",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "batch-verify-lib.ac4",
+            "title": "Given [ITEM, ITEM], markItemsDone returns a record with one key, and no test in tests/unit/lib/xbrief/continue-state.test.ts calls markItemDone any more.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-variadic-done",
+        "title": "Make pan task done take one or more ids with one continue commit",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T18:16:54Z",
+        "metadata": {
+          "issueLabel": "pan-5118",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/cli/commands/task.ts",
+            "src/cli/commands/__tests__/task.test.ts",
+            "src/lib/xbrief/continue-state.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/task.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "task.test.ts passes, including the new multi-id tests",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD work item 2. In src/cli/commands/task.ts: import markItemsDone instead of markItemDone; add notDoneMessage(itemIds, repoRoots, error) exactly as the PRD After snippet (one id keeps today's wording \"<id> is not done yet: <reason>.\" plus \"Nothing was written. Commit the work with a body line \\\"Item: <id>\\\", push the branch, then run this again.\"; several ids print \"<failing> of <total> items are not done yet. Nothing was written.\", then ONE line listing every missing-trailer id (\"  - No commit in <roots> carries the line \"Item: <id>\" for: <ids>\"), then one line per unpushed-repo failure, then a closing instruction line, so stderr stays under the self-job runner's 16 KiB tail); change runTaskDone to take itemIds: readonly string[], dedupe them, call markItemsDone once and commitContinue once inside one withTaskStateLock; print one object for one id (unchanged), a JSON array with --json, or one \"<id>\\tcompleted\" line per id otherwise. Register the verb as `done <issue> <items...>` with the PRD description text. Update the module header to say done takes one or more ids. Then delete markItemDone and MarkItemDoneOptions from src/lib/xbrief/continue-state.ts (one variant per operation, CLAUDE.md Key Invariants) and update that module's header comment to name markItemsDone. In task.test.ts update the continue-state mock (markItemsDone, ItemNotVerifiable with a failures constructor argument), update the two existing done-call assertions, and add the new tests named in the PRD."
+        },
+        "items": [
+          {
+            "id": "cli-variadic-done.ac1",
+            "title": "When `pan task done PAN-1 PAN-1-a PAN-1-a.ac1 PAN-1-a.ac2` runs, markItemsDone is called once with the three ids, commitPlanArtifacts is called exactly once, and stdout prints one \"<id>\\tcompleted\" line per id.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-variadic-done.ac2",
+            "title": "When markItemsDone rejects with missing-trailer failures for PAN-1-a.ac1 and PAN-1-a.ac2, the command exits 1, stderr contains \"2 of 3 items are not done yet\", one line ending \"for: PAN-1-a.ac1, PAN-1-a.ac2\" and \"Nothing was written\", and commitPlanArtifacts is not called.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-variadic-done.ac3",
+            "title": "Given one id, stdout is \"PAN-1-a\\tcompleted\" and a refusal still contains \"is not done yet\" and \"Item: PAN-1-a\"; the existing single-id tests pass unchanged in meaning.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-variadic-done.ac4",
+            "title": "With --json and three ids, stdout parses as a JSON array whose itemId values equal the argument order, and `pan task done PAN-1 PAN-1-a PAN-1-a` passes [\"PAN-1-a\"] to markItemsDone.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-variadic-done.ac5",
+            "title": "After this item, `git grep -nw markItemDone -- src tests` returns no matches and `npm run typecheck` exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "self-route-item-ids",
+        "title": "Accept itemIds on POST /api/self/tasks/done",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T18:16:54Z",
+        "metadata": {
+          "issueLabel": "pan-5118",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "api",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/server/routes/self-workflow.ts",
+            "src/dashboard/server/__tests__/self-workflow.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/self-workflow.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "self-workflow.test.ts passes, including the new itemIds describe block",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-8",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD work item 3 and decision D-4. In src/dashboard/server/routes/self-workflow.ts add exported MAX_TASK_DONE_ITEMS = 500 and parseItemIds(body) as in the PRD snippet, then change handleSelfTaskDone (line 109, anchor \"export async function handleSelfTaskDone(\") so a body with itemIds builds args [{ ref: issueId }, ...ids.map(ref => ({ ref })), { switch: \"json\" }], a body with both itemId and itemIds returns 400 \"pass itemId or itemIds, not both\", and a body without itemIds keeps today's itemId path and error text. Do not change handleSelfTaskClaim, self-job-argv.ts, or the route list. Update the module header. Leave the shared claim/done describe.each table as it is and add a new describe(\"handleSelfTaskDone itemIds (PAN-5118)\") with the cases named in the PRD."
+        },
+        "items": [
+          {
+            "id": "self-route-item-ids.ac1",
+            "title": "Given body {\"itemIds\":[\"item-a\",\"item-a.ac1\",\"item-a.ac2\"]}, handleSelfTaskDone returns 200 and the recorded job argv after the binary equals [\"task\",\"done\",\"PAN-1\",\"item-a\",\"item-a.ac1\",\"item-a.ac2\",\"--json\"].",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "self-route-item-ids.ac2",
+            "title": "Given a body with both itemId and itemIds, the handler returns 400 with error \"pass itemId or itemIds, not both\" and records no job.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "self-route-item-ids.ac3",
+            "title": "Given itemIds of [], \"item-a\", [1] or 501 ids, the handler returns 400 bad-request; given [\"item-a\",\"--steal\"] it returns 400 bad-job-arg; no job is recorded in any of these cases.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "self-route-item-ids.ac4",
+            "title": "Given 500 ids the handler returns 200, and the existing itemId tests in the shared describe.each table still pass.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mcp-task-done-item-ids",
+        "title": "Accept itemIds in the MCP task_done tool",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T18:16:54Z",
+        "metadata": {
+          "issueLabel": "pan-5118",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "api",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/mcp/tools-self.ts",
+            "src/lib/mcp/agent-instructions.ts",
+            "tests/unit/lib/mcp/tools-self.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/mcp/tools-self.test.ts tests/unit/lib/mcp/agent-instructions.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tools-self.test.ts and agent-instructions.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD work item 4 and decision D-5. In src/lib/mcp/tools-self.ts replace the taskDone tool (lines 61-77, anchor \"name: 'task_done'\") with the PRD After snippet: description text, schema with itemId and itemIds (minItems 1, maxItems 500) and no required list, and run() that posts { itemIds } or { itemId }, refusing both together and an empty or non-string list. Do not change task_claim. In src/lib/mcp/agent-instructions.ts change only the two \"- Checklist:\" lines to the PRD text; both blocks must stay at or under 1500 characters and the MCP block must add no backticked token containing an underscore. In tests/unit/lib/mcp/tools-self.test.ts keep the shared describe.each at line 277 and add describe(\"task_done itemIds (PAN-5118)\") with the cases in the PRD."
+        },
+        "items": [
+          {
+            "id": "mcp-task-done-item-ids.ac1",
+            "title": "Calling task_done with { itemIds: [\"item-a\",\"item-a.ac1\"] } produces exactly one API call: POST /api/self/tasks/done with body { itemIds: [\"item-a\",\"item-a.ac1\"] }.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-task-done-item-ids.ac2",
+            "title": "Calling task_done with both itemId and itemIds, or with itemIds [], returns isError true and makes no API call; calling it with {} still returns an error whose text contains \"itemId\".",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mcp-task-done-item-ids.ac3",
+            "title": "listTools() returns task_done with inputSchema.properties.itemIds.maxItems equal to 500, and agent-instructions.test.ts passes with both instruction blocks at or under 1500 characters.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "work-prompts-ac-batch",
+        "title": "Teach the one-call item-and-AC close in the work prompts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T18:16:54Z",
+        "metadata": {
+          "issueLabel": "pan-5118",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "docs",
+          "requiresInspection": false,
+          "files_scope": [
+            "roles/work.md",
+            "src/lib/cloister/prompts/work.md",
+            "sync-sources/agents/pan-work-agent.md"
+          ],
+          "verify_commands": [
+            "bash scripts/lint-prompts.sh",
+            "bash scripts/check-prompt-change-trailer.sh"
+          ],
+          "expected_outputs": [
+            "lint-prompts.sh exits 0 with no item-loop-order failure",
+            "check-prompt-change-trailer.sh reports the Prompt-Change trailer found"
+          ],
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD work item 5 and decision D-8. In roles/work.md (## Per-Task Workflow, lines 50-61) and src/lib/cloister/prompts/work.md (## MANDATORY: One Item At A Time, lines 218-242): step 4 adds one body line \"Item: <item-id>.acN\" per acceptance criterion so the item commit is the evidence for the item and all its ACs, and step 4 must NOT contain the literal text \"pan task done\" (scripts/lint-prompts.sh check_item_order_file requires the first step containing \"pan task done\" to come after the first step containing \"git push\"); step 6 shows `pan task done <ISSUE> <item-id> <item-id>.ac1 <item-id>.ac2 ...` as one call that records all ids with one commit, records nothing if any id lacks its line, and needs no extra push; add the --allow-empty fallback sentence after the list; extend \"Never batch multiple tasks into a single commit\" with \"An item's AC sub-items are not separate tasks: they share the item's commit.\" In prompts/work.md use {{ISSUE_ID}}, change the \"End your turn\" bullet at line 274 (anchor \"Complete the item with `pan task done {{ISSUE_ID}} <item>`\") to the multi-id form, and also update the {{#REMOTE}} block line near 345. In sync-sources/agents/pan-work-agent.md update steps 3 and 5 the same way. Write no em dashes in new sentences. The commit that changes roles/work.md must carry a body line starting \"Prompt-Change:\"."
+        },
+        "items": [
+          {
+            "id": "work-prompts-ac-batch.ac1",
+            "title": "roles/work.md, src/lib/cloister/prompts/work.md and sync-sources/agents/pan-work-agent.md each show a commit step that adds one \"Item: <item-id>.acN\" line per acceptance criterion and a done step that renders `pan task done` with the item id followed by its .ac1 and .ac2 ids in one call; `grep -c \"pan task done {{ISSUE_ID}} <item>`\" src/lib/cloister/prompts/work.md` prints 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "work-prompts-ac-batch.ac2",
+            "title": "Running `bash scripts/lint-prompts.sh` exits 0, which proves the commit step does not contain \"pan task done\" and the push step still precedes the done step.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "work-prompts-ac-batch.ac3",
+            "title": "The commit that changes roles/work.md carries a body line starting \"Prompt-Change:\", and `bash scripts/check-prompt-change-trailer.sh` exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "work-prompts-ac-batch.ac4",
+            "title": "roles/work.md still contains \"Never batch multiple tasks into a single commit\" followed by the sentence saying AC sub-items share the item's commit.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-task-done-batch",
+        "title": "Document the multi-id pan task done in the skill, XBRIEF doc, MCP table and changelog",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T18:16:54Z",
+        "metadata": {
+          "issueLabel": "pan-5118",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "trivial",
+          "kind": "docs",
+          "requiresInspection": false,
+          "files_scope": [
+            "sync-sources/skills/pan-task/SKILL.md",
+            "docs/XBRIEF.md",
+            "configuration/mcp.mdx",
+            "changelog.mdx"
+          ],
+          "verify_commands": [
+            "npm run lint:docs",
+            "git diff origin/main -- sync-sources/skills/pan-task/SKILL.md docs/XBRIEF.md configuration/mcp.mdx changelog.mdx | grep '^+[^+]' | grep -c '—' || true"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "the em-dash count prints 0"
+          ],
+          "traces": [
+            "FR-11",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD work item 6 and decision D-6 (no new Mintlify page; the pan task reference text lives in sync-sources/skills/pan-task/SKILL.md and docs/XBRIEF.md). Add the multi-id example line and replace the last paragraph of SKILL.md with the PRD text; add the sentence to docs/XBRIEF.md line 9; replace the task_done row text in configuration/mcp.mdx line 73; add the PRD bullet under #### Improved in the v0.77.0 Upcoming block of changelog.mdx. Use no em dashes in any added line."
+        },
+        "items": [
+          {
+            "id": "docs-task-done-batch.ac1",
+            "title": "sync-sources/skills/pan-task/SKILL.md shows the example `pan task done PAN-123 PAN-123-a PAN-123-a.ac1 PAN-123-a.ac2` and states that the command records nothing and names each failing id when any id lacks its \"Item: <id>\" line.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-task-done-batch.ac2",
+            "title": "docs/XBRIEF.md contains the example `pan task done <issue> <item-id> <item-id>.ac1 <item-id>.ac2`, and the configuration/mcp.mdx task_done row contains itemIds with its 500 cap.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-task-done-batch.ac3",
+            "title": "changelog.mdx contains a bullet under #### Improved in the v0.77.0 Upcoming block that links PAN-5118 and shows the multi-id pan task done form.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-task-done-batch.ac4",
+            "title": "The em-dash count over added lines in the four files prints 0 and `npm run lint:docs` exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "self-jobs-full-stdout",
+        "title": "Keep the whole stdout of a task-done self job",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T18:16:54Z",
+        "metadata": {
+          "issueLabel": "pan-5118",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/dashboard/server/services/self-jobs.ts",
+            "src/dashboard/server/__tests__/self-jobs.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/self-jobs.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "self-jobs.test.ts passes, including the 500-entry JSON test",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD work item 7. In src/dashboard/server/services/self-jobs.ts add exported SELF_JOB_FULL_STDOUT_VERBS = new Set<SelfJobVerb>([\"task-done\"]) and a required stdoutTailBytes: number field on SelfJobRunInput; runPanJob passes input.stdoutTailBytes to tailUtf8 for stdout on both the success path (anchor \"stdout: tailUtf8(stdout)\") and the failure path (anchor \"stdout: tailUtf8(failure.stdout\"), while stderr keeps the default 16,384-byte tail; start() passes stdoutTailBytes = SELF_JOB_MAX_BUFFER for verbs in the set and SELF_JOB_OUTPUT_TAIL_BYTES otherwise. Update the module header sentence about the 16 KiB tail. In src/dashboard/server/__tests__/self-jobs.test.ts add stdoutTailBytes to every SelfJobRunInput literal and add the three tests named in the PRD."
+        },
+        "items": [
+          {
+            "id": "self-jobs-full-stdout.ac1",
+            "title": "When an injected runner records a started task-done job, its input stdoutTailBytes equals SELF_JOB_MAX_BUFFER; for a task-claim job it equals 16384.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "self-jobs-full-stdout.ac2",
+            "title": "Given a real child that prints a 500-entry pretty-printed JSON array (about 51 KB), runPanJob with stdoutTailBytes SELF_JOB_MAX_BUFFER returns stdout that JSON.parse turns into 500 entries.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "self-jobs-full-stdout.ac3",
+            "title": "The existing runPanJob test that prints 17,408 bytes with stdoutTailBytes 16384 still returns a stdout of exactly 16,384 bytes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "foreman-docs-ac-batch",
+        "title": "Teach the foreman protocol to close an item and its ACs in one call",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T18:16:54Z",
+        "metadata": {
+          "issueLabel": "pan-5118",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "trivial",
+          "kind": "docs",
+          "requiresInspection": false,
+          "files_scope": [
+            "docs/FOREMAN.md",
+            "sync-sources/skills/pan-foreman/SKILL.md"
+          ],
+          "verify_commands": [
+            "git grep -nw markItemDone -- docs sync-sources",
+            "git diff origin/main -- docs/FOREMAN.md sync-sources/skills/pan-foreman/SKILL.md | grep '^+[^+]' | grep -c '—' || true"
+          ],
+          "expected_outputs": [
+            "the markItemDone grep prints nothing",
+            "the em-dash count prints 0"
+          ],
+          "traces": [
+            "FR-13",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD work item 8. In docs/FOREMAN.md worker step 3 (line 76, anchor \"One commit with the trailer `Item: <item-id>`\") add that the commit also carries one body line \"Item: <item-id>.acN\" per acceptance criterion; at lines 86-89 change markItemDone to markItemsDone; in the foreman Integrate bullet (line 98) change the final command to `pan task done <id> <item-id> <item-id>.ac1 <item-id>.ac2 ...` described as one call for the item and its ACs, and change \"re-add the `Item:` trailer if you squash\" to \"re-add the `Item:` lines if you squash\". Make the same worker-step and Integrate changes in sync-sources/skills/pan-foreman/SKILL.md (worker brief step 3 at line 95, Integrate bullet at line 110). Write no em dashes in new text."
+        },
+        "items": [
+          {
+            "id": "foreman-docs-ac-batch.ac1",
+            "title": "docs/FOREMAN.md and sync-sources/skills/pan-foreman/SKILL.md each contains a worker commit step that adds one \"Item: <item-id>.acN\" line per acceptance criterion.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "foreman-docs-ac-batch.ac2",
+            "title": "The foreman Integrate bullet in both files shows `pan task done <id> <item-id> <item-id>.ac1 <item-id>.ac2 ...` as one call and says to re-add the `Item:` lines when squashing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "foreman-docs-ac-batch.ac3",
+            "title": "`git grep -nw markItemDone -- docs sync-sources` returns no matches and the em-dash count over added lines in the two files prints 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "verifier-feedback-one-call",
+        "title": "Give one copy-ready pan task done command in the incomplete-plan-items feedback",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T18:16:54Z",
+        "metadata": {
+          "issueLabel": "pan-5118",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "difficulty": "trivial",
+          "kind": "backend",
+          "requiresInspection": false,
+          "files_scope": [
+            "src/lib/cloister/verification-runner.ts",
+            "tests/unit/lib/cloister/verification-runner-adopted-options.test.ts"
+          ],
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/verification-runner-adopted-options.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "verification-runner-adopted-options.test.ts passes, including the feedback-body assertion",
+            "typecheck completes without errors"
+          ],
+          "traces": [
+            "FR-14"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD work item 9. In src/lib/cloister/verification-runner.ts change only the non-stuck feedbackBody string at line 804 (anchor \"Complete each listed item with\") so it tells the agent to give every listed id its own `Item: <id>` body line on a pushed commit and then close them all with one call `pan task done ${issueId} ${itemIds.join(' ')}`, using the itemIds array already built a few lines above (anchor \"const itemIds = taskBlockers\"). Do not change buildFinalFailureInstructions. In tests/unit/lib/cloister/verification-runner-adopted-options.test.ts make checkIncompletePlanItems resolve the three lines given in the PRD and assert the mocked writeFeedbackFile body."
+        },
+        "items": [
+          {
+            "id": "verifier-feedback-one-call.ac1",
+            "title": "Given checkIncompletePlanItems returns lines for item-a and item-a.ac1, when verification runs for PAN-9001, writeFeedbackFile receives a body that contains `pan task done PAN-9001 item-a item-a.ac1`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verifier-feedback-one-call.ac2",
+            "title": "The feedback body no longer contains \"Complete each listed item with\", and the existing adopted and never-adopted tests in the file still pass.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "batch-verify-lib",
+        "to": "cli-variadic-done",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
