@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5106",
   "created": "2026-11-10T14:09:58.025Z",
-  "updated": "2026-11-10T15:08:12.129Z",
+  "updated": "2026-11-10T15:08:40.289Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -88,6 +88,10 @@
     "ember-dashboard-catalog.ac2": {
       "status": "completed",
       "doneAt": "2026-11-10T15:08:12.129Z"
+    },
+    "muse-catalog-audit-pins.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T15:08:40.288Z"
     }
   }
 }
