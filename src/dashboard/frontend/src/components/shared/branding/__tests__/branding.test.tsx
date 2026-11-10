@@ -72,4 +72,11 @@ describe('shared branding registry', () => {
     rerender(<ProviderLogo provider="unknown-provider" label="Unknown Provider" />);
     expect(screen.getByText('U')).toBeInTheDocument();
   });
+
+  it('resolves Grok Build for the grok provider and harness (PAN-5078)', () => {
+    expect(PROVIDER_BRANDS.grok.label).toBe('Grok Build');
+    expect(HARNESS_BRANDS.grok.label).toBe('Grok Build');
+    render(<HarnessLogo harness="grok" />);
+    expect(screen.getByLabelText('Grok Build logo')).toBeInTheDocument();
+  });
 });
