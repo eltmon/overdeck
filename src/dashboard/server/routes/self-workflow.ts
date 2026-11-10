@@ -7,7 +7,8 @@
  * from the token, builds argv only from `buildSelfJobArgv` pieces, starts a
  * job, waits up to `WAIT_CHUNK_MS` and answers `selfJobAnswer`. There is no
  * CSRF check: only a header-borne agent token is accepted, never a cookie
- * (D-8).
+ * (D-8). `task_done` takes one id (`itemId`) or a list (`itemIds`, up to
+ * MAX_TASK_DONE_ITEMS); passing both is a 400 (PAN-5118).
  */
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
@@ -106,6 +107,18 @@ export async function handleSelfTaskClaim(
   return startSelfJobAnswer(jobs, caller, 'task-claim', [{ ref: caller.issueId }, { ref: itemId.value }, { switch: 'json' }], {}, signal);
 }
 
+/** PAN-5118: the most ids one task_done call may close (PAN-4223 had 117 AC sub-items). */
+export const MAX_TASK_DONE_ITEMS = 500;
+
+/** `body.itemIds` → 1..MAX_TASK_DONE_ITEMS non-empty strings of at most 200 characters, else the refusal. */
+function parseItemIds(body: Record<string, unknown>): { ok: true; value: readonly string[] } | { ok: false; result: SelfRouteResult } {
+  const ids = body['itemIds'];
+  const bad = { ok: false, result: badRequest(`itemIds must be a list of 1 to ${MAX_TASK_DONE_ITEMS} item ids of at most 200 characters`) } as const;
+  if (!Array.isArray(ids) || ids.length === 0 || ids.length > MAX_TASK_DONE_ITEMS) return bad;
+  for (const id of ids) if (typeof id !== 'string' || !id.trim() || id.length > 200) return bad;
+  return { ok: true, value: ids as readonly string[] };
+}
+
 export async function handleSelfTaskDone(
   credential: DashboardCredential | null,
   text: string,
@@ -115,10 +128,20 @@ export async function handleSelfTaskDone(
   const prepared = prelude(credential, text, deps);
   if (!prepared.ok) return prepared.result;
   const { caller, body, jobs } = prepared;
-  const itemId = requiredBodyString(body, 'itemId', 200);
-  if (!itemId.ok) return itemId.result;
+  let ids: readonly string[];
+  if (body['itemIds'] !== undefined) {
+    if (body['itemId'] !== undefined) return badRequest('pass itemId or itemIds, not both');
+    const parsed = parseItemIds(body);
+    if (!parsed.ok) return parsed.result;
+    ids = parsed.value;
+  } else {
+    const itemId = requiredBodyString(body, 'itemId', 200);
+    if (!itemId.ok) return itemId.result;
+    ids = [itemId.value];
+  }
   if (caller.issueId === null) return { status: 409, body: NO_ISSUE };
-  return startSelfJobAnswer(jobs, caller, 'task-done', [{ ref: caller.issueId }, { ref: itemId.value }, { switch: 'json' }], {}, signal);
+  const args: SelfJobArg[] = [{ ref: caller.issueId }, ...ids.map((ref) => ({ ref })), { switch: 'json' }];
+  return startSelfJobAnswer(jobs, caller, 'task-done', args, {}, signal);
 }
 
 /** `body.on`: undefined → []; else an array of at most 20 non-empty, at-most-500-char strings, else the refusal. */
