@@ -58,8 +58,8 @@ terminal backend (Herdr by default, tmux when `terminal.backend: tmux`).
   `delivery.ts`, `health.ts`, `resume.ts`, `termination.ts`. Harness resolution lives in
   `src/lib/harness-resolve.ts`.
 - `runtimes/` — harness adapters: `claude-code.ts`, `ohmypi.ts` (+ `ohmypi-fifo.ts`),
-  `codex.ts`, `acp.ts`, `kimi-code.ts`, `muse.ts`, plus OpenCode via ACP. `RuntimeName =
-  'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse'` (`pi` is a
+  `codex.ts`, `acp.ts`, `kimi-code.ts`, `muse.ts`, `prime-agent.ts`, plus OpenCode and Grok Build via ACP. `RuntimeName =
+  'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent' | 'grok'` (`pi` is a
   legacy alias). Per-harness behavior table: `packages/contracts/src/harness-behavior.ts`;
   its `HarnessBehavior.capabilities` (`packages/contracts/src/harness-capabilities.ts`)
   declares every per-harness behavior decision, and the `lint:harness-branches` ratchet
