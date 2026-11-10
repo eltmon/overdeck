@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5117",
   "created": "2026-11-10T17:52:40.588Z",
-  "updated": "2026-11-10T19:06:29.259Z",
+  "updated": "2026-11-10T19:06:50.520Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -56,6 +56,10 @@
     "move-wall-clock-cases.ac3": {
       "status": "completed",
       "doneAt": "2026-11-10T19:06:29.258Z"
+    },
+    "add-fast-fallback-case.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T19:06:50.519Z"
     }
   }
 }
