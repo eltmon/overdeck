@@ -27,11 +27,18 @@ const AGENT_LABELS: Record<string, string> = {
   unknown: 'Unknown',
 };
 
+/** Feed labels that differ from the harness brand; every other harness uses its brand label. */
+const FEED_LABEL_BY_HARNESS: Partial<Record<Harness, string>> = {
+  ohmypi: 'Pi',
+  acp: 'Kimi',
+};
+
 export function ConversationFeedCard({ entry, onSelect, now = new Date() }: ConversationFeedCardProps) {
-  // OpenCode and Grok Build share the ACP feed kind; name them by harness, not "Kimi".
-  const acpHosted = entry.agent === 'acp' && entry.harness !== undefined && entry.harness !== 'acp' ? entry.harness : undefined;
-  const agentLabel = acpHosted ? HARNESS_BRANDS[acpHosted].label : AGENT_LABELS[entry.agent] ?? entry.agent;
-  const harness = acpHosted ?? harnessForFeedAgent(entry.agent);
+  // OpenCode and Grok Build share the ACP feed kind, so a known harness names the row (PAN-5078).
+  const agentLabel = entry.harness
+    ? FEED_LABEL_BY_HARNESS[entry.harness] ?? HARNESS_BRANDS[entry.harness].label
+    : AGENT_LABELS[entry.agent] ?? entry.agent;
+  const harness = entry.harness ?? harnessForFeedAgent(entry.agent);
 
   return (
     <button

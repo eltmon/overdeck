@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import {
   getHarnessBehavior,
   isSingletonConversation,
+  normalizeHarnessName,
   type HarnessFeedKind,
   type IssueId,
 } from '@overdeck/contracts';
@@ -48,7 +49,7 @@ export function mapConversationToFeedEntry(conversation: ConversationFeedRow): C
     conversationId: conversation.id,
     conversationName: conversation.name,
     agent: mapHarnessToAgent(conversation.harness),
-    ...(conversation.harness && conversation.harness !== 'pi' ? { harness: conversation.harness } : {}),
+    ...(normalizeHarnessName(conversation.harness) ? { harness: normalizeHarnessName(conversation.harness)! } : {}),
     lastMessageDate: recencyAt,
     lastMessageSnippet: conversation.title ?? 'No messages yet',
     ...(conversation.messageCount === undefined ? {} : { messageCount: conversation.messageCount }),

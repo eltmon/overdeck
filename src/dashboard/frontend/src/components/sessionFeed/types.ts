@@ -1,4 +1,4 @@
-import type { IssueId, LaneActivity } from '@overdeck/contracts';
+import type { IssueId, LaneActivity, RuntimeName } from '@overdeck/contracts';
 
 export type SessionFeedTab = 'all' | 'chats' | 'files' | 'git' | 'comments' | 'activity';
 
@@ -51,8 +51,8 @@ export interface ConversationSessionFeedEntry extends SessionFeedEntryBase {
   conversationId: number;
   conversationName: string;
   agent: string;
-  /** The conversation's harness; OpenCode and Grok Build share the `acp` feed kind (PAN-5078). */
-  harness?: Exclude<NonNullable<ConversationFeedRow['harness']>, 'pi'>;
+  /** The conversation's harness (legacy `pi` normalized); OpenCode and Grok Build share the `acp` feed kind (PAN-5078). */
+  harness?: RuntimeName;
   lastMessageDate: string;
   lastMessageSnippet: string;
   messageCount?: number;
