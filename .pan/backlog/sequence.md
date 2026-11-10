@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-10T15:57:47.046100Z · model: claude-opus-5-5 · open: 871_
+_Last sequenced: 2026-11-10T16:00:02.640517Z · model: claude-opus-5-5 · open: 872_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -25,6 +25,7 @@ _Last sequenced: 2026-11-10T15:57:47.046100Z · model: claude-opus-5-5 · open: 
 | 18 | PAN-4671 | M | high | ok |  |  | CodeRabbit comments posted after the reviewer snapshot merge unseen; deliver late ones to the work agent at merge. Needs handoff. |
 | 19 | PAN-4675 | S | critical | ok |  |  | One transient gh label timeout aborts post-merge lifecycle; merge door replies Already merged, so the issue can never close. |
 | 20 | PAN-4705 | S | high | ok |  |  | quality-gate-admission test leaks a poller past afterEach rmSync; unhandled ENOENT fails unrelated PR CI shards. |
+| 21 | PAN-5112 | S | high | ok |  |  | Merge closes the paused work agent's pane but leaves status running, so every merge fires a false 'stopped responding' push. |
 | 22 | PAN-4746 | S | high | ok |  |  | CI test shard flakes on ENOTEMPTY: afterEach rmSync races an unawaited snapshot write; reds unrelated PRs (seen on #4745). |
 | 23 | PAN-5104 | XS | high | ok |  |  | Stale cost hook bundle prices Fable 5.1/5.2 at Fable 5 rates; reconciler never corrects it. Unblocked: PAN-5103 merged. |
 | 24 | PAN-4572 | M | medium | ok |  |  | Residual re-render offenders PAN-4560 profiled but left: unmemoized deck rows, App 5 s poll, clock/selector identity bugs. |
@@ -959,6 +960,10 @@ New this pass. addLabel in merge-agent.ts uses Effect.promise, so one gh network
 
 New since the prior pass. A latent race in the PAN-4546 admission test fails whole CI shards with an unhandled ENOENT on PRs that never touch it (seen on #4703), costing verification attempts pipeline-wide. It sits beside PAN-4680, the sibling flake fix, because both keep CI verification honest; the fix is small and scoped to one test file or publishExclusive.
 
+### PAN-5112 (rank 21)
+
+New substrate-improvement bug with a decided, file-cited fix: merge-agent.ts pauses the work agent and closes its terminal without recording it stopped, so handleAgentCrash() counts it as a crash, emits heartbeat_dead, and the push classifier sends a false failed push after every merge (six on 2026-11-10). The fix records stopped through the normal stop door and adds a paused guard in handleAgentCrash, with tests. It fills the open rank 21 among the high-importance S substrate fixes, so no other rank moves; it is operator noise rather than a pipeline blocker, which keeps it below the critical tier.
+
 ### PAN-4746 (rank 22)
 
 New flaky-test bug: a background membership-snapshot write races the test's teardown rmSync and turned an unrelated PR's CI shard red. Ranked next to PAN-4705, the same leaked-async-work-vs-teardown pattern, because each red shard costs a PR a rerun on the path to merge.
@@ -1195,10 +1200,6 @@ New this pass. Every agent pane is a child of one transient tmux-server unit, so
 
 Triage: the auto-requeue machinery cited targeted the deleted review_status table; verify review-dispatch-after-PR-open against the current mechanism (see PAN-3939 for the post-cut reproduction). Rank held.
 
-### PAN-4623 (rank 81)
-
-New since the prior run (filed by the PAN-4532 plan critic). recoverStalledReviews falls back to getRequestReviewStarter(), which is only registered by the dashboard route module the forked deacon child never loads, so the fallback is a silent no-op in production and a journaled-but-undispatched review with no parent state stays stranded. The fix is a one-call swap to requestReviewThroughRoute, which undispatched-review-recovery already uses. Placed beside PAN-3278 (review never dispatched) because it closes the same throughput hole; it is review-recovery machinery, so it goes through a supervised handoff.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1206,10 +1207,10 @@ New since the prior run (filed by the PAN-4532 plan critic). recoverStalledRevie
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-10T15:57:47.046100Z",
+  "generatedAt": "2026-11-10T16:00:02.640517Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 871,
+  "openCount": 872,
   "nodes": [
     {
       "issue": "PAN-5001",
@@ -12036,6 +12037,19 @@ New since the prior run (filed by the PAN-4532 plan critic). recoverStalledRevie
       "dependsOn": [],
       "why": "Phone app: let phone credentials reach linked machines (fleet Needs-you, linked-conv proxy, /ws/linked); PAN-4835 merged.",
       "rationale": "PAN-4835 merged in #4894, which clears its only dependency; rank held because the Anywhere phone epic is low-impact relative to substrate work above it.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5112",
+      "rank": 21,
+      "size": "S",
+      "importance": "high",
+      "score": 78,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Merge closes the paused work agent's pane but leaves status running, so every merge fires a false 'stopped responding' push.",
+      "rationale": "New substrate-improvement bug with a decided, file-cited fix: merge-agent.ts pauses the work agent and closes its terminal without recording it stopped, so handleAgentCrash() counts it as a crash, emits heartbeat_dead, and the push classifier sends a false failed push after every merge (six on 2026-11-10). The fix records stopped through the normal stop door and adds a paused guard in handleAgentCrash, with tests. It fills the open rank 21 among the high-importance S substrate fixes, so no other rank moves; it is operator noise rather than a pipeline blocker, which keeps it below the critical tier.",
       "gate": "auto",
       "planning": "auto"
     }
