@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5111",
   "created": "2026-11-10T15:51:44.994Z",
-  "updated": "2026-11-10T17:03:56.446Z",
+  "updated": "2026-11-10T17:04:19.343Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -200,6 +200,10 @@
     "link-failure-tracking.ac3": {
       "status": "completed",
       "doneAt": "2026-11-10T17:03:56.445Z"
+    },
+    "link-failure-tracking.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:04:19.343Z"
     }
   }
 }
