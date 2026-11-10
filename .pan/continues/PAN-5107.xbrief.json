@@ -1,0 +1,210 @@
+{
+  "version": "1",
+  "issueId": "PAN-5107",
+  "created": "2026-11-10T14:32:45.039Z",
+  "updated": "2026-11-10T15:10:25.510Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-10T15:10Z] coderabbit → FINDINGS — seq 1",
+      "timestamp": "2026-11-10T15:10:25.510Z"
+    }
+  ],
+  "items": {
+    "delete-copy-parity": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5107",
+      "claimedAt": "2026-11-10T14:32:45.039Z",
+      "doneAt": "2026-11-10T14:35:11.175Z"
+    },
+    "account-deletion-module": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5107",
+      "claimedAt": "2026-11-10T14:35:15.383Z",
+      "doneAt": "2026-11-10T14:38:05.613Z"
+    },
+    "settings-delete-dialog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5107",
+      "claimedAt": "2026-11-10T14:38:10.358Z",
+      "doneAt": "2026-11-10T14:41:36.845Z"
+    },
+    "signin-notice": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5107",
+      "claimedAt": "2026-11-10T14:41:41.307Z",
+      "doneAt": "2026-11-10T14:42:50.483Z"
+    },
+    "shellapp-wiring": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5107",
+      "claimedAt": "2026-11-10T14:42:54.862Z",
+      "doneAt": "2026-11-10T14:46:05.107Z"
+    },
+    "docs-release-readme": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5107",
+      "claimedAt": "2026-11-10T14:46:08.843Z",
+      "doneAt": "2026-11-10T14:47:55.252Z"
+    },
+    "docs-phone-mdx": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5107",
+      "claimedAt": "2026-11-10T14:48:01.197Z",
+      "doneAt": "2026-11-10T14:48:45.665Z"
+    },
+    "docs-changelog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5107",
+      "claimedAt": "2026-11-10T14:48:49.630Z",
+      "doneAt": "2026-11-10T14:49:36.353Z"
+    },
+    "acceptance-evidence": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5107",
+      "claimedAt": "2026-11-10T14:49:40.495Z",
+      "doneAt": "2026-11-10T14:50:38.520Z"
+    },
+    "delete-copy-parity.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T14:52:11.772Z"
+    },
+    "delete-copy-parity.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T14:52:28.484Z"
+    },
+    "delete-copy-parity.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-10T14:52:44.289Z"
+    },
+    "account-deletion-module.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T14:53:04.667Z"
+    },
+    "account-deletion-module.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T14:53:22.793Z"
+    },
+    "account-deletion-module.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-10T14:53:40.879Z"
+    },
+    "account-deletion-module.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-10T14:53:57.769Z"
+    },
+    "account-deletion-module.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-10T14:54:14.544Z"
+    },
+    "settings-delete-dialog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T14:54:35.141Z"
+    },
+    "settings-delete-dialog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T14:54:52.761Z"
+    },
+    "settings-delete-dialog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-10T14:55:10.951Z"
+    },
+    "settings-delete-dialog.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-10T14:55:28.343Z"
+    },
+    "settings-delete-dialog.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-10T14:55:46.450Z"
+    },
+    "settings-delete-dialog.ac6": {
+      "status": "completed",
+      "doneAt": "2026-11-10T14:56:04.242Z"
+    },
+    "signin-notice.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T14:56:25.642Z"
+    },
+    "signin-notice.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T14:56:42.439Z"
+    },
+    "signin-notice.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-10T14:57:01.772Z"
+    },
+    "shellapp-wiring.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T14:57:22.047Z"
+    },
+    "shellapp-wiring.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T14:57:39.856Z"
+    },
+    "shellapp-wiring.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-10T14:57:57.356Z"
+    },
+    "shellapp-wiring.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-10T14:58:13.851Z"
+    },
+    "docs-release-readme.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T14:58:41.828Z"
+    },
+    "docs-release-readme.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T14:59:00.102Z"
+    },
+    "docs-release-readme.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-10T14:59:17.052Z"
+    },
+    "docs-release-readme.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-10T14:59:33.844Z"
+    },
+    "docs-phone-mdx.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T14:59:53.954Z"
+    },
+    "docs-phone-mdx.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T15:00:11.250Z"
+    },
+    "docs-phone-mdx.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-10T15:00:28.584Z"
+    },
+    "docs-changelog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T15:00:45.639Z"
+    },
+    "docs-changelog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T15:01:03.210Z"
+    },
+    "acceptance-evidence.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T15:01:24.456Z"
+    },
+    "acceptance-evidence.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T15:01:41.127Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "coderabbit",
+      "outcome": "findings",
+      "timestamp": "2026-11-10T15:10:25Z",
+      "markdownBody": "# CodeRabbit findings for PAN-5107 (PR #5109)\n\nCodeRabbit posted 4 inline finding(s). CodeRabbit is advisory: nothing waits for these,\nbut each one gets an answer, either a fix or a reply with your reason.\n\n- Thread 4526592329 · apps/mobile/README.md:239 [Minor]: Fix the revoke-skip rationale. It holds only for the `requested` outcome.\n  https://github.com/eltmon/overdeck/pull/5109#discussion_r4526592329\n- Thread 4526592381 · apps/mobile/src/shell/SettingsScreen.tsx:244 [Minor]: Fix punctuation in the error message.\n  https://github.com/eltmon/overdeck/pull/5109#discussion_r4526592381\n- Thread 4526592393 · changelog.mdx:20 [Minor]: Correct the trigger for \"Delete on the web\".\n  https://github.com/eltmon/overdeck/pull/5109#discussion_r4526592393\n- Thread 4526592405 · configuration/phone.mdx:170 [Minor]: Correct the failure condition for \"Delete on the web\".\n  https://github.com/eltmon/overdeck/pull/5109#discussion_r4526592405\n\n## What to do\n\n1. Read each thread (open its link, or the code at the path and line).\n2. If you agree with a finding, fix it.\n3. If you reject a finding, reply on its thread with your reason:\n   `gh api repos/eltmon/overdeck/pulls/5109/comments/<thread id>/replies -f body=\"<reason>\"`\n4. If you changed code: run the quality gates on what you touched, commit, push, then run `pan review request PAN-5107`.\n   If you only replied, you are done.\n5. If PR #5109 has already merged when you read this, nothing more lands on it: open a follow-up issue\n   for the findings you agree with instead of pushing."
+    }
+  ]
+}
