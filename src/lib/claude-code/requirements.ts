@@ -1,13 +1,16 @@
 /**
  * Claude Code version requirements: which configured models need a minimum
  * Claude Code version, whether the launch binary meets it, and the refusal
- * raised by `prepareHarnessLaunch` when it does not (PAN-4359).
+ * raised by `prepareHarnessLaunch` when it does not (PAN-4359). With
+ * `harnesses.auto_update` on, the refusal first runs the upgrade once (PAN-5108).
  */
 
 import { realpath } from 'node:fs/promises';
+import { dirname } from 'node:path';
 import { PARENT_MODEL_REF, WORKHORSE_SLOTS, type NormalizedConfig, type Role } from '../config-yaml/schema.js';
 import { DEFAULT_MODEL_REFS, derefWorkhorse } from '../config-yaml/roles.js';
 import { compareSemver } from '../herdr-setup/binary.js';
+import { isHarnessAutoUpdateEnabled, launchUpdateNote, runLaunchUpdate } from '../fleet/harness-auto-update.js';
 import { MODEL_CAPABILITIES, resolveModelId } from '../model-capabilities.js';
 import type { ModelId } from '../settings.js';
 import { claudeCodeUpgradePlan, detectClaudeInstall, readClaudeCodeVersion } from './version.js';
@@ -150,15 +153,18 @@ export interface ClaudeCodeTooOldErrorArgs {
   readonly required: string;
   readonly binaryPath: string;
   readonly upgradeCommand: string;
+  /** PAN-5108: why the automatic update on refusal did not make the launch pass. */
+  readonly updateNote?: string;
 }
 
-/** The exact refusal text `prepareHarnessLaunch` throws (PAN-4359 FR-6). */
+/** The exact refusal text `prepareHarnessLaunch` throws (PAN-4359 FR-6), plus the PAN-5108 update note when set. */
 export function formatClaudeCodeTooOldMessage(args: ClaudeCodeTooOldErrorArgs): string {
   return (
     `${args.displayName} (${args.model}) needs Claude Code ${args.required} or newer, but Overdeck would launch ` +
     `Claude Code ${args.installed} at ${args.binaryPath}. Upgrade it with \`${args.upgradeCommand}\` (or the ` +
     `Upgrade Claude Code button in the dashboard), then launch again. Running sessions keep their current Claude ` +
-    `Code. No terminal session was created.`
+    `Code. No terminal session was created.` +
+    (args.updateNote ? ` ${args.updateNote}` : '')
   );
 }
 
@@ -185,6 +191,9 @@ export interface AssertClaudeCodeSupportsModelDeps {
   readonly detectInstall?: typeof detectClaudeInstall;
   readonly upgradePlan?: typeof claudeCodeUpgradePlan;
   readonly resolveRealPath?: (path: string) => Promise<string>;
+  /** PAN-5108: defaults to the global `harnesses.auto_update` reader (false under Vitest). */
+  readonly autoUpdateEnabled?: () => Promise<boolean>;
+  readonly launchUpdate?: typeof runLaunchUpdate;
 }
 
 /**
@@ -227,12 +236,30 @@ export async function assertClaudeCodeSupportsModel(
   const install = detectInstall(realBinaryPath);
   const plan = await upgradePlan(install);
 
+  // PAN-5108 D3, D7: update on refusal. Run the upgrade once, re-check, and continue the launch when it passes.
+  let updateNote: string | undefined;
+  let current = installed;
+  const autoUpdateEnabled = deps.autoUpdateEnabled ?? isHarnessAutoUpdateEnabled;
+  if (plan.runnable && plan.argv && (await autoUpdateEnabled())) {
+    const satisfied = async (): Promise<boolean> => {
+      current = (await readVersion(binaryPath, { refresh: true })) ?? current;
+      return compareSemver(current, required) >= 0;
+    };
+    const outcome = await (deps.launchUpdate ?? runLaunchUpdate)(plan.argv, dirname(binaryPath), satisfied);
+    if (outcome.kind === 'already-current' || (outcome.kind === 'ran' && outcome.code === 0 && (await satisfied()))) {
+      console.log(`[claude-code] updated ${binaryPath} for ${model}; running sessions keep their current Claude Code`);
+      return;
+    }
+    updateNote = launchUpdateNote(outcome);
+  }
+
   throw new ClaudeCodeTooOldError({
     model,
     displayName: displayNameFor(model),
-    installed,
+    installed: current,
     required,
     binaryPath,
     upgradeCommand: plan.display,
+    updateNote,
   });
 }
