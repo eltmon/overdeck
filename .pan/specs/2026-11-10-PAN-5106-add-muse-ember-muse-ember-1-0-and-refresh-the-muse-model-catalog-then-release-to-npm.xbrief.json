@@ -1,0 +1,478 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-10T14:03:50Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5106: Add Muse Ember (muse-ember-1.0) and refresh the Muse model catalog, then release to NPM",
+    "updated": "2026-11-10T14:08:28.288Z"
+  },
+  "plan": {
+    "id": "pan-5106",
+    "title": "Add Muse Ember (muse-ember-1.0) and refresh the Muse model catalog, then release to NPM",
+    "status": "proposed",
+    "uid": "aae00a18-8f16-44ef-866e-ea9319981dde",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-10T14:03:50Z",
+    "updated": "2026-11-10T14:08:28.288Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5106",
+        "label": "PAN-5106",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "models",
+      "muse",
+      "meta",
+      "pricing",
+      "catalog",
+      "docs"
+    ],
+    "metadata": {
+      "sizeJustification": "Mechanical model addition across the catalog, cost, launcher and dashboard layers plus docs (about 20 files with tests). Sibling issues would force several releases for one model launch the operator wants shipped today in one PR.",
+      "canonicalFilename": "2026-11-10-PAN-5106-add-muse-ember-muse-ember-1-0-and-refresh-the-muse-model-catalog-then-release-to-npm.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Meta released Muse Ember (muse-ember-1.0) on 2026-11-09. Overdeck's Muse harness, catalog, launcher allowlist and cost tables know only muse-wonder-1.0, muse-spark-1.3 and muse-spark-1.3-contributor, so Ember cannot be selected, launched or priced. Ember also has a per-request long-context tier above 200K input tokens that the Muse cost parser cannot apply today, because it prices the session aggregate by hand instead of through calculateCost().",
+      "Proposal": "Register muse-ember-1.0 in one atomic catalog commit (MuseModel union, capability row with 1,048,576 context, 524,288 output, low-max effort and class small, provider maps, launcher allowlist edited in place, base cost row). Add Ember's >200K tier as a 3x branch in calculateCost() and make summarizeMuseRecords() price each model_completed event through calculateCost(). Add the dashboard catalog row, pin the four Muse models' verified values in a new audit test, update docs/MUSE-HARNESS.md, configuration/harnesses.mdx and docs/MODEL-CONTEXT-AUDIT.md, and add an Unreleased v0.76.0 changelog block. The Flywheel releases v0.76.0 after merge.",
+      "NonGoals": "- No minimal effort level, no default-effort field on capability rows, no change to the Muse harness xhigh effort cap\n- No change to existing Muse models' prices, effort lists, context windows or display names\n- No muse-spark-1.2, no Muse Wonder Full, no bare muse-ember alias\n- No change to how a session that switches models mid-run is attributed (the parser still prices the whole session with its last model_id)\n- No new pricing engine; only the existing calculateCost() per-model tier mechanism\n- No npm release, version bump or tag by the work agent; the Flywheel releases v0.76.0 after merge\n- No host Muse Code upgrade or reconfiguration\n- No no-loss fixture edits; new models go in the withoutOpus55() filter"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Apply Ember's 200K long-context tier, via a 3x branch in calculateCost() plus per-request pricing in summarizeMuseRecords().",
+        "rationale": "The issue says to add the tier when cost.ts already supports per-model input thresholds; it does (Sonnet 4, Haiku 5.5). The Muse parser bypasses calculateCost() and prices the session aggregate, so without the parser change the tier would never apply and an aggregate check would overbill sessions of small requests."
+      },
+      {
+        "summary": "Append Ember last in every Muse list (additions, providers, MODEL_PROVIDERS, MuseModel, modelCatalog.ts, muse-support models tuple).",
+        "rationale": "Keeps Wonder at meta[0] as an existing test asserts and leaves every existing row's position unchanged."
+      },
+      {
+        "summary": "Use Meta's documented 1,048,576 context and 524,288 max output for Ember and keep max excluded for Contributor, recording Muse Code 1.4.15 catalog disagreements in notes and docs.",
+        "rationale": "The issue names Meta's pages as the authority; changing existing contextWindow values would alter labels and the no-loss comparison."
+      },
+      {
+        "summary": "Record no minimum Muse Code version; document verification with Muse Code 1.4.15.",
+        "rationale": "The probe showed Muse Code fetches its model list from Meta at startup (source provider_catalog, no model ids in the binary), and 1.4.15 lists and launches muse-ember-1.0."
+      },
+      {
+        "summary": "Store Meta's minimal effort and max API default only in notes; Overdeck effort list for Ember is low-max and the Muse harness keeps its xhigh cap.",
+        "rationale": "EFFORT_LEVELS has no minimal, ModelCapability has no default-effort field, and the repo rule keeps the effort default at high."
+      },
+      {
+        "summary": "Correct two stale user-facing strings Ember makes wrong: harness-policy.ts 'Select a Muse Spark model' and the shared ModelPicker muse harness description.",
+        "rationale": "Both name only Spark or Standard/Contributor and would mislead Ember users; each is a one-string edit with no test asserting the old text."
+      }
+    ],
+    "items": [
+      {
+        "id": "ember-catalog-registration",
+        "title": "Register muse-ember-1.0 in the Muse catalog, launcher allowlist and base cost table",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-10T14:03:50Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5106",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/settings.ts",
+            "src/lib/model-capability-additions.ts",
+            "src/lib/model-capability-class.ts",
+            "src/lib/model-fallback.ts",
+            "src/lib/providers.ts",
+            "src/lib/harness-policy.ts",
+            "src/lib/launcher-generator.ts",
+            "src/lib/cost.ts",
+            "src/lib/__tests__/muse-support.test.ts",
+            "src/lib/__tests__/settings-model-catalog.test.ts",
+            "src/lib/__tests__/harness-policy.test.ts",
+            "src/lib/__tests__/model-catalog-refresh-pan-4825.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/muse-support.test.ts src/lib/__tests__/settings-model-catalog.test.ts src/lib/__tests__/harness-policy.test.ts src/lib/__tests__/model-catalog-refresh-pan-4825.test.ts src/lib/__tests__/model-capability-class.test.ts src/lib/__tests__/model-catalog-audit.test.ts src/lib/__tests__/model-capabilities.test.ts",
+            "wc -l src/lib/launcher-generator.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "all seven named test files pass (the last three are unchanged and must stay green)",
+            "wc prints 995 for src/lib/launcher-generator.ts"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-1 exactly, in one commit (the MuseModel union forces MODEL_CAPABILITIES and MODEL_PROVIDERS keys, and the muse-support models tuple drives identity, command, launcher and pricing tests together). Append muse-ember-1.0 to MuseModel and getAgentCommand in settings.ts; add the capability row after muse-spark-1.3-contributor in model-capability-additions.ts (displayName 'Muse Ember 1.0', costPer1MTokens 0.3, contextWindow 1048576, maxOutputTokens 524288, effortLevels low-max, notes text from the PRD); add 'small' class, 'meta' provider map, providers.ts models entry and description; fix the harness-policy.ts reason string; edit launcher-generator.ts lines 976 and 979 in place (no new lines); add the base cost row 0.0001/0.0005/0.000004 in cost.ts. Update the four tests as listed in the PRD, including the explicit buildMuseCommand Ember test and the 0.552 expected cost.",
+          "Why": "Ember must be selectable under the Muse harness and accepted by the Muse launcher (issue acceptance 1) and priced at base rates (acceptance 2)."
+        },
+        "items": [
+          {
+            "id": "ember-catalog-registration.ac1",
+            "title": "Given the catalog API, when getAvailableModelsApi().meta is read, then it returns ids ['muse-wonder-1.0','muse-spark-1.3','muse-spark-1.3-contributor','muse-ember-1.0'] and the last row has name 'Muse Ember 1.0 (1M context)', costPer1MTokens 0.3 and harness 'muse'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ember-catalog-registration.ac2",
+            "title": "Given museModel 'muse-ember-1.0' and requested effort max, when generateLauncherScript runs for harness muse, then the script contains \"muse --model 'muse-ember-1.0' --reasoning-effort 'xhigh'\" and wc -l src/lib/launcher-generator.ts prints 995",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ember-catalog-registration.ac3",
+            "title": "canUseHarness('muse','muse-ember-1.0') returns allowed, and canUseHarness rejects muse-ember-1.0 on claude-code and on prime-agent with api-key auth",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ember-catalog-registration.ac4",
+            "title": "getPricing('custom','muse-ember-1.0') returns inputPer1k 0.0001, outputPer1k 0.0005 and cacheReadPer1k 0.000004, and the muse-support pricing test produces 0.552 for Ember's fixture session",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ember-catalog-registration.ac5",
+            "title": "getModelEffortLevels('muse-ember-1.0') returns a list that contains max, capabilityClassOf('muse-ember-1.0') returns 'small', and withoutOpus55(getAvailableModelsApi()) still returns expectedPreviousCatalog with Ember filtered next to museWonderId and the fixture file unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ember-long-context-tier",
+        "title": "Apply Muse Ember's 200K long-context tier per request",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-10T14:03:50Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5106",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cost.ts",
+            "src/lib/cost-parsers/muse-parser.ts",
+            "tests/lib/cost.test.ts",
+            "src/lib/__tests__/muse-support.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/lib/cost.test.ts src/lib/__tests__/muse-support.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "tests/lib/cost.test.ts and src/lib/__tests__/muse-support.test.ts pass, including the new muse-ember-1.0 prompt-size tier tests and the per-request tier test"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2. In cost.ts calculateCost(), after the Haiku 5.5 block, add a muse-ember-1.0 branch that sets input, output and cache multipliers to 3 when totalInputTokens > 200000, and update the cache-read comment. In muse-parser.ts summarizeMuseRecords(), collect one TokenUsage per model_completed event ({inputTokens: input_tokens - cached, outputTokens, cacheReadTokens: cached}) and set cost to the sum of calculateCost(request, pricing) (0 when no pricing). Add the two boundary tests in tests/lib/cost.test.ts (0.0202 at exactly 200K, 0.0606 at 200,001), change the Ember expectation in the muse-support pricing it.each to 1.656 with a 3x factor in the formula check, and add the per-request tier test (two 150K requests = 0.031, one 300K request = 0.0627).",
+          "Why": "Issue work item 2 and acceptance 2: cost.ts already supports per-model thresholds, so the tier is applied; the Muse parser is the only Muse pricing path and must price per request because Meta sets the tier per request."
+        },
+        "items": [
+          {
+            "id": "ember-long-context-tier.ac1",
+            "title": "Given Ember pricing, when calculateCost receives 150,000 input + 50,000 cache-read + 10,000 output tokens, then it returns 0.0202 (base rates at exactly 200K)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ember-long-context-tier.ac2",
+            "title": "Given Ember pricing, when calculateCost receives 150,001 input + 50,000 cache-read + 10,000 output tokens, then it returns 0.0606 (3x every component above 200K)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ember-long-context-tier.ac3",
+            "title": "Given an Ember session with two model_completed events of 150,000 input tokens each, when summarizeMuseRecords runs, then cost is 0.031 (base rates); and a session with one 300,000-input event (100,000 cached, 1,000 output) returns 0.0627",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ember-long-context-tier.ac4",
+            "title": "The muse-support pricing test still returns 22.1, 4.95 and 0.251 for muse-wonder-1.0, muse-spark-1.3 and muse-spark-1.3-contributor, and returns 1.656 for muse-ember-1.0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ember-dashboard-catalog",
+        "title": "List Muse Ember in the dashboard Settings model catalog",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T14:03:50Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5106",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/modelCatalog.ts",
+            "src/dashboard/frontend/src/components/shared/ModelPicker/ModelPicker.tsx",
+            "src/dashboard/frontend/src/components/Settings/__tests__/muse-ember-catalog.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend test -- src/components/Settings/__tests__/muse-ember-catalog.test.ts"
+          ],
+          "expected_outputs": [
+            "muse-ember-catalog.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3. Append the Ember row after muse-spark-1.3-contributor in MODELS_BY_PROVIDER.meta (name 'Muse Ember 1.0', costPer1MTokens 0.3, capabilities code/reasoning/large-context/cost-efficient, description naming both rate tiers, no em dashes). Change the shared ModelPicker muse harness description to 'Meta Muse Code with Wonder, Spark and Ember models'. Add muse-ember-catalog.test.ts in the shape of fable-52-catalog.test.ts.",
+          "Why": "Issue acceptance 1: Ember is selectable under the Muse harness in the dashboard."
+        },
+        "items": [
+          {
+            "id": "ember-dashboard-catalog.ac1",
+            "title": "Given the Settings catalog module, when MODELS_BY_PROVIDER.meta.models is read, then its ids are ['muse-wonder-1.0','muse-spark-1.3','muse-spark-1.3-contributor','muse-ember-1.0'] in that order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ember-dashboard-catalog.ac2",
+            "title": "The Ember row has name 'Muse Ember 1.0' and costPer1MTokens 0.3, and its description contains '$0.10 input' and '$0.30' and no em dash",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "muse-catalog-audit-pins",
+        "title": "Pin the four Muse models' verified prices, effort lists and context windows in an audit test",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T14:03:50Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-5106",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/__tests__/muse-catalog-audit-pan-5106.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/muse-catalog-audit-pan-5106.test.ts"
+          ],
+          "expected_outputs": [
+            "muse-catalog-audit-pan-5106.test.ts passes with one case per Muse model plus the Ember max-output case"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "FR-1",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-4. Create src/lib/__tests__/muse-catalog-audit-pan-5106.test.ts with an it.each over the PRD table asserting, for each of muse-wonder-1.0, muse-spark-1.3, muse-spark-1.3-contributor and muse-ember-1.0: exact getPricing inputPer1k/cacheReadPer1k/outputPer1k, exact getModelEffortLevels list, getModelCapability contextWindow 1048576 and costPer1MTokens, and capabilityClassOf class. Add one case asserting Ember maxOutputTokens 524288. Make no source change: the audit found no drift (PRD Verified fact 6). Type the table's id column as ModelId (import type { ModelId } from '../settings.js') so the file typechecks if tests are ever included.",
+          "Why": "Issue work item 4 and acceptance 3: the three existing Muse models must match Meta's current prices and effort lists, proven by tests, with Contributor's max exclusion in particular."
+        },
+        "items": [
+          {
+            "id": "muse-catalog-audit-pins.ac1",
+            "title": "getModelEffortLevels('muse-spark-1.3-contributor') returns ['low','medium','high','xhigh'] (no max), and returns ['low','medium','high','xhigh','max'] for muse-wonder-1.0, muse-spark-1.3 and muse-ember-1.0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "muse-catalog-audit-pins.ac2",
+            "title": "getPricing('custom', id) returns exact per-1K rates for all four models: Wonder 0.004/0.0002/0.02, Spark 0.00125/0.00015/0.00425, Contributor 0.0001/0.000002/0.0002, Ember 0.0001/0.000004/0.0005 (input/cached/output)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "muse-catalog-audit-pins.ac3",
+            "title": "getModelCapability(id) returns contextWindow 1048576 and blended costs 12/2.75/0.15/0.3, capabilityClassOf returns frontier/workhorse/workhorse/small, and Ember's row returns maxOutputTokens 524288",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "muse-docs",
+        "title": "Document Muse Ember in the Muse harness, harnesses and model audit docs",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T14:03:50Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5106",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/MUSE-HARNESS.md",
+            "configuration/harnesses.mdx",
+            "docs/MODEL-CONTEXT-AUDIT.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -c 'muse-ember-1.0' docs/MUSE-HARNESS.md configuration/harnesses.mdx docs/MODEL-CONTEXT-AUDIT.md"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "grep prints a count of at least 1 for each of the three files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-5. docs/MUSE-HARNESS.md: list four routed models, add the Ember paragraph (released 2026-11-09, no Contributor tier, checked against the Muse Code 1.4.15 catalog fetched from Meta at startup, prices from Meta's pricing page) and the per-request tier sentence in the cost paragraph. configuration/harnesses.mdx: harness table cell 'Meta Muse models (Wonder, Spark, Ember)', verified-with sentence naming 1.4.15, 'All four use', the Ember price row and long-tier sentence using &#36;, the effort sentence naming Ember, and the Ember paragraph. docs/MODEL-CONTEXT-AUDIT.md: the Muse context table row and a '## November 2026 Muse refresh (PAN-5106)' section with Verified, Changed and Not changed lists exactly as the PRD gives. No new em dashes in the .mdx; &#36; for dollars; &lt; before digits.",
+          "Why": "Issue work item 6 and acceptance 4; repo rule that every PRD ships its documentation."
+        },
+        "items": [
+          {
+            "id": "muse-docs.ac1",
+            "title": "configuration/harnesses.mdx renders a muse-ember-1.0 price row with &#36;0.10 / &#36;0.004 / &#36;0.50 and a sentence giving the &#36;0.30 / &#36;0.012 / &#36;1.50 rate above 200K input tokens, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "muse-docs.ac2",
+            "title": "docs/MUSE-HARNESS.md contains muse-ember-1.0 in its list of routed models and contains a sentence that each model_completed event is priced as its own request",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "muse-docs.ac3",
+            "title": "docs/MODEL-CONTEXT-AUDIT.md contains a 'November 2026 Muse refresh (PAN-5106)' section whose Not changed list records that Muse Code's catalog lists max for muse-spark-1.3-contributor while Overdeck keeps it excluded",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "changelog-v076",
+        "title": "Add the Unreleased v0.76.0 changelog block with a Muse Ember entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T14:03:50Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5106",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "changelog.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n 'label=\"v0.7[56].0\"' changelog.mdx"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "the v0.76.0 label line number is smaller than the v0.75.0 label line number"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-1"
+          ],
+          "acJustification": "One file, one block; two criteria cover placement and content."
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-6: insert the given <Update label=\"v0.76.0\" description=\"Unreleased\" tags={[\"Upcoming\"]}> block directly below the RELEASE STEP comment and above the v0.75.0 block, with the 'Upcoming release' heading, the 'Drafted from' line and one #### New entry for Muse Ember using &#36; and no em dashes. Do not bump package.json, tag or release.",
+          "Why": "Issue work item 6: the Flywheel completes and dates this block at release."
+        },
+        "items": [
+          {
+            "id": "changelog-v076.ac1",
+            "title": "changelog.mdx contains an Update block with label v0.76.0 and description Unreleased placed above the v0.75.0 block, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "changelog-v076.ac2",
+            "title": "The v0.76.0 block has a Muse Ember entry that names muse-ember-1.0 and renders &#36;0.10/M input, &#36;0.004/M cached input and &#36;0.50/M output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "ember-catalog-registration",
+        "to": "ember-long-context-tier",
+        "type": "blocks"
+      },
+      {
+        "from": "ember-catalog-registration",
+        "to": "muse-catalog-audit-pins",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
