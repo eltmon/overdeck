@@ -1,8 +1,9 @@
 /**
  * ACP replay harness (PAN-4563): a `ChildProcessSpawner` whose child plays a
  * recorded protocol fixture, so the real effect-acp client, AcpSessionRuntime,
- * Kimi runtime factory, and AcpHost run against recorded provider behavior
- * with no child process.
+ * provider runtime factory (Kimi, or Grok for fixtures whose header names
+ * provider grok), and AcpHost run against recorded provider behavior with no
+ * child process.
  */
 import { fileURLToPath } from "node:url";
 import type { Writable } from "node:stream";
@@ -20,6 +21,7 @@ import { ChildProcessSpawner } from "effect/unstable/process";
 
 import { loadProtocolFixture, type ProtocolFixture } from "../../../protocol-capture/fixture.js";
 import { createProtocolReplay, type ProtocolReplay } from "../../../protocol-capture/replay.js";
+import { makeGrokAcpRuntime } from "../../grok.js";
 import { AcpHost } from "../../host.js";
 import { makeKimiAcpRuntime } from "../../kimi.js";
 
@@ -100,11 +102,13 @@ function captureLines(): { stdout: Writable; lines: string[] } {
 
 /**
  * Load a fixture (by name under `fixtures/replay/`, or inline), build the real
- * Kimi ACP runtime over a replay spawner inside its own scope, and construct
- * the real AcpHost. The caller runs `host.start()` and `host.stop()`; stopping
- * the host closes the runtime scope.
+ * ACP runtime for the fixture's provider (Kimi unless the header names grok)
+ * over a replay spawner inside its own scope, and construct the real AcpHost.
+ * A recorded `hostOptions.resumeSessionId` starts the host resumed, so the
+ * client sends session/load. The caller runs `host.start()` and `host.stop()`;
+ * stopping the host closes the runtime scope.
  */
-export async function startKimiReplay(
+export async function startAcpReplay(
   fixture: string | ProtocolFixture,
   deps: { overdeckHome: string },
 ): Promise<KimiReplay> {
@@ -117,22 +121,28 @@ export async function startKimiReplay(
     scopeClosed = true;
     await Effect.runPromise(Scope.close(scope, Exit.void));
   };
+  const hostOptions = loaded.header.hostOptions ?? {};
+  const resumeSessionId = typeof hostOptions.resumeSessionId === "string" ? hostOptions.resumeSessionId : undefined;
+  const provider = loaded.header.provider === "grok" ? "grok" : "kimi";
+  const runtimeInput = {
+    childProcessSpawner: makeReplaySpawnerFromFixture(replay),
+    cwd: REPLAY_WORKSPACE,
+    clientInfo: { name: "overdeck", version: "replay" },
+    ...(resumeSessionId ? { resumeSessionId } : {}),
+  };
   const runtime = await Effect.runPromise(
-    makeKimiAcpRuntime({
-      childProcessSpawner: makeReplaySpawnerFromFixture(replay),
-      cwd: REPLAY_WORKSPACE,
-      clientInfo: { name: "overdeck", version: "replay" },
-      kimiSettings: { binaryPath: "kimi" },
-    }).pipe(
+    (provider === "grok"
+      ? makeGrokAcpRuntime({ ...runtimeInput, binaryPath: "grok" })
+      : makeKimiAcpRuntime({ ...runtimeInput, kimiSettings: { binaryPath: "kimi" } })
+    ).pipe(
       Effect.provideService(Scope.Scope, scope),
       Effect.provide(NodeServices.layer),
     ),
   );
-  const hostOptions = loaded.header.hostOptions ?? {};
   const { stdout, lines } = captureLines();
   const host = new AcpHost({
     agentId: "agent-replay",
-    provider: "kimi",
+    provider,
     workspace: REPLAY_WORKSPACE,
     model: typeof hostOptions.model === "string" ? hostOptions.model : undefined,
     effort: typeof hostOptions.effort === "string" ? hostOptions.effort : undefined,
@@ -141,6 +151,10 @@ export async function startKimiReplay(
     stdout,
     disposeRuntime: closeScope,
     turnStallTimeoutMs: 0,
+    ...(resumeSessionId ? { resumeSessionId } : {}),
   });
   return { replay, host, lines };
 }
+
+/** The Kimi replay entry point the PAN-4563 cases use; any fixture's provider is honored. */
+export const startKimiReplay = startAcpReplay;
