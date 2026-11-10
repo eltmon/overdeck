@@ -1,0 +1,2036 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-10T14:34:09Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5078: Grok Build CLI harness: run Overdeck agents and conversations through xAI's grok (ACP)",
+    "updated": "2026-11-10T14:47:10.114Z"
+  },
+  "plan": {
+    "id": "pan-5078",
+    "title": "Grok Build CLI harness: run Overdeck agents and conversations through xAI's grok (ACP)",
+    "status": "proposed",
+    "uid": "d03a10b0-6539-4618-82ce-c6f7357e8081",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-10T14:34:09Z",
+    "updated": "2026-11-10T14:47:10.114Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5078",
+        "label": "PAN-5078",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "harness",
+      "acp",
+      "grok",
+      "xai",
+      "cost",
+      "doctor",
+      "dashboard"
+    ],
+    "metadata": {
+      "sizeJustification": "Adding a literal to the Harness union forces coordinated edits across contracts, src/lib, CLI, dashboard server and frontend (type-forced Records plus hand-copied harness lists), and a harness that is selectable but not launchable delivers zero value. PAN-3668 (Prime Agent) kept the same full scope for the same reason. The work is decomposed into 24 small items with explicit dependency edges so leaves run in parallel.",
+      "prd": ".pan/drafts/PAN-5078.md",
+      "canonicalFilename": "2026-11-10-PAN-5078-grok-build-cli-harness-run-overdeck-agents-and-conversations-through-xai-s-grok-acp.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Grok reaches Overdeck only as an outside bot plugin and as model ids through OpenCode Zen or the xai API-key provider. An operator with a signed-in Grok Build CLI (SuperGrok) cannot run Overdeck work agents, planning agents or conversations on it.",
+      "Proposal": "Add a 'grok' harness that rides Overdeck's existing ACP host: a grok ACP provider entry launches 'grok agent --always-approve --no-leader stdio', authenticates with the cached sign-in, sets the model and reasoning_effort config options, resumes with session/load, and receives the managed overdeck MCP server through session/new. A new 'grok' model provider carries four grok/* ids that run only on the grok harness. The host records Grok's reported turn usage on the transcript, and a grok reconcile source imports it into the cost store. Pickers list Grok models when the CLI is installed and signed in; pan doctor reports missing or signed-out grok; docs cover setup and behavior.",
+      "NonGoals": "- A native terminal-UI grok harness or a companion terminal that attaches the Grok TUI to a conversation\n- Running Grok agents on Fly machines\n- Isolating GROK_HOME or filtering the operator's Grok MCP servers, plugins or hooks\n- API-key (XAI_API_KEY) billing through the grok harness\n- Dynamic model discovery from grok models\n- Using grok agent serve, headless, leader mode, or any one-shot invocation (grok -p, --single, --prompt-file)\n- Changing OpenCode's recorded session-index harness or recording OpenCode/Kimi ACP costs\n- Adding grok to the lint-harness-branches pattern, raising any ratchet baseline, or raising any file-size allowlist row\n- Reading Grok's private ~/.grok/sessions store\n- Changing the xai provider or its bare grok-* model ids\n- Adding a new HTTP route\n- Distributing Overdeck skills or plugins into ~/.grok (pan sync targets, harness-skill-sync, Herdr integrations)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "New harness literal 'grok' on the ACP host (OpenCode pattern), not a provider under the 'acp' harness",
+        "rationale": "harnessBinaryName('acp') and binaryConfigKey resolve the Kimi binary, capabilities (binaryLabel, installHint, npmPackage, updateArgs) are per harness, policy denies non-Kimi models on acp, and the issue's acceptance names harness grok in pickers."
+      },
+      {
+        "summary": "Harness name 'grok', display name 'Grok Build'",
+        "rationale": "The issue proposes 'harness: grok'; it matches the binary name and the existing telemetry mcp_client value."
+      },
+      {
+        "summary": "New model provider 'grok' with prefixed ids grok/<cli-id> (grok-4.7, grok-4.7-build-fast, grok-4.6, grok-4.5), fixed union",
+        "rationale": "Auth and billing are provider properties: bare grok-4.7 is the xai API-key route. OpenCode keeps opencode/grok-4.7 separate the same way. grok models has no machine-readable output, so discovery is not used."
+      },
+      {
+        "summary": "Launch 'grok agent --always-approve --no-leader stdio' and delete XAI_API_KEY from the child env",
+        "rationale": "--no-leader keeps one dedicated process per agent even when config enables leader mode; --always-approve mirrors OpenCode's pre-allowed permissions so Grok subagent asks cannot stall a turn; Grok's README says an API key takes precedence over the sign-in."
+      },
+      {
+        "summary": "Cost = Grok's reported costUsdTicks / 1e10, pricing table as fallback; usage written to the ACP transcript and imported by a grok reconcile source",
+        "rationale": "The ticks matched the $2/$0.50/$6 and $4/$1/$12 rates exactly in probes and include the >=200K double rate the table cannot model; the transcript route avoids reading Grok's private session store."
+      },
+      {
+        "summary": "Signed-in = ~/.grok/auth.json entry with a key and a future expires_at or a refresh_token",
+        "rationale": "grok models reported 'not authenticated' while ACP auth succeeded, and grok whoami/status need a TTY, so no subprocess is a reliable signal."
+      },
+      {
+        "summary": "No ToS gate for grok",
+        "rationale": "xAI's first-party CLI runs xAI models on the operator's own xAI sign-in, and its README documents ACP mode for custom automation tools."
+      },
+      {
+        "summary": "Accept the operator's ~/.grok config (MCP servers, plugins, hooks) instead of isolating GROK_HOME",
+        "rationale": "Isolation would lose auth.json; Kimi and OpenCode also read their operator config."
+      },
+      {
+        "summary": "Keep the full scope in one issue with sizeJustification",
+        "rationale": "PAN-3668 precedent: a Harness literal forces coordinated edits across five subsystems and a selectable but unlaunchable harness has no value; the work is split into 24 items with real edges."
+      },
+      {
+        "summary": "Do not add 'grok' to the lint-harness-branches pattern",
+        "rationale": "Adding it would raise baseline rows, which is an operator decision; new behavior uses capability and provider-support fields instead of name comparisons."
+      }
+    ],
+    "items": [
+      {
+        "id": "contracts-harness",
+        "title": "Add the grok harness literal, GROK_BEHAVIOR and GROK_CAPABILITIES to contracts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T14:34:09Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5078",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/types.ts",
+            "packages/contracts/src/harness-behavior.ts",
+            "packages/contracts/src/harness-capabilities.ts",
+            "packages/contracts/src/context-layers.ts",
+            "packages/contracts/src/telemetry.ts",
+            "packages/contracts/src/flywheel.ts",
+            "packages/contracts/src/artifacts.ts",
+            "packages/contracts/src/fleet-versions.ts",
+            "packages/contracts/src/index.ts",
+            "packages/contracts/src/harness-behavior.test.ts",
+            "docs/TELEMETRY.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run packages/contracts/src/harness-behavior.test.ts tests/unit/telemetry-docs.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "harness-behavior.test.ts and telemetry-docs.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-12",
+            "NFR-7"
+          ],
+          "foundationFor": [
+            "runtime-policy-binary",
+            "runtime-registration",
+            "config-validation-lists",
+            "conversation-lists",
+            "agent-launch-lists",
+            "server-route-lists",
+            "cli-harness-lists",
+            "frontend-conversation-surfaces",
+            "grok-no-loss-audit"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Append 'grok' to Harness (packages/contracts/src/types.ts line 51) and KNOWN_HARNESSES (line 53). Add GROK_CAPABILITIES = {...OPENCODE_CAPABILITIES, binaryLabel: 'Grok Build', installHint: 'curl -fsSL https://x.ai/cli/install.sh | bash', updateArgs: ['update'], npmPackage: '@xai-official/grok'} after OPENCODE_CAPABILITIES. Add 'grok' to HarnessContextLayerKind (harness-behavior.ts line 38) and GROK_BEHAVIOR = {...ACP_BEHAVIOR, displayName: 'Grok Build', capabilities: GROK_CAPABILITIES, contextLayerKind: 'grok', executableName: 'grok', processNames: ['acp-host','grok','grok-native'], effortLevels: ['low','medium','high','xhigh']} after OPENCODE_BEHAVIOR, plus a grok row in BEHAVIORS. Append 'grok' to CONTEXT_PREVIEW_HARNESSES (context-layers.ts line 5) and add grok: Schema.optional(Schema.String) beside opencode (line 139); TELEMETRY_HARNESSES (telemetry.ts line 100 only; mcp_client at line 489 already lists grok); FlywheelHarness (flywheel.ts line 11); ArtifactAgentHarness (artifacts.ts line 15); FLEET_BINARY_ORDER after 'opencode' (fleet-versions.ts line 99). Export GROK_* the way OPENCODE_* are exported. Run npm run typecheck and add a grok row (equal to the opencode row) to every Record<Harness|RuntimeName,...> it reports anywhere in the repo, so this commit typechecks on its own (NFR-7); keep such edits to the one row. Extend harness-behavior.test.ts. Add `grok` to the harness row of docs/TELEMETRY.md (line 200) so tests/unit/telemetry-docs.test.ts stays green."
+        },
+        "items": [
+          {
+            "id": "contracts-harness.ac1",
+            "title": "Given the contracts package, when getHarnessBehavior('grok') is called, then it returns displayName 'Grok Build' and effortLevels ['low','medium','high','xhigh']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-harness.ac2",
+            "title": "Given KNOWN_HARNESSES, when has('grok') is called, then it returns true, and normalizeHarnessName('grok') returns 'grok'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-harness.ac3",
+            "title": "Given GROK_CAPABILITIES, when read, then npmPackage returns '@xai-official/grok', updateArgs returns ['update'] and overdeckMcp returns true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-harness.ac4",
+            "title": "Given the change, when npm run typecheck runs, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "grok-provider-models",
+        "title": "Add the grok model provider, the four grok/* model ids, routing carve-outs and capability rows",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T14:34:09Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5078",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/settings.ts",
+            "src/lib/providers.ts",
+            "src/lib/model-fallback.ts",
+            "src/lib/configurable-providers.ts",
+            "src/lib/model-capability-additions.ts",
+            "tests/unit/lib/providers.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/providers.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "providers.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3, D2. settings.ts near line 50: add GrokBuildModel = 'grok/grok-4.7' | 'grok/grok-4.7-build-fast' | 'grok/grok-4.6' | 'grok/grok-4.5' and export GROK_BUILD_MODELS (that order); add GrokBuildModel to ModelId (line 57); do not touch the xai list at line 249. providers.ts: 'grok' in ProviderName (line 15); PROVIDERS.grok after 'opencode-go' with name 'grok', displayName 'Grok Build', compatibility 'direct', defaultHarness 'grok', models [...GROK_BUILD_MODELS], tested false, description 'Grok Build models through the persistent grok ACP runtime. Sign in with grok login.' (tierModels only if the type requires it, never a non-grok id); getProviderForModel returns PROVIDERS.grok for ids starting 'grok/' beside line 466, before any slash/OpenRouter check. model-fallback.ts: 'grok' in ModelProvider (line 16); MODEL_PROVIDERS rows for the four ids (near line 130); isOpenRouterModel adds && !modelId.startsWith('grok/') (line 317); provider resolution returns 'grok' for 'grok/' beside line 326; add cross-provider fallback rows only if tsc requires them, copying the 'grok-4.7' target. configurable-providers.ts: 'grok' after 'opencode-go'. model-capability-additions.ts: four rows after 'grok-4.3' (displayName Grok 4.7 / Grok 4.7 Fast / Grok 4.6 / Grok 4.5; contextWindow 256000; costPer1MTokens 4 / 8 / 4 / 4; skills 0 except context-length copied from grok-4.7; effortLevels low, medium, high, xhigh; notes naming the PRD D10 rates and 'Runs through the Grok Build harness on the grok sign-in.'). If tests/unit/lib/providers.test.ts does not exist, extend the existing providers test file."
+        },
+        "items": [
+          {
+            "id": "grok-provider-models.ac1",
+            "title": "Given getProviderForModel, when called with 'grok/grok-4.6', then it returns the provider named 'grok' with defaultHarness 'grok'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "grok-provider-models.ac2",
+            "title": "Given isOpenRouterModel, when called with 'grok/grok-4.6', then it returns false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "grok-provider-models.ac3",
+            "title": "Given the existing xai route, when getProviderForModel('grok-4.7') is called, then it still returns provider 'xai'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "grok-provider-models.ac4",
+            "title": "Given the change, when npm run typecheck runs, then it exits 0 with all four grok/* ids present in MODEL_CAPABILITIES",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "runtime-policy-binary",
+        "title": "Extend RuntimeName, the harness policy, policy decisions, binary map, context markers and transcript adapter for grok",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T14:34:09Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5078",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/runtimes/types.ts",
+            "src/lib/harness-policy.ts",
+            "src/lib/harness-policy-decisions.ts",
+            "src/lib/harness-binary.ts",
+            "src/lib/context-layers/harness.ts",
+            "src/lib/conversations/transcript-adapter.ts",
+            "src/lib/__tests__/harness-policy.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/harness-policy.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the harness policy test file passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2, D3. Append 'grok' to RuntimeName (src/lib/runtimes/types.ts line 46). harness-policy.ts: grok: true beside 'opencode: true' (line 70); after the OpenCode clause (lines 163-167) add: const isGrokProvider = providerName === 'grok'; if (harness === 'grok' || isGrokProvider) return harness === 'grok' && isGrokProvider ? ALLOWED : { allowed: false, reason: 'Grok Build model IDs require the Grok Build harness, and the Grok Build harness runs only grok/* models. Select a grok/* model.' }. harness-policy-decisions.ts line 87: grok row. harness-binary.ts line 70: grok: 'grok'; line 197: ...(binary === 'grok' ? [join(home, '.grok', 'bin')] : []). context-layers/harness.ts lines 27/35/42: 'grok' marker in the type, map and Set. transcript-adapter.ts line 588: 'grok': acpAdapter. Add a grok row equal to the opencode row in every other Record<RuntimeName,...> tsc reports in src/lib. If the cross-routing policy tests live in another file, extend that file."
+        },
+        "items": [
+          {
+            "id": "runtime-policy-binary.ac1",
+            "title": "Given canUseHarness, when called with ('grok','grok/grok-4.6'), then it returns allowed true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "runtime-policy-binary.ac2",
+            "title": "Given canUseHarness, when called with ('claude-code','grok/grok-4.6') or ('grok','claude-sonnet-5-5'), then it returns allowed false with the D3 reason text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "runtime-policy-binary.ac3",
+            "title": "Given harnessBinaryName, when called with 'grok', then it returns 'grok', and HARNESS_MARKERS.grok returns 'grok'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "runtime-policy-binary.ac4",
+            "title": "Given getTranscriptAdapter, when called with 'grok', then it returns the ACP adapter",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "grok-pricing",
+        "title": "Add grok-4.7-build-fast, grok-4.6 and grok-4.5 pricing rows to cost.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T14:34:09Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5078",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cost.ts",
+            "tests/lib/cost.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/lib/cost.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the pricing test passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4, D10. In src/lib/cost.ts after the comment '// xAI Grok (docs.x.ai/docs/models)' insert the two comment lines from the PRD and a grok-4.7-build-fast row (provider 'custom', inputPer1k 0.004, outputPer1k 0.012, cacheReadPer1k 0.001) ABOVE the existing grok-4.7 row (getPricing prefix-matches in table order), then grok-4.6 and grok-4.5 rows below grok-4.7 (0.002 / 0.006 / 0.0005). If the pricing tests live in another file, extend that file."
+        },
+        "items": [
+          {
+            "id": "grok-pricing.ac1",
+            "title": "Given getPricing, when called with ('custom','grok-4.7-build-fast'), then it returns inputPer1k 0.004 and outputPer1k 0.012",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "grok-pricing.ac2",
+            "title": "Given getPricing, when called with ('custom','grok-4.7'), then it returns inputPer1k 0.002 (the fast row does not shadow it)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "grok-pricing.ac3",
+            "title": "Given getPricing, when called with ('custom','grok-4.6'), then it returns cacheReadPer1k 0.0005",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "grok-acp-module",
+        "title": "Add src/lib/acp/grok.ts and register the grok ACP provider support entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T14:34:09Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5078",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/lib/acp/grok.ts",
+            "src/lib/acp/providers.ts",
+            "src/lib/acp/__tests__/grok.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/acp/__tests__/grok.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "grok.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-1",
+            "NFR-2"
+          ],
+          "foundationFor": [
+            "host-grok-launch",
+            "turn-usage-transcript",
+            "grok-replay-fixtures"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5, D4, D5, D6. New src/lib/acp/grok.ts modeled on acp/opencode.ts and acp/kimi.ts: buildGrokAcpSpawnInput(settings, cwd, environment) returns {command: settings?.binaryPath || 'grok', args: ['agent','--always-approve','--no-leader','stdio'], cwd, env} where env copies (environment ?? process.env) and deletes XAI_API_KEY; resolveGrokAuthMethodId returns 'cached_token' when advertised, else throws 'Grok sign-in is required. Run grok login, then retry.'; translateGrokAcpModelId returns the part after 'grok/' for ids matching /^grok\\/[a-z0-9][a-z0-9.-]*$/ and throws 'Invalid Grok Build model \"<id>\". Select a grok/* model.' otherwise; export GROK_EFFORT_CONFIG_ID = 'reasoning_effort'; makeGrokAcpRuntime shaped like makeKimiAcpRuntime. providers.ts: add grok to ACP_PROVIDER_SUPPORT with the four functions plus two optional fields any entry may carry: effortConfigId (grok: 'reasoning_effort') and harness ('acp' | 'opencode' | 'grok'; grok: 'grok'). Existing entries keep their behavior. Never add a one-shot invocation (grok -p, --single, --prompt-file)."
+        },
+        "items": [
+          {
+            "id": "grok-acp-module.ac1",
+            "title": "Given buildGrokAcpSpawnInput with an environment containing XAI_API_KEY, when called, then it returns args ['agent','--always-approve','--no-leader','stdio'] and an env without XAI_API_KEY",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "grok-acp-module.ac2",
+            "title": "Given an initialize result advertising only 'grok.com', when resolveGrokAuthMethodId runs, then it rejects with 'Grok sign-in is required. Run grok login, then retry.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "grok-acp-module.ac3",
+            "title": "Given translateGrokAcpModelId, when called with 'grok/grok-4.6', then it returns 'grok-4.6', and when called with 'grok-4.6', then it throws",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "grok-acp-module.ac4",
+            "title": "Given resolveAcpProviderSupport('grok'), when read, then it returns effortConfigId 'reasoning_effort' and harness 'grok'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "host-grok-launch",
+        "title": "Set reasoning_effort, the Grok sign-in error and the session-index harness in the ACP host",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T14:34:09Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5078",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/acp/host.ts",
+            "src/lib/acp/__tests__/host.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/acp/__tests__/host.test.ts",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "host.test.ts passes",
+            "file-size guard passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6, D6, D13. src/lib/acp/host.ts (920 lines; must stay <= 1000). In AcpHost.start() after runtime.setModel(...) (line ~159-168): get support = resolveAcpProviderSupport(this.options.provider); when support.effortConfigId is set, read getConfigOptions; if an option with that id exists, require this.options.effort (throw 'Grok Build launch requires --effort.' when missing) and call setConfigOption(effortConfigId, effort); if the option is absent and effort is not 'high', throw 'The selected model does not expose a reasoning effort setting (<effort> requested).'. Leave the OpenCode and Kimi branches unchanged. Line 201 launch error: for provider 'grok' with isAuthenticationFailure(error) write 'Grok sign-in is required. Run grok login, then retry.'. Line 196 appendSessionIdToHistory: harness: support.harness ?? 'acp'."
+        },
+        "items": [
+          {
+            "id": "host-grok-launch.ac1",
+            "title": "Given a fake runtime and provider 'grok' with effort 'high', when the host starts, then it calls setModel('grok-4.6') before setConfigOption('reasoning_effort','high')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "host-grok-launch.ac2",
+            "title": "Given provider 'grok' and no effort, when the host starts, then it rejects with 'Grok Build launch requires --effort.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "host-grok-launch.ac3",
+            "title": "Given provider 'grok', when the session id is recorded, then appendSessionIdToHistory receives harness 'grok'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "host-grok-launch.ac4",
+            "title": "Given the change, when bash scripts/lint-file-size.sh runs, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "runtime-registration",
+        "title": "Register the grok ACP runtime and derive grok launcher fields",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T14:34:09Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5078",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/runtimes/acp.ts",
+            "src/lib/runtimes/index.ts",
+            "src/lib/agents/runtime-command.ts",
+            "src/lib/acp/context.ts",
+            "src/lib/harness-resolve.ts",
+            "src/lib/runtimes/__tests__/acp.test.ts",
+            "src/lib/agents/__tests__/runtime-command.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/runtimes/__tests__/acp.test.ts src/lib/agents/__tests__/runtime-command.test.ts",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the acp runtime and runtime-command tests pass",
+            "file-size guard passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. runtimes/acp.ts lines 50 and 68: name type 'acp' | 'opencode' | 'grok'; line 77 provider default maps name 'grok' to provider 'grok'; line 178: throw 'Grok Build requires an explicit model' when name is 'grok' and config.model is missing; line 201: push --effort for 'grok' as for 'opencode'. runtimes/index.ts beside line 126: globalRegistry.register(createAcpRuntime({ name: 'grok', provider: 'grok' })). agents/runtime-command.ts getAcpLauncherFields (lines 131-149; file 976 lines, stay <= 1000): harness type gains 'grok'; line 141 returns 'grok' for models starting 'grok/' before the opencode check; acpProvider stays getProviderForModel(model).name. acp/context.ts: harness param type 'acp' | 'opencode' | 'grok'. If the named test files do not exist, extend the nearest existing acp runtime and runtime-command tests. Confirm resolveHarness for model grok/grok-4.6 returns grok through PROVIDERS.grok.defaultHarness (src/lib/harness-resolve.ts getBuiltInDefaultHarness); change harness-resolve.ts only if it does not."
+        },
+        "items": [
+          {
+            "id": "runtime-registration.ac1",
+            "title": "Given getAcpLauncherFields with model 'grok/grok-4.6' and no effort, when called, then it returns acpProvider 'grok', harness 'grok' and acpEffort 'high'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "runtime-registration.ac2",
+            "title": "Given requested effort 'max' for 'grok/grok-4.6', when getAcpLauncherFields runs, then it returns acpEffort 'xhigh'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "runtime-registration.ac3",
+            "title": "Given getRuntime('grok'), when called, then it returns a defined runtime, and spawnAgent without a model rejects with 'Grok Build requires an explicit model'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "runtime-registration.ac4",
+            "title": "Given no explicit harness and model grok/grok-4.6, when resolveHarness runs, then it resolves 'grok'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "config-validation-lists",
+        "title": "Accept grok in config-yaml, role, tier and settings-api harness and provider lists",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T14:34:09Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5078",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/config-yaml/schema.ts",
+            "src/lib/config-yaml/merge.ts",
+            "src/lib/config-yaml/roles.ts",
+            "src/lib/settings-api.ts",
+            "src/lib/agents/tier-table.ts",
+            "tests/lib/config-yaml.test.ts",
+            "tests/lib/settings-api.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/lib/config-yaml.test.ts tests/lib/settings-api.test.ts",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "config-yaml and settings-api tests pass",
+            "file-size guard passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-10",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. Lines: config-yaml/schema.ts 398; merge.ts 64 and the provider loop at 460 (['opencode', 'opencode-go'] -> add 'grok'); roles.ts 294; settings-api.ts 292 (MODEL_PROVIDERS), 511, 693, 950, 1229; agents/tier-table.ts 155 and 188. Rule: at each listed line, where 'opencode' appears as a harness in a union, allowlist, Set, switch or error/help message, add 'grok' beside it; skip lines that are OpenCode-specific behavior (port, permission watchdog, attach terminal, opencode-models discovery, 'opencode-go' provider logic). In files over 1000 lines add 'grok' on the existing line (net line delta 0, NFR-3)."
+        },
+        "items": [
+          {
+            "id": "config-validation-lists.ac1",
+            "title": "Given mergeConfigs({ models: { providers: { grok: { enabled: true, harness: 'grok' } } } }), when called, then it does not throw and the result's enabledProviders contains 'grok'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-validation-lists.ac2",
+            "title": "Given a role config with harness 'grok', when roles validation runs, then it accepts it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-validation-lists.ac3",
+            "title": "Given a tiered-execution row with harness 'grok', when tier-table validation runs, then it accepts it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-validation-lists.ac4",
+            "title": "Given the change, when bash scripts/lint-file-size.sh runs, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "conversation-lists",
+        "title": "Accept grok in conversation normalization, runtime, archive, planning-session and harness-discovery lists",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T14:34:09Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5078",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversations.ts",
+            "src/lib/overdeck/conversation-runtime.ts",
+            "src/lib/overdeck/conversation-archive.ts",
+            "src/lib/overdeck/planning-sessions.ts",
+            "src/lib/conversations/harness-discovery.ts",
+            "src/lib/overdeck/conversation-restart-all.ts",
+            "src/lib/overdeck/__tests__/conversation-runtime-acp-readiness.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/overdeck/__tests__/conversation-runtime-acp-readiness.test.ts src/lib/conversations/__tests__/harness-discovery.test.ts",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "conversation runtime and harness discovery tests pass",
+            "file-size guard passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "FR-8",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. Lines: overdeck/conversations.ts 47 and 465; conversation-runtime.ts 220; conversation-archive.ts 330; planning-sessions.ts 179; conversations/harness-discovery.ts 17, 157 (agentHarness === 'opencode' ? 'opencode' : agentHarness === 'grok' ? 'grok' : 'acp') and 172 (parameter type gains 'grok'); conversation-restart-all.ts 40 and 57 (the ACP-host harness lists used when the dashboard restarts conversations; without grok there, Grok conversations are skipped on reload). Rule: at each listed line, where 'opencode' appears as a harness in a union, allowlist, Set, switch or error/help message, add 'grok' beside it; skip lines that are OpenCode-specific behavior (port, permission watchdog, attach terminal, opencode-models discovery, 'opencode-go' provider logic). In files over 1000 lines add 'grok' on the existing line (net line delta 0, NFR-3). If the named test file does not exist, extend the nearest existing conversation-runtime test."
+        },
+        "items": [
+          {
+            "id": "conversation-lists.ac1",
+            "title": "Given resolveAllowedHarness, when called with ('grok','grok/grok-4.6'), then it resolves 'grok'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-lists.ac2",
+            "title": "Given normalizeHarness, when called with 'grok', then it returns 'grok'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-lists.ac3",
+            "title": "Given an agent dir whose state harness is 'grok', when harness discovery collects it, then it records the transcript under harness 'grok'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "conversation-lists.ac4",
+            "title": "Given a running conversation with harness 'grok', when restart-all runs, then it applies the same ACP-host restart path it applies to 'opencode'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "agent-launch-lists",
+        "title": "Accept grok in launcher, recovery, planning spawn, context-layer source, telemetry and artifact lists",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T14:34:09Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5078",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/launcher-generator.ts",
+            "src/lib/agents/recovery.ts",
+            "src/lib/planning/spawn-planning-session.ts",
+            "src/lib/context-layers/launch-sources.ts",
+            "src/lib/telemetry/pipeline.ts",
+            "src/lib/artifacts/lifecycle.ts",
+            "tests/lib/context-layers/harness.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/lib/context-layers/harness.test.ts",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "context-layers harness test passes",
+            "file-size guard passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "FR-12",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10. Lines: launcher-generator.ts 24 (LauncherHarness; file 995 lines, stay <= 1000); agents/recovery.ts 146 and 654; planning/spawn-planning-session.ts 347; context-layers/launch-sources.ts 16 (add behavior.contextLayerKind === 'grok' beside 'opencode'); telemetry/pipeline.ts 15; artifacts/lifecycle.ts 210. Rule: at each listed line, where 'opencode' appears as a harness in a union, allowlist, Set, switch or error/help message, add 'grok' beside it; skip lines that are OpenCode-specific behavior (port, permission watchdog, attach terminal, opencode-models discovery, 'opencode-go' provider logic). In files over 1000 lines add 'grok' on the existing line (net line delta 0, NFR-3)."
+        },
+        "items": [
+          {
+            "id": "agent-launch-lists.ac1",
+            "title": "Given a context layer with a harness:grok block and a harness:opencode block, when the Grok launch context renders, then it includes the grok block and excludes the opencode block",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-launch-lists.ac2",
+            "title": "Given recovery for an agent whose harness is 'grok', when the recovery harness is resolved, then it returns the ACP-host recovery path used for 'opencode'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-launch-lists.ac3",
+            "title": "Given the change, when bash scripts/lint-file-size.sh runs, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "server-route-lists",
+        "title": "Accept grok in dashboard spawn, restart, context-preview and worker route harness lists",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T14:34:09Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5078",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/agents/spawn-issue.ts",
+            "src/dashboard/server/routes/agents/spawn-helpers.ts",
+            "src/dashboard/server/routes/agents/lifecycle-restart.ts",
+            "src/dashboard/server/routes/context.ts",
+            "src/dashboard/server/routes/workers.ts",
+            "tests/unit/dashboard/server/routes/context.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/dashboard/server/routes/context.test.ts",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "context route test passes",
+            "file-size guard passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-11. Lines: routes/agents/spawn-issue.ts 725-727; spawn-helpers.ts 237; lifecycle-restart.ts 446 and 493 (over 1000 lines: same-line edits only); routes/context.ts 82 (PREVIEW_HARNESSES) and 525 (grok: previews.grok); routes/workers.ts harness list. Rule: at each listed line, where 'opencode' appears as a harness in a union, allowlist, Set, switch or error/help message, add 'grok' beside it; skip lines that are OpenCode-specific behavior (port, permission watchdog, attach terminal, opencode-models discovery, 'opencode-go' provider logic). In files over 1000 lines add 'grok' on the existing line (net line delta 0, NFR-3)."
+        },
+        "items": [
+          {
+            "id": "server-route-lists.ac1",
+            "title": "Given the context preview route, when it builds previews, then the response contains a 'grok' key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-route-lists.ac2",
+            "title": "Given a spawn request body with harness 'grok', when spawn-issue parses it, then it accepts 'grok' as the user-picked harness",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-route-lists.ac3",
+            "title": "Given the change, when bash scripts/lint-file-size.sh runs, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-harness-lists",
+        "title": "Accept grok in CLI --harness options, validators and help text",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T14:34:09Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5078",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/index.ts",
+            "src/cli/commands/start.ts",
+            "src/cli/commands/strike.ts",
+            "src/cli/commands/worker.ts",
+            "src/cli/commands/artifacts.ts",
+            "src/cli/commands/context-layers.ts",
+            "packages/contracts/src/composer-commands.generated.ts",
+            "tests/unit/cli/start-harness.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run tests/unit/cli/start-harness.test.ts",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without errors",
+            "start harness test passes",
+            "file-size guard passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-12. src/cli/index.ts lines 328 and 484: append ' | grok' to 'Coding-agent harness: ... | prime-agent'. start.ts 124-125 (over 1000 lines: same-line edits only); strike.ts 33; worker.ts 61; artifacts.ts 284 and 390; context-layers.ts 59 (add case 'grok': handled like 'opencode'). Rule: at each listed line, where 'opencode' appears as a harness in a union, allowlist, Set, switch or error/help message, add 'grok' beside it; skip lines that are OpenCode-specific behavior (port, permission watchdog, attach terminal, opencode-models discovery, 'opencode-go' provider logic). In files over 1000 lines add 'grok' on the existing line (net line delta 0, NFR-3). If npm run lint's CLI/skill drift guard requires it, regenerate packages/contracts/src/composer-commands.generated.ts with the repo's generator (never hand-edit). If start.ts's validator already has a test file, extend it instead of creating tests/unit/cli/start-harness.test.ts."
+        },
+        "items": [
+          {
+            "id": "cli-harness-lists.ac1",
+            "title": "Given the built CLI, when pan start --help runs, then its --harness help text contains '| grok'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-harness-lists.ac2",
+            "title": "Given pan start validation, when --harness grok is passed, then it accepts the value and does not print 'Invalid --harness value'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-harness-lists.ac3",
+            "title": "Given the change, when npm run lint runs, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "grok-sign-in-status",
+        "title": "Add readGrokSignIn, the auth.json sign-in reader",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T14:34:09Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5078",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/grok-sign-in.ts",
+            "tests/unit/lib/grok-sign-in.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/grok-sign-in.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "grok-sign-in.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "FR-11",
+            "NFR-5",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-13, D7. New src/lib/grok-sign-in.ts: export interface GrokSignIn { signedIn: boolean; reason: 'ok' | 'missing' | 'unreadable' | 'no-credential' | 'expired' } and async readGrokSignIn(home = homedir(), now = new Date()). Read join(home, '.grok', 'auth.json') with fs/promises readFile (no subprocess, no execSync). ENOENT -> missing; JSON parse error -> unreadable; no object value with a non-empty string key -> no-credential; a value with key and (Date.parse(expires_at) > now or a non-empty refresh_token) -> ok, signedIn true; otherwise expired. Never log or return token values. Tests use temp home dirs with synthetic fixtures only."
+        },
+        "items": [
+          {
+            "id": "grok-sign-in-status.ac1",
+            "title": "Given no auth.json, when readGrokSignIn runs, then it returns signedIn false with reason 'missing'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "grok-sign-in-status.ac2",
+            "title": "Given an entry with a key and a future expires_at, when readGrokSignIn runs, then it returns signedIn true with reason 'ok'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "grok-sign-in-status.ac3",
+            "title": "Given an entry with a key, a past expires_at and no refresh_token, when readGrokSignIn runs, then it returns reason 'expired'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "grok-sign-in-status.ac4",
+            "title": "Given malformed JSON or an entry without a key, when readGrokSignIn runs, then it returns reason 'unreadable' or 'no-credential' respectively",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "picker-availability",
+        "title": "List the grok model group in the settings catalog only when grok is installed and signed in",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T14:34:09Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5078",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/settings-model-catalog.ts",
+            "src/lib/__tests__/settings-model-catalog.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/settings-model-catalog.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "settings-model-catalog.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-14, D8. settings-model-catalog.ts: add 'grok' to the AvailableModelsApi key union (line 19); getAvailableModelsApi(openCodeModels = [], grokModels = []) returns grok: grokModels (line 39); in getAvailableModelsWithOpenCodeApi (line 118) compute grokModels = GROK_BUILD_MODELS mapped to AvailableModel (name = the capability displayName, harness 'grok') when await resolveHarnessBinary('grok') is truthy and (await readGrokSignIn()).signedIn, else []; either check failing -> [] with one console.warn. Tests mock the resolver and the reader."
+        },
+        "items": [
+          {
+            "id": "picker-availability.ac1",
+            "title": "Given grok installed and signed in, when the catalog is built, then the grok group returns the four grok/* ids",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "picker-availability.ac2",
+            "title": "Given grok not installed, when the catalog is built, then the grok group returns []",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "picker-availability.ac3",
+            "title": "Given grok installed but signed out, when the catalog is built, then the grok group returns []",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "doctor-grok",
+        "title": "Add the Grok Build CLI prerequisite row and the pan doctor Grok check",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T14:34:09Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5078",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/system-prerequisites.ts",
+            "src/cli/commands/doctor-grok.ts",
+            "src/cli/commands/doctor.ts",
+            "tests/unit/cli/doctor-grok.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/cli/doctor-grok.test.ts",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "doctor-grok.test.ts passes",
+            "file-size guard passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-15. system-prerequisites.ts: row after 'kimi' {id 'grok', name 'Grok Build CLI', required false, purpose 'Grok Build agents (grok harness, ACP)', versionArgs ['--version'], install linux/mac 'curl -fsSL https://x.ai/cli/install.sh | bash', win 'https://x.ai/cli'}. New doctor-grok.ts modeled on doctor-kimi.ts: checkGrok(probe?, resolver?, readSignIn = readGrokSignIn): not found -> warn 'Not installed (optional ACP harness)', fix 'Install: curl -fsSL https://x.ai/cli/install.sh | bash'; found and not signed in -> warn 'Signed out (<reason>)', fix 'Run grok login'; else ok '<version>, signed in'. doctor.ts (971 lines): import beside line 21 and one call beside line 730 (+2 lines)."
+        },
+        "items": [
+          {
+            "id": "doctor-grok.ac1",
+            "title": "Given a resolver that finds no grok binary, when checkGrok runs, then it returns one warn result 'Not installed (optional ACP harness)' with the install fix",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-grok.ac2",
+            "title": "Given grok found and readSignIn returning signedIn false, when checkGrok runs, then it returns a warn result whose fix is 'Run grok login'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-grok.ac3",
+            "title": "Given grok found and signed in, when checkGrok runs, then it returns an ok result containing the version and 'signed in'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-pickers-settings",
+        "title": "Show Grok Build in dashboard harness pickers, model pickers and provider settings",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T14:34:09Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5078",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/types.ts",
+            "src/dashboard/frontend/src/components/shared/ModelPicker/ModelPicker.tsx",
+            "src/dashboard/frontend/src/components/chat/ModelPicker.tsx",
+            "src/dashboard/frontend/src/components/Settings/RolesPanel.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/CrewRow.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/TieredExecutionSection.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/ProviderManagementSection.tsx",
+            "src/dashboard/frontend/src/hooks/useSwitchModel.ts",
+            "src/dashboard/frontend/src/components/PlanDialog.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ModelPicker.test.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/frontend/src/components/chat/__tests__/ModelPicker.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors (including the frontend lane)",
+            "ModelPicker.test.tsx passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-16. Settings/types.ts line 9 Harness + provider flags (lines 25-26) gain grok; shared ModelPicker line 15 type and an option {id: 'grok', label: 'Grok Build', description: 'xAI Grok Build CLI over ACP'} after the opencode option (line 22); chat ModelPicker provider label grok: 'Grok Build' (near line 95) and the isHarness list (line 206); ProviderManagementSection: label (line 66), provider row (lines 73-74), provider->harness (line 104: if (provider === 'grok') return ['grok']), a 'Grok sign-in' badge beside the OpenCode badge (lines 285-293) and help text (lines 352-353): 'Run <code>grok login</code> on the host. Overdeck uses Grok Build's saved sign-in; models appear once the CLI is installed and signed in.'. RolesPanel, CrewRow, TieredExecutionSection, useSwitchModel, PlanDialog: add 'grok' wherever 'opencode' is enumerated as a harness or provider. Follow the pan-style-guide rules (no pills, no decorative color)."
+        },
+        "items": [
+          {
+            "id": "frontend-pickers-settings.ac1",
+            "title": "Given a catalog containing grok/grok-4.6, when the chat ModelPicker renders, then it renders a 'Grok Build' group containing grok/grok-4.6",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-pickers-settings.ac2",
+            "title": "Given the shared harness picker, when it renders its options, then it renders a 'Grok Build' option with id 'grok'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-pickers-settings.ac3",
+            "title": "Given ProviderManagementSection with provider grok, when it renders, then it renders the 'Grok sign-in' badge and the grok login help text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-branding",
+        "title": "Add Grok Build provider and harness branding entries",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T14:34:09Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5078",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/shared/branding/index.tsx",
+            "src/dashboard/frontend/src/components/shared/branding/__tests__/branding.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/frontend/src/components/shared/branding/__tests__/branding.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "branding.test.tsx passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ],
+          "acJustification": "Two lookups (provider and harness) are the whole observable surface of this leaf."
+        },
+        "narrative": {
+          "Action": "PRD WI-17. Add GrokHarnessIcon, a simple original geometric SVG mark (do not copy xAI logo artwork) with aria-label 'Grok Build harness mark', and entries grok: { id: 'grok', label: 'Grok Build', color: '#475569', Icon: GrokHarnessIcon } in the provider map (near line 109) and the harness map (near line 125)."
+        },
+        "items": [
+          {
+            "id": "frontend-branding.ac1",
+            "title": "Given the branding module, when the provider 'grok' is looked up, then it returns label 'Grok Build'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-branding.ac2",
+            "title": "Given the branding module, when the harness 'grok' is looked up, then it returns label 'Grok Build' and renders an svg with aria-label 'Grok Build harness mark'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-conversation-surfaces",
+        "title": "Accept grok in frontend conversation list, fork, mutations, session feed, context page and composer effort",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T14:34:09Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5078",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationList.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ForkModal.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/useConversationMutations.ts",
+            "src/dashboard/frontend/src/components/sessionFeed/types.ts",
+            "src/dashboard/frontend/src/components/context/ContextPage.tsx",
+            "src/dashboard/frontend/src/components/chat/useComposerEffort.ts",
+            "src/dashboard/frontend/src/types.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors (including the frontend lane)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-18. Add 'grok' wherever these files enumerate 'opencode' as a harness (skip OpenCode-only behavior such as attach terminals). useComposerEffort.ts: the Grok effort choices are GROK_BEHAVIOR.effortLevels (low, medium, high, xhigh). ContextPage: a Grok Build preview tab like OpenCode's."
+        },
+        "items": [
+          {
+            "id": "frontend-conversation-surfaces.ac1",
+            "title": "Given a conversation with harness 'grok', when the composer effort hook computes choices, then it returns ['low','medium','high','xhigh']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-conversation-surfaces.ac2",
+            "title": "Given the context page with previews containing a grok key, when it renders, then it renders a 'Grok Build' preview tab",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-conversation-surfaces.ac3",
+            "title": "Given the change, when npm run typecheck runs (frontend lane included), then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "turn-usage-transcript",
+        "title": "Record Grok turn usage on the turn_completed ACP transcript entry",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T14:34:09Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-5078",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/acp/transcript.ts",
+            "src/lib/acp/grok.ts",
+            "src/lib/acp/providers.ts",
+            "src/lib/acp/host.ts",
+            "src/lib/acp/__tests__/grok.test.ts",
+            "src/lib/acp/__tests__/host.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/acp/__tests__/grok.test.ts src/lib/acp/__tests__/host.test.ts",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "grok.test.ts and host.test.ts pass",
+            "file-size guard passed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-3"
+          ],
+          "foundationFor": [
+            "grok-cost-collector",
+            "grok-replay-fixtures"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-19, D9. transcript.ts: add exported AcpTurnUsage {model, inputTokens (uncached), outputTokens, cacheReadTokens, cacheWriteTokens, reasoningTokens?, costUsd?} and optional usage on AcpTranscriptEntry; AcpTranscriptWriter.append copies it. grok.ts: extractGrokTurnUsage(response) reads response.usage ?? response._meta?.usage and response._meta?.modelId; returns undefined unless inputTokens and outputTokens are finite and modelId is a non-empty string; maps cachedReadTokens -> cacheReadTokens, cacheCreationTokens -> cacheWriteTokens, inputTokens -> max(0, inputTokens - cachedReadTokens), costUsd = costUsdTicks / 1e10 when finite, model = 'grok/' + modelId; ignores modelUsage keys. providers.ts: optional extractTurnUsage on support entries, set for grok only. host.ts turn_completed append (line ~312): usage: support.extractTurnUsage?.(promptResult). host.ts must stay <= 1000 lines."
+        },
+        "items": [
+          {
+            "id": "turn-usage-transcript.ac1",
+            "title": "Given the probe's grok-4.6 prompt response (synthetic, no account fields), when extractGrokTurnUsage runs, then it returns {model 'grok/grok-4.6', inputTokens 31153, outputTokens 32, cacheReadTokens 640, cacheWriteTokens 0, reasoningTokens 31, costUsd 0.062818}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "turn-usage-transcript.ac2",
+            "title": "Given a prompt response without _meta.usage, when extractGrokTurnUsage runs, then it returns undefined",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "turn-usage-transcript.ac3",
+            "title": "Given provider 'grok', when a turn completes in the host, then the turn_completed transcript entry persists the usage field, and given provider 'kimi', then the entry has no usage field",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "turn-usage-transcript.ac4",
+            "title": "Given the change, when bash scripts/lint-file-size.sh runs, then it exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "grok-cost-collector",
+        "title": "Import Grok turn usage into the cost store through a grok reconcile source",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T14:34:09Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5078",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/costs/grok-collector.ts",
+            "src/lib/overdeck/cost.ts",
+            "src/lib/cloister/pi-cost-reconciler.ts",
+            "src/dashboard/server/routes/costs.ts",
+            "src/lib/costs/__tests__/grok-collector.test.ts",
+            "src/lib/overdeck/__tests__/cost-grok-reconcile.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/costs/__tests__/grok-collector.test.ts src/lib/overdeck/__tests__/cost-grok-reconcile.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "grok collector and reconcile tests pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-20, D9. New src/lib/costs/grok-collector.ts modeled on costs/prime-agent-collector.ts: collectGrokCostEvents(home = getOverdeckHome()) walks agents/<id>/acp-session.jsonl (path via acpTranscriptPath from runtimes/storage/acp.ts); for each event 'turn_completed' entry whose usage.model starts with 'grok/', emits {ts, issueId (Prime collector's agent-name regex), agentId, sessionId, sessionType 'grok', provider 'custom', model, input, output, cacheRead, cacheWrite, cost, requestId 'grok:<sessionId>:<promptId>', sourceFile, effort via readLaunchEfforts}; cost = usage.costUsd ?? calculated with getPricing('custom', id without 'grok/'); entries missing promptId or sessionId are skipped with reason 'no-request-id'. overdeck/cost.ts: add 'grok' to the reconcile source unions (lines 519, 615), extend the early-return guard (line 634), and add a source === 'grok' block shaped like the prime-agent block. pi-cost-reconciler.ts: widen the source type and call reconcileSourceForRunningAgents(runningAgents, 'grok'). routes/costs.ts line 311: 'grok' in OverdeckReconcileSource and in the route's source validation (no new route). New lib modules import getAgentState from agent-state-read.js. Implementation checkpoint: if Grok conversation states are not in listRunningAgentsSync(), document POST /api/costs/reconcile source grok as the path in harnesses.mdx."
+        },
+        "items": [
+          {
+            "id": "grok-cost-collector.ac1",
+            "title": "Given a fixture acp-session.jsonl with two Grok turns, when reconcile({source: 'grok'}) runs, then it imports 2 events with provider 'custom' and model 'grok/grok-4.6'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "grok-cost-collector.ac2",
+            "title": "Given the same fixture, when reconcile({source: 'grok'}) runs a second time, then it imports 0 events and reports duplicatesSkipped 2",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "grok-cost-collector.ac3",
+            "title": "Given a turn entry whose usage lacks costUsd, when collected, then its cost falls back to the getPricing value for the bare id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "grok-cost-collector.ac4",
+            "title": "Given a Kimi transcript entry without usage, when collected, then it produces no event",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "grok-no-loss-audit",
+        "title": "Extend the harness no-loss audit to cover grok",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T14:34:09Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-5078",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/lib/prime-agent-no-loss-audit.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/prime-agent-no-loss-audit.test.ts"
+          ],
+          "expected_outputs": [
+            "prime-agent-no-loss-audit.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-5"
+          ],
+          "acJustification": "The audit is one test file whose two observable outcomes are the harness surface checks and the literal-file checks."
+        },
+        "narrative": {
+          "Action": "PRD WI-21. Add grok: 'grok/grok-4.7' to MODEL_FOR. Add GROK_LITERAL_FILES = the 27 files listed in PRD WI-21 and an it.each asserting each contains the literal 'grok' in quotes; extend the CLI help assertion to require '| grok'. Do not add Prime-only cost/transcript-kind files to the grok list. The existing it.each(harnesses) blocks then exercise grok (behavior, policy, binary, marker, contract schemas, normalization, conversation allowlist, config validation, transcript adapter, runtime)."
+        },
+        "items": [
+          {
+            "id": "grok-no-loss-audit.ac1",
+            "title": "Given KNOWN_HARNESSES includes grok, when the no-loss audit runs, then every it.each(harnesses) case for grok passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "grok-no-loss-audit.ac2",
+            "title": "Given GROK_LITERAL_FILES, when the audit runs, then each listed file contains 'grok' and every 'Coding-agent harness:' help string contains '| grok'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "grok-replay-fixtures",
+        "title": "Record Grok ACP replay fixtures and add host replay tests for turn completion and resume",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T14:34:09Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "test",
+          "issueLabel": "pan-5078",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/protocol-capture/record.ts",
+            "src/lib/protocol-capture/scrub.ts",
+            "src/lib/acp/__tests__/fixtures/replay/grok-turn-completion.jsonl",
+            "src/lib/acp/__tests__/fixtures/replay/grok-resume.jsonl",
+            "src/lib/acp/__tests__/host-replay.test.ts",
+            "src/lib/acp/__tests__/fixtures/replay-spawner.ts",
+            "docs/PROTOCOL-REPLAY-TESTS.md"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/acp/__tests__/host-replay.test.ts",
+            "grep -E -c '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[a-z]{2,}' src/lib/acp/__tests__/fixtures/replay/grok-*.jsonl || true"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "host-replay.test.ts passes",
+            "grep reports 0 matches for each grok fixture"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-6",
+            "FR-9",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-22. Extend the recorder (node --import tsx src/lib/protocol-capture/record.ts) with grok support and scenarios grok-turn-completion (prompt 'Reply with exactly OK.', model grok/grok-4.6, effort low) and grok-resume (host started with --resume <session id from the first run>, so out frames include session/load). Ensure the scrubber redacts the authenticate result _meta account fields (email, team ids, subscription fields) before disk. Record with the real signed-in CLI; never hand-edit fixtures. Extend host-replay.test.ts: model then reasoning_effort set_config_option frames, turn_completed usage, and session/load on resume. Add both scenarios and the Grok prerequisite (a signed-in grok login) to docs/PROTOCOL-REPLAY-TESTS.md."
+        },
+        "items": [
+          {
+            "id": "grok-replay-fixtures.ac1",
+            "title": "Given the grok-turn-completion fixture, when the replay test runs, then the client's out frames set model 'grok-4.6' before reasoning_effort 'low' and the transcript's turn_completed entry has usage.model 'grok/grok-4.6' and a finite costUsd",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "grok-replay-fixtures.ac2",
+            "title": "Given the grok-resume fixture, when the replay test runs, then the first session frame the client emits is session/load with the recorded session id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "grok-replay-fixtures.ac3",
+            "title": "Given both fixtures, when searched with grep -E '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[a-z]{2,}', then the search returns no match",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "grok-replay-fixtures.ac4",
+            "title": "Given docs/PROTOCOL-REPLAY-TESTS.md, when read, then its scenario table lists grok-turn-completion and grok-resume with their fixture paths",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "grok-docs",
+        "title": "Document the Grok Build harness in harnesses.mdx, harness-landscape.mdx, ROLES.md, bots.mdx, CLAUDE.md and the codebase map",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T14:34:09Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5078",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/harnesses.mdx",
+            "reference/harness-landscape.mdx",
+            "docs/ROLES.md",
+            "configuration/bots.mdx",
+            "CLAUDE.md",
+            ".overdeck/context/codebase/architecture.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n '### Grok Build CLI' configuration/harnesses.mdx",
+            "grep -n 'Grok Build has no gate' configuration/harnesses.mdx",
+            "grep -n 'Wired now' reference/harness-landscape.mdx"
+          ],
+          "expected_outputs": [
+            "each grep prints at least one matching line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-23. configuration/harnesses.mdx: 'Supported today' list (line 16) adds grok; the table near line 28 gets the grok row from the PRD; the steering table (line 49) adds Grok Build to the ACP row; a new '### Grok Build CLI' section after the OpenCode section and before '### Prime Agent' (line 645) covering install (curl installer, grok update), sign-in (grok login; XAI_API_KEY is removed from the agent env), the four grok/* ids and that they run only on the grok harness, the config example models.providers.grok {enabled: true, harness: grok}, effort levels (max clamps to xhigh), launch flags --always-approve and --no-leader and why, resume via session/load, the overdeck MCP server via ACP, cost from Grok's costUsdTicks imported by the grok reconcile source, harness:grok context blocks, and that Grok loads the operator's ~/.grok MCP servers, plugins and hooks; the ToS section (line 886) adds 'Grok Build has no gate: it is xAI's own CLI running xAI models on your xAI sign-in.'. reference/harness-landscape.mdx: line 92 paragraph names grok; ACP table (line 113) Grok row becomes 'Wired now' through grok agent stdio; a '### Grok Build — Supported through ACP' profile after the OpenCode profile; a comparison-matrix row (line 516). docs/ROLES.md line 133: ACP harnesses (acp, opencode, grok). configuration/bots.mdx '### Grok Build' (line 107): one paragraph separating the bot plugin from the grok harness. CLAUDE.md topic-index Harnesses row adds grok. .overdeck/context/codebase/architecture.md RuntimeName sentence (line ~61) adds 'grok' and 'Grok Build via ACP' (keep its last-verified line unchanged)."
+        },
+        "items": [
+          {
+            "id": "grok-docs.ac1",
+            "title": "Given configuration/harnesses.mdx, when read, then it contains a '### Grok Build CLI' section that names grok login, the four grok/* model ids, --no-leader, session/load and costUsdTicks",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "grok-docs.ac2",
+            "title": "Given the ToS rules section of configuration/harnesses.mdx, when read, then it states that Grok Build has no gate",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "grok-docs.ac3",
+            "title": "Given reference/harness-landscape.mdx, when read, then the ACP table's Grok row says 'Wired now' and a Grok Build profile section exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "grok-docs.ac4",
+            "title": "Given docs/ROLES.md line 133 and CLAUDE.md's Harnesses topic row, when read, then both name grok",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "grok-live-verification",
+        "title": "Verify Grok Build end to end with the real CLI, a throwaway dashboard and isolated Playwright",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-10T14:34:09Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "test",
+          "issueLabel": "pan-5078",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".pan/drafts/PAN-5078-live-verification.md"
+          ],
+          "files_scope_confidence": "low",
+          "verify_commands": [
+            "test -s .pan/drafts/PAN-5078-live-verification.md"
+          ],
+          "expected_outputs": [
+            "the evidence file exists and records all six checks"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "FR-9",
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-24. With a signed-in grok 1.0.77+, build the branch and run a throwaway dashboard (separate OVERDECK_HOME and port; never the operator's live dashboard). Use Playwright with an isolated browser profile (no shared browser state). Checks: (1) start a conversation with harness grok and model grok/grok-4.6, send 'Reply with exactly OK.', and the conversation view renders the user and assistant rows; (2) restart the throwaway dashboard server, then the conversation resumes with the same acp-session-id and answers a second message; (3) pan start <test issue> --harness grok --model grok/grok-4.6 in a throwaway project launches and the pane's process tree shows acp-host and grok-native; (4) POST /api/costs/reconcile with source grok imports one cost event per completed turn (provider custom, model grok/grok-4.6); (5) pan doctor prints the Grok Build line as ok and signed in; (6) the agent calls one overdeck MCP tool successfully (HZ-1). Write commands, outputs and screenshot paths to .pan/drafts/PAN-5078-live-verification.md and the PR description."
+        },
+        "items": [
+          {
+            "id": "grok-live-verification.ac1",
+            "title": "Given a throwaway dashboard and a signed-in grok, when a grok conversation receives 'Reply with exactly OK.', then the conversation view renders the assistant reply",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "grok-live-verification.ac2",
+            "title": "Given that conversation, when the throwaway dashboard restarts, then the conversation resumes with the same acp-session-id and answers a second message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "grok-live-verification.ac3",
+            "title": "Given pan start --harness grok --model grok/grok-4.6, when it launches, then the pane process tree contains acp-host and grok-native",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "grok-live-verification.ac4",
+            "title": "Given completed grok turns, when POST /api/costs/reconcile runs with source grok, then it returns imported >= 1 and pan doctor reports Grok Build ok and signed in",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "grok-live-verification.ac5",
+            "title": "Given the running grok agent, when it calls an overdeck MCP tool, then the call succeeds against the managed per-agent server",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "contracts-harness",
+        "to": "runtime-policy-binary",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-harness",
+        "to": "runtime-registration",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-harness",
+        "to": "config-validation-lists",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-harness",
+        "to": "conversation-lists",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-harness",
+        "to": "agent-launch-lists",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-harness",
+        "to": "server-route-lists",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-harness",
+        "to": "cli-harness-lists",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-harness",
+        "to": "frontend-conversation-surfaces",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-harness",
+        "to": "grok-no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "grok-provider-models",
+        "to": "runtime-policy-binary",
+        "type": "blocks"
+      },
+      {
+        "from": "grok-provider-models",
+        "to": "runtime-registration",
+        "type": "blocks"
+      },
+      {
+        "from": "grok-provider-models",
+        "to": "config-validation-lists",
+        "type": "blocks"
+      },
+      {
+        "from": "grok-provider-models",
+        "to": "picker-availability",
+        "type": "blocks"
+      },
+      {
+        "from": "runtime-policy-binary",
+        "to": "runtime-registration",
+        "type": "blocks"
+      },
+      {
+        "from": "runtime-policy-binary",
+        "to": "config-validation-lists",
+        "type": "blocks"
+      },
+      {
+        "from": "runtime-policy-binary",
+        "to": "conversation-lists",
+        "type": "blocks"
+      },
+      {
+        "from": "runtime-policy-binary",
+        "to": "agent-launch-lists",
+        "type": "blocks"
+      },
+      {
+        "from": "runtime-policy-binary",
+        "to": "server-route-lists",
+        "type": "blocks"
+      },
+      {
+        "from": "runtime-policy-binary",
+        "to": "cli-harness-lists",
+        "type": "blocks"
+      },
+      {
+        "from": "runtime-policy-binary",
+        "to": "picker-availability",
+        "type": "blocks"
+      },
+      {
+        "from": "runtime-policy-binary",
+        "to": "grok-no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "grok-acp-module",
+        "to": "host-grok-launch",
+        "type": "blocks"
+      },
+      {
+        "from": "grok-acp-module",
+        "to": "turn-usage-transcript",
+        "type": "blocks"
+      },
+      {
+        "from": "host-grok-launch",
+        "to": "turn-usage-transcript",
+        "type": "blocks"
+      },
+      {
+        "from": "turn-usage-transcript",
+        "to": "grok-cost-collector",
+        "type": "blocks"
+      },
+      {
+        "from": "grok-pricing",
+        "to": "grok-cost-collector",
+        "type": "blocks"
+      },
+      {
+        "from": "grok-sign-in-status",
+        "to": "picker-availability",
+        "type": "blocks"
+      },
+      {
+        "from": "grok-sign-in-status",
+        "to": "doctor-grok",
+        "type": "blocks"
+      },
+      {
+        "from": "config-validation-lists",
+        "to": "grok-no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "conversation-lists",
+        "to": "grok-no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "agent-launch-lists",
+        "to": "grok-no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "server-route-lists",
+        "to": "grok-no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-harness-lists",
+        "to": "grok-no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "doctor-grok",
+        "to": "grok-no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "runtime-registration",
+        "to": "grok-no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "turn-usage-transcript",
+        "to": "grok-replay-fixtures",
+        "type": "blocks"
+      },
+      {
+        "from": "runtime-registration",
+        "to": "grok-replay-fixtures",
+        "type": "blocks"
+      },
+      {
+        "from": "runtime-registration",
+        "to": "grok-live-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "conversation-lists",
+        "to": "grok-live-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "agent-launch-lists",
+        "to": "grok-live-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "server-route-lists",
+        "to": "grok-live-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-harness-lists",
+        "to": "grok-live-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "grok-cost-collector",
+        "to": "grok-live-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "doctor-grok",
+        "to": "grok-live-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "picker-availability",
+        "to": "grok-live-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-pickers-settings",
+        "to": "grok-live-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-branding",
+        "to": "grok-live-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-conversation-surfaces",
+        "to": "grok-live-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "host-grok-launch",
+        "to": "grok-live-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "config-validation-lists",
+        "to": "grok-live-verification",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
