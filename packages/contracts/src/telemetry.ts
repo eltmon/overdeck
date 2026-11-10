@@ -97,7 +97,7 @@ export const TELEMETRY_CLI_VERBS = [
   "other",
 ] as const
 
-const TELEMETRY_HARNESSES = ["claude-code", "ohmypi", "codex", "acp", "kimi-code", "opencode", "muse", "prime-agent"] as const satisfies readonly Harness[]
+const TELEMETRY_HARNESSES = ["claude-code", "ohmypi", "codex", "acp", "kimi-code", "opencode", "muse", "prime-agent", "grok"] as const satisfies readonly Harness[]
 
 /** PAN-5084: what kind of install reported an event — distinguishes real adoption from CI/test/VM churn. */
 export const TELEMETRY_INSTALL_KINDS = ["user", "remote_vm", "dev_checkout", "container"] as const

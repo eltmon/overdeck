@@ -273,7 +273,7 @@ describe('canUseHarness', () => {
 
   it('gives every RuntimeName an explicit policy decision', () => {
     expect([...POLICY_RUNTIME_NAMES].sort()).toEqual(
-      ['acp', 'claude-code', 'codex', 'kimi-code', 'muse', 'ohmypi', 'opencode', 'prime-agent'],
+      ['acp', 'claude-code', 'codex', 'grok', 'kimi-code', 'muse', 'ohmypi', 'opencode', 'prime-agent'],
     )
     for (const harness of POLICY_RUNTIME_NAMES) {
       for (const authMode of AUTH_MODES) {

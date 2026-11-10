@@ -24,7 +24,7 @@
 import type { Harness } from '@overdeck/contracts';
 
 /** Short marker name used in `{{#harness:<name>}}` blocks. */
-export type HarnessMarker = 'claude' | 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent';
+export type HarnessMarker = 'claude' | 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent' | 'grok';
 
 /** Maps a Overdeck {@link Harness} to its templating marker name. */
 export const HARNESS_MARKERS: Record<Harness, HarnessMarker> = {
@@ -36,6 +36,7 @@ export const HARNESS_MARKERS: Record<Harness, HarnessMarker> = {
   'kimi-code': 'kimi-code',
   muse: 'muse',
   'prime-agent': 'prime-agent',
+  grok: 'grok',
 };
 
 /** Marker names Overdeck ships an adapter for in v1. */
