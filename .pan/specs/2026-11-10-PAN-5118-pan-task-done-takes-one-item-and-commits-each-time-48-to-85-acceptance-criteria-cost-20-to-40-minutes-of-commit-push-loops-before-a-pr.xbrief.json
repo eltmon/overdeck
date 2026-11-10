@@ -4,17 +4,17 @@
     "created": "2026-11-10T18:16:54Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5118: pan task done takes one item and commits each time: 48 to 85 acceptance criteria cost 20 to 40 minutes of commit+push loops before a PR",
-    "updated": "2026-11-10T18:31:25.939Z"
+    "updated": "2026-11-10T18:32:36.098Z"
   },
   "plan": {
     "id": "pan-5118",
     "title": "pan task done takes one item and commits each time: 48 to 85 acceptance criteria cost 20 to 40 minutes of commit+push loops before a PR",
-    "status": "proposed",
+    "status": "running",
     "uid": "b6377d9f-410d-4c92-bcca-f150dbcb63c9",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-10T18:16:54Z",
-    "updated": "2026-11-10T18:31:25.939Z",
+    "updated": "2026-11-10T18:32:36.098Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5118",
@@ -676,5 +676,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
