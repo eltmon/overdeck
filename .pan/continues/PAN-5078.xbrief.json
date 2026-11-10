@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5078",
   "created": "2026-11-10T14:48:32.729Z",
-  "updated": "2026-11-10T17:57:36.518Z",
+  "updated": "2026-11-10T17:57:54.745Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -316,6 +316,10 @@
     "server-route-lists.ac3": {
       "status": "completed",
       "doneAt": "2026-11-10T17:57:36.518Z"
+    },
+    "cli-harness-lists.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:57:54.745Z"
     }
   }
 }
