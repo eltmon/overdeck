@@ -53,6 +53,8 @@ export const MODEL_CAPABILITY_CLASSES: Readonly<Record<string, ModelCapabilityCl
   'mistral-large-latest': 'frontier',
   'mistral-large-4-0': 'frontier',
   'grok-4.7': 'frontier',
+  'grok/grok-4.7': 'frontier',
+  'grok/grok-4.7-build-fast': 'frontier',
   // workhorse
   'claude-sonnet-5-5': 'workhorse',
   'claude-sonnet-5': 'workhorse',
@@ -78,6 +80,8 @@ export const MODEL_CAPABILITY_CLASSES: Readonly<Record<string, ModelCapabilityCl
   'qwen3-plus': 'workhorse',
   'grok-build-0.1': 'workhorse',
   'grok-4.3': 'workhorse',
+  'grok/grok-4.6': 'workhorse',
+  'grok/grok-4.5': 'workhorse',
   'muse-spark-1.3': 'workhorse',
   'muse-spark-1.3-contributor': 'workhorse',
   'llama-3.3-70b-versatile': 'workhorse',

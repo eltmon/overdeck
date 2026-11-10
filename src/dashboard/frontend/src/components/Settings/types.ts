@@ -24,6 +24,7 @@ export interface ProvidersConfig {
   dashscope: boolean;
   opencode?: boolean;
   "opencode-go"?: boolean;
+  grok?: boolean;
   meta?: boolean;
 }
 

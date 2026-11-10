@@ -13,7 +13,7 @@ import type { SubscriptionPlan } from './subscription-types.js';
 /**
  * AI model provider types
  */
-export type ModelProvider = 'anthropic' | 'openai' | 'google' | 'kimi' | 'minimax' | 'openrouter' | 'zai' | 'mimo' | 'nous' | 'dashscope' | 'xai' | 'groq' | 'cerebras' | 'mistral' | 'quantumllama' | 'meta' | 'opencode' | 'opencode-go' | 'ollama';
+export type ModelProvider = 'anthropic' | 'openai' | 'google' | 'kimi' | 'minimax' | 'openrouter' | 'zai' | 'mimo' | 'nous' | 'dashscope' | 'xai' | 'groq' | 'cerebras' | 'mistral' | 'quantumllama' | 'meta' | 'opencode' | 'opencode-go' | 'grok' | 'ollama';
 
 /**
  * Map of model ID to provider
@@ -130,6 +130,12 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
   'grok-build-0.1': 'xai',
   'grok-4.7': 'xai',
   'grok-4.3': 'xai',
+
+  // Grok Build CLI models (grok harness, grok sign-in)
+  'grok/grok-4.7': 'grok',
+  'grok/grok-4.7-build-fast': 'grok',
+  'grok/grok-4.6': 'grok',
+  'grok/grok-4.5': 'grok',
 
   // Groq models
   'openai/gpt-oss-120b': 'groq',
@@ -314,7 +320,7 @@ const TIER_RANK: Record<SubscriptionPlan, number> = {
 const GROQ_SLASH_MODEL_IDS = new Set(['openai/gpt-oss-120b', 'openai/gpt-oss-20b']);
 
 export function isOpenRouterModel(modelId: string): boolean {
-  return modelId.includes('/') && modelId !== 'qwen/qwen3.6-plus' && !GROQ_SLASH_MODEL_IDS.has(modelId) && !modelId.startsWith('opencode/') && !modelId.startsWith('opencode-go/');
+  return modelId.includes('/') && modelId !== 'qwen/qwen3.6-plus' && !GROQ_SLASH_MODEL_IDS.has(modelId) && !modelId.startsWith('opencode/') && !modelId.startsWith('opencode-go/') && !modelId.startsWith('grok/');
 }
 
 /**
@@ -325,6 +331,7 @@ export function getModelProvider(modelId: ModelId | string): ModelProvider {
   if (modelId.startsWith('ollama:')) return 'ollama';
   if (modelId.startsWith('opencode/')) return 'opencode';
   if (modelId.startsWith('opencode-go/')) return 'opencode-go';
+  if (modelId.startsWith('grok/')) return 'grok';
   if (isOpenRouterModel(modelId)) return 'openrouter';
   const direct = (MODEL_PROVIDERS as Record<string, ModelProvider>)[modelId];
   if (direct) return direct;

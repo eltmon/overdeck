@@ -108,6 +108,7 @@ const OpenCodeHarnessIcon = (props: IconProps) => (
 export const PROVIDER_BRANDS: Record<Provider, BrandDef> = {
   opencode: { id: 'opencode', label: 'OpenCode Zen', color: '#475569', Icon: OpenCodeHarnessIcon },
   'opencode-go': { id: 'opencode-go', label: 'OpenCode Go', color: '#475569', Icon: OpenCodeHarnessIcon },
+  grok: { id: 'grok', label: 'Grok Build', color: '#475569', Icon: Cpu },
   meta: { id: 'meta', label: 'Meta (Muse)', color: '#0866ff', Icon: Sparkles },
   anthropic: { id: 'anthropic', label: 'Anthropic', color: '#d97757', Icon: AnthropicIcon },
   openai: { id: 'openai', label: 'OpenAI', color: '#10a37f', Icon: OpenAIIcon },

@@ -13,6 +13,7 @@ describe('shared branding registry', () => {
     expect(Object.keys(PROVIDER_BRANDS)).toEqual([
       'opencode',
       'opencode-go',
+      'grok',
       'meta',
       'anthropic',
       'openai',
