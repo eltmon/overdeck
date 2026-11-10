@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5117",
   "created": "2026-11-10T17:52:40.588Z",
-  "updated": "2026-11-10T18:48:55.219Z",
+  "updated": "2026-11-10T18:50:03.031Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -25,6 +25,11 @@
       "status": "in_progress",
       "claimedBy": "agent-pan-5117",
       "claimedAt": "2026-11-10T18:48:55.219Z"
+    },
+    "add-fast-fallback-case": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5117",
+      "claimedAt": "2026-11-10T18:50:03.031Z"
     }
   }
 }
