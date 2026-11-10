@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-10T18:36:17.650046Z · model: claude-opus-5-5 · open: 871_
+_Last sequenced: 2026-11-10T18:37:05.534677Z · model: claude-opus-5-5 · open: 871_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -1206,7 +1206,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-10T18:36:17.650046Z",
+  "generatedAt": "2026-11-10T18:37:05.534677Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 871,
