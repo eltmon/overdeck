@@ -40,7 +40,7 @@ export const HARNESS_MARKERS: Record<Harness, HarnessMarker> = {
 };
 
 /** Marker names Overdeck ships an adapter for in v1. */
-export const KNOWN_HARNESS_MARKERS: ReadonlySet<string> = new Set<HarnessMarker>(['claude', 'pi', 'ohmypi', 'codex', 'acp', 'kimi-code', 'opencode', 'muse', 'prime-agent']);
+export const KNOWN_HARNESS_MARKERS: ReadonlySet<string> = new Set<HarnessMarker>(['claude', 'pi', 'ohmypi', 'codex', 'acp', 'kimi-code', 'opencode', 'muse', 'prime-agent', 'grok']);
 
 /** Matches an open `{{#harness:x}}` or close `{{/harness:x}}` marker. */
 const MARKER_RE = /\{\{([#/])harness:([a-zA-Z0-9_-]+)\}\}/g;

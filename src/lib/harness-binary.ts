@@ -196,6 +196,7 @@ export async function resolveExecutableDetailed(
     join(home, '.claude', 'local'),
     join(home, '.kimi-code', 'bin'),
     ...(binary === 'opencode' ? [join(home, '.opencode', 'bin')] : []),
+    ...(binary === 'grok' ? [join(home, '.grok', 'bin')] : []),
     join(home, '.npm-global', 'bin'),
   ];
   const fixedMatch = await firstExecutable(fixedCandidates, binary, accessExecutable);

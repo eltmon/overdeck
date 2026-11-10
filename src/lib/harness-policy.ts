@@ -167,8 +167,11 @@ export function canUseHarness(
       ? ALLOWED
       : { allowed: false, reason: 'OpenCode Go and Zen model IDs require the OpenCode harness. Select an opencode/* or opencode-go/* model.' };
   }
-  if (harness === 'grok') {
-    return { allowed: false, reason: 'Grok Build model IDs require the Grok Build harness, and the Grok Build harness runs only grok/* models. Select a grok/* model.' };
+  const isGrokProvider = providerName === 'grok';
+  if (harness === 'grok' || isGrokProvider) {
+    return harness === 'grok' && isGrokProvider
+      ? ALLOWED
+      : { allowed: false, reason: 'Grok Build model IDs require the Grok Build harness, and the Grok Build harness runs only grok/* models. Select a grok/* model.' };
   }
   const isMuseModel = providerName === 'meta';
   if (harness === 'muse' || isMuseModel) {

@@ -307,6 +307,28 @@ describe('Ollama harness pin (PAN-1641)', () => {
   })
 })
 
+describe('Grok Build harness pin (PAN-5078)', () => {
+  const GROK_REASON = 'Grok Build model IDs require the Grok Build harness, and the Grok Build harness runs only grok/* models. Select a grok/* model.'
+
+  it('allows grok/* models on the grok harness', () => {
+    expect(canUseHarness('grok', 'grok/grok-4.6', undefined).allowed).toBe(true)
+    expect(canUseHarness('grok', 'grok/grok-4.7-build-fast', 'subscription').allowed).toBe(true)
+  })
+
+  it('denies non-grok models on the grok harness', () => {
+    expect(canUseHarness('grok', 'claude-sonnet-5-5', 'subscription')).toEqual({ allowed: false, reason: GROK_REASON })
+    expect(canUseHarness('grok', 'grok-4.7', 'api-key')).toEqual({ allowed: false, reason: GROK_REASON })
+  })
+
+  it('denies grok/* models on every other harness', () => {
+    for (const harness of ['claude-code', 'ohmypi', 'codex', 'acp', 'kimi-code', 'muse', 'prime-agent'] as RuntimeName[]) {
+      expect(canUseHarness(harness, 'grok/grok-4.6', 'subscription')).toEqual({ allowed: false, reason: GROK_REASON })
+    }
+    // OpenCode's own clause runs first and names its own models.
+    expect(canUseHarness('opencode', 'grok/grok-4.6', 'subscription').allowed).toBe(false)
+  })
+})
+
 describe('codex model client-version floor (PAN-4363)', () => {
   it('blocks gpt-6-luna under ChatGPT sign-in below the floor', () => {
     const decision = canUseHarness('codex', 'gpt-6-luna', 'subscription', { codexCliVersion: '0.153.4' })

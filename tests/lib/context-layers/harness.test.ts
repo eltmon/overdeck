@@ -95,6 +95,13 @@ describe('validateTemplate', () => {
     expect(v.issues.some((i) => i.severity === 'error')).toBe(true);
   });
 
+  it('accepts grok as a known harness marker (PAN-5078)', () => {
+    const v = validateTemplate('{{#harness:grok}}x{{/harness:grok}}');
+    expect(v.ok).toBe(true);
+    expect(v.issues).toHaveLength(0);
+    expect(renderForHarness('{{#harness:grok}}grok only{{/harness:grok}}', 'grok')).toContain('grok only');
+  });
+
   it('warns — but does not error — on an unknown harness name', () => {
     const v = validateTemplate('{{#harness:cursor}}x{{/harness:cursor}}');
     expect(v.ok).toBe(true);
