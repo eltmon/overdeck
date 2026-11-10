@@ -62,3 +62,68 @@ describe('linked Needs-You cache (D-4651-15, NFR-1)', () => {
     expect(await buildFleetNeedsYou(deps)).toEqual({ machines: [{ environmentId: 'env-desk', label: 'desk', ...FEED }] });
   });
 });
+
+describe('linked Needs-You fetch failures (PAN-5111)', () => {
+  function syncWith(fetch: () => Promise<{ status: number; json: unknown }>) {
+    let now = Date.parse('2026-11-10T12:00:00.000Z');
+    const sync = createLinkedNeedsYouSync({ fetch, log: () => undefined, now: () => now });
+    return { sync, advance: (ms: number) => { now += ms; } };
+  }
+
+  it('remembers a thrown fetch, keeps the first since, and moves lastAttemptAt', async () => {
+    const { sync, advance } = syncWith(async () => {
+      throw new Error('Secure channel did not open within 10000 ms');
+    });
+    await sync.onConnect(DESK);
+    expect(sync.failureFor('env-desk')).toEqual({
+      since: '2026-11-10T12:00:00.000Z',
+      lastAttemptAt: '2026-11-10T12:00:00.000Z',
+      reason: 'Secure channel did not open within 10000 ms',
+    });
+    advance(60_000);
+    await sync.onConnect(DESK);
+    expect(sync.failureFor('env-desk')).toEqual({
+      since: '2026-11-10T12:00:00.000Z',
+      lastAttemptAt: '2026-11-10T12:01:00.000Z',
+      reason: 'Secure channel did not open within 10000 ms',
+    });
+  });
+
+  it('clears the failure on a later 200', async () => {
+    let fail = true;
+    const { sync } = syncWith(async () => {
+      if (fail) throw new Error('boom');
+      return { status: 200, json: { hash: 'h', ...FEED } };
+    });
+    await sync.onConnect(DESK);
+    expect(sync.failureFor('env-desk')).not.toBeNull();
+    fail = false;
+    await sync.onConnect(DESK);
+    expect(sync.failureFor('env-desk')).toBeNull();
+  });
+
+  it('records answered <status> for a non-200 and clears on a 404', async () => {
+    let status = 500;
+    const { sync } = syncWith(async () => ({ status, json: null }));
+    await sync.onConnect(DESK);
+    expect(sync.failureFor('env-desk')?.reason).toBe('answered 500');
+    status = 404;
+    await sync.onConnect(DESK);
+    expect(sync.failureFor('env-desk')).toBeNull();
+  });
+
+  it('records a malformed feed', async () => {
+    const { sync } = syncWith(async () => ({ status: 200, json: { nope: true } }));
+    await sync.onConnect(DESK);
+    expect(sync.failureFor('env-desk')?.reason).toBe('sent a malformed Needs-You feed');
+  });
+
+  it('prune drops the failure with the link', async () => {
+    const { sync } = syncWith(async () => {
+      throw new Error('boom');
+    });
+    await sync.onConnect(DESK);
+    sync.prune([]);
+    expect(sync.failureFor('env-desk')).toBeNull();
+  });
+});
