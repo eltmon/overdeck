@@ -4,17 +4,17 @@
     "created": "2026-11-10T16:30:00Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5108: Auto-update harness CLIs (Claude Code first) by default, with a Settings switch to turn it off",
-    "updated": "2026-11-10T15:16:57.671Z"
+    "updated": "2026-11-10T15:18:05.410Z"
   },
   "plan": {
     "id": "pan-5108",
     "title": "Auto-update harness CLIs (Claude Code first) by default, with a Settings switch to turn it off",
-    "status": "proposed",
+    "status": "running",
     "uid": "64309cb9-04fc-4493-b9e3-270ac75a4867",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-10T16:30:00Z",
-    "updated": "2026-11-10T15:16:57.671Z",
+    "updated": "2026-11-10T15:18:05.410Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5108",
@@ -910,5 +910,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
