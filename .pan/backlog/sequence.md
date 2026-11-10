@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-10T18:17:12.103920Z · model: claude-opus-5-5 · open: 871_
+_Last sequenced: 2026-11-10T18:32:53.987510Z · model: claude-opus-5-5 · open: 871_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -870,8 +870,8 @@ _Last sequenced: 2026-11-10T18:17:12.103920Z · model: claude-opus-5-5 · open: 
 | 863 | PAN-4594 | M | low | ok |  | PAN-4590 | Dashboard Semgrep controls: Settings security section, per-project sast override, findings in issue view; after PAN-4590. |
 | 864 | PAN-4593 | L | low | needs-refinement |  | PAN-4590 | Semgrep Platform/Guardian tier; operator decisions (offer Guardian? contact Semgrep first?) still open — refine before work. |
 | 865 | PAN-5022 | L | medium | ok |  |  | Phone app: relay notification preferences to offline machines via the directory, and drop muted pushes on the phone. |
+| 866 | PAN-5021 | M | low | needs-refinement |  |  | PAN-5100 landed phone telemetry with conflicting decisions; re-scope to any remaining gap or close as superseded. |
 | 867 | PAN-5078 | XL | low | ok |  |  | Parked: add xAI's Grok Build CLI as a harness over ACP (stdio agent, resumable sessions). |
-| 867 | PAN-5021 | M | low | needs-refinement |  |  | PAN-5100 landed phone telemetry with conflicting decisions; re-scope to any remaining gap or close as superseded. |
 | 868 | PAN-5029 | M | medium | needs-refinement |  |  | Grok Build Tailscale reach can't work: pan mcp serve verifies tokens only against its own machine. Needs a design choice. |
 | 869 | PAN-4842 | S | medium | ok |  |  | Phone app W-DOC: phone-app.mdx and updates to Anywhere, push, tailscale and service docs; finished last. |
 | 870 | PAN-4851 | S | low | needs-refinement |  |  | Open question: opt-in Overdeck reviewer for Deft-pipeline issues; operator says low priority, do not plan or start without them |
@@ -1206,7 +1206,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-10T18:17:12.103920Z",
+  "generatedAt": "2026-11-10T18:32:53.987510Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 871,
@@ -11977,14 +11977,14 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-5021",
-      "rank": 867,
+      "rank": 866,
       "size": "M",
       "importance": "low",
       "score": 25,
       "condition": "needs-refinement",
       "dependsOn": [],
       "why": "PAN-5100 landed phone telemetry with conflicting decisions; re-scope to any remaining gap or close as superseded.",
-      "rationale": "Dependency PAN-5100 closed as completed on 2026-11-07, so the blocking edge is dropped; rank holds and condition stays needs-refinement until it is re-scoped or closed.",
+      "rationale": "Rank shared slot 867 with in-pipeline PAN-5078 in the prior run; moved to the free slot 866 with no change in impact.",
       "gate": "auto",
       "planning": "auto"
     },
