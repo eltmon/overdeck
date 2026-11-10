@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5078",
   "created": "2026-11-10T14:48:32.729Z",
-  "updated": "2026-11-10T16:07:42.205Z",
+  "updated": "2026-11-10T16:08:55.719Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -82,9 +82,10 @@
       "doneAt": "2026-11-10T16:07:35.359Z"
     },
     "grok-sign-in-status": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5078",
-      "claimedAt": "2026-11-10T16:07:42.205Z"
+      "claimedAt": "2026-11-10T16:07:42.205Z",
+      "doneAt": "2026-11-10T16:08:55.718Z"
     }
   }
 }
