@@ -34,7 +34,7 @@ does:
    one `Item: <item-id>.acN` line for each acceptance criterion of the item.
 4. Push the feature branch — `git push -u origin "$(git branch --show-current)"`.
    An unpushed commit does not exist as far as Overdeck is concerned.
-5. `pan task done <issue-id> <item-id> <item-id>.ac1 ...` — one call closes
+5. `pan task done <issue-id> <item-id> <item-id>.ac1 <item-id>.ac2 ...` — one call closes
    the item and its ACs. It verifies each id's trailer against the pushed
    commit and records them all with one continue commit, or nothing if any
    id lacks its line.
