@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5118",
   "created": "2026-11-10T18:32:53.186Z",
-  "updated": "2026-11-10T19:40:13.985Z",
+  "updated": "2026-11-10T19:40:33.205Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -186,6 +186,10 @@
     "verifier-feedback-one-call.ac1": {
       "status": "completed",
       "doneAt": "2026-11-10T19:40:13.984Z"
+    },
+    "verifier-feedback-one-call.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T19:40:33.204Z"
     }
   }
 }
