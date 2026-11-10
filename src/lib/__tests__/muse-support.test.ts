@@ -50,7 +50,10 @@ vi.mock('../runtimes/muse-context.js', async (importOriginal) => {
   return { ...actual, materializeMuseContext: vi.fn(async () => '/tmp/fake-muse-context.md') };
 });
 
-const models = ['muse-wonder-1.0', 'muse-spark-1.3', 'muse-spark-1.3-contributor'] as const;
+const models = ['muse-wonder-1.0', 'muse-spark-1.3', 'muse-spark-1.3-contributor', 'muse-ember-1.0'] as const;
+// Muse Wonder Full (operator addition, issue comment 2026-11-10): Muse Code-only,
+// no per-token price, so it is excluded from the priced `models` tuple above.
+const museWonderFullId = 'muse-wonder-full-1.0';
 const temporary: string[] = [];
 afterEach(async () => { await Promise.all(temporary.splice(0).map(path => rm(path, { recursive: true, force: true }))); });
 
@@ -58,7 +61,7 @@ describe('Muse model and harness support', () => {
   it('registers every Muse model without changing its exact identity', () => {
     expect(KNOWN_HARNESSES.has('muse')).toBe(true);
     expect(getHarnessBehavior('muse').executableName).toBe('muse');
-    expect(getAvailableModelsApi().meta.map(model => model.id)).toEqual(models);
+    expect(getAvailableModelsApi().meta.map(model => model.id)).toEqual([...models, museWonderFullId]);
     for (const model of models) {
       expect(getProviderForModel(model)).toMatchObject({ name: 'meta', defaultHarness: 'muse' });
       expect(canUseHarness('muse', model, undefined).allowed).toBe(true);
@@ -69,6 +72,13 @@ describe('Muse model and harness support', () => {
     expect(() => applyFallback(models[0], new Set(['anthropic']), 'claude-sonnet-5')).toThrow('Meta (Muse) is disabled');
     expect(getAvailableModelsApi().meta.find(model => model.id === 'muse-spark-1.3-contributor')?.name).toContain('training data');
     expect(getAvailableModelsApi().meta[0]).toMatchObject({ id: 'muse-wonder-1.0', name: 'Muse Wonder 1.0 (1M context)', costPer1MTokens: 12 });
+    expect(getAvailableModelsApi().meta.find(model => model.id === 'muse-ember-1.0')).toMatchObject({ name: 'Muse Ember 1.0 (1M context)', costPer1MTokens: 0.3, harness: 'muse' });
+    // Muse Wonder Full: Muse Code-only, no per-token price (operator addition, issue comment 2026-11-10).
+    expect(getAvailableModelsApi().meta.at(-1)).toMatchObject({ id: museWonderFullId, name: 'Muse Wonder Full 1.0 (1M context)', costPer1MTokens: 0, harness: 'muse' });
+    expect(getProviderForModel(museWonderFullId)).toMatchObject({ name: 'meta', defaultHarness: 'muse' });
+    expect(canUseHarness('muse', museWonderFullId, undefined).allowed).toBe(true);
+    expect(canUseHarness('claude-code', museWonderFullId, undefined).allowed).toBe(false);
+    expect(getPricing('custom', museWonderFullId)).toBeNull();
   });
 
   it('preserves opt-in provider settings and Muse-specific context', () => {
@@ -133,6 +143,20 @@ describe('Muse model and harness support', () => {
       overdeckEnv: { agentId: 'agent-muse-test' } })).toThrow('explicit supported Muse');
   });
 
+  it('buildMuseCommand accepts muse-ember-1.0 and clamps max to xhigh', () => {
+    const museEffort = resolveEffort({ explicit: 'max', model: 'muse-ember-1.0', harness: 'muse' }).effort;
+    const script = generateLauncherScript({ role: 'work', workingDir: '/tmp', harness: 'muse',
+      museModel: 'muse-ember-1.0', museEffort, overdeckEnv: { agentId: 'agent-muse-ember-test' } });
+    expect(script).toContain("muse --model 'muse-ember-1.0' --reasoning-effort 'xhigh'");
+  });
+
+  it('buildMuseCommand accepts muse-wonder-full-1.0 and clamps max to xhigh', () => {
+    const museEffort = resolveEffort({ explicit: 'max', model: 'muse-wonder-full-1.0', harness: 'muse' }).effort;
+    const script = generateLauncherScript({ role: 'work', workingDir: '/tmp', harness: 'muse',
+      museModel: 'muse-wonder-full-1.0', museEffort, overdeckEnv: { agentId: 'agent-muse-wonder-full-test' } });
+    expect(script).toContain("muse --model 'muse-wonder-full-1.0' --reasoning-effort 'xhigh'");
+  });
+
   it.each(EFFORT_LEVELS)('muse launch argv carries the resolved effort %s (max clamps to xhigh)', level => {
     const museEffort = resolveEffort({ explicit: level, model: 'muse-spark-1.3', harness: 'muse' }).effort;
     const script = generateLauncherScript({ role: 'work', workingDir: '/tmp', harness: 'muse',
@@ -167,8 +191,28 @@ describe('Muse model and harness support', () => {
     const result = summarizeMuseRecords(records, '/sessions/root/session.jsonl');
     const price = getPricing('custom', model)!;
     expect(result?.usage).toEqual({ inputTokens: 500000, outputTokens: 1000000, cacheReadTokens: 500000 });
-    expect(result?.cost).toBeCloseTo(500 * price.inputPer1k + 1000 * price.outputPer1k + 500 * price.cacheReadPer1k!);
-    expect(result?.cost).toBeCloseTo({ 'muse-wonder-1.0': 22.1, 'muse-spark-1.3': 4.95, 'muse-spark-1.3-contributor': 0.251 }[model]);
+    const tierMultiplier = model === 'muse-ember-1.0' ? 3 : 1;
+    expect(result?.cost).toBeCloseTo((500 * price.inputPer1k + 1000 * price.outputPer1k + 500 * price.cacheReadPer1k!) * tierMultiplier);
+    expect(result?.cost).toBeCloseTo({ 'muse-wonder-1.0': 22.1, 'muse-spark-1.3': 4.95, 'muse-spark-1.3-contributor': 0.251, 'muse-ember-1.0': 1.656 }[model]);
+  });
+
+  it('applies the Muse Ember long-context tier per request, not per session', () => {
+    const metadata = { id: 'metadata', payload_type: 'runtime.session.metadata', payload: { record: { model_id: 'muse-ember-1.0' } } };
+    const baseRateEvents = [1, 2].map(n => ({
+      id: `completion-${n}`, payload_type: 'runtime.session', payload: { kind: 'run', event: {
+        kind: 'model_completed', usage: { input_tokens: 150000, output_tokens: 1000, cached_tokens: 0 },
+      } },
+    }));
+    const baseRateRecords = parseMuseRecords([metadata, ...baseRateEvents].map(record => JSON.stringify(record)).join('\n') + '\n');
+    // Two 150K-input requests each stay under the 200K tier threshold: 2 * (150 * 0.0001 + 1 * 0.0005) = 0.031.
+    expect(summarizeMuseRecords(baseRateRecords, '/sessions/root/session.jsonl')?.cost).toBeCloseTo(2 * (150 * 0.0001 + 1 * 0.0005), 6);
+
+    const tieredEvent = { id: 'completion-tiered', payload_type: 'runtime.session', payload: { kind: 'run', event: {
+      kind: 'model_completed', usage: { input_tokens: 300000, output_tokens: 1000, cached_tokens: 100000 },
+    } } };
+    const tieredRecords = parseMuseRecords([metadata, tieredEvent].map(record => JSON.stringify(record)).join('\n') + '\n');
+    // One 300K-input (100K cached) request crosses the tier: 3 * (200 * 0.0001 + 1 * 0.0005 + 100 * 0.000004) = 0.0627.
+    expect(summarizeMuseRecords(tieredRecords, '/sessions/root/session.jsonl')?.cost).toBeCloseTo(3 * (200 * 0.0001 + 1 * 0.0005 + 100 * 0.000004), 6);
   });
 
   it('reads real Muse 1.0.2 echo turns without rendering private reasoning or duplicating user intents', async () => {

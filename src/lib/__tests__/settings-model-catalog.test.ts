@@ -47,6 +47,10 @@ const gpt6Additions = [
 const gpt6AdditionIds = new Set(gpt6Additions.map((model) => model.id));
 // Muse Wonder (2026-10-12) is an addition after the fixture was captured.
 const museWonderId = 'muse-wonder-1.0';
+// Muse Ember (2026-11-09) is an addition after the fixture was captured.
+const museEmberId = 'muse-ember-1.0';
+// Muse Wonder Full (operator addition, issue comment 2026-11-10) is an addition after the fixture was captured.
+const museWonderFullId = 'muse-wonder-full-1.0';
 // Gemini 4 Argon (GA 2026-10-13) is an addition after the fixture was captured.
 const geminiArgon = {
   id: 'gemini-4-argon',
@@ -109,7 +113,7 @@ function withoutOpus55<T extends { anthropic: Array<{ id: string }>; openai: Arr
     anthropic: catalog.anthropic.filter((model) => ![fable52.id, opus55.id, sonnet55.id, haiku55.id].includes(model.id)),
     openai: catalog.openai.filter((model) => !gpt6AdditionIds.has(model.id)),
     google: catalog.google.filter((model) => ![geminiArgon.id, gemini36FlashId, gemini31FlashLiteId].includes(model.id)),
-    meta: catalog.meta.filter((model) => model.id !== museWonderId),
+    meta: catalog.meta.filter((model) => model.id !== museWonderId && model.id !== museEmberId && model.id !== museWonderFullId),
     kimi: catalog.kimi.filter((model) => !kimiK31AdditionIds.has(model.id)),
     mimo: catalog.mimo.filter((model) => !mimoV26Ids.includes(model.id)),
     minimax: catalog.minimax.filter((model) => model.id !== minimaxM31FlashId),

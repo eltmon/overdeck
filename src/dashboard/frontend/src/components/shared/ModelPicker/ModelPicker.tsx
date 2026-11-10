@@ -21,7 +21,7 @@ export const HARNESS_OPTIONS: Array<{ id: Harness; label: string; description: s
   { id: 'codex', label: 'Codex', description: 'OpenAI Codex CLI harness' },
   { id: 'opencode', label: 'OpenCode', description: 'OpenCode with Go and Zen providers' },
   { id: 'acp', label: 'ACP', description: 'Agent Client Protocol harness' },
-  { id: 'muse', label: 'Muse Code', description: 'Meta Muse Code with Standard or Contributor models' },
+  { id: 'muse', label: 'Muse Code', description: 'Meta Muse Code with Wonder, Spark, Ember and Wonder Full models' },
   { id: 'kimi-code', label: 'Kimi Code', description: 'Moonshot Kimi Code CLI (native, Kimi models only)' },
   { id: 'prime-agent', label: 'Prime Agent', description: 'Prime Intellect coding agent (RPC)' },
 ];

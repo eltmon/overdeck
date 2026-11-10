@@ -124,9 +124,11 @@ describe('MiniMax M3.1 Flash', () => {
 });
 
 describe('Muse max effort', () => {
-  it('lists max for Muse Wonder and Muse Spark 1.3 but not the Contributor tier', () => {
+  it('lists max for Muse Wonder, Spark 1.3, Ember and Wonder Full but not the Contributor tier', () => {
     expect(getModelEffortLevels('muse-wonder-1.0')).toContain('max');
     expect(getModelEffortLevels('muse-spark-1.3')).toContain('max');
+    expect(getModelEffortLevels('muse-ember-1.0')).toContain('max');
+    expect(getModelEffortLevels('muse-wonder-full-1.0')).toContain('max');
     expect(getModelEffortLevels('muse-spark-1.3-contributor')).not.toContain('max');
   });
 });

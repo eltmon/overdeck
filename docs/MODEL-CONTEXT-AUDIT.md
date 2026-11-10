@@ -23,6 +23,7 @@ Picker context labels describe the configured session budget. They are not a cla
 | Grok 4.3, Mistral Large 4 | 1,000,000 | Official xAI and Mistral model pages (PAN-4825). |
 | Grok 4.7 | 500,000 | Official xAI models page (PAN-4825). |
 | GPT OSS 120B / 20B (Groq), GPT OSS 120B (Cerebras) | 131,072 | Groq models page; Cerebras paid tier (65K on its free tier) (PAN-4825). |
+| Muse Wonder 1.0, Spark 1.3, Spark 1.3 Contributor, Ember 1.0 | 1,048,576 | Meta models page. The Muse Code 1.4.15 catalog reports a 1,007,997-token context limit and a 128,000-token output limit for all four; Meta documents 524,288 max output for Ember (PAN-5106). |
 
 Other retained entries show their existing configured budget. This audit does not silently raise every older model to its largest advertised API window. Known non-Anthropic models routed through Claude Code receive both `CLAUDE_CODE_AUTO_COMPACT_WINDOW` and `CLAUDE_CODE_MAX_CONTEXT_TOKENS`; supplying only the first can leave Claude's unknown-model 200K ceiling in place.
 
@@ -112,3 +113,24 @@ Every fact below was re-read from the official source on 2026-11-02 before the c
 - Muse `minimal` effort: not an Overdeck effort level.
 - Groq's own replacements for QwQ (`qwen/qwen3-32b`) and Gemma (`llama-3.1-8b-instant`, itself shut down) are not used, because this refresh adds no third Groq model and a migration target must be live.
 - omp/pi launches of the Groq slash ids: omp reads `openai/` as its own provider prefix, so qualifying them as `groq/openai/...` is out of scope.
+
+## November 2026 Muse refresh (PAN-5106)
+
+**Verified**
+
+- Meta's [models](https://dev.meta.ai/docs/models), [pricing and rate limits](https://dev.meta.ai/docs/pricing-rate-limits) and [reasoning](https://dev.meta.ai/docs/reasoning) pages, plus the [Muse Ember model page](https://dev.meta.ai/models/muse-ember/) and [Meta's Muse Ember announcement](https://research.meta.ai/blog/muse-ember), read 2026-11-10: Muse Ember (`muse-ember-1.0`, released 2026-11-09) is Meta's low-cost Standard model, 1,048,576 context, 524,288 max output, no Contributor variant. Up to 200,000 input tokens: $0.10 input / $0.004 cached input / $0.50 output per million tokens. Above 200,000 input tokens (cached included), Meta bills the whole request at 3x every rate ($0.30 / $0.012 / $1.50). Meta's reasoning docs list `minimal` through `max` with an API default of `max`; Meta's docs support only the full `muse-ember-1.0` id, not a bare `muse-ember` alias.
+- The same pages, re-read for the three existing Muse models: Wonder ($4.00 / $0.20 / $20.00, effort `minimal`-`max`, default `max`), Spark 1.3 ($1.25 / $0.15 / $4.25, effort up to `max`, default `high`), Spark 1.3 Contributor ($0.10 / $0.002 / $0.20, default `high`, no `max`). None has a long-context premium.
+- Muse Code 1.4.15's locally-fetched model catalog (`source: provider_catalog`) lists `muse-ember-1.0` and accepts it on the installed TUI, with the session log's `runtime.session.metadata` record carrying `model_id: muse-ember-1.0`.
+- Operator scope addition (issue comment, 2026-11-10): `muse-wonder-full-1.0` runs only inside Muse Code on the Power Usage ($50/mo) and Maximum Usage ($200/mo) plans, is not on the Meta Model API, has no per-token price, 1,048,576 context, and supports `max` effort in Muse Code. It is absent from this host's Muse Code 1.4.15 catalog (no Power/Maximum plan is configured here, and `muse usage` reports `no_allowance`), so real acceptance could not be verified and no minimum Muse Code version is recorded.
+
+**Changed**
+
+- Added `muse-ember-1.0` with the per-request long-context tier. `calculateCost()` gains a Muse Ember branch (3x every component above 200,000 total input tokens, cached included), and the Muse cost parser (`summarizeMuseRecords()`) now prices each `model_completed` event as its own request through `calculateCost()` instead of pricing the session aggregate by hand, so the tier applies per request rather than per session.
+- Added `muse-wonder-full-1.0`, capability class `frontier`, as a Muse-harness-only subscription model: no `cost.ts` pricing row, so `getPricing()` returns `null` and cost tracking records $0.
+
+**Not changed**
+
+- The existing three Muse models' prices, effort lists and context windows match Meta's pages; no drift found, so no no-loss exception row was needed.
+- Muse Code's catalog reports `max` for `muse-spark-1.3-contributor`, but Meta's reasoning page says `max` is "not available with `muse-spark-1.3-contributor`", so Overdeck keeps it excluded.
+- Muse `minimal` effort and Meta's `max` API default are not represented as an Overdeck effort level or a default-effort field; the Muse harness row still caps launches at `xhigh`.
+- `muse-spark-1.2` is not added.

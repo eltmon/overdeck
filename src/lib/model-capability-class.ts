@@ -20,6 +20,7 @@ export const MODEL_CAPABILITY_CLASSES: Readonly<Record<string, ModelCapabilityCl
   'claude-opus-4-7': 'frontier',
   'claude-opus-4-6': 'frontier',
   'muse-wonder-1.0': 'frontier',
+  'muse-wonder-full-1.0': 'frontier',
   'gpt-6-astra': 'frontier',
   'gpt-6-sol': 'frontier',
   'gpt-6.1-sol': 'frontier',
@@ -89,6 +90,7 @@ export const MODEL_CAPABILITY_CLASSES: Readonly<Record<string, ModelCapabilityCl
   'codestral-latest': 'workhorse',
   'ql-swift-8b': 'workhorse',
   // small
+  'muse-ember-1.0': 'small',
   'claude-haiku-5-5': 'small',
   'claude-haiku-4-5': 'small',
   'gpt-5.6-luna': 'small',
