@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-10T20:03:07.690132Z · model: claude-opus-5-5 · open: 869_
+_Last sequenced: 2026-11-10T20:03:51.532854Z · model: claude-opus-5-5 · open: 869_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -1204,7 +1204,7 @@ New this pass. The deployment gate's queue message is unusually good — it name
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-10T20:03:07.690132Z",
+  "generatedAt": "2026-11-10T20:03:51.532854Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
   "openCount": 869,
