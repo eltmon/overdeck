@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-10T19:03:48.085016Z · model: claude-opus-5-5 · open: 871_
+_Last sequenced: 2026-11-10T19:06:03.992934Z · model: claude-opus-5-5 · open: 870_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -871,11 +871,10 @@ _Last sequenced: 2026-11-10T19:03:48.085016Z · model: claude-opus-5-5 · open: 
 | 864 | PAN-4593 | L | low | needs-refinement |  | PAN-4590 | Semgrep Platform/Guardian tier; operator decisions (offer Guardian? contact Semgrep first?) still open — refine before work. |
 | 865 | PAN-5022 | L | medium | ok |  |  | Phone app: relay notification preferences to offline machines via the directory, and drop muted pushes on the phone. |
 | 866 | PAN-5021 | M | low | needs-refinement |  |  | PAN-5100 landed phone telemetry with conflicting decisions; re-scope to any remaining gap or close as superseded. |
-| 867 | PAN-5078 | XL | low | ok |  |  | Parked: add xAI's Grok Build CLI as a harness over ACP (stdio agent, resumable sessions). |
-| 868 | PAN-5029 | M | medium | needs-refinement |  |  | Grok Build Tailscale reach can't work: pan mcp serve verifies tokens only against its own machine. Needs a design choice. |
-| 869 | PAN-4842 | S | medium | ok |  |  | Phone app W-DOC: phone-app.mdx and updates to Anywhere, push, tailscale and service docs; finished last. |
-| 870 | PAN-4851 | S | low | needs-refinement |  |  | Open question: opt-in Overdeck reviewer for Deft-pipeline issues; operator says low priority, do not plan or start without them |
-| 871 | PAN-4887 | M | medium | ok |  |  | Phone app: let phone credentials reach linked machines (fleet Needs-you, linked-conv proxy, /ws/linked); PAN-4835 merged. |
+| 867 | PAN-5029 | M | medium | needs-refinement |  |  | Grok Build Tailscale reach can't work: pan mcp serve verifies tokens only against its own machine. Needs a design choice. |
+| 868 | PAN-4842 | S | medium | ok |  |  | Phone app W-DOC: phone-app.mdx and updates to Anywhere, push, tailscale and service docs; finished last. |
+| 869 | PAN-4851 | S | low | needs-refinement |  |  | Open question: opt-in Overdeck reviewer for Deft-pipeline issues; operator says low priority, do not plan or start without them |
+| 870 | PAN-4887 | M | medium | ok |  |  | Phone app: let phone credentials reach linked machines (fleet Needs-you, linked-conv proxy, /ws/linked); PAN-4835 merged. |
 
 ## Rationale detail
 
@@ -1206,10 +1205,10 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-10T19:03:48.085016Z",
+  "generatedAt": "2026-11-10T19:06:03.992934Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 871,
+  "openCount": 870,
   "nodes": [
     {
       "issue": "PAN-5001",
@@ -11964,18 +11963,6 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "planning": "auto"
     },
     {
-      "issue": "PAN-5078",
-      "rank": 867,
-      "size": "XL",
-      "importance": "low",
-      "score": 34,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Parked: add xAI's Grok Build CLI as a harness over ACP (stdio agent, resumable sessions).",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-5021",
       "rank": 866,
       "size": "M",
@@ -11990,7 +11977,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-5029",
-      "rank": 868,
+      "rank": 867,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -12002,7 +11989,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-4842",
-      "rank": 869,
+      "rank": 868,
       "size": "S",
       "importance": "medium",
       "score": 26,
@@ -12015,7 +12002,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-4851",
-      "rank": 870,
+      "rank": 869,
       "size": "S",
       "importance": "low",
       "score": 15,
@@ -12028,7 +12015,7 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
     },
     {
       "issue": "PAN-4887",
-      "rank": 871,
+      "rank": 870,
       "size": "M",
       "importance": "medium",
       "score": 30,
@@ -13216,13 +13203,6 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.4
-    },
-    {
-      "from": "PAN-5116",
-      "to": "PAN-5078",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
     },
     {
       "from": "PAN-5118",
