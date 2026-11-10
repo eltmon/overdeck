@@ -292,6 +292,7 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
     permissionMode: 'auto',
   },
   kimiCode: {},
+  harnesses: { autoUpdate: true },
 };
 
 /**
