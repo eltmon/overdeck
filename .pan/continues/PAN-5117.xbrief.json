@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5117",
   "created": "2026-11-10T17:52:40.588Z",
-  "updated": "2026-11-10T18:10:40.458Z",
+  "updated": "2026-11-10T18:10:46.540Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -14,6 +14,11 @@
       "claimedBy": "agent-pan-5117",
       "claimedAt": "2026-11-10T17:52:40.588Z",
       "doneAt": "2026-11-10T18:10:40.458Z"
+    },
+    "move-wall-clock-cases": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5117",
+      "claimedAt": "2026-11-10T18:10:46.539Z"
     }
   }
 }
