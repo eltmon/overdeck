@@ -697,14 +697,18 @@ per-agent `overdeck` MCP server reaches Grok through the ACP `session/new` and
 `turn_completed` entry, and the `grok` cost reconcile source imports one cost
 event per turn (provider `custom`, model `grok/<id>`). The vendor figure
 includes the double rate for prompts of 200K tokens or more; Overdeck's
-pricing table is used only when a turn reports no cost.
+pricing table is used only when a turn reports no cost. The Cloister tick
+imports a running Grok work agent's turns. Grok conversations write no agent
+state, so their turns are imported when `POST /api/costs/reconcile` runs (the
+dashboard's five-minute sweep covers only Pi and Codex).
 
 **Known behavior.** Grok Build loads the operator's own `~/.grok` MCP servers,
 plugins, hooks and skills into every session, alongside Overdeck's. MCP servers
 that fail to authenticate print noise in the agent pane. If the Overdeck Grok
 Build bot plugin is enabled in `~/.grok/config.toml`, its `overdeck` server is
 the outside-client plugin; the harness agent already gets its own per-agent
-`overdeck` server. Plain transcript forks are unavailable; use a summary fork.
+`overdeck` server. In the live check (bot plugin enabled), the agent's
+`overdeck__list_conversations` call was answered by the per-agent server. Plain transcript forks are unavailable; use a summary fork.
 
 ### Prime Agent
 

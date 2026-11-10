@@ -48,6 +48,7 @@ export function mapConversationToFeedEntry(conversation: ConversationFeedRow): C
     conversationId: conversation.id,
     conversationName: conversation.name,
     agent: mapHarnessToAgent(conversation.harness),
+    ...(conversation.harness && conversation.harness !== 'pi' ? { harness: conversation.harness } : {}),
     lastMessageDate: recencyAt,
     lastMessageSnippet: conversation.title ?? 'No messages yet',
     ...(conversation.messageCount === undefined ? {} : { messageCount: conversation.messageCount }),

@@ -51,6 +51,8 @@ export interface ConversationSessionFeedEntry extends SessionFeedEntryBase {
   conversationId: number;
   conversationName: string;
   agent: string;
+  /** The conversation's harness; OpenCode and Grok Build share the `acp` feed kind (PAN-5078). */
+  harness?: Exclude<NonNullable<ConversationFeedRow['harness']>, 'pi'>;
   lastMessageDate: string;
   lastMessageSnippet: string;
   messageCount?: number;
