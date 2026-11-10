@@ -4,17 +4,17 @@
     "created": "2026-11-10T15:45:00Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5111: Push notifications: keep a sent-push history, mark withdrawn questions, and show unreachable linked machines in Needs you",
-    "updated": "2026-11-10T15:50:09.400Z"
+    "updated": "2026-11-10T15:51:30.154Z"
   },
   "plan": {
     "id": "pan-5111",
     "title": "Push notifications: keep a sent-push history, mark withdrawn questions, and show unreachable linked machines in Needs you",
-    "status": "proposed",
+    "status": "running",
     "uid": "69b21e86-661f-434c-aafe-e6ca02237d7d",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-10T15:45:00Z",
-    "updated": "2026-11-10T15:50:09.400Z",
+    "updated": "2026-11-10T15:51:30.154Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5111",
@@ -1009,5 +1009,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
