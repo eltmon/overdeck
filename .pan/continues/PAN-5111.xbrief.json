@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5111",
   "created": "2026-11-10T15:51:44.994Z",
-  "updated": "2026-11-10T17:01:06.162Z",
+  "updated": "2026-11-10T17:01:27.379Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -168,6 +168,10 @@
     "history-route.ac3": {
       "status": "completed",
       "doneAt": "2026-11-10T17:01:06.162Z"
+    },
+    "recent-notifications-ui.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:01:27.378Z"
     }
   }
 }
