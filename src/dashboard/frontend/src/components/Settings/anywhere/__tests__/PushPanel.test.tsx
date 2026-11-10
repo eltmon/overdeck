@@ -15,6 +15,7 @@ vi.mock('../../../push/pushApi', async (importOriginal) => {
   return {
     ...actual,
     loadPushStatus: vi.fn(async () => currentStatus),
+    loadPushHistory: vi.fn(async () => []),
     deletePushSubscription: vi.fn(async () => undefined),
     sendTestPush: vi.fn(async () => [{ target: 'webpush:s1', ok: true }]),
   };
