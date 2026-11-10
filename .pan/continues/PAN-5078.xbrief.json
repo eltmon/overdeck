@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-5078",
+  "created": "2026-11-10T14:48:32.729Z",
+  "updated": "2026-11-10T14:48:32.729Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "contracts-harness": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5078",
+      "claimedAt": "2026-11-10T14:48:32.729Z"
+    }
+  }
+}
