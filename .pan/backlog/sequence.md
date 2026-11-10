@@ -1,12 +1,11 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-10T20:12:10.400853Z · model: claude-opus-5-5 · open: 869_
+_Last sequenced: 2026-11-10T20:13:12.717957Z · model: claude-opus-5-5 · open: 868_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-5001 | S | critical | ok |  |  | Closed-issue reaper re-checks 426 reaped issues every minute and drains the 5k/hr GitHub App quota; in pipeline. |
-| 3 | PAN-5118 | S | high | ok |  |  | In pipeline: pan task done takes one item and commits each call; 48-85 AC sub-items cost 20-40 min of push loops. |
 | 4 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
 | 5 | PAN-5090 | XS | critical | ok |  |  | Herdr unit lacks OOMPolicy=continue: one OOM-killed pane child stops the service and kills every conversation; seen twice. |
 | 6 | PAN-4995 | S | high | ok |  |  | pan review request verifies a half-adopted workspace; its main merge trips adoption's head check -> false Needs-you on handoff PRs |
@@ -881,10 +880,6 @@ _Last sequenced: 2026-11-10T20:12:10.400853Z · model: claude-opus-5-5 · open: 
 
 New in-pipeline substrate bug: the deacon close-out sweep alone exhausted the GitHub App REST pool, which pauses every tracker read and write across the pipeline. Pinned at the free top slot; the fix (skip already-reaped residue for 6h, no overlapping deacon-lite sweeps) is small and well specified.
 
-### PAN-5118 (rank 3)
-
-New in-pipeline substrate issue, pinned at the free slot after the other in-pipeline work: runTaskDone commits the continue file once per item, so agents closing dozens of acceptance-criterion sub-items pay one pre-push hook run per sub-item before opening a PR. The fix (variadic items, one commit) is small, well specified and speeds every work agent.
-
 ### PAN-5013 (rank 4)
 
 Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat Herdr's done state, which means the harness is alive and waiting, as no live agent. Derived issue state feeds pickup and respawn, so a wrong answer here can launch duplicate agents. Small, well-located fix, so it takes the rank-2 slot freed by the closure of PAN-4998.
@@ -1197,6 +1192,10 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
 
 New this pass. The deployment gate's queue message is unusually good — it names the holders, the queue age, and warns against forcing — and it promises a 'next verification boundary' trigger that does not exist. Every holder cleared and the deploy never fired; the live build stayed stale for 35 minutes until a manual reload. A correct-sounding instruction that cannot happen is worse than no message.
 
+### PAN-3118 (rank 82)
+
+Triage: verify "running at $0.00 with no capacity fallback" against the current liveness definition. Rank held.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1204,10 +1203,10 @@ New this pass. The deployment gate's queue message is unusually good — it name
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-10T20:12:10.400853Z",
+  "generatedAt": "2026-11-10T20:13:12.717957Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 869,
+  "openCount": 868,
   "nodes": [
     {
       "issue": "PAN-5001",
@@ -1219,19 +1218,6 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "dependsOn": [],
       "why": "Closed-issue reaper re-checks 426 reaped issues every minute and drains the 5k/hr GitHub App quota; in pipeline.",
       "rationale": "New in-pipeline substrate bug: the deacon close-out sweep alone exhausted the GitHub App REST pool, which pauses every tracker read and write across the pipeline. Pinned at the free top slot; the fix (skip already-reaped residue for 6h, no overlapping deacon-lite sweeps) is small and well specified.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5118",
-      "rank": 3,
-      "size": "S",
-      "importance": "high",
-      "score": 80,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline: pan task done takes one item and commits each call; 48-85 AC sub-items cost 20-40 min of push loops.",
-      "rationale": "New in-pipeline substrate issue, pinned at the free slot after the other in-pipeline work: runTaskDone commits the continue file once per item, so agents closing dozens of acceptance-criterion sub-items pay one pre-push hook run per sub-item before opening a PR. The fix (variadic items, one commit) is small, well specified and speeds every work agent.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13186,13 +13172,6 @@ New this pass. The deployment gate's queue message is unusually good — it name
     {
       "from": "PAN-5097",
       "to": "PAN-2954",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.4
-    },
-    {
-      "from": "PAN-5118",
-      "to": "PAN-4219",
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.4
