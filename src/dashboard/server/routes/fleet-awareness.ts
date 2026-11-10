@@ -4,9 +4,14 @@
  * that arrives through a secure channel.
  *
  * - `GET /api/fleet/needs-you` (`read:conversations`, D-4651-15) →
- *   `{ machines: [{ environmentId, label, conversations, agents }] }` from the
- *   hash-driven cache, online links only. An offline machine contributes no
- *   rows and no error (NFR-2).
+ *   `{ machines: [{ environmentId, label, conversations, agents }],
+ *   unreachable: [{ environmentId, label, since, reason }] }`. `machines` comes
+ *   from the hash-driven cache, online links only. PAN-5111: a machine whose
+ *   Needs-You fetch failed within the last hour contributes an `unreachable`
+ *   entry until a fetch succeeds; a machine that goes offline without a failed
+ *   fetch still contributes no rows and no error (NFR-2). A paired phone,
+ *   which reaches this machine only through a channel, gets
+ *   `{ machines: [], unreachable }`; every other channel caller is refused.
  * - `GET /api/fleet/search?q=&limit=` (`read:conversations`, D-4651-16) → runs
  *   `GET /api/palette/search` on every online link in parallel (2.5 s each) and
  *   answers `{ machines: [{ environmentId, label, conversations, error? }] }`
@@ -26,22 +31,37 @@ import { channelOfRequest } from '../channel-peer.js';
 import { jsonResponse } from '../http-helpers.js';
 import { currentLinkSupervisor } from '../services/anywhere-boot.js';
 import { type IssueActivity, issueActivity } from '../services/issue-activity.js';
-import { currentLinkedNeedsYou, type LinkedNeedsYou } from '../services/linked-needs-you-sync.js';
+import { currentLinkedNeedsYou, type LinkedNeedsYou, type LinkedNeedsYouFailure } from '../services/linked-needs-you-sync.js';
 import { connectingStatusSource, type LinkStatusSource } from '../services/machine-link-service.js';
-import { rejectUnauthorizedDashboardRequest } from './dashboard-auth.js';
+import { rejectUnauthorizedDashboardRequest, resolveRequestCredential } from './dashboard-auth.js';
 import { refuseFleetRequest } from './machines-fleet.js';
 
 export interface FleetAwarenessDeps {
   links: () => Promise<MachineLink[]>;
   status: LinkStatusSource['status'];
   needsYou: (environmentId: string) => LinkedNeedsYou | null;
+  /** PAN-5111: the link's remembered Needs-You fetch failure. */
+  needsYouFailure?: (environmentId: string) => LinkedNeedsYouFailure | null;
+  now?: () => number;
 }
 
 export const defaultFleetAwarenessDeps = (): FleetAwarenessDeps => ({
   links: listLinks,
   status: (linkId) => (currentLinkSupervisor() ?? connectingStatusSource).status(linkId),
   needsYou: (environmentId) => currentLinkedNeedsYou()?.feedFor(environmentId) ?? null,
+  needsYouFailure: (environmentId) => currentLinkedNeedsYou()?.failureFor(environmentId) ?? null,
+  now: Date.now,
 });
+
+/** PAN-5111 D-10: a failure older than this no longer produces a "Can't reach" row. */
+export const UNREACHABLE_FRESH_MS = 60 * 60 * 1000;
+
+export interface UnreachableMachine {
+  environmentId: string;
+  label: string;
+  since: string;
+  reason: string;
+}
 
 /** Online, visible, non-revoked links in store order. */
 export async function onlineLinks(deps: Pick<FleetAwarenessDeps, 'links' | 'status'>): Promise<MachineLink[]> {
@@ -49,13 +69,24 @@ export async function onlineLinks(deps: Pick<FleetAwarenessDeps, 'links' | 'stat
 }
 
 export async function buildFleetNeedsYou(deps: FleetAwarenessDeps = defaultFleetAwarenessDeps()) {
+  const links = await deps.links();
   const machines = [];
-  for (const link of await onlineLinks(deps)) {
+  for (const link of await onlineLinks({ status: deps.status, links: async () => links })) {
     const feed = deps.needsYou(link.environmentId);
     if (!feed) continue;
     machines.push({ environmentId: link.environmentId, label: link.label, conversations: feed.conversations, agents: feed.agents });
   }
-  return { machines };
+  // D-10: not filtered on `offline`, so a flapping link's row does not blink;
+  // a switched-off machine stops failing fetches and its row expires.
+  const now = (deps.now ?? Date.now)();
+  const unreachable: UnreachableMachine[] = [];
+  for (const link of links) {
+    if (link.revokedAt || link.hidden === true || deps.status(link.id).state === 'revoked') continue;
+    const failure = deps.needsYouFailure?.(link.environmentId) ?? null;
+    if (!failure || now - Date.parse(failure.lastAttemptAt) > UNREACHABLE_FRESH_MS) continue;
+    unreachable.push({ environmentId: link.environmentId, label: link.label, since: failure.since, reason: failure.reason });
+  }
+  return { machines, unreachable };
 }
 
 export const FLEET_SEARCH_TIMEOUT_MS = 2_500;
@@ -165,7 +196,18 @@ const needsYouRoute = HttpRouter.add(
   '/api/fleet/needs-you',
   Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
-    const refused = refuseFleetRequest(channelOfRequest(request) !== null, () => rejectUnauthorizedDashboardRequest(request));
+    const viaChannel = channelOfRequest(request) !== null;
+    // PAN-5111 (D-12): a paired phone reaches this machine only through a channel. It reads
+    // which linked machines this machine cannot reach, never their rows; every other channel
+    // caller (a linked machine, a connector) is still refused. Same shape as fleetSpawnGate's
+    // connector exception (PAN-4950 D-5).
+    if (viaChannel && resolveRequestCredential(request)?.kind === 'phone') {
+      const authError = rejectUnauthorizedDashboardRequest(request);
+      if (authError) return authError;
+      const { unreachable } = yield* Effect.promise(() => buildFleetNeedsYou());
+      return jsonResponse({ machines: [], unreachable });
+    }
+    const refused = refuseFleetRequest(viaChannel, () => rejectUnauthorizedDashboardRequest(request));
     if (refused) return refused;
     return jsonResponse(yield* Effect.promise(() => buildFleetNeedsYou()));
   }),

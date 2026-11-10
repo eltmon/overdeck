@@ -59,7 +59,7 @@ describe('linked Needs-You cache (D-4651-15, NFR-1)', () => {
       status: ((linkId: string) => ({ state: linkId === 'link-desk' ? 'online' : 'offline' })) as unknown as FleetAwarenessDeps['status'],
       needsYou: () => ({ hash: 'h', ...FEED }),
     };
-    expect(await buildFleetNeedsYou(deps)).toEqual({ machines: [{ environmentId: 'env-desk', label: 'desk', ...FEED }] });
+    expect(await buildFleetNeedsYou(deps)).toEqual({ machines: [{ environmentId: 'env-desk', label: 'desk', ...FEED }], unreachable: [] });
   });
 });
 
