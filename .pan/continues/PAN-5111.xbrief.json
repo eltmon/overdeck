@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5111",
   "created": "2026-11-10T15:51:44.994Z",
-  "updated": "2026-11-10T17:05:23.100Z",
+  "updated": "2026-11-10T17:05:46.547Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -216,6 +216,10 @@
     "fleet-unreachable-route.ac3": {
       "status": "completed",
       "doneAt": "2026-11-10T17:05:23.100Z"
+    },
+    "fleet-unreachable-route.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:05:46.547Z"
     }
   }
 }
