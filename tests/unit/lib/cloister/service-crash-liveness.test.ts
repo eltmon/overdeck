@@ -219,6 +219,16 @@ describe('handleAgentCrash', () => {
     expect(host.deathTimestamps).toEqual([]);
   });
 
+  it('does not count a crash for a paused agent whose pane is gone (PAN-5112)', async () => {
+    world.agentState = { ...world.agentState, paused: true, pausedReason: 'awaiting close-out (verify on main)' };
+    const host = makeHost();
+    await handleAgentCrash(host, AGENT);
+    expect(host.events).toEqual([]);
+    expect(host.appended).toEqual([]);
+    expect(host.deathTimestamps).toEqual([]);
+    expect(host.crashTrackers.size).toBe(0);
+  });
+
   it('counts a crash and emits heartbeat_dead for a confirmed-dead agent', async () => {
     const host = makeHost();
     await handleAgentCrash(host, AGENT);
