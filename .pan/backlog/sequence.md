@@ -1,13 +1,12 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-10T17:33:17.312297Z · model: claude-opus-5-5 · open: 872_
+_Last sequenced: 2026-11-10T17:34:39.050684Z · model: claude-opus-5-5 · open: 871_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-5001 | S | critical | ok |  |  | Closed-issue reaper re-checks 426 reaped issues every minute and drains the 5k/hr GitHub App quota; in pipeline. |
 | 2 | PAN-5117 | S | critical | ok |  |  | In pipeline: real-sleep bash fallback test times out under CI load and turns main red; move it to a .slow test file. |
-| 3 | PAN-5108 | M | high | ok |  |  | In pipeline: auto-update harness CLIs by default; new models are refused until the operator upgrades Claude Code by hand. |
 | 4 | PAN-5111 | M | high | ok |  |  | In pipeline: record sent pushes, mark withdrawn questions, flag unreachable linked machines in Needs you |
 | 4 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
 | 5 | PAN-5090 | XS | critical | ok |  |  | Herdr unit lacks OOMPolicy=continue: one OOM-killed pane child stops the service and kills every conversation; seen twice. |
@@ -888,10 +887,6 @@ New in-pipeline substrate bug: the deacon close-out sweep alone exhausted the Gi
 
 New since the prior run and already in the pipeline. A flaky test on main turns main red, and a red main silently empties the merge gate for every other issue, so this substrate fix ranks in the top tier. It takes the free rank-2 slot without displacing other pinned work.
 
-### PAN-5108 (rank 3)
-
-New issue, already in the pipeline, so it is pinned near the top. It removes a launch refusal every user hits after each model release (Fable 5.2 on 2026-11-10), reusing the PAN-4654 update plans and the PAN-4359 version gate.
-
 ### PAN-5111 (rank 4)
 
 New since the prior run and already in the pipeline, so it is pinned near the top. The substrate-improvement label sets a high floor: phantom 'needs you' pushes with no record undermine operator trust in the notification path.
@@ -1200,6 +1195,10 @@ Triage: the auto-requeue machinery cited targeted the deleted review_status tabl
 
 New since the prior run (filed by the PAN-4532 plan critic). recoverStalledReviews falls back to getRequestReviewStarter(), which is only registered by the dashboard route module the forked deacon child never loads, so the fallback is a silent no-op in production and a journaled-but-undispatched review with no parent state stays stranded. The fix is a one-call swap to requestReviewThroughRoute, which undispatched-review-recovery already uses. Placed beside PAN-3278 (review never dispatched) because it closes the same throughput hole; it is review-recovery machinery, so it goes through a supervised handoff.
 
+### PAN-3234 (rank 80)
+
+Triage: verify whether blocking-choice-menu detection is wired to the current liveness/health surface. Rank held.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1207,10 +1206,10 @@ New since the prior run (filed by the PAN-4532 plan critic). recoverStalledRevie
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-10T17:33:17.312297Z",
+  "generatedAt": "2026-11-10T17:34:39.050684Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 872,
+  "openCount": 871,
   "nodes": [
     {
       "issue": "PAN-5001",
@@ -1222,19 +1221,6 @@ New since the prior run (filed by the PAN-4532 plan critic). recoverStalledRevie
       "dependsOn": [],
       "why": "Closed-issue reaper re-checks 426 reaped issues every minute and drains the 5k/hr GitHub App quota; in pipeline.",
       "rationale": "New in-pipeline substrate bug: the deacon close-out sweep alone exhausted the GitHub App REST pool, which pauses every tracker read and write across the pipeline. Pinned at the free top slot; the fix (skip already-reaped residue for 6h, no overlapping deacon-lite sweeps) is small and well specified.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5108",
-      "rank": 3,
-      "size": "M",
-      "importance": "high",
-      "score": 80,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "In pipeline: auto-update harness CLIs by default; new models are refused until the operator upgrades Claude Code by hand.",
-      "rationale": "New issue, already in the pipeline, so it is pinned near the top. It removes a launch refusal every user hits after each model release (Fable 5.2 on 2026-11-10), reusing the PAN-4654 update plans and the PAN-4359 version gate.",
       "gate": "auto",
       "planning": "auto"
     },
