@@ -86,9 +86,9 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
   meta: {
     name: 'meta', displayName: 'Meta (Muse)', compatibility: 'direct',
     defaultHarness: 'muse',
-    models: ['muse-wonder-1.0', 'muse-spark-1.3', 'muse-spark-1.3-contributor', 'muse-ember-1.0'],
+    models: ['muse-wonder-1.0', 'muse-spark-1.3', 'muse-spark-1.3-contributor', 'muse-ember-1.0', 'muse-wonder-full-1.0'],
     tested: false,
-    description: 'Muse Code with Muse Wonder, Muse Spark or Muse Ember; Spark Contributor pricing permits training on submitted content.',
+    description: 'Muse Code with Muse Wonder, Muse Spark, Muse Ember or Muse Wonder Full; Spark Contributor pricing permits training on submitted content, and Wonder Full is a Muse Code-only subscription model with no per-token price.',
   },
   anthropic: {
     name: 'anthropic',

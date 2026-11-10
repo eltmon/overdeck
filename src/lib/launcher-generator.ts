@@ -973,10 +973,10 @@ function buildKimiCodeCommand(config: LauncherConfig, useExec: boolean): string[
   ];
 }
 
-/** Persistent native TUI, verified against Muse Code 1.0.2; Wonder IDs checked against the 1.4.7 catalog, Ember against the 1.4.15 catalog. */
+/** Persistent native TUI, verified against Muse Code 1.0.2; Wonder IDs checked against the 1.4.7 catalog, Ember against the 1.4.15 catalog; Wonder Full unverified (no plan entitlement on this host). */
 function buildMuseCommand(config: LauncherConfig, useExec: boolean): string[] {
   const model = config.museModel ?? config.model;
-  if (model !== 'muse-wonder-1.0' && model !== 'muse-spark-1.3' && model !== 'muse-spark-1.3-contributor' && model !== 'muse-ember-1.0') {
+  if (model !== 'muse-wonder-1.0' && model !== 'muse-spark-1.3' && model !== 'muse-spark-1.3-contributor' && model !== 'muse-ember-1.0' && model !== 'muse-wonder-full-1.0') {
     throw new Error('Muse launcher requires an explicit supported Muse model');
   }
   const agentId = config.overdeckEnv?.agentId;

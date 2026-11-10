@@ -51,6 +51,9 @@ vi.mock('../runtimes/muse-context.js', async (importOriginal) => {
 });
 
 const models = ['muse-wonder-1.0', 'muse-spark-1.3', 'muse-spark-1.3-contributor', 'muse-ember-1.0'] as const;
+// Muse Wonder Full (operator addition, issue comment 2026-11-10): Muse Code-only,
+// no per-token price, so it is excluded from the priced `models` tuple above.
+const museWonderFullId = 'muse-wonder-full-1.0';
 const temporary: string[] = [];
 afterEach(async () => { await Promise.all(temporary.splice(0).map(path => rm(path, { recursive: true, force: true }))); });
 
@@ -58,7 +61,7 @@ describe('Muse model and harness support', () => {
   it('registers every Muse model without changing its exact identity', () => {
     expect(KNOWN_HARNESSES.has('muse')).toBe(true);
     expect(getHarnessBehavior('muse').executableName).toBe('muse');
-    expect(getAvailableModelsApi().meta.map(model => model.id)).toEqual(models);
+    expect(getAvailableModelsApi().meta.map(model => model.id)).toEqual([...models, museWonderFullId]);
     for (const model of models) {
       expect(getProviderForModel(model)).toMatchObject({ name: 'meta', defaultHarness: 'muse' });
       expect(canUseHarness('muse', model, undefined).allowed).toBe(true);
@@ -69,7 +72,13 @@ describe('Muse model and harness support', () => {
     expect(() => applyFallback(models[0], new Set(['anthropic']), 'claude-sonnet-5')).toThrow('Meta (Muse) is disabled');
     expect(getAvailableModelsApi().meta.find(model => model.id === 'muse-spark-1.3-contributor')?.name).toContain('training data');
     expect(getAvailableModelsApi().meta[0]).toMatchObject({ id: 'muse-wonder-1.0', name: 'Muse Wonder 1.0 (1M context)', costPer1MTokens: 12 });
-    expect(getAvailableModelsApi().meta.at(-1)).toMatchObject({ id: 'muse-ember-1.0', name: 'Muse Ember 1.0 (1M context)', costPer1MTokens: 0.3, harness: 'muse' });
+    expect(getAvailableModelsApi().meta.find(model => model.id === 'muse-ember-1.0')).toMatchObject({ name: 'Muse Ember 1.0 (1M context)', costPer1MTokens: 0.3, harness: 'muse' });
+    // Muse Wonder Full: Muse Code-only, no per-token price (operator addition, issue comment 2026-11-10).
+    expect(getAvailableModelsApi().meta.at(-1)).toMatchObject({ id: museWonderFullId, name: 'Muse Wonder Full 1.0 (1M context)', costPer1MTokens: 0, harness: 'muse' });
+    expect(getProviderForModel(museWonderFullId)).toMatchObject({ name: 'meta', defaultHarness: 'muse' });
+    expect(canUseHarness('muse', museWonderFullId, undefined).allowed).toBe(true);
+    expect(canUseHarness('claude-code', museWonderFullId, undefined).allowed).toBe(false);
+    expect(getPricing('custom', museWonderFullId)).toBeNull();
   });
 
   it('preserves opt-in provider settings and Muse-specific context', () => {
@@ -139,6 +148,13 @@ describe('Muse model and harness support', () => {
     const script = generateLauncherScript({ role: 'work', workingDir: '/tmp', harness: 'muse',
       museModel: 'muse-ember-1.0', museEffort, overdeckEnv: { agentId: 'agent-muse-ember-test' } });
     expect(script).toContain("muse --model 'muse-ember-1.0' --reasoning-effort 'xhigh'");
+  });
+
+  it('buildMuseCommand accepts muse-wonder-full-1.0 and clamps max to xhigh', () => {
+    const museEffort = resolveEffort({ explicit: 'max', model: 'muse-wonder-full-1.0', harness: 'muse' }).effort;
+    const script = generateLauncherScript({ role: 'work', workingDir: '/tmp', harness: 'muse',
+      museModel: 'muse-wonder-full-1.0', museEffort, overdeckEnv: { agentId: 'agent-muse-wonder-full-test' } });
+    expect(script).toContain("muse --model 'muse-wonder-full-1.0' --reasoning-effort 'xhigh'");
   });
 
   it.each(EFFORT_LEVELS)('muse launch argv carries the resolved effort %s (max clamps to xhigh)', level => {

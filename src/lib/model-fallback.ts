@@ -23,6 +23,7 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
   'muse-spark-1.3': 'meta',
   'muse-spark-1.3-contributor': 'meta',
   'muse-ember-1.0': 'meta',
+  'muse-wonder-full-1.0': 'meta',
   // Anthropic models
   'claude-fable-5-2': 'anthropic',
   'claude-fable-5-1': 'anthropic',
