@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5107",
   "created": "2026-11-10T14:32:45.039Z",
-  "updated": "2026-11-10T14:42:50.484Z",
+  "updated": "2026-11-10T14:42:54.862Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,6 +32,11 @@
       "claimedBy": "agent-pan-5107",
       "claimedAt": "2026-11-10T14:41:41.307Z",
       "doneAt": "2026-11-10T14:42:50.483Z"
+    },
+    "shellapp-wiring": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5107",
+      "claimedAt": "2026-11-10T14:42:54.862Z"
     }
   }
 }
