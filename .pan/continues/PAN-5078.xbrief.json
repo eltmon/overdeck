@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5078",
   "created": "2026-11-10T14:48:32.729Z",
-  "updated": "2026-11-10T16:23:46.042Z",
+  "updated": "2026-11-10T16:23:51.409Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -116,6 +116,11 @@
       "claimedBy": "agent-pan-5078",
       "claimedAt": "2026-11-10T16:21:09.318Z",
       "doneAt": "2026-11-10T16:23:46.042Z"
+    },
+    "turn-usage-transcript": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5078",
+      "claimedAt": "2026-11-10T16:23:51.409Z"
     }
   }
 }
