@@ -13,6 +13,12 @@ import type { EnsureMainResult } from '../../agents/input-target.js';
 
 const deliverAgentMessage = vi.hoisted(() => vi.fn(async (..._args: unknown[]) => ({ ok: true, path: 'tmux' })));
 const callOrder = vi.hoisted(() => [] as string[]);
+const getPendingQuestions = vi.hoisted(() => vi.fn(async (_file: string) => [] as Array<{ toolId: string }>));
+
+vi.mock('../../agent-enrichment.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../agent-enrichment.js')>()),
+  getPendingQuestions,
+}));
 
 vi.mock('../../agents.js', () => ({
   deliverAgentMessage: vi.fn(async (...args: unknown[]) => {
@@ -34,6 +40,8 @@ beforeEach(() => {
   testHome = mkdtempSync(join(tmpdir(), 'pan-conv-message-input-target-'));
   process.env.OVERDECK_HOME = testHome;
   deliverAgentMessage.mockClear();
+  getPendingQuestions.mockReset();
+  getPendingQuestions.mockResolvedValue([]);
   callOrder.length = 0;
 });
 
@@ -103,5 +111,63 @@ describe('handleConversationMessage input-target check', () => {
     expect(response.body).not.toHaveProperty('inputTarget');
     expect(ensure).not.toHaveBeenCalled();
     expect(deliverAgentMessage).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('handleConversationMessage answer notes (PAN-5111)', () => {
+  async function answer(body: Record<string, unknown>) {
+    const { createConversation } = await import('../conversations.js');
+    const { handleConversationMessage } = await import('../conversation-message.js');
+    createConversation({
+      name: 'answer-conv',
+      tmuxSession: 'conv-answer',
+      cwd: '/tmp',
+      harness: 'codex',
+      status: 'active',
+      titleSource: 'manual',
+      title: 'Manual',
+    });
+    return (await handleConversationMessage('answer-conv', { message: 'Use main', ...body }, {
+      resolveSessionFile: async () => '/tmp/session.jsonl',
+      generateAiTitle: async () => {},
+      conversationPendingPermission: async () => null,
+    })) as unknown as { status: number; body: Record<string, unknown> };
+  }
+
+  async function noted(key: string): Promise<boolean> {
+    const { operatorAnsweredBetween } = await import('../../push/operator-answers.js');
+    return operatorAnsweredBetween(key, 0, Number.MAX_SAFE_INTEGER);
+  }
+
+  beforeEach(async () => {
+    const { resetOperatorAnswers } = await import('../../push/operator-answers.js');
+    resetOperatorAnswers();
+  });
+
+  it('notes a pending question after a successful delivery', async () => {
+    getPendingQuestions.mockResolvedValue([{ toolId: 'toolu_live' }]);
+    const response = await answer({ answersToolUseId: 'toolu_live' });
+    expect(response.status).toBe(200);
+    expect(getPendingQuestions).toHaveBeenCalledWith('/tmp/session.jsonl');
+    expect(await noted('auq:toolu_live')).toBe(true);
+  });
+
+  it('writes no note for a question that is not pending', async () => {
+    getPendingQuestions.mockResolvedValue([{ toolId: 'toolu_live' }]);
+    await answer({ answersToolUseId: 'toolu_stale' });
+    expect(await noted('auq:toolu_stale')).toBe(false);
+  });
+
+  it('writes no note when delivery fails', async () => {
+    getPendingQuestions.mockResolvedValue([{ toolId: 'toolu_live' }]);
+    deliverAgentMessage.mockResolvedValueOnce({ ok: false, path: 'tmux' });
+    const response = await answer({ answersToolUseId: 'toolu_live' });
+    expect(response.status).toBe(502);
+    expect(await noted('auq:toolu_live')).toBe(false);
+  });
+
+  it('checks nothing and notes nothing without the field', async () => {
+    await answer({});
+    expect(getPendingQuestions).not.toHaveBeenCalled();
   });
 });

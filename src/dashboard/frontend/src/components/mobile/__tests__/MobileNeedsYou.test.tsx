@@ -255,7 +255,7 @@ describe('MobileNeedsYou', () => {
     });
     expect(lastCall(fetchMock)).toEqual({
       url: '/api/conversations/c1/message',
-      body: { message: 'Operator answered the pending question:\n\nQ: Question for c1?\nA: Use the other branch' },
+      body: { message: 'Operator answered the pending question:\n\nQ: Question for c1?\nA: Use the other branch', answersToolUseId: 't3' },
     });
   });
 });
