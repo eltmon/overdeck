@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5108",
   "created": "2026-11-10T15:18:20.585Z",
-  "updated": "2026-11-10T16:22:58.461Z",
+  "updated": "2026-11-10T16:23:19.498Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -134,6 +134,10 @@
     "update-runner.ac4": {
       "status": "completed",
       "doneAt": "2026-11-10T16:22:58.461Z"
+    },
+    "plan-npm-field.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T16:23:19.498Z"
     }
   }
 }
