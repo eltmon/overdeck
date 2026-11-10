@@ -82,10 +82,11 @@ export interface ModelPricing {
 // ============== Pricing Data ==============
 
 export const DEFAULT_PRICING: ModelPricing[] = [
-  // Meta published 1.3 rates, per 1K tokens (2026-09-08).
+  // Meta published Muse rates, per 1K tokens (Spark 2026-09-08, Ember 2026-11-10).
   { provider: 'custom', model: 'muse-wonder-1.0', inputPer1k: 0.004, outputPer1k: 0.02, cacheReadPer1k: 0.0002, currency: 'USD' },
   { provider: 'custom', model: 'muse-spark-1.3', inputPer1k: 0.00125, outputPer1k: 0.00425, cacheReadPer1k: 0.00015, currency: 'USD' },
   { provider: 'custom', model: 'muse-spark-1.3-contributor', inputPer1k: 0.0001, outputPer1k: 0.0002, cacheReadPer1k: 0.000002, currency: 'USD' },
+  { provider: 'custom', model: 'muse-ember-1.0', inputPer1k: 0.0001, outputPer1k: 0.0005, cacheReadPer1k: 0.000004, currency: 'USD' },
   // TypeSafe Jev (PAN-4369): $0.042/Mtok input, output free. The exact -free row is required:
   // getPricing() falls back to a prefix match, which would otherwise price jev-1.13-free as paid.
   { provider: 'custom', model: 'jev-1.13', inputPer1k: 0.000042, outputPer1k: 0, currency: 'USD' },
@@ -271,13 +272,22 @@ export function calculateCost(usage: TokenUsage, pricing: ModelPricing): number 
     cacheMultiplier = 5;
   }
 
+  // Muse Ember (>200K): Meta bills the whole request at 3x every component
+  // ($0.30/$1.50 in/out, $0.012 cached per MTok against $0.10/$0.50/$0.004).
+  if (pricing.model === 'muse-ember-1.0'
+      && totalInputTokens > 200000) {
+    inputMultiplier = 3;
+    outputMultiplier = 3;
+    cacheMultiplier = 3;
+  }
+
   // Input tokens
   cost += (usage.inputTokens / 1000) * pricing.inputPer1k * inputMultiplier;
 
   // Output tokens
   cost += (usage.outputTokens / 1000) * pricing.outputPer1k * outputMultiplier;
 
-  // Cache read tokens (only the Haiku 5.5 tier above multiplies them)
+  // Cache read tokens (only the Haiku 5.5 and Muse Ember tiers above multiply them)
   if (usage.cacheReadTokens && pricing.cacheReadPer1k) {
     cost += (usage.cacheReadTokens / 1000) * pricing.cacheReadPer1k * cacheMultiplier;
   }

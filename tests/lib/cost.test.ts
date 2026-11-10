@@ -504,6 +504,22 @@ describe('cost module', () => {
           .toBeCloseTo(0.2, 6);
       });
     });
+
+    describe('muse-ember-1.0 prompt-size tiers', () => {
+      const ember = () => getPricing('custom', 'muse-ember-1.0')!;
+
+      it('charges base rates at exactly 200K total input tokens', () => {
+        const usage: TokenUsage = { inputTokens: 150_000, outputTokens: 10_000, cacheReadTokens: 50_000 };
+        // 150 * 0.0001 + 10 * 0.0005 + 50 * 0.000004 = 0.015 + 0.005 + 0.0002 = 0.0202
+        expect(calculateCost(usage, ember())).toBeCloseTo(0.0202, 6);
+      });
+
+      it('charges 3x on input, output and cache reads above 200K', () => {
+        const usage: TokenUsage = { inputTokens: 150_001, outputTokens: 10_000, cacheReadTokens: 50_000 };
+        // 3 * (150.001 * 0.0001 + 10 * 0.0005 + 50 * 0.000004) = 3 * 0.0202001 = 0.0606003, rounds to 0.0606.
+        expect(calculateCost(usage, ember())).toBeCloseTo(0.0606, 6);
+      });
+    });
   });
 
   describe('summarizeCosts', () => {

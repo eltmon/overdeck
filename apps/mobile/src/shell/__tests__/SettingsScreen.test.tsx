@@ -1,6 +1,8 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import type { DeleteAccountResult } from '../accountDeletion';
+import { DELETE_STATEMENT } from '../accountDeletionCopy';
 import type { Appearance } from '../appearance';
 import { type LiveActivitySetting, type NotificationsSetting, SettingsScreen } from '../SettingsScreen';
 import type { AccountRecord } from '../types';
@@ -26,6 +28,7 @@ function renderSettings(
   notifications?: NotificationsSetting,
   appearance: Appearance = 'system',
   onAppearanceChange: (appearance: Appearance) => void = () => {},
+  deletion: { onDeleteAccount?: () => Promise<DeleteAccountResult>; onOpenAccountPage?: () => void } = {},
 ) {
   return render(
     <SettingsScreen
@@ -37,6 +40,8 @@ function renderSettings(
       notifications={notifications}
       appearance={appearance}
       onAppearanceChange={onAppearanceChange}
+      onDeleteAccount={deletion.onDeleteAccount}
+      onOpenAccountPage={deletion.onOpenAccountPage}
     />,
   );
 }
@@ -236,5 +241,80 @@ describe('Settings Live Activity row (PAN-4839 WI-10)', () => {
     renderWithLiveActivity(setting({ available: false }));
     expect(screen.queryByText('Live Activity')).toBeNull();
     expect(screen.queryByRole('switch')).toBeNull();
+  });
+});
+
+describe('SettingsScreen delete account (PAN-5107)', () => {
+  it('ac1: renders Delete account after Sign out and opens the dialog without calling onDeleteAccount', () => {
+    const onDeleteAccount = vi.fn();
+    renderSettings(undefined, 'system', () => {}, { onDeleteAccount });
+    const buttons = screen.getAllByRole('button').map((b) => b.textContent);
+    expect(buttons.indexOf('Delete account')).toBeGreaterThan(buttons.indexOf('Sign out'));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete account' }));
+    const dialog = screen.getByRole('dialog', { name: 'Delete your account' });
+    expect(dialog.textContent).toContain(DELETE_STATEMENT);
+    expect(dialog.textContent).toContain("This can't be undone.");
+    expect(onDeleteAccount).not.toHaveBeenCalled();
+  });
+
+  it('ac2: the confirm button is enabled only once DELETE is typed (trimmed)', () => {
+    renderSettings(undefined, 'system', () => {}, { onDeleteAccount: vi.fn() });
+    fireEvent.click(screen.getByRole('button', { name: 'Delete account' }));
+    const dialog = screen.getByRole('dialog');
+    const field = within(dialog).getByLabelText('Type DELETE to confirm');
+    const confirm = within(dialog).getByRole('button', { name: 'Delete account' });
+    for (const text of ['', 'delete', 'DELET']) {
+      fireEvent.change(field, { target: { value: text } });
+      expect(confirm.hasAttribute('disabled')).toBe(true);
+    }
+    for (const text of ['DELETE', ' DELETE ']) {
+      fireEvent.change(field, { target: { value: text } });
+      expect(confirm.hasAttribute('disabled')).toBe(false);
+    }
+  });
+
+  it("ac3: tapping confirm with DELETE typed calls onDeleteAccount once and shows 'Deleting…' disabled", () => {
+    let resolveDeletion!: (result: DeleteAccountResult) => void;
+    const onDeleteAccount = vi.fn(() => new Promise<DeleteAccountResult>((resolve) => (resolveDeletion = resolve)));
+    renderSettings(undefined, 'system', () => {}, { onDeleteAccount });
+    fireEvent.click(screen.getByRole('button', { name: 'Delete account' }));
+    const dialog = screen.getByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText('Type DELETE to confirm'), { target: { value: 'DELETE' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Delete account' }));
+    expect(onDeleteAccount).toHaveBeenCalledTimes(1);
+    const deleting = within(dialog).getByRole('button', { name: 'Deleting…' });
+    expect(deleting.hasAttribute('disabled')).toBe(true);
+    resolveDeletion({ ok: true });
+  });
+
+  it("ac4: a failed deletion shows a role=alert error and 'Delete on the web' calls onOpenAccountPage", async () => {
+    const onDeleteAccount = vi.fn(async (): Promise<DeleteAccountResult> => ({ ok: false, message: 'HTTP 503' }));
+    const onOpenAccountPage = vi.fn();
+    renderSettings(undefined, 'system', () => {}, { onDeleteAccount, onOpenAccountPage });
+    fireEvent.click(screen.getByRole('button', { name: 'Delete account' }));
+    const dialog = screen.getByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText('Type DELETE to confirm'), { target: { value: 'DELETE' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Delete account' }));
+    const alert = await within(dialog).findByRole('alert');
+    expect(alert.textContent).toBe("Couldn't delete your account: HTTP 503. Try again, or delete it on the web.");
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Delete on the web' }));
+    expect(onOpenAccountPage).toHaveBeenCalledTimes(1);
+  });
+
+  it('ac5: Cancel removes the dialog, and reopening it shows an empty field', () => {
+    renderSettings(undefined, 'system', () => {}, { onDeleteAccount: vi.fn() });
+    fireEvent.click(screen.getByRole('button', { name: 'Delete account' }));
+    const firstDialog = screen.getByRole('dialog');
+    fireEvent.change(within(firstDialog).getByLabelText('Type DELETE to confirm'), { target: { value: 'DELETE' } });
+    fireEvent.click(within(firstDialog).getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Delete account' }));
+    const reopened = screen.getByRole('dialog');
+    expect(within(reopened).getByLabelText('Type DELETE to confirm')).toHaveProperty('value', '');
+  });
+
+  it('ac6: with no onDeleteAccount, no Delete account button renders', () => {
+    renderSettings();
+    expect(screen.queryByRole('button', { name: 'Delete account' })).toBeNull();
   });
 });
