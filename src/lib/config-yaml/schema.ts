@@ -395,7 +395,7 @@ export interface RoleConfig {
   model: RoleModelRef;
   /** Explicit scalar staffing model for autonomous planning dispatch. */
   autonomousModel?: RoleModelRef;
-  harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent';
+  harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent' | 'grok';
   effort?: RoleEffort;
   mode?: ReviewMode;
   /** PAN-4433: minutes a dispatched reviewer may stay silent before recovery (review role only; default 15). */
