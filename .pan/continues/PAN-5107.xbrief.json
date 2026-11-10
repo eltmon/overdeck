@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5107",
   "created": "2026-11-10T14:32:45.039Z",
-  "updated": "2026-11-10T14:48:49.630Z",
+  "updated": "2026-11-10T14:49:36.354Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -52,9 +52,10 @@
       "doneAt": "2026-11-10T14:48:45.665Z"
     },
     "docs-changelog": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5107",
-      "claimedAt": "2026-11-10T14:48:49.630Z"
+      "claimedAt": "2026-11-10T14:48:49.630Z",
+      "doneAt": "2026-11-10T14:49:36.353Z"
     }
   }
 }
