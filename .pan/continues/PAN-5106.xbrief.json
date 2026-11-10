@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5106",
   "created": "2026-11-10T14:09:58.025Z",
-  "updated": "2026-11-10T15:10:28.511Z",
+  "updated": "2026-11-10T15:10:46.805Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -116,6 +116,10 @@
     "changelog-v076.ac1": {
       "status": "completed",
       "doneAt": "2026-11-10T15:10:28.510Z"
+    },
+    "changelog-v076.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T15:10:46.804Z"
     }
   }
 }
