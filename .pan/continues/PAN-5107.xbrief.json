@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5107",
   "created": "2026-11-10T14:32:45.039Z",
-  "updated": "2026-11-10T14:50:38.520Z",
+  "updated": "2026-11-10T14:52:11.773Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -62,6 +62,10 @@
       "claimedBy": "agent-pan-5107",
       "claimedAt": "2026-11-10T14:49:40.495Z",
       "doneAt": "2026-11-10T14:50:38.520Z"
+    },
+    "delete-copy-parity.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T14:52:11.772Z"
     }
   }
 }
