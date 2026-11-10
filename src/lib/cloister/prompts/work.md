@@ -227,16 +227,25 @@ completion — one item per commit keeps that trailer unambiguous.
    If the claim is refused, run `pan task next` and pick another item — never pass `--steal` for a worker.
 3. Implement only that item's work
 4. `git add` specific files and `git commit` — one item = one commit, with the body line
-   `Item: <item-id>`. Before committing, check `git status`: every staged file must be required
+   `Item: <item-id>`. Add one more body line `Item: <item-id>.acN` for each acceptance
+   criterion of the item, so this one commit is the evidence for the item and all of its
+   ACs. Before committing, check `git status`: every staged file must be required
    by this item's description or ACs. Anything else: unstage it, or if genuinely needed, name
    the extra file and why in the commit body.
 5. Immediately run `git push -u origin "$(git branch --show-current)"`. Every completed
    item commit must exist on origin before you complete its status. This managed-work invariant
    overrides generic project Git profiles such as conservative or maintainer modes.
-6. `pan task done {{ISSUE_ID}} <item-id>` — verifies the pushed commit carries the trailer
-   and records completion. It takes no extra flags; say why in the commit body.
+6. `pan task done {{ISSUE_ID}} <item-id> <item-id>.ac1 <item-id>.ac2 ...`: one call closes
+   the item and every AC. It verifies each id's trailer against the pushed commit and
+   records them all with one continue commit, or nothing if any id lacks its line. Do
+   not push again just for this call; your next item's push carries it. It takes no
+   extra flags; say why in the commit body.
 7. `metadata.requiresInspection` on an item is a subscription signal for a standing
    tier-supervisor; it asks nothing of you. Continue to the next item.
+
+If an item's commit is already pushed without its AC lines, make one `git commit --allow-empty`
+whose body lists `Item: <item-id>.acN` for each AC, push once, then close the ACs with one
+`pan task done` call.
 
 Every machine follows the push step above.
 {{#REMOTE}}
@@ -271,7 +280,7 @@ writes.
 - Use `sleep` to wait for reviews, tests, or any external process
 - Call `AskUserQuestion` to pause, wait, or report status. It is only for real operator decisions; each call reaches the operator as a modal. To wait for a background task or Monitor, end your turn. To report status, write it as text.
 - **Stop after completing a subset of tasks to ask "what should I do next?"** Just continue to the next task. The plan IS the input; no human kickoff is coming between xBRIEF tasks.
-- **End your turn with a multi-paragraph "what I just did" summary and idle.** Complete the item with `pan task done {{ISSUE_ID}} <item>`, then immediately call `pan task next {{ISSUE_ID}}` and start the next one.
+- **End your turn with a multi-paragraph "what I just did" summary and idle.** Complete the item with `pan task done {{ISSUE_ID}} <item> <item>.ac1 ...`, then immediately call `pan task next {{ISSUE_ID}}` and start the next one.
 - If you encounter an error on a task, try to fix it. If you truly cannot proceed, skip it and move to the next task, noting what failed in a `pan tell` message and in your commit body.
 
 **ALWAYS do this instead:**
@@ -342,7 +351,7 @@ pan done {{ISSUE_ID}} -c "Brief summary"      # Signal completion — creates Gi
 When ALL tasks are complete:
 ```bash
 {{#USES_VITEST}}npx vitest run <changed test files>{{/USES_VITEST}}{{^USES_VITEST}}<test runner> <changed test files or packages>{{/USES_VITEST}}   # only the tests you touched; the full suite runs {{#TESTS_ON_CI}}on CI{{/TESTS_ON_CI}}{{^TESTS_ON_CI}}in the verification gate{{/TESTS_ON_CI}}
-pan task done {{ISSUE_ID}} <item-id>   # complete every implemented item
+pan task done {{ISSUE_ID}} <item-id> <item-id>.ac1 ...   # one call per item, ACs included
 git add -A && git commit -m "feat: description"
 git push -u origin $(git branch --show-current)
 git status   # must show a clean tree and the branch pushed
