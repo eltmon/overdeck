@@ -1,6 +1,18 @@
 import { readFileSync } from 'node:fs';
-import { describe, expect, it } from 'vitest';
-import { getAvailableModelsApi } from '../settings-model-catalog.js';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const availability = vi.hoisted(() => ({
+  resolveHarnessBinary: vi.fn(async (): Promise<string | null> => null),
+  readGrokSignIn: vi.fn(async () => ({ signedIn: false, reason: 'missing' as const })),
+}));
+vi.mock('../harness-binary.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../harness-binary.js')>()),
+  resolveHarnessBinary: availability.resolveHarnessBinary,
+}));
+vi.mock('../grok-sign-in.js', () => ({ readGrokSignIn: availability.readGrokSignIn }));
+vi.mock('../opencode-models.js', () => ({ discoverOpenCodeModels: vi.fn(async () => []) }));
+
+import { getAvailableModelsApi, getAvailableModelsWithOpenCodeApi } from '../settings-model-catalog.js';
 import { getAvailableModelsApi as compatibilityExport } from '../settings-api.js';
 
 // Captured by executing the catalog functions from 7346a85bec0 before extraction.
@@ -123,7 +135,7 @@ function withoutOpus55<T extends { anthropic: Array<{ id: string }>; openai: Arr
 
 describe('model catalog no-loss audit', () => {
   it('preserves every previous provider, ordered model, display name, price and effort field', () => {
-    const { opencode, 'opencode-go': go, ...existing } = getAvailableModelsApi();
+    const { opencode, 'opencode-go': go, grok, ...existing } = getAvailableModelsApi();
     expect(existing.anthropic[0]).toEqual(fable52);
     expect(existing.anthropic.findIndex((model) => model.id === fable52.id)).toBeLessThan(existing.anthropic.findIndex((model) => model.id === 'claude-fable-5-1'));
     expect(existing.anthropic.find((model) => model.id === opus55.id)).toEqual(opus55);
@@ -137,6 +149,7 @@ describe('model catalog no-loss audit', () => {
     expect(withoutOpus55(existing)).toEqual(expectedPreviousCatalog);
     expect(opencode).toEqual([]);
     expect(go).toEqual([]);
+    expect(grok).toEqual([]);
     expect(compatibilityExport).toBe(getAvailableModelsApi);
   });
 
@@ -164,7 +177,7 @@ describe('model catalog no-loss audit', () => {
   it('adds native Go and Zen rows without changing the previous catalog', () => {
     const zen = { id: 'opencode/kimi-k3' as const, name: 'Kimi K3', costPer1MTokens: 3, harness: 'opencode' as const };
     const go = { ...zen, id: 'opencode-go/kimi-k3' as const };
-    const { opencode, 'opencode-go': goModels, ...existing } = getAvailableModelsApi([zen, go]);
+    const { opencode, 'opencode-go': goModels, grok: _grok, ...existing } = getAvailableModelsApi([zen, go]);
     expect(opencode).toEqual([zen]);
     expect(goModels).toEqual([go]);
     expect(existing.anthropic.find((model) => model.id === fable52.id)).toEqual(fable52);
@@ -172,5 +185,33 @@ describe('model catalog no-loss audit', () => {
     expect(existing.anthropic.find((model) => model.id === sonnet55.id)).toEqual(sonnet55);
     expect(existing.anthropic.find((model) => model.id === haiku55.id)).toEqual(haiku55);
     expect(withoutOpus55(existing)).toEqual(expectedPreviousCatalog);
+  });
+});
+
+describe('Grok Build picker availability (PAN-5078)', () => {
+  beforeEach(() => {
+    availability.resolveHarnessBinary.mockReset();
+    availability.readGrokSignIn.mockReset();
+  });
+
+  it('lists the four Grok Build models when grok is installed and signed in', async () => {
+    availability.resolveHarnessBinary.mockResolvedValue('/home/test/.grok/bin/grok');
+    availability.readGrokSignIn.mockResolvedValue({ signedIn: true, reason: 'ok' });
+    const { grok } = await getAvailableModelsWithOpenCodeApi();
+    expect(grok.map((model) => model.id)).toEqual(['grok/grok-4.7', 'grok/grok-4.7-build-fast', 'grok/grok-4.6', 'grok/grok-4.5']);
+    expect(grok.every((model) => model.harness === 'grok')).toBe(true);
+    expect(grok[2]).toMatchObject({ name: 'Grok 4.6', effortLevels: ['low', 'medium', 'high', 'xhigh'] });
+  });
+
+  it('lists none when grok is not installed', async () => {
+    availability.resolveHarnessBinary.mockResolvedValue(null);
+    availability.readGrokSignIn.mockResolvedValue({ signedIn: true, reason: 'ok' });
+    expect((await getAvailableModelsWithOpenCodeApi()).grok).toEqual([]);
+  });
+
+  it('lists none when grok is signed out', async () => {
+    availability.resolveHarnessBinary.mockResolvedValue('/home/test/.grok/bin/grok');
+    availability.readGrokSignIn.mockResolvedValue({ signedIn: false, reason: 'expired' });
+    expect((await getAvailableModelsWithOpenCodeApi()).grok).toEqual([]);
   });
 });

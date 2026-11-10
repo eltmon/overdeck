@@ -12,7 +12,7 @@ vi.mock('sonner', () => ({
 
 type HarnessPolicyDecisionsMap = Record<string, Record<string, { allowed: boolean; reason?: string }>>;
 
-function installFetchMock(options: { showHarnessModelPermutations?: boolean; missingCatalogMetadata?: boolean; harnessPolicyDecisions?: HarnessPolicyDecisionsMap; defaultConversationModel?: string; availableModelsGate?: Promise<void> } = {}) {
+function installFetchMock(options: { grokModels?: boolean; showHarnessModelPermutations?: boolean; missingCatalogMetadata?: boolean; harnessPolicyDecisions?: HarnessPolicyDecisionsMap; defaultConversationModel?: string; availableModelsGate?: Promise<void> } = {}) {
   vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
     const url = input.toString();
     if (url === '/api/settings/available-models') {
@@ -45,6 +45,11 @@ function installFetchMock(options: { showHarnessModelPermutations?: boolean; mis
         dashscope: [
           { id: 'qwen3-max', name: 'Qwen3 Max', costPer1MTokens: 2 },
         ],
+        ...(options.grokModels ? {
+          grok: [
+            { id: 'grok/grok-4.6', name: 'Grok 4.6', baseName: 'Grok 4.6', costPer1MTokens: 4, harness: 'grok', effortLevels: ['low', 'medium', 'high', 'xhigh'] },
+          ],
+        } : {}),
       }), { status: 200, headers: { 'Content-Type': 'application/json' } });
     }
     if (url === '/api/settings') {
@@ -310,6 +315,32 @@ describe('chat ModelPicker live harness labels', () => {
       expect(vi.mocked(fetch)).toHaveBeenCalledWith(expect.stringContaining('/api/settings/harness-policy'));
     });
     expect(onChange).not.toHaveBeenCalled();
+  });
+});
+
+describe('chat ModelPicker Grok Build group (PAN-5078)', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    installFetchMock({ grokModels: true });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('renders a Grok Build group with the signed-in grok models', async () => {
+    const user = userEvent.setup();
+    render(<ModelPicker value="claude-sonnet-4-6" onChange={vi.fn()} harness="claude-code" onHarnessChange={vi.fn()} />);
+
+    await user.click(screen.getByRole('button', { name: /Claude Sonnet 4\.6/i }));
+
+    // The provider group header and the Grok Build harness row both carry the label.
+    expect(await screen.findByRole('button', { name: /Grok 4\.6/i })).toBeInTheDocument();
+    expect(screen.getAllByText('Grok Build').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('offers Grok Build as a harness option', () => {
+    expect(HARNESS_OPTIONS).toContainEqual({ id: 'grok', label: 'Grok Build', description: 'xAI Grok Build CLI over ACP' });
   });
 });
 

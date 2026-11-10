@@ -43,6 +43,13 @@ describe('resolveAllowedHarness (PAN-1842)', () => {
     expect(resolveHarnessMock).toHaveBeenCalledWith({ model: 'kimi-k2.6', explicit: 'kimi-code' });
   });
 
+  it('passes an explicit grok pick through to resolveHarness (PAN-5078)', async () => {
+    resolveHarnessMock.mockImplementation(async ({ explicit }) => explicit ?? 'claude-code');
+
+    expect(await resolveAllowedHarness('grok', 'grok/grok-4.6')).toBe('grok');
+    expect(resolveHarnessMock).toHaveBeenCalledWith({ model: 'grok/grok-4.6', explicit: 'grok' });
+  });
+
   it('surfaces resolveHarness errors instead of falling back to claude-code', async () => {
     resolveHarnessMock.mockRejectedValue(new Error('model denied'));
 

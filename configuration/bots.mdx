@@ -116,6 +116,13 @@ connector when `~/.overdeck-connector/pairing.json` exists, and otherwise
 Overdeck installed, type `/overdeck:overdeck pending`, because Overdeck's own
 `overdeck` skill has the same name.
 
+This plugin makes Grok Build an outside client of Overdeck. It is separate from
+the `grok` harness, where Overdeck itself launches Grok Build agents and
+conversations (see [Grok Build CLI](/configuration/harnesses#grok-build-cli)).
+A harness agent already gets its own per-agent `overdeck` MCP server over ACP,
+so it does not need this plugin; on a host that runs `grok` harness agents, the
+plugin's own `overdeck` server also loads into those sessions.
+
 ### Grok Bot
 
 The Grok Bot plugin lives in

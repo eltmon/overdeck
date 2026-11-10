@@ -1,5 +1,5 @@
 import { MessageCircle } from 'lucide-react';
-import { HarnessLogo } from '../shared/branding';
+import { HARNESS_BRANDS, HarnessLogo } from '../shared/branding';
 import { formatRelativeTime } from '../../lib/formatRelativeTime';
 import type { ConversationSessionFeedEntry } from './types';
 import type { Harness } from '../Settings/types';
@@ -27,9 +27,18 @@ const AGENT_LABELS: Record<string, string> = {
   unknown: 'Unknown',
 };
 
+/** Feed labels that differ from the harness brand; every other harness uses its brand label. */
+const FEED_LABEL_BY_HARNESS: Partial<Record<Harness, string>> = {
+  ohmypi: 'Pi',
+  acp: 'Kimi',
+};
+
 export function ConversationFeedCard({ entry, onSelect, now = new Date() }: ConversationFeedCardProps) {
-  const agentLabel = AGENT_LABELS[entry.agent] ?? entry.agent;
-  const harness = harnessForFeedAgent(entry.agent);
+  // OpenCode and Grok Build share the ACP feed kind, so a known harness names the row (PAN-5078).
+  const agentLabel = entry.harness
+    ? FEED_LABEL_BY_HARNESS[entry.harness] ?? HARNESS_BRANDS[entry.harness].label
+    : AGENT_LABELS[entry.agent] ?? entry.agent;
+  const harness = entry.harness ?? harnessForFeedAgent(entry.agent);
 
   return (
     <button

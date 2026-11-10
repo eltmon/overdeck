@@ -7,12 +7,12 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import type { ModelId, GrokModel } from './settings.js';
+import { GROK_BUILD_MODELS, type ModelId, type GrokModel } from './settings.js';
 import type { RuntimeName } from './runtimes/types.js';
 import { getOpenAICompatibleProxyBaseUrl } from './openai-compatible-proxy.js';
 import { MODEL_DEPRECATIONS } from './model-capabilities.js';
 
-export type ProviderName = 'anthropic' | 'kimi' | 'openai' | 'google' | 'minimax' | 'zai' | 'mimo' | 'openrouter' | 'nous' | 'dashscope' | 'xai' | 'groq' | 'cerebras' | 'mistral' | 'quantumllama' | 'meta' | 'opencode' | 'opencode-go' | 'ollama';
+export type ProviderName = 'anthropic' | 'kimi' | 'openai' | 'google' | 'minimax' | 'zai' | 'mimo' | 'openrouter' | 'nous' | 'dashscope' | 'xai' | 'groq' | 'cerebras' | 'mistral' | 'quantumllama' | 'meta' | 'opencode' | 'opencode-go' | 'grok' | 'ollama';
 
 /**
  * Provider configuration
@@ -82,6 +82,11 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     name: 'opencode-go', displayName: 'OpenCode Go', compatibility: 'direct',
     defaultHarness: 'opencode', models: [], tested: false,
     description: 'OpenCode Go subscription models through the persistent OpenCode ACP runtime. Sign in with opencode auth login.',
+  },
+  grok: {
+    name: 'grok', displayName: 'Grok Build', compatibility: 'direct',
+    defaultHarness: 'grok', models: [...GROK_BUILD_MODELS], tested: false,
+    description: 'Grok Build models through the persistent grok ACP runtime. Sign in with grok login.',
   },
   meta: {
     name: 'meta', displayName: 'Meta (Muse)', compatibility: 'direct',
@@ -465,6 +470,7 @@ export function getProviderForModel(modelId: ModelId | string): ProviderConfig {
   // before the generic slash-delimited catch-all below.
   if (modelId.startsWith('opencode/')) return PROVIDERS.opencode;
   if (modelId.startsWith('opencode-go/')) return PROVIDERS['opencode-go'];
+  if (modelId.startsWith('grok/')) return PROVIDERS.grok;
   if (modelId.startsWith('kimi-code/')) {
     return PROVIDERS.kimi;
   }

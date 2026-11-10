@@ -71,6 +71,7 @@ vi.mock('../model-capabilities.js', () => ({
     'gpt-5.5-mini': { provider: 'openai', displayName: 'GPT-5.5 Mini', costPer1MTokens: 1 },
     'minimax-m2.7-highspeed': { provider: 'minimax', displayName: 'MiniMax M2.7', costPer1MTokens: 1 },
     'qwen3-coder-plus': { provider: 'dashscope', displayName: 'Qwen3 Coder Plus', costPer1MTokens: 1 },
+    'grok/grok-4.6': { provider: 'grok', displayName: 'Grok 4.6', costPer1MTokens: 4 },
   },
   MODEL_DEPRECATIONS: {
     'claude-opus-4-6': 'claude-opus-4-7',
@@ -84,6 +85,7 @@ vi.mock('../model-capabilities.js', () => ({
     'gpt-5.5-mini',
     'minimax-m2.7-highspeed',
     'qwen3-coder-plus',
+    'grok/grok-4.6',
   ].includes(modelId),
   resolveModelId: (modelId: string) => mockResolveModelId(modelId),
   getModelEffortLevels: (modelId: string) => (({
@@ -316,6 +318,7 @@ describe('loadSettingsApi', () => {
       dashscope: 'ohmypi',
       opencode: 'opencode',
       'opencode-go': 'opencode',
+      grok: 'grok',
       meta: 'muse',
     });
   });
@@ -1005,6 +1008,14 @@ describe('validateSettingsApi', () => {
     expect(result).toEqual({ valid: true, errors: [], warnings: [] });
   });
 
+  it('accepts a Grok Build role with the grok harness (PAN-5078)', async () => {
+    const { validateSettingsApi } = await import('../settings-api.js');
+    const result = validateSettingsApi({ ...validSettings,
+      roles: { ...validSettings.roles, work: { model: 'grok/grok-4.6', harness: 'grok', effort: 'high' } },
+    });
+    expect(result).toEqual({ valid: true, errors: [], warnings: [] });
+  });
+
   it('accepts role and workhorse model references', async () => {
     const { validateSettingsApi } = await import('../settings-api.js');
 
@@ -1101,7 +1112,7 @@ describe('validateSettingsApi', () => {
     });
 
     expect(result.valid).toBe(false);
-    expect(result.errors).toContain('roles.flywheel.harness must be claude-code, ohmypi, codex, acp, kimi-code, opencode, muse, prime-agent, null, or empty string');
+    expect(result.errors).toContain('roles.flywheel.harness must be claude-code, ohmypi, codex, acp, kimi-code, opencode, muse, prime-agent, grok, null, or empty string');
     expect(result.errors).toContain('roles.flywheel.effort must be one of low, medium, high, xhigh, max');
     expect(result.errors).toContain('roles.flywheel.maxAgents must be a positive integer');
     expect(result.errors).toContain('roles.flywheel.scope must be pan-only or all-tracked-projects');

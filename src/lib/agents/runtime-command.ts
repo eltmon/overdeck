@@ -128,7 +128,7 @@ export async function getAcpLauncherFields(
   role?: Role,
   effort?: string,
 ): Promise<{
-  harness: 'acp' | 'opencode';
+  harness: 'acp' | 'opencode' | 'grok';
   acpAgentId: string;
   acpProvider: string;
   acpWorkspace: string;
@@ -138,7 +138,7 @@ export async function getAcpLauncherFields(
   model: string;
   unsetProviderEnv: true;
 }> {
-  const harness = model.startsWith('opencode/') || model.startsWith('opencode-go/') ? 'opencode' : 'acp';
+  const harness = model.startsWith('grok/') ? 'grok' : model.startsWith('opencode/') || model.startsWith('opencode-go/') ? 'opencode' : 'acp';
   return {
     harness,
     acpAgentId: agentId,

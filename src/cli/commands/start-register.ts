@@ -12,7 +12,7 @@ export function registerStartCommand(program: Command): void {
     .command('start <id>')
     .description('Create workspace and spawn agent for an issue')
     .option('--model <model>', 'Work model for this session (defaults to Cloister config)')
-    .option('--harness <harness>', 'Coding-agent harness: claude-code | pi | codex | acp | kimi-code | opencode | muse | prime-agent (defaults to role/provider settings)')
+    .option('--harness <harness>', 'Coding-agent harness: claude-code | pi | codex | acp | kimi-code | opencode | muse | prime-agent | grok (defaults to role/provider settings)')
     .option('--effort <level>', 'Claude Code effort: low | medium | high | xhigh | max (defaults to roles.work.effort)')
     .option('--tier <tier>', 'Remote workspace resiliency tier: ephemeral | durable (defaults to remote.resiliency_tier)')
     .option('--dry-run', 'Show what would be created')

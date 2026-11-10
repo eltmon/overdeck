@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { getBuiltInDefaultHarness, getProviderEnv, getProviderForModel, PROVIDERS, type ProviderName } from '../../../src/lib/providers.js';
-import { getModelProvider } from '../../../src/lib/model-fallback.js';
+import { getModelProvider, isOpenRouterModel } from '../../../src/lib/model-fallback.js';
 import { shellQuoteModelId } from '../../../src/lib/model-validation.js';
 import { apiLaunchModelId } from '../../../src/lib/model-context-windows.js';
 import { normalizeModelName } from '../../../src/lib/cost-parsers/jsonl-parser.js';
@@ -22,6 +22,7 @@ const EXPECTED_DEFAULT_HARNESSES: Record<ProviderName, RuntimeName> = {
   dashscope: 'ohmypi',
       opencode: 'opencode',
       'opencode-go': 'opencode',
+  grok: 'grok',
   xai: 'ohmypi',
   groq: 'ohmypi',
   cerebras: 'ohmypi',
@@ -47,6 +48,25 @@ describe('providers', () => {
 
   it('falls back to claude-code for unknown providers', () => {
     expect(getBuiltInDefaultHarness('unknown-provider')).toBe('claude-code');
+  });
+});
+
+describe('Grok Build model routing (PAN-5078)', () => {
+  it('routes grok/* ids to the grok provider, never OpenRouter', () => {
+    const provider = getProviderForModel('grok/grok-4.6');
+    expect(provider.name).toBe('grok');
+    expect(provider.defaultHarness).toBe('grok');
+    expect(getModelProvider('grok/grok-4.6')).toBe('grok');
+    expect(isOpenRouterModel('grok/grok-4.6')).toBe(false);
+  });
+
+  it('lists the four Grok Build model ids', () => {
+    expect(PROVIDERS.grok.models).toEqual(['grok/grok-4.7', 'grok/grok-4.7-build-fast', 'grok/grok-4.6', 'grok/grok-4.5']);
+  });
+
+  it('keeps bare grok-* ids on the xai provider', () => {
+    expect(getProviderForModel('grok-4.7').name).toBe('xai');
+    expect(getModelProvider('grok-4.7')).toBe('xai');
   });
 });
 

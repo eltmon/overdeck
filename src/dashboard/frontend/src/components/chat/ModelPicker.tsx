@@ -94,6 +94,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   openrouter: 'OpenRouter',
   opencode: 'OpenCode Zen',
   'opencode-go': 'OpenCode Go',
+  grok: 'Grok Build',
 };
 
 const FALLBACK_GROUPS: ModelGroup[] = [
@@ -203,7 +204,7 @@ function formatCost(costPer1M: number | null, provider?: string): string {
 }
 
 function isHarness(value: unknown): value is Harness {
-  return value === 'claude-code' || value === 'ohmypi' || value === 'codex' || value === 'acp' || value === 'kimi-code' || value === 'opencode' || value === 'muse' || value === 'prime-agent';
+  return value === 'claude-code' || value === 'ohmypi' || value === 'codex' || value === 'acp' || value === 'kimi-code' || value === 'opencode' || value === 'muse' || value === 'prime-agent' || value === 'grok';
 }
 
 function providerDefaultHarness(provider: string, providerHarnesses: ProviderHarnesses): Harness {

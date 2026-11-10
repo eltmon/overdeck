@@ -40,7 +40,7 @@ describe('resolveRecoveryResumeSessionId', () => {
     expect(resolveRecoveryResumeSessionId(agentId, 'codex')).toBe('thread-123');
   });
 
-  it.each(['acp', 'opencode'] as const)('returns the persisted %s session id for recovery launchers', (harness) => {
+  it.each(['acp', 'opencode', 'grok'] as const)('returns the persisted %s session id for recovery launchers', (harness) => {
     const agentId = 'agent-acp-resume';
     mkdirSync(agentDir(agentId), { recursive: true });
     writeFileSync(join(agentDir(agentId), 'state.json'), JSON.stringify({

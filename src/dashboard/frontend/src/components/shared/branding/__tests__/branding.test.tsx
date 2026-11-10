@@ -13,6 +13,7 @@ describe('shared branding registry', () => {
     expect(Object.keys(PROVIDER_BRANDS)).toEqual([
       'opencode',
       'opencode-go',
+      'grok',
       'meta',
       'anthropic',
       'openai',
@@ -25,7 +26,7 @@ describe('shared branding registry', () => {
       'dashscope',
       'openrouter',
     ]);
-    expect(Object.keys(HARNESS_BRANDS)).toEqual(['opencode', 'muse', 'claude-code', 'codex', 'ohmypi', 'acp', 'kimi-code', 'prime-agent']);
+    expect(Object.keys(HARNESS_BRANDS)).toEqual(['opencode', 'muse', 'claude-code', 'codex', 'ohmypi', 'acp', 'kimi-code', 'prime-agent', 'grok']);
 
     for (const brand of [...Object.values(PROVIDER_BRANDS), ...Object.values(HARNESS_BRANDS)]) {
       expect(brand.id).toBeTruthy();
@@ -70,5 +71,12 @@ describe('shared branding registry', () => {
 
     rerender(<ProviderLogo provider="unknown-provider" label="Unknown Provider" />);
     expect(screen.getByText('U')).toBeInTheDocument();
+  });
+
+  it('resolves Grok Build for the grok provider and harness (PAN-5078)', () => {
+    expect(PROVIDER_BRANDS.grok.label).toBe('Grok Build');
+    expect(HARNESS_BRANDS.grok.label).toBe('Grok Build');
+    render(<HarnessLogo harness="grok" />);
+    expect(screen.getByLabelText('Grok Build logo')).toBeInTheDocument();
   });
 });

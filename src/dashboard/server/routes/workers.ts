@@ -37,7 +37,7 @@ import { type DashboardCredential, rejectUnsafeDashboardMutationRequest, resolve
 import { httpHandler } from './http-handler.js';
 
 /** The `pan worker run --harness` set (`src/cli/commands/worker.ts`). */
-const HARNESSES: readonly RuntimeName[] = ['claude-code', 'codex', 'acp', 'kimi-code', 'opencode', 'muse', 'prime-agent'];
+const HARNESSES: readonly RuntimeName[] = ['claude-code', 'codex', 'acp', 'kimi-code', 'opencode', 'muse', 'prime-agent', 'grok'];
 
 export type ParsedStartWorkerBody = { ok: true; value: StartWorkerOptions } | { ok: false; error: string };
 

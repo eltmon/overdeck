@@ -30,6 +30,7 @@ export const CONFIGURABLE_PROVIDERS = [
   'meta',
   'opencode',
   'opencode-go',
+  'grok',
 ] as const;
 
 export type ConfigurableProvider = (typeof CONFIGURABLE_PROVIDERS)[number];

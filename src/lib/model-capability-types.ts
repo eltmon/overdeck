@@ -28,7 +28,7 @@ export interface ModelCapability {
   /** Model identifier */
   model: ModelId;
   /** Provider for this model */
-  provider: 'anthropic' | 'openai' | 'google' | 'kimi' | 'minimax' | 'openrouter' | 'zai' | 'mimo' | 'nous' | 'dashscope' | 'xai' | 'quantumllama' | 'meta' | 'groq' | 'cerebras' | 'mistral';
+  provider: 'anthropic' | 'openai' | 'google' | 'kimi' | 'minimax' | 'openrouter' | 'zai' | 'mimo' | 'nous' | 'dashscope' | 'xai' | 'quantumllama' | 'meta' | 'groq' | 'cerebras' | 'mistral' | 'grok';
   /** Display name */
   displayName: string;
   /** Cost per 1M tokens (average of input/output) in USD */

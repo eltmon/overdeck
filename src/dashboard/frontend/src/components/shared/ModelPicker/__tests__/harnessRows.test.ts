@@ -8,6 +8,10 @@ describe('pickerEffortLevels', () => {
     expect(pickerEffortLevels('kimi-code/kimi-for-coding')).toEqual(KIMI_NATIVE_EFFORT_LEVELS);
   });
 
+  it('offers the Grok Build levels for grok/* models (PAN-5078)', () => {
+    expect(pickerEffortLevels('grok/grok-4.6')).toEqual(['low', 'medium', 'high', 'xhigh']);
+  });
+
   it('offers no effort for K2.7 Code Highspeed', () => {
     expect(pickerEffortLevels('kimi-code/kimi-for-coding-highspeed')).toEqual([]);
   });

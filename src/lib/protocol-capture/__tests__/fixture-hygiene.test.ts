@@ -26,7 +26,7 @@ const FIXTURE_DIRS = {
 };
 const EXPECTED_FIXTURES = {
   codex: ['approval.jsonl', 'interrupt.jsonl', 'subagent.jsonl', 'turn-idle.jsonl', 'user-input.jsonl'],
-  acp: ['kimi-interrupt.jsonl', 'kimi-turn-completion.jsonl'],
+  acp: ['grok-resume.jsonl', 'grok-turn-completion.jsonl', 'kimi-interrupt.jsonl', 'kimi-turn-completion.jsonl'],
 };
 
 function oversizedString(value: unknown): boolean {

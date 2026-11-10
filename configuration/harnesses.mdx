@@ -13,7 +13,7 @@ that runs in a terminal-backend pane (Herdr by default; see
 independently per spawn.
 
 <Info>
-**Supported today:** `claude-code` (default), `ohmypi`, `codex`, `acp`, `kimi-code`, `opencode`, `muse`, and `prime-agent`. For the wider
+**Supported today:** `claude-code` (default), `ohmypi`, `codex`, `acp`, `kimi-code`, `opencode`, `muse`, `prime-agent`, and `grok`. For the wider
 field of coding-agent harnesses Overdeck could adopt next — and how each one handles
 skills, MCP, and AGENTS.md — see the [Harness Landscape](/reference/harness-landscape).
 </Info>
@@ -28,6 +28,7 @@ skills, MCP, and AGENTS.md — see the [Harness Landscape](/reference/harness-la
 | `opencode` | [OpenCode](https://opencode.ai) (`opencode`) | OpenCode Go and Zen | Persistent ACP sessions, native credentials, and model discovery; verified with 1.18.31. |
 | `muse` | Muse Code (`muse`) | Meta Muse models (Wonder, Spark, Ember) | Persistent native terminal sessions with separate Standard and Contributor model choices. |
 | `prime-agent` | [Prime Agent](https://github.com/PrimeIntellect-ai/prime-agent) (`prime-agent`) | Opt-in multi-provider work | RPC mode behind an Overdeck host, with one private Prime daemon per agent; supports 0.8.x. |
+| `grok` | [Grok Build](https://x.ai/cli) (`grok`) | Grok Build sign-in (SuperGrok) | Persistent ACP sessions, sign-in reuse, reported cost; verified with 1.0.77. |
 
 ## Composer commands across harnesses
 
@@ -46,7 +47,7 @@ Pressing **Enter** in the dashboard composer queues your message while the agent
 | Claude Code | Auto, Steer | Interrupts the running turn and sends the message at once, like the TUI's Ctrl+Enter. Under the hood Overdeck types the message and presses Claude Code's send-now chord, Ctrl+X Ctrl+S. An idle agent just receives the message. |
 | Pi (`ohmypi`) | Auto, Steer, Follow-up | Steers over the Pi control channel. Conversations only. |
 | Codex | Auto | Not yet; see [PAN-4303](https://github.com/eltmon/overdeck/issues/4303). |
-| ACP, OpenCode, Kimi Code, Muse Code, Prime Agent | Auto | None. |
+| ACP, OpenCode, Grok Build, Kimi Code, Muse Code, Prime Agent | Auto | None. |
 
 A steer never falls back silently to a queued message. A harness without steer answers `steer-unsupported` and delivers nothing. A Claude Code agent launched before steer support has a PTY supervisor that presses Enter instead, and the delivery reports that it went out as a normal submit.
 
@@ -694,6 +695,73 @@ the terminal backend's environment) to change the timeout, in milliseconds. `0` 
 the OpenCode status check still runs. Each prompt gets at most one
 `prompt_stalled` entry.
 
+### Grok Build CLI
+
+Overdeck runs xAI's Grok Build CLI as the `grok` harness. The integration was
+verified against `grok 1.0.77`. Install the CLI with
+`curl -fsSL https://x.ai/cli/install.sh | bash` (it also installs into
+`~/.grok/bin`, which Overdeck searches), and update it with `grok update`.
+`pan doctor` reports it as not installed, signed out, or `<version>, signed in`.
+
+**Sign-in.** Run `grok login` on the host. Grok Build saves the sign-in in
+`~/.grok/auth.json`, and Overdeck reuses it: the ACP host authenticates with
+the `cached_token` method. If you are signed out, the launch fails with
+`Grok sign-in is required. Run grok login, then retry.` Grok Build prefers an
+API key over the sign-in, so Overdeck removes `XAI_API_KEY` from a Grok agent's
+environment; the turn is billed to your Grok Build sign-in, never to an API key.
+
+**Models.** The `grok` provider has four fixed model IDs:
+`grok/grok-4.7`, `grok/grok-4.7-build-fast`, `grok/grok-4.6` and
+`grok/grok-4.5`. They run only on the `grok` harness, and the `grok` harness
+runs only these IDs; any other combination fails before launch. The bare
+`grok-4.7` ID still belongs to the `xai` provider (an xAI API key routed through
+Claude Code). The pickers list the four models only when the CLI is installed
+and signed in. Every Grok launch needs an explicit model; there is no fallback.
+
+```yaml
+models:
+  providers:
+    grok:
+      enabled: true
+      harness: grok
+```
+
+**Effort.** Grok Build offers `low`, `medium`, `high` and `xhigh`. Overdeck sets
+the ACP `reasoning_effort` option right after the model, defaults to `high`, and
+clamps `max` to `xhigh`. A dashboard effort change on a live Grok conversation
+applies to subsequent turns.
+
+**Launch.** Overdeck runs one persistent
+`grok agent --always-approve --no-leader stdio` process per agent behind its ACP
+host. `--no-leader` keeps a dedicated process even when `~/.grok/config.toml`
+turns on leader mode, which would share one process across clients.
+`--always-approve` approves tool calls inside Grok, including Grok subagents
+whose permission requests never reach the ACP client. Restart and resume pass
+the recorded `acp-session-id`, and the host reopens it with `session/load`.
+
+**Context and tools.** Grok receives Overdeck's rendered context at session
+start; use `harness:grok` blocks for Grok-specific instructions. The managed
+per-agent `overdeck` MCP server reaches Grok through the ACP `session/new` and
+`session/load` requests.
+
+**Cost.** Grok reports token usage and the turn cost (`costUsdTicks`, units of
+10⁻¹⁰ USD) with each prompt result. The ACP host records it on the transcript's
+`turn_completed` entry, and the `grok` cost reconcile source imports one cost
+event per turn (provider `custom`, model `grok/<id>`). The vendor figure
+includes the double rate for prompts of 200K tokens or more; Overdeck's
+pricing table is used only when a turn reports no cost. The Cloister tick
+imports a running Grok work agent's turns. Grok conversations write no agent
+state, so their turns are imported when `POST /api/costs/reconcile` runs (the
+dashboard's five-minute sweep covers only Pi and Codex).
+
+**Known behavior.** Grok Build loads the operator's own `~/.grok` MCP servers,
+plugins, hooks and skills into every session, alongside Overdeck's. MCP servers
+that fail to authenticate print noise in the agent pane. If the Overdeck Grok
+Build bot plugin is enabled in `~/.grok/config.toml`, its `overdeck` server is
+the outside-client plugin; the harness agent already gets its own per-agent
+`overdeck` server. In the live check (bot plugin enabled), the agent's
+`overdeck__list_conversations` call was answered by the per-agent server. Plain transcript forks are unavailable; use a summary fork.
+
 ### Prime Agent
 
 [Prime Agent](https://github.com/PrimeIntellect-ai/prime-agent) is Prime
@@ -972,6 +1040,10 @@ runtime name, so adding a harness without a policy entry is a type error. A
 harness the gate does not recognise is denied, never allowed by default, and a
 raw legacy `pi` value gets the `ohmypi` rules.
 
+Grok Build has no gate: it is xAI's own CLI running xAI models on your xAI
+sign-in, and its documentation describes ACP mode for automation tools. The
+gate only pins `grok/*` models to the `grok` harness and back.
+
 The same gate enforces Kimi id-space correctness: a `kimi-code/*`
 native-catalog id is blocked on every harness except `kimi-code` and `acp`, so
 a stale role pin fails loudly instead of launching a session whose first turn
@@ -1152,7 +1224,7 @@ other harness gets "Overdeck commands" with the `pan` equivalents instead (see
 
 | Harness | At launch it gets |
 | --- | --- |
-| `claude-code`, `codex`, `acp`, `opencode` | The `overdeck` MCP server and the "Overdeck tools" block |
+| `claude-code`, `codex`, `acp`, `opencode`, `grok` | The `overdeck` MCP server and the "Overdeck tools" block |
 | `kimi-code`, `ohmypi`, `muse`, `prime-agent` | The "Overdeck commands" block, with the `pan` command for each tool |
 
 Any harness gets the "Overdeck commands" block instead of the server when it
@@ -1316,6 +1388,7 @@ Subscription usage allowances are not API token prices. A larger window can cons
 | Codex (TUI) | `model_reasoning_effort` in the agent's `CODEX_HOME/config.toml` | low | medium | high | xhigh | max on models that advertise it |
 | Codex (app-server) | host `--effort` at launch, per-turn `effort`, live `set-effort` | same as Codex TUI | | | | |
 | OpenCode | ACP `setConfigOption("effort", …)`; model variants pass through | low | medium | high | xhigh | max (only levels/variants the model exposes) |
+| Grok Build | ACP `setConfigOption("reasoning_effort", …)`; live `set-effort` | low | medium | high | xhigh | xhigh |
 | Kimi K3 / K3.1 / K2.8 Preview (ACP) | ACP `thinking` option | low | high | high | max | max |
 | Kimi K3 / K3.1 / K2.8 Preview (native) | `KIMI_MODEL_THINKING_EFFORT` env per process | low | high | high | max | max |
 | Pi (`omp`) | `--thinking <level>`; live `set_thinking_level` | low | medium | high | xhigh | xhigh |

@@ -1,3 +1,4 @@
+import { getHarnessBehavior } from '@overdeck/contracts';
 import type { Harness } from './ModelPicker';
 
 /**
@@ -67,7 +68,8 @@ export function expandHarnessRows<T extends RowBase>(models: T[]): T[] {
  * Effort-level override for the composer's EffortPicker. The native `kimi`
  * binary's /effort offers low/high/max only — surface exactly that for
  * kimi-code/* ids instead of Claude Code's full five. K2.7 Code Highspeed has
- * no adjustable effort, so it gets an empty list. Everything else returns
+ * no adjustable effort, so it gets an empty list. Grok Build models (grok/*,
+ * grok harness only) offer the harness's low/medium/high/xhigh. Everything else returns
  * undefined ("no model-specific restriction" → the picker shows all levels,
  * which is correct for the claude-code route).
  */
@@ -76,5 +78,6 @@ export function pickerEffortLevels(modelId: string): readonly string[] | undefin
   if (modelId === 'kimi-code/kimi-for-coding') return KIMI_NATIVE_EFFORT_LEVELS;
   // Covers K3 (kimi-code/k3, k3-256k) and K3.1 (kimi-code/k3.1-pro*): all native low/high/max.
   if (modelId.startsWith('kimi-code/k3')) return KIMI_NATIVE_EFFORT_LEVELS;
+  if (modelId.startsWith('grok/')) return getHarnessBehavior('grok').effortLevels;
   return undefined;
 }

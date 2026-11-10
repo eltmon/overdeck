@@ -74,6 +74,19 @@ describe('ConversationFeedCard', () => {
     expect(screen.getByText('2')).toBeInTheDocument();
   });
 
+  it.each([['grok', 'Grok Build'], ['opencode', 'OpenCode']] as const)('names an ACP-hosted %s conversation %s, not Kimi (PAN-5078)', (harness, label) => {
+    render(<ConversationFeedCard entry={entry({ agent: 'acp', harness })} onSelect={vi.fn()} />);
+    expect(screen.getByText(label)).toBeInTheDocument();
+    expect(screen.getByLabelText(`${label} logo`)).toBeInTheDocument();
+    expect(screen.queryByText('Kimi')).not.toBeInTheDocument();
+  });
+
+  it('keeps the Kimi label for a Kimi ACP conversation with a known harness (PAN-5078)', () => {
+    render(<ConversationFeedCard entry={entry({ agent: 'acp', harness: 'acp' })} onSelect={vi.fn()} />);
+    expect(screen.getByText('Kimi')).toBeInTheDocument();
+    expect(screen.getByLabelText('ACP logo')).toBeInTheDocument();
+  });
+
   it('renders kimi_code conversations with the Kimi Code label and logo (2026-08-02 harness-labeled rows)', () => {
     render(
       <ConversationFeedCard

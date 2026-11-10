@@ -11,9 +11,9 @@ import { materializeSharedManagedLaunchContext } from './materialize.js';
 export async function claudeSystemPromptFiles(workspace: string, harness: RuntimeName | undefined): Promise<string[]> {
   const effectiveHarness = harness ?? 'claude-code';
   const behavior = getHarnessBehavior(effectiveHarness);
-  // Host-materialized harnesses (ACP, OpenCode, Muse, Prime Agent) get their context
+  // Host-materialized harnesses (ACP, OpenCode, Grok Build, Muse, Prime Agent) get their context
   // from their own per-agent artifact, never Claude system-prompt files.
-  if (behavior.contextLayerKind === 'acp' || behavior.contextLayerKind === 'opencode' || behavior.contextLayerKind === 'muse' || behavior.contextLayerKind === 'prime-agent') {
+  if (behavior.contextLayerKind === 'acp' || behavior.contextLayerKind === 'opencode' || behavior.contextLayerKind === 'grok' || behavior.contextLayerKind === 'muse' || behavior.contextLayerKind === 'prime-agent') {
     return [];
   }
 

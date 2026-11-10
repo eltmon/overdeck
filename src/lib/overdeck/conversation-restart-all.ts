@@ -37,7 +37,7 @@ export async function handleConversationRestartAll(
         const harness = await resolveAllowedHarness(conv.harness, conv.model);
         attemptedHarness = harness;
         await spawnConversationSession(conv.tmuxSession, conv.cwd, oldSessionId ?? randomUUID(), conv.model ?? undefined, conv.effort ?? undefined, conv.issueId ?? undefined, canResume, harness, false, conversationLaunchContext(conv));
-        if (harness === 'acp' || harness === 'opencode' || harness === 'kimi-code' || harness === 'muse' || harness === 'prime-agent') {
+        if (harness === 'acp' || harness === 'opencode' || harness === 'grok' || harness === 'kimi-code' || harness === 'muse' || harness === 'prime-agent') {
           await waitForConversationRuntimeReady(conv.tmuxSession, harness, 'respawn');
         }
         if (harness === 'kimi-code' && !conv.bareContext) {
@@ -54,7 +54,7 @@ export async function handleConversationRestartAll(
         // PAN-1837 review fix: kimi-code needs the same teardown-on-failure as
         // acp — a failed capture must not leave a running tmux session with no
         // owned native identity presented as a healthy conversation.
-        if (attemptedHarness === 'acp' || attemptedHarness === 'kimi-code' || attemptedHarness === 'opencode' || attemptedHarness === 'muse' || attemptedHarness === 'prime-agent') await stopConversationRuntime(conv, conv.name);
+        if (attemptedHarness === 'acp' || attemptedHarness === 'kimi-code' || attemptedHarness === 'opencode' || attemptedHarness === 'grok' || attemptedHarness === 'muse' || attemptedHarness === 'prime-agent') await stopConversationRuntime(conv, conv.name);
         results.push({ name: conv.name, model: conv.model, status: 'failed' });
       } finally {
         respawn.done();

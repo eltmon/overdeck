@@ -31,19 +31,21 @@ function summary(imported: number): CostReconcileSummary {
 }
 
 describe('POST /api/costs/reconcile route wiring', () => {
-  it('runs the Claude transcript reconciler plus explicit ohmypi, codex and prime-agent sweeps', async () => {
-    const runSource = vi.fn(async (source: 'ohmypi' | 'codex' | 'prime-agent') =>
-      source === 'ohmypi' ? summary(1) : source === 'codex' ? summary(2) : summary(4),
+  it('runs the Claude transcript reconciler plus explicit ohmypi, codex, prime-agent and grok sweeps', async () => {
+    const runSource = vi.fn(async (source: 'ohmypi' | 'codex' | 'prime-agent' | 'grok') =>
+      source === 'ohmypi' ? summary(1) : source === 'codex' ? summary(2) : source === 'grok' ? summary(5) : summary(4),
     );
     const runClaude = vi.fn(async () => claudeSummary(3));
 
     const result = await runCostReconcileSources(runSource, runClaude);
 
     expect(runClaude).toHaveBeenCalledTimes(1);
-    expect(runSource).toHaveBeenCalledTimes(3);
+    expect(runSource).toHaveBeenCalledTimes(4);
     expect(runSource).toHaveBeenNthCalledWith(1, 'ohmypi');
     expect(runSource).toHaveBeenNthCalledWith(2, 'codex');
     expect(runSource).toHaveBeenNthCalledWith(3, 'prime-agent');
+    expect(runSource).toHaveBeenNthCalledWith(4, 'grok');
+    expect(result.grok.imported).toBe(5);
     expect(result['prime-agent'].imported).toBe(4);
     expect(result.claude.eventsImported).toBe(3);
     expect(result.ohmypi.imported).toBe(1);
@@ -64,5 +66,6 @@ describe('POST /api/costs/reconcile route wiring', () => {
     expect(response.ohmypi.eventsImported).toBe(1);
     expect(response.codex.eventsImported).toBe(2);
     expect(response['prime-agent'].eventsImported).toBe(4);
+    expect(response.grok.eventsImported).toBe(5);
   });
 });

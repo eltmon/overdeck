@@ -89,6 +89,36 @@ afterEach(async () => {
   tempHomes.splice(0).forEach((home) => rmSync(home, { recursive: true, force: true }))
 })
 
+describe('Grok Build ACP runtime (PAN-5078)', () => {
+  it('refuses to spawn without an explicit model', async () => {
+    const runtime = new AcpRuntimeSync({ name: 'grok', overdeckHome: makeHome() })
+    await expect(runtime.spawnAgent({ agentId: 'agent-grok-no-model', workspace: '/tmp/w', runtime: 'grok' } as never))
+      .rejects.toThrow('Grok Build requires an explicit model')
+  })
+
+  it('launches the host with provider grok and a clamped effort', async () => {
+    const home = makeHome()
+    tmuxMocks.tmuxCreateSession.mockImplementation(async (agentId: string) => {
+      writeAgentFile(home, agentId, 'acp-session-id', 'grok-session\n')
+      writeAgentFile(home, agentId, 'acp-token', 'secret\n')
+    })
+    tmuxMocks.tmuxSessionExists.mockResolvedValue(true)
+    const runtime = new AcpRuntimeSync({
+      name: 'grok',
+      overdeckHome: home,
+      prepareLaunch: async () => ({ binaryPath: '/opt/grok/bin/grok', pathExport: '' }),
+    })
+
+    await runtime.spawnAgent({ agentId: 'agent-grok', workspace: '/tmp/w', runtime: 'grok', model: 'grok/grok-4.6', effort: 'max' } as never)
+
+    const command = tmuxMocks.tmuxCreateSession.mock.calls[0]?.[2]
+    expect(command).toContain("--provider 'grok'")
+    expect(command).toContain("--binary-path '/opt/grok/bin/grok'")
+    expect(command).toContain("--model 'grok/grok-4.6'")
+    expect(command).toContain("--effort 'xhigh'")
+  })
+})
+
 describe('AcpRuntimeSync', () => {
   it('uses the ACP transcript mtime for activity and heartbeat without cost data', () => {
     const home = makeHome()
