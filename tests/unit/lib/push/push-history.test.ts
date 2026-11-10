@@ -27,7 +27,7 @@ function sentRecord(overrides: Partial<PushSentRecord> = {}): PushSentRecord {
     id: overrides.id ?? `id-${Math.random().toString(36).slice(2)}`,
     ts: '2026-11-10T12:00:00.000Z',
     kind: 'question',
-    category: 'questions',
+    category: 'question',
     key: 'auq:t1',
     subject: 'conv:my-conv',
     title: 'my-conv needs you',
