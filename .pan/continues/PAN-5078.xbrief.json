@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5078",
   "created": "2026-11-10T14:48:32.729Z",
-  "updated": "2026-11-10T18:08:30.807Z",
+  "updated": "2026-11-10T18:09:00.096Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -444,6 +444,10 @@
     "grok-replay-fixtures.ac1": {
       "status": "completed",
       "doneAt": "2026-11-10T18:08:30.807Z"
+    },
+    "grok-replay-fixtures.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T18:09:00.096Z"
     }
   }
 }
