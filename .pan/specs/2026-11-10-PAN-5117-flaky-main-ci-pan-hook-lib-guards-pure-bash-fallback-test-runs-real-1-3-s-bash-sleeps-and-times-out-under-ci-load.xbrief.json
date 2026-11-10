@@ -1,0 +1,327 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-10T17:38:01Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5117: Flaky main CI: pan-hook-lib-guards 'pure-bash fallback' test runs real 1-3 s bash sleeps and times out under CI load",
+    "updated": "2026-11-10T17:48:58.947Z"
+  },
+  "plan": {
+    "id": "pan-5117",
+    "title": "Flaky main CI: pan-hook-lib-guards 'pure-bash fallback' test runs real 1-3 s bash sleeps and times out under CI load",
+    "status": "proposed",
+    "uid": "daa3b3e9-ab14-42fb-b861-8df3bb7cdf24",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-10T17:38:01Z",
+    "updated": "2026-11-10T17:48:58.947Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5117",
+        "label": "PAN-5117",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5117.md",
+        "label": "PAN-5117 PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "flaky-test",
+      "ci",
+      "hooks",
+      "bash",
+      "vitest"
+    ],
+    "narratives": {
+      "Problem": "Main CI run 42862542293 failed only on tests/scripts/pan-hook-lib-guards.test.ts 'uses the pure-bash fallback when timeout commands are absent': it timed out at 5000 ms twice (first try and retry) while the sibling GNU-timeout case took 1014 ms. The case runs a real 1 s deadline around a real 3 s sleep in the default run. Planning also found a real race in the fallback watchdog of pan_run_with_timeout (sync-sources/hooks/pan-hook-lib.sh lines 165-183): when the parent kills the watchdog after a /bin/sleep forks but before sleep_pid=$! runs, the trap kills nothing and the orphaned sleep holds the caller's stdout open, so a captured call takes 6 s instead of 1 s. A widened-window copy reproduces it every time on bash 5.2 and bash 3.2.",
+      "Proposal": "WI-1: change the watchdog trap to kill $(jobs -p) so every background sleep dies with the watchdog, and delete the two now-dead sleep_pid=\"\" resets. WI-2: move the three wall-clock cases (lines 200, 227, 306) into tests/scripts/pan-hook-lib-guards.slow.test.ts with { timeout: 20_000 }; vitest.config.ts already excludes *.slow.test.ts unless VITEST_INCLUDE_SLOW=1. WI-3: add one fast default-run case that forces the fallback with an empty PATH and checks stdout and exit code. WI-4: document the *.slow.test.ts convention in docs/TESTING.md and correct the fake-timers rule, which names a nonexistent @slow tag. Full detail, before/after code, and the race probe script are in .pan/drafts/PAN-5117.md.",
+      "NonGoals": "- Adding tests/scripts/pan-hook-lib-guards.slow.test.ts to any CI workflow step (.github/workflows/ci.yml stays unchanged)\n- Deleting pan_run_with_timeout or pan_llm_rate_check, or adding callers for them\n- Changing vitest.config.ts, the CI shard layout, or the global testTimeout\n- Changing the GNU timeout/gtimeout branches of pan_run_with_timeout\n- Changing pan_llm_rate_check's retry count or sleep length\n- Quarantining any test, or adding .skip/.only/skipIf/skip: true\n- Adding a shared test-helper module for the hook lib tests"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Fix the watchdog race in pan-hook-lib.sh in addition to moving the tests (D1).",
+        "rationale": "The issue's acceptance requires the slow file to pass when run explicitly; an orphaned grace sleep makes the call take about 6 s, which fails the < 2_500 ms deadline assertion in either file. The mechanism was demonstrated on bash 5.2 and 3.2."
+      },
+      {
+        "summary": "Use trap 'kill $(jobs -p) 2>/dev/null; exit 0' TERM INT and delete the sleep_pid=\"\" resets (D2).",
+        "rationale": "jobs -p lists a job from fork time, so the trap no longer depends on sleep_pid being recorded; waited jobs leave the list on bash 5.2 and 3.2, so finished sleeps are never signalled. Redirecting watchdog stdio was rejected because it leaves orphan processes."
+      },
+      {
+        "summary": "Keep the caller-less pan_run_with_timeout and pan_llm_rate_check (D3).",
+        "rationale": "Deleting them contradicts the issue's acceptance line and removes shipped lib code nobody asked to remove; the zero-caller fact is recorded in the codebase map concerns.md."
+      },
+      {
+        "summary": "Move three cases: lines 200, 227 and 306 (D4).",
+        "rationale": "Rule: a case moves when its expected wall-clock time is about 1 s or more because of real sleeps or deadlines. Line 306 spends about 0.9 s in ten 0.1 s lock retries (1470 ms on CI). The lock-holder cases poll 10 ms sleeps and took under 170 ms."
+      },
+      {
+        "summary": "Add one fast fallback case to the default run (D5).",
+        "rationale": "After the move nothing in the default run exercises the pure-bash fallback; a no-sleep case keeps CI coverage of its stdout and exit-code behavior."
+      },
+      {
+        "summary": "Do not add the slow file to a CI workflow step (D8).",
+        "rationale": "The issue only requires the slow file to pass when run explicitly, and a workflow edit needs a token with the workflow scope."
+      },
+      {
+        "summary": "Copy runBash/startBash/waitForFile into the slow file instead of a shared helper module (D9).",
+        "rationale": "Every tests/scripts file is self-contained; duplication is about 30 lines and keeps the default file's diff minimal."
+      }
+    ],
+    "items": [
+      {
+        "id": "fix-watchdog-trap",
+        "title": "Make the pure-bash fallback watchdog kill every background job it started",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-10T17:38:01Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5117",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/hooks/pan-hook-lib.sh"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash .tmp/pan-5117-probe.sh",
+            "npx vitest run tests/scripts/pan-hook-lib-guards.test.ts",
+            "git diff $(git merge-base origin/main HEAD) -- sync-sources/hooks/pan-hook-lib.sh"
+          ],
+          "expected_outputs": [
+            "probe (body copied from .pan/drafts/PAN-5117.md WI-1 into the gitignored .tmp/pan-5117-probe.sh) prints no 'FAIL anchor' line, then 'PASS start-window' and 'PASS grace-window', and exits 0",
+            "pan-hook-lib-guards.test.ts reports all tests passed",
+            "diff shows only the new trap line, its three comment lines, and two deleted sleep_pid=\"\" lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD .pan/drafts/PAN-5117.md WI-1. In sync-sources/hooks/pan-hook-lib.sh, function pan_run_with_timeout, replace the watchdog trap line `trap '[ -n \"$sleep_pid\" ] && kill \"$sleep_pid\" 2>/dev/null; exit 0' TERM INT` with `trap 'kill $(jobs -p) 2>/dev/null; exit 0' TERM INT`, add the three-line comment from the PRD above it, and delete both `sleep_pid=\"\"` lines that follow `wait \"$sleep_pid\" 2>/dev/null || exit 0`. Keep `local sleep_pid=\"\"` and both `sleep_pid=$!` lines. Leave $(jobs -p) unquoted. Change nothing else in the file. Prove it with the probe script in the PRD, saved as .tmp/pan-5117-probe.sh (gitignored, never committed): it must fail on the pre-fix lib and pass after the fix. Do not run pan sync."
+        },
+        "items": [
+          {
+            "id": "fix-watchdog-trap.ac1",
+            "title": "Given the PRD WI-1 probe script run from the workspace root, when the start window is widened, then pan_run_with_timeout 5 on a command that exits at once returns 'alpha rc=7' in under 2000 ms and the probe prints 'PASS start-window'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-watchdog-trap.ac2",
+            "title": "Given the same probe, when the grace window is widened, then pan_run_with_timeout 1 on 'exec /bin/sleep 3' returns rc=124 in under 2500 ms, the probe prints 'PASS grace-window', and the probe exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fix-watchdog-trap.ac3",
+            "title": "git diff $(git merge-base origin/main HEAD) -- sync-sources/hooks/pan-hook-lib.sh contains only the new kill $(jobs -p) trap line, its three comment lines, and two removed sleep_pid=\"\" lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "move-wall-clock-cases",
+        "title": "Move the three wall-clock hook-lib cases into pan-hook-lib-guards.slow.test.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-10T17:38:01Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-5117",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/scripts/pan-hook-lib-guards.slow.test.ts",
+            "tests/scripts/pan-hook-lib-guards.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "VITEST_INCLUDE_SLOW=1 npx vitest run tests/scripts/pan-hook-lib-guards.slow.test.ts",
+            "npx vitest run tests/scripts/pan-hook-lib-guards --reporter=verbose",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "slow file exits 0 and reports 3 tests passed",
+            "without VITEST_INCLUDE_SLOW the filter matching both files reports 'Test Files  1 passed (1)' and lists none of the three moved case names",
+            "lint exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD .pan/drafts/PAN-5117.md WI-2. Create tests/scripts/pan-hook-lib-guards.slow.test.ts with the PRD's header comment, copies of runBash/startBash/waitForFile and the beforeEach/afterEach/env() setup, and a describe('pan-hook-lib wall-clock guards') holding three cases copied verbatim from the current default file: 'returns 124 before the deadline and kills the timed-out child' (line 200), 'uses the pure-bash fallback when timeout commands are absent' (line 227), and 'fails closed without changing the bucket when its live lock cannot be acquired' (line 306). Each becomes it('<name>', { timeout: 20_000 }, async () => { ... }). Keep the < 2_500 ms assertions. Delete those three cases from tests/scripts/pan-hook-lib-guards.test.ts and drop any import the deletion leaves unused. Do not touch vitest.config.ts or .github/workflows/ci.yml."
+        },
+        "items": [
+          {
+            "id": "move-wall-clock-cases.ac1",
+            "title": "VITEST_INCLUDE_SLOW=1 npx vitest run tests/scripts/pan-hook-lib-guards.slow.test.ts exits 0 and reports 3 tests passed, each case declared with { timeout: 20_000 }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "move-wall-clock-cases.ac2",
+            "title": "Given VITEST_INCLUDE_SLOW is unset, when npx vitest run tests/scripts/pan-hook-lib-guards runs (a filter matching both files), then it reports 'Test Files  1 passed (1)' and the slow file is excluded from the default run and CI shards",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "move-wall-clock-cases.ac3",
+            "title": "npx vitest run tests/scripts/pan-hook-lib-guards.test.ts --reporter=verbose lists none of the three moved case names, and the diff contains no added .skip, .only, skipIf, or skip: true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "add-fast-fallback-case",
+        "title": "Add a fast pure-bash fallback case to the default hook-lib test run",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T17:38:01Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "test",
+          "issueLabel": "pan-5117",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/scripts/pan-hook-lib-guards.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/scripts/pan-hook-lib-guards.test.ts --reporter=verbose",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "'preserves stdout and exit code through the pure-bash fallback' is reported as passed",
+            "typecheck exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD .pan/drafts/PAN-5117.md WI-3. In tests/scripts/pan-hook-lib-guards.test.ts, inside describe('pan-hook-lib guard primitives'), directly after the case 'passes piped stdin through to the wrapped command', add the case 'preserves stdout and exit code through the pure-bash fallback' exactly as written in the PRD: it creates an empty directory, sets PATH to it and HOME to tempRoot so timeout and gtimeout are hidden, runs result=$(pan_run_with_timeout 5 /bin/bash -c 'printf \"alpha\\nbeta\\n\"; exit 7'), and expects output 'alpha\\nbeta\\nrc=7'. Add no wall-clock assertion and no per-test timeout."
+        },
+        "items": [
+          {
+            "id": "add-fast-fallback-case.ac1",
+            "title": "Given PATH set to an empty directory, when the new case runs pan_run_with_timeout 5 on a command that prints alpha and beta and exits 7, then the bash output it returns is 'alpha\\nbeta\\nrc=7'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "add-fast-fallback-case.ac2",
+            "title": "npx vitest run tests/scripts/pan-hook-lib-guards.test.ts --reporter=verbose shows 'preserves stdout and exit code through the pure-bash fallback' as passed under the default 5 s testTimeout",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-slow-test-convention",
+        "title": "Document the *.slow.test.ts convention in TESTING.md and the fake-timers rule",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-10T17:38:01Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5117",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/TESTING.md",
+            "sync-sources/rules/fake-timers-for-retry-tests.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n -A12 'Wall-clock tests' docs/TESTING.md",
+            "grep -n 'VITEST_INCLUDE_SLOW' sync-sources/rules/fake-timers-for-retry-tests.md",
+            "! grep -q '@slow' sync-sources/rules/fake-timers-for-retry-tests.md",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "TESTING.md shows the '### Wall-clock tests (*.slow.test.ts)' subsection between 'Real-process fixtures' and 'Signals and fixture PIDs'",
+            "the rule's former @slow line now names <name>.slow.test.ts and VITEST_INCLUDE_SLOW=1",
+            "the negated grep exits 0 because no '@slow' remains in the rule",
+            "lint exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD .pan/drafts/PAN-5117.md WI-4. In docs/TESTING.md add a '### Wall-clock tests (*.slow.test.ts)' subsection directly after '### Real-process fixtures' and before '### Signals and fixture PIDs', stating the six points listed in the PRD: when a case belongs in <name>.slow.test.ts, that vitest.config.ts excludes **/*.slow.test.ts unless VITEST_INCLUDE_SLOW=1, the explicit run command, the { timeout: 20_000 } per-test timeout, that CI runs a slow file only when a workflow step names it (today only two-machine-ac1.slow.test.ts in test-e2e), and the PAN-5117 example file. In sync-sources/rules/fake-timers-for-retry-tests.md line 36, replace the 'tagged @slow' sentence with the PRD's replacement naming <name>.slow.test.ts and VITEST_INCLUDE_SLOW=1. Do not run pan sync: unmerged rule and hook edits must not reach this machine's live context."
+        },
+        "items": [
+          {
+            "id": "docs-slow-test-convention.ac1",
+            "title": "docs/TESTING.md contains a '### Wall-clock tests (*.slow.test.ts)' subsection placed after 'Real-process fixtures' that names VITEST_INCLUDE_SLOW=1, the 'VITEST_INCLUDE_SLOW=1 npx vitest run <file>' command, { timeout: 20_000 }, and tests/scripts/pan-hook-lib-guards.slow.test.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-slow-test-convention.ac2",
+            "title": "sync-sources/rules/fake-timers-for-retry-tests.md contains '.slow.test.ts' and 'VITEST_INCLUDE_SLOW=1' on its wall-clock line, and ! grep -q '@slow' on the file exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "move-wall-clock-cases",
+        "to": "add-fast-fallback-case",
+        "type": "blocks"
+      },
+      {
+        "from": "fix-watchdog-trap",
+        "to": "move-wall-clock-cases",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-10-PAN-5117-flaky-main-ci-pan-hook-lib-guards-pure-bash-fallback-test-runs-real-1-3-s-bash-sleeps-and-times-out-under-ci-load.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
