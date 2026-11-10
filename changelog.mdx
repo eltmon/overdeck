@@ -23,6 +23,10 @@ This page starts at v0.60.0, the release that removed Overdeck's state layer. Ol
 
   - **Can't reach rows in Needs you:** when this machine cannot read a linked machine's Needs you, the desktop and the phone show `Can't reach <machine>; it may have items waiting.` until a fetch succeeds. ([PAN-5111](https://github.com/eltmon/overdeck/issues/5111))
 
+  #### Fixed
+
+  - **No more false "stopped responding" push after a PR merges.** The merged work agent is recorded as stopped when its terminal closes, and the crash watcher never counts a paused agent as crashed.
+
   [Compare v0.76.0...v0.77.0](https://github.com/eltmon/overdeck/compare/v0.76.0...v0.77.0)
 </Update>
 
