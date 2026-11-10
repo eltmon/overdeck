@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5078",
   "created": "2026-11-10T14:48:32.729Z",
-  "updated": "2026-11-10T17:53:10.614Z",
+  "updated": "2026-11-10T17:53:29.556Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -260,6 +260,10 @@
     "runtime-registration.ac4": {
       "status": "completed",
       "doneAt": "2026-11-10T17:53:10.614Z"
+    },
+    "config-validation-lists.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T17:53:29.556Z"
     }
   }
 }
