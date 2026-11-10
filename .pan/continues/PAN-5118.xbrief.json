@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5118",
   "created": "2026-11-10T18:32:53.186Z",
-  "updated": "2026-11-10T19:32:29.698Z",
+  "updated": "2026-11-10T19:32:51.371Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -118,6 +118,10 @@
     "mcp-task-done-item-ids.ac1": {
       "status": "completed",
       "doneAt": "2026-11-10T19:32:29.698Z"
+    },
+    "mcp-task-done-item-ids.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T19:32:51.370Z"
     }
   }
 }
