@@ -11,7 +11,9 @@ import {
   EVENT_STREAM_OPEN_TIMEOUT_MS,
   EVENT_STREAM_RETRY_MAX_MS,
   EVENT_STREAM_STABLE_MS,
+  INVENTORY_TTL_MS,
   _resetBackendInventoryForTests,
+  getBackendPanes,
   onBackendConnectionChange,
   onBackendPanesChanged,
   startBackendInventory,
@@ -327,11 +329,34 @@ describe('backend inventory connection edges (PAN-5091)', () => {
     await startBackendInventory({ backend: b.backend });
     await vi.advanceTimersByTimeAsync(1_000);
     expect(b.events).toHaveBeenCalledTimes(2);
-    // The re-open succeeded, but nothing was lost: the listener ignores a restored with nothing recorded.
-    expect(edges).toEqual(['restored']);
+    // The re-open succeeded, but nothing was lost: no edge.
+    expect(edges).toEqual([]);
 
     stopBackendInventory();
     await vi.advanceTimersByTimeAsync(0);
-    expect(edges).toEqual(['restored']);
+    expect(edges).toEqual([]);
+  });
+
+  it('a degraded snapshot at the re-open defers restored to the next good refresh', async () => {
+    const first = controlledStream();
+    const second = controlledStream();
+    const streams = [first.stream, second.stream];
+    const b = backendWith(() => Effect.succeed(streams.shift() as BackendEventStream) as unknown as EventsResult);
+    const edges: string[] = [];
+    onBackendConnectionChange({ lost: () => edges.push('lost'), restored: () => edges.push('restored') });
+
+    await startBackendInventory({ backend: b.backend });
+    b.list.mockImplementationOnce(() => Effect.fail(new Error('herdr not ready')) as never);
+    first.end();
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(b.events).toHaveBeenCalledTimes(2);
+    expect(edges).toEqual(['lost']);
+
+    await vi.advanceTimersByTimeAsync(INVENTORY_TTL_MS);
+    await getBackendPanes({ backend: b.backend });
+    expect(edges).toEqual(['lost', 'restored']);
+    await vi.advanceTimersByTimeAsync(INVENTORY_TTL_MS);
+    await getBackendPanes({ backend: b.backend });
+    expect(edges).toEqual(['lost', 'restored']);
   });
 });

@@ -144,6 +144,9 @@ one 660 MB OBS browser process took down every conversation). The unit sets `OOM
 the killed process dies. `pan install`/`pan sync` rewrite the unit and run `daemon-reload`, which applies
 the policy to a running server without restarting it.
 
+`pan doctor` reports `Terminal backend`, `Herdr binary`, `Herdr server`, `Herdr config`, and one
+`Herdr integration: <target>` row per target.
+
 See [After a session-server restart (PAN-5091)](#after-a-session-server-restart-pan-5091) for what
 Overdeck does when one restarts anyway.
 
@@ -164,23 +167,31 @@ instead (`src/dashboard/server/services/backend-restart-recovery.ts`, primary da
    between: on a unit still on the default `OOMPolicy=stop`, the kernel OOM-kills one pane process and
    then systemd stops the whole unit. The poll ends no row while the backend is unreadable, so the
    rows still say which conversations were live.
-2. **Restored.** `restored` fires when a re-opened stream is up on a fresh, non-degraded snapshot. The
-   service keeps only the recorded conversations whose harness `listLiveConversationSessions` does not
-   report, so a stream blip offers nothing. The list only shrinks after this, so a conversation that
-   dies later is never offered as a restart casualty.
+2. **Restored.** `restored` fires once per `lost`, on the first fresh, non-degraded snapshot taken
+   while a stream is open again: at the re-open, or at a later refresh when the re-open's snapshot was
+   degraded. The service keeps only the recorded conversations whose harness
+   `listLiveConversationSessions` does not report, so a stream blip offers nothing, and records each
+   ended row's `ended_at`. The list only shrinks after this, so a conversation that dies later is never
+   offered as a restart casualty. A second loss starts a new incident: a fresh loss time and fresh
+   `ended_at` baselines, carrying over only the names the last offer still held, so a conversation
+   resumed after the first restart is offered again when the second one stops it.
 3. **Offer.** `GET /api/backend-restart-recovery` (`read:conversations`) serves the list as one
    Needs-you row (`BackendRestartCard`). Each read drops conversations that are live again, archived,
-   released to another machine, or stopped on purpose, and hides those paused (`pan pause`) or holding
-   a `--hold` kickoff. Stopped on purpose is either a stop door in the dashboard process since a minute
+   released to another machine, paused (`pan pause`), holding a `--hold` kickoff, or stopped on
+   purpose. Stopped on purpose is either a stop door in the dashboard process since a minute
    before the loss (`handleConversationStop`, lane stop and lane reap write `conversation-stop-marks.ts`)
    or a row ended again after the offer first saw it ended: a stop from any process, such as
-   `pan flywheel pause` in a CLI process, rewrites `ended_at`. A CLI-process stop in the minute before
-   the loss is not recognized.
+   `pan flywheel pause` in a CLI process, rewrites `ended_at`. A failed resume's own later `ended_at`
+   change is not a stop. Two gaps remain: a CLI-process stop in the minute before the loss, and one
+   in the seconds between the lifecycle poll ending the row and the offer's first read of it.
 4. **Resume all.** `POST /api/backend-restart-recovery/resume-all` (`operate`) resumes them one at a
    time through `handleConversationResume` with resume cause `system`, so the resume contract says the
-   process ended unexpectedly, and each harness takes a turn to re-arm its timers and loops. Before
-   each one it waits while `assessMemoryPressure` (MemAvailable, PSI and CPU saturation) is not `ok`
-   (`PRESSURE_WAIT_MS`, 15 s between checks) and re-checks the skip rules. `POST
+   process ended unexpectedly, and each harness takes a turn to re-arm its timers and loops.
+   `conv-flywheel` goes through `resumeFlywheel` instead, as `pan flywheel resume` does: no resume
+   contract, then `/pan-flywheel` re-sent. Before each one it waits while `assessMemoryPressure`
+   (MemAvailable, PSI and CPU saturation) is not `ok` or cannot answer (`PRESSURE_WAIT_MS`, 15 s
+   between checks) and re-checks the skip rules. The run is reserved before the offer is read, so a
+   second request answers 409. `POST
    /api/backend-restart-recovery/dismiss` drops the offer and stops a running Resume all before its
    next conversation; the one in flight finishes.
 
@@ -188,8 +199,6 @@ The state is in memory only: a dashboard restart forgets the offer. tmux hosts n
 because the tmux adapter has no event stream. Work agents are out of scope; `pan resume <id>` resumes
 one. A single conversation resumes with `pan conversations resume <name>` or the MCP
 `resume_conversation` tool, over `POST /api/conversations/:name/resume`.
-`pan doctor` reports `Terminal backend`, `Herdr binary`, `Herdr server`, `Herdr config`, and one
-`Herdr integration: <target>` row per target.
 
 ## Detection policy per harness (PAN-3917 W12)
 

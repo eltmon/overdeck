@@ -214,6 +214,7 @@ try {
 // PAN-4645 D-4645-19: this machine's environment id on local conversation rows (non-fatal).
 await bootConversationEnvironmentOrWarn();
 
+if (!isPeerDashboardProcess()) (await import('./services/backend-restart-recovery.js')).startBackendRestartRecovery(); // PAN-5091: before the read model starts the inventory
 // Bind the HTTP socket before starting any background service or the Deacon.
 // A bind failure is retried by server.ts and then terminates this process through
 // Effect's Node runtime; no headless orchestrator is allowed to survive it.
@@ -282,7 +283,6 @@ console.log(`[overdeck] AgentEnrichmentService started${isPeerDashboard ? ' (pee
 if (!isPeerDashboard) {
   startNeedsYouPushService({ readConversationFeed: () => getConversationsPendingInputFeed(conversationReadDependencies) });
   startDiskAlertService(); // PAN-5093
-  void import('./services/backend-restart-recovery.js').then((m) => m.startBackendRestartRecovery()); // PAN-5091
   startHarnessAutoUpdateService(); // PAN-5108
   startLiveActivityService();
 }

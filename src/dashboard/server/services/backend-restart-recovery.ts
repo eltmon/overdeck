@@ -21,19 +21,22 @@
  *    recorded conversations whose harness the backend does not run now. A
  *    stream blip leaves every conversation live, so it offers nothing.
  * 3. **Offer.** Each read drops conversations that are live again, archived,
- *    or stopped on purpose, and hides those paused (`pan pause`) or held (a
- *    `--hold` handoff kickoff). Stopped on purpose is either a stop door in
- *    this process (`conversation-stop-marks.ts`) since a minute before the
- *    loss, or a row ended again after the offer first saw it ended (a stop
- *    from any process, such as `pan flywheel pause`, rewrites `ended_at`).
- *    The list only shrinks: a conversation that dies days later is never
- *    offered as a restart casualty.
+ *    paused (`pan pause`), held (a `--hold` handoff kickoff), or stopped on
+ *    purpose. Stopped on purpose is either a stop door in this process
+ *    (`conversation-stop-marks.ts`) since a minute before the loss, or a row
+ *    ended again after the offer first saw it ended (a stop from any process
+ *    rewrites `ended_at`; settle records the first value). The list only
+ *    shrinks: a conversation that dies days later is never offered as a
+ *    restart casualty. A new loss starts a new incident: a fresh loss time and
+ *    baselines, carrying over only the names still offered.
  * 4. **Resume all.** One conversation at a time through
  *    `handleConversationResume` (resume cause `system`, so the resume contract
  *    says the process ended unexpectedly and the harness takes a turn). Before
  *    each one it waits while the resource governor (`assessMemoryPressure`:
- *    MemAvailable, PSI and CPU saturation) is not admitting, and it re-checks
- *    the skip rules. Dismiss cancels a run before its next resume.
+ *    MemAvailable, PSI and CPU saturation) is not admitting, or cannot answer,
+ *    and it re-checks the skip rules. `conv-flywheel` resumes through
+ *    `resumeFlywheel`, as `pan flywheel resume` does. Dismiss cancels a run
+ *    before its next resume.
  *
  * State is in memory only. It runs in the primary dashboard (main.ts); a
  * dashboard restart forgets the offer. tmux hosts never fire the edges, because
@@ -54,6 +57,7 @@ import { handleConversationResume } from '../../../lib/overdeck/conversation-run
 import { conversationStoppedSince } from '../../../lib/overdeck/conversation-stop-marks.js';
 import { getConversationByName, listConversations } from '../../../lib/overdeck/conversations.js';
 import { decodeDoorResponse } from '../../../lib/overdeck/scheduled-message-delivery.js';
+import { FLYWHEEL_CONVERSATION_SESSION } from '../../../lib/flywheel/constants.js';
 import { onBackendConnectionChange } from './backend-inventory.js';
 
 /** A row that ended this long before the loss still counts as live at the loss. */
@@ -87,6 +91,24 @@ export interface BackendRestartRecoveryDeps {
   now: () => number;
 }
 
+/**
+ * The flywheel resumes the way `pan flywheel resume` does: no resume contract,
+ * then `/pan-flywheel` re-sent, so the loop re-orients from its skill.
+ */
+async function resumeFlywheelConversation(): Promise<{ status: number; body: unknown }> {
+  const [{ resumeFlywheel }, { FlywheelAlreadyRunning }] = await Promise.all([
+    import('../../../lib/flywheel/actions.js'),
+    import('../../../lib/flywheel/errors.js'),
+  ]);
+  try {
+    await resumeFlywheel();
+    return { status: 200, body: { reattached: false } };
+  } catch (error) {
+    if (error instanceof FlywheelAlreadyRunning) return { status: 200, body: { reattached: true } };
+    return { status: 500, body: { error: error instanceof Error ? error.message : String(error) } };
+  }
+}
+
 const defaultDeps: BackendRestartRecoveryDeps = {
   listConversations: () => listConversations(),
   getConversation: (name) => getConversationByName(name),
@@ -95,9 +117,9 @@ const defaultDeps: BackendRestartRecoveryDeps = {
   isHeld: (name) => readHeldKickoff(name) !== null,
   stoppedSince: conversationStoppedSince,
   pressureBand: async () => (await assessMemoryPressure()).band,
-  resume: async (name) => decodeDoorResponse(
-    await handleConversationResume(name, {}, { resolveSessionFile, resumeCause: 'system' }),
-  ),
+  resume: async (name) => (name === FLYWHEEL_CONVERSATION_SESSION
+    ? resumeFlywheelConversation()
+    : decodeDoorResponse(await handleConversationResume(name, {}, { resolveSessionFile, resumeCause: 'system' }))),
   sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   now: Date.now,
 };
@@ -111,6 +133,8 @@ interface Capture {
   settled: boolean;
   /** The `ended_at` each row had when the offer first saw it ended. */
   endedAtSeen: Map<string, string>;
+  /** Names whose resume failed: their next `ended_at` change is the failure's own, not a stop. */
+  rebaseline: Set<string>;
 }
 
 interface MutableRun {
@@ -142,13 +166,11 @@ function dropReason(row: RecoveryConversationRow | null, live: ReadonlySet<strin
   if (row.status === 'ended' && row.endedAt) {
     const seen = current.endedAtSeen.get(row.name);
     if (seen === undefined) current.endedAtSeen.set(row.name, row.endedAt);
-    else if (seen !== row.endedAt) return 'stopped on purpose';
+    else if (seen !== row.endedAt) {
+      if (!current.rebaseline.delete(row.name)) return 'stopped on purpose';
+      current.endedAtSeen.set(row.name, row.endedAt);
+    }
   }
-  return null;
-}
-
-/** Why a conversation is left out of the offer for now, or null. */
-function holdReason(row: RecoveryConversationRow): string | null {
   if (deps.isPaused(row.tmuxSession)) return 'paused';
   if (deps.isHeld(row.name)) return 'held';
   return null;
@@ -162,15 +184,16 @@ export function noteBackendLost(): void {
     .filter(isResumableHere)
     .filter((row) => row.status === 'active' || (row.endedAt !== null && Date.parse(row.endedAt) >= cutoff))
     .map((row) => row.name);
-  if (capture) {
-    // A second loss before the operator acted: one offer for both.
-    capture.names = [...new Set([...capture.names, ...names])];
-    capture.restored = false;
-    capture.settled = false;
-    return;
-  }
-  if (names.length === 0) return;
-  capture = { lostAtMs: now, names, restored: false, settled: false, endedAtSeen: new Map() };
+  // A new loss is a new incident: a fresh loss time and fresh baselines, so a
+  // conversation resumed after the last restart is never read as stopped on
+  // purpose. Names the last offer still holds carry over.
+  const carried = capture?.names ?? [];
+  if (run?.state === 'running') run.cancelled = true;
+  run = null;
+  const merged = [...new Set([...carried, ...names])];
+  capture = merged.length > 0
+    ? { lostAtMs: now, names: merged, restored: false, settled: false, endedAtSeen: new Map(), rebaseline: new Set() }
+    : null;
 }
 
 /** The backend is back: settle which recorded conversations it left stopped. */
@@ -190,7 +213,9 @@ async function settle(): Promise<void> {
   if (!live || capture !== current || !current.restored) return;
   current.names = current.names.filter((name) => {
     const row = deps.getConversation(name);
-    return row !== null && !live.has(row.tmuxSession);
+    if (row === null || live.has(row.tmuxSession)) return false;
+    if (row.status === 'ended' && row.endedAt) current.endedAtSeen.set(name, row.endedAt);
+    return true;
   });
   current.settled = true;
   if (current.names.length === 0) {
@@ -210,8 +235,8 @@ async function offeredConversations(): Promise<BackendRestartConversation[]> {
   const offered: BackendRestartConversation[] = [];
   current.names = current.names.filter((name) => {
     const row = deps.getConversation(name);
-    if (dropReason(row, live, current) !== null) return false;
-    if (row && holdReason(row) === null) offered.push({ name: row.name, title: row.title });
+    if (!row || dropReason(row, live, current) !== null) return false;
+    offered.push({ name: row.name, title: row.title });
     return true;
   });
   if (current.names.length === 0 && run?.state !== 'running') capture = null;
@@ -238,12 +263,13 @@ export async function getBackendRestartRecoverySnapshot(): Promise<BackendRestar
 
 async function waitForPressure(active: MutableRun): Promise<void> {
   while (!active.cancelled) {
-    let band: MemoryPressureBand;
+    let band: MemoryPressureBand | 'unknown';
     try {
       band = await deps.pressureBand();
     } catch (error) {
-      console.warn(`[backend-restart-recovery] governor check failed, resuming anyway: ${error instanceof Error ? error.message : String(error)}`);
-      band = 'ok';
+      // No verdict is not a yes: wait and ask again.
+      console.warn(`[backend-restart-recovery] governor check failed, waiting: ${error instanceof Error ? error.message : String(error)}`);
+      band = 'unknown';
     }
     if (band === 'ok') break;
     active.waitingForPressure = true;
@@ -259,21 +285,26 @@ async function resumeOne(name: string, current: Capture): Promise<BackendRestart
   const drop = dropReason(row, live, current);
   if (drop === 'already running') return { name, outcome: 'already-running' };
   if (drop) return { name, outcome: 'skipped', reason: drop };
-  const hold = row ? holdReason(row) : null;
-  if (hold) return { name, outcome: 'skipped', reason: hold };
+  let failed = false;
   try {
     const response = await deps.resume(name);
     const body = response.body as { error?: unknown; reattached?: unknown } | null;
     if (response.status >= 400) {
+      failed = true;
       return { name, outcome: 'failed', reason: typeof body?.error === 'string' ? body.error : `resume answered ${response.status}` };
     }
     return { name, outcome: body?.reattached === true ? 'already-running' : 'resumed' };
   } catch (error) {
+    failed = true;
     return { name, outcome: 'failed', reason: error instanceof Error ? error.message : String(error) };
   } finally {
-    // A failed resume may end the row again; that is not a stop on purpose.
-    const after = deps.getConversation(name);
-    if (after?.status === 'ended' && after.endedAt) current.endedAtSeen.set(name, after.endedAt);
+    // A failed resume may end the row again, now or after the lifecycle poll
+    // saw its pane come up and die; that is not a stop on purpose.
+    if (failed) {
+      const after = deps.getConversation(name);
+      if (after?.status === 'ended' && after.endedAt) current.endedAtSeen.set(name, after.endedAt);
+      current.rebaseline.add(name);
+    }
   }
 }
 
@@ -303,9 +334,8 @@ export type ResumeAllStart =
 /** Start Resume all in the background. Refuses while a run is in progress. */
 export async function startBackendRestartResumeAll(): Promise<ResumeAllStart> {
   if (run?.state === 'running') return { started: false, reason: 'running' };
-  const offered = await offeredConversations();
-  const current = capture;
-  if (offered.length === 0 || !current) return { started: false, reason: 'nothing-to-resume' };
+  // Reserve the run before the first await, so a second POST sees it running.
+  const previous = run;
   const active: MutableRun = {
     state: 'running',
     startedAt: new Date(deps.now()).toISOString(),
@@ -316,6 +346,13 @@ export async function startBackendRestartResumeAll(): Promise<ResumeAllStart> {
     results: [],
   };
   run = active;
+  const offered = await offeredConversations();
+  const current = capture;
+  if (run !== active || active.cancelled) return { started: false, reason: 'nothing-to-resume' };
+  if (offered.length === 0 || !current) {
+    run = previous;
+    return { started: false, reason: 'nothing-to-resume' };
+  }
   void runResumeAll(active, offered.map((row) => row.name), current).catch(() => undefined);
   return { started: true, conversations: offered.length };
 }

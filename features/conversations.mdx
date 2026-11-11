@@ -956,7 +956,8 @@ stopped when the terminal backend restarted`, with their names and a **Resume
 all** button. Resume all resumes them one at a time. Before each one it waits
 while the memory governor reports memory or CPU pressure, and the row says so
 while it waits. Each resumed conversation is told that its process ended
-unexpectedly, so it takes a turn to restart its timers and loops. Resume all
+unexpectedly, so it takes a turn to restart its timers and loops; the
+flywheel resumes the way `pan flywheel resume` does. Resume all
 skips a conversation that you paused with `pan pause`, that holds an unsent
 `--hold` handoff kickoff, that continues on another machine, or that you
 stopped or archived after the restart. When it finishes, the row lists any

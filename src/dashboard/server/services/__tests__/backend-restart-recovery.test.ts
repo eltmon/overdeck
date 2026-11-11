@@ -165,8 +165,40 @@ describe('the snapshot of live conversations at the restart', () => {
   });
 });
 
+describe('a second restart is a new incident', () => {
+  it('offers a conversation resumed after the first restart when a second restart stops it again', async () => {
+    const w = world([row('a'), row('p')]);
+    // A resume marks the row active again, as handleConversationResume does.
+    const resume = w.deps.resume;
+    w.deps.resume = async (name) => {
+      w.rows.set(name, row(name));
+      return resume(name);
+    };
+    startBackendRestartRecovery(w.deps);
+    await restart(w);
+    // The lifecycle poll ends both rows; the operator pauses p and resumes the rest.
+    w.rows.set('a', row('a', { status: 'ended', endedAt: new Date(NOW + 10_000).toISOString() }));
+    w.rows.set('p', row('p', { status: 'ended', endedAt: new Date(NOW + 10_000).toISOString() }));
+    w.paused.add('conv-p');
+    expect(await offeredNames()).toEqual(['a']);
+    await startBackendRestartResumeAll();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(w.resumed).toEqual(['a']);
+
+    // An hour later the backend restarts again; the poll ends `a` with a new ended_at.
+    vi.setSystemTime(NOW + 60 * 60_000);
+    await restart(w);
+    w.rows.set('a', row('a', { status: 'ended', endedAt: new Date(NOW + 60 * 60_000 + 10_000).toISOString() }));
+    const snapshot = await getBackendRestartRecoverySnapshot();
+    expect(snapshot.conversations.map((c) => c.name)).toEqual(['a']);
+    expect(snapshot.lostAt).toBe(new Date(NOW + 60 * 60_000).toISOString());
+    // The first incident's run summary is gone.
+    expect(snapshot.run).toBeNull();
+  });
+});
+
 describe('the offer leaves out what Resume all must not resume', () => {
-  it('drops resumed, archived, released and stopped-on-purpose conversations, and hides paused and held ones', async () => {
+  it('drops resumed, archived, released, paused, held and stopped-on-purpose conversations for good', async () => {
     const w = world(['live', 'archived', 'stopped', 'paused', 'held', 'released', 'ok'].map((name) => row(name)));
     startBackendRestartRecovery(w.deps);
     await restart(w);
@@ -180,11 +212,11 @@ describe('the offer leaves out what Resume all must not resume', () => {
     w.rows.set('released', row('released', { releasedTo: 'env-desk' }));
     expect(await offeredNames()).toEqual(['ok']);
 
-    // Paused and held come back when lifted; dropped ones never do.
+    // Lifting the pause or the hold does not bring them back: no invisible offer lingers.
     w.paused.clear();
     w.held.clear();
     w.live!.delete('conv-live');
-    expect(await offeredNames()).toEqual(['paused', 'held', 'ok']);
+    expect(await offeredNames()).toEqual(['ok']);
   });
 
   it('a stop recorded just before the loss still counts as on purpose', async () => {
@@ -330,6 +362,58 @@ describe('Resume all', () => {
     expect(w.resumed).toEqual([]);
     expect(await getBackendRestartRecoverySnapshot()).toEqual({ lostAt: null, conversations: [], run: null });
     expect(await startBackendRestartResumeAll()).toEqual({ started: false, reason: 'nothing-to-resume' });
+  });
+
+  it('only one of two concurrent Resume all requests starts a run', async () => {
+    const w = world([row('a'), row('b')]);
+    startBackendRestartRecovery(w.deps);
+    await restart(w);
+
+    const [first, second] = await Promise.all([startBackendRestartResumeAll(), startBackendRestartResumeAll()]);
+    expect([first, second]).toEqual([{ started: true, conversations: 2 }, { started: false, reason: 'running' }]);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(w.resumed).toEqual(['a', 'b']);
+  });
+
+  it('a failed governor check waits and asks again instead of resuming', async () => {
+    const w = world([row('a')]);
+    let calls = 0;
+    w.deps.pressureBand = async () => {
+      calls++;
+      if (calls === 1) throw new Error('/proc/pressure unreadable');
+      return 'ok';
+    };
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    startBackendRestartRecovery(w.deps);
+    await restart(w);
+
+    await startBackendRestartResumeAll();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(w.resumed).toEqual([]);
+    expect((await getBackendRestartRecoverySnapshot()).run).toMatchObject({ waitingForPressure: true });
+    await vi.advanceTimersByTimeAsync(PRESSURE_WAIT_MS);
+    expect(w.resumed).toEqual(['a']);
+  });
+
+  it('a failed resume whose row comes up and ends again later stays offered', async () => {
+    const w = world([row('a')]);
+    w.deps.resume = async (name) => {
+      w.resumed.push(name);
+      return { status: 500, body: { error: 'runtime not ready' } };
+    };
+    startBackendRestartRecovery(w.deps);
+    await restart(w);
+    w.rows.set('a', row('a', { status: 'ended', endedAt: new Date(NOW + 10_000).toISOString() }));
+    expect(await offeredNames()).toEqual(['a']);
+
+    await startBackendRestartResumeAll();
+    await vi.advanceTimersByTimeAsync(0);
+    // The pane came up and died: the lifecycle poll ends the row with a new ended_at.
+    w.rows.set('a', row('a', { status: 'ended', endedAt: new Date(NOW + 90_000).toISOString() }));
+    expect(await offeredNames()).toEqual(['a']);
+    // A later change is a stop again.
+    w.rows.set('a', row('a', { status: 'ended', endedAt: new Date(NOW + 200_000).toISOString() }));
+    expect(await offeredNames()).toEqual([]);
   });
 
   it('never resumes anything on its own', async () => {
