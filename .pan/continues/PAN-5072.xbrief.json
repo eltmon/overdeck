@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5072",
   "created": "2026-11-11T10:00:36.495Z",
-  "updated": "2026-11-11T10:03:09.996Z",
+  "updated": "2026-11-11T10:03:19.255Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -30,6 +30,11 @@
     "w1-hermes-shape.ac4": {
       "status": "completed",
       "doneAt": "2026-11-11T10:03:09.995Z"
+    },
+    "w2-openclaw-shape": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5072",
+      "claimedAt": "2026-11-11T10:03:19.255Z"
     }
   }
 }
