@@ -10,6 +10,8 @@
  * mcp.json shapes, the Hermes config.yaml shape, the OpenClaw `mcp set` command, and generic
  * JSON for `other`.
  */
+import { shellQuote } from '../../shell-quote.js';
+
 export const CONNECT_STATUS_PREFIX = 'OVERDECK_CONNECT ';
 export const CONNECT_EXIT = { ready: 0, error: 1, authorize: 3, retry: 4 } as const;
 export const CONNECT_PLATFORMS = ['grok-bot', 'grok-build', 'hermes', 'openclaw', 'other'] as const;
@@ -130,6 +132,11 @@ export function hermesRegistrationYaml(registration: ConnectRegistration): strin
   return lines.join('\n');
 }
 
+/** `openclaw mcp set overdeck '<json>'`: writes mcp.servers.overdeck without prompting. */
+export function openclawRegistrationCommand(registration: ConnectRegistration): string {
+  return `openclaw mcp set ${registration.name} ${shellQuote(JSON.stringify(stdioServer(registration)))}`;
+}
+
 /** Human lines that show the registration in the platform's own shape. */
 export function registrationLines(platform: ConnectPlatform, registration: ConnectRegistration): string[] {
   const server = stdioServer(registration);
@@ -148,6 +155,12 @@ export function registrationLines(platform: ConnectPlatform, registration: Conne
         ...hermesRegistrationYaml(registration).split('\n'),
         'Then run /reload-mcp in Hermes, or start a new session, so the overdeck tools load.',
         'The Overdeck Hermes plugin also needs plugins.entries.overdeck.mcp_allowlist: ["overdeck"] in the same file.',
+      ];
+    case 'openclaw':
+      return [
+        'Register it with OpenClaw (changes under mcp.servers apply without a restart):',
+        openclawRegistrationCommand(registration),
+        "The Overdeck OpenClaw plugin's summary and its overdeck_pending and overdeck_answer tools still need the connector's HTTP route (serve and localToken); see the plugin README.",
       ];
     default:
       return [`Register a stdio MCP server named "${registration.name}":`, ...jsonLines(server)];

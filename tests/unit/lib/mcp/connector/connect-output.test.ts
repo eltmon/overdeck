@@ -11,6 +11,7 @@ import {
   failureStatus,
   formatStatusLine,
   hermesRegistrationYaml,
+  openclawRegistrationCommand,
   READY_NEXT,
   registrationFor,
   registrationLines,
@@ -100,7 +101,7 @@ describe('registrationLines', () => {
   });
 
   it('shows every other platform a generic stdio server named overdeck', () => {
-    for (const platform of ['openclaw', 'other'] as const) {
+    for (const platform of ['other'] as const) {
       const lines = registrationLines(platform, REGISTRATION);
       expect(lines[0]).toBe('Register a stdio MCP server named "overdeck":');
       expect(JSON.parse(lines.slice(1).join('\n'))).toEqual({ command: 'npx', args: REGISTRATION.args });
@@ -126,5 +127,29 @@ describe('hermesRegistrationYaml and registrationLines("hermes", …) (FR-1, FR-
     expect(lines.slice(1, 5).join('\n')).toBe(hermesRegistrationYaml(REGISTRATION));
     expect(lines[5]).toContain('/reload-mcp');
     expect(lines[6]).toContain('mcp_allowlist');
+  });
+});
+
+describe('openclawRegistrationCommand and registrationLines("openclaw", …) (FR-2, FR-3, NFR-2)', () => {
+  it('shell-quotes a JSON stdio server that parses back to command and args', () => {
+    const command = openclawRegistrationCommand(REGISTRATION);
+    expect(command.startsWith("openclaw mcp set overdeck '")).toBe(true);
+    expect(command.endsWith("'")).toBe(true);
+    const inner = command.slice("openclaw mcp set overdeck '".length, -1);
+    expect(JSON.parse(inner)).toEqual({ command: 'npx', args: REGISTRATION.args });
+  });
+
+  it('escapes a single quote in the connector home so the command still parses', () => {
+    const withQuote = registrationFor({ version: '0.75.0', env: { OVERDECK_CONNECTOR_HOME: "/data/it's" } });
+    const command = openclawRegistrationCommand(withQuote);
+    const inner = command.slice("openclaw mcp set overdeck '".length, -1);
+    const unescaped = inner.split("'\\''").join("'");
+    expect(JSON.parse(unescaped)).toEqual({ command: 'npx', args: withQuote.args, env: { OVERDECK_CONNECTOR_HOME: "/data/it's" } });
+  });
+
+  it('prints a register line, the command, and a plugin HTTP-route line mentioning localToken', () => {
+    const lines = registrationLines('openclaw', REGISTRATION);
+    expect(lines[1]).toBe(openclawRegistrationCommand(REGISTRATION));
+    expect(lines[2]).toContain('localToken');
   });
 });
