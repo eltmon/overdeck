@@ -1204,4 +1204,6 @@ await groups.finish();
 // PAN-3917: durable-write-drain.ts (journal writes plus the state worktree's
 // commit flush) is gone with the state layer — there is nothing left to drain
 // before exit, so runCliWithTelemetry's drain hook is a no-op.
+// PAN-5151: decide the Claude permission default once per home before any verb can launch Claude Code.
+await import('../lib/claude-permission-mode-pin.js').then(async (m) => { const r = await m.pinClaudePermissionModeOnce(); if (r.notice) process.stderr.write(`${r.notice}\n`); }).catch(() => undefined);
 await runCliWithTelemetry(() => program.parseAsync(process.argv, { from: 'node' }), async () => {});

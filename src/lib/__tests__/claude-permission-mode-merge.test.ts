@@ -34,11 +34,16 @@ describe('claude.permissionMode merge', () => {
       { claude: { permissionMode: 'bypassPermissions' } } as unknown as YamlConfig,
     );
 
-    expect(config.claude.permissionMode).toBe('bypass');
+    expect(config.claude.permissionMode).toBe('auto');
     expect(errors).toHaveBeenCalledTimes(1);
     expect(errors.mock.calls[0]?.[0]).toContain('claude.permissionMode "bypassPermissions"');
     expect(errors.mock.calls[0]?.[0]).toContain("'auto'");
     expect(errors.mock.calls[0]?.[0]).toContain("'bypass'");
+  });
+
+  it('defaults to auto with no config at all (PAN-5151)', () => {
+    expect(mergeConfigs(null).config.claude.permissionMode).toBe('auto');
+    expect(mergeConfigs({} as YamlConfig).config.claude.permissionMode).toBe('auto');
   });
 
   it('warns once per distinct bad value, not once per config load', () => {

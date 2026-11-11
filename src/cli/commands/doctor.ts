@@ -791,6 +791,7 @@ export async function collectDoctorChecks(options: DoctorOptions = {}): Promise<
   }
 
   checks.push(checkDeployedHooksDrift(), await checkSyncSourceCheckout(), (await import('./doctor-okf-skill.js')).checkOkfSkillVersion()); // PAN-3327, PAN-3881, PAN-4408
+  checks.push(await (await import('./doctor-permission-mode.js')).checkClaudePermissionModeLive()); // PAN-5151
   checks.push(await checkCliGenerationLink(), checkPanOnPath());
 
   // Check environment variables

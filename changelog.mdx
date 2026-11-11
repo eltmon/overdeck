@@ -15,6 +15,10 @@ This page starts at v0.60.0, the release that removed Overdeck's state layer. Ol
 
   Drafted from the changes merged to `main` since v0.79.0. The date is set when the release is tagged.
 
+  #### Improved
+
+  - **New installations start in Auto permission mode:** a new install launches Claude Code with `--permission-mode default` and Overdeck's auto-approve hook instead of bypass; installs that existed before this release keep bypass, written once into `~/.overdeck/config.yaml`; `pan doctor` reports a missing hook, and a launch is refused rather than prompting on every tool call. ([#5151](https://github.com/eltmon/overdeck/issues/5151))
+
   #### Fixed
 
   - **A stranded review request is re-requested again:** when a review was requested but never dispatched, and the review had no run state yet, the background patrol's recovery did nothing, so the review stayed stuck until someone requested it again. The patrol now re-requests it through the same guarded review route that `pan review request` uses, 15 minutes after the request. ([#4623](https://github.com/eltmon/overdeck/issues/4623))

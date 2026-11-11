@@ -323,8 +323,8 @@ export interface SettingsConfig {
   /**
    * Permission mode for spawned Claude Code agents.
    *
-   * 'auto' (default) — Claude Code's classifier blocks destructive ops while running autonomously
-   * 'bypass'         — pass --dangerously-skip-permissions (legacy behavior)
+   * 'auto' (default for new installations) — --permission-mode default plus Overdeck's auto-approve hook
+   * 'bypass'                               — --permission-mode bypassPermissions
    */
   claude?: {
     permissionMode?: 'auto' | 'bypass';

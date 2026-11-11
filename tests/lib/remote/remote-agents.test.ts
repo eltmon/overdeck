@@ -56,6 +56,8 @@ import {
   killRemoteAgent,
   saveRemoteAgentState,
   loadRemoteAgentState,
+  assertRemotePermissionModeSupported,
+  spawnRemoteAgent,
   type RemoteAgentState,
 } from '../../../src/lib/remote/remote-agents.js';
 import { getManagedTmuxSocketName } from '../../../src/lib/tmux.js';
@@ -612,5 +614,39 @@ describe('remote tmux target (PAN-4734)', () => {
       ]);
       expect(loadRemoteAgentState(AGENT)?.status).toBe('stopped');
     });
+  });
+});
+
+describe('assertRemotePermissionModeSupported (PAN-5151)', () => {
+  it('throws naming bypass and PAN_YOLO under auto', () => {
+    expect(() => assertRemotePermissionModeSupported('auto')).toThrow(/bypass/);
+    expect(() => assertRemotePermissionModeSupported('auto')).toThrow(/PAN_YOLO/);
+  });
+
+  it('does not throw under bypass', () => {
+    expect(() => assertRemotePermissionModeSupported('bypass')).not.toThrow();
+  });
+});
+
+describe('spawnRemoteAgent refuses auto before touching Fly (PAN-5151)', () => {
+  const ORIGINAL_YOLO = process.env.PAN_YOLO;
+
+  afterEach(() => {
+    if (ORIGINAL_YOLO === undefined) delete process.env.PAN_YOLO;
+    else process.env.PAN_YOLO = ORIGINAL_YOLO;
+  });
+
+  it('rejects with the permission-mode message when PAN_YOLO=false resolves auto, before any Fly call', async () => {
+    process.env.PAN_YOLO = 'false';
+
+    await expect(
+      spawnRemoteAgent({
+        issueId: 'PAN-5151',
+        startedBy: 'operator',
+        workspace: {
+          id: 'PAN-5151', issue: 'PAN-5151', provider: 'fly', vmName: 'pan-5151-vm', urls: {},
+        },
+      }),
+    ).rejects.toThrow(/claude\.permissionMode: bypass/);
   });
 });

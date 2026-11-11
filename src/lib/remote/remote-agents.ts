@@ -27,7 +27,8 @@ import {
 import type { RemoteTmuxTarget } from './remote-tmux.js';
 import { countFlyMachines } from '../anywhere/fly/machine-store.js';
 import { generateLauncherScript } from '../launcher-generator.js';
-import { getClaudePermissionFlags, getClaudePermissionFlagsString } from '../claude-permissions.js';
+import { getClaudePermissionFlags, getClaudePermissionFlagsString, resolvePermissionMode } from '../claude-permissions.js';
+import type { ClaudePermissionMode } from '../config.js';
 import {
   withAutoSpawnConsentClaim,
   type AcceptAutoSpawnConsent,
@@ -604,10 +605,20 @@ export async function spawnRemoteAgent(options: SpawnRemoteAgentOptions): Promis
   );
 }
 
+/** PAN-5151: the Fly VM has no Overdeck hooks, so auto would prompt on every tool call. */
+export function assertRemotePermissionModeSupported(mode: ClaudePermissionMode = resolvePermissionMode()): void {
+  if (mode !== 'auto') return;
+  throw new Error(
+    'Remote Fly agents need claude.permissionMode: bypass. The Fly VM has no Overdeck auto-approve hook, '
+      + 'so under auto every tool call would wait for approval. Set Bypass in Settings → Permissions, or start with PAN_YOLO=true.',
+  );
+}
+
 async function spawnRemoteAgentWithoutConsentClaim(
   options: SpawnRemoteAgentOptions,
   acceptConsent?: AcceptAutoSpawnConsent,
 ): Promise<RemoteAgentState> {
+  assertRemotePermissionModeSupported();
   const { issueId, workspace, startedBy, prompt } = options;
   // No explicit model → the configured work-role routing, same as a local
   // spawn. Throws when routing cannot resolve; never a literal model ID.
