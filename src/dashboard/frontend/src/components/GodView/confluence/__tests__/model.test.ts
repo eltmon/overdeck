@@ -98,6 +98,55 @@ describe('Confluence model', () => {
       }
     });
 
+    describe('lane slots (PAN-5131 FR-8)', () => {
+      const layout = computeLayout(1680, 912);
+      const place = (orbs: PositionableOrb[]) => {
+        for (const candidate of orbs) positionOrb(candidate, orbs, layout, 1, 1);
+        return orbs.filter((candidate) => candidate.stage === 'WORK').map((candidate) => candidate.ty);
+      };
+      const gaps = (values: number[]) => {
+        const sorted = [...values].sort((a, b) => a - b);
+        return sorted.slice(1).map((value, index) => value - sorted[index]!);
+      };
+
+      it('gives three active orbs in one column three slots at least 24 px apart', () => {
+        expect(layout.riverBottom - layout.riverTop).toBe(600);
+        const ys = place([orb('PAN-3', 'active'), orb('PAN-1', 'active'), orb('PAN-2', 'active')]);
+
+        expect(new Set(ys).size).toBe(3);
+        expect(Math.min(...gaps(ys))).toBeGreaterThanOrEqual(24);
+        for (const y of ys) {
+          expect(y).toBeGreaterThan(layout.riverTop);
+          expect(y).toBeLessThan(layout.riverBottom);
+        }
+      });
+
+      it('gives a failed orb its own slot among the active orbs of its column', () => {
+        const ys = place([orb('PAN-1', 'active'), orb('PAN-2', 'failed'), orb('PAN-3', 'active')]);
+
+        expect(new Set(ys).size).toBe(3);
+        expect(Math.min(...gaps(ys))).toBeGreaterThanOrEqual(24);
+      });
+
+      it('gives 20 orbs in one column 20 distinct slots', () => {
+        const ys = place(Array.from({ length: 20 }, (_, index) => orb(`PAN-${index + 1}`, 'active')));
+
+        expect(new Set(ys).size).toBe(20);
+        expect(Math.min(...gaps(ys))).toBeGreaterThan(0);
+      });
+
+      it('keeps a column unchanged when another column gains an orb, and is stable across calls', () => {
+        const work = () => Array.from({ length: 20 }, (_, index) => orb(`PAN-${index + 1}`, 'active'));
+        const alone = place(work());
+        const withPlan = [...work(), orb('PAN-99', 'active', 'PLAN')];
+        const first = place(withPlan);
+        const second = place(withPlan);
+
+        expect(first).toEqual(alone);
+        expect(second).toEqual(first);
+      });
+    });
+
     it('places a needs-you orb on the shelf row alongside shelf orbs (PAN-4383)', () => {
       const layout = computeLayout(1680, 945);
       const orbs = [orb('PAN-1', 'shelf'), orb('PAN-2', 'needs-you')];

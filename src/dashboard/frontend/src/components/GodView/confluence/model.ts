@@ -310,11 +310,12 @@ export function positionOrb<T extends PositionableOrb>(
   const column = stageIdx(orb.stage);
   const jitter = ((hashStr(orb.id) % 100) / 100 - 0.5) * layout.colW * 0.45;
   orb.tx = layout.padX + (column + 0.5) * layout.colW + jitter;
-  const laneCount = orbs.filter(
-    (candidate) => candidate !== orb && candidate.stage === orb.stage && candidate.state === 'active',
-  ).length;
+  const lane = orbs
+    .filter((candidate) => candidate.stage === orb.stage && (candidate.state === 'active' || candidate.state === 'failed'))
+    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  const slot = Math.max(0, lane.indexOf(orb));
   orb.ty = layout.riverTop + 40
-    + ((hashStr(orb.id) + laneCount * 53) % Math.max(60, layout.riverBottom - layout.riverTop - 80));
+    + ((slot + 0.5) / Math.max(1, lane.length)) * (layout.riverBottom - layout.riverTop - 80);
   return orb;
 }
 
