@@ -721,3 +721,9 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
 - Release is owned by conv-20261111-9538: the Flywheel does NOT run `pan release`. Tell that conversation the merge commit when PAN-5153 merges with main CI green, and when PAN-5152 merges; `pan reload` after each. Report any stall or park on these three to it in one message.
 - PAN-5153 touches the agents runtime and merge routes; started with `pan start` on the operator's explicit order (TENET-10 bars only auto-starts).
 - CI runner flake seen on PR #5150: "Temporary failure resolving 'azure.archive.ubuntu.com'" while installing Playwright browsers kills test shards in setup. Not a code failure: `gh run rerun <run> --failed` after the run completes.
+
+## 2026-11-11 — 15:50Z memory spike: stack and gate rules (operator via conv 20261111-1250)
+- Every workspace, adopted handoff PRs included, starts a Docker stack whose frontend dev server holds about 1.2 GB. Six at once plus gate runs (tsc, madge) and other hosts' jobs pushed mem PSI some avg60 to 66 with swap full.
+- Rules: keep frontend/dev containers stopped for every workspace not in UAT or active browser use (`docker compose -p overdeck-feature-<id> stop frontend dev`); never start `pan reload` while quality gates run; start no new work while mem PSI some avg60 > 2; at most four issues in flight.
+- Disk hold: no new workspaces or worktrees until the Fort 20 upload frees about 29 GB. Remove /home/eltmon/Projects/mobile-build-4 after the operator uploads the AAB; a verified copy of overdeck-1.0-4.aab is in the Flywheel scratchpad store-prep/android/.
+- Re-requesting verification for several PRs at once runs their gates together; stagger them.
