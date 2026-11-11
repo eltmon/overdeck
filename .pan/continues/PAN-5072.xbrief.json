@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-5072",
+  "created": "2026-11-11T10:00:36.495Z",
+  "updated": "2026-11-11T10:00:36.495Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "w1-hermes-shape": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5072",
+      "claimedAt": "2026-11-11T10:00:36.495Z"
+    }
+  }
+}
