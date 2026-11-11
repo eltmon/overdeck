@@ -732,3 +732,5 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
 - Each `pan release` dates the Upcoming block, so every open PR that added an entry to it now conflicts in `changelog.mdx` (seen after v0.78.0 and again after v0.79.0, three PRs each time). Handoff PRs have no agent to repair it.
 - Mechanical resolver: scratchpad `resolve-changelog.py <New|Improved|Fixed> <entry-file>` takes main's file and inserts the branch's entry in a fresh Upcoming block. Match blocks with `\n<Update label="v0`: the RELEASE STEP comment also contains `<Update label="vX.Y.Z"`.
 - The class fix is PAN-5137 (one changelog file per PR, folded at release). It needs the operator's `released` label.
+- Gate check before a reload: `pgrep -f 'vitest|tsc --noEmit|madge'` matches the checking shell's own command line, so a wait loop never sees "idle" (a reload went out at 18:57 after the loop timed out). Use the bracket form `pgrep -f '[v]itest|[t]sc --noEmit|[m]adge'`.
+- The resolver now adds an entry into main's existing Upcoming block (under its section heading) and creates a new block only when main has none.
