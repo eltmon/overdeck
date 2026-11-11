@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5072",
   "created": "2026-11-11T10:00:36.495Z",
-  "updated": "2026-11-11T10:24:02.873Z",
+  "updated": "2026-11-11T10:24:56.585Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -166,9 +166,18 @@
       "doneAt": "2026-11-11T10:23:53.360Z"
     },
     "w9-cli-docs": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5072",
-      "claimedAt": "2026-11-11T10:24:02.873Z"
+      "claimedAt": "2026-11-11T10:24:02.873Z",
+      "doneAt": "2026-11-11T10:24:56.584Z"
+    },
+    "w9-cli-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T10:24:56.584Z"
+    },
+    "w9-cli-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T10:24:56.584Z"
     }
   }
 }
