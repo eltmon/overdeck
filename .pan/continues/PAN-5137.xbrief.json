@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5137",
   "created": "2026-11-11T18:41:59.017Z",
-  "updated": "2026-11-11T19:03:54.793Z",
+  "updated": "2026-11-11T19:04:00.986Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -118,6 +118,11 @@
     "merge-test.ac2": {
       "status": "completed",
       "doneAt": "2026-11-11T19:03:54.793Z"
+    },
+    "docs-release": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5137",
+      "claimedAt": "2026-11-11T19:04:00.985Z"
     }
   }
 }
