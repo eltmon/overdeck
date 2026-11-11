@@ -1333,3 +1333,29 @@ The owner's own pane was never touched: before and after the run it is the same 
 same `agentId`/`harness`/`model` tokens and `idle` status. The companion carried only the
 `companion` and `companionGeneration` tokens, so it never appeared in `listHerdrAgents()` or as an
 Overdeck agent anywhere in the inventory.
+
+**Browser UAT, isolated Playwright profile.** The shared host dashboard (`:3011`) still ran
+pre-fix code and could not be reloaded from this role, so the browser check ran against an
+isolated dashboard instance built from this branch: `npm run build:dashboard`, then
+`API_PORT=3091 HOST=127.0.0.1 OVERDECK_HOME=<scratch home> node dist/dashboard/server.js`, backed
+by its own headless Herdr server (`herdr --session <scratch session> server`) — a second Herdr
+session entirely, so nothing here touched the real operator session or its conversations. Two
+throwaway conversations were created through the real UI (`Ask Codex: …`, and `Ask OpenCode: …`
+via an OpenCode Zen model), both cwd `~/Projects`:
+
+```
+Codex conversation (20261111-7698), Terminal → Native CLI
+  → "OpenAI Codex (v0.167.1)", "~/Projects", the sent prompt echoed, prompt box with
+    "claude-sonnet-5-5 high · ~/Projects" — no "conversation is not running" notice.
+
+OpenCode conversation (20261111-5776, Beam Free), Terminal → Native CLI
+  → "Build · Beam Free OpenCode · high", "OpenCode 1.18.31", "~/Projects",
+    "esc interrupt", "ctrl+p commands" — no "conversation is not running" notice.
+```
+
+Both Native CLI tabs attached at once, with no reload or retry needed. Teardown: both
+conversations stopped from the dashboard's own "Stop all agents", then the isolated dashboard
+server and its headless Herdr server were killed and the scratch `OVERDECK_HOME` and Herdr session
+directory were deleted. The real host dashboard (`:3011`) and its Herdr session were never
+restarted, stopped, or otherwise touched; `GET /api/health` against it before and after this check
+shows the same long-running `pid`.
