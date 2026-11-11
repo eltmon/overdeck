@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5152",
   "created": "2026-11-11T14:36:40.308Z",
-  "updated": "2026-11-11T15:57:20.617Z",
+  "updated": "2026-11-11T15:57:22.067Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -340,6 +340,11 @@
     "wi18-spawn-transition-jira.ac2": {
       "status": "completed",
       "doneAt": "2026-11-11T15:57:20.617Z"
+    },
+    "wi19-pan-done-jira": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5152",
+      "claimedAt": "2026-11-11T15:57:22.067Z"
     }
   }
 }
