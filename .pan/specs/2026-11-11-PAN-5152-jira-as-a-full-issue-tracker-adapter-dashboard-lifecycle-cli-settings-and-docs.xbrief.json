@@ -4,17 +4,17 @@
     "created": "2026-11-11T14:34:38.180Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5152: Jira as a full issue tracker: adapter, dashboard, lifecycle, CLI, settings and docs",
-    "updated": "2026-11-11T14:34:45.611Z"
+    "updated": "2026-11-11T14:36:16.352Z"
   },
   "plan": {
     "id": "pan-5152",
     "title": "Jira as a full issue tracker: adapter, dashboard, lifecycle, CLI, settings and docs",
-    "status": "proposed",
+    "status": "running",
     "uid": "ff0e7235-df4a-4e43-93da-e6fdfa815e79",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-11T14:34:38.180Z",
-    "updated": "2026-11-11T14:34:45.611Z",
+    "updated": "2026-11-11T14:36:16.352Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5152",
@@ -2231,5 +2231,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
