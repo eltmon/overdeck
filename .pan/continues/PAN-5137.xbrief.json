@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5137",
   "created": "2026-11-11T18:41:59.017Z",
-  "updated": "2026-11-11T18:59:33.346Z",
+  "updated": "2026-11-11T18:59:42.779Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -82,6 +82,11 @@
     "migrate-upcoming.ac4": {
       "status": "completed",
       "doneAt": "2026-11-11T18:59:33.345Z"
+    },
+    "lint-guard": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5137",
+      "claimedAt": "2026-11-11T18:59:42.779Z"
     }
   }
 }
