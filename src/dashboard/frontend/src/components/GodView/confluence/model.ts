@@ -26,11 +26,6 @@ export const ROLE_COLORS = {
   conversation: '#00d4ff',
 } as const;
 
-export const PROJECT_RING = {
-  overdeck: '#00d4ff',
-  myn: '#ff2d7c',
-} as const;
-
 export const HOOKS = {
   tool_read: { color: '#00d4ff', label: 'Read/Grep', tools: ['Read', 'Grep', 'Glob'] },
   tool_write: { color: '#ffb800', label: 'Edit/Write', tools: ['Edit', 'Write', 'NotebookEdit'] },
@@ -53,6 +48,16 @@ export function hashStr(value: string): number {
     hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
   }
   return hash;
+}
+
+const RING_PALETTE = ['#00e5a8', '#ff8fa3', '#b388ff', '#6d8bff', '#e07aff', '#d4b483', '#c6ff7a', '#ff9e6d'] as const;
+
+/** Ring color for an issue's project (PAN-5131 FR-7): PAN cyan, MIN magenta, every other prefix a fixed palette color. */
+export function projectRingColor(issueId: string): string {
+  const prefix = (issueId.includes('-') ? issueId.split('-')[0]! : issueId.replace(/\d+$/, '')).toLowerCase();
+  if (prefix === 'pan') return '#00d4ff';
+  if (prefix === 'min') return '#ff2d7c';
+  return RING_PALETTE[hashStr(prefix) % RING_PALETTE.length]!;
 }
 
 export function hexA(hex: string, alpha: number): string {

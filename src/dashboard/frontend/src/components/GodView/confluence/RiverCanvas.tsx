@@ -8,7 +8,6 @@ import {
 import { createAurora, type AuroraController } from './aurora';
 import { resolveHoverOrb } from './OrbTooltip';
 import {
-  PROJECT_RING,
   ROLE_COLORS,
   STAGES,
   STAGE_COLORS,
@@ -30,6 +29,7 @@ import {
   parkedOrbitTag,
   pickOrb,
   positionOrb,
+  projectRingColor,
   shelfSlotWidth,
   staleSlotWidth,
   type Stage,
@@ -191,10 +191,6 @@ function mixColor(first: string, second: string, amount: number): string {
 
 function roleColor(role: string): string {
   return ROLE_COLORS[role as keyof typeof ROLE_COLORS] ?? STAGE_COLORS.WORK;
-}
-
-function projectColor(project: string): string {
-  return PROJECT_RING[project as keyof typeof PROJECT_RING] ?? STAGE_COLORS.PLAN;
 }
 
 function createSatellite(member: ConfluenceConvoyMember, index: number, total: number, arriving = false): Satellite {
@@ -584,7 +580,7 @@ function createEngine(
       const glow = fx.createRadialGradient(orb.x, orb.y, 0, orb.x, orb.y, radius * 3); glow.addColorStop(0, hexA(baseRole, 0.45 * (0.3 + orb.heat) * (1 - orb.frost * 0.6))); glow.addColorStop(1, hexA(baseRole, 0)); fx.fillStyle = glow; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 3, 0, 7); fx.fill();
       fx.fillStyle = color; fx.shadowColor = baseRole; fx.shadowBlur = (14 + orb.heat * 22) * (1 - orb.frost * 0.7); fx.beginPath(); fx.arc(orb.x, orb.y, radius * 0.6, 0, 7); fx.fill(); fx.shadowBlur = 0; fx.fillStyle = `rgba(255,255,255,${0.35 + orb.heat * 0.5})`; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 0.28, 0, 7); fx.fill();
       if (orb.glyph) { fx.fillStyle = 'rgba(10,14,26,.92)'; fx.font = '700 8px "JetBrains Mono"'; fx.textAlign = 'center'; fx.fillText(orb.glyph, orb.x, orb.y + 2.5); }
-      fx.strokeStyle = hexA(projectColor(orb.project), 0.8); fx.lineWidth = 1.6; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 0.92, 0, 7); fx.stroke(); if (orb.frost > 0.25) drawFrostCrown(orb, radius, orb.frost);
+      fx.strokeStyle = hexA(projectRingColor(orb.id), 0.8); fx.lineWidth = 1.6; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 0.92, 0, 7); fx.stroke(); if (orb.frost > 0.25) drawFrostCrown(orb, radius, orb.frost);
       if (orb.waitUntil > now) { fx.save(); fx.translate(orb.x, orb.y); fx.rotate(simT * 1.8); fx.strokeStyle = 'rgba(255,184,0,.9)'; fx.setLineDash([5, 4]); fx.lineWidth = 1.8; fx.beginPath(); fx.arc(0, 0, radius * 1.18, 0, 7); fx.stroke(); fx.restore(); fx.setLineDash([]); }
       if (orb.thinkUntil > now) { fx.strokeStyle = 'rgba(255,255,255,.75)'; fx.lineWidth = 1.6; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 0.55, simT * 4, simT * 4 + 2.2); fx.stroke(); }
       if (orb.compactT > 0) { fx.strokeStyle = 'rgba(255,119,0,.9)'; fx.lineWidth = 2; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 1.15, 0, 7); fx.stroke(); }

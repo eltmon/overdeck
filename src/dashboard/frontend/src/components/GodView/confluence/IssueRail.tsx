@@ -1,5 +1,5 @@
 import type { Agent } from '../../../types';
-import { STAGES, STAGE_COLORS, ROLE_COLORS, PROJECT_RING, failedReason, fmtAge, orbIdleMinutes } from './model';
+import { STAGES, STAGE_COLORS, ROLE_COLORS, failedReason, fmtAge, orbIdleMinutes, projectRingColor } from './model';
 import type { ConfluenceOrb, HookStreamEntry } from './useConfluenceData';
 
 /** Operator-reopened D-3 (PAN-3447): clicking an orb slides this rail in over the
@@ -44,7 +44,7 @@ function chip(text: string, color: string) {
 }
 
 export function IssueRail({ orb, agents, entries, onClose, onOpenIssue }: IssueRailProps) {
-  const projectColor = PROJECT_RING[orb.project as keyof typeof PROJECT_RING] ?? STAGE_COLORS.PLAN;
+  const projectColor = projectRingColor(orb.id);
   const stageColor = STAGE_COLORS[orb.stage];
   const roleColor = ROLE_COLORS[orb.role as keyof typeof ROLE_COLORS] ?? STAGE_COLORS.WORK;
   const stageIndex = STAGES.indexOf(orb.stage);

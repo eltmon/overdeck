@@ -18,6 +18,7 @@ import {
   orbIdleMinutes,
   pickOrb,
   positionOrb,
+  projectRingColor,
   pruneTraceEvents,
   shelfSlotWidth,
   toolToFamily,
@@ -291,6 +292,19 @@ describe('Confluence model', () => {
     expect(frostFromIdleMinutes(8)).toBe(0);
     expect(frostFromIdleMinutes(21)).toBe(0.5);
     expect(frostFromIdleMinutes(34)).toBe(1);
+  });
+
+  it('gives each project prefix one ring color', () => {
+    const palette = ['#00e5a8', '#ff8fa3', '#b388ff', '#6d8bff', '#e07aff', '#d4b483', '#c6ff7a', '#ff9e6d'];
+
+    expect(projectRingColor('PAN-1')).toBe('#00d4ff');
+    expect(projectRingColor('MIN-1')).toBe('#ff2d7c');
+    expect(projectRingColor('AUR-7')).toBe(projectRingColor('AUR-900'));
+    expect(palette).toContain(projectRingColor('AUR-7'));
+    expect(projectRingColor('US123')).toBe(projectRingColor('US9'));
+    expect(palette).toContain(projectRingColor('US123'));
+    // Prefixes do not all land on one color.
+    expect(new Set(['AUR-1', 'KRUX-1', 'TIN-1', 'OKF-1', 'ELV-1', 'US1'].map(projectRingColor)).size).toBeGreaterThan(1);
   });
 
   it('names what a failed orb\'s attention means', () => {
