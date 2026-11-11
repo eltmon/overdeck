@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5072",
   "created": "2026-11-11T10:00:36.495Z",
-  "updated": "2026-11-11T10:08:08.760Z",
+  "updated": "2026-11-11T10:11:25.316Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -74,6 +74,11 @@
     "w3-shared-skill.ac4": {
       "status": "completed",
       "doneAt": "2026-11-11T10:08:08.760Z"
+    },
+    "w4-grokbot-mcpjson": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5072",
+      "claimedAt": "2026-11-11T10:11:25.315Z"
     }
   }
 }
