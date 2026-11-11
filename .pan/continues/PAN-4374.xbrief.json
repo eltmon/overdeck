@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4374",
   "created": "2026-11-11T12:38:14.502Z",
-  "updated": "2026-11-11T13:10:11.915Z",
+  "updated": "2026-11-11T13:10:47.670Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -56,6 +56,11 @@
     "claude-cli-provider.ac4": {
       "status": "completed",
       "doneAt": "2026-11-11T13:10:11.915Z"
+    },
+    "claude-cli-extraction-e2e": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4374",
+      "claimedAt": "2026-11-11T13:10:47.670Z"
     }
   }
 }
