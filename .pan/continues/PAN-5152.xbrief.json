@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5152",
   "created": "2026-11-11T14:36:40.308Z",
-  "updated": "2026-11-11T15:49:25.601Z",
+  "updated": "2026-11-11T15:49:28.762Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -312,6 +312,11 @@
     "wi16-work-agent-context-jira.ac2": {
       "status": "completed",
       "doneAt": "2026-11-11T15:49:25.600Z"
+    },
+    "wi17-discussions-jira": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5152",
+      "claimedAt": "2026-11-11T15:49:28.761Z"
     }
   }
 }
