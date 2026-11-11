@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5070",
   "created": "2026-11-11T07:26:39.792Z",
-  "updated": "2026-11-11T08:05:24.126Z",
+  "updated": "2026-11-11T08:05:44.327Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -122,6 +122,11 @@
     "w5-notice-routes.ac4": {
       "status": "completed",
       "doneAt": "2026-11-11T08:05:24.125Z"
+    },
+    "w6-connect-message": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5070",
+      "claimedAt": "2026-11-11T08:05:44.326Z"
     }
   }
 }
