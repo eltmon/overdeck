@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4374",
   "created": "2026-11-11T12:38:14.502Z",
-  "updated": "2026-11-11T13:12:57.917Z",
+  "updated": "2026-11-11T13:13:01.891Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -70,6 +70,11 @@
     "claude-cli-extraction-e2e.ac2": {
       "status": "completed",
       "doneAt": "2026-11-11T13:12:57.917Z"
+    },
+    "query-expansion-gate": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4374",
+      "claimedAt": "2026-11-11T13:13:01.891Z"
     }
   }
 }
