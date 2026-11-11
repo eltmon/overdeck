@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-5152",
+  "created": "2026-11-11T14:36:40.308Z",
+  "updated": "2026-11-11T14:36:40.308Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "wi1-jira-types": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5152",
+      "claimedAt": "2026-11-11T14:36:40.308Z"
+    }
+  }
+}
