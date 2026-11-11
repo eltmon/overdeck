@@ -87,6 +87,8 @@
 - Phone-app (`apps/mobile`) acceptance evidence goes in one file per issue,
   `apps/mobile/acceptance/PAN-<n>.md`, never a new section in `apps/mobile/ACCEPTANCE.md`;
   union cannot merge sectioned markdown safely (PAN-5054).
+- Changelog entries go in one file per issue, `changelog.d/<issue>.md`, never in `changelog.mdx`;
+  `pan release stable` folds them and `lint:docs` rejects an Upcoming block (PAN-5137).
 - Frontend typecheck skips tests: `src/dashboard/frontend/tsconfig.json` excludes `src/**/*.test.*` and
   `src/**/__tests__/**`, and Vitest does not typecheck, so a fixture or mock that keeps a removed
   field still passes; prove removals in test files with a grep. `scripts/lint-file-size.sh` checks
