@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5153",
   "created": "2026-11-11T14:43:19.840Z",
-  "updated": "2026-11-11T15:23:09.433Z",
+  "updated": "2026-11-11T15:23:15.974Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -190,6 +190,11 @@
     "spawn-identity.ac3": {
       "status": "completed",
       "doneAt": "2026-11-11T15:23:09.433Z"
+    },
+    "verdict-per-repo": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5153",
+      "claimedAt": "2026-11-11T15:23:15.973Z"
     }
   }
 }
