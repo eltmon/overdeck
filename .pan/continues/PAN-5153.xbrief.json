@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5153",
   "created": "2026-11-11T14:43:19.840Z",
-  "updated": "2026-11-11T15:39:55.874Z",
+  "updated": "2026-11-11T15:41:38.656Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -314,9 +314,18 @@
       "doneAt": "2026-11-11T15:39:47.070Z"
     },
     "cloister-status-bot-name": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5153",
-      "claimedAt": "2026-11-11T15:39:55.874Z"
+      "claimedAt": "2026-11-11T15:39:55.874Z",
+      "doneAt": "2026-11-11T15:41:38.656Z"
+    },
+    "cloister-status-bot-name.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:41:38.656Z"
+    },
+    "cloister-status-bot-name.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:41:38.656Z"
     }
   }
 }
