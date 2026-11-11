@@ -25,6 +25,7 @@ export const CODE_EXPIRED_MESSAGE = 'This code expired. Run the sign-in command 
 export const DEVICE_CONNECTED_MESSAGE = 'Device connected. You can close this tab and return to your terminal.';
 export const ACCOUNT_DELETING_MESSAGE = 'This account is being deleted. Try again after deletion finishes.';
 export const REQUEST_REJECTED_MESSAGE = 'Request rejected.';
+export const NAMES_ARE_CLAIMS_MESSAGE = 'These names come from the device that asked for this code. Overdeck does not verify them.';
 
 /**
  * The /activate POSTs must come from the activate page itself: a cross-site form post could otherwise walk a
@@ -123,6 +124,31 @@ ${notice}
   );
 }
 
+/** The confirm step for a pending grant (PAN-5071 FR-26/FR-27); names are claims from the requesting device, always escaped. */
+function confirmStep(grant: DeviceGrantRow, normalized: string): string {
+  const device = escapeHtml(defaultLabel(grant.platform));
+  const client = grant.client_name === null ? null : escapeHtml(grant.client_name);
+  const target = grant.target_name === null ? null : escapeHtml(grant.target_name);
+  const reach = target === null ? '' : ` to reach <strong>${target}</strong>`;
+  const lead =
+    client !== null
+      ? `<strong>${client}</strong> (${device}) wants to connect to your Overdeck account${reach}.`
+      : target !== null
+        ? `This <strong>${device}</strong> wants to connect to your Overdeck account${reach}.`
+        : `Connect a <strong>${device}</strong> to your Overdeck account?`;
+  const claims = client !== null || target !== null ? `\n<p class="muted">${escapeHtml(NAMES_ARE_CLAIMS_MESSAGE)}</p>` : '';
+  return layout(
+    'Connect a device',
+    `<h1>Connect a device</h1>
+<p>${lead}</p>${claims}
+<p class="muted">Code ${escapeHtml(formatUserCode(normalized))}. If you did not start this sign-in, close this tab.</p>
+<form method="post" action="/activate/confirm">
+  <input type="hidden" name="user_code" value="${escapeHtml(normalized)}">
+  <button type="submit">Authorize</button>
+</form>`,
+  );
+}
+
 /** GET /activate[?user_code=…] */
 export const activatePage: Handler = async (req, _rc) => {
   const raw = new URL(req.url).searchParams.get('user_code') ?? '';
@@ -151,19 +177,7 @@ export const activateSubmit: Handler = async (req, rc) => {
     if (!verdict.ok) return rateLimitedPage(verdict.retryAfterS, TOO_MANY_WRONG_CODES_MESSAGE);
     return html(activateForm(raw, INVALID_CODE_MESSAGE), 400);
   }
-  const normalized = normalizeUserCode(raw);
-  return html(
-    layout(
-      'Connect a device',
-      `<h1>Connect a device</h1>
-<p>Connect a <strong>${escapeHtml(defaultLabel(grant.platform))}</strong> to your Overdeck account?</p>
-<p class="muted">Code ${escapeHtml(formatUserCode(normalized))}. If you did not start this sign-in, close this tab.</p>
-<form method="post" action="/activate/confirm">
-  <input type="hidden" name="user_code" value="${escapeHtml(normalized)}">
-  <button type="submit">Continue with GitHub</button>
-</form>`,
-    ),
-  );
+  return html(confirmStep(grant, normalizeUserCode(raw)));
 };
 
 /** POST /activate/confirm: re-validate, then start the GitHub leg bound to this device code. */

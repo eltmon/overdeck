@@ -1,3 +1,6 @@
+import { readFileSync, readdirSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { DEVICE_GRANT_TTL_MS, DEVICE_CONNECTED_MESSAGE, DEVICE_NAME_MAX, deviceName, INVALID_CODE_MESSAGE, REQUEST_REJECTED_MESSAGE, TOO_MANY_WRONG_CODES_MESSAGE } from '../../../../services/account/src/device-flow.ts';
 import { verifyDeviceToken } from '../../../../services/account/src/devices.ts';
@@ -6,6 +9,8 @@ import type { GitHubIdentity } from '../../../../services/account/src/github.ts'
 import { addGrant, getPendingAttempt } from '../../../../services/account/src/grants.ts';
 import { githubMock } from './helpers/github-mock.ts';
 import { call, dbOf, form, makeDeps, makeEnv, makeRc, TEST_BASE_URL, TEST_OWNER_GITHUB_ID, type TestDeps } from './helpers/harness.ts';
+
+const ACCOUNT_SRC_DIR = join(dirname(fileURLToPath(import.meta.url)), '../../../../services/account/src');
 
 const ENV_ID = '11111111-2222-4333-8444-555555555555';
 const OWNER: GitHubIdentity = { githubId: TEST_OWNER_GITHUB_ID, login: 'owner' };
@@ -270,6 +275,58 @@ describe('device flow (PAN-4293 account-device-flow, RFC 8628)', () => {
       const cut = deviceName(emoji);
       expect(cut).not.toBeNull();
       expect(Array.from(cut ?? '').length).toBe(DEVICE_NAME_MAX);
+    });
+  });
+
+  describe('confirm step names and Authorize button (PAN-5071)', () => {
+    async function issueNamed(env: Env, deps: TestDeps, platform: string, names: Record<string, string>): Promise<CodeResponse> {
+      const res = await call('POST', '/oauth/device/code', { env, deps, ip: CLI_IP, ...form({ platform, environment_id: ENV_ID, ...names }) });
+      expect(res.status).toBe(200);
+      return (await res.json()) as CodeResponse;
+    }
+
+    it('both names present: the lead sentence names bot and machine, the claims notice shows, and the button is Authorize', async () => {
+      const { env, deps } = setup();
+      const code = await issueNamed(env, deps, 'linux-x64', { client_name: 'grok-bot', target_name: 'eltmon-desktop' });
+      const res = await call('POST', '/activate', { env, deps, ip: BROWSER_IP, ...withOrigin(form({ user_code: code.user_code })) });
+      const body = await res.text();
+      expect(body).toContain('<strong>grok-bot</strong> (Linux device) wants to connect to your Overdeck account to reach <strong>eltmon-desktop</strong>.');
+      expect(body).toContain('These names come from the device that asked for this code. Overdeck does not verify them.');
+      expect(body).toContain('>Authorize</button>');
+    });
+
+    it('client-only and target-only grants render their FR-27 sentence; a no-name grant renders today\'s sentence without the claims notice', async () => {
+      const { env, deps } = setup();
+
+      const clientOnly = await issueNamed(env, deps, 'linux-x64', { client_name: 'grok-bot' });
+      const clientBody = await (await call('POST', '/activate', { env, deps, ip: BROWSER_IP, ...withOrigin(form({ user_code: clientOnly.user_code })) })).text();
+      expect(clientBody).toContain('<strong>grok-bot</strong> (Linux device) wants to connect to your Overdeck account.');
+
+      const targetOnly = await issueNamed(env, deps, 'linux-x64', { target_name: 'eltmon-desktop' });
+      const targetBody = await (await call('POST', '/activate', { env, deps, ip: BROWSER_IP, ...withOrigin(form({ user_code: targetOnly.user_code })) })).text();
+      expect(targetBody).toContain('This <strong>Linux device</strong> wants to connect to your Overdeck account to reach <strong>eltmon-desktop</strong>.');
+
+      const noName = await issue(env, deps, 'win32-arm64');
+      const noNameBody = await (await call('POST', '/activate', { env, deps, ip: BROWSER_IP, ...withOrigin(form({ user_code: noName.user_code })) })).text();
+      expect(noNameBody).toContain('Connect a <strong>Windows device</strong>');
+      expect(noNameBody).not.toContain('These names come from the device that asked for this code. Overdeck does not verify them.');
+    });
+
+    it('escapes a script-tag client_name and a quote in target_name', async () => {
+      const { env, deps } = setup();
+      const code = await issueNamed(env, deps, 'linux-x64', { client_name: '<script>alert(1)</script>', target_name: 'a"b' });
+      const body = await (await call('POST', '/activate', { env, deps, ip: BROWSER_IP, ...withOrigin(form({ user_code: code.user_code })) })).text();
+      expect(body).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
+      expect(body).toContain('a&quot;b');
+      expect(body).not.toContain('<script>');
+    });
+
+    it('"Continue with GitHub" no longer appears anywhere in services/account/src', () => {
+      const files = readdirSync(join(ACCOUNT_SRC_DIR), { recursive: true }) as string[];
+      for (const file of files) {
+        if (!file.endsWith('.ts')) continue;
+        expect(readFileSync(join(ACCOUNT_SRC_DIR, file), 'utf8'), file).not.toContain('Continue with GitHub');
+      }
     });
   });
 });
