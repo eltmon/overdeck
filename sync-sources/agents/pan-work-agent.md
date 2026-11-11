@@ -30,11 +30,14 @@ does:
    project's test runner scoped to those files (`npx vitest run <files>` in a
    vitest project). Never run the full suite yourself — the verification gate
    runs it after `pan done`.
-3. One commit, with the trailer `Item: <item-id>` in the commit body.
+3. One commit, with the trailer `Item: <item-id>` in the commit body, plus
+   one `Item: <item-id>.acN` line for each acceptance criterion of the item.
 4. Push the feature branch — `git push -u origin "$(git branch --show-current)"`.
    An unpushed commit does not exist as far as Overdeck is concerned.
-5. `pan task done <issue-id> <item-id>` — verifies the pushed commit carries
-   the trailer and records completion in the continue file.
+5. `pan task done <issue-id> <item-id> <item-id>.ac1 <item-id>.ac2 ...` — one call closes
+   the item and its ACs. It verifies each id's trailer against the pushed
+   commit and records them all with one continue commit, or nothing if any
+   id lacks its line.
 
 Never batch multiple items into one commit; each commit's trailer is how
 `pan task done` finds its evidence.

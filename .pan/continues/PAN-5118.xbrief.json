@@ -1,0 +1,195 @@
+{
+  "version": "1",
+  "issueId": "PAN-5118",
+  "created": "2026-11-10T18:32:53.186Z",
+  "updated": "2026-11-10T19:40:33.205Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "batch-verify-lib": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5118",
+      "claimedAt": "2026-11-10T18:32:53.186Z",
+      "doneAt": "2026-11-10T18:49:45.382Z"
+    },
+    "batch-verify-lib.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T18:50:09.082Z"
+    },
+    "batch-verify-lib.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T18:50:32.937Z"
+    },
+    "batch-verify-lib.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-10T18:50:53.045Z"
+    },
+    "batch-verify-lib.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-10T18:51:15.449Z"
+    },
+    "cli-variadic-done": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5118",
+      "claimedAt": "2026-11-10T18:51:52.228Z",
+      "doneAt": "2026-11-10T18:57:22.213Z"
+    },
+    "self-route-item-ids": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5118",
+      "claimedAt": "2026-11-10T18:57:47.596Z",
+      "doneAt": "2026-11-10T19:02:21.852Z"
+    },
+    "mcp-task-done-item-ids": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5118",
+      "claimedAt": "2026-11-10T19:02:47.178Z",
+      "doneAt": "2026-11-10T19:04:44.690Z"
+    },
+    "work-prompts-ac-batch": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5118",
+      "claimedAt": "2026-11-10T19:05:18.524Z",
+      "doneAt": "2026-11-10T19:08:35.598Z"
+    },
+    "docs-task-done-batch": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5118",
+      "claimedAt": "2026-11-10T19:08:58.012Z",
+      "doneAt": "2026-11-10T19:11:36.718Z"
+    },
+    "self-jobs-full-stdout": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5118",
+      "claimedAt": "2026-11-10T19:11:59.058Z",
+      "doneAt": "2026-11-10T19:16:50.971Z"
+    },
+    "foreman-docs-ac-batch": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5118",
+      "claimedAt": "2026-11-10T19:17:14.604Z",
+      "doneAt": "2026-11-10T19:18:07.481Z"
+    },
+    "verifier-feedback-one-call": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5118",
+      "claimedAt": "2026-11-10T19:18:32.398Z",
+      "doneAt": "2026-11-10T19:22:34.008Z"
+    },
+    "cli-variadic-done.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T19:28:34.983Z"
+    },
+    "cli-variadic-done.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T19:28:54.908Z"
+    },
+    "cli-variadic-done.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-10T19:29:17.921Z"
+    },
+    "cli-variadic-done.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-10T19:29:37.738Z"
+    },
+    "cli-variadic-done.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-10T19:29:57.887Z"
+    },
+    "self-route-item-ids.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T19:30:45.603Z"
+    },
+    "self-route-item-ids.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T19:31:04.580Z"
+    },
+    "self-route-item-ids.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-10T19:31:23.806Z"
+    },
+    "self-route-item-ids.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-10T19:31:42.303Z"
+    },
+    "mcp-task-done-item-ids.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T19:32:29.698Z"
+    },
+    "mcp-task-done-item-ids.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T19:32:51.370Z"
+    },
+    "mcp-task-done-item-ids.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-10T19:33:10.507Z"
+    },
+    "work-prompts-ac-batch.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T19:34:12.430Z"
+    },
+    "work-prompts-ac-batch.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T19:34:30.806Z"
+    },
+    "work-prompts-ac-batch.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-10T19:34:49.018Z"
+    },
+    "work-prompts-ac-batch.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-10T19:35:06.745Z"
+    },
+    "docs-task-done-batch.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T19:35:51.110Z"
+    },
+    "docs-task-done-batch.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T19:36:09.078Z"
+    },
+    "docs-task-done-batch.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-10T19:36:26.815Z"
+    },
+    "docs-task-done-batch.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-10T19:36:44.556Z"
+    },
+    "self-jobs-full-stdout.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T19:37:27.789Z"
+    },
+    "self-jobs-full-stdout.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T19:37:46.451Z"
+    },
+    "self-jobs-full-stdout.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-10T19:38:04.510Z"
+    },
+    "foreman-docs-ac-batch.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T19:38:48.075Z"
+    },
+    "foreman-docs-ac-batch.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T19:39:06.292Z"
+    },
+    "foreman-docs-ac-batch.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-10T19:39:25.803Z"
+    },
+    "verifier-feedback-one-call.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-10T19:40:13.984Z"
+    },
+    "verifier-feedback-one-call.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-10T19:40:33.204Z"
+    }
+  }
+}

@@ -1,4 +1,4 @@
-import type { IssueId, LaneActivity } from '@overdeck/contracts';
+import type { IssueId, LaneActivity, RuntimeName } from '@overdeck/contracts';
 
 export type SessionFeedTab = 'all' | 'chats' | 'files' | 'git' | 'comments' | 'activity';
 
@@ -15,7 +15,7 @@ export interface ConversationFeedRow {
   issueId: string | null;
   cwd?: string | null;
   title?: string | null;
-  harness?: 'claude-code' | 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent' | null;
+  harness?: 'claude-code' | 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent' | 'grok' | null;
   archivedAt?: string | null;
   messageCount?: number;
   status?: 'active' | 'ended' | null;
@@ -51,6 +51,8 @@ export interface ConversationSessionFeedEntry extends SessionFeedEntryBase {
   conversationId: number;
   conversationName: string;
   agent: string;
+  /** The conversation's harness (legacy `pi` normalized); OpenCode and Grok Build share the `acp` feed kind (PAN-5078). */
+  harness?: RuntimeName;
   lastMessageDate: string;
   lastMessageSnippet: string;
   messageCount?: number;

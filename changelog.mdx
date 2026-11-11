@@ -10,6 +10,62 @@ This page starts at v0.60.0, the release that removed Overdeck's state layer. Ol
 
 {/* RELEASE STEP: before tagging vX.Y.Z, add a new <Update label="vX.Y.Z" description="YYYY-MM-DD"> block at the top with the user-facing changes since the previous tag, and point its compare link at the new tag. See docs/RELEASING.md "Update the public changelog". If a new model needs a newer Claude Code, say so and confirm its minClaudeCodeVersion is set. */}
 
+<Update label="v0.77.0" description="2026-11-11">
+  #### New
+
+  - **Grok Build harness:** run agents and conversations on xAI's Grok Build CLI (`grok`) with the `grok` harness. Overdeck reuses your Grok Build sign-in, keeps sessions persistent over ACP, reports cost, and lists the Grok models in pickers once `grok` is installed and signed in. `pan doctor` checks it. See [Harnesses](/configuration/harnesses). ([#5119](https://github.com/eltmon/overdeck/pull/5119))
+
+  - **Recent notifications:** Settings → Anywhere → Phone notifications lists the last 50 notifications Overdeck sent, where each went, and whether the question is still waiting, was answered from Overdeck, or was answered or withdrawn elsewhere. ([#5115](https://github.com/eltmon/overdeck/pull/5115))
+  - **Coding-agent CLIs stay up to date:** Overdeck now updates npm-installed Claude Code, Codex CLI and OpenCode in the background once a day, and updates Claude Code before a launch that needs a newer version, so a new model no longer stops at "needs Claude Code X or newer". Running sessions keep their version. Turn it off in Settings, Coding Agents, or with `harnesses.auto_update: false`. See [Harnesses](/configuration/harnesses). ([#5114](https://github.com/eltmon/overdeck/pull/5114))
+
+  #### Improved
+
+  - **Can't reach rows in Needs you:** when this machine cannot read a linked machine's Needs you, the desktop and the phone show `Can't reach <machine>; it may have items waiting.` until a fetch succeeds. ([#5115](https://github.com/eltmon/overdeck/pull/5115))
+  - **Close an item and its acceptance criteria in one call:** `pan task done <issue> <item> <item>.ac1 <item>.ac2 ...` and the `task_done` tool's `itemIds` take many ids at once. They record every id with one commit, or none of them and name each one that lacks its `Item:` line, so a plan with 85 acceptance criteria no longer costs 85 commits and pushes. ([#5121](https://github.com/eltmon/overdeck/pull/5121))
+
+  #### Fixed
+
+  - **No more false "stopped responding" push after a PR merges.** The merged work agent is recorded as stopped when its terminal closes, and the crash watcher never counts a paused agent as crashed. ([#5113](https://github.com/eltmon/overdeck/pull/5113))
+
+  [Compare v0.76.0...v0.77.0](https://github.com/eltmon/overdeck/compare/v0.76.0...v0.77.0)
+</Update>
+
+<Update label="v0.76.0" description="2026-11-10">
+  #### New
+
+  - **Delete your account from the phone app:** Settings → **Delete account** deletes your overdeck.ai account from inside the Overdeck app. Type `DELETE` to confirm; the phone then signs out. If the request fails, the app stays signed in and offers **Delete on the web**. ([#5109](https://github.com/eltmon/overdeck/pull/5109))
+  - **Muse Ember:** Meta's `muse-ember-1.0` is in the Muse Code model picker, the Settings catalog and the cost tables (&#36;0.10/M input, &#36;0.004/M cached input, &#36;0.50/M output, 1M context). A request over 200K input tokens is billed at &#36;0.30 / &#36;0.012 / &#36;1.50, and cost tracking applies that rate per request. ([#5110](https://github.com/eltmon/overdeck/pull/5110))
+  - **Muse Wonder Full:** `muse-wonder-full-1.0` is in the Muse Code model picker as a subscription-only model, billed through the Power (&#36;50/mo) or Maximum (&#36;200/mo) Muse Code plan rather than per token. ([#5110](https://github.com/eltmon/overdeck/pull/5110))
+
+  [Compare v0.75.0...v0.76.0](https://github.com/eltmon/overdeck/compare/v0.75.0...v0.76.0)
+</Update>
+
+<Update label="v0.75.0" description="2026-11-10">
+  #### New
+
+  - **Claude Fable 5.2:** Anthropic's `claude-fable-5-2` is in the model pickers, the Settings catalog and the cost tables (&#36;8/M input, &#36;40/M output, &#36;0.20/M cache reads, 1M context). It is cheaper than Fable 5.1, which stays selectable. Fable 5.2 needs Claude Code 2.1.321 or newer: use the dashboard's **Upgrade Claude Code** button or run `npm install -g @anthropic-ai/claude-code@latest`. No default model changes. ([#5105](https://github.com/eltmon/overdeck/pull/5105))
+  - **Connect a bot in one paste:** Settings → Anywhere → Bots → **Connect a bot** copies one setup message for your bot. The bot does the setup itself and shows you an approval link, and you approve it on your own machine. ([#5080](https://github.com/eltmon/overdeck/pull/5080))
+  - **Per-project MCP servers and credentials:** a project can give its agents its own MCP servers and the credentials they need. ([#5077](https://github.com/eltmon/overdeck/pull/5077))
+  - **Low-disk alerts:** when free disk drops below 5 GiB, and again below 2 GiB, Overdeck adds a Needs you item and sends a phone push. ([#5099](https://github.com/eltmon/overdeck/pull/5099))
+
+  #### Improved
+
+  - **Gauntlet lanes respect the disk floor:** `pan lane start` refuses to launch when the disk is low, and superseded lanes are reaped. ([#5098](https://github.com/eltmon/overdeck/pull/5098))
+  - **Telemetry you can act on:** the dashboard and the phone app report failed requests, crashes and phone link drops to PostHog (anonymous, only when telemetry is on); usage of MCP protocol revisions, clients and surfaces is recorded; and CI runs, test homes and throwaway VMs no longer count as new installs. See [Telemetry](https://github.com/eltmon/overdeck/blob/main/docs/TELEMETRY.md). ([#5101](https://github.com/eltmon/overdeck/pull/5101), [#5085](https://github.com/eltmon/overdeck/pull/5085), [#5086](https://github.com/eltmon/overdeck/pull/5086))
+  - **dbt projects:** gate environments get placeholders, feature names are identifier-safe, and each workspace gets its own dev target. ([#5073](https://github.com/eltmon/overdeck/pull/5073))
+  - **Skill packs:** the docs are current, with a pack authoring guide and a config reference. ([#5075](https://github.com/eltmon/overdeck/pull/5075))
+
+  #### Fixed
+
+  - **No more false "agent stopped responding" push** after every planning finalize. ([#5081](https://github.com/eltmon/overdeck/pull/5081))
+  - **Account sign-in** retries the device-code request once after a network error and shows the real cause when it fails. ([#5076](https://github.com/eltmon/overdeck/pull/5076))
+  - **`pan close` works for GitHub-tracked projects with a custom issue prefix.** ([#5059](https://github.com/eltmon/overdeck/pull/5059))
+  - **`pan` is on PATH** for operator shells and spawned work agents, so `pan doctor` can run. ([#5063](https://github.com/eltmon/overdeck/pull/5063))
+  - **The conversation view follows Claude Code's backgrounded sessions** instead of drifting from the terminal. ([#5060](https://github.com/eltmon/overdeck/pull/5060))
+
+  [Compare v0.74.0...v0.75.0](https://github.com/eltmon/overdeck/compare/v0.74.0...v0.75.0)
+</Update>
+
 <Update label="v0.74.0" description="2026-11-04">
   #### New
 

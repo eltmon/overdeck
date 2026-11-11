@@ -204,6 +204,75 @@ describe.each([
   });
 });
 
+describe('handleSelfTaskDone itemIds (PAN-5118)', () => {
+  it('builds argv with every id as its own positional', async () => {
+    const { jobs, recorded, finish } = controlledJobs();
+    const promise = handleSelfTaskDone(
+      agentCredential('agent-pan-1'),
+      '{"itemIds":["item-a","item-a.ac1","item-a.ac2"]}',
+      undefined,
+      { jobs, caller: callerDeps },
+    );
+    finish(0, { exitCode: 0, stdout: 'ok' });
+    const result = await promise;
+    expect(result.status).toBe(200);
+    expect(recorded[0]?.args.slice(1)).toEqual(['task', 'done', 'PAN-1', 'item-a', 'item-a.ac1', 'item-a.ac2', '--json']);
+  });
+
+  it('refuses itemId and itemIds together with 400, and starts no job', async () => {
+    const { jobs, recorded } = controlledJobs();
+    const result = await handleSelfTaskDone(
+      agentCredential('agent-pan-1'),
+      '{"itemId":"item-a","itemIds":["item-b"]}',
+      undefined,
+      { jobs, caller: callerDeps },
+    );
+    expect(result).toEqual({ status: 400, body: { error: 'pass itemId or itemIds, not both', code: 'bad-request' } });
+    expect(recorded).toEqual([]);
+  });
+
+  it.each([
+    ['{"itemIds":[]}'],
+    ['{"itemIds":"item-a"}'],
+    ['{"itemIds":[1]}'],
+    [`{"itemIds":${JSON.stringify(Array.from({ length: 501 }, (_, i) => `item-${i}`))}}`],
+  ])('refuses a malformed itemIds body %s with 400 bad-request, and starts no job', async (bodyText) => {
+    const { jobs, recorded } = controlledJobs();
+    const result = await handleSelfTaskDone(agentCredential('agent-pan-1'), bodyText, undefined, { jobs, caller: callerDeps });
+    expect(result.status).toBe(400);
+    expect((result.body as { code: string }).code).toBe('bad-request');
+    expect(recorded).toEqual([]);
+  });
+
+  it('refuses an id such as --steal with 400 bad-job-arg, and starts no job', async () => {
+    const { jobs, recorded } = controlledJobs();
+    const result = await handleSelfTaskDone(
+      agentCredential('agent-pan-1'),
+      '{"itemIds":["item-a","--steal"]}',
+      undefined,
+      { jobs, caller: callerDeps },
+    );
+    expect(result.status).toBe(400);
+    expect((result.body as { code: string }).code).toBe('bad-job-arg');
+    expect(recorded).toEqual([]);
+  });
+
+  it('accepts 500 ids and builds argv with all of them', async () => {
+    const { jobs, recorded, finish } = controlledJobs();
+    const ids = Array.from({ length: 500 }, (_, i) => `item-${i}`);
+    const promise = handleSelfTaskDone(
+      agentCredential('agent-pan-1'),
+      JSON.stringify({ itemIds: ids }),
+      undefined,
+      { jobs, caller: callerDeps },
+    );
+    finish(0, { exitCode: 0, stdout: 'ok' });
+    const result = await promise;
+    expect(result.status).toBe(200);
+    expect(recorded[0]?.args.slice(1)).toEqual(['task', 'done', 'PAN-1', ...ids, '--json']);
+  });
+});
+
 describe('handleSelfTaskBlock', () => {
   it('builds argv with each on ref as its own --on flag', async () => {
     const { jobs, recorded, finish } = controlledJobs();

@@ -14,6 +14,8 @@ import { waitForManagedKimiSessionId } from '../runtimes/kimi-context-envelope.j
 import type { RuntimeName } from '../runtimes/types.js';
 import { captureTranscriptUserRecordSnapshot } from '../transcript-landing.js';
 import { deliverAgentMessage, injectPiConversationMemory } from '../agents.js';
+import { getPendingQuestions } from '../agent-enrichment.js';
+import { noteOperatorAnswer } from '../push/operator-answers.js';
 import type { DeliveryResult } from '../agents/delivery.js';
 import { ensureMainInputTarget, type EnsureMainResult } from '../agents/input-target.js';
 import { conversationPendingPermission, type PendingPermission } from './conversation-permission.js';
@@ -405,13 +407,54 @@ export function partitionAttachmentsForModel(
   };
 }
 
+const DEFAULT_MESSAGE_DEPENDENCIES: ConversationMessageDependencies = {
+  resolveSessionFile: async () => null,
+  generateAiTitle: async () => {},
+};
+
+/**
+ * PAN-5111: true when `toolUseId` is one of the conversation's pending
+ * AskUserQuestions right now. Checked before delivery, so a stale caller id
+ * never earns an answer note.
+ */
+async function isPendingConversationQuestion(
+  name: string,
+  toolUseId: string,
+  deps: ConversationMessageDependencies,
+): Promise<boolean> {
+  try {
+    const conv = getConversationByName(name);
+    const file = conv ? await deps.resolveSessionFile(conv) : null;
+    if (!file) return false;
+    return (await getPendingQuestions(file)).some((q) => q.toolId === toolUseId);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Delivers an operator message to a conversation. An optional
+ * `answersToolUseId` names the pending AskUserQuestion the message answers;
+ * when it was pending and delivery succeeded, the push history records the
+ * question as answered (PAN-5111).
+ */
 export async function handleConversationMessage(
   name: string,
   body: Record<string, unknown>,
-  deps: ConversationMessageDependencies = {
-    resolveSessionFile: async () => null,
-    generateAiTitle: async () => {},
-  },
+  deps: ConversationMessageDependencies = DEFAULT_MESSAGE_DEPENDENCIES,
+): Promise<ReturnType<typeof jsonResponse>> {
+  const answersToolUseId = typeof body['answersToolUseId'] === 'string' ? body['answersToolUseId'].trim() : '';
+  if (!answersToolUseId) return deliverConversationMessage(name, body, deps);
+  const verified = await isPendingConversationQuestion(name, answersToolUseId, deps);
+  const response = await deliverConversationMessage(name, body, deps);
+  if (verified && response.status < 300) noteOperatorAnswer(`auq:${answersToolUseId}`);
+  return response;
+}
+
+async function deliverConversationMessage(
+  name: string,
+  body: Record<string, unknown>,
+  deps: ConversationMessageDependencies,
 ): Promise<ReturnType<typeof jsonResponse>> {
   const conv = getConversationByName(name);
   if (!conv) return jsonResponse({ error: 'Conversation not found' }, { status: 404 });

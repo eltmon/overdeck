@@ -7,12 +7,12 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import type { ModelId, GrokModel } from './settings.js';
+import { GROK_BUILD_MODELS, type ModelId, type GrokModel } from './settings.js';
 import type { RuntimeName } from './runtimes/types.js';
 import { getOpenAICompatibleProxyBaseUrl } from './openai-compatible-proxy.js';
 import { MODEL_DEPRECATIONS } from './model-capabilities.js';
 
-export type ProviderName = 'anthropic' | 'kimi' | 'openai' | 'google' | 'minimax' | 'zai' | 'mimo' | 'openrouter' | 'nous' | 'dashscope' | 'xai' | 'groq' | 'cerebras' | 'mistral' | 'quantumllama' | 'meta' | 'opencode' | 'opencode-go' | 'ollama';
+export type ProviderName = 'anthropic' | 'kimi' | 'openai' | 'google' | 'minimax' | 'zai' | 'mimo' | 'openrouter' | 'nous' | 'dashscope' | 'xai' | 'groq' | 'cerebras' | 'mistral' | 'quantumllama' | 'meta' | 'opencode' | 'opencode-go' | 'grok' | 'ollama';
 
 /**
  * Provider configuration
@@ -83,19 +83,24 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     defaultHarness: 'opencode', models: [], tested: false,
     description: 'OpenCode Go subscription models through the persistent OpenCode ACP runtime. Sign in with opencode auth login.',
   },
+  grok: {
+    name: 'grok', displayName: 'Grok Build', compatibility: 'direct',
+    defaultHarness: 'grok', models: [...GROK_BUILD_MODELS], tested: false,
+    description: 'Grok Build models through the persistent grok ACP runtime. Sign in with grok login.',
+  },
   meta: {
     name: 'meta', displayName: 'Meta (Muse)', compatibility: 'direct',
     defaultHarness: 'muse',
-    models: ['muse-wonder-1.0', 'muse-spark-1.3', 'muse-spark-1.3-contributor'],
+    models: ['muse-wonder-1.0', 'muse-spark-1.3', 'muse-spark-1.3-contributor', 'muse-ember-1.0', 'muse-wonder-full-1.0'],
     tested: false,
-    description: 'Muse Code with Muse Wonder or Muse Spark; Spark Contributor pricing permits training on submitted content.',
+    description: 'Muse Code with Muse Wonder, Muse Spark, Muse Ember or Muse Wonder Full; Spark Contributor pricing permits training on submitted content, and Wonder Full is a Muse Code-only subscription model with no per-token price.',
   },
   anthropic: {
     name: 'anthropic',
     displayName: 'Anthropic',
     compatibility: 'direct',
     defaultHarness: 'claude-code',
-    models: ['claude-fable-5-1', 'claude-fable-5', 'claude-opus-5-5', 'claude-opus-5', 'claude-opus-4-8', 'claude-opus-4-7', 'claude-opus-4-6', 'claude-sonnet-5-5', 'claude-sonnet-5', 'claude-sonnet-4-6', 'claude-haiku-5-5', 'claude-haiku-4-5'],
+    models: ['claude-fable-5-2', 'claude-fable-5-1', 'claude-fable-5', 'claude-opus-5-5', 'claude-opus-5', 'claude-opus-4-8', 'claude-opus-4-7', 'claude-opus-4-6', 'claude-sonnet-5-5', 'claude-sonnet-5', 'claude-sonnet-4-6', 'claude-haiku-5-5', 'claude-haiku-4-5'],
     tested: true,
     description: 'Native Claude API',
   },
@@ -465,6 +470,7 @@ export function getProviderForModel(modelId: ModelId | string): ProviderConfig {
   // before the generic slash-delimited catch-all below.
   if (modelId.startsWith('opencode/')) return PROVIDERS.opencode;
   if (modelId.startsWith('opencode-go/')) return PROVIDERS['opencode-go'];
+  if (modelId.startsWith('grok/')) return PROVIDERS.grok;
   if (modelId.startsWith('kimi-code/')) {
     return PROVIDERS.kimi;
   }
@@ -473,7 +479,7 @@ export function getProviderForModel(modelId: ModelId | string): ProviderConfig {
   }
 
   // Check Anthropic models
-  if (['claude-fable-5-1', 'claude-fable-5', 'claude-opus-5-5', 'claude-opus-5', 'claude-opus-4-8', 'claude-opus-4-7', 'claude-opus-4-6', 'claude-sonnet-5-5', 'claude-sonnet-5', 'claude-sonnet-4-6', 'claude-sonnet-4-5', 'claude-haiku-5-5', 'claude-haiku-4-5'].includes(modelId)) {
+  if (['claude-fable-5-2', 'claude-fable-5-1', 'claude-fable-5', 'claude-opus-5-5', 'claude-opus-5', 'claude-opus-4-8', 'claude-opus-4-7', 'claude-opus-4-6', 'claude-sonnet-5-5', 'claude-sonnet-5', 'claude-sonnet-4-6', 'claude-sonnet-4-5', 'claude-haiku-5-5', 'claude-haiku-4-5'].includes(modelId)) {
     return PROVIDERS.anthropic;
   }
 

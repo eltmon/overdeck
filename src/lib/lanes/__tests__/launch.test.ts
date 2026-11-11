@@ -3,7 +3,7 @@
  * OVERDECK_HOME; injected git, liveness, stop door, runtime start and sleep.
  */
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -15,6 +15,11 @@ vi.mock('../../../dashboard/server/event-store.js', () => ({
   getEventStore: vi.fn(() => ({ emitOnly: vi.fn() })),
 }));
 
+vi.mock('../../disk-floor.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../disk-floor.js')>();
+  return { ...actual, reserveDiskFloor: vi.fn(actual.reserveDiskFloor) };
+});
+
 const { closeOverdeckDatabase } = await import('../../overdeck/infra.js');
 const { createConversation, getConversationByName, markConversationEnded } = await import('../../overdeck/conversations.js');
 const { writeWorkerReport } = await import('../../agents/worker/report.js');
@@ -22,6 +27,14 @@ const { workerDir } = await import('../../agents/worker/ids.js');
 const { laneConfigFor } = await import('../config.js');
 const { launchLane } = await import('../launch.js');
 const { LaneLaunchError } = await import('../types.js');
+const { listAllLaneRows } = await import('../lane-rows.js');
+const reserveDiskFloor = vi.mocked((await import('../../disk-floor.js')).reserveDiskFloor);
+
+const GIB = 1024 ** 3;
+const LEDGER_DIR = join(process.env.OVERDECK_HOME, 'disk-reservations');
+function leaseFiles(): string[] {
+  return existsSync(LEDGER_DIR) ? readdirSync(LEDGER_DIR).filter((name) => name.endsWith('.json')) : [];
+}
 
 type Deps = NonNullable<Parameters<typeof launchLane>[1]>;
 type Request = Parameters<typeof launchLane>[0];
@@ -70,6 +83,7 @@ function harness(laneConfig: LaneConfig = config()) {
     homeDir: () => TEST_HOME,
     tmpRoot: TMP_ROOT,
     cpuPressure: vi.fn(async () => CPU_CALM),
+    disk: { read: vi.fn(async () => 1024 ** 4), estimate: vi.fn(async () => 0) },
   } satisfies Deps;
   return { deps, git, live, stop };
 }
@@ -331,6 +345,74 @@ describe('launchLane under CPU pressure (PAN-4311)', () => {
 
     expect(deps.cpuPressure).toHaveBeenCalledTimes(1);
     expect(deps.start).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('launchLane disk floor (PAN-5094)', () => {
+  it('rejects a builder launch with 507 disk-low below the floor, creating no row or directory (home-door-disk.ac1)', async () => {
+    const { deps, git } = harness();
+    deps.disk = { read: vi.fn(async () => 5 * GIB), estimate: vi.fn(async () => 0) };
+    const parent = root();
+
+    const error = await rejection(launchLane(request(parent, { key: 'disk-low' }), deps));
+
+    expect(error.status).toBe(507);
+    expect(error.code).toBe('disk-low');
+    expect(git.addBranchWorktree).not.toHaveBeenCalled();
+    expect(await listAllLaneRows({ run: 'hotel', key: 'disk-low' })).toHaveLength(0);
+    expect(existsSync(join(LANES_ROOT, 'hotel-disk-low'))).toBe(false);
+  });
+
+  it('still rejects with 507 when force is true, without reading CPU pressure (home-door-disk.ac2)', async () => {
+    const { deps } = harness();
+    deps.disk = { read: vi.fn(async () => 5 * GIB), estimate: vi.fn(async () => 0) };
+
+    const error = await rejection(launchLane(request(root(), { key: 'disk-forced', force: true }), deps));
+
+    expect(error.status).toBe(507);
+    expect(error.code).toBe('disk-low');
+    expect(deps.cpuPressure).not.toHaveBeenCalled();
+  });
+
+  it('holds the disk lease after a successful launch, but releases it at once after one that fails in git.addBranchWorktree (home-door-disk.ac3, CodeRabbit #4496531317)', async () => {
+    const { deps } = harness();
+    const parent = root();
+
+    const beforeOk = new Set(leaseFiles());
+    await launchLane(request(parent, { key: 'disk-ok' }), deps);
+    expect(leaseFiles().filter((file) => !beforeOk.has(file))).toHaveLength(1);
+
+    const beforeFail = new Set(leaseFiles());
+    const failing = { ...deps, git: { ...deps.git, addBranchWorktree: vi.fn(async () => { throw new Error('worktree failed'); }) } };
+    await expect(launchLane(request(parent, { key: 'disk-fail' }), failing)).rejects.toThrow('worktree failed');
+    expect(leaseFiles().filter((file) => !beforeFail.has(file))).toHaveLength(0);
+  });
+
+  it('rejects with the launch error, not a release error, when a failed launch\'s disk release also rejects (home-door-disk.ac3)', async () => {
+    const { deps } = harness();
+    const parent = root();
+    reserveDiskFloor.mockImplementationOnce(async () => ({
+      ok: true,
+      reservation: { release: () => Promise.reject(new Error('release boom')) },
+    }));
+    const failing = { ...deps, git: { ...deps.git, addBranchWorktree: vi.fn(async () => { throw new Error('worktree failed'); }) } };
+
+    await expect(launchLane(request(parent, { key: 'disk-release-fail' }), failing)).rejects.toThrow('worktree failed');
+  });
+
+  it('holds two concurrent successful launches\' leases so a third is refused before any worktree call (FR-5 overlap)', async () => {
+    const { deps, git } = harness();
+    deps.disk = { read: vi.fn(async () => 30 * GIB), estimate: vi.fn(async () => 8 * GIB) };
+    const parent = root();
+
+    await launchLane(request(parent, { key: 'overlap-a' }), deps);
+    await launchLane(request(parent, { key: 'overlap-b' }), deps);
+    git.addBranchWorktree.mockClear();
+
+    const error = await rejection(launchLane(request(parent, { key: 'overlap-c' }), deps));
+
+    expect(error.status).toBe(507);
+    expect(git.addBranchWorktree).not.toHaveBeenCalled();
   });
 });
 

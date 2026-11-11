@@ -19,6 +19,7 @@ pan task show PAN-123 PAN-123-a
 pan task claim PAN-123 PAN-123-a
 pan task claim PAN-123 PAN-123-a --steal
 pan task done PAN-123 PAN-123-a
+pan task done PAN-123 PAN-123-a PAN-123-a.ac1 PAN-123-a.ac2
 pan task block PAN-123 PAN-123-a
 pan task block PAN-123 PAN-123-a --on PAN-120 '#4444'
 pan task unblock PAN-123 PAN-123-a
@@ -37,4 +38,4 @@ recording.
 
 `pan task claim` refuses (exit 1, nothing written) when a running agent already holds the item, or holds another item whose `files_scope` overlaps it — a low-confidence `files_scope` on either side counts as overlap. A worker that gets refused should run `pan task next` and pick a different item, never retry with `--steal`. `--steal` overrides both refusal kinds and is for the foreman or the operator only, when the other holder is known stuck or gone.
 
-`pan task done <item>` then verifies a commit on the pushed feature branch carries `Item: <item-id>`, and commits the item's status into the continue file. It refuses if the branch isn't pushed or the trailer is missing.
+`pan task done <issue> <id>...` takes one or more ids. Each id needs its own body line `Item: <id>` on a commit of the pushed feature branch, so put the item's line and one `Item: <item>.acN` line per acceptance criterion on the item's commit. The command checks every id first. If any id lacks its line, or the branch is not pushed, it records nothing and names each failing id. Otherwise it records every id and commits the continue file once.

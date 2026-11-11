@@ -11,6 +11,7 @@ export type ModelCapabilityClass = 'frontier' | 'workhorse' | 'small';
  * literal id first and only hops MODEL_DEPRECATIONS for ids with no row. */
 export const MODEL_CAPABILITY_CLASSES: Readonly<Record<string, ModelCapabilityClass>> = {
   // frontier
+  'claude-fable-5-2': 'frontier',
   'claude-fable-5-1': 'frontier',
   'claude-fable-5': 'frontier',
   'claude-opus-5-5': 'frontier',
@@ -19,6 +20,7 @@ export const MODEL_CAPABILITY_CLASSES: Readonly<Record<string, ModelCapabilityCl
   'claude-opus-4-7': 'frontier',
   'claude-opus-4-6': 'frontier',
   'muse-wonder-1.0': 'frontier',
+  'muse-wonder-full-1.0': 'frontier',
   'gpt-6-astra': 'frontier',
   'gpt-6-sol': 'frontier',
   'gpt-6.1-sol': 'frontier',
@@ -52,6 +54,8 @@ export const MODEL_CAPABILITY_CLASSES: Readonly<Record<string, ModelCapabilityCl
   'mistral-large-latest': 'frontier',
   'mistral-large-4-0': 'frontier',
   'grok-4.7': 'frontier',
+  'grok/grok-4.7': 'frontier',
+  'grok/grok-4.7-build-fast': 'frontier',
   // workhorse
   'claude-sonnet-5-5': 'workhorse',
   'claude-sonnet-5': 'workhorse',
@@ -77,6 +81,8 @@ export const MODEL_CAPABILITY_CLASSES: Readonly<Record<string, ModelCapabilityCl
   'qwen3-plus': 'workhorse',
   'grok-build-0.1': 'workhorse',
   'grok-4.3': 'workhorse',
+  'grok/grok-4.6': 'workhorse',
+  'grok/grok-4.5': 'workhorse',
   'muse-spark-1.3': 'workhorse',
   'muse-spark-1.3-contributor': 'workhorse',
   'llama-3.3-70b-versatile': 'workhorse',
@@ -88,6 +94,7 @@ export const MODEL_CAPABILITY_CLASSES: Readonly<Record<string, ModelCapabilityCl
   'codestral-latest': 'workhorse',
   'ql-swift-8b': 'workhorse',
   // small
+  'muse-ember-1.0': 'small',
   'claude-haiku-5-5': 'small',
   'claude-haiku-4-5': 'small',
   'gpt-5.6-luna': 'small',

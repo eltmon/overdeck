@@ -1,9 +1,11 @@
-import { TELEMETRY_INSTALL_KINDS, type TelemetryInstallKind } from '@overdeck/contracts';
+import { TELEMETRY_INSTALL_KINDS, type TelemetryClientConfig, type TelemetryInstallKind } from '@overdeck/contracts';
 import type { TelemetryConfig } from './config-yaml/schema.js';
+import { getBuildInfo } from './deploy/build-info.js';
 import { resolveTelemetryState, type TelemetryDisabledReason } from './telemetry/config.js';
 import { getOrCreateInstallId } from './telemetry/install-id.js';
 import { getInstallKind } from './telemetry/install-kind.js';
 import { getOperatorHashIfEnabled } from './telemetry/operator-hash.js';
+import { resolvePostHogTarget } from './telemetry/service.js';
 
 const TELEMETRY_DISABLED_REASONS: readonly TelemetryDisabledReason[] = ['environment', 'config', 'ci', 'temporary_home'];
 
@@ -19,6 +21,8 @@ export interface ApiTelemetryConfig {
   operatorGrouping?: boolean;
   /** PAN-4264: the 16-hex hash itself, when grouping is on and a hash exists. */
   operatorHash?: string;
+  /** PAN-5100: the machine's build commit, when the build has one. */
+  buildCommit?: string;
 }
 
 export function validateApiTelemetryConfig(value: unknown): string[] {
@@ -52,6 +56,9 @@ export function validateApiTelemetryConfig(value: unknown): string[] {
   if (telemetry.operatorHash !== undefined && typeof telemetry.operatorHash !== 'string') {
     errors.push('telemetry.operatorHash must be a string');
   }
+  if (telemetry.buildCommit !== undefined && typeof telemetry.buildCommit !== 'string') {
+    errors.push('telemetry.buildCommit must be a string');
+  }
   return errors;
 }
 
@@ -60,6 +67,7 @@ export function telemetrySettingsFromConfig(telemetry: TelemetryConfig | undefin
   const operatorHash = getOperatorHashIfEnabled();
   const enabled = telemetry?.enabled ?? true;
   const state = resolveTelemetryState(enabled);
+  const buildCommit = getBuildInfo().buildCommit;
   return {
     enabled,
     effectiveEnabled: state.enabled,
@@ -68,6 +76,7 @@ export function telemetrySettingsFromConfig(telemetry: TelemetryConfig | undefin
     installKind: getInstallKind(),
     operatorGrouping: telemetry?.operator_grouping ?? false,
     ...(operatorHash ? { operatorHash } : {}),
+    ...(buildCommit ? { buildCommit } : {}),
   };
 }
 
@@ -86,5 +95,26 @@ export function mergeApiTelemetrySettings(
     installKind: current?.installKind,
     operatorGrouping: updates?.operatorGrouping ?? current?.operatorGrouping ?? false,
     ...(current?.operatorHash ? { operatorHash: current.operatorHash } : {}),
+    ...(current?.buildCommit ? { buildCommit: current.buildCommit } : {}),
+  };
+}
+
+/** PAN-5100: what `GET /api/telemetry/client-config` answers for the phone (D-10..D-12). */
+export function telemetryClientConfig(): TelemetryClientConfig {
+  const state = resolveTelemetryState();
+  if (!state.enabled) return { effectiveEnabled: false };
+
+  const buildCommit = getBuildInfo().buildCommit;
+  const operatorHash = getOperatorHashIfEnabled();
+  const { key: posthogKey, host: posthogHost } = resolvePostHogTarget();
+
+  return {
+    effectiveEnabled: true,
+    installId: getOrCreateInstallId(),
+    installKind: getInstallKind(),
+    ...(buildCommit ? { buildCommit } : {}),
+    ...(operatorHash ? { operatorHash } : {}),
+    posthogKey,
+    posthogHost,
   };
 }

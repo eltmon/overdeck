@@ -67,6 +67,8 @@ export interface ConnectionDeps {
   log?: (message: string) => void;
   /** Append ` (<code>)` to a failed secure open's text. Default {@link DEBUG_ERRORS}. */
   showErrorCodes?: boolean;
+  /** PAN-5100: reports the route a link (not a pairing) successfully opened over. Never thrown from. */
+  onLinkOpened?: (environmentId: string, route: Route) => void;
 }
 
 type Route = 'direct' | 'relay';
@@ -125,6 +127,7 @@ export function createConnection({
   openSecureChannel: open = openSecureChannel,
   log = (message) => console.warn(`[overdeck] ${message}`),
   showErrorCodes = DEBUG_ERRORS,
+  onLinkOpened,
 }: ConnectionDeps): Connection {
   /** environment id → whether the route that last worked was the relay. */
   const routes = new Map<string, boolean>();
@@ -228,6 +231,11 @@ export function createConnection({
       const { stream } = await secure(raw, machine.environmentId, machine.label, route, () =>
         open(raw, { mode: 'link', localKey, remoteKeyHex: machine.machineKeyHex, ...(opts.signal ? { signal: opts.signal } : {}) }, machine.label),
       );
+      try {
+        onLinkOpened?.(machine.environmentId, route);
+      } catch {
+        // Telemetry must never break the link.
+      }
       return stream;
     },
     async openPairing(environmentId, label, code, localKey, opts = {}) {

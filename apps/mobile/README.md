@@ -13,7 +13,7 @@ Design: [PAN-4837 PRD](../../.pan/drafts/PAN-4837.md) (this app) and the epic
 | Path | What lives there |
 | --- | --- |
 | `src/main.tsx` | Entry. Sets `__OVERDECK_NATIVE__`, installs the channel shims, then loads the shell (D-3). |
-| `src/shell/` | The app's own screens and logic: sign-in (`signIn.ts`), the directory and dial policy (`directory.ts`, `connection.ts`, `relayMeter.ts`), pairing (`pairing.ts`), the machine list, pair, settings, removed-machine and machine views, sign-out, the foreground resume path (`lifecycle.ts`), and the System/Light/Dark appearance setting and controller (`appearance.ts`, PAN-5041). |
+| `src/shell/` | The app's own screens and logic: sign-in (`signIn.ts`), the directory and dial policy (`directory.ts`, `connection.ts`, `relayMeter.ts`), pairing (`pairing.ts`), the machine list, pair, settings, removed-machine and machine views, sign-out, account deletion (`accountDeletion.ts`, PAN-5107), the foreground resume path (`lifecycle.ts`), and the System/Light/Dark appearance setting and controller (`appearance.ts`, PAN-5041). |
 | `src/native/` | The `OverdeckKeys` plugin bridge (`keys.ts`), its `localStorage` stand-in for a desktop browser (`keys-web.ts`), push registration (`push.ts`), the `OverdeckLiveActivity` bridge (`liveActivity.ts`, PAN-4839), and the `OverdeckAppearance` bridge (`appearance.ts`, PAN-5041). |
 | `android/` | The Capacitor Android project. App code is in `app/src/main/java/ai/overdeck/app/` (`OverdeckKeysPlugin`, `SecureStore`, `OverdeckAppearancePlugin`, and the push path: `OverdeckMessagingService`, `PushHandler`, `PushNotice`, `PushNotifier`, `SealedBox`, `OverdeckPushPlugin`). |
 | `ios/` | The Capacitor iOS project (Swift Package Manager). App code is in `ios/App/App/` (`OverdeckKeysPlugin.swift`, `OverdeckLiveActivityPlugin.swift`, `OverdeckAppearancePlugin.swift`, `MainViewController.swift`, `App.entitlements`). |
@@ -230,6 +230,18 @@ on iOS, `stored()` on Android) so a cold start never flashes the wrong native ch
 WebView's own write runs. On the iOS Simulator, change the system appearance live with
 `xcrun simctl ui <udid> appearance light|dark` to exercise the System setting.
 
+## Account deletion
+
+Settings → Delete account (PAN-5107, `src/shell/accountDeletion.ts`) sends `DELETE /v1/account`
+with the device token, then runs the normal sign-out cleanup. A 202 or a 401 `account_deleted`
+answer maps to the deletion-started outcome; any other 401 or 403 maps to finish-on-web, telling
+the user to delete it at account.overdeck.ai instead; the sign-out that follows either outcome
+skips the revoke-device step. After a 202, the server has already revoked every device; after
+finish-on-web, this phone's token is already refused. The outcome
+survives the sign-out reload as `overdeck.signedOutNotice` in `sessionStorage`, read once by
+`ShellApp` for the sign-in screen. Its two copy strings are pinned equal to the account service's
+by `tests/unit/services/account/phone-delete-copy.test.ts`.
+
 ## Tests
 
 ```bash
@@ -254,7 +266,6 @@ iOS builds are archived and uploaded on the Mac rig.
 
 ## What it cannot do yet
 
-- App Store review (beyond TestFlight) needs in-app account deletion.
 - Reaching machines that are linked through the paired one: PAN-4887.
 - Admin-only actions such as settings, the model picker, archive, share and voice. The phone token
   cannot call them, so the phone screens hide them in native shell mode.

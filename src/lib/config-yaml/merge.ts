@@ -4,6 +4,7 @@ import type { RuntimeName } from '../runtimes/types.js';
 import type { ModelProvider } from '../model-fallback.js';
 import { resolveModelId } from '../model-capabilities.js';
 import { mergeCpuResources } from './merge-cpu.js';
+import { mergeDiskResources } from './merge-disk.js';
 import type { ModelId } from '../settings.js';
 import { BACKGROUND_AI_FEATURES } from '../background-ai/registry.js';
 import { isTerminalBackendName } from '@overdeck/contracts';
@@ -22,6 +23,7 @@ import {
   isFeatureRegistryClassificationProvider,
   mergeCavemanConfig,
   mergeDashboardConfig,
+  mergeHarnessesConfig,
   mergeDocsConfig,
   mergeRemoteConfig,
   mergeRtkConfig,
@@ -60,8 +62,8 @@ function normalizeProviderConfig(
 }
 
 function validateProviderHarness(provider: ModelProvider, harness: RuntimeName | undefined): void {
-  if (harness !== undefined && harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code' && harness !== 'opencode' && harness !== 'muse' && harness !== 'prime-agent') {
-    throw new Error(`config.yaml: models.providers.${provider}.harness must be claude-code, ohmypi, codex, acp, kimi-code, opencode, muse, or prime-agent`);
+  if (harness !== undefined && harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code' && harness !== 'opencode' && harness !== 'muse' && harness !== 'prime-agent' && harness !== 'grok') {
+    throw new Error(`config.yaml: models.providers.${provider}.harness must be claude-code, ohmypi, codex, acp, kimi-code, opencode, muse, prime-agent, or grok`);
   }
 }
 
@@ -172,6 +174,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     ollama: { ...DEFAULT_CONFIG.ollama },
     jev: { ...DEFAULT_CONFIG.jev },
     security: { semgrep: { ...DEFAULT_CONFIG.security.semgrep } },
+    harnesses: { ...DEFAULT_CONFIG.harnesses },
     enabledProviders: new Set(DEFAULT_CONFIG.enabledProviders),
     providerHarnesses: { ...DEFAULT_CONFIG.providerHarnesses },
     workhorses: { ...DEFAULT_WORKHORSES },
@@ -266,6 +269,8 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       governorCpuPsiRecoveryAvg60: DEFAULT_CONFIG.resources.governorCpuPsiRecoveryAvg60,
       governorCpuHoldDispatch: DEFAULT_CONFIG.resources.governorCpuHoldDispatch,
       qualityGateSlots: DEFAULT_CONFIG.resources.qualityGateSlots,
+      diskWarnGb: DEFAULT_CONFIG.resources.diskWarnGb,
+      diskCriticalGb: DEFAULT_CONFIG.resources.diskCriticalGb,
     },
     issues: {
       closedWindowDays: DEFAULT_CONFIG.issues.closedWindowDays,
@@ -454,7 +459,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       }
     }
 
-    for (const provider of ['opencode', 'opencode-go'] as const) {
+    for (const provider of ['opencode', 'opencode-go', 'grok'] as const) {
       const raw = config.models?.providers?.[provider];
       if (raw === undefined) continue;
       const normalized = normalizeProviderConfig(raw);
@@ -852,6 +857,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
         result.resources.governorCpuRecoveryLoadPerCore = config.resources.governor_cpu_recovery_load_per_core;
       }
       mergeCpuResources(config.resources, result.resources, DEFAULT_CONFIG.resources); // PAN-4311
+      mergeDiskResources(config.resources, result.resources, DEFAULT_CONFIG.resources); // PAN-5093
       // PAN-4267: normalize hard/soft/watch/recovery ordering and cap all four
       // against this host's RAM in one place — see governor-reserves.ts.
       const normalizedGovernorReserves = normalizeGovernorReserves(
@@ -987,6 +993,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
 
     // Merge dashboard access settings (PAN-4435)
     mergeDashboardConfig(result, config);
+    mergeHarnessesConfig(result, config); // PAN-5108
 
     // Merge conversationSearch configuration
     if (config.conversationSearch) {

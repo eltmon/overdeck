@@ -140,6 +140,18 @@ describe('tiered execution tier table', () => {
     }))).toThrow("tiered_execution.tiers.cheap.harness 'bad-harness' is unknown");
   });
 
+  it('accepts a grok tier on a Grok Build model (PAN-5078)', () => {
+    expect(() => validateTieredExecutionConfig(validConfig({
+      tiers: {
+        cheap: {
+          model: 'grok/grok-4.6',
+          harness: 'grok',
+          difficulties: ['trivial', 'simple', 'medium', 'complex', 'expert'],
+        },
+      },
+    }))).not.toThrow();
+  });
+
   it('rejects Anthropic subscription auth on ohmypi through the harness policy gate', () => {
     expect(() => validateTieredExecutionConfig(validConfig({
       tiers: {

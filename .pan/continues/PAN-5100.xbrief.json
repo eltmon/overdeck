@@ -1,0 +1,318 @@
+{
+  "version": "1",
+  "issueId": "PAN-5100",
+  "created": "2026-11-06T23:08:04.192Z",
+  "updated": "2026-11-07T00:56:55.855Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-07T00:51Z] coderabbit → FINDINGS — seq 1",
+      "timestamp": "2026-11-07T00:51:07.208Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-07T00:56Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-11-07T00:56:55.855Z"
+    }
+  ],
+  "items": {
+    "49": {
+      "status": "completed",
+      "doneAt": "2026-11-07T00:25:40.112Z"
+    },
+    "wi1-contract": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5100",
+      "claimedAt": "2026-11-06T23:08:04.191Z",
+      "doneAt": "2026-11-06T23:18:55.531Z"
+    },
+    "wi2-client-config-builder": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5100",
+      "claimedAt": "2026-11-06T23:19:06.612Z",
+      "doneAt": "2026-11-06T23:24:12.742Z"
+    },
+    "wi3-client-config-route": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5100",
+      "claimedAt": "2026-11-06T23:24:18.419Z",
+      "doneAt": "2026-11-06T23:28:03.696Z"
+    },
+    "wi4-browser-door": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5100",
+      "claimedAt": "2026-11-06T23:28:11.086Z",
+      "doneAt": "2026-11-06T23:34:40.792Z"
+    },
+    "wi4b-door-consent": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5100",
+      "claimedAt": "2026-11-06T23:34:45.099Z",
+      "doneAt": "2026-11-06T23:41:38.437Z"
+    },
+    "wi5-request-observer": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5100",
+      "claimedAt": "2026-11-06T23:41:44.034Z",
+      "doneAt": "2026-11-06T23:46:54.800Z"
+    },
+    "wi6-phone-boot": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5100",
+      "claimedAt": "2026-11-06T23:46:59.873Z",
+      "doneAt": "2026-11-06T23:52:40.710Z"
+    },
+    "wi7-phone-error-boundary": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5100",
+      "claimedAt": "2026-11-06T23:52:47.311Z",
+      "doneAt": "2026-11-06T23:58:19.958Z"
+    },
+    "wi8-phone-observer": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5100",
+      "claimedAt": "2026-11-06T23:58:24.882Z",
+      "doneAt": "2026-11-07T00:02:45.625Z"
+    },
+    "wi9a-link-route": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5100",
+      "claimedAt": "2026-11-07T00:02:50.327Z",
+      "doneAt": "2026-11-07T00:06:57.395Z"
+    },
+    "wi9b-link-reporter": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5100",
+      "claimedAt": "2026-11-07T00:07:03.446Z",
+      "doneAt": "2026-11-07T00:14:21.348Z"
+    },
+    "wi10-store-privacy": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5100",
+      "claimedAt": "2026-11-07T00:14:27.748Z",
+      "doneAt": "2026-11-07T00:18:32.511Z"
+    },
+    "wi11-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5100",
+      "claimedAt": "2026-11-07T00:18:38.320Z",
+      "doneAt": "2026-11-07T00:22:08.645Z"
+    },
+    "wi1-contract.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-07T00:27:09.691Z"
+    },
+    "wi1-contract.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-07T00:27:29.276Z"
+    },
+    "wi1-contract.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-07T00:27:48.057Z"
+    },
+    "wi1-contract.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-07T00:28:06.637Z"
+    },
+    "wi2-client-config-builder.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-07T00:28:25.694Z"
+    },
+    "wi2-client-config-builder.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-07T00:28:45.302Z"
+    },
+    "wi2-client-config-builder.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-07T00:29:04.628Z"
+    },
+    "wi2-client-config-builder.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-07T00:29:24.200Z"
+    },
+    "wi3-client-config-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-07T00:29:43.243Z"
+    },
+    "wi3-client-config-route.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-07T00:30:02.076Z"
+    },
+    "wi3-client-config-route.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-07T00:30:22.558Z"
+    },
+    "wi3-client-config-route.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-07T00:30:42.052Z"
+    },
+    "wi4-browser-door.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-07T00:31:01.335Z"
+    },
+    "wi4-browser-door.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-07T00:31:20.947Z"
+    },
+    "wi4-browser-door.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-07T00:31:39.252Z"
+    },
+    "wi4-browser-door.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-07T00:31:58.163Z"
+    },
+    "wi4b-door-consent.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-07T00:32:16.560Z"
+    },
+    "wi4b-door-consent.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-07T00:32:35.631Z"
+    },
+    "wi4b-door-consent.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-07T00:32:54.612Z"
+    },
+    "wi4b-door-consent.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-07T00:33:14.131Z"
+    },
+    "wi5-request-observer.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-07T00:33:33.322Z"
+    },
+    "wi5-request-observer.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-07T00:33:52.048Z"
+    },
+    "wi5-request-observer.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-07T00:34:11.291Z"
+    },
+    "wi5-request-observer.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-07T00:34:30.019Z"
+    },
+    "wi5-request-observer.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-07T00:34:49.486Z"
+    },
+    "wi6-phone-boot.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-07T00:35:07.473Z"
+    },
+    "wi6-phone-boot.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-07T00:35:26.289Z"
+    },
+    "wi6-phone-boot.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-07T00:35:44.791Z"
+    },
+    "wi6-phone-boot.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-07T00:36:03.725Z"
+    },
+    "wi7-phone-error-boundary.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-07T00:36:23.325Z"
+    },
+    "wi7-phone-error-boundary.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-07T00:36:42.740Z"
+    },
+    "wi7-phone-error-boundary.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-07T00:37:00.987Z"
+    },
+    "wi8-phone-observer.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-07T00:37:19.480Z"
+    },
+    "wi8-phone-observer.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-07T00:37:37.996Z"
+    },
+    "wi9a-link-route.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-07T00:37:56.736Z"
+    },
+    "wi9a-link-route.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-07T00:38:15.348Z"
+    },
+    "wi9b-link-reporter.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-07T00:38:34.928Z"
+    },
+    "wi9b-link-reporter.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-07T00:38:53.259Z"
+    },
+    "wi9b-link-reporter.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-07T00:39:12.586Z"
+    },
+    "wi9b-link-reporter.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-07T00:39:30.440Z"
+    },
+    "wi9b-link-reporter.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-07T00:39:49.636Z"
+    },
+    "wi10-store-privacy.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-07T00:40:08.548Z"
+    },
+    "wi10-store-privacy.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-07T00:40:28.811Z"
+    },
+    "wi10-store-privacy.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-07T00:40:47.973Z"
+    },
+    "wi11-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-07T00:41:06.589Z"
+    },
+    "wi11-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-07T00:41:25.058Z"
+    },
+    "wi11-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-07T00:41:44.348Z"
+    },
+    "wi11-docs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-07T00:42:03.506Z"
+    },
+    "wi1-contract.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-07T00:42:46.432Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "coderabbit",
+      "outcome": "findings",
+      "timestamp": "2026-11-07T00:51:07Z",
+      "markdownBody": "# CodeRabbit findings for PAN-5100 (PR #5101)\n\nCodeRabbit posted 6 inline finding(s). CodeRabbit is advisory: nothing waits for these,\nbut each one gets an answer, either a fix or a reply with your reason.\n\n- Thread 4499183525 · apps/mobile/ios/App/App/PrivacyInfo.xcprivacy:25 [Minor]: Declare Other Diagnostic Data.\n  https://github.com/eltmon/overdeck/pull/5101#discussion_r4499183525\n- Thread 4499183531 · apps/mobile/ios/App/App/PrivacyInfo.xcprivacy:27 [Minor]: Declare crash data linked to the user.\n  https://github.com/eltmon/overdeck/pull/5101#discussion_r4499183531\n- Thread 4499183538 · apps/mobile/src/main.tsx:29 [Major]: Continue boot if the observer fails.\n  https://github.com/eltmon/overdeck/pull/5101#discussion_r4499183538\n- Thread 4499183557 · apps/mobile/src/shell/telemetry.ts:94 [Major]: Refresh phone telemetry when the connection becomes live.\n  https://github.com/eltmon/overdeck/pull/5101#discussion_r4499183557\n- Thread 4499183564 · apps/mobile/store/privacy-app.html:36 [Minor]: Disclose the reported HTTP status precision.\n  https://github.com/eltmon/overdeck/pull/5101#discussion_r4499183564\n- Thread 4499183574 · docs/TELEMETRY.md:427 [Minor]: Exclude phase events when no machine is open.\n  https://github.com/eltmon/overdeck/pull/5101#discussion_r4499183574\n\n## What to do\n\n1. Read each thread (open its link, or the code at the path and line).\n2. If you agree with a finding, fix it.\n3. If you reject a finding, reply on its thread with your reason:\n   `gh api repos/eltmon/overdeck/pulls/5101/comments/<thread id>/replies -f body=\"<reason>\"`\n4. If you changed code: run the quality gates on what you touched, commit, push, then run `pan review request PAN-5100`.\n   If you only replied, you are done.\n5. If PR #5101 has already merged when you read this, nothing more lands on it: open a follow-up issue\n   for the findings you agree with instead of pushing."
+    },
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-11-07T00:56:55Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-5100\n\n# Review — PAN-5100\n## Verdict: CHANGES REQUESTED — phone never re-reads the machine's telemetry setting when the link recovers (PRD WI-6 \"Refresh on reconnect\" missing), so an opt-out can be ignored for the rest of the page\n\n## Context\n- Run ID: agent-pan-5100-review-45edd0ae\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-5100/.pan/review/agent-pan-5100-review-45edd0ae/context.json\n- Branch / workspace: feature/pan-5100 / /home/eltmon/Projects/overdeck/workspaces/feature-pan-5100\n- PR: https://github.com/eltmon/overdeck/pull/5101\n- HEAD reviewed: 45edd0ae6baec05f98cd5442007b9b7cda3f284d\n- Base / prior cycle SHA: merge-base d4b9b3dab25 (origin/main); no prior review cycle\n- Requirements source: `.pan/drafts/PAN-5100.md` at HEAD (the manifest carried no acceptance criteria; PRD AC-1..AC-10, FR/NFR and the xBRIEF item ACs were used)\n\n## Blocking Findings\n\n### [requirements/correctness] Phone telemetry consent is not refreshed when the link recovers — `apps/mobile/src/shell/telemetry.ts:52`\n- Severity: `!` MUST\n- Classification / requirement scope: implementation defect (missing in-scope requirement); in_pr_scope. Root cause is partly a plan-lowering gap (see Scope Note), but the canonical PRD at HEAD requires it.\n- Requirement: PRD WI-6, \"**Refresh on reconnect.** `bootPhoneTelemetry` returns `() => void` (an unsubscriber) and takes `subscribePhase?` … Each time the phase changes into `live` from another phase, it fetches the client config again and applies it with the same rules (null keeps state; off disables and removes the cache; on stores and reconciles). So a phone that initialized from a cached \"on\" while the first read failed applies a fresh \"off\" as soon as the link recovers, which is the D-10 promise.\" The WI-6 test list requires \"cached on → failed read → phase `delayed` → `live` → fresh off ⇒ `disable` called\", and the PRD's Critique response marks \"reconnect does not refresh consent\" as **Accepted** with that test.\n- Trigger and changed-code connection: `bootPhoneTelemetry` (`apps/mobile/src/shell/telemetry.ts:52`) returns `Promise<void>`, takes no `subscribePhase`, and fetches the client config exactly once. `MachineView.tsx` calls it once on mount with no cleanup. `MachineView` stays mounted while the link is down: `ShellApp.tsx` (~line 433) renders it and only overlays `dialError`, so there is no remount that would re-run the boot.\n- Expected / observed / impact: Scenario — the phone holds a cached \"on\" for machine A from an earlier session; the operator turns telemetry off on A; the phone opens A while the link is down. The cached \"on\" initializes PostHog, the one fresh read resolves `null` (link down), and when the link later recovers nothing re-reads the setting. The phone keeps sending `client_request_failed`, `phone_link_state` and `$exception` under A's install id for the rest of the page (until a machine switch or app restart reloads it). `configuration/phone.mdx` (\"reaches the phone the next time it successfully connects to that machine\") and `docs/TELEMETRY.md` (\"Phone consent\") both promise the opposite to users. This is an opt-out leak in a privacy feature, bounded to one page lifetime.\n- Evidence: static trace of `apps/mobile/src/shell/telemetry.ts`, `MachineView.tsx` and `ShellApp.tsx` render branch; `grep -n \"reconnect\\|subscribePhase\\|phase\" apps/mobile/src/shell/__tests__/telemetry.test.ts` returns nothing, so the PRD-required test does not exist. Not reproduced at runtime on a device.\n- Fix: implement WI-6 as written. Add `subscribePhase?: (listener: (phase: ConnectionPhase) => void) => () => void` (default `useConnectionState.subscribe((s) => listener(deriveConnectionPhase(s)))`), track the previous phase, and on each transition into `live` from another phase re-run the fetch-and-apply step (null keeps state; off ⇒ `disable()` + remove cache; on ⇒ store + `init`). Return the unsubscriber and change the `MachineView` effect to the PRD's form (`let off = () => {}; void bootPhoneTelemetry(...).then((u) => { off = u; }); return () => off();`). Add the PRD's test: cached on → fetch null → phase `delayed` → `live` → fresh off ⇒ `disable` called.\n- Coupled fix (becomes reachable with the refresh): `disableTelemetry()` (`src/dashboard/frontend/src/lib/telemetry.ts`, `if (!loaded) return;`) returns before setting `consent = 'off'` and clearing `pendingExceptions`. On a phone whose first answer is \"off\" and that never loaded PostHog, consent stays `unknown`, so later crashes keep queuing (up to 5) and a later \"on\" from the reconnect refresh would flush crashes raised while the machine was known off — contrary to WI-4b step 3 (\"While `consent === 'off'` an exception is dropped, never queued\"). Move `consent = 'off'` and the queue clear outside the `loaded` guard (keep `opt_out_capturing` inside it), and add a test: no load → `disableTelemetry()` → `captureException` → on init sends nothing.\n\n## Non-blocking Findings\n\n- `~` [correctness] `src/dashboard/frontend/src/lib/requestFailures.ts` `maybeReport` sets `lastSentAt` before calling `report`, and `capture()` drops events while consent is not `on`. A failure in the pre-init window (for example the first `/api/conversations` read before the phone's config answer arrives) consumes the 60 s throttle slot for that key with nothing sent, so the same failure right after init is suppressed for up to a minute. Non-goal 5 allows dropping pre-init failures, but not suppressing post-init ones. Bounded; consider only stamping the throttle when capture is actually on (for example, have the default `report` return whether it sent).\n- `?` [performance] `telemetryClientConfig()` calls `resolveTelemetryState()` with no argument, which runs `loadConfigSync()` on each `GET /api/telemetry/client-config`. This matches the `/api/settings` baseline the PRD accepted, the call happens once per machine-view mount (more after the reconnect fix, still once per recovery), and `getBuildInfo()` is a build-time constant, not a child process. No action needed.\n- `?` [correctness] On the desktop, if `/api/settings` fails, consent stays `unknown` for the page and up to five exceptions sit in `pendingExceptions` forever. Bounded memory; behavior otherwise matches the old \"never initialized\" path.\n- Note: posthog `install_id`/`posthogKey` exposure on a `read:state` route is per D-11/D-12 (the key is PostHog's public ingestion key; the install id is anonymous and the caller is a paired credential). No security finding.\n\n## Coverage\n\n### Changed-file ledger\n| File | Status |\n| --- | --- |\n| `apps/mobile/src/shell/telemetry.ts` | reviewed — blocking finding |\n| `apps/mobile/src/shell/MachineView.tsx` | reviewed — boundary OK; boot effect lacks refresh/cleanup (blocker) |\n| `apps/mobile/src/shell/ShellApp.tsx` | reviewed — link telemetry wiring OK, uninstall in cleanup |\n| `apps/mobile/src/shell/connection.ts` | reviewed — `onLinkOpened` only in `openLink`, try/catch, not in `openPairing` |\n| `apps/mobile/src/shell/lifecycle.ts` | reviewed |\n| `apps/mobile/src/shell/linkTelemetry.ts` | reviewed — mapping, throttle, drop/recover, current-machine filter match WI-9b |\n| `apps/mobile/src/main.tsx` | reviewed — observer installed after shims/request log, before shell (H-2) |\n| `src/dashboard/frontend/src/lib/telemetry.ts` | reviewed — WI-4/4b; coupled `disableTelemetry` finding |\n| `src/dashboard/frontend/src/lib/requestFailures.ts` | reviewed — rethrows same error, returns same response, cross-host ignored; throttle advisory |\n| `src/dashboard/frontend/src/main.tsx` | reviewed — observer before `initTelemetry()` |\n| `packages/contracts/src/telemetry.ts` | reviewed — helpers and domains; literal route/area lists spot-checked against docs table |\n| `src/lib/settings-api-telemetry.ts` | reviewed — off ⇒ exactly `{ effectiveEnabled: false }` (D-12) |\n| `src/lib/telemetry/service.ts` | reviewed — `resolvePostHogTarget` refactor, behavior unchanged |\n| `src/dashboard/server/routes/telemetry-client-config.ts` | reviewed |\n| `src/dashboard/server/route-scopes.ts` | reviewed — `read:state` row |\n| `src/dashboard/server/server.ts` | reviewed — layer registered |\n| `tests/unit/lib/overdeck/no-loss-matrix.ts` | reviewed — READ row present |\n| `apps/mobile/ios/App/App/PrivacyInfo.xcprivacy` | reviewed — two types, not linked, not tracking, analytics |\n| `apps/mobile/store/privacy-app.html`, `apps/mobile/RELEASE.md` | reviewed — false \"no analytics\" claims removed, operator checklist added |\n| `configuration/phone.mdx`, `configuration/telemetry.mdx`, `docs/TELEMETRY.md` | reviewed — accurate except the reconnect promise the code does not yet keep |\n| `.overdeck/context/codebase/architecture.md` | reviewed |\n| `apps/mobile/acceptance/PAN-5100.md` | reviewed — D-19 operator steps pending as unchecked boxes |\n| `scripts/frontend-test-subset.txt` | reviewed — `requestFailures.test.ts` added in sorted position |\n| Test files: `telemetry.test.ts` (frontend) | case list read, run |\n| `requestFailures.test.ts` (frontend) | `secret-key` guard read, run |\n| `apps/mobile/src/shell/__tests__/telemetry.test.ts` | grepped for reconnect coverage (absent), run |\n| `linkTelemetry.test.ts`, `MachineView.test.tsx`, `connection.test.ts`, `requestFailures.test.ts` (mobile), `boot.test.ts`, `native-config.test.ts` | run only (not line-read) |\n| `tests/unit/contracts/*`, `tests/unit/lib/settings-api-telemetry.test.ts`, `route-scopes.test.ts`, `telemetry-client-config.test.ts` | run only (not line-read) |\n| `.pan/continues/*`, `.pan/drafts/*`, `.pan/specs/*` | N/A — planning artifacts (used as requirements source) |\n\n### Dimensions\n- Correctness: one blocker (reconnect refresh) plus coupled `disableTelemetry` guard; throttle advisory. Fetch wrapper error/response passthrough, StrictMode double-mount idempotence, identity-change opt-out, and current-machine-only link reporting verified by trace.\n- Security: no attacker-controlled input reaches a sensitive operation. `route`/`route_area` come only from closed lists via `clientRouteOf` (H-3, guarded by the `secret-key` test). No raw path, body, label or environment id in event payloads (NFR-1). The new route sits behind the existing scope table.\n- Performance: per-request work is O(routes) template matching on failures only; one sync config read per config request (baseline-consistent). No unbounded structures (throttle map keyed by closed values; pending queue capped at 5).\n- Requirements/UX: Reload fallback present; store declarations updated; docs added. WI-6 refresh-on-reconnect missing (blocker).\n\n### Acceptance criteria\n| AC | Status | Evidence |\n| --- | --- | --- |\n| AC-1 contract | met | contract/schema/docs tests pass locally; `/api/conversations/:id` asserted |\n| AC-2 client-config route | met | settings-api-telemetry + route + route-scopes tests pass |\n| AC-3 phone/desktop init | met | frontend telemetry tests (lines 214–249) pass |\n| AC-4 desktop observer | met | requestFailures tests pass (fake timers) |\n| AC-5 phone off ⇒ no init | met for the mount-time read; the PRD's reconnect variant (WI-6) is unmet | mobile telemetry tests; missing reconnect test |\n| AC-6 phone observer | met | mobile requestFailures + boot order tests pass |\n| AC-7 phone error boundary | met | MachineView test passes |\n| AC-8 link state | met | linkTelemetry + connection tests pass |\n| AC-9 store privacy | met | native-config test passes; diff read |\n| AC-10 docs | met, but `phone.mdx`/`TELEMETRY.md` promise reconnect behavior the code lacks | diff read |\n| Non-goals 1–10 | respected | no QueryCache handlers, no phone switch, desktop distinct_id unchanged, no anywhere-channel changes |\n\n## Verification\n- Local focused runs at HEAD 45edd0ae:\n  - `npx vitest run` contract/schema/docs/settings-api-telemetry/route/route-scopes/no-loss-matrix — 7 files, 41 tests passed.\n  - `src/dashboard/frontend`: `npx vitest run src/lib/__tests__/telemetry.test.ts src/lib/__tests__/requestFailures.test.ts` — 37 passed.\n  - `npm --prefix apps/mobile test -- <7 phone test files>` — 76 passed.\n  - `npm run lint:effect-diagnostics` — passed, 227 known findings, none new.\n- CI on exact HEAD (PR #5101): `overdeck/test` verification gate pass (typecheck+lint); `build (22)` pass; `mobile-android` pass (runs `npm --prefix apps/mobile test` and the phone build, so the D-17 `posthog-js` resolution checkpoint holds); `lint-group (core|skills|state)` pass; `integrations` pass; clean-install smoke pass.\n- Unverified: `test-shard (1/4)`–`(4/4)`, `test-e2e`, `lint-group (effect)` and the flake lane were still pending at review time; the full test suite result is therefore unverified.\n- Not run: full suite (by policy); no device/runtime reproduction of the blocker.\n\n## Scope Note\n- Plan drift: at planning completion (`29c82c6b0bf`) the PRD listed \"reconnect does not refresh consent\" under \"Unresolved after two critic rounds\". Commit `c1e1f4f7ed5` (19:23:41) changed it to \"Accepted\" and added the WI-6 \"Refresh on reconnect\" step, after implementation started (18:18) and 96 s before the AC-completion commit `cdf600974ef`. The xBRIEF item narrative and ACs for `wi6-phone-boot` were never updated (still \"on stores and inits once\"), so the work agent's checklist never carried this requirement. Two of the three late-accepted critique items (exceptions-while-off, reconcile on fresh config) were implemented; this one was not. The pipeline should regenerate xBRIEF items when the PRD changes after planning.\n- The review manifest carried no acceptance criteria; the PRD's AC-1..AC-10 were used.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-5100/.pan/review/agent-pan-5100-review-45edd0ae/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-5100 -m \"Fixed review issues\"`"
+    }
+  ]
+}

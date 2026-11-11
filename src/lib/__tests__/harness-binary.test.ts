@@ -387,6 +387,33 @@ describe('harnessBinaryName', () => {
     expect(harnessBinaryName('kimi-code')).toBe('kimi');
     expect(harnessBinaryName('acp')).toBe('kimi');
   });
+
+  it("maps 'grok' to the 'grok' binary", () => {
+    expect(harnessBinaryName('grok')).toBe('grok');
+  });
+});
+
+describe('Grok Build install directory (PAN-5078)', () => {
+  it('finds grok in ~/.grok/bin when the server PATH omits it', async () => {
+    await expect(resolveExecutable('grok', {
+      pathValue: '/usr/bin',
+      home: '/home/test',
+      accessExecutable: executableAccess(['/home/test/.grok/bin/grok']),
+      runCommand: vi.fn(async () => ''),
+      allowLoginShell: false,
+    })).resolves.toBe('/home/test/.grok/bin/grok');
+  });
+
+  it('does not search ~/.grok/bin for other binaries', async () => {
+    const resolved = await resolveExecutable('claude', {
+      pathValue: '/usr/bin',
+      home: '/home/test',
+      accessExecutable: executableAccess(['/home/test/.grok/bin/claude']),
+      runCommand: vi.fn(async () => ''),
+      allowLoginShell: false,
+    }).catch(() => null);
+    expect(resolved).not.toBe('/home/test/.grok/bin/claude');
+  });
 });
 
 describe('configuredHarnessBinaryPath', () => {
@@ -430,6 +457,7 @@ describe('binary handling reads declared capabilities (PAN-4562)', () => {
     ['opencode', 'OpenCode'],
     ['muse', 'Muse Code'],
     ['prime-agent', 'Prime Agent'],
+    ['grok', 'Grok Build'],
   ] as const)('%s names itself %s when its binary is missing', async (harness, label) => {
     expect(await missing(harness)).toMatch(new RegExp(`^${label} executable `));
   });

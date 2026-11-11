@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 
 import {
   CLAUDE_CODE_BEHAVIOR,
+  GROK_BEHAVIOR,
   PRIME_AGENT_BEHAVIOR,
   getHarnessBehavior,
   getRuntimeBehavior,
@@ -9,7 +10,7 @@ import {
   normalizeHarnessName,
   type RuntimeName,
 } from "./harness-behavior"
-import { HARNESS_CAPABILITY_KEYS } from "./harness-capabilities"
+import { GROK_CAPABILITIES, HARNESS_CAPABILITY_KEYS } from "./harness-capabilities"
 import { KNOWN_HARNESSES } from "./types"
 
 describe("PRIME_AGENT_BEHAVIOR", () => {
@@ -44,6 +45,30 @@ describe("PRIME_AGENT_BEHAVIOR", () => {
   })
 })
 
+describe("GROK_BEHAVIOR (PAN-5078)", () => {
+  it("getHarnessBehavior('grok') returns the Grok Build behavior with four effort levels", () => {
+    expect(getHarnessBehavior("grok")).toBe(GROK_BEHAVIOR)
+    expect(getHarnessBehavior("grok").displayName).toBe("Grok Build")
+    expect(getHarnessBehavior("grok").effortLevels).toEqual(["low", "medium", "high", "xhigh"])
+    expect(getHarnessBehavior("grok").contextLayerKind).toBe("grok")
+    expect(getHarnessBehavior("grok").processNames).toEqual(["acp-host", "grok", "grok-native"])
+  })
+
+  it("is a known harness name", () => {
+    expect(KNOWN_HARNESSES.has("grok")).toBe(true)
+    expect(normalizeHarnessName("grok")).toBe("grok")
+  })
+
+  it("declares Grok Build capabilities with the overdeck MCP server", () => {
+    const capabilities = getHarnessBehavior("grok").capabilities
+    expect(capabilities).toBe(GROK_CAPABILITIES)
+    expect(capabilities.npmPackage).toBe("@xai-official/grok")
+    expect(capabilities.updateArgs).toEqual(["update"])
+    expect(capabilities.overdeckMcp).toBe(true)
+    expect(capabilities.binaryLabel).toBe("Grok Build")
+  })
+})
+
 describe("steerKind (PAN-4292)", () => {
   it("Claude Code steers with its send-now keys", () => {
     expect(getHarnessBehavior("claude-code").steerKind).toBe("send-now-keys")
@@ -55,14 +80,14 @@ describe("steerKind (PAN-4292)", () => {
   })
 
   it("every other harness has no steer delivery", () => {
-    for (const harness of ["codex", "acp", "opencode", "kimi-code", "muse", "prime-agent"] as const) {
+    for (const harness of ["codex", "acp", "opencode", "kimi-code", "muse", "prime-agent", "grok"] as const) {
       expect(getHarnessBehavior(harness).steerKind).toBeNull()
     }
   })
 })
 
 describe("HarnessCapabilities (PAN-4562)", () => {
-  const RUNTIMES: readonly RuntimeName[] = ["claude-code", "ohmypi", "codex", "acp", "kimi-code", "opencode", "muse", "prime-agent"]
+  const RUNTIMES: readonly RuntimeName[] = ["claude-code", "ohmypi", "codex", "acp", "kimi-code", "opencode", "muse", "prime-agent", "grok"]
 
   it("every runtime declares every capability key with a defined value", () => {
     for (const runtime of RUNTIMES) {
@@ -81,7 +106,7 @@ describe("HarnessCapabilities (PAN-4562)", () => {
   })
 
   it("declares overdeckMcp exactly for the harnesses wired to the overdeck MCP server (PAN-4932, PAN-4933, PAN-4934)", () => {
-    const injected = new Set(["claude-code", "codex", "acp", "opencode"])
+    const injected = new Set(["claude-code", "codex", "acp", "opencode", "grok"])
     for (const runtime of RUNTIMES) {
       expect(getHarnessBehavior(runtime).capabilities.overdeckMcp).toBe(injected.has(runtime))
     }
@@ -96,6 +121,7 @@ describe("HarnessCapabilities (PAN-4562)", () => {
     ["opencode", "acp-initial-context", true, true],
     ["muse", "append-system-prompt-file", true, false],
     ["prime-agent", "prime-agent-append-system-prompt", true, true],
+    ["grok", "acp-initial-context", true, true],
   ] as const)("%s declares contextChannel=%s stopRuntimeOnStartFailure=%s initialPromptMustLand=%s", (runtime, contextChannel, stopRuntimeOnStartFailure, initialPromptMustLand) => {
     const capabilities = getRuntimeBehavior(runtime).capabilities
     expect(capabilities.contextChannel).toBe(contextChannel)

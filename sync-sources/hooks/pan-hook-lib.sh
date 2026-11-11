@@ -164,12 +164,14 @@ pan_run_with_timeout() {
   local command_pid=$!
   (
     local sleep_pid=""
-    trap '[ -n "$sleep_pid" ] && kill "$sleep_pid" 2>/dev/null; exit 0' TERM INT
+    # Kill every background job, not only the recorded one: the parent can
+    # signal this subshell after a sleep forks but before `sleep_pid=$!` runs,
+    # and an unkilled sleep keeps the caller's stdout open (PAN-5117).
+    trap 'kill $(jobs -p) 2>/dev/null; exit 0' TERM INT
 
     /bin/sleep "$timeout_seconds" &
     sleep_pid=$!
     wait "$sleep_pid" 2>/dev/null || exit 0
-    sleep_pid=""
 
     if kill -0 "$command_pid" 2>/dev/null; then
       : > "$expired_file"
@@ -177,7 +179,6 @@ pan_run_with_timeout() {
       /bin/sleep 5 &
       sleep_pid=$!
       wait "$sleep_pid" 2>/dev/null || exit 0
-      sleep_pid=""
       kill -KILL "$command_pid" 2>/dev/null || true
     fi
   ) &

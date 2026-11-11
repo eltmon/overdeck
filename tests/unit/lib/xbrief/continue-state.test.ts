@@ -1,6 +1,6 @@
 /**
  * PAN-3917 W1: item status and claims live in
- * `<planHome>/.pan/continues/<ISSUE>.xbrief.json`, and `markItemDone` refuses
+ * `<planHome>/.pan/continues/<ISSUE>.xbrief.json`, and `markItemsDone` refuses
  * a completion git cannot corroborate.
  */
 import { execFileSync } from 'node:child_process';
@@ -13,7 +13,7 @@ import {
   ItemNotVerifiable,
   claimItem,
   continueStatePath,
-  markItemDone,
+  markItemsDone,
   readContinueState,
   readItemStatuses,
   readItemStatusesAsync,
@@ -92,14 +92,14 @@ describe('claimItem', () => {
   });
 });
 
-describe('markItemDone', () => {
-  const options = { requireTrailer: `Item: ${ITEM}`, requirePushed: true };
+describe('markItemsDone', () => {
+  const options = { requirePushed: true };
 
   it('refuses when no commit carries the Item trailer, and writes nothing', async () => {
     commitWithItemTrailer(planHome, 'w2-other-item', 'other.ts');
     git(planHome, 'push', '-q', 'origin', 'main');
 
-    await expect(markItemDone(planHome, ISSUE, ITEM, options)).rejects.toBeInstanceOf(ItemNotVerifiable);
+    await expect(markItemsDone(planHome, ISSUE, [ITEM], options)).rejects.toBeInstanceOf(ItemNotVerifiable);
     expect(existsSync(continueStatePath(planHome, ISSUE))).toBe(false);
   });
 
@@ -107,13 +107,13 @@ describe('markItemDone', () => {
     commitWithItemTrailer(planHome, `${ITEM}-extra`, 'extra.ts');
     git(planHome, 'push', '-q', 'origin', 'main');
 
-    await expect(markItemDone(planHome, ISSUE, ITEM, options)).rejects.toThrow(/Item: w1-plan-home/);
+    await expect(markItemsDone(planHome, ISSUE, [ITEM], options)).rejects.toThrow(/Item: w1-plan-home/);
   });
 
   it('refuses while the branch is ahead of its upstream', async () => {
     commitWithItemTrailer(planHome, ITEM, 'work.ts');
 
-    await expect(markItemDone(planHome, ISSUE, ITEM, options)).rejects.toThrow(/ahead of its upstream/);
+    await expect(markItemsDone(planHome, ISSUE, [ITEM], options)).rejects.toThrow(/ahead of its upstream/);
     expect(existsSync(continueStatePath(planHome, ISSUE))).toBe(false);
   });
 
@@ -121,14 +121,14 @@ describe('markItemDone', () => {
     git(planHome, 'checkout', '-q', '-b', 'cut/w1');
     commitWithItemTrailer(planHome, ITEM, 'work.ts');
 
-    await expect(markItemDone(planHome, ISSUE, ITEM, options)).rejects.toThrow(/no upstream/);
+    await expect(markItemsDone(planHome, ISSUE, [ITEM], options)).rejects.toThrow(/no upstream/);
   });
 
   it('records the item when the trailer is present and the branch is pushed', async () => {
     commitWithItemTrailer(planHome, ITEM, 'work.ts');
     git(planHome, 'push', '-q', 'origin', 'main');
 
-    const done = await markItemDone(planHome, ISSUE, ITEM, options);
+    const done = (await markItemsDone(planHome, ISSUE, [ITEM], options))[ITEM];
     expect(done.status).toBe('completed');
     expect(Date.parse(done.doneAt!)).not.toBeNaN();
     expect(readItemStatuses(planHome, ISSUE)).toEqual({ [ITEM]: 'completed' });
@@ -139,19 +139,95 @@ describe('markItemDone', () => {
     commitWithItemTrailer(planHome, ITEM, 'work.ts');
     git(planHome, 'push', '-q', 'origin', 'main');
 
-    const done = await markItemDone(planHome, ISSUE, ITEM, options);
+    const done = (await markItemsDone(planHome, ISSUE, [ITEM], options))[ITEM];
     expect(done.claimedBy).toBe('agent-7');
   });
 
   it('skips the push check when requirePushed is false', async () => {
     commitWithItemTrailer(planHome, ITEM, 'work.ts');
 
-    const done = await markItemDone(planHome, ISSUE, ITEM, { requireTrailer: `Item: ${ITEM}`, requirePushed: false });
+    const done = (await markItemsDone(planHome, ISSUE, [ITEM], { requirePushed: false }))[ITEM];
     expect(done.status).toBe('completed');
+  });
+
+  it('records an item and its AC sub-items from one commit in one write', async () => {
+    writeFileSync(join(planHome, 'work.ts'), 'work.ts\n', 'utf8');
+    git(planHome, 'add', '-A');
+    git(
+      planHome,
+      'commit',
+      '-m',
+      `feat(cli): work.ts\n\nItem: ${ITEM}\n\nItem: ${ITEM}.ac1\n\nItem: ${ITEM}.ac2\n\nCo-Authored-By: Claude <noreply@anthropic.com>`,
+    );
+    git(planHome, 'push', '-q', 'origin', 'main');
+
+    const ids = [ITEM, `${ITEM}.ac1`, `${ITEM}.ac2`];
+    const done = await markItemsDone(planHome, ISSUE, ids, options);
+
+    const statuses = readItemStatuses(planHome, ISSUE);
+    for (const id of ids) expect(statuses[id]).toBe('completed');
+    const doneAts = ids.map((id) => done[id].doneAt);
+    expect(doneAts[1]).toBe(doneAts[0]);
+    expect(doneAts[2]).toBe(doneAts[0]);
+  });
+
+  it('writes nothing and names every id without a trailer', async () => {
+    writeFileSync(join(planHome, 'work.ts'), 'work.ts\n', 'utf8');
+    git(planHome, 'add', '-A');
+    git(
+      planHome,
+      'commit',
+      '-m',
+      `feat(cli): work.ts\n\nItem: ${ITEM}\n\nItem: ${ITEM}.ac1\n\nCo-Authored-By: Claude <noreply@anthropic.com>`,
+    );
+    git(planHome, 'push', '-q', 'origin', 'main');
+
+    const ids = [ITEM, `${ITEM}.ac1`, `${ITEM}.ac2`, `${ITEM}.ac3`];
+    const error: ItemNotVerifiable = await markItemsDone(planHome, ISSUE, ids, options).then(
+      () => {
+        throw new Error('expected rejection');
+      },
+      (caught: unknown) => caught as ItemNotVerifiable,
+    );
+
+    expect(error).toBeInstanceOf(ItemNotVerifiable);
+    expect(error.failures.map((failure) => failure.itemIds)).toEqual([[`${ITEM}.ac2`], [`${ITEM}.ac3`]]);
+    expect(existsSync(continueStatePath(planHome, ISSUE))).toBe(false);
+  });
+
+  it('reports an unpushed repository once, naming every id it corroborates', async () => {
+    writeFileSync(join(planHome, 'work.ts'), 'work.ts\n', 'utf8');
+    git(planHome, 'add', '-A');
+    git(
+      planHome,
+      'commit',
+      '-m',
+      `feat(cli): work.ts\n\nItem: ${ITEM}\n\nItem: ${ITEM}.ac1\n\nItem: ${ITEM}.ac2\n\nCo-Authored-By: Claude <noreply@anthropic.com>`,
+    );
+
+    const ids = [ITEM, `${ITEM}.ac1`, `${ITEM}.ac2`];
+    const error: ItemNotVerifiable = await markItemsDone(planHome, ISSUE, ids, options).then(
+      () => {
+        throw new Error('expected rejection');
+      },
+      (caught: unknown) => caught as ItemNotVerifiable,
+    );
+
+    expect(error.failures).toHaveLength(1);
+    expect(error.failures[0]!.itemIds).toEqual(ids);
+    expect(error.failures[0]!.reason).toMatch(/ahead of its upstream/);
+  });
+
+  it('processes a repeated id once', async () => {
+    commitWithItemTrailer(planHome, ITEM, 'work.ts');
+    git(planHome, 'push', '-q', 'origin', 'main');
+
+    const done = await markItemsDone(planHome, ISSUE, [ITEM, ITEM], options);
+    expect(Object.keys(done)).toEqual([ITEM]);
   });
 });
 
-describe('markItemDone across a polyrepo workspace', () => {
+describe('markItemsDone across a polyrepo workspace', () => {
   let apiRepo: string;
 
   /** A second repository of the same workspace, with its own remote. */
@@ -176,7 +252,6 @@ describe('markItemDone across a polyrepo workspace', () => {
   });
 
   const options = (roots: string[]) => ({
-    requireTrailer: `Item: ${ITEM}`,
     requirePushed: true,
     repoRoots: roots,
   });
@@ -185,7 +260,7 @@ describe('markItemDone across a polyrepo workspace', () => {
     commitWithItemTrailer(apiRepo, ITEM, 'handler.ts');
     git(apiRepo, 'push', '-q', 'origin', 'main');
 
-    const done = await markItemDone(planHome, ISSUE, ITEM, options([planHome, apiRepo]));
+    const done = (await markItemsDone(planHome, ISSUE, [ITEM], options([planHome, apiRepo])))[ITEM];
 
     expect(done.status).toBe('completed');
     expect(continueStatePath(planHome, ISSUE)).toBe(join(planHome, '.pan', 'continues', 'PAN-3917.xbrief.json'));
@@ -195,13 +270,13 @@ describe('markItemDone across a polyrepo workspace', () => {
   it('requires the repository that carries the commit to be pushed, not the plan home', async () => {
     commitWithItemTrailer(apiRepo, ITEM, 'handler.ts');
 
-    await expect(markItemDone(planHome, ISSUE, ITEM, options([planHome, apiRepo])))
+    await expect(markItemsDone(planHome, ISSUE, [ITEM], options([planHome, apiRepo])))
       .rejects.toThrow(/ahead of its upstream/);
     expect(existsSync(continueStatePath(planHome, ISSUE))).toBe(false);
   });
 
   it('names every repository it searched when no commit carries the trailer', async () => {
-    await expect(markItemDone(planHome, ISSUE, ITEM, options([planHome, apiRepo])))
+    await expect(markItemsDone(planHome, ISSUE, [ITEM], options([planHome, apiRepo])))
       .rejects.toThrow(new RegExp(apiRepo));
   });
 });

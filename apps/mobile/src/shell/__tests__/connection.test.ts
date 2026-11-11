@@ -248,6 +248,51 @@ describe('openLink', () => {
     expect(options.localKey.secretKey).toEqual(new Uint8Array(32).fill(0xef));
     expect(label).toBe('desk');
   });
+
+  // PAN-5100 WI-9a
+  it('calls onLinkOpened with the direct route once the secure open resolves', async () => {
+    const f = fakeDirectory({ relayAllowed: false, direct: 'ok' });
+    const open = vi.fn(async () => ({ stream: {}, channel: { mode: 'link', remoteKeyHex: MACHINE.machineKeyHex, pairingId: null } }));
+    const onLinkOpened = vi.fn();
+    const connection = createConnection({ directory: f.directory, meter, openSecureChannel: open as never, onLinkOpened });
+
+    await connection.openLink(MACHINE);
+
+    expect(onLinkOpened).toHaveBeenCalledTimes(1);
+    expect(onLinkOpened).toHaveBeenCalledWith(MACHINE.environmentId, 'direct');
+  });
+
+  it('calls onLinkOpened with the relay route after a relay fallback', async () => {
+    const f = fakeDirectory({ relayAllowed: true, direct: 'fail', relay: 'ok' });
+    const open = vi.fn(async () => ({ stream: {}, channel: { mode: 'link', remoteKeyHex: MACHINE.machineKeyHex, pairingId: null } }));
+    const onLinkOpened = vi.fn();
+    const connection = createConnection({ directory: f.directory, meter, openSecureChannel: open as never, onLinkOpened, log: vi.fn() });
+
+    await connection.openLink(MACHINE);
+
+    expect(onLinkOpened).toHaveBeenCalledWith(MACHINE.environmentId, 'relay');
+  });
+
+  it('never calls onLinkOpened when the secure open fails', async () => {
+    const f = fakeDirectory({ relayAllowed: false, direct: 'ok' });
+    const open = vi.fn(async () => { throw new ChannelOpenError('timeout', 'refused'); });
+    const onLinkOpened = vi.fn();
+    const connection = createConnection({ directory: f.directory, meter, openSecureChannel: open, onLinkOpened, log: vi.fn() });
+
+    await rejection(connection.openLink(MACHINE));
+
+    expect(onLinkOpened).not.toHaveBeenCalled();
+  });
+
+  it('still returns the stream from openLink when onLinkOpened throws', async () => {
+    const f = fakeDirectory({ relayAllowed: false, direct: 'ok' });
+    const stream = { marker: 'plaintext' };
+    const open = vi.fn(async () => ({ stream, channel: { mode: 'link', remoteKeyHex: MACHINE.machineKeyHex, pairingId: null } }));
+    const onLinkOpened = vi.fn(() => { throw new Error('telemetry blew up'); });
+    const connection = createConnection({ directory: f.directory, meter, openSecureChannel: open as never, onLinkOpened });
+
+    await expect(connection.openLink(MACHINE)).resolves.toBe(stream);
+  });
 });
 
 describe('failure logging (PAN-5018 FR-1)', () => {

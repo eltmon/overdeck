@@ -57,10 +57,11 @@ const EFFORT_WITHOUT_XHIGH = EFFORT_LEVELS.filter((level) => level !== 'xhigh');
 const EFFORT_UP_TO_HIGH = EFFORT_LEVELS.filter((level) => compareEffort(level, 'high') <= 0);
 
 /** @deprecated Use string — exported for backward compatibility only. */
-export type ClaudeModelId = 'claude-fable-5-1' | 'claude-fable-5' | 'claude-opus-5-5' | 'claude-opus-5' | 'claude-opus-4-8' | 'claude-opus-4-7' | 'claude-opus-4-6' | 'claude-sonnet-5-5' | 'claude-sonnet-5' | 'claude-sonnet-4-6' | 'claude-haiku-5-5' | 'claude-haiku-4-5-20251001';
+export type ClaudeModelId = 'claude-fable-5-2' | 'claude-fable-5-1' | 'claude-fable-5' | 'claude-opus-5-5' | 'claude-opus-5' | 'claude-opus-4-8' | 'claude-opus-4-7' | 'claude-opus-4-6' | 'claude-sonnet-5-5' | 'claude-sonnet-5' | 'claude-sonnet-4-6' | 'claude-haiku-5-5' | 'claude-haiku-4-5-20251001';
 
 /** Effort levels for known Anthropic models. Kept for backward compatibility. */
 export const MODEL_EFFORT_SUPPORT: Record<ClaudeModelId, readonly string[]> = {
+  'claude-fable-5-2': EFFORT_LEVELS,
   'claude-fable-5-1': EFFORT_LEVELS,
   'claude-fable-5': EFFORT_LEVELS,
   'claude-opus-5-5': EFFORT_LEVELS,
@@ -93,6 +94,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   openrouter: 'OpenRouter',
   opencode: 'OpenCode Zen',
   'opencode-go': 'OpenCode Go',
+  grok: 'Grok Build',
 };
 
 const FALLBACK_GROUPS: ModelGroup[] = [
@@ -100,6 +102,7 @@ const FALLBACK_GROUPS: ModelGroup[] = [
     provider: 'anthropic',
     label: 'Anthropic',
     models: [
+      { id: 'claude-fable-5-2', label: 'Claude Fable 5.2 (1M context)', provider: 'anthropic', costDisplay: '$24/1M', costPer1MTokens: 24, effortLevels: EFFORT_LEVELS },
       { id: 'claude-fable-5-1', label: 'Claude Fable 5.1 (1M context)', provider: 'anthropic', costDisplay: '$30/1M', costPer1MTokens: 30, effortLevels: EFFORT_LEVELS },
       { id: 'claude-fable-5', label: 'Claude Fable 5 (1M context)', provider: 'anthropic', costDisplay: '$30/1M', costPer1MTokens: 30, effortLevels: EFFORT_LEVELS },
       { id: 'claude-opus-5-5', label: 'Claude Opus 5.5 (1M context)', provider: 'anthropic', costDisplay: '$12/1M', costPer1MTokens: 12, effortLevels: EFFORT_LEVELS },
@@ -201,7 +204,7 @@ function formatCost(costPer1M: number | null, provider?: string): string {
 }
 
 function isHarness(value: unknown): value is Harness {
-  return value === 'claude-code' || value === 'ohmypi' || value === 'codex' || value === 'acp' || value === 'kimi-code' || value === 'opencode' || value === 'muse' || value === 'prime-agent';
+  return value === 'claude-code' || value === 'ohmypi' || value === 'codex' || value === 'acp' || value === 'kimi-code' || value === 'opencode' || value === 'muse' || value === 'prime-agent' || value === 'grok';
 }
 
 function providerDefaultHarness(provider: string, providerHarnesses: ProviderHarnesses): Harness {

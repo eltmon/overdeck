@@ -9,7 +9,9 @@ import type { BackgroundAiFeature } from '../background-ai/registry.js';
 import type { TieredExecutionConfig, ValidatedTieredExecutionConfig } from '../agents/tier-table-types.js';
 import type { TerminalBackendName } from '../terminal-backends/types.js';
 import type { CpuResourcesConfig, CpuResourcesYamlConfig } from './schema-cpu.js';
+import type { DiskResourcesConfig, DiskResourcesYamlConfig } from './schema-disk.js';
 import type { DashboardYamlConfig, NormalizedDashboardConfig } from './schema-dashboard.js';
+import type { HarnessesYamlConfig, NormalizedHarnessesConfig } from './schema-harnesses.js';
 import type { NormalizedOllamaConfig, YamlOllamaConfig } from './ollama.js';
 
 export type { SubscriptionPlan, AuthMode };
@@ -394,7 +396,7 @@ export interface RoleConfig {
   model: RoleModelRef;
   /** Explicit scalar staffing model for autonomous planning dispatch. */
   autonomousModel?: RoleModelRef;
-  harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent';
+  harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent' | 'grok';
   effort?: RoleEffort;
   mode?: ReviewMode;
   /** PAN-4433: minutes a dispatched reviewer may stay silent before recovery (review role only; default 15). */
@@ -417,8 +419,8 @@ export interface RoleConfig {
 
 export type RolesConfig = Partial<Record<Role, RoleConfig>>;
 
-/** PAN-4311 CPU keys live in schema-cpu.ts. */
-export interface ResourcesConfig extends CpuResourcesYamlConfig {
+/** PAN-4311 CPU keys live in schema-cpu.ts; PAN-5093 disk keys live in schema-disk.ts. */
+export interface ResourcesConfig extends CpuResourcesYamlConfig, DiskResourcesYamlConfig {
   /** Available RAM threshold that triggers a warning state/guardrail (GiB) */
   memory_warn_gb?: number;
   /** Available RAM threshold that blocks spawns / marks critical state (GiB) */
@@ -707,6 +709,7 @@ export interface YamlConfig {
 
   /** Dashboard access settings (PAN-4435). */
   dashboard?: DashboardYamlConfig;
+  harnesses?: HarnessesYamlConfig;
 }
 
 /**
@@ -975,8 +978,8 @@ export interface NormalizedConfig {
     batchWindowSeconds: number;
   };
 
-  /** Resource thresholds (normalised, never undefined); PAN-4311 CPU fields in schema-cpu.ts */
-  resources: CpuResourcesConfig & {
+  /** Resource thresholds (normalised, never undefined); PAN-4311 CPU fields in schema-cpu.ts; PAN-5093 disk fields in schema-disk.ts */
+  resources: CpuResourcesConfig & DiskResourcesConfig & {
     memoryWarnGb: number;
     memoryBlockGb: number;
     agentWarnCount: number;
@@ -1045,6 +1048,7 @@ export interface NormalizedConfig {
 
   /** Dashboard access settings (PAN-4435). */
   dashboard?: NormalizedDashboardConfig;
+  harnesses: NormalizedHarnessesConfig;
 }
 
 /**

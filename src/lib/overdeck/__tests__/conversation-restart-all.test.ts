@@ -33,6 +33,7 @@ vi.mock('../conversation-delivery.js', () => ({ resolveConversationDeliveryMetho
 vi.mock('../conversation-launch-context.js', () => ({ conversationLaunchContext: () => ({}) }));
 
 import { handleConversationRestartAll } from '../conversation-restart-all.js';
+import { stopConversationRuntime, waitForConversationRuntimeReady } from '../conversation-runtime.js';
 
 function decodeJsonResponse(response: { body: unknown }) {
   const payload = response.body as { body: Uint8Array } | null;
@@ -60,5 +61,29 @@ describe('handleConversationRestartAll', () => {
     expect(spawnConversationSession.mock.calls[0]?.[2]).toBe('new');
     expect(closeConversationPane).toHaveBeenCalledTimes(1);
     expect(result['restarted']).toBe(1);
+  });
+
+  it('waits for the ACP host when it restarts a Grok conversation (PAN-5078)', async () => {
+    resolveAllowedHarness.mockResolvedValue('grok');
+    listConversations.mockReturnValue([
+      { id: 3, name: 'g', tmuxSession: 'conv-p', clearedToConvId: null, claudeSessionId: 'grok-session', harness: 'grok', cwd: '/fixture', model: 'grok/grok-4.6', effort: 'high', issueId: null, bareContext: false },
+    ]);
+
+    await handleConversationRestartAll({ resolveSessionFile: async () => null });
+
+    expect(waitForConversationRuntimeReady).toHaveBeenCalledWith('conv-p', 'grok', 'respawn');
+    expect(setConversationHarness).toHaveBeenCalledWith('g', 'grok');
+  });
+
+  it('stops the Grok runtime when its restart fails (PAN-5078)', async () => {
+    resolveAllowedHarness.mockResolvedValue('grok');
+    vi.mocked(waitForConversationRuntimeReady).mockRejectedValueOnce(new Error('host exited'));
+    listConversations.mockReturnValue([
+      { id: 3, name: 'g', tmuxSession: 'conv-p', clearedToConvId: null, claudeSessionId: 'grok-session', harness: 'grok', cwd: '/fixture', model: 'grok/grok-4.6', effort: 'high', issueId: null, bareContext: false },
+    ]);
+
+    await handleConversationRestartAll({ resolveSessionFile: async () => null });
+
+    expect(stopConversationRuntime).toHaveBeenCalledTimes(1);
   });
 });

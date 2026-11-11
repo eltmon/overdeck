@@ -21,7 +21,7 @@ function cli(binary: string, label: string, version: string, argv: string[] | nu
   return {
     binary, label, harnesses: [binary], version,
     updatable: argv !== null, command: argv ? argv.join(' ') : '', reason: argv ? null : `Overdeck does not update ${label}`,
-    binaryPath: `/b/${binary}`, plan: { argv, display: argv ? argv.join(' ') : '', reason: argv ? null : `Overdeck does not update ${label}` },
+    binaryPath: `/b/${binary}`, plan: { argv, display: argv ? argv.join(' ') : '', reason: argv ? null : `Overdeck does not update ${label}`, npmPackage: null },
   };
 }
 

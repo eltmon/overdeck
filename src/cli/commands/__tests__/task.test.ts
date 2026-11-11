@@ -2,9 +2,13 @@ import { Command } from 'commander';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  ItemNotVerifiable: class ItemNotVerifiable extends Error {},
+  ItemNotVerifiable: class ItemNotVerifiable extends Error {
+    constructor(message: string, public readonly failures: Array<{ kind: string; itemIds: string[]; reason: string }> = []) {
+      super(message);
+    }
+  },
   claimItem: vi.fn(),
-  markItemDone: vi.fn(),
+  markItemsDone: vi.fn(),
   setItemStatus: vi.fn(),
   readContinueState: vi.fn(),
   readPlan: vi.fn(),
@@ -28,7 +32,7 @@ vi.mock('../../../lib/project-repos.js', () => ({
 vi.mock('../../../lib/xbrief/io.js', () => ({ readWorkspacePlanSync: mocks.readPlan }));
 vi.mock('../../../lib/xbrief/continue-state.js', () => ({
   claimItem: mocks.claimItem,
-  markItemDone: mocks.markItemDone,
+  markItemsDone: mocks.markItemsDone,
   setItemStatus: mocks.setItemStatus,
   readContinueState: mocks.readContinueState,
   ItemNotVerifiable: mocks.ItemNotVerifiable,
@@ -65,7 +69,8 @@ describe('pan task CLI', () => {
     mocks.readPlan.mockReturnValue({ plan: { id: 'PAN-1', items: [item], edges: [] } });
     mocks.readContinueState.mockReturnValue({ items: {} });
     mocks.claimItem.mockReturnValue({ status: 'in_progress', claimedBy: 'agent-pan-1' });
-    mocks.markItemDone.mockResolvedValue({ status: 'completed', doneAt: 'now' });
+    mocks.markItemsDone.mockImplementation(async (_planHome: string, _issue: string, ids: string[]) =>
+      Object.fromEntries(ids.map((id) => [id, { status: 'completed', doneAt: 'now' }])));
     mocks.commit.mockResolvedValue({ committed: true, sha: 'abc' });
     mocks.repos.mockReturnValue(null);
     mocks.repoRoots.mockReturnValue(['.']);
@@ -85,12 +90,11 @@ describe('pan task CLI', () => {
 
   it('done requires the Item trailer and a pushed branch', async () => {
     await program().parseAsync(['node', 'pan', 'task', 'done', 'PAN-1', 'PAN-1-a']);
-    expect(mocks.markItemDone).toHaveBeenCalledWith(
+    expect(mocks.markItemsDone).toHaveBeenCalledWith(
       '/tmp/test/workspaces/feature-pan-1',
       'PAN-1',
-      'PAN-1-a',
+      ['PAN-1-a'],
       {
-        requireTrailer: 'Item: PAN-1-a',
         requirePushed: true,
         repoRoots: ['/tmp/test/workspaces/feature-pan-1'],
       },
@@ -104,10 +108,10 @@ describe('pan task CLI', () => {
 
     await program().parseAsync(['node', 'pan', 'task', 'done', 'PAN-1', 'PAN-1-a']);
 
-    expect(mocks.markItemDone).toHaveBeenCalledWith(
+    expect(mocks.markItemsDone).toHaveBeenCalledWith(
       '/tmp/test/workspaces/feature-pan-1',
       'PAN-1',
-      'PAN-1-a',
+      ['PAN-1-a'],
       expect.objectContaining({
         repoRoots: [
           '/tmp/test/workspaces/feature-pan-1/api',
@@ -115,6 +119,75 @@ describe('pan task CLI', () => {
           '/tmp/test/workspaces/feature-pan-1',
         ],
       }),
+    );
+  });
+
+  it('done closes several ids with one continue commit', async () => {
+    await program().parseAsync(['node', 'pan', 'task', 'done', 'PAN-1', 'PAN-1-a', 'PAN-1-a.ac1', 'PAN-1-a.ac2']);
+
+    expect(mocks.markItemsDone).toHaveBeenCalledTimes(1);
+    expect(mocks.markItemsDone).toHaveBeenCalledWith(
+      '/tmp/test/workspaces/feature-pan-1',
+      'PAN-1',
+      ['PAN-1-a', 'PAN-1-a.ac1', 'PAN-1-a.ac2'],
+      expect.objectContaining({ requirePushed: true }),
+    );
+    expect(mocks.commit).toHaveBeenCalledTimes(1);
+    expect(mocks.withTaskStateLock).toHaveBeenCalledTimes(1);
+    expect(console.log).toHaveBeenCalledWith('PAN-1-a\tcompleted');
+    expect(console.log).toHaveBeenCalledWith('PAN-1-a.ac1\tcompleted');
+    expect(console.log).toHaveBeenCalledWith('PAN-1-a.ac2\tcompleted');
+  });
+
+  it('done --json with several ids prints one array in argument order', async () => {
+    const logs: string[] = [];
+    vi.mocked(console.log).mockImplementation((message: unknown) => { logs.push(String(message)); });
+
+    await program().parseAsync(['node', 'pan', 'task', 'done', '--json', 'PAN-1', 'PAN-1-a', 'PAN-1-a.ac1', 'PAN-1-a.ac2']);
+
+    const parsed = JSON.parse(logs.join('')) as Array<{ itemId: string }>;
+    expect(parsed.map((entry) => entry.itemId)).toEqual(['PAN-1-a', 'PAN-1-a.ac1', 'PAN-1-a.ac2']);
+  });
+
+  it('done refuses several ids, names each failing one, and writes nothing', async () => {
+    mocks.markItemsDone.mockRejectedValue(new mocks.ItemNotVerifiable('x', [
+      { kind: 'missing-trailer', itemIds: ['PAN-1-a.ac1'], reason: 'no commit ... carries the trailer "Item: PAN-1-a.ac1"' },
+      { kind: 'missing-trailer', itemIds: ['PAN-1-a.ac2'], reason: 'no commit ... carries the trailer "Item: PAN-1-a.ac2"' },
+    ]));
+    const errors: string[] = [];
+    vi.mocked(console.error).mockImplementation((message: unknown) => { errors.push(String(message)); });
+
+    await program().parseAsync(['node', 'pan', 'task', 'done', 'PAN-1', 'PAN-1-a', 'PAN-1-a.ac1', 'PAN-1-a.ac2']);
+
+    expect(process.exitCode).toBe(1);
+    const stderr = errors.join('\n');
+    expect(stderr).toContain('2 of 3 items are not done yet');
+    expect(stderr).toContain('carries the line "Item: <id>" for: PAN-1-a.ac1, PAN-1-a.ac2');
+    expect(stderr).toContain('Nothing was written');
+    expect(mocks.commit).not.toHaveBeenCalled();
+  });
+
+  it('done names an unpushed repository once', async () => {
+    mocks.markItemsDone.mockRejectedValue(new mocks.ItemNotVerifiable('x', [
+      { kind: 'unpushed', itemIds: ['PAN-1-a', 'PAN-1-a.ac1'], reason: 'the branch in /tmp/x is 1 commit(s) ahead of its upstream — push before completing PAN-1-a, PAN-1-a.ac1' },
+    ]));
+    const errors: string[] = [];
+    vi.mocked(console.error).mockImplementation((message: unknown) => { errors.push(String(message)); });
+
+    await program().parseAsync(['node', 'pan', 'task', 'done', 'PAN-1', 'PAN-1-a', 'PAN-1-a.ac1']);
+
+    const stderr = errors.join('\n');
+    expect([...stderr.matchAll(/ahead of its upstream/g)]).toHaveLength(1);
+  });
+
+  it('done processes a repeated id once', async () => {
+    await program().parseAsync(['node', 'pan', 'task', 'done', 'PAN-1', 'PAN-1-a', 'PAN-1-a']);
+
+    expect(mocks.markItemsDone).toHaveBeenCalledWith(
+      expect.any(String),
+      'PAN-1',
+      ['PAN-1-a'],
+      expect.anything(),
     );
   });
 
@@ -138,7 +211,7 @@ describe('pan task CLI', () => {
   });
 
   it('done refuses in plain English and writes nothing when git cannot corroborate it', async () => {
-    mocks.markItemDone.mockRejectedValue(new mocks.ItemNotVerifiable('the branch is 2 commit(s) ahead of its upstream'));
+    mocks.markItemsDone.mockRejectedValue(new mocks.ItemNotVerifiable('the branch is 2 commit(s) ahead of its upstream'));
     const errors: string[] = [];
     vi.mocked(console.error).mockImplementation((message: unknown) => { errors.push(String(message)); });
 
@@ -200,7 +273,7 @@ describe('pan task CLI', () => {
     await program().parseAsync(['node', 'pan', 'task', 'next', 'PAN-1']);
     await program().parseAsync(['node', 'pan', 'task', 'show', 'PAN-1', 'PAN-1-a']);
     expect(mocks.claimItem).not.toHaveBeenCalled();
-    expect(mocks.markItemDone).not.toHaveBeenCalled();
+    expect(mocks.markItemsDone).not.toHaveBeenCalled();
     expect(mocks.setItemStatus).not.toHaveBeenCalled();
     expect(mocks.withTaskStateLock).not.toHaveBeenCalled();
   });

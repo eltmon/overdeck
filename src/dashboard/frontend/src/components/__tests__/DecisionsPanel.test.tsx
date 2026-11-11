@@ -274,6 +274,115 @@ describe('DecisionsPanel', () => {
   });
 });
 
+describe('DecisionsPanel disk alert (PAN-5093)', () => {
+  const diskAlertSnapshot = {
+    level: 'critical' as const,
+    path: '/home/op/.overdeck',
+    availableBytes: 1.2 * 1024 ** 3,
+    totalBytes: 100 * 1024 ** 3,
+    warningBytes: 5 * 1024 ** 3,
+    criticalBytes: 2 * 1024 ** 3,
+    since: '2026-11-06T17:00:00.000Z',
+    checkedAt: '2026-11-06T17:00:30.000Z',
+    measuring: false,
+    holders: null,
+  };
+  const diskAlertDecision = {
+    id: 'disk-alert',
+    source: 'agent' as const,
+    label: 'Disk critical',
+    kinds: ['diskCritical'],
+    since: diskAlertSnapshot.since,
+    blocking: true,
+    diskAlert: diskAlertSnapshot,
+  };
+
+  it('renders disk-alert-card in its own System group, with no Answer button', () => {
+    vi.spyOn(useDecisionsModule, 'useDecisions').mockReturnValue([diskAlertDecision]);
+    renderWithQuery(<DecisionsPanel />);
+
+    expect(screen.getByTestId('disk-alert-card')).toBeTruthy();
+    expect(screen.getByText('System')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Answer' })).toBeNull();
+  });
+
+  it('keeps a critical disk decision out of "Blocking work"', () => {
+    vi.spyOn(useDecisionsModule, 'useDecisions').mockReturnValue([agentDecision, diskAlertDecision]);
+    renderWithQuery(<DecisionsPanel />);
+
+    const blockingGroup = screen.getByText('Blocking work').closest('section');
+    expect(blockingGroup?.textContent).not.toContain('Disk critical');
+    const systemGroup = screen.getByText('System').closest('section');
+    expect(systemGroup?.textContent).toContain('Disk critical');
+  });
+});
+
+describe('DecisionsPanel unreachable machine (PAN-5111)', () => {
+  const row = {
+    environmentId: 'env-air',
+    label: 'Edwards-MacBook-Air.local',
+    since: '2026-11-10T11:00:00.000Z',
+    reason: 'answered 500',
+  };
+  const unreachableDecision = {
+    id: 'unreachable:env-air',
+    source: 'agent' as const,
+    label: "Can't reach Edwards-MacBook-Air.local",
+    kinds: ['machineUnreachable'],
+    since: row.since,
+    blocking: false,
+    machineLabel: row.label,
+    unreachableMachine: row,
+  };
+
+  it('renders unreachable-machine-card in the System group, never in Waiting', () => {
+    vi.spyOn(useDecisionsModule, 'useDecisions').mockReturnValue([planDecision, unreachableDecision]);
+    renderWithQuery(<DecisionsPanel />);
+
+    const card = screen.getByTestId('unreachable-machine-card');
+    expect(card.textContent).toContain("Can't reach Edwards-MacBook-Air.local; it may have items waiting.");
+    expect(screen.getByText('System').closest('section')?.contains(card)).toBe(true);
+    expect(screen.getByText('Waiting').closest('section')?.textContent).not.toContain("Can't reach");
+  });
+
+  it('opens the Anywhere settings section', async () => {
+    vi.spyOn(useDecisionsModule, 'useDecisions').mockReturnValue([unreachableDecision]);
+    const pushState = vi.spyOn(window.history, 'pushState');
+    renderWithQuery(<DecisionsPanel />);
+    await userEvent.click(screen.getByRole('button', { name: 'Open Machines' }));
+    expect(pushState).toHaveBeenCalledWith({ tab: 'settings' }, '', '/settings');
+  });
+});
+
+describe('DecisionsPanel harness update failure (PAN-5108)', () => {
+  const failure = {
+    binary: 'claude',
+    label: 'Claude Code',
+    error: 'npm ERR! code E404',
+    command: 'npm install -g --prefix /p @anthropic-ai/claude-code@latest',
+    failedAt: '2026-11-10T12:01:00.000Z',
+  };
+  const harnessDecision = {
+    id: 'harness-update:claude',
+    source: 'agent' as const,
+    label: 'Claude Code update failed',
+    kinds: ['harnessUpdateFailed'],
+    since: failure.failedAt,
+    blocking: false,
+    harnessUpdate: failure,
+  };
+
+  it('renders harness-update-card in the System group, not under Waiting', () => {
+    vi.spyOn(useDecisionsModule, 'useDecisions').mockReturnValue([agentDecision, harnessDecision]);
+    renderWithQuery(<DecisionsPanel />);
+
+    expect(screen.getByTestId('harness-update-card')).toBeTruthy();
+    const systemGroup = screen.getByText('System').closest('section');
+    expect(systemGroup?.textContent).toContain('Claude Code update failed');
+    expect(screen.getByText('Blocking work').closest('section')?.textContent).not.toContain('Claude Code update failed');
+  });
+});
+
 describe('DecisionsCount', () => {
   it('counts agents and conversations together', () => {
     vi.spyOn(useDecisionsModule, 'useDecisions').mockReturnValue([agentDecision, conversationDecision, planDecision]);

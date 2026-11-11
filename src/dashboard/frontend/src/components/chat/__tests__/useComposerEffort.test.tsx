@@ -77,6 +77,24 @@ describe('useComposerEffort', () => {
     expect(result.current.chip).toEqual({ level: 'low', source: 'explicit', observed: false });
   });
 
+  it('changes a live Grok Build conversation through the conversation door (PAN-5078)', async () => {
+    vi.mocked(fetch).mockResolvedValue(jsonResponse({ ok: true, effort: 'xhigh' }));
+    const grok = { ...conversation, name: 'grok-conv', harness: 'grok', model: 'grok/grok-4.6' } as unknown as Conversation;
+    const { result } = renderHook(() => useComposerEffort(input({ conversation: grok, harness: 'grok', model: 'grok/grok-4.6' })));
+
+    expect(result.current.liveChangeEnabled).toBe(true);
+    act(() => result.current.onChange('xhigh'));
+    await waitFor(() => expect(result.current.pending).toBe(false));
+    expect(fetch).toHaveBeenCalledWith('/api/conversations/grok-conv/thinking-level', expect.objectContaining({ body: JSON.stringify({ level: 'xhigh' }) }));
+    expect(result.current.effort).toBe('xhigh');
+  });
+
+  it('shows a stored max as xhigh for Grok Build (PAN-5078)', () => {
+    const grok = { ...conversation, harness: 'grok', model: 'grok/grok-4.6', effort: 'max' } as unknown as Conversation;
+    const { result } = renderHook(() => useComposerEffort(input({ conversation: grok, harness: 'grok', model: 'grok/grok-4.6' })));
+    expect(result.current.effort).toBe('xhigh');
+  });
+
   it('marks the change observed once the transcript reports it', async () => {
     vi.mocked(fetch).mockResolvedValue(jsonResponse({ ok: true, effort: 'low', source: 'explicit' }));
     const { result, rerender } = renderHook((props: UseComposerEffortInput) => useComposerEffort(props), { initialProps: input() });

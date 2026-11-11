@@ -125,6 +125,14 @@ allow notifications. A notification opens the question it is about, or the
 Needs-you list. See [Push notifications](/configuration/push-notifications) for
 what is sent and how it is encrypted.
 
+A notification for a question that is no longer waiting opens Needs you with
+"This question was already answered." When this machine cannot read a linked
+machine's list, Needs you shows
+`Can't reach <machine>; it may have items waiting.` Open that machine from the
+machine list to see its items. The browser phone view (`/m`) shows this row as soon as the machine runs the new
+version; the installed Overdeck app shows it after its next app update,
+because the app bundles its own copy of the screens.
+
 The phone app's service worker only shows notifications. It never stores
 pages, so the phone always shows the current state of the machine.
 
@@ -138,8 +146,34 @@ close the app or switch machines. Signing out resets it to System. The
 lock-screen Live Activity and notifications follow the phone's own
 appearance.
 
+## Diagnostics
+
+When the machine you open has anonymous telemetry on, the Overdeck app
+installed from an app store sends anonymous diagnostics to PostHog so the
+maintainers can fix what is actually failing: failed API routes and their
+HTTP status (exact for common codes, otherwise the status class), your
+phone's link health (failures, drops, and recoveries),
+and app crashes without their messages. Events carry the machine's anonymous
+install id, the platform, and the app version — never conversation content,
+names, labels, URLs, or your GitHub identity. See
+[Anonymous telemetry](/configuration/telemetry) for the full list of what is
+and is not sent.
+
+Turning telemetry off in the machine's **Settings → Telemetry** reaches the
+phone the next time it successfully connects to that machine.
+
 ## Remove a phone
 
 On the machine, open Settings → Anywhere → Paired devices and select
 **Revoke** next to the phone. The next time the phone app opens, it shows
 **Pair this phone** again.
+
+## Delete your account
+
+In the app, open **Settings** and tap **Delete account**. Type `DELETE` and
+confirm. Deletion signs out every device, removes your machines from the
+directory, and deletes your hosted data within 24 hours; it can't be
+undone. The phone then signs out and shows **Your account is being
+deleted.** If the request fails, the phone stays signed in and
+offers **Delete on the web** instead. You can also delete the account at
+[https://account.overdeck.ai/account](https://account.overdeck.ai/account).

@@ -3,10 +3,11 @@
  * production code.
  *
  *   node --import tsx src/lib/protocol-capture/record.ts \
- *     --harness <codex|acp> --scenario <name> --out <path> [--model <id>] [--effort <level>] [--note <text>]
+ *     --harness <codex|acp|grok> --scenario <name> --out <path> [--model <id>] [--effort <level>] [--note <text>]
  *
  * It drives the real host classes through one named scenario with capture on,
- * against a live `codex app-server` or `kimi acp` session, and writes one
+ * against a live `codex app-server`, `kimi acp` or `grok agent stdio` session
+ * (the `grok` harness records the ACP host with provider grok), and writes one
  * `overdeck-protocol-capture/1` fixture. After the scenario's terminal event
  * it keeps capturing until no frame has moved in either direction for 2 s, so
  * frames that arrive after the turn boundary stay in the fixture.
@@ -43,7 +44,7 @@ export const QUIET_GAP_MS = 2_000;
 const EXIT_WAIT_MS = 5_000;
 const EXIT_LOG_GRACE_MS = 500;
 
-type Harness = 'codex' | 'acp';
+type Harness = 'codex' | 'acp' | 'grok';
 
 interface Scenario {
   harness: Harness;
@@ -86,24 +87,33 @@ export const SCENARIOS: readonly Scenario[] = [
   },
   { harness: 'acp', name: 'turn-completion', prompt: 'Reply with exactly OK.', actions: 'none' },
   { harness: 'acp', name: 'interrupt', prompt: COUNT_PROMPT, actions: 'interrupt on the first [assistant] pane line' },
+  { harness: 'grok', name: 'grok-turn-completion', prompt: 'Reply with exactly OK.', actions: 'none' },
+  {
+    harness: 'grok',
+    name: 'grok-resume',
+    prompt: 'Reply with exactly OK.',
+    actions: 'prime one uncaptured turn, then capture a host resumed with that session id (session/load)',
+  },
 ];
 
 const DEFAULTS: Record<Harness, { model: string; effort: string }> = {
   codex: { model: 'gpt-5.6-luna', effort: 'low' },
   // K3 refuses to launch without an effort level (resolveKimiNativeEffort).
   acp: { model: 'k3', effort: 'low' },
+  // Grok Build requires an explicit model and effort (PAN-5078 D4, D6).
+  grok: { model: 'grok/grok-4.6', effort: 'low' },
 };
 
 export function scenarioTable(): string {
   const rows = SCENARIOS.map(scenario => `  ${scenario.harness.padEnd(6)} ${scenario.name.padEnd(16)} ${scenario.actions}`);
   return [
-    'Usage: node --import tsx src/lib/protocol-capture/record.ts --harness <codex|acp> --scenario <name> --out <path> [--model <id>] [--effort <level>] [--note <text>]',
+    'Usage: node --import tsx src/lib/protocol-capture/record.ts --harness <codex|acp|grok> --scenario <name> --out <path> [--model <id>] [--effort <level>] [--note <text>]',
     '',
     'Scenarios:',
     `  ${'HARNESS'.padEnd(6)} ${'SCENARIO'.padEnd(16)} SCRIPTED ACTIONS`,
     ...rows,
     '',
-    `Defaults: codex ${DEFAULTS.codex.model} effort ${DEFAULTS.codex.effort}; acp (kimi) ${DEFAULTS.acp.model} effort ${DEFAULTS.acp.effort}.`,
+    `Defaults: codex ${DEFAULTS.codex.model} effort ${DEFAULTS.codex.effort}; acp (kimi) ${DEFAULTS.acp.model} effort ${DEFAULTS.acp.effort}; grok ${DEFAULTS.grok.model} effort ${DEFAULTS.grok.effort}.`,
   ].join('\n');
 }
 
@@ -252,23 +262,88 @@ async function recordCodex(input: RecordInput, tempDirs: string[]): Promise<void
   }
 }
 
-async function kimiVersion(): Promise<string | null> {
-  const { stdout } = await execFileAsync('kimi', ['--version'], { timeout: 10_000 });
+async function cliVersion(binary: 'kimi' | 'grok'): Promise<string | null> {
+  const { stdout } = await execFileAsync(binary, ['--version'], { timeout: 10_000 });
   return stdout.match(/\d+\.\d+\.\d+\S*/)?.[0] ?? (stdout.trim() || null);
 }
 
-async function recordAcp(input: RecordInput): Promise<void> {
+type AcpRecordProvider = 'kimi' | 'grok';
+
+async function makeAcpCaptureRuntime(
+  provider: AcpRecordProvider,
+  cwd: string,
+  scope: Scope.Scope,
+  options: { resumeSessionId?: string; protocolLogging?: ReturnType<typeof acpCaptureProtocolLogging> },
+) {
+  return Effect.runPromise(
+    Effect.gen(function* () {
+      const childProcessSpawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+      return yield* resolveAcpProviderSupport(provider).makeRuntime({
+        childProcessSpawner,
+        cwd,
+        kimiSettings: { binaryPath: provider },
+        binaryPath: provider,
+        clientInfo: { name: 'overdeck', version: 'capture' },
+        environment: process.env,
+        ...(options.resumeSessionId ? { resumeSessionId: options.resumeSessionId } : {}),
+        ...(options.protocolLogging ? { protocolLogging: options.protocolLogging } : {}),
+      });
+    }).pipe(Effect.provideService(Scope.Scope, scope), Effect.provide(NodeServices.layer)),
+  );
+}
+
+/**
+ * Run one uncaptured turn and return its session id. Grok keeps sessions per
+ * working directory, so the resumed capture must run in the same cwd.
+ */
+async function primeAcpSession(input: RecordInput, provider: AcpRecordProvider): Promise<string> {
+  const scope = await Effect.runPromise(Scope.make());
+  let closed = false;
+  const closeScope = async () => {
+    if (closed) return;
+    closed = true;
+    await Effect.runPromise(Scope.close(scope, Exit.void));
+  };
+  let host: AcpHost | undefined;
+  try {
+    const runtime = await makeAcpCaptureRuntime(provider, input.cwd, scope, {});
+    host = new AcpHost({
+      agentId: 'agent-capture-prime',
+      provider,
+      workspace: input.cwd,
+      model: input.model,
+      effort: input.effort,
+      overdeckHome: input.overdeckHome,
+      runtime,
+      stdout: process.stdout,
+      disposeRuntime: closeScope,
+    });
+    await host.start();
+    const sent = await host.handleOp({ op: 'message', content: input.scenario.prompt });
+    if (sent.status !== 202) throw new Error(`priming message op failed: ${JSON.stringify(sent.body)}`);
+    await withTimeout(host.waitForIdle(), `${provider} priming turn`);
+    const sessionId = host.status().sessionId;
+    if (typeof sessionId !== 'string' || !sessionId) throw new Error('priming turn produced no session id');
+    return sessionId;
+  } finally {
+    if (host) await host.stop();
+    await closeScope();
+  }
+}
+
+async function recordAcp(input: RecordInput, provider: AcpRecordProvider): Promise<void> {
   const { scenario, model, effort, cwd, overdeckHome } = input;
+  const resumeSessionId = scenario.name === 'grok-resume' ? await primeAcpSession(input, provider) : undefined;
   const tracked = trackActivity(createProtocolCaptureSink({
     path: input.out,
     harness: 'acp',
     scrub: defaultScrubContext({ cwd, overdeckHome, home: homedir() }),
   }));
   tracked.sink.setHeader({
-    provider: 'kimi',
-    cliVersion: await kimiVersion(),
+    provider,
+    cliVersion: await cliVersion(provider),
     scenario: scenario.name,
-    hostOptions: { model, effort, prompt: scenario.prompt },
+    hostOptions: { model, effort, prompt: scenario.prompt, ...(resumeSessionId ? { resumeSessionId } : {}) },
     ...(input.note ? { note: input.note } : {}),
   });
 
@@ -281,20 +356,10 @@ async function recordAcp(input: RecordInput): Promise<void> {
   };
   let host: AcpHost | undefined;
   try {
-    const runtime = await Effect.runPromise(
-      Effect.gen(function* () {
-        const childProcessSpawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-        return yield* resolveAcpProviderSupport('kimi').makeRuntime({
-          childProcessSpawner,
-          cwd,
-          kimiSettings: { binaryPath: 'kimi' },
-          binaryPath: 'kimi',
-          clientInfo: { name: 'overdeck', version: 'capture' },
-          environment: process.env,
-          protocolLogging: acpCaptureProtocolLogging(tracked.sink),
-        });
-      }).pipe(Effect.provideService(Scope.Scope, scope), Effect.provide(NodeServices.layer)),
-    );
+    const runtime = await makeAcpCaptureRuntime(provider, cwd, scope, {
+      resumeSessionId,
+      protocolLogging: acpCaptureProtocolLogging(tracked.sink),
+    });
 
     let interrupted = false;
     let buffer = '';
@@ -317,7 +382,7 @@ async function recordAcp(input: RecordInput): Promise<void> {
     });
     host = new AcpHost({
       agentId: 'agent-capture',
-      provider: 'kimi',
+      provider,
       workspace: cwd,
       model,
       effort,
@@ -325,6 +390,7 @@ async function recordAcp(input: RecordInput): Promise<void> {
       runtime,
       stdout,
       disposeRuntime: closeScope,
+      ...(resumeSessionId ? { resumeSessionId } : {}),
     });
     await host.start();
     const sent = await host.handleOp({ op: 'message', content: scenario.prompt });
@@ -390,7 +456,8 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     };
     const recorders: Record<Harness, () => Promise<void>> = {
       codex: () => recordCodex(input, tempDirs),
-      acp: () => recordAcp(input),
+      acp: () => recordAcp(input, 'kimi'),
+      grok: () => recordAcp(input, 'grok'),
     };
     await recorders[harness]();
     process.stderr.write(`[record] wrote ${input.out}\n`);

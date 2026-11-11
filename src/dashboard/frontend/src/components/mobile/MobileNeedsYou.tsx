@@ -17,6 +17,20 @@ import { formatRelativeTime } from '../../lib/formatRelativeTime';
 
 type PendingQuestion = NonNullable<Decision['pendingAskUserQuestion']>;
 
+const GIB = 1024 ** 3;
+
+/**
+ * PAN-5093 — holder labels already read `~/.overdeck/<name>` from the
+ * collector, and holders are sorted biggest-first, so the first row is the
+ * biggest without any extra path formatting here.
+ */
+function diskAlertPhoneText(snapshot: NonNullable<Decision['diskAlert']>): string {
+  const free = snapshot.availableBytes !== null ? `${(snapshot.availableBytes / GIB).toFixed(1)} GiB free` : 'Free space unknown';
+  const biggest = snapshot.holders?.holders[0];
+  const biggestText = biggest ? ` · biggest: ${biggest.label} ${(biggest.bytes / GIB).toFixed(1)} GiB` : '';
+  return `${free}${biggestText} · free space on the desktop`;
+}
+
 function answerableQuestion(decision: Decision): PendingQuestion | null {
   const pending = decision.pendingAskUserQuestion;
   if (!decision.kinds.includes('askUserQuestion') || !pending || pending.questions.length === 0) return null;
@@ -143,6 +157,14 @@ function QuestionCard({ decision, pending, error, onError }: {
 }
 
 function ReadOnlyAction({ decision }: { decision: Decision }) {
+  // PAN-5111: this machine cannot fetch that machine's Needs-You; its own items may be waiting.
+  if (decision.unreachableMachine) {
+    return <p className="px-4 pb-3 text-xs text-muted-foreground">{`Can't reach ${decision.unreachableMachine.label}; it may have items waiting.`}</p>;
+  }
+  // PAN-5093 — disk space is freed on the machine itself; the phone shows the numbers only.
+  if (decision.diskAlert) return <p className="px-4 pb-3 text-xs text-muted-foreground">{diskAlertPhoneText(decision.diskAlert)}</p>;
+  // PAN-5108 D16 — a failed harness update retries by itself; the phone shows a read-only line.
+  if (decision.harnessUpdate) return <p className="px-4 pb-3 text-xs text-muted-foreground">Update failed. Overdeck retries at the next daily check.</p>;
   // PAN-4946 — an MCP sign-in is approved or denied only on this machine's own desktop dashboard.
   if (decision.mcpSignIn) return <p className="px-4 pb-3 text-xs text-muted-foreground">Approve on the desktop</p>;
   // PAN-4941 — a secret request is answered only on this machine's own desktop dashboard.

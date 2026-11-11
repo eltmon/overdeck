@@ -71,6 +71,7 @@ const HARNESS_BINARY_BY_RUNTIME: Record<RuntimeName, string> = {
   'kimi-code': 'kimi',
   muse: 'muse',
   'prime-agent': 'prime-agent',
+  grok: 'grok',
 };
 
 export type ExecutableCommandRunner = (command: string, args: string[]) => Promise<string>;
@@ -195,6 +196,7 @@ export async function resolveExecutableDetailed(
     join(home, '.claude', 'local'),
     join(home, '.kimi-code', 'bin'),
     ...(binary === 'opencode' ? [join(home, '.opencode', 'bin')] : []),
+    ...(binary === 'grok' ? [join(home, '.grok', 'bin')] : []),
     join(home, '.npm-global', 'bin'),
   ];
   const fixedMatch = await firstExecutable(fixedCandidates, binary, accessExecutable);

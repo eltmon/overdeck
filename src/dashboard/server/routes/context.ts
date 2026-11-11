@@ -79,7 +79,7 @@ type DashboardContextSyncResponse = ContextSyncResponse & {
 
 type RuleScope = 'universal' | 'dev';
 
-const PREVIEW_HARNESSES: readonly Harness[] = ['claude-code', 'ohmypi', 'codex', 'acp', 'kimi-code', 'opencode', 'muse', 'prime-agent'];
+const PREVIEW_HARNESSES: readonly Harness[] = ['claude-code', 'ohmypi', 'codex', 'acp', 'kimi-code', 'opencode', 'muse', 'prime-agent', 'grok'];
 const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
 const execFileAsync = promisify(execFile);
 const decodePreviewRequest = Schema.decodeUnknownSync(ContextPreviewRequest);
@@ -525,6 +525,7 @@ export async function previewContextLayers(
       opencode: previews.opencode,
       muse: previews.muse,
       'prime-agent': previews['prime-agent'],
+      grok: previews.grok,
       fullPrompt: fullPromptPreview(previews),
     },
     diagnostics: diagnosticsForLayers(layers, drafts),

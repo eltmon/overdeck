@@ -33,13 +33,14 @@
   <li>A random install id that the app creates, so your machines can tell your phones apart.</li>
   <li>The push token Apple or Google gives the app, so we can deliver notifications to your phone.</li>
   <li>If you use the relay plan: the number of bytes relayed for your account, to meter the plan. We count bytes; we cannot read them.</li>
+  <li>When the Overdeck machine you open has anonymous telemetry on, the app sends anonymous diagnostics to PostHog: which API route failed and its HTTP status (exact for common codes, otherwise the status class), link failures and recoveries, and app crashes without their messages. Events carry the machine's anonymous install id, the platform and app version, never conversation content, names, labels, URLs or your GitHub identity. Turning telemetry off in the machine's Settings stops it.</li>
 </ul>
 
 <h2>What we cannot see</h2>
 <p>Conversation content and notification text are end-to-end encrypted between your phone and your machines. Apple, Google, Cloudflare and Overdeck see only ciphertext. The keys stay on your phone and your machines.</p>
 
 <h2>What we do not do</h2>
-<p>The app contains no analytics, crash-reporting or advertising code. We do not track you across apps or websites, and we do not sell or share your data.</p>
+<p>The app contains no advertising code. Its anonymous diagnostics follow your machine's telemetry setting. We do not track you across apps or websites, and we do not sell or share your data.</p>
 
 <h2>Where it is processed</h2>
 <ul>

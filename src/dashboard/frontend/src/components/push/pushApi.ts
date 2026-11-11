@@ -86,3 +86,27 @@ export function urlBase64ToUint8Array(base64url: string): Uint8Array<ArrayBuffer
   for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
   return bytes;
 }
+
+/** Mirrors `PushHistoryView` in src/dashboard/server/services/needs-you-push-service.ts (PAN-5111). */
+export interface PushHistoryEntry {
+  id: string;
+  ts: string;
+  kind: string;
+  category: string;
+  key: string;
+  subject: string | null;
+  title: string;
+  issueId: string | null;
+  url: string;
+  deliveries: Array<{ provider: string; target: string; ok: boolean; reason?: string; status?: number }>;
+  resolution: { outcome: 'answered' | 'resolved-without-answer'; ts: string } | null;
+  state: 'open' | 'answered' | 'resolved-without-answer' | null;
+}
+
+export const PUSH_HISTORY_QUERY_KEY = ['push-history'] as const;
+
+export async function loadPushHistory(): Promise<PushHistoryEntry[]> {
+  const response = await fetch('/api/push/history');
+  if (!response.ok) throw await errorFrom(response);
+  return ((await response.json()) as { entries: PushHistoryEntry[] }).entries;
+}

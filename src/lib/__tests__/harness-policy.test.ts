@@ -261,6 +261,8 @@ describe('canUseHarness', () => {
   it('keeps the model-level opencode, muse and kimi-code/* rules for prime-agent', () => {
     expect(canUseHarness('prime-agent', 'opencode/big-pickle', 'api-key').allowed).toBe(false)
     expect(canUseHarness('prime-agent', 'muse-spark-1.3', 'api-key').allowed).toBe(false)
+    expect(canUseHarness('prime-agent', 'muse-ember-1.0', 'api-key').allowed).toBe(false)
+    expect(canUseHarness('prime-agent', 'muse-wonder-full-1.0', 'api-key').allowed).toBe(false)
     expect(canUseHarness('prime-agent', 'kimi-code/k3', 'api-key').allowed).toBe(false)
   })
 
@@ -273,11 +275,11 @@ describe('canUseHarness', () => {
 
   it('gives every RuntimeName an explicit policy decision', () => {
     expect([...POLICY_RUNTIME_NAMES].sort()).toEqual(
-      ['acp', 'claude-code', 'codex', 'kimi-code', 'muse', 'ohmypi', 'opencode', 'prime-agent'],
+      ['acp', 'claude-code', 'codex', 'grok', 'kimi-code', 'muse', 'ohmypi', 'opencode', 'prime-agent'],
     )
     for (const harness of POLICY_RUNTIME_NAMES) {
       for (const authMode of AUTH_MODES) {
-        for (const model of [...Object.values(MODEL_BY_PROVIDER), 'k3', 'opencode/big-pickle', 'muse-spark-1.3']) {
+        for (const model of [...Object.values(MODEL_BY_PROVIDER), 'k3', 'opencode/big-pickle', 'muse-spark-1.3', 'muse-ember-1.0', 'muse-wonder-full-1.0']) {
           const decision = canUseHarness(harness, model, authMode)
           expect(decision.reason ?? '', `${harness} / ${model}`).not.toContain('no harness-policy decision')
         }
@@ -304,6 +306,28 @@ describe('Ollama harness pin (PAN-1641)', () => {
       const decision = canUseHarness(harness, 'ollama:gemma4:12b', undefined)
       expect(decision.allowed === false && decision.reason).toContain('claude-code')
     }
+  })
+})
+
+describe('Grok Build harness pin (PAN-5078)', () => {
+  const GROK_REASON = 'Grok Build model IDs require the Grok Build harness, and the Grok Build harness runs only grok/* models. Select a grok/* model.'
+
+  it('allows grok/* models on the grok harness', () => {
+    expect(canUseHarness('grok', 'grok/grok-4.6', undefined).allowed).toBe(true)
+    expect(canUseHarness('grok', 'grok/grok-4.7-build-fast', 'subscription').allowed).toBe(true)
+  })
+
+  it('denies non-grok models on the grok harness', () => {
+    expect(canUseHarness('grok', 'claude-sonnet-5-5', 'subscription')).toEqual({ allowed: false, reason: GROK_REASON })
+    expect(canUseHarness('grok', 'grok-4.7', 'api-key')).toEqual({ allowed: false, reason: GROK_REASON })
+  })
+
+  it('denies grok/* models on every other harness', () => {
+    for (const harness of ['claude-code', 'ohmypi', 'codex', 'acp', 'kimi-code', 'muse', 'prime-agent'] as RuntimeName[]) {
+      expect(canUseHarness(harness, 'grok/grok-4.6', 'subscription')).toEqual({ allowed: false, reason: GROK_REASON })
+    }
+    // OpenCode's own clause runs first and names its own models.
+    expect(canUseHarness('opencode', 'grok/grok-4.6', 'subscription').allowed).toBe(false)
   })
 })
 

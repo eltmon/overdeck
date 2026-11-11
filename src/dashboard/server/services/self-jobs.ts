@@ -8,7 +8,8 @@
  * with only the caller's identity variables (D-5; a conversation gets
  * `OVERDECK_AGENT_ID` and `OVERDECK_CONVERSATION`, both its tmux session,
  * PAN-4937) and never an MCP token (NFR-4). It keeps the last 16 KiB of
- * each stream; output arrives when the
+ * each stream (a `task-done` job keeps its whole stdout, up to the 4 MiB
+ * buffer, PAN-5118); output arrives when the
  * child exits (D-7). Jobs live in memory only: a finished job is dropped one
  * hour after it ends, at most 200 are held (D-6), and a dashboard restart
  * forgets them all. Only the job's owner can read or wait on it. A wait
@@ -31,6 +32,9 @@ export const SELF_JOB_OUTPUT_TAIL_BYTES = 16_384;
 export const SELF_JOB_LIMIT = 200;
 export const FINISHED_JOB_TTL_MS = 60 * 60_000;
 
+/** PAN-5118: verbs whose stdout is a result the caller parses; kept whole, up to SELF_JOB_MAX_BUFFER. */
+export const SELF_JOB_FULL_STDOUT_VERBS: ReadonlySet<SelfJobVerb> = new Set(['task-done']);
+
 export interface SelfJobRunInput {
   command: string;
   args: string[];
@@ -39,6 +43,8 @@ export interface SelfJobRunInput {
   stdin?: string;
   timeoutMs: number;
   maxBuffer: number;
+  /** How many trailing stdout bytes the job keeps. stderr always keeps SELF_JOB_OUTPUT_TAIL_BYTES. */
+  stdoutTailBytes: number;
 }
 export interface SelfJobRunResult {
   exitCode: number | null;
@@ -134,7 +140,7 @@ export async function runPanJob(input: SelfJobRunInput): Promise<SelfJobRunResul
   pending.child.stdin?.end(input.stdin ?? '');
   try {
     const { stdout, stderr } = await pending;
-    return { exitCode: 0, signal: null, timedOut: false, stdout: tailUtf8(stdout), stderr: tailUtf8(stderr), error: null };
+    return { exitCode: 0, signal: null, timedOut: false, stdout: tailUtf8(stdout, input.stdoutTailBytes), stderr: tailUtf8(stderr), error: null };
   } catch (raw) {
     const failure = raw as Error & { code?: number | string; signal?: NodeJS.Signals | null; killed?: boolean; stdout?: string; stderr?: string };
     const overflow = failure.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER';
@@ -143,7 +149,7 @@ export async function runPanJob(input: SelfJobRunInput): Promise<SelfJobRunResul
       exitCode: typeof failure.code === 'number' ? failure.code : null,
       signal: failure.signal ?? null,
       timedOut,
-      stdout: tailUtf8(failure.stdout ?? ''),
+      stdout: tailUtf8(failure.stdout ?? '', input.stdoutTailBytes),
       stderr: tailUtf8(failure.stderr ?? ''),
       error: overflow ? 'job output exceeded 4 MiB' : timedOut ? 'job timed out after 15 minutes' : typeof failure.code === 'number' ? null : failure.message,
     };
@@ -230,6 +236,7 @@ export function createSelfJobs(deps: { runner?: SelfJobRunner; now?: () => numbe
         stdin: options.stdin,
         timeoutMs: SELF_JOB_TIMEOUT_MS,
         maxBuffer: SELF_JOB_MAX_BUFFER,
+        stdoutTailBytes: SELF_JOB_FULL_STDOUT_VERBS.has(verb) ? SELF_JOB_MAX_BUFFER : SELF_JOB_OUTPUT_TAIL_BYTES,
       })
         .catch((error: unknown): SelfJobRunResult => ({ exitCode: null, signal: null, timedOut: false, stdout: '', stderr: '', error: String(error) }))
         .then((result) => {

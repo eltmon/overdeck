@@ -13,6 +13,8 @@ import { ServerConfigLayer } from './config.js';
 import { runServer } from './server.js';
 import { startSharedIssueService, getSharedIssueService } from './services/issue-service-singleton.js';
 import { startAgentEnrichmentService, stopAgentEnrichmentService } from './services/agent-enrichment-service.js';
+import { startDiskAlertService, stopDiskAlertService } from './services/disk-alert-service.js';
+import { startHarnessAutoUpdateService, stopHarnessAutoUpdateService } from './services/harness-auto-update-service.js';
 import { startNeedsYouPushService, stopNeedsYouPushService } from './services/needs-you-push-service.js';
 import { startLiveActivityService, stopLiveActivityService } from './services/live-activity-service.js';
 import { conversationReadDependencies } from './routes/conversations.js';
@@ -279,6 +281,8 @@ console.log(`[overdeck] AgentEnrichmentService started${isPeerDashboard ? ' (pee
 // a peer dashboard would send every notification twice.
 if (!isPeerDashboard) {
   startNeedsYouPushService({ readConversationFeed: () => getConversationsPendingInputFeed(conversationReadDependencies) });
+  startDiskAlertService(); // PAN-5093
+  startHarnessAutoUpdateService(); // PAN-5108
   startLiveActivityService();
 }
 
@@ -777,6 +781,8 @@ const handleShutdownSignal = async (signal: NodeJS.Signals) => {
   stopResourceRefreshServices();
   stopAgentEnrichmentService();
   stopNeedsYouPushService();
+  stopDiskAlertService(); // PAN-5093
+  stopHarnessAutoUpdateService(); // PAN-5108
   stopLiveActivityService();
   stopAgentOutputService();
   stopConversationLifecycleService();

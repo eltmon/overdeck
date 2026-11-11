@@ -3,7 +3,7 @@ import { readFileSync, existsSync } from 'fs';
 import { SETTINGS_FILE } from './paths.js';
 
 // Model identifiers
-export type AnthropicModel = 'claude-fable-5-1' | 'claude-fable-5' | 'claude-opus-5-5' | 'claude-opus-5' | 'claude-opus-4-8' | 'claude-opus-4-7' | 'claude-opus-4-6' | 'claude-sonnet-5-5' | 'claude-sonnet-5' | 'claude-sonnet-4-6' | 'claude-sonnet-4-5' | 'claude-haiku-5-5' | 'claude-haiku-4-5';
+export type AnthropicModel = 'claude-fable-5-2' | 'claude-fable-5-1' | 'claude-fable-5' | 'claude-opus-5-5' | 'claude-opus-5' | 'claude-opus-4-8' | 'claude-opus-4-7' | 'claude-opus-4-6' | 'claude-sonnet-5-5' | 'claude-sonnet-5' | 'claude-sonnet-4-6' | 'claude-sonnet-4-5' | 'claude-haiku-5-5' | 'claude-haiku-4-5';
 export type OpenAIModel =
   // Supported (Codex CLI catalog, 2026-09-07)
   | 'gpt-6-astra'
@@ -48,13 +48,15 @@ export type MimoModel = 'mimo-v2.6-pro' | 'mimo-v2.6-flash' | 'mimo-v2.6-pro-ult
 export type NousModel = 'qwen/qwen3.6-plus';
 export type DashScopeModel = 'qwen3.7-plus' | 'qwen3.8-flash' | 'qwen3-max' | 'qwen3-coder-plus' | 'qwen3-plus' | 'qwen3.7-max' | 'qwen3.8-max';
 export type GrokModel = 'grok-build-0.1' | 'grok-4.7' | 'grok-4.3';
+export type GrokBuildModel = 'grok/grok-4.7' | 'grok/grok-4.7-build-fast' | 'grok/grok-4.6' | 'grok/grok-4.5';
+export const GROK_BUILD_MODELS: readonly GrokBuildModel[] = ['grok/grok-4.7', 'grok/grok-4.7-build-fast', 'grok/grok-4.6', 'grok/grok-4.5'];
 export type GroqModel = 'openai/gpt-oss-120b' | 'openai/gpt-oss-20b';
 export type CerebrasModel = 'gpt-oss-120b';
 export type MistralModel = 'mistral-large-4-0';
 export type QuantumLlamaModel = 'ql-reason-70b' | 'ql-swift-8b' | 'ql-nano-1b';
 export type OpenCodeModelId = `opencode/${string}` | `opencode-go/${string}`;
-export type MuseModel = 'muse-wonder-1.0' | 'muse-spark-1.3' | 'muse-spark-1.3-contributor';
-export type ModelId = OpenCodeModelId | MuseModel | AnthropicModel | OpenAIModel | GoogleModel | KimiModel | MiniMaxModel | ZAIModel | MimoModel | NousModel | DashScopeModel | GrokModel | GroqModel | CerebrasModel | MistralModel | QuantumLlamaModel;
+export type MuseModel = 'muse-wonder-1.0' | 'muse-spark-1.3' | 'muse-spark-1.3-contributor' | 'muse-ember-1.0' | 'muse-wonder-full-1.0';
+export type ModelId = OpenCodeModelId | MuseModel | AnthropicModel | OpenAIModel | GoogleModel | KimiModel | MiniMaxModel | ZAIModel | MimoModel | NousModel | DashScopeModel | GrokModel | GrokBuildModel | GroqModel | CerebrasModel | MistralModel | QuantumLlamaModel;
 
 // Specialist agent types
 export interface SpecialistModels {
@@ -203,6 +205,7 @@ export function getAvailableModels(settings: SettingsConfig): {
   quantumllama: QuantumLlamaModel[];
 } {
   const anthropicModels: AnthropicModel[] = [
+    'claude-fable-5-2',
     'claude-fable-5-1',
     'claude-fable-5',
     'claude-opus-5-5',
@@ -302,7 +305,7 @@ export function getAgentCommand(modelId: ModelId | string): { command: string; a
       args: ['--model', getClaudeModelFlag(modelId)],
     };
   }
-  if (modelId === 'muse-wonder-1.0' || modelId === 'muse-spark-1.3' || modelId === 'muse-spark-1.3-contributor') {
+  if (modelId === 'muse-wonder-1.0' || modelId === 'muse-spark-1.3' || modelId === 'muse-spark-1.3-contributor' || modelId === 'muse-ember-1.0' || modelId === 'muse-wonder-full-1.0') {
     return { command: getHarnessBehavior('muse').executableName, args: ['--model', modelId] };
   }
   // Non-Anthropic direct providers: use claude CLI with the model name as-is.

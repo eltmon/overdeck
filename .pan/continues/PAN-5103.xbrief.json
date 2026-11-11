@@ -1,0 +1,164 @@
+{
+  "version": "1",
+  "issueId": "PAN-5103",
+  "created": "2026-11-09T22:25:19.629Z",
+  "updated": "2026-11-09T23:21:52.864Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-09T23:21Z] coderabbit → FINDINGS — seq 1",
+      "timestamp": "2026-11-09T23:21:52.864Z"
+    }
+  ],
+  "items": {
+    "fable-52-catalog-entry": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5103",
+      "claimedAt": "2026-11-09T22:25:19.628Z",
+      "doneAt": "2026-11-09T22:37:12.267Z"
+    },
+    "fable-52-cost-pricing": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5103",
+      "claimedAt": "2026-11-09T22:37:19.599Z",
+      "doneAt": "2026-11-09T22:40:17.902Z"
+    },
+    "fable-52-cost-normalization": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5103",
+      "claimedAt": "2026-11-09T22:40:24.414Z",
+      "doneAt": "2026-11-09T22:44:47.518Z"
+    },
+    "fable-52-compaction-budget": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5103",
+      "claimedAt": "2026-11-09T22:44:52.743Z",
+      "doneAt": "2026-11-09T22:47:54.586Z"
+    },
+    "fable-52-frontend-pickers": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5103",
+      "claimedAt": "2026-11-09T22:48:00.811Z",
+      "doneAt": "2026-11-09T22:51:46.902Z"
+    },
+    "fable-family-friendly-names": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5103",
+      "claimedAt": "2026-11-09T22:51:51.967Z",
+      "doneAt": "2026-11-09T22:54:33.643Z"
+    },
+    "fable-52-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5103",
+      "claimedAt": "2026-11-09T22:54:38.125Z",
+      "doneAt": "2026-11-09T22:58:02.797Z"
+    },
+    "fable-52-changelog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5103",
+      "claimedAt": "2026-11-09T22:58:07.716Z",
+      "doneAt": "2026-11-09T22:58:52.580Z"
+    },
+    "fable-52-catalog-entry.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-09T23:08:54.929Z"
+    },
+    "fable-52-catalog-entry.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-09T23:09:36.064Z"
+    },
+    "fable-52-catalog-entry.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-09T23:09:52.612Z"
+    },
+    "fable-52-catalog-entry.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-09T23:10:08.919Z"
+    },
+    "fable-52-cost-pricing.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-09T23:10:26.893Z"
+    },
+    "fable-52-cost-pricing.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-09T23:10:44.459Z"
+    },
+    "fable-52-cost-pricing.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-09T23:11:01.209Z"
+    },
+    "fable-52-cost-normalization.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-09T23:11:18.109Z"
+    },
+    "fable-52-cost-normalization.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-09T23:11:35.812Z"
+    },
+    "fable-52-compaction-budget.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-09T23:11:51.830Z"
+    },
+    "fable-52-compaction-budget.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-09T23:12:07.838Z"
+    },
+    "fable-52-frontend-pickers.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-09T23:12:23.593Z"
+    },
+    "fable-52-frontend-pickers.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-09T23:12:39.093Z"
+    },
+    "fable-52-frontend-pickers.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-09T23:12:54.780Z"
+    },
+    "fable-family-friendly-names.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-09T23:13:10.792Z"
+    },
+    "fable-family-friendly-names.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-09T23:13:26.596Z"
+    },
+    "fable-52-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-09T23:13:43.265Z"
+    },
+    "fable-52-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-09T23:14:00.071Z"
+    },
+    "fable-52-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-09T23:14:15.596Z"
+    },
+    "fable-52-docs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-09T23:14:31.068Z"
+    },
+    "fable-52-changelog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-09T23:14:47.000Z"
+    },
+    "fable-52-changelog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-09T23:15:03.101Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "coderabbit",
+      "outcome": "findings",
+      "timestamp": "2026-11-09T23:21:52Z",
+      "markdownBody": "# CodeRabbit findings for PAN-5103 (PR #5105)\n\nCodeRabbit posted 1 inline finding(s). CodeRabbit is advisory: nothing waits for these,\nbut each one gets an answer, either a fix or a reply with your reason.\n\n- Thread 4519172586 · changelog.mdx:20 [Minor]: Unverified \"faster\" claim in the changelog.\n  https://github.com/eltmon/overdeck/pull/5105#discussion_r4519172586\n\n## What to do\n\n1. Read each thread (open its link, or the code at the path and line).\n2. If you agree with a finding, fix it.\n3. If you reject a finding, reply on its thread with your reason:\n   `gh api repos/eltmon/overdeck/pulls/5105/comments/<thread id>/replies -f body=\"<reason>\"`\n4. If you changed code: run the quality gates on what you touched, commit, push, then run `pan review request PAN-5103`.\n   If you only replied, you are done.\n5. If PR #5105 has already merged when you read this, nothing more lands on it: open a follow-up issue\n   for the findings you agree with instead of pushing."
+    }
+  ]
+}

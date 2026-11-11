@@ -1,10 +1,29 @@
 import { readFileSync } from 'node:fs';
-import { describe, expect, it } from 'vitest';
-import { getAvailableModelsApi } from '../settings-model-catalog.js';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const availability = vi.hoisted(() => ({
+  resolveHarnessBinary: vi.fn(async (): Promise<string | null> => null),
+  readGrokSignIn: vi.fn(async () => ({ signedIn: false, reason: 'missing' as const })),
+}));
+vi.mock('../harness-binary.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../harness-binary.js')>()),
+  resolveHarnessBinary: availability.resolveHarnessBinary,
+}));
+vi.mock('../grok-sign-in.js', () => ({ readGrokSignIn: availability.readGrokSignIn }));
+vi.mock('../opencode-models.js', () => ({ discoverOpenCodeModels: vi.fn(async () => []) }));
+
+import { getAvailableModelsApi, getAvailableModelsWithOpenCodeApi } from '../settings-model-catalog.js';
 import { getAvailableModelsApi as compatibilityExport } from '../settings-api.js';
 
 // Captured by executing the catalog functions from 7346a85bec0 before extraction.
 const previousCatalog = JSON.parse(readFileSync(new URL('./fixtures/pre-opencode-model-catalog.json', import.meta.url), 'utf8'));
+const fable52 = {
+  id: 'claude-fable-5-2',
+  name: 'Claude Fable 5.2 (1M context)',
+  contextWindow: 1000000,
+  effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
+  costPer1MTokens: 24,
+};
 const opus55 = {
   id: 'claude-opus-5-5',
   name: 'Claude Opus 5.5 (1M context)',
@@ -40,6 +59,10 @@ const gpt6Additions = [
 const gpt6AdditionIds = new Set(gpt6Additions.map((model) => model.id));
 // Muse Wonder (2026-10-12) is an addition after the fixture was captured.
 const museWonderId = 'muse-wonder-1.0';
+// Muse Ember (2026-11-09) is an addition after the fixture was captured.
+const museEmberId = 'muse-ember-1.0';
+// Muse Wonder Full (operator addition, issue comment 2026-11-10) is an addition after the fixture was captured.
+const museWonderFullId = 'muse-wonder-full-1.0';
 // Gemini 4 Argon (GA 2026-10-13) is an addition after the fixture was captured.
 const geminiArgon = {
   id: 'gemini-4-argon',
@@ -99,10 +122,10 @@ const expectedPreviousCatalog = {
 function withoutOpus55<T extends { anthropic: Array<{ id: string }>; openai: Array<{ id: string }>; google: Array<{ id: string }>; meta: Array<{ id: string }>; kimi: Array<{ id: string }>; mimo: Array<{ id: string }>; minimax: Array<{ id: string }>; zai: Array<{ id: string }> }>(catalog: T): T {
   return {
     ...catalog,
-    anthropic: catalog.anthropic.filter((model) => ![opus55.id, sonnet55.id, haiku55.id].includes(model.id)),
+    anthropic: catalog.anthropic.filter((model) => ![fable52.id, opus55.id, sonnet55.id, haiku55.id].includes(model.id)),
     openai: catalog.openai.filter((model) => !gpt6AdditionIds.has(model.id)),
     google: catalog.google.filter((model) => ![geminiArgon.id, gemini36FlashId, gemini31FlashLiteId].includes(model.id)),
-    meta: catalog.meta.filter((model) => model.id !== museWonderId),
+    meta: catalog.meta.filter((model) => model.id !== museWonderId && model.id !== museEmberId && model.id !== museWonderFullId),
     kimi: catalog.kimi.filter((model) => !kimiK31AdditionIds.has(model.id)),
     mimo: catalog.mimo.filter((model) => !mimoV26Ids.includes(model.id)),
     minimax: catalog.minimax.filter((model) => model.id !== minimaxM31FlashId),
@@ -112,7 +135,9 @@ function withoutOpus55<T extends { anthropic: Array<{ id: string }>; openai: Arr
 
 describe('model catalog no-loss audit', () => {
   it('preserves every previous provider, ordered model, display name, price and effort field', () => {
-    const { opencode, 'opencode-go': go, ...existing } = getAvailableModelsApi();
+    const { opencode, 'opencode-go': go, grok, ...existing } = getAvailableModelsApi();
+    expect(existing.anthropic[0]).toEqual(fable52);
+    expect(existing.anthropic.findIndex((model) => model.id === fable52.id)).toBeLessThan(existing.anthropic.findIndex((model) => model.id === 'claude-fable-5-1'));
     expect(existing.anthropic.find((model) => model.id === opus55.id)).toEqual(opus55);
     expect(existing.anthropic.find((model) => model.id === sonnet55.id)).toEqual(sonnet55);
     expect(existing.anthropic.findIndex((model) => model.id === sonnet55.id)).toBeLessThan(existing.anthropic.findIndex((model) => model.id === 'claude-sonnet-5'));
@@ -124,6 +149,7 @@ describe('model catalog no-loss audit', () => {
     expect(withoutOpus55(existing)).toEqual(expectedPreviousCatalog);
     expect(opencode).toEqual([]);
     expect(go).toEqual([]);
+    expect(grok).toEqual([]);
     expect(compatibilityExport).toBe(getAvailableModelsApi);
   });
 
@@ -151,12 +177,41 @@ describe('model catalog no-loss audit', () => {
   it('adds native Go and Zen rows without changing the previous catalog', () => {
     const zen = { id: 'opencode/kimi-k3' as const, name: 'Kimi K3', costPer1MTokens: 3, harness: 'opencode' as const };
     const go = { ...zen, id: 'opencode-go/kimi-k3' as const };
-    const { opencode, 'opencode-go': goModels, ...existing } = getAvailableModelsApi([zen, go]);
+    const { opencode, 'opencode-go': goModels, grok: _grok, ...existing } = getAvailableModelsApi([zen, go]);
     expect(opencode).toEqual([zen]);
     expect(goModels).toEqual([go]);
+    expect(existing.anthropic.find((model) => model.id === fable52.id)).toEqual(fable52);
     expect(existing.anthropic.find((model) => model.id === opus55.id)).toEqual(opus55);
     expect(existing.anthropic.find((model) => model.id === sonnet55.id)).toEqual(sonnet55);
     expect(existing.anthropic.find((model) => model.id === haiku55.id)).toEqual(haiku55);
     expect(withoutOpus55(existing)).toEqual(expectedPreviousCatalog);
+  });
+});
+
+describe('Grok Build picker availability (PAN-5078)', () => {
+  beforeEach(() => {
+    availability.resolveHarnessBinary.mockReset();
+    availability.readGrokSignIn.mockReset();
+  });
+
+  it('lists the four Grok Build models when grok is installed and signed in', async () => {
+    availability.resolveHarnessBinary.mockResolvedValue('/home/test/.grok/bin/grok');
+    availability.readGrokSignIn.mockResolvedValue({ signedIn: true, reason: 'ok' });
+    const { grok } = await getAvailableModelsWithOpenCodeApi();
+    expect(grok.map((model) => model.id)).toEqual(['grok/grok-4.7', 'grok/grok-4.7-build-fast', 'grok/grok-4.6', 'grok/grok-4.5']);
+    expect(grok.every((model) => model.harness === 'grok')).toBe(true);
+    expect(grok[2]).toMatchObject({ name: 'Grok 4.6', effortLevels: ['low', 'medium', 'high', 'xhigh'] });
+  });
+
+  it('lists none when grok is not installed', async () => {
+    availability.resolveHarnessBinary.mockResolvedValue(null);
+    availability.readGrokSignIn.mockResolvedValue({ signedIn: true, reason: 'ok' });
+    expect((await getAvailableModelsWithOpenCodeApi()).grok).toEqual([]);
+  });
+
+  it('lists none when grok is signed out', async () => {
+    availability.resolveHarnessBinary.mockResolvedValue('/home/test/.grok/bin/grok');
+    availability.readGrokSignIn.mockResolvedValue({ signedIn: false, reason: 'expired' });
+    expect((await getAvailableModelsWithOpenCodeApi()).grok).toEqual([]);
   });
 });

@@ -1,0 +1,17 @@
+plan-digest: 4852fd15661d87727011e59b02161ad2f0aa6ba5579e1665bf06bd485bbc1174
+
+## blocks-the-design: telemetry cannot resume after opt-out
+
+PRD lines 233-235 and 276 specify `posthog.opt_out_capturing()`, set the local `initialized` flag false, then call `posthog.init()` again after a later on response. The installed posthog-js implementation treats every later `init()` as a no-op (`src/dashboard/frontend/node_modules/posthog-js/lib/src/posthog-core.js`, lines 584-598), while opt-out stores denied consent (`lib/src/consent.js`, lines 57-59, 83-87). That consent is stored in localStorage by default even when event persistence is `memory` (`lib/src/posthog-core.js`, line 202; `lib/src/consent.js`, lines 92-103). Turning the machine back on therefore leaves phone captures disabled, including after a page reload. Specify an explicit re-enable path using `opt_in_capturing({ captureEventName: false })` after an authorized on response, without reinitializing the singleton in the same page, and test on → off → on and off → page reload → on.
+
+## blocks-the-design: initial phone render crashes are missed
+
+PRD lines 277 and 283 place telemetry boot in `MachineView`'s passive `useEffect` and call `captureException` from the child error boundary's `componentDidCatch`. A child that throws on its initial render reaches `componentDidCatch` during the commit before that effect runs. The existing capture door returns immediately before initialization (`src/dashboard/frontend/src/lib/telemetry.ts`, lines 167-169). Thus AC-7's initial `MobileApp` crash is not reported, even with a valid cached on config. Specify a consent-gated pending exception in the boundary or an equivalent boot ordering that flushes it once telemetry initializes; discard it when the fresh machine setting is off. Test an initial-render throw with cached on, fresh on, and off.
+
+## blocks-the-design: background machine links are reported under the open machine
+
+PRD lines 330 and 339-341 send every `onLinkOpened(environmentId, route)` into the same `phone_link_state` reporter, whose route state is used for drop and recovery. But the connection is also used by notification preference sync (`apps/mobile/src/shell/ShellApp.tsx`, lines 226-235); that sync iterates **every paired machine** (`apps/mobile/src/shell/notificationPrefsSync.ts`, lines 114-119) and calls `connection.openLink(machine)` (`notificationPrefsSync.ts`, lines 148-150). While machine A's telemetry is initialized, openings and route changes for machine B can therefore produce events with A's install ID, even when B's telemetry setting is off, and can mislabel A's drop route. Add a current-machine ID filter before `routeOpened` updates state or emits, and test a background opening for B while A is selected.
+
+## blocks-the-design: a throwing PostHog client can break the crash fallback
+
+NFR-2 requires telemetry never to change app behavior, but WI-7 directly calls the existing `captureException` from `componentDidCatch` (PRD line 283). That function calls `posthog.captureException` without a catch (`src/dashboard/frontend/src/lib/telemetry.ts`, lines 167-169); `capture()` is likewise unguarded at lines 149-155. If PostHog throws, the error boundary's crash handler throws too, so the Reload fallback can fail. Make both exported capture functions swallow SDK exceptions and add a test with a throwing PostHog mock that still renders the fallback.

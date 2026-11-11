@@ -316,6 +316,40 @@ describe.each(['task_claim', 'task_done'] as const)('%s (PAN-4927 W-SELF2)', (na
   });
 });
 
+describe('task_done itemIds (PAN-5118)', () => {
+  const path = '/api/self/tasks/done';
+
+  it('posts itemIds through unchanged', async () => {
+    const api = fakeApi({});
+    const client = await connectClient(api, ['tell'], true);
+    await callTool(client, 'task_done', { itemIds: ['item-a', 'item-a.ac1'] });
+    expect(api.calls).toEqual([{ method: 'POST', path, body: { itemIds: ['item-a', 'item-a.ac1'] } }]);
+  });
+
+  it('refuses itemId and itemIds together, with no call', async () => {
+    const api = fakeApi({});
+    const client = await connectClient(api, ['tell'], true);
+    const result = await callTool(client, 'task_done', { itemId: 'item-a', itemIds: ['item-b'] });
+    expect(result.isError).toBe(true);
+    expect(api.calls).toEqual([]);
+  });
+
+  it('refuses an empty itemIds, with no call', async () => {
+    const api = fakeApi({});
+    const client = await connectClient(api, ['tell'], true);
+    const result = await callTool(client, 'task_done', { itemIds: [] });
+    expect(result.isError).toBe(true);
+    expect(api.calls).toEqual([]);
+  });
+
+  it('lists task_done with itemIds.maxItems === 500', async () => {
+    const api = fakeApi({});
+    const client = await connectClient(api, ['tell'], true);
+    const tool = (await client.listTools()).tools.find((candidate) => candidate.name === 'task_done');
+    expect((tool?.inputSchema as { properties?: { itemIds?: { maxItems?: number } } })?.properties?.itemIds?.maxItems).toBe(500);
+  });
+});
+
 describe('task_block (PAN-4927 W-SELF2)', () => {
   const path = '/api/self/tasks/block';
 

@@ -19,6 +19,7 @@ import { ConversationSearchSection } from './sections/ConversationSearchSection'
 import { ConversationSettingsSection } from './sections/ConversationSettingsSection';
 import { PROVIDER_ROW_ID_PREFIX, ProviderManagementSection, type ProviderFocusRequest } from './sections/ProviderManagementSection';
 import { PermissionsSection } from './sections/PermissionsSection';
+import { HarnessesSection } from './sections/HarnessesSection';
 import { TieredExecutionSection } from './sections/TieredExecutionSection';
 import { SwarmSettingsSection } from './sections/SwarmSettingsSection';
 import { CloisterSection } from './sections/CloisterSection';
@@ -535,6 +536,8 @@ export function SettingsPage() {
         onClaudePermissionModeChange={handlePermissionModeChange}
         onCodexPermissionModeChange={handleCodexPermissionModeChange}
       />
+
+      <HarnessesSection formData={formData} onSettingsChange={applySettings} />
 
       <TieredExecutionSection
         formData={formData}

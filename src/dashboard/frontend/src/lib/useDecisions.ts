@@ -24,6 +24,9 @@ import {
   type PendingInputSource,
 } from './store';
 import { fetchWithTimeout } from './apiFetch';
+import { DISK_ALERT_QUERY_KEY, fetchDiskAlert } from './diskAlert';
+import { fetchHarnessAutoUpdate, HARNESS_AUTO_UPDATE_QUERY_KEY } from './harnessAutoUpdate';
+import type { DiskAlertSnapshot, HarnessAutoUpdateFailure, HarnessAutoUpdateSnapshot } from '@overdeck/contracts';
 import { formatIssueRef } from './issueLabel';
 import type { PendingPaneChoice } from './paneChoice';
 import type { TerminalPendingPermission } from '../components/TerminalPermissionDialog';
@@ -135,6 +138,12 @@ export interface Decision {
     | { id: string; kind: 'machine-link'; hint: string; agentId: string; expiresAt: string };
   /** PAN-4946 — set on an MCP OAuth sign-in waiting for a decision. */
   mcpSignIn?: McpSignInApproval;
+  /** PAN-5093 — set on the disk alert decision; the card ignores `source`. */
+  diskAlert?: DiskAlertSnapshot;
+  /** PAN-5111: a linked machine this machine could not fetch Needs-You from. */
+  unreachableMachine?: UnreachableMachineRow;
+  /** PAN-5108 — set on a harness update failure; the card ignores `source`. */
+  harnessUpdate?: HarnessAutoUpdateFailure;
 }
 
 /**
@@ -167,6 +176,8 @@ const BLOCKING_KINDS = new Set([
   'machineLink',
   // PAN-4946 — an MCP client cannot proceed until its sign-in is approved or denied.
   'mcpSignIn',
+  // PAN-5093 — free disk is critical; writes can fail mid-write soon.
+  'diskCritical',
 ]);
 
 export function isBlockingDecision(kinds: ReadonlyArray<string>): boolean {
@@ -244,6 +255,36 @@ export function mcpSignInDecisions(rows: ReadonlyArray<McpSignInApproval>): Deci
   }));
 }
 
+/** PAN-5093 — the disk alert as one Needs-you item; none at level `ok` or missing. */
+export function diskAlertDecisions(snapshot: DiskAlertSnapshot | null): Decision[] {
+  if (!snapshot || snapshot.level === 'ok') return [];
+  const critical = snapshot.level === 'critical';
+  return [{
+    id: 'disk-alert',
+    source: 'agent',
+    label: critical ? 'Disk critical' : 'Disk low',
+    kinds: [critical ? 'diskCritical' : 'diskLow'],
+    since: snapshot.since ?? snapshot.checkedAt ?? '',
+    blocking: critical,
+    diskAlert: snapshot,
+  }];
+}
+
+/** PAN-5108 — one non-blocking Needs-you item per CLI whose last daily background update failed. */
+export function harnessUpdateDecisions(snapshot: HarnessAutoUpdateSnapshot | null): Decision[] {
+  // A server that answers in another shape (an older peer, a catch-all route) must not crash Needs you.
+  if (!snapshot || !Array.isArray(snapshot.failures)) return [];
+  return snapshot.failures.map((failure) => ({
+    id: `harness-update:${failure.binary}`,
+    source: 'agent',
+    label: `${failure.label} update failed`,
+    kinds: ['harnessUpdateFailed'],
+    since: failure.failedAt,
+    blocking: false,
+    harnessUpdate: failure,
+  }));
+}
+
 /** PAN-4651 D-4651-15 — `GET /api/fleet/needs-you`: what waits on the operator on each online linked machine. */
 export interface FleetNeedsYouMachine {
   environmentId: string;
@@ -252,11 +293,43 @@ export interface FleetNeedsYouMachine {
   agents: Array<{ id: string; issueId: string | null; pendingInputKinds: string[] }>;
 }
 
-export function fetchFleetNeedsYou(signal?: AbortSignal): Promise<FleetNeedsYouMachine[]> {
+/** PAN-5111 — a linked machine whose Needs-You this machine could not fetch within the last hour. */
+export interface UnreachableMachineRow {
+  environmentId: string;
+  label: string;
+  since: string;
+  reason: string;
+}
+
+export interface FleetNeedsYou {
+  machines: FleetNeedsYouMachine[];
+  unreachable: UnreachableMachineRow[];
+}
+
+const EMPTY_FLEET: FleetNeedsYou = { machines: [], unreachable: [] };
+
+export function fetchFleetNeedsYou(signal?: AbortSignal): Promise<FleetNeedsYou> {
   return fetchWithTimeout('/api/fleet/needs-you', { signal })
-    .then((res) => (res.ok ? res.json() : { machines: [] }))
-    .then((body: { machines?: unknown }) => (Array.isArray(body?.machines) ? body.machines as FleetNeedsYouMachine[] : []))
-    .catch(() => []);
+    .then((res) => (res.ok ? res.json() : EMPTY_FLEET))
+    .then((body: { machines?: unknown; unreachable?: unknown }) => ({
+      machines: Array.isArray(body?.machines) ? body.machines as FleetNeedsYouMachine[] : [],
+      unreachable: Array.isArray(body?.unreachable) ? body.unreachable as UnreachableMachineRow[] : [],
+    }))
+    .catch(() => EMPTY_FLEET);
+}
+
+/** PAN-5111 — one non-blocking "Can't reach" item per unreachable linked machine. */
+export function unreachableMachineDecisions(rows: ReadonlyArray<UnreachableMachineRow>): Decision[] {
+  return rows.map((row) => ({
+    id: `unreachable:${row.environmentId}`,
+    source: 'agent',
+    label: `Can't reach ${row.label}`,
+    kinds: ['machineUnreachable'],
+    since: row.since,
+    blocking: false,
+    machineLabel: row.label,
+    unreachableMachine: row,
+  }));
 }
 
 /** Linked machines' rows as decisions: names become `@<env>/<name>`, each labelled with its machine. */
@@ -364,7 +437,7 @@ export function useDecisions(): Decision[] {
   });
 
   // PAN-4651 D-4651-15 — linked machines' rows, served from this machine's cache (no cross-machine poll).
-  const { data: fleetMachines = [] } = useQuery({
+  const { data: fleet = EMPTY_FLEET } = useQuery({
     queryKey: ['fleet-needs-you'],
     queryFn: ({ signal }) => fetchFleetNeedsYou(signal),
     refetchInterval: 5000,
@@ -375,6 +448,23 @@ export function useDecisions(): Decision[] {
     queryKey: ['agent-requests'],
     queryFn: ({ signal }) => fetchAgentRequests(signal),
     refetchInterval: 5000,
+  });
+
+  // PAN-5093 — fetchDiskAlert throws on failure, so a rejected refetch keeps
+  // the last successful snapshot instead of hiding an active alert.
+  const { data: diskAlert } = useQuery({
+    queryKey: DISK_ALERT_QUERY_KEY,
+    queryFn: ({ signal }) => fetchDiskAlert(signal),
+    refetchInterval: 10_000,
+    retry: false,
+  });
+
+  // PAN-5108 — like the disk alert, a rejected refetch keeps the last snapshot.
+  const { data: harnessAutoUpdate } = useQuery({
+    queryKey: HARNESS_AUTO_UPDATE_QUERY_KEY,
+    queryFn: ({ signal }) => fetchHarnessAutoUpdate(signal),
+    refetchInterval: 60_000,
+    retry: false,
   });
 
   // PAN-4946 — only a root viewer (this machine's own session or the internal
@@ -394,7 +484,7 @@ export function useDecisions(): Decision[] {
   });
 
   return useMemo(() => {
-    const out: Decision[] = [...fleetDecisions(fleetMachines)];
+    const out: Decision[] = [...fleetDecisions(fleet.machines), ...unreachableMachineDecisions(fleet.unreachable)];
 
     for (const s of agentSubjects) {
       const issueTitle = s.issueId ? titleByIssueId.get(s.issueId) : undefined;
@@ -441,6 +531,8 @@ export function useDecisions(): Decision[] {
     }
 
     out.push(...agentRequestDecisions(Array.isArray(agentRequestRows) ? agentRequestRows : []));
+    out.push(...diskAlertDecisions(diskAlert ?? null));
+    out.push(...harnessUpdateDecisions(harnessAutoUpdate ?? null));
     // PAN-4946 review — a disabled query still returns its last cached rows
     // (`enabled: false` only stops refetching), so a viewer that just dropped
     // from root to device could otherwise still see a stale approval's detail.
@@ -456,5 +548,5 @@ export function useDecisions(): Decision[] {
       return a.since.localeCompare(b.since);
     });
     return out;
-  }, [agentSubjects, convRows, fleetMachines, agentRequestRows, mcpSignInApprovals, canSeeMcpSignIns, titleByIssueId]);
+  }, [agentSubjects, convRows, fleet, agentRequestRows, mcpSignInApprovals, canSeeMcpSignIns, titleByIssueId, diskAlert, harnessAutoUpdate]);
 }

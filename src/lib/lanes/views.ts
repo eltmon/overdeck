@@ -26,6 +26,7 @@ import type { LaneRole } from '../overdeck/conversations.js';
 import { laneIterations } from './iteration.js';
 import { listAllLaneRows, type LaneRow } from './lane-rows.js';
 import { judgedIteration, pairBuilder, type CriticSummary, type PairingRow, type VerdictState } from './pairing.js';
+import { supersededLanes } from './reapable.js';
 import type { LaneGitFacts } from './types.js';
 
 const execFileAsync = promisify(execFile);
@@ -62,6 +63,10 @@ export interface LaneView {
   createdAt: string;
   lastActivityAt: string | null;
   archived: boolean;
+  /** PAN-5094 FR-6: a newer iteration superseded this lane and `pan lane reap` can remove it now. */
+  reapable: boolean;
+  /** The newest lane of the iteration that superseded this one; null unless reapable. */
+  supersededBy: string | null;
   /** Critic and verifier lanes with a link: the builder row judged (WI-20). */
   criticOf: { id: number | null; name: string; key: string; iteration: number } | null;
   /** Critic and verifier lanes only. */
@@ -181,6 +186,17 @@ async function buildLaneViews(filter: LaneViewFilter, deps: LaneViewDeps, now: n
     };
   });
   const pairingByName = new Map(pairingRows.map((row) => [row.name, row]));
+  const superseded = supersededLanes(context.map((row) => ({
+    name: row.name,
+    run: row.run,
+    key: row.key,
+    role: row.role,
+    iteration: iterations.get(row.name) ?? 1,
+    createdAt: row.createdAt,
+    archived: row.archivedAt !== null,
+    activity: activityOf(row),
+    reported: (reports.get(row.name) ?? null) !== null,
+  })));
 
   return withConcurrencyLimit(rows.map((row) => async (): Promise<LaneView> => {
     const archived = row.archivedAt !== null;
@@ -219,6 +235,8 @@ async function buildLaneViews(filter: LaneViewFilter, deps: LaneViewDeps, now: n
       createdAt: row.createdAt,
       lastActivityAt: remote ? (mirror?.lastActivityAt ?? null) : (live?.lastActivityAt ?? null),
       archived,
+      reapable: superseded.has(row.name),
+      supersededBy: superseded.get(row.name) ?? null,
       criticOf: judged && judgedAt !== null ? { id: judged.id, name: judged.name, key: judged.key, iteration: judgedAt } : null,
       verdict: judge ? { value: verdict?.value ?? 'pending', defects: verdict?.defects ?? null, file: verdict?.file ?? null } : null,
       critics: builderPairing?.critics ?? [],

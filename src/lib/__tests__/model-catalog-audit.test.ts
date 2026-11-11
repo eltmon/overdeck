@@ -40,6 +40,7 @@ describe('September model catalog no-loss audit', () => {
     ['gpt-5.6-sol', 'openai', 272000],
     ['gpt-5.6-terra', 'openai', 272000],
     ['gpt-5.6-luna', 'openai', 272000],
+    ['claude-fable-5-2', 'anthropic', 1000000],
     ['claude-fable-5-1', 'anthropic', 1000000],
     ['claude-opus-5-5', 'anthropic', 1000000],
     ['claude-sonnet-5-5', 'anthropic', 1000000],

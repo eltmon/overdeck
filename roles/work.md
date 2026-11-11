@@ -53,12 +53,14 @@ For every item:
 1. `pan task next <ISSUE-ID>` — find the next unblocked item scoped to this issue.
 2. `pan task claim <ISSUE-ID> <item-id>` — claim it.
 3. Implement only that item. Run only the tests it touched, with the project's test runner scoped to those files (`npx vitest run <files>` in a vitest project). Never run the full suite yourself — the verification gate runs it after `pan done`.
-4. `git add` specific files and `git commit` — one item = one commit, with the body line `Item: <item-id>`.
+4. `git add` specific files and `git commit` — one item = one commit, with the body line `Item: <item-id>`. Add one more body line `Item: <item-id>.acN` for each acceptance criterion of the item (`<item-id>.ac1`, `<item-id>.ac2`, ...), so this one commit is the evidence for the item and all of its ACs.
 5. Immediately push that commit with `git push -u origin "$(git branch --show-current)"`. Every completed item must exist on origin before its status is closed; generic project Git profiles do not override this managed-work invariant.
-6. `pan task done <ISSUE-ID> <item-id>` — verifies the pushed commit carries the `Item:` trailer and records completion in the continue file. It takes no extra flags. Do **not** write to `.overdeck/continue.json` directly.
+6. `pan task done <ISSUE-ID> <item-id> <item-id>.ac1 <item-id>.ac2 ...`: one call closes the item and every AC. It verifies each id's `Item:` line on the pushed commit, records them all in the continue file with one commit, and records nothing if any id lacks its line. Do not push again just for this call; your next item's push carries it. It takes no extra flags. Do **not** write to `.overdeck/continue.json` directly.
 7. `metadata.requiresInspection` is a subscription signal for a standing tier-supervisor; it asks nothing of you. Continue with the next ready item.
 
-Never batch multiple tasks into a single commit. Each commit's `Item:` trailer is how `pan task done` finds its evidence, and a one-item diff is what makes review and rollback tractable.
+If an item's commit is already pushed without its AC lines, make one `git commit --allow-empty` whose body lists `Item: <item-id>.acN` for each AC, push once, then close the ACs with one `pan task done` call.
+
+Never batch multiple tasks into a single commit. Each commit's `Item:` trailer is how `pan task done` finds its evidence, and a one-item diff is what makes review and rollback tractable. An item's AC sub-items are not separate tasks: they share the item's commit.
 
 Never edit `.pan/specs/` and never write a `Plan-Finalized` trailer. The spec is immutable after planning; completion goes to the continue file through `pan task done`. The verification gate's required `plan-integrity` check fails any change to the spec beyond its lifecycle status fields. If the plan is wrong, stop and ask for re-planning.
 

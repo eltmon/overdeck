@@ -15,6 +15,7 @@ vi.mock('../../../push/pushApi', async (importOriginal) => {
   return {
     ...actual,
     loadPushStatus: vi.fn(async () => currentStatus),
+    loadPushHistory: vi.fn(async () => []),
     deletePushSubscription: vi.fn(async () => undefined),
     sendTestPush: vi.fn(async () => [{ target: 'webpush:s1', ok: true }]),
   };
@@ -59,6 +60,12 @@ describe('PushPanel (PAN-2354)', () => {
     expect(deletePushSubscription).not.toHaveBeenCalled();
     await userEvent.click(within(dialog).getByRole('button', { name: 'Remove' }));
     await waitFor(() => expect(deletePushSubscription).toHaveBeenCalledWith('s1'));
+  });
+
+  it('renders the Recent notifications section (PAN-5111)', async () => {
+    renderPanel();
+    expect(await screen.findByRole('heading', { name: 'Recent notifications' })).toBeTruthy();
+    expect(await screen.findByText('No notifications sent yet.')).toBeTruthy();
   });
 
   it('renders the ntfy topic hint and never the full topic', async () => {

@@ -216,6 +216,18 @@ export const PREREQUISITES: readonly PrerequisiteDefinition[] = [
       win: 'https://www.kimi.com/code/docs/en/kimi-code-cli/guides/getting-started.html',
     },
   },
+  {
+    id: 'grok',
+    name: 'Grok Build CLI',
+    required: false,
+    purpose: 'Grok Build agents (grok harness, ACP)',
+    versionArgs: ['--version'],
+    install: {
+      linux: 'curl -fsSL https://x.ai/cli/install.sh | bash',
+      mac: 'curl -fsSL https://x.ai/cli/install.sh | bash',
+      win: 'https://x.ai/cli',
+    },
+  },
 ];
 
 export type PrerequisiteProbe = (cmd: string, args: string[]) => Promise<string>;

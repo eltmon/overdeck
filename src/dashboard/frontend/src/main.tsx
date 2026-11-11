@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { initTelemetry } from './lib/telemetry';
+import { installRequestFailureObserver } from './lib/requestFailures';
 import { DialogProvider } from './components/DialogProvider';
 import App from './App';
 import { installRecovery, RootErrorBoundary } from './recovery';
@@ -18,6 +19,7 @@ import { AnywhereDialogHost } from './components/Settings/anywhere/AnywhereDialo
 import { ImageLightboxHost } from './components/chat/ImageLightbox';
 import './index.css';
 
+installRequestFailureObserver({ client: 'desktop' });
 void initTelemetry();
 
 // Reconcile the locally-mirrored Overdeck Theme (Ledger/Broadsheet) against

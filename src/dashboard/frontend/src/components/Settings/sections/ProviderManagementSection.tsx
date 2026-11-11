@@ -67,11 +67,13 @@ const HARNESS_LABELS: Record<Harness, string> = {
   'kimi-code': 'Kimi Code',
   muse: 'Muse Code',
   'prime-agent': 'Prime Agent',
+  grok: 'Grok Build',
 };
 
 const PROVIDERS: { id: Provider; name: string; placeholder: string }[] = [
   { id: 'opencode', name: 'OpenCode Zen', placeholder: '' },
   { id: 'opencode-go', name: 'OpenCode Go', placeholder: '' },
+  { id: 'grok', name: 'Grok Build', placeholder: '' },
   { id: 'anthropic', name: 'Anthropic', placeholder: 'sk-ant-...' },
   { id: 'openai', name: 'OpenAI', placeholder: 'sk-...' },
   { id: 'google', name: 'Google', placeholder: 'AIza...' },
@@ -102,6 +104,7 @@ const PRIME_AGENT_PROVIDERS: ReadonlySet<Provider | 'openrouter'> = new Set(['an
  */
 function harnessOptionsFor(provider: Provider | 'openrouter'): Harness[] {
   if (provider === 'opencode' || provider === 'opencode-go') return ['opencode'];
+  if (provider === 'grok') return ['grok'];
   if (provider === 'meta') return ['muse'];
   const shared: Harness[] = ['claude-code', 'ohmypi', 'codex'];
   const options: Harness[] = provider === 'kimi' ? [...shared, 'acp', 'kimi-code'] : shared;
@@ -291,6 +294,7 @@ export function ProviderManagementSection({
 
             const getAuthSummary = () => {
               if (isOpenCode) return { text: 'OpenCode sign-in', variant: 'neutral' as const };
+              if (provider.id === 'grok') return { text: 'Grok sign-in', variant: 'neutral' as const };
               if (provider.id === 'meta') return { text: 'Muse login', variant: 'neutral' as const };
               if (isDefault) {
                 if (claudeAuth?.loggedIn) return { text: claudeAuth.subscriptionType ? `${claudeAuth.subscriptionType} plan` : 'Subscription', variant: 'success' as const };
@@ -351,6 +355,8 @@ export function ProviderManagementSection({
                   <div className="px-3 pb-3 pt-0 ml-7 space-y-3">
                     {isOpenCode ? (
                       <p className="text-xs text-muted-foreground">Run <code>opencode auth login</code> on the host and select {provider.name}. Overdeck uses OpenCode’s saved credentials and discovers its available models.</p>
+                    ) : provider.id === 'grok' ? (
+                      <p className="text-xs text-muted-foreground">Run <code>grok login</code> on the host. Overdeck uses Grok Build’s saved sign-in; models appear once the CLI is installed and signed in.</p>
                     ) : provider.id === 'meta' ? (
                       <p className="text-xs text-muted-foreground">Sign in on the host with <code>muse login</code>, or store an API key with <code>muse auth set --api-key-stdin</code>. Contributor models permit training on prompts and replies.</p>
                     ) : isDefault ? (

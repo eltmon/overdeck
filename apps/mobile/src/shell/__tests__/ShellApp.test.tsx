@@ -88,6 +88,7 @@ vi.mock('../MachineView', async () => {
   };
 });
 
+import { SIGNED_OUT_NOTICE_KEY } from '../accountDeletion';
 import ShellApp from '../ShellApp';
 import { CURRENT_MACHINE_KEY, readMachines, removeAccount, useShellStore, writeAccount, writeMachines } from '../store';
 import type { PairedMachine } from '../types';
@@ -379,5 +380,24 @@ describe('ShellApp appearance (PAN-5041 WI-5)', () => {
     expect(localStorage.getItem('overdeck.appearance')).toBe('light');
     expect(harness.appearance.set).toHaveBeenCalledWith({ appearance: 'light' });
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('ShellApp account deletion notice (PAN-5107)', () => {
+  it('shows the deletion-started notice on the sign-in screen and clears it from sessionStorage', async () => {
+    await removeAccount();
+    sessionStorage.setItem(SIGNED_OUT_NOTICE_KEY, 'deletion-requested');
+    render(<ShellApp navigate={() => undefined} />);
+    expect(await screen.findByText('Your account is being deleted.')).toBeTruthy();
+    await vi.waitFor(() => expect(sessionStorage.getItem(SIGNED_OUT_NOTICE_KEY)).toBeNull());
+  });
+
+  it('renders the Delete account button when opening Settings from the machine list', async () => {
+    localStorage.removeItem(CURRENT_MACHINE_KEY);
+    history.replaceState(null, '', '/');
+    render(<ShellApp navigate={() => undefined} />);
+    const settings = await screen.findByText('Settings');
+    await act(async () => settings.click());
+    expect(await screen.findByRole('button', { name: 'Delete account' })).toBeTruthy();
   });
 });

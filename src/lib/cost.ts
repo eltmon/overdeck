@@ -82,14 +82,18 @@ export interface ModelPricing {
 // ============== Pricing Data ==============
 
 export const DEFAULT_PRICING: ModelPricing[] = [
-  // Meta published 1.3 rates, per 1K tokens (2026-09-08).
+  // Meta published Muse rates, per 1K tokens (Spark 2026-09-08, Ember 2026-11-10).
   { provider: 'custom', model: 'muse-wonder-1.0', inputPer1k: 0.004, outputPer1k: 0.02, cacheReadPer1k: 0.0002, currency: 'USD' },
   { provider: 'custom', model: 'muse-spark-1.3', inputPer1k: 0.00125, outputPer1k: 0.00425, cacheReadPer1k: 0.00015, currency: 'USD' },
   { provider: 'custom', model: 'muse-spark-1.3-contributor', inputPer1k: 0.0001, outputPer1k: 0.0002, cacheReadPer1k: 0.000002, currency: 'USD' },
+  { provider: 'custom', model: 'muse-ember-1.0', inputPer1k: 0.0001, outputPer1k: 0.0005, cacheReadPer1k: 0.000004, currency: 'USD' },
   // TypeSafe Jev (PAN-4369): $0.042/Mtok input, output free. The exact -free row is required:
   // getPricing() falls back to a prefix match, which would otherwise price jev-1.13-free as paid.
   { provider: 'custom', model: 'jev-1.13', inputPer1k: 0.000042, outputPer1k: 0, currency: 'USD' },
   { provider: 'custom', model: 'jev-1.13-free', inputPer1k: 0, outputPer1k: 0, currency: 'USD' },
+  // Anthropic - Fable 5.2 (2026-11-09): $8/M input, $40/M output, $0.20/M cache
+  // read (0.025x input, as on Fable 5.1), $10/M 5m and $16/M 1h cache write.
+  { provider: 'anthropic', model: 'claude-fable-5-2', inputPer1k: 0.008, outputPer1k: 0.040, cacheReadPer1k: 0.0002, cacheWrite5mPer1k: 0.010, cacheWrite1hPer1k: 0.016, currency: 'USD' },
   // Anthropic - Fable 5 (Mythos-class flagship): $10/M input, $50/M output. Cache
   // rates mirror Anthropic's standard ratios (read 0.1×, write-5m 1.25×, write-1h 2× of input).
   { provider: 'anthropic', model: 'claude-fable-5-1', inputPer1k: 0.010, outputPer1k: 0.050, cacheReadPer1k: 0.00025, cacheWrite5mPer1k: 0.0125, cacheWrite1hPer1k: 0.020, currency: 'USD' },
@@ -187,7 +191,12 @@ export const DEFAULT_PRICING: ModelPricing[] = [
   // Mistral Large 4 (docs.mistral.ai/models/mistral-large-4-0, Public Preview)
   { provider: 'custom', model: 'mistral-large-4-0', inputPer1k: 0.0007, outputPer1k: 0.0021, cacheReadPer1k: 0.00007, currency: 'USD' },
   // xAI Grok (docs.x.ai/docs/models). <200K-prompt rates; the >=200K double rate is in capability notes.
+  // grok-4.7-build-fast sits above grok-4.7: getPricing prefix-matches in table order.
+  // 4.7-build-fast and 4.6 rates verified against Grok's costUsdTicks (PAN-5078); 4.5 is within 0.3%.
+  { provider: 'custom', model: 'grok-4.7-build-fast', inputPer1k: 0.004, outputPer1k: 0.012, cacheReadPer1k: 0.001, currency: 'USD' },
   { provider: 'custom', model: 'grok-4.7', inputPer1k: 0.002, outputPer1k: 0.006, cacheReadPer1k: 0.0005, currency: 'USD' },
+  { provider: 'custom', model: 'grok-4.6', inputPer1k: 0.002, outputPer1k: 0.006, cacheReadPer1k: 0.0005, currency: 'USD' },
+  { provider: 'custom', model: 'grok-4.5', inputPer1k: 0.002, outputPer1k: 0.006, cacheReadPer1k: 0.0005, currency: 'USD' },
   { provider: 'custom', model: 'grok-4.3', inputPer1k: 0.00125, outputPer1k: 0.0025, cacheReadPer1k: 0.0002, currency: 'USD' },
   // Z.AI GLM, verified 2026-11-02 against docs.z.ai/guides/overview/pricing (cached-input storage is limited-time free).
   { provider: 'custom', model: 'glm-5.3-flashx', inputPer1k: 0.00037, outputPer1k: 0.00125, cacheReadPer1k: 0.000075, currency: 'USD' },
@@ -268,13 +277,22 @@ export function calculateCost(usage: TokenUsage, pricing: ModelPricing): number 
     cacheMultiplier = 5;
   }
 
+  // Muse Ember (>200K): Meta bills the whole request at 3x every component
+  // ($0.30/$1.50 in/out, $0.012 cached per MTok against $0.10/$0.50/$0.004).
+  if (pricing.model === 'muse-ember-1.0'
+      && totalInputTokens > 200000) {
+    inputMultiplier = 3;
+    outputMultiplier = 3;
+    cacheMultiplier = 3;
+  }
+
   // Input tokens
   cost += (usage.inputTokens / 1000) * pricing.inputPer1k * inputMultiplier;
 
   // Output tokens
   cost += (usage.outputTokens / 1000) * pricing.outputPer1k * outputMultiplier;
 
-  // Cache read tokens (only the Haiku 5.5 tier above multiplies them)
+  // Cache read tokens (only the Haiku 5.5 and Muse Ember tiers above multiply them)
   if (usage.cacheReadTokens && pricing.cacheReadPer1k) {
     cost += (usage.cacheReadTokens / 1000) * pricing.cacheReadPer1k * cacheMultiplier;
   }

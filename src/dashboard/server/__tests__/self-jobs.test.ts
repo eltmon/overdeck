@@ -10,8 +10,10 @@ import { buildSelfJobArgv, SelfJobArgError } from '../services/self-job-argv.js'
 import {
   createSelfJobs,
   runPanJob,
+  SELF_JOB_FULL_STDOUT_VERBS,
   SELF_JOB_LIMIT,
   SELF_JOB_MAX_BUFFER,
+  SELF_JOB_OUTPUT_TAIL_BYTES,
   type SelfJobRunInput,
   type SelfJobRunResult,
   selfJobAnswer,
@@ -166,6 +168,23 @@ describe('self jobs', () => {
     expect(call.env.OVERDECK_AGENT_ID).toBe('agent-pan-1');
   });
 
+  it('starts a task-done job with the full stdout buffer (PAN-5118)', () => {
+    const { runner, calls } = controlledRunner();
+    const jobs = createSelfJobs({ runner });
+    jobs.start(agent, 'task-done', [{ ref: 'PAN-1' }, { ref: 'item-a' }]);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.stdoutTailBytes).toBe(SELF_JOB_MAX_BUFFER);
+  });
+
+  it('starts a task-claim job with the ordinary 16 KiB stdout tail', () => {
+    const { runner, calls } = controlledRunner();
+    const jobs = createSelfJobs({ runner });
+    jobs.start(agent, 'task-claim', [{ ref: 'PAN-1' }, { ref: 'item-a' }]);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.stdoutTailBytes).toBe(SELF_JOB_OUTPUT_TAIL_BYTES);
+    expect(SELF_JOB_FULL_STDOUT_VERBS.has('task-claim')).toBe(false);
+  });
+
   describe('selfJobEnv', () => {
     const base: NodeJS.ProcessEnv = {
       PATH: '/bin',
@@ -285,6 +304,7 @@ describe('self jobs', () => {
       env: process.env,
       timeoutMs: 60_000,
       maxBuffer: SELF_JOB_MAX_BUFFER,
+      stdoutTailBytes: SELF_JOB_OUTPUT_TAIL_BYTES,
       ...overrides,
     });
 
@@ -306,6 +326,26 @@ describe('self jobs', () => {
       const result = await runPanJob(input(['-e', '0'], { cwd: '/nonexistent-pan-4936' }));
       expect(result.exitCode).toBeNull();
       expect(result.error).not.toBeNull();
+    });
+
+    it('keeps a full 500-entry JSON array when stdoutTailBytes is the 4 MiB buffer (PAN-5118)', async () => {
+      const script = `
+        const entries = Array.from({ length: 500 }, (_, i) => ({
+          itemId: 'item-' + i + '.ac1',
+          status: 'completed',
+          doneAt: '2026-11-10T00:00:00.000Z',
+        }));
+        process.stdout.write(JSON.stringify(entries, null, 2));
+      `;
+      const result = await runPanJob(input(['-e', script], { stdoutTailBytes: SELF_JOB_MAX_BUFFER }));
+      expect(result.exitCode).toBe(0);
+      const parsed = JSON.parse(result.stdout) as Array<{ itemId: string }>;
+      expect(parsed).toHaveLength(500);
+    });
+
+    it('still keeps a 16,384-byte stdout tail when stdoutTailBytes is the ordinary cap', async () => {
+      const result = await runPanJob(input(['-e', "process.stdout.write('x'.repeat(17408))"], { stdoutTailBytes: SELF_JOB_OUTPUT_TAIL_BYTES }));
+      expect(result.stdout).toHaveLength(16_384);
     });
   });
 });

@@ -24,6 +24,9 @@ export function getFriendlyModelName(fullModel: string | undefined | null): stri
   const backingModel = fullModel.replace(/^(?:oai|cx|go)@/, '');
 
   // Anthropic models
+  if (backingModel.includes('fable-5-2') || backingModel.includes('fable-5.2') || backingModel.includes('fable.5.2')) return 'Fable 5.2';
+  if (backingModel.includes('fable-5-1') || backingModel.includes('fable-5.1') || backingModel.includes('fable.5.1')) return 'Fable 5.1';
+  if (backingModel.includes('fable')) return 'Fable 5';
   if (backingModel.includes('opus-5-5') || backingModel.includes('opus-5.5') || backingModel.includes('opus.5.5')) return 'Opus 5.5';
   if (backingModel.includes('opus-5') || backingModel.includes('opus.5')) return 'Opus 5';
   if (backingModel.includes('opus-4-8') || backingModel.includes('opus-4.8')) return 'Opus 4.8';

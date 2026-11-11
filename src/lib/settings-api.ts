@@ -32,6 +32,7 @@ import {
 import { ModelId } from './settings.js';
 import type { Role } from './agents.js';
 import { tieredExecutionConfigForSave, validateTieredExecutionSettings, type ApiTieredExecutionConfig } from './settings-api-tiered-execution.js';
+import { validateHarnessesSettings, type ApiHarnessesConfig } from './settings-api-harnesses.js';
 import { mergeApiTelemetrySettings, telemetrySettingsFromConfig, validateApiTelemetryConfig, type ApiTelemetryConfig } from './settings-api-telemetry.js';
 import { jevToggleProblems } from './jev/settings-validation.js';
 import type { RuntimeName } from './runtimes/types.js';
@@ -131,7 +132,7 @@ export interface ApiSettingsConfig {
       nous: boolean;
       dashscope: boolean;
       opencode?: boolean;
-      "opencode-go"?: boolean;
+      "opencode-go"?: boolean; grok?: boolean;
       meta?: boolean;
     };
     provider_harnesses?: ProviderHarnessesConfig;
@@ -272,6 +273,7 @@ export interface ApiSettingsConfig {
   };
   /** Dashboard access (PAN-4435). `require_token_mint` persists under `dashboard` in config.yaml. */
   dashboard?: { require_token_mint?: boolean };
+  harnesses?: ApiHarnessesConfig; // PAN-5108, global config only
   tiered_execution?: ApiTieredExecutionConfig;
 }
 
@@ -289,7 +291,7 @@ export function getDefaultConversationModelApi(): ModelId | undefined {
 const ROLE_NAMES: readonly Role[] = ['plan', 'work', 'review', 'test', 'ship', 'flywheel', 'strike', 'sequencer', 'knowledge', 'worker'];
 
 const WORKHORSE_SLOTS: readonly WorkhorseSlot[] = ['expensive', 'mid', 'cheap'];
-const MODEL_PROVIDERS = ['anthropic', 'openai', 'google', 'minimax', 'zai', 'kimi', 'mimo', 'openrouter', 'nous', 'dashscope', 'meta', 'opencode', 'opencode-go'] as const;
+const MODEL_PROVIDERS = ['anthropic', 'openai', 'google', 'minimax', 'zai', 'kimi', 'mimo', 'openrouter', 'nous', 'dashscope', 'meta', 'opencode', 'opencode-go', 'grok'] as const;
 type ApiModelProvider = typeof MODEL_PROVIDERS[number];
 type ProviderHarnessesConfig = Partial<Record<ApiModelProvider, RuntimeName | ''>>;
 type BuiltInProviderHarnessesConfig = Record<ApiModelProvider, RuntimeName>;
@@ -508,8 +510,8 @@ function validateModelRef(
 
 function validateRoleFields(fieldPath: string, roleConfig: Record<string, unknown>, errors: string[]): void {
   const harness = roleConfig.harness;
-  if (harness !== undefined && harness !== null && harness !== '' && harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code' && harness !== 'opencode' && harness !== 'muse' && harness !== 'prime-agent') {
-    errors.push(`${fieldPath}.harness must be claude-code, ohmypi, codex, acp, kimi-code, opencode, muse, prime-agent, null, or empty string`);
+  if (harness !== undefined && harness !== null && harness !== '' && harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code' && harness !== 'opencode' && harness !== 'muse' && harness !== 'prime-agent' && harness !== 'grok') {
+    errors.push(`${fieldPath}.harness must be claude-code, ohmypi, codex, acp, kimi-code, opencode, muse, prime-agent, grok, null, or empty string`);
   }
 
   errors.push(...effortConfigErrors(fieldPath, roleConfig.effort, []));
@@ -691,7 +693,7 @@ export function loadSettingsApi(): ApiSettingsConfig {
         nous: config.enabledProviders.has('nous'),
         dashscope: config.enabledProviders.has('dashscope'),
         opencode: config.enabledProviders.has('opencode'),
-        'opencode-go': config.enabledProviders.has('opencode-go'),
+        'opencode-go': config.enabledProviders.has('opencode-go'), grok: config.enabledProviders.has('grok'),
         meta: config.enabledProviders.has('meta'),
       },
       provider_harnesses: config.providerHarnesses,
@@ -764,6 +766,7 @@ export function loadSettingsApi(): ApiSettingsConfig {
     // D-1: reports the enforced value (raw config.yaml), not the merged
     // config — a project .pan.yaml never reaches enforcement.
     dashboard: { require_token_mint: readRemoteAccessConfig().requireTokenMint },
+    harnesses: { auto_update: config.harnesses?.autoUpdate ?? true },
     tiered_execution: config.tieredExecution,
   };
 }
@@ -865,6 +868,8 @@ async function writeYamlConfigPreservingComments(yamlConfig: YamlConfig): Promis
   if (isRecord(config.dashboard)) {
     setBlockMergePreserving(doc, ['dashboard'], config.dashboard as Record<string, unknown>);
   }
+  // PAN-5108 D17: never delete the block when a PUT omits it, so a stale tab cannot turn auto-update back on.
+  if (isRecord(config.harnesses)) setBlockMergePreserving(doc, ['harnesses'], config.harnesses as Record<string, unknown>);
 
   await writeFile(configPath, doc.toString({ lineWidth: 120 }), 'utf-8');
 }
@@ -948,7 +953,7 @@ async function saveSettingsApiPromiseUnlocked(
         nous: providerConfigForSave('nous', settings.models.providers.nous, settings, currentConfig),
         dashscope: providerConfigForSave('dashscope', settings.models.providers.dashscope, settings, currentConfig),
         opencode: providerConfigForSave('opencode', settings.models.providers.opencode ?? false, settings, currentConfig),
-        'opencode-go': providerConfigForSave('opencode-go', settings.models.providers['opencode-go'] ?? false, settings, currentConfig),
+        'opencode-go': providerConfigForSave('opencode-go', settings.models.providers['opencode-go'] ?? false, settings, currentConfig), grok: providerConfigForSave('grok', settings.models.providers.grok ?? false, settings, currentConfig),
         meta: providerConfigForSave('meta', settings.models.providers.meta ?? false, settings, currentConfig),
       },
       gemini_thinking_level: settings.models.gemini_thinking_level as 1 | 2 | 3 | 4,
@@ -1057,6 +1062,7 @@ async function saveSettingsApiPromiseUnlocked(
       : undefined,
     remote: settings.remote,
     dashboard: settings.dashboard,
+    harnesses: settings.harnesses,
     tiered_execution: tieredExecutionConfigForSave(settings.tiered_execution, {
       providerAuth: currentConfig.providerAuth,
       workhorses: { ...currentConfig.workhorses, ...(settings.workhorses ?? {}) },
@@ -1169,6 +1175,7 @@ async function updateSettingsApi(updates: Partial<ApiSettingsConfig>): Promise<A
       ...updates.remote,
     },
     dashboard: { ...current.dashboard, ...updates.dashboard },
+    harnesses: { ...current.harnesses, ...updates.harnesses },
   };
 
   // Save and return
@@ -1226,8 +1233,8 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
           errors.push(`Unknown provider harness entry "${provider}"`);
           continue;
         }
-        if (harness !== undefined && harness !== '' && harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code' && harness !== 'opencode' && harness !== 'muse' && harness !== 'prime-agent') {
-          errors.push(`models.provider_harnesses.${provider} must be claude-code, ohmypi, codex, acp, kimi-code, opencode, muse, prime-agent, or empty string`);
+        if (harness !== undefined && harness !== '' && harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code' && harness !== 'opencode' && harness !== 'muse' && harness !== 'prime-agent' && harness !== 'grok') {
+          errors.push(`models.provider_harnesses.${provider} must be claude-code, ohmypi, codex, acp, kimi-code, opencode, muse, prime-agent, grok, or empty string`);
         }
       }
     }
@@ -1344,6 +1351,7 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
       errors.push('dashboard.require_token_mint must be a boolean');
     }
   }
+  validateHarnessesSettings(settings.harnesses, errors);
 
   if (settings.tiered_execution !== undefined) {
     const { config: currentConfig } = loadConfigSync();

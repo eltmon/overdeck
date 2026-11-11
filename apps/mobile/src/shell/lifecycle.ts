@@ -27,6 +27,11 @@ export function markResumed(at = Date.now()): void {
   for (const listener of [...listeners]) listener();
 }
 
+/** PAN-5100: the timestamp of the last resume, or null before the first one. */
+export function lastResumedAt(): number | null {
+  return resumedAt;
+}
+
 export function useResumedAt(): number | null {
   return useSyncExternalStore(
     (onChange) => {

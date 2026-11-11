@@ -217,7 +217,7 @@ const PI_CONVERSATION_SOURCE_CONTRACT = [
 export async function resolveAllowedHarness(requested: unknown, model?: string | null): Promise<RuntimeName> {
   if (!model) return 'claude-code';
   const explicit: RuntimeName | undefined =
-    requested === 'ohmypi' || requested === 'claude-code' || requested === 'codex' || requested === 'acp' || requested === 'kimi-code' || requested === 'opencode' || requested === 'muse' || requested === 'prime-agent'
+    requested === 'ohmypi' || requested === 'claude-code' || requested === 'codex' || requested === 'acp' || requested === 'kimi-code' || requested === 'opencode' || requested === 'muse' || requested === 'prime-agent' || requested === 'grok'
       ? requested
       : undefined;
   return resolveHarness({ model, explicit });
