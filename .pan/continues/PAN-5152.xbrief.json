@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5152",
   "created": "2026-11-11T14:36:40.308Z",
-  "updated": "2026-11-11T16:40:37.998Z",
+  "updated": "2026-11-11T16:40:39.496Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -462,6 +462,11 @@
     "wi25-add-project-dialog.ac4": {
       "status": "completed",
       "doneAt": "2026-11-11T16:40:37.998Z"
+    },
+    "wi28-generic-tracker-sites": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5152",
+      "claimedAt": "2026-11-11T16:40:39.495Z"
     }
   }
 }
