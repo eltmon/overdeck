@@ -10,11 +10,14 @@ import { DISK_ALERT_QUERY_KEY } from '../diskAlert';
 import { HARNESS_AUTO_UPDATE_QUERY_KEY } from '../harnessAutoUpdate';
 import { type AgentRequestRow, diskAlertDecisions, harnessUpdateDecisions, isBlockingDecision, useDecisions } from '../useDecisions';
 import type { McpSignInApproval } from '../../components/Settings/anywhere/anywhereApi';
+import type { ConnectorNoticeRow } from '../../components/Settings/anywhere/botsApi';
 
 interface RenderDecisionsOptions {
   /** PAN-4946: who the dashboard sees itself answering to; defaults to this machine's own session. */
   viewerKind?: 'root-session' | 'device' | 'token' | 'internal-token' | 'machine' | null;
   mcpApprovals?: McpSignInApproval[];
+  /** PAN-5070: the cached `/api/connectors/notices` rows. */
+  connectorNotices?: ConnectorNoticeRow[];
   /** PAN-4946 review: the raw `['anywhere-status']` body, overriding `viewerKind` — for a malformed/partial status. */
   anywhereStatus?: unknown;
   /** PAN-5093: the cached `/api/disk-alert` snapshot. */
@@ -36,6 +39,7 @@ function renderDecisions(
   queryClient.setQueryData(['agent-requests'], agentRequestRows); // PAN-4941
   queryClient.setQueryData(['anywhere-status'], options.anywhereStatus ?? { viewer: { kind: options.viewerKind ?? 'root-session' } }); // PAN-4946
   queryClient.setQueryData(['mcp-oauth-approvals'], options.mcpApprovals ?? []); // PAN-4946
+  queryClient.setQueryData(['anywhere-connector-notices'], options.connectorNotices ?? []); // PAN-5070
   queryClient.setQueryData(DISK_ALERT_QUERY_KEY, options.diskAlert ?? null); // PAN-5093
   queryClient.setQueryData(HARNESS_AUTO_UPDATE_QUERY_KEY, options.harnessAutoUpdate ?? null); // PAN-5108
 
