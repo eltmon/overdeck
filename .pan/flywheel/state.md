@@ -727,3 +727,8 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
 - Rules: keep frontend/dev containers stopped for every workspace not in UAT or active browser use (`docker compose -p overdeck-feature-<id> stop frontend dev`); never start `pan reload` while quality gates run; start no new work while mem PSI some avg60 > 2; at most four issues in flight.
 - Disk hold: no new workspaces or worktrees until the Fort 20 upload frees about 29 GB. Remove /home/eltmon/Projects/mobile-build-4 after the operator uploads the AAB; a verified copy of overdeck-1.0-4.aab is in the Flywheel scratchpad store-prep/android/.
 - Re-requesting verification for several PRs at once runs their gates together; stagger them.
+
+## 2026-11-11 — every release re-breaks every open PR's changelog (PAN-5137)
+- Each `pan release` dates the Upcoming block, so every open PR that added an entry to it now conflicts in `changelog.mdx` (seen after v0.78.0 and again after v0.79.0, three PRs each time). Handoff PRs have no agent to repair it.
+- Mechanical resolver: scratchpad `resolve-changelog.py <New|Improved|Fixed> <entry-file>` takes main's file and inserts the branch's entry in a fresh Upcoming block. Match blocks with `\n<Update label="v0`: the RELEASE STEP comment also contains `<Update label="vX.Y.Z"`.
+- The class fix is PAN-5137 (one changelog file per PR, folded at release). It needs the operator's `released` label.
