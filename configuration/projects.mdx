@@ -244,7 +244,8 @@ projects:
 | `name` | Yes | Human-readable project name |
 | `path` | Yes | Absolute path to project root |
 | `issue_prefix` | Yes* | Issue prefix for standard format IDs (e.g., "MIN", "PAN"). Automatically proposed during registration based on the repository name. 1 to 10 uppercase letters; digits are rejected because issue IDs must match `LETTERS-NUMBER`. For tracker IDs that do not fit, use `issue_pattern`. |
-| `tracker` | No | Issue tracker type: `linear`, `github`, `gitlab`, `rally`. Set it explicitly when the code host and issue tracker differ. |
+| `tracker` | No | Issue tracker type: `linear`, `github`, `gitlab`, `rally`, `jira`. Set it explicitly when the code host and issue tracker differ. |
+| `jira` | No | Jira settings for a `tracker: jira` project: `site` (Jira site URL), `deployment` (`cloud` or `datacenter`), and `status_map` (Jira status name per Overdeck state). See [Issue Tracker Integration](/configuration/issue-trackers#jira-integration). |
 | `issue_prefixes` | No | Array of prefixes for multi-prefix trackers (e.g., `[F, US, DE, TA]`) |
 | `issue_pattern` | No | Custom regex for issue ID parsing: `^(PREFIX)-(\\d+)$` |
 | `issue_routing` | No | Label-based routing rules |
@@ -724,5 +725,5 @@ See [Progressive Polyrepo](/configuration/progressive-polyrepo) for full documen
 - [Progressive Polyrepo](/configuration/progressive-polyrepo) - Large-scale polyrepo with on-demand checkout
 - [Setup Wizard](/configuration/setup-wizard) - Interactive project configuration
 - [Meta Repos](/configuration/meta-repos) - Team conventions and onboarding kits
-- [Issue Tracker Integration](/configuration/issue-trackers) - Connecting to Linear, GitHub, Rally, etc.
+- [Issue Tracker Integration](/configuration/issue-trackers) - Connecting to Linear, GitHub, Rally, Jira, etc.
 - [Workspaces](/features/workspaces) - Workspace management

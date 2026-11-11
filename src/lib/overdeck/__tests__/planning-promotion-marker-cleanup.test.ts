@@ -55,6 +55,7 @@ vi.mock('../../remote/remote-agents.js', () => ({
 }));
 vi.mock('../../tracker-utils.js', () => ({
   resolveGitHubIssue: () => ({ isGitHub: true, owner: 'eltmon', repo: 'overdeck', number: 3229 }),
+  resolveTrackerType: () => 'github',
 }));
 vi.mock('../../tmux.js', () => ({
   killSession: () => Effect.void,

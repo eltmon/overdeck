@@ -8,7 +8,7 @@
 
 export type ProjectCreateMode = 'clone' | 'existing' | 'new';
 
-export type ProjectIntentField = 'url' | 'path' | 'parentDir' | 'name' | 'issuePrefix';
+export type ProjectIntentField = 'url' | 'path' | 'parentDir' | 'name' | 'issuePrefix' | 'jiraSite';
 
 export interface ProjectIntentFinding {
   field: ProjectIntentField;
@@ -65,6 +65,10 @@ export interface ResolvedProjectIntent {
   nestedRepositories?: NestedRepository[];
   /** Set when a `repos` selection resolved to a multi-repo project; read as `?? []`. */
   workspaceRepos?: ProjectWorkspaceRepo[];
+  /** `jira` when the operator chose Jira as the issue tracker (PAN-5152). */
+  tracker?: 'jira' | null;
+  /** The validated Jira site URL, when one was given. */
+  jiraSite?: string | null;
 }
 
 export type ProjectCreateFailureCode =

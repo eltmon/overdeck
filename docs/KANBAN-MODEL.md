@@ -158,20 +158,21 @@ Currently the PRD directory path is hardcoded to `{projectPath}/docs/prds/`. A `
 
 The 4-column model maps cleanly to all supported trackers:
 
-| Overdeck | Linear (defaults) | GitHub | Rally (User Stories) |
-|---|---|---|---|
-| Backlog | Backlog | open | New |
-| Todo | Todo | open | Defined |
-| In Progress | In Progress | open + `in-progress` label | In-Progress |
-| In Review | In Progress | open + `in-review` label | In-Progress |
-| Done | In Progress (shadow) | open (shadow) | In-Progress (shadow) |
-| Closed Out | Done | closed + `closed-out` label | Completed/Accepted |
+| Overdeck | Linear (defaults) | GitHub | Rally (User Stories) | Jira (defaults) |
+|---|---|---|---|---|
+| Backlog | Backlog | open | New | Backlog |
+| Todo | Todo | open | Defined | To Do |
+| In Progress | In Progress | open + `in-progress` label | In-Progress | In Progress |
+| In Review | In Progress | open + `in-review` label | In-Progress | In Review |
+| Done | In Progress (shadow) | open (shadow) | In-Progress (shadow) | In Review (`verifying_on_main`) |
+| Closed Out | Done | closed + `closed-out` label | Completed/Accepted | Done (`canceled` → Canceled) |
 
 Key implications:
 
 - **Linear**: The custom "In Planning" and "In Review" states added to the MIN team can be removed. Only default states are needed. In Review maps to Linear's "In Progress" (or we keep "In Review" in Linear if the team finds it useful — but it's optional, not required).
 - **GitHub**: Uses labels (`in-progress`, `in-review`) on open issues to distinguish sub-states, since GitHub only has open/closed natively.
 - **Rally**: Both In Progress and In Review map to Rally's "In-Progress" since Rally doesn't distinguish review from active work.
+- **Jira**: Status names come from `DEFAULT_STATE_MAPPINGS.jira` merged with the project's `jira.status_map`; writes go through workflow transitions, and reads fall back to the status category. No workflow labels are written.
 
 ## Canonical States (Internal)
 

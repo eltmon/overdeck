@@ -1,7 +1,7 @@
 /**
  * work list - List issues from configured trackers
  *
- * Uses the tracker abstraction to support Linear, GitHub, and GitLab.
+ * Uses the tracker abstraction to support Linear, GitHub, GitLab, Rally and Jira.
  */
 
 import { exitCli } from '../exit.js';
@@ -10,8 +10,9 @@ import { Effect } from 'effect';
 import ora from 'ora';
 import { loadConfigSync } from '../../lib/config.js';
 import type { Issue, IssueTracker, TrackerType } from '../../lib/tracker/index.js';
-import { createTracker, TrackerConfig } from '../../lib/tracker/index.js';
+import { createJiraTrackerForProject, createTracker, TrackerConfig } from '../../lib/tracker/index.js';
 import { loadProjectsConfigSync } from '../../lib/projects.js';
+import { findJiraProjectsAsync } from '../../lib/tracker/tracker-projects.js';
 
 interface ListOptions {
   all?: boolean;
@@ -103,7 +104,26 @@ function getConfiguredTrackers(): TrackerType[] {
     } catch { /* ignore */ }
   }
 
+  // Jira is configured per project (PAN-5152)
+  try {
+    const { projects } = loadProjectsConfigSync();
+    if (Object.values(projects).some(project => project.tracker === 'jira')) trackers.push('jira');
+  } catch { /* ignore */ }
+
   return trackers;
+}
+
+/** List issues from every `tracker: jira` project, concatenated (PAN-5152). */
+async function listJiraIssues(filters: { includeClosed?: boolean; assignee?: string }): Promise<Issue[]> {
+  const issues: Issue[] = [];
+  for (const { key, config } of await findJiraProjectsAsync()) {
+    try {
+      issues.push(...await Effect.runPromise(createJiraTrackerForProject(key, config).listIssues(filters)));
+    } catch (error: any) {
+      console.log(chalk.yellow(`\nWarning: Failed to fetch Jira issues for ${key}: ${error.message}`));
+    }
+  }
+  return issues;
 }
 
 /**
@@ -124,7 +144,7 @@ async function displayIssues(issues: Issue[], trackerName: string): Promise<void
   }
 
   // Display order
-  const stateOrder = ['in_progress', 'open', 'closed'];
+  const stateOrder = ['in_progress', 'in_review', 'open', 'closed'];
 
   for (const state of stateOrder) {
     const stateIssues = byState[state];
@@ -156,9 +176,9 @@ export async function listCommand(options: ListOptions): Promise<void> {
     if (options.tracker) {
       // Specific tracker requested
       const trackerType = options.tracker as TrackerType;
-      if (!['linear', 'github', 'gitlab', 'rally'].includes(trackerType)) {
+      if (!['linear', 'github', 'gitlab', 'rally', 'jira'].includes(trackerType)) {
         spinner.fail(`Unknown tracker: ${options.tracker}`);
-        console.log(chalk.dim('Valid trackers: linear, github, gitlab, rally'));
+        console.log(chalk.dim('Valid trackers: linear, github, gitlab, rally, jira'));
         return exitCli(1);
       }
       trackersToQuery.push(trackerType);
@@ -181,6 +201,12 @@ export async function listCommand(options: ListOptions): Promise<void> {
 
     for (const trackerType of trackersToQuery) {
       spinner.text = `Fetching from ${trackerType}...`;
+
+      if (trackerType === 'jira') {
+        const filters = { includeClosed: options.all, assignee: options.mine ? 'me' : undefined };
+        allIssues.push({ tracker: 'jira', issues: await listJiraIssues(filters) });
+        continue;
+      }
 
       const trackerConfig = getTrackerConfig(trackerType);
       if (!trackerConfig) {

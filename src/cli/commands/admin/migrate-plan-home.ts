@@ -81,7 +81,10 @@ async function listOpenIssuesFromTracker(project: ProjectConfig): Promise<string
     projectId: project.gitlab_repo,
     server: trackerType === 'rally' && trackerConfig && 'server' in trackerConfig ? trackerConfig.server : undefined,
     workspace: trackerType === 'rally' && trackerConfig && 'workspace' in trackerConfig ? trackerConfig.workspace : undefined,
-    project: project.rally_project,
+    // PAN-5152: a Jira project's key is its issue_prefix; its site comes from the jira block.
+    project: trackerType === 'jira' ? issuePrefix : project.rally_project,
+    site: project.jira?.site,
+    jiraProject: project.jira,
   });
 
   // No `limit`: paginate fully (github.ts and linear.ts both page to

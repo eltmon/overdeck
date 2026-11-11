@@ -1,0 +1,539 @@
+{
+  "version": "1",
+  "issueId": "PAN-5152",
+  "created": "2026-11-11T14:36:40.308Z",
+  "updated": "2026-11-11T16:49:12.350Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "wi1-jira-types": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5152",
+      "claimedAt": "2026-11-11T14:36:40.308Z",
+      "doneAt": "2026-11-11T14:44:56.108Z"
+    },
+    "wi1-jira-types.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T14:44:56.108Z"
+    },
+    "wi1-jira-types.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T14:44:56.108Z"
+    },
+    "wi1-jira-types.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T14:44:56.108Z"
+    },
+    "wi2-jira-credentials": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5152",
+      "claimedAt": "2026-11-11T14:45:09.778Z",
+      "doneAt": "2026-11-11T14:55:52.587Z"
+    },
+    "wi2-jira-credentials.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T14:55:52.587Z"
+    },
+    "wi2-jira-credentials.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T14:55:52.587Z"
+    },
+    "wi2-jira-credentials.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T14:55:52.587Z"
+    },
+    "wi2-jira-credentials.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T14:55:52.587Z"
+    },
+    "wi3-jira-routing": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5152",
+      "claimedAt": "2026-11-11T14:55:57.087Z",
+      "doneAt": "2026-11-11T14:59:06.130Z"
+    },
+    "wi3-jira-routing.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T14:59:06.130Z"
+    },
+    "wi3-jira-routing.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T14:59:06.130Z"
+    },
+    "wi3-jira-routing.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T14:59:06.130Z"
+    },
+    "wi3-jira-routing.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T14:59:06.130Z"
+    },
+    "wi4-prefix-collision-message": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5152",
+      "claimedAt": "2026-11-11T14:59:08.329Z",
+      "doneAt": "2026-11-11T15:00:27.786Z"
+    },
+    "wi4-prefix-collision-message.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:00:27.786Z"
+    },
+    "wi4-prefix-collision-message.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:00:27.786Z"
+    },
+    "wi5-jira-http-client": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5152",
+      "claimedAt": "2026-11-11T15:00:29.540Z",
+      "doneAt": "2026-11-11T15:03:47.321Z"
+    },
+    "wi5-jira-http-client.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:03:47.321Z"
+    },
+    "wi5-jira-http-client.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:03:47.321Z"
+    },
+    "wi5-jira-http-client.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:03:47.321Z"
+    },
+    "wi5-jira-http-client.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:03:47.321Z"
+    },
+    "wi5-jira-http-client.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:03:47.321Z"
+    },
+    "wi6-jira-text-converters": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5152",
+      "claimedAt": "2026-11-11T15:03:50.293Z",
+      "doneAt": "2026-11-11T15:08:01.034Z"
+    },
+    "wi6-jira-text-converters.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:08:01.034Z"
+    },
+    "wi6-jira-text-converters.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:08:01.034Z"
+    },
+    "wi6-jira-text-converters.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:08:01.034Z"
+    },
+    "wi6-jira-text-converters.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:08:01.034Z"
+    },
+    "wi7-jira-status-mapping": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5152",
+      "claimedAt": "2026-11-11T15:08:05.053Z",
+      "doneAt": "2026-11-11T15:10:57.608Z"
+    },
+    "wi7-jira-status-mapping.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:10:57.608Z"
+    },
+    "wi7-jira-status-mapping.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:10:57.608Z"
+    },
+    "wi7-jira-status-mapping.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:10:57.608Z"
+    },
+    "wi7-jira-status-mapping.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:10:57.608Z"
+    },
+    "wi7-jira-status-mapping.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:10:57.608Z"
+    },
+    "wi8-jira-adapter": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:19:37.195Z"
+    },
+    "wi8-jira-adapter.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:19:37.195Z"
+    },
+    "wi8-jira-adapter.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:19:37.195Z"
+    },
+    "wi8-jira-adapter.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:19:37.195Z"
+    },
+    "wi8-jira-adapter.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:19:37.195Z"
+    },
+    "wi8-jira-adapter.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:19:37.195Z"
+    },
+    "wi9-jira-write-seam": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:21:54.507Z"
+    },
+    "wi9-jira-write-seam.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:21:54.507Z"
+    },
+    "wi9-jira-write-seam.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:21:54.507Z"
+    },
+    "wi9-jira-write-seam.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:21:54.507Z"
+    },
+    "wi10-dashboard-poller": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5152",
+      "claimedAt": "2026-11-11T15:21:56.151Z",
+      "doneAt": "2026-11-11T15:25:15.812Z"
+    },
+    "wi10-dashboard-poller.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:25:15.812Z"
+    },
+    "wi10-dashboard-poller.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:25:15.812Z"
+    },
+    "wi10-dashboard-poller.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:25:15.812Z"
+    },
+    "wi11-tracker-status-jira": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5152",
+      "claimedAt": "2026-11-11T15:25:21.111Z",
+      "doneAt": "2026-11-11T15:27:28.702Z"
+    },
+    "wi11-tracker-status-jira.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:27:28.702Z"
+    },
+    "wi11-tracker-status-jira.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:27:28.702Z"
+    },
+    "wi12-lifecycle-service-jira": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5152",
+      "claimedAt": "2026-11-11T15:27:30.619Z",
+      "doneAt": "2026-11-11T15:29:48.551Z"
+    },
+    "wi12-lifecycle-service-jira.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:29:48.551Z"
+    },
+    "wi12-lifecycle-service-jira.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:29:48.551Z"
+    },
+    "wi12-lifecycle-service-jira.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:29:48.551Z"
+    },
+    "wi13-close-out-jira": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5152",
+      "claimedAt": "2026-11-11T15:29:52.124Z",
+      "doneAt": "2026-11-11T15:33:38.398Z"
+    },
+    "wi13-close-out-jira.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:33:38.398Z"
+    },
+    "wi13-close-out-jira.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:33:38.398Z"
+    },
+    "wi13-close-out-jira.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:33:38.398Z"
+    },
+    "wi14-reopen-reset-jira": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5152",
+      "claimedAt": "2026-11-11T15:33:40.189Z",
+      "doneAt": "2026-11-11T15:39:13.124Z"
+    },
+    "wi14-reopen-reset-jira.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:39:13.124Z"
+    },
+    "wi14-reopen-reset-jira.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:39:13.124Z"
+    },
+    "wi14-reopen-reset-jira.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:39:13.124Z"
+    },
+    "wi15-planning-prompt-jira": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5152",
+      "claimedAt": "2026-11-11T15:39:16.663Z",
+      "doneAt": "2026-11-11T15:44:06.588Z"
+    },
+    "wi15-planning-prompt-jira.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:44:06.588Z"
+    },
+    "wi15-planning-prompt-jira.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:44:06.588Z"
+    },
+    "wi16-work-agent-context-jira": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5152",
+      "claimedAt": "2026-11-11T15:44:09.062Z",
+      "doneAt": "2026-11-11T15:49:25.600Z"
+    },
+    "wi16-work-agent-context-jira.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:49:25.600Z"
+    },
+    "wi16-work-agent-context-jira.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:49:25.600Z"
+    },
+    "wi17-discussions-jira": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5152",
+      "claimedAt": "2026-11-11T15:49:28.761Z",
+      "doneAt": "2026-11-11T15:55:29.568Z"
+    },
+    "wi17-discussions-jira.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:55:29.568Z"
+    },
+    "wi17-discussions-jira.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:55:29.568Z"
+    },
+    "wi18-spawn-transition-jira": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5152",
+      "claimedAt": "2026-11-11T15:55:31.203Z",
+      "doneAt": "2026-11-11T15:57:20.617Z"
+    },
+    "wi18-spawn-transition-jira.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:57:20.617Z"
+    },
+    "wi18-spawn-transition-jira.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:57:20.617Z"
+    },
+    "wi19-pan-done-jira": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5152",
+      "claimedAt": "2026-11-11T15:57:22.067Z",
+      "doneAt": "2026-11-11T16:01:05.722Z"
+    },
+    "wi19-pan-done-jira.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T16:01:05.722Z"
+    },
+    "wi19-pan-done-jira.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T16:01:05.722Z"
+    },
+    "wi19-pan-done-jira.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T16:01:05.722Z"
+    },
+    "wi20-pan-issues-jira": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5152",
+      "claimedAt": "2026-11-11T16:01:07.453Z",
+      "doneAt": "2026-11-11T16:03:30.569Z"
+    },
+    "wi20-pan-issues-jira.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T16:03:30.569Z"
+    },
+    "wi20-pan-issues-jira.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T16:03:30.569Z"
+    },
+    "wi21-doctor-jira": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5152",
+      "claimedAt": "2026-11-11T16:03:32.122Z",
+      "doneAt": "2026-11-11T16:06:05.158Z"
+    },
+    "wi21-doctor-jira.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T16:06:05.158Z"
+    },
+    "wi21-doctor-jira.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T16:06:05.158Z"
+    },
+    "wi21-doctor-jira.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T16:06:05.158Z"
+    },
+    "wi22-cli-project-jira": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5152",
+      "claimedAt": "2026-11-11T16:06:13.675Z",
+      "doneAt": "2026-11-11T16:09:38.470Z"
+    },
+    "wi22-cli-project-jira.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T16:09:38.470Z"
+    },
+    "wi22-cli-project-jira.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T16:09:38.470Z"
+    },
+    "wi23-settings-jira-rows": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5152",
+      "claimedAt": "2026-11-11T16:09:40.451Z",
+      "doneAt": "2026-11-11T16:14:01.570Z"
+    },
+    "wi23-settings-jira-rows.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T16:14:01.570Z"
+    },
+    "wi23-settings-jira-rows.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T16:14:01.570Z"
+    },
+    "wi23-settings-jira-rows.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T16:14:01.570Z"
+    },
+    "wi24-dashboard-jira-labels": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5152",
+      "claimedAt": "2026-11-11T16:14:03.988Z",
+      "doneAt": "2026-11-11T16:29:25.021Z"
+    },
+    "wi24-dashboard-jira-labels.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T16:29:25.021Z"
+    },
+    "wi24-dashboard-jira-labels.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T16:29:25.021Z"
+    },
+    "wi24-dashboard-jira-labels.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T16:29:25.021Z"
+    },
+    "wi25-add-project-dialog": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5152",
+      "claimedAt": "2026-11-11T16:29:26.568Z",
+      "doneAt": "2026-11-11T16:40:37.998Z"
+    },
+    "wi25-add-project-dialog.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T16:40:37.998Z"
+    },
+    "wi25-add-project-dialog.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T16:40:37.998Z"
+    },
+    "wi25-add-project-dialog.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T16:40:37.998Z"
+    },
+    "wi25-add-project-dialog.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T16:40:37.998Z"
+    },
+    "wi28-generic-tracker-sites": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5152",
+      "claimedAt": "2026-11-11T16:40:39.495Z",
+      "doneAt": "2026-11-11T16:44:16.356Z"
+    },
+    "wi28-generic-tracker-sites.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T16:44:16.356Z"
+    },
+    "wi28-generic-tracker-sites.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T16:44:16.356Z"
+    },
+    "wi28-generic-tracker-sites.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T16:44:16.356Z"
+    },
+    "wi29-gate-autostart-text": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5152",
+      "claimedAt": "2026-11-11T16:44:17.694Z",
+      "doneAt": "2026-11-11T16:46:40.379Z"
+    },
+    "wi29-gate-autostart-text.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T16:46:40.379Z"
+    },
+    "wi29-gate-autostart-text.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T16:46:40.379Z"
+    },
+    "wi26-docs-jira-section": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5152",
+      "claimedAt": "2026-11-11T16:46:42.393Z",
+      "doneAt": "2026-11-11T16:48:00.109Z"
+    },
+    "wi26-docs-jira-section.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T16:48:00.109Z"
+    },
+    "wi26-docs-jira-section.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T16:48:00.109Z"
+    },
+    "wi26-docs-jira-section.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T16:48:00.109Z"
+    },
+    "wi27-docs-tracker-lists": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5152",
+      "claimedAt": "2026-11-11T16:48:01.823Z",
+      "doneAt": "2026-11-11T16:49:12.349Z"
+    },
+    "wi27-docs-tracker-lists.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T16:49:12.349Z"
+    },
+    "wi27-docs-tracker-lists.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T16:49:12.349Z"
+    },
+    "wi27-docs-tracker-lists.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T16:49:12.349Z"
+    },
+    "wi27-docs-tracker-lists.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T16:49:12.349Z"
+    }
+  }
+}

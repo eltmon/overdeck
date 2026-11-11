@@ -9,7 +9,7 @@ import type { LifecycleContext, StepResult, WorkflowResult } from '../lifecycle/
 import type { DodRowId } from '../lifecycle/dod.js';
 import { getAgentState, normalizeAgentId } from '../agents.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
-import { resolveGitHubIssue } from '../tracker-utils.js';
+import { resolveGitHubIssue, resolveTrackerType } from '../tracker-utils.js';
 import { sessionExists } from '../tmux.js';
 import { resolveIssueProjectPath } from './issue-reads.js';
 import { archiveIssueWorkspaceRow } from './workspace-hygiene.js';
@@ -44,6 +44,18 @@ function buildCloseOutContext(id: string): LifecycleContext | null {
       ? { github: { owner: githubCheck.owner, repo: githubCheck.repo, number: githubCheck.number } }
       : {}),
   };
+}
+
+/** The merged PR URL for a Jira issue, linked and quoted at close-out (PAN-5152, D-9). */
+async function mergedJiraPullRequestUrl(issueId: string): Promise<string | undefined> {
+  if (resolveTrackerType(issueId) !== 'jira') return undefined;
+  try {
+    const { fetchIssuePullRequest } = await import('./pull-requests.js');
+    const { pr } = await fetchIssuePullRequest(issueId);
+    return pr?.mergedAt ? pr.url : undefined;
+  } catch {
+    return undefined; // Forge unreachable: close-out still runs, the comment omits the URL.
+  }
 }
 
 function closeOutFailureResponse(result: WorkflowResult) {
@@ -123,6 +135,8 @@ export function closeOutIssue(id: string, opts: { acceptedRows?: DodRowId[]; acc
         };
       }
     }
+    const jiraPrUrl = yield* Effect.promise(() => mergedJiraPullRequestUrl(id));
+    if (jiraPrUrl) ctx.prUrl = jiraPrUrl;
 
     const closeOutResult = yield* Effect.promise(async () => {
       try {
@@ -178,6 +192,7 @@ export function closeOutIssue(id: string, opts: { acceptedRows?: DodRowId[]; acc
     issueDataService.invalidateTracker('github').catch(() => {});
     issueDataService.invalidateTracker('linear').catch(() => {});
     issueDataService.invalidateTracker('rally').catch(() => {});
+    issueDataService.invalidateTracker('jira').catch(() => {});
 
     return jsonResponse(result);
   });
@@ -265,18 +280,21 @@ export function bulkCloseOut(body: Record<string, unknown>) {
         );
         // PAN-3917: the pull request owns "merged"; nothing mirrors it.
         let allowPausedMerged = false;
+        let mergedPrUrl: string | undefined;
         try {
           const { fetchIssuePullRequest } = await import('./pull-requests.js');
-          allowPausedMerged = Boolean((await fetchIssuePullRequest(id)).pr?.mergedAt);
+          const { pr } = await fetchIssuePullRequest(id);
+          allowPausedMerged = Boolean(pr?.mergedAt);
+          if (pr?.mergedAt) mergedPrUrl = pr.url;
         } catch { /* forge unreachable — treat as not merged */ }
         void cachedIssue;
         const hasActiveAgent = await hasActiveAgentForIssue(id, allowPausedMerged);
-        return { id, hasActiveAgent };
+        return { id, hasActiveAgent, mergedPrUrl };
       })),
       { concurrency: 10 },
     );
 
-    for (const { id, hasActiveAgent } of agentChecks) {
+    for (const { id, hasActiveAgent, mergedPrUrl } of agentChecks) {
       if (hasActiveAgent) {
         tasks.push({ id, skipped: true, error: 'Skipped: active agent running' });
         continue;
@@ -295,6 +313,7 @@ export function bulkCloseOut(body: Record<string, unknown>) {
         ...(githubCheck.isGitHub && githubCheck.owner && githubCheck.repo && githubCheck.number
           ? { github: { owner: githubCheck.owner, repo: githubCheck.repo, number: githubCheck.number } }
           : {}),
+        ...(mergedPrUrl && resolveTrackerType(id) === 'jira' ? { prUrl: mergedPrUrl } : {}),
       };
 
       const issueSource = issueDataService.getIssueSource(id);
@@ -386,6 +405,7 @@ export function bulkCloseOut(body: Record<string, unknown>) {
     if (anySucceeded) {
       issueDataService.invalidateTracker('github').catch((e: Error) => { console.error('Failed to invalidate github tracker:', e); });
       issueDataService.invalidateTracker('linear').catch((e: Error) => { console.error('Failed to invalidate linear tracker:', e); });
+      issueDataService.invalidateTracker('jira').catch((e: Error) => { console.error('Failed to invalidate jira tracker:', e); });
     }
 
     return jsonResponse({ results });
