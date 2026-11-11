@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-5122",
+  "created": "2026-11-11T10:01:02.133Z",
+  "updated": "2026-11-11T10:01:02.133Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-11T10:01:02.132Z"
+    }
+  ],
+  "agentModel": "claude-opus-5-5"
+}
