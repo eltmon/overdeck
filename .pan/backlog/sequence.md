@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-11T07:33:21.789394Z · model: claude-opus-5-5 · open: 868_
+_Last sequenced: 2026-11-11T07:36:26.950576Z · model: claude-opus-5-5 · open: 869_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -872,6 +872,7 @@ _Last sequenced: 2026-11-11T07:33:21.789394Z · model: claude-opus-5-5 · open: 
 | 865 | PAN-4842 | S | medium | ok |  |  | Phone app W-DOC: phone-app.mdx and updates to Anywhere, push, tailscale and service docs; finished last. |
 | 866 | PAN-4851 | S | low | needs-refinement |  |  | Open question: opt-in Overdeck reviewer for Deft-pipeline issues; operator says low priority, do not plan or start without them |
 | 867 | PAN-4887 | M | medium | ok |  |  | Phone app: let phone credentials reach linked machines (fleet Needs-you, linked-conv proxy, /ws/linked); PAN-4835 merged. |
+| 868 | PAN-5122 | S | high | ok |  |  | Terminal tab says 'not running' for every Codex/OpenCode conv on Herdr: companion owner check is tmux-only. Add Herdr host. |
 | 872 | PAN-5123 | XS | low | ok |  |  | Docs only: add the five Skills-page named classes to STYLE-GUIDE.md and the pan-style-guide skill so new pages reuse them. |
 
 ## Rationale detail
@@ -1203,10 +1204,10 @@ New this pass. The deployment gate's queue message is unusually good — it name
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-11T07:33:21.789394Z",
+  "generatedAt": "2026-11-11T07:36:26.950576Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 868,
+  "openCount": 869,
   "nodes": [
     {
       "issue": "PAN-5071",
@@ -12000,6 +12001,19 @@ New this pass. The deployment gate's queue message is unusually good — it name
       "dependsOn": [],
       "why": "Docs only: add the five Skills-page named classes to STYLE-GUIDE.md and the pan-style-guide skill so new pages reuse them.",
       "rationale": "New issue; cosmetic design-system documentation with no pipeline impact, so it ranks at the tail.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5122",
+      "rank": 868,
+      "size": "S",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Terminal tab says 'not running' for every Codex/OpenCode conv on Herdr: companion owner check is tmux-only. Add Herdr host.",
+      "rationale": "Restored after the previous run dropped it from the manifest; it is in-pipeline with a live workspace, so it takes the free rank slot 868 instead of re-ranking 800 nodes. Importance and score carry over from its earlier rank-51 node: the companion-terminal host checks owner existence with tmux has-session only, so the native-CLI Terminal tab is broken on Herdr for every Codex and OpenCode conversation.",
       "gate": "auto",
       "planning": "auto"
     }
