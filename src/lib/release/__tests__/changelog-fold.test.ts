@@ -3,6 +3,7 @@ import {
   type ChangelogEntryFile,
   foldChangelogEntries,
   formatReleaseDate,
+  hasUpcomingBlock,
   parseChangelogEntry,
 } from '../changelog-fold.js';
 
@@ -226,6 +227,16 @@ describe('parseChangelogEntry', () => {
       content: '#### New\n\n- costs &#36;2 and loves &lt;3\n',
     });
     expect(parsed.get('New')).toEqual([['- costs &#36;2 and loves &lt;3']]);
+  });
+});
+
+describe('hasUpcomingBlock', () => {
+  it('detects the single-quoted form', () => {
+    expect(hasUpcomingBlock("<Update label='v0.80.0' description='Unreleased' tags={['Upcoming']}>")).toBe(true);
+  });
+
+  it('does not flag a dated release block', () => {
+    expect(hasUpcomingBlock('<Update label="v0.79.0" description="2026-11-11">')).toBe(false);
   });
 });
 

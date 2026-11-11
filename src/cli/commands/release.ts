@@ -4,7 +4,7 @@ import chalk from 'chalk';
 import { execFileSync, execSync, spawn } from 'child_process';
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync, type Dirent } from 'fs';
 import { readdir, unlink } from 'fs/promises';
-import { dirname, join } from 'path';
+import { basename, dirname, join } from 'path';
 import { resolveBunBinary } from '../../lib/deploy/build-from-origin.js';
 import {
   CHANGELOG_ENTRY_FILE_NAME,
@@ -538,7 +538,7 @@ async function releaseCheckCommand(): Promise<void> {
 export interface ChangelogFoldPlan {
   changelogPath: string;
   content: string;
-  entryPaths: string[];
+  entries: { path: string; content: string }[];
 }
 
 export type ChangelogFoldOutcome =
@@ -588,12 +588,23 @@ export function planChangelogFold(
   }
 
   const content = foldChangelogEntries({ changelog, entries, version, date: formatReleaseDate(now) });
-  return { kind: 'fold', plan: { changelogPath, content, entryPaths: names.map((name) => join(dir, name)) } };
+  const planEntries = entries.map((entry) => ({ path: join(dir, entry.fileName), content: entry.content }));
+  return { kind: 'fold', plan: { changelogPath, content, entries: planEntries } };
 }
 
+// PAN-5137: re-reads every entry right before writing/deleting, in case an operator (or
+// another process) edited one of them during the minutes-long preflight that runs
+// between planChangelogFold and this call. Throws before any write if one changed, so a
+// late edit is never silently folded with stale content and then deleted.
 export function applyChangelogFold(plan: ChangelogFoldPlan): void {
+  for (const entry of plan.entries) {
+    const current = readFileSync(entry.path, 'utf8');
+    if (current !== entry.content) {
+      throw new Error(`changelog.d/${basename(entry.path)} changed after planning; rerun pan release stable`);
+    }
+  }
   writeFileSync(plan.changelogPath, plan.content);
-  for (const path of plan.entryPaths) rmSync(path);
+  for (const entry of plan.entries) rmSync(entry.path);
 }
 
 async function releaseCreateCommand(
@@ -641,6 +652,11 @@ async function releaseCreateCommand(
   const bunBinary = await resolveBunBinary(repoRoot);
 
   let committed = false;
+  // Tracks whether applyChangelogFold actually ran, not merely whether a fold was
+  // planned: the catch below must restore changelog.mdx/changelog.d only when this run
+  // wrote to them, never when it only planned to and failed before applying (PAN-5137
+  // review: an edit made to an untouched entry during preflight must survive rollback).
+  let changelogApplied = false;
   try {
     pkg.version = resolvedVersion;
     writePackageJson(repoRoot, pkg);
@@ -667,7 +683,8 @@ async function releaseCreateCommand(
 
     if (changelogFold.kind === 'fold') {
       applyChangelogFold(changelogFold.plan);
-      const count = changelogFold.plan.entryPaths.length;
+      changelogApplied = true;
+      const count = changelogFold.plan.entries.length;
       console.log(chalk.dim(`Folded ${count} changelog.d entr${count === 1 ? 'y' : 'ies'} into changelog.mdx.`));
     } else if (changelogFold.reason === 'no-entries') {
       console.log(chalk.dim(changelogFold.message));
@@ -681,7 +698,7 @@ async function releaseCreateCommand(
       `git add package.json apps/desktop/package.json packages/contracts/package.json bun.lock ${releaseNotesPath}`,
       repoRoot
     );
-    if (changelogFold.kind === 'fold') run('git add -A -- changelog.mdx changelog.d', repoRoot);
+    if (changelogApplied) run('git add -A -- changelog.mdx changelog.d', repoRoot);
     // Idempotent: when retagging the same version after a CI failure, the package
     // bumps and release notes are already on HEAD. Skip the commit if nothing
     // staged. Tagging is still meaningful because the tag may have been deleted.
@@ -711,7 +728,7 @@ async function releaseCreateCommand(
       } catch {
         // The restore is best-effort; the original error matters more.
       }
-      if (changelogFold.kind === 'fold') {
+      if (changelogApplied) {
         try {
           run('git restore --source=HEAD --staged --worktree -- changelog.mdx changelog.d', repoRoot);
         } catch {

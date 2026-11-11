@@ -34,13 +34,17 @@ Do not recommend GitFlow or a long-lived `develop` branch unless the user explic
 
 ## Preferred operator flow
 
-Every stable release updates the public changelog and ends with a clean-install
-check. Neither step is optional.
+Every stable release checks the pending changelog entries and ends with a
+clean-install check. Neither step is optional, though the public changelog
+itself is left unchanged when there are no pending entries or the target
+version's block already exists (a retag).
 
 1. **Check the pending entries.** Run `ls changelog.d` and fix any wording you
    want to change, in a normal commit, before releasing. `pan release stable`
    folds every entry file into a dated `<Update>` block at the top of
-   `changelog.mdx` and deletes the entry files in the release commit; it
+   `changelog.mdx` and deletes the entry files in the release commit, unless
+   there are no entries or a block for the target version already exists, in
+   which case it leaves `changelog.mdx` unchanged and still releases; it
    refuses to proceed on a malformed entry, a misnamed file, or a leftover
    Upcoming block, and `pan release canary` never folds. Details:
    `docs/RELEASING.md`, "Update the public changelog".

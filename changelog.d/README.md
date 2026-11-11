@@ -1,6 +1,6 @@
 # changelog.d
 
-Each PR that changes something users notice adds one file here, `changelog.d/<issue>.md` (lowercase issue ID, for example `pan-5137.md`). Do not edit the top of `changelog.mdx`: one file per PR means concurrent PRs never conflict.
+Each PR that changes something users notice adds one file here, `changelog.d/<issue>.md` (lowercase issue ID, for example `pan-5137.md`). Do not edit the top of `changelog.mdx`: one file per PR means concurrent PRs never conflict. If a second PR for the same issue is already open with its own `changelog.d/<issue>.md`, name yours `changelog.d/<issue>-<pr>.md` instead, so the two branches never add the same file.
 
 `pan release stable` folds every file except this README into a dated `<Update>` block at the top of `changelog.mdx`, sections in the order New, Improved, Fixed, and deletes the files in the release commit.
 

@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 // changelog.d/<issue>.md entry file must merge with no conflict, because they are the
 // fix for every PR sharing one Upcoming block in changelog.mdx.
 
-const GIT_IDENTITY = ['-c', 'user.name=t', '-c', 'user.email=t@example.invalid'];
+const GIT_IDENTITY = ['-c', 'user.name=t', '-c', 'user.email=t@example.invalid', '-c', 'commit.gpgsign=false'];
 const tempDirs: string[] = [];
 
 afterEach(() => {

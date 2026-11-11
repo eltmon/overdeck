@@ -154,8 +154,14 @@ export function formatReleaseDate(now: Date): string {
   return `${year}-${month}-${day}`;
 }
 
+// Matches tags={["Upcoming"]}/tags={['Upcoming']} and description="Unreleased"/'Unreleased',
+// independent of quote style or incidental whitespace inside the braces.
+// Mirrors hasUpcomingBlock in scripts/lint-docs.js; keep both identical.
+const UPCOMING_TAG = /tags\s*=\s*\{\s*\[\s*['"]Upcoming['"]\s*\]\s*\}/;
+const UNRELEASED_DESCRIPTION = /description\s*=\s*['"]Unreleased['"]/;
+
 export function hasUpcomingBlock(changelog: string): boolean {
-  return changelog.includes('tags={["Upcoming"]}') || changelog.includes('description="Unreleased"');
+  return UPCOMING_TAG.test(changelog) || UNRELEASED_DESCRIPTION.test(changelog);
 }
 
 export function foldChangelogEntries(params: {

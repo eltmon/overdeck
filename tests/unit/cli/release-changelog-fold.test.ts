@@ -74,7 +74,7 @@ describe('planChangelogFold', () => {
     expect(outcome.plan.content).toContain('<Update label="v0.80.0" description="2026-11-12">');
     expect(outcome.plan.content).toContain('- **First bullet.**');
     expect(outcome.plan.content).toContain('- **Second bullet.**');
-    expect(outcome.plan.entryPaths.sort()).toEqual(
+    expect(outcome.plan.entries.map((entry) => entry.path).sort()).toEqual(
       [join(repoRoot, 'changelog.d', 'pan-1.md'), join(repoRoot, 'changelog.d', 'pan-2.md')].sort()
     );
 
@@ -83,6 +83,24 @@ describe('planChangelogFold', () => {
     expect(() => readFileSync(join(repoRoot, 'changelog.d', 'pan-1.md'), 'utf8')).toThrow();
     expect(() => readFileSync(join(repoRoot, 'changelog.d', 'pan-2.md'), 'utf8')).toThrow();
     expect(readFileSync(join(repoRoot, 'changelog.d', 'README.md'), 'utf8')).toBe('# changelog.d\n');
+  });
+
+  it('refuses to apply, and deletes nothing, when an entry changed after planning', () => {
+    writeChangelog(BASE_CHANGELOG);
+    writeEntry('pan-1.md', '#### New\n\n- **Original bullet.**\n');
+    writeEntry('pan-2.md', '#### Fixed\n\n- **Second bullet.**\n');
+
+    const outcome = planChangelogFold(repoRoot, 'stable', '0.80.0', new Date(2026, 10, 12));
+    if (outcome.kind !== 'fold') throw new Error('expected fold');
+
+    // Simulates an operator editing an entry's wording during the minutes-long preflight
+    // that runs between planChangelogFold and applyChangelogFold.
+    writeEntry('pan-1.md', '#### New\n\n- **Edited after planning.**\n');
+
+    expect(() => applyChangelogFold(outcome.plan)).toThrow(/pan-1\.md changed after planning/);
+    expect(readFileSync(join(repoRoot, 'changelog.mdx'), 'utf8')).toBe(BASE_CHANGELOG);
+    expect(readFileSync(join(repoRoot, 'changelog.d', 'pan-1.md'), 'utf8')).toBe('#### New\n\n- **Edited after planning.**\n');
+    expect(readFileSync(join(repoRoot, 'changelog.d', 'pan-2.md'), 'utf8')).toBe('#### Fixed\n\n- **Second bullet.**\n');
   });
 
   it('throws on a misnamed file and writes nothing', () => {

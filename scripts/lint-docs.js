@@ -78,6 +78,16 @@ export function findChangelogEntryProblems(fileName, content) {
   let currentSection = null;
   let hasCurrentBullet = false;
 
+  // Checked per bullet/continuation line, not via findMdxProblems(content) on the whole
+  // file: findMdxProblems skips fenced code (including an indented fence), but
+  // checkMdxSafety in src/lib/release/changelog-fold.ts does not, so a fence-skipping
+  // check here would accept an entry that the release-time fold would still reject.
+  const checkLineSafety = (line, lineNo) => {
+    const prose = stripInlineCode(line);
+    if (prose.includes('$')) problems.push({ line: lineNo, message: DOLLAR_MESSAGE });
+    if (/<\d/.test(prose)) problems.push({ line: lineNo, message: LT_DIGIT_MESSAGE });
+  };
+
   lines.forEach((line, index) => {
     const lineNo = index + 1;
     if (line.trim() === '') return;
@@ -103,10 +113,14 @@ export function findChangelogEntryProblems(fileName, content) {
       }
       bulletCounts.set(currentSection, bulletCounts.get(currentSection) + 1);
       hasCurrentBullet = true;
+      checkLineSafety(line, lineNo);
       return;
     }
 
-    if (/^ {2,}/.test(line) && hasCurrentBullet) return;
+    if (/^ {2,}/.test(line) && hasCurrentBullet) {
+      checkLineSafety(line, lineNo);
+      return;
+    }
 
     problems.push({
       line: lineNo,
@@ -121,7 +135,17 @@ export function findChangelogEntryProblems(fileName, content) {
     if (count === 0) problems.push({ line: 0, message: `#### ${section} has no bullets` });
   }
 
-  return [...problems, ...findMdxProblems(content)];
+  return problems;
+}
+
+// Matches tags={["Upcoming"]}/tags={['Upcoming']} and description="Unreleased"/'Unreleased',
+// independent of quote style or incidental whitespace inside the braces.
+// Mirrors hasUpcomingBlock in src/lib/release/changelog-fold.ts; keep both identical.
+const UPCOMING_TAG = /tags\s*=\s*\{\s*\[\s*['"]Upcoming['"]\s*\]\s*\}/;
+const UNRELEASED_DESCRIPTION = /description\s*=\s*['"]Unreleased['"]/;
+
+export function hasUpcomingBlock(content) {
+  return UPCOMING_TAG.test(content) || UNRELEASED_DESCRIPTION.test(content);
 }
 
 function checkChangelog(root) {
@@ -131,10 +155,8 @@ function checkChangelog(root) {
   const changelogPath = join(root, 'changelog.mdx');
   if (existsSync(changelogPath)) {
     const changelog = readFileSync(changelogPath, 'utf-8');
-    if (changelog.includes('tags={["Upcoming"]}') || changelog.includes('description="Unreleased"')) {
-      const lineIndex = changelog
-        .split('\n')
-        .findIndex((line) => line.includes('tags={["Upcoming"]}') || line.includes('description="Unreleased"'));
+    if (hasUpcomingBlock(changelog)) {
+      const lineIndex = changelog.split('\n').findIndex((line) => hasUpcomingBlock(line));
       console.error(
         `changelog.mdx:${lineIndex + 1}: Upcoming/Unreleased block found; put each PR's bullets in changelog.d/<issue>.md (see changelog.d/README.md); pan release stable folds them`,
       );

@@ -4,7 +4,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
-import { collectPublishedPages, findChangelogEntryProblems, findMdxProblems, stripInlineCode } from '../../../scripts/lint-docs.js';
+import {
+  collectPublishedPages,
+  findChangelogEntryProblems,
+  findMdxProblems,
+  hasUpcomingBlock,
+  stripInlineCode,
+} from '../../../scripts/lint-docs.js';
 
 const DOLLAR = '&#36;';
 const LT = '&lt;';
@@ -160,6 +166,26 @@ describe('findChangelogEntryProblems', () => {
     const problems = findChangelogEntryProblems('pan-1.md', '#### New\n\n- i love you <3\n');
     expect(problems.some((p) => p.message.includes(LT))).toBe(true);
   });
+
+  it('rejects a dollar sign inside an indented fence under a bullet', () => {
+    const content = '#### Fixed\n\n- bullet\n  ~~~\n  $2\n  ~~~\n';
+    const problems = findChangelogEntryProblems('pan-1.md', content);
+    expect(problems.some((p) => p.message.includes(DOLLAR))).toBe(true);
+  });
+});
+
+describe('hasUpcomingBlock', () => {
+  it('detects the double-quoted form', () => {
+    expect(hasUpcomingBlock('<Update label="v0.80.0" description="Unreleased" tags={["Upcoming"]}>')).toBe(true);
+  });
+
+  it('detects the single-quoted form', () => {
+    expect(hasUpcomingBlock("<Update label='v0.80.0' description='Unreleased' tags={['Upcoming']}>")).toBe(true);
+  });
+
+  it('does not flag a dated release block', () => {
+    expect(hasUpcomingBlock('<Update label="v0.79.0" description="2026-11-11">')).toBe(false);
+  });
 });
 
 describe('collectPublishedPages', () => {
@@ -262,6 +288,20 @@ describe('lint-docs CLI', () => {
     expect(ok).toBe(false);
     expect(output).toContain('Upcoming/Unreleased block found');
     expect(output).toContain('changelog.d/<issue>.md');
+  });
+
+  it('fails with Upcoming/Unreleased block found for a single-quoted Update opener', () => {
+    const root = makeRoot();
+    writeDocsJson(root, []);
+    writeFileSync(
+      join(root, 'changelog.mdx'),
+      "<Update label='v0.80.0' description='Unreleased' tags={['Upcoming']}>\n  #### Fixed\n\n  - bullet\n</Update>\n",
+    );
+
+    const { ok, output } = run(root);
+
+    expect(ok).toBe(false);
+    expect(output).toContain('Upcoming/Unreleased block found');
   });
 
   it('fails and names the offending changelog.d entry', () => {
