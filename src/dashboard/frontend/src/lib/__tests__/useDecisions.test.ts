@@ -3,12 +3,13 @@ import { renderHook } from '@testing-library/react';
 import { createElement, type ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { DiskAlertSnapshot, HarnessAutoUpdateSnapshot } from '@overdeck/contracts';
+import type { BackendRestartRecoverySnapshot, DiskAlertSnapshot, HarnessAutoUpdateSnapshot } from '@overdeck/contracts';
 import { useDashboardStore } from '../store';
 import { describePendingInput } from '../pendingInput';
 import { DISK_ALERT_QUERY_KEY } from '../diskAlert';
 import { HARNESS_AUTO_UPDATE_QUERY_KEY } from '../harnessAutoUpdate';
-import { type AgentRequestRow, diskAlertDecisions, harnessUpdateDecisions, isBlockingDecision, useDecisions } from '../useDecisions';
+import { BACKEND_RESTART_RECOVERY_QUERY_KEY } from '../backendRestartRecovery';
+import { type AgentRequestRow, backendRestartDecisions, diskAlertDecisions, harnessUpdateDecisions, isBlockingDecision, useDecisions } from '../useDecisions';
 import type { McpSignInApproval } from '../../components/Settings/anywhere/anywhereApi';
 
 interface RenderDecisionsOptions {
@@ -21,6 +22,8 @@ interface RenderDecisionsOptions {
   diskAlert?: DiskAlertSnapshot | null;
   /** PAN-5108: the cached `/api/harness-auto-update` snapshot. */
   harnessAutoUpdate?: HarnessAutoUpdateSnapshot | null;
+  /** PAN-5091: the cached `/api/backend-restart-recovery` snapshot. */
+  backendRestart?: BackendRestartRecoverySnapshot | null;
 }
 
 function renderDecisions(
@@ -38,6 +41,7 @@ function renderDecisions(
   queryClient.setQueryData(['mcp-oauth-approvals'], options.mcpApprovals ?? []); // PAN-4946
   queryClient.setQueryData(DISK_ALERT_QUERY_KEY, options.diskAlert ?? null); // PAN-5093
   queryClient.setQueryData(HARNESS_AUTO_UPDATE_QUERY_KEY, options.harnessAutoUpdate ?? null); // PAN-5108
+  queryClient.setQueryData(BACKEND_RESTART_RECOVERY_QUERY_KEY, options.backendRestart ?? null); // PAN-5091
 
   return renderHook(() => useDecisions(), {
     wrapper: ({ children }: { children: ReactNode }) =>
@@ -427,5 +431,46 @@ describe('useDecisions disk alert integration (PAN-5093)', () => {
     await queryClient.refetchQueries({ queryKey: DISK_ALERT_QUERY_KEY }).catch(() => {});
     expect(result.current.some((d) => d.kinds.includes('diskLow'))).toBe(true);
     fetchSpy.mockRestore();
+  });
+});
+
+describe('backendRestartDecisions (PAN-5091)', () => {
+  const offer = (overrides: Partial<BackendRestartRecoverySnapshot> = {}): BackendRestartRecoverySnapshot => ({
+    lostAt: '2026-11-06T09:13:00.000Z',
+    conversations: [{ name: 'a', title: 'Fernkite deploy' }, { name: 'b', title: null }],
+    run: null,
+    ...overrides,
+  });
+
+  it('returns no decision for a null snapshot, an empty offer, or another shape', () => {
+    expect(backendRestartDecisions(null)).toEqual([]);
+    expect(backendRestartDecisions(offer({ lostAt: null, conversations: [] }))).toEqual([]);
+    expect(backendRestartDecisions({} as unknown as BackendRestartRecoverySnapshot)).toEqual([]);
+  });
+
+  it('returns one non-blocking decision that counts the stopped conversations', () => {
+    const [decision, ...rest] = backendRestartDecisions(offer());
+    expect(rest).toEqual([]);
+    expect(decision).toMatchObject({
+      id: 'backend-restart',
+      label: '2 conversations stopped when the terminal backend restarted',
+      kinds: ['backendRestart'],
+      blocking: false,
+      since: '2026-11-06T09:13:00.000Z',
+    });
+    expect(backendRestartDecisions(offer({ conversations: [{ name: 'a', title: null }] }))[0]!.label)
+      .toBe('1 conversation stopped when the terminal backend restarted');
+    expect(describePendingInput(['backendRestart'])).toBe('Stopped by a terminal-backend restart');
+  });
+
+  it('stays while Resume all runs, even after the last conversation left the offer', () => {
+    const run = { state: 'running' as const, startedAt: '2026-11-06T09:20:00.000Z', finishedAt: null, current: 'b', waitingForMemory: false, results: [] };
+    const [decision] = backendRestartDecisions(offer({ lostAt: null, conversations: [], run }));
+    expect(decision).toMatchObject({ label: 'Resuming conversations after a terminal-backend restart', since: run.startedAt });
+  });
+
+  it('reaches useDecisions from the cached snapshot', () => {
+    const { result } = renderDecisions([], [], { backendRestart: offer() });
+    expect(result.current.filter((d) => d.backendRestart).map((d) => d.id)).toEqual(['backend-restart']);
   });
 });

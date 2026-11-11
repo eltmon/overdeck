@@ -143,6 +143,43 @@ one pane process stopped the whole unit, and `KillMode=control-group` then kille
 one 660 MB OBS browser process took down every conversation). The unit sets `OOMPolicy=continue`, so only
 the killed process dies. `pan install`/`pan sync` rewrite the unit and run `daemon-reload`, which applies
 the policy to a running server without restarting it.
+
+See [After a session-server restart (PAN-5091)](#after-a-session-server-restart-pan-5091) for what
+Overdeck does when one restarts anyway.
+
+### After a session-server restart (PAN-5091)
+
+A Herdr session server can still restart on its own: a crash, an OOM stop, a unit restart. Because
+`resume_agents_on_restore = false`, no harness comes back, and every agent and conversation pane is
+gone. Overdeck never resumes them automatically: relaunching about 40 harnesses into a host that just
+ran out of memory can cause the same OOM again. It offers a supervised resume of the conversations
+instead (`src/dashboard/server/services/backend-restart-recovery.ts`, primary dashboard only):
+
+1. **Lost.** `backend-inventory.ts` fires `lost` (`onBackendConnectionChange`) when an event stream
+   that was open ends. The service records the operator conversations (`conv-` sessions, not the
+   backfilled `agent-*` rows) whose row is `active`, or ended within the last 60 s
+   (`RESTART_EXIT_WINDOW_MS`; the supervisor's exit event can end a row just before the stream drops).
+   The conversation lifecycle poll ends no row while the backend is unreadable, so the rows still say
+   which conversations were live.
+2. **Restored.** `restored` fires when a re-opened stream is up on a fresh, non-degraded snapshot. The
+   service keeps only the recorded conversations whose harness `listLiveConversationSessions` does not
+   report, so a stream blip offers nothing. The list only shrinks after this, so a conversation that
+   dies later is never offered as a restart casualty.
+3. **Offer.** `GET /api/backend-restart-recovery` (`read:conversations`) serves the list as one
+   Needs-you row (`BackendRestartCard`). Each read drops conversations that are live again, archived, or
+   stopped on purpose since the loss (the Stop route, `pan flywheel pause` and lane reap record the stop
+   in `conversation-stop-marks.ts`), and hides those paused (`pan pause`), holding a `--hold` kickoff,
+   or owned by another machine.
+4. **Resume all.** `POST /api/backend-restart-recovery/resume-all` (`operate`) resumes them one at a
+   time through `handleConversationResume` with resume cause `system`, so the resume contract says the
+   process ended unexpectedly. Before each one it waits while `assessMemoryPressure` is not `ok`
+   (`MEMORY_WAIT_MS`, 15 s between checks) and re-checks the skip rules. `POST
+   /api/backend-restart-recovery/dismiss` drops the offer.
+
+The state is in memory only: a dashboard restart forgets the offer. tmux hosts never fire the edges,
+because the tmux adapter has no event stream. Work agents are out of scope; `pan resume <id>` resumes
+one. A single conversation resumes with `pan conversations resume <name>` or the MCP
+`resume_conversation` tool, over `POST /api/conversations/:name/resume`.
 `pan doctor` reports `Terminal backend`, `Herdr binary`, `Herdr server`, `Herdr config`, and one
 `Herdr integration: <target>` row per target.
 

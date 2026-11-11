@@ -25,6 +25,7 @@ import {
 import { healAction } from './heal.js';
 import { pendingAction } from './pending.js';
 import { pullAction, reclaimAction } from './pull.js';
+import { resumeAction } from './resume.js';
 
 function collectRepeatable(value: string, previous: string[] = []): string[] {
   return [...previous, value];
@@ -117,6 +118,13 @@ export function registerConversationsCommands(program: Command): void {
     .description('List messages queued to send when the conversation\'s usage limit resets')
     .option('--json', 'Print JSON')
     .action((conv: string, opts: { json?: boolean }) => pendingAction(conv, opts));
+
+  // ── resume (PAN-5091) ───────────────────────────────────────────────────────
+  conversations
+    .command('resume <name>')
+    .description('Resume a stopped conversation (@<machine>/<name> for one on a linked machine); reattaches if it still runs')
+    .option('--json', 'Print the resumed conversation as JSON')
+    .action((name: string, opts: { json?: boolean }) => resumeAction(name, opts));
 
   // ── pull / reclaim (PAN-4650) ───────────────────────────────────────────────
   conversations

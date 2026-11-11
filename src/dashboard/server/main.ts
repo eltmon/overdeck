@@ -282,6 +282,7 @@ console.log(`[overdeck] AgentEnrichmentService started${isPeerDashboard ? ' (pee
 if (!isPeerDashboard) {
   startNeedsYouPushService({ readConversationFeed: () => getConversationsPendingInputFeed(conversationReadDependencies) });
   startDiskAlertService(); // PAN-5093
+  void import('./services/backend-restart-recovery.js').then((m) => m.startBackendRestartRecovery()); // PAN-5091
   startHarnessAutoUpdateService(); // PAN-5108
   startLiveActivityService();
 }

@@ -91,6 +91,7 @@ import { piSessionsRoot } from '../runtimes/storage/pi.js';
 import { conversationContextEnvExports, conversationLaunchContext, type ConversationLaunchContext } from './conversation-launch-context.js';
 import { ConversationCreateInputError, parseConversationLaunchContext, resolveConversationCreateTarget } from './conversation-create-input.js';
 import { FLYWHEEL_CONVERSATION_SESSION } from '../flywheel/constants.js';
+import { recordConversationStop } from './conversation-stop-marks.js';
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 const PROCESS_CLEANUP_GRACE_MS = 750;
@@ -1062,6 +1063,7 @@ export async function handleConversationStop(name: string, deps: { resolveSessio
     const conv = isSupersededConversation(requested) ? resolveClearChainHead(requested) : requested;
     if (conv !== requested && requested.status !== 'ended') markConversationEnded(requested.name);
     if (!conv) return jsonResponse({ success: true });
+    recordConversationStop(conv.name); // PAN-5091: a deliberate stop, never offered for restart recovery
     await stopConversationRuntime(conv, conv.name);
     markConversationEnded(conv.name);
     void (async () => {

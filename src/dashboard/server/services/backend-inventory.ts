@@ -374,6 +374,31 @@ function publishDelta(previous: BackendPaneCache | null, next: BackendPaneCache)
   }
 }
 
+/**
+ * PAN-5091: the backend's connection edges. `lost` fires when an event stream
+ * that was open ends (the server stopped, crashed or restarted). `restored`
+ * fires when a re-opened stream is up again on a fresh, non-degraded snapshot.
+ * A stream blip fires both; the listener decides what changed.
+ */
+export interface BackendConnectionListener {
+  lost(): void;
+  restored(): void;
+}
+
+let connectionListener: BackendConnectionListener | null = null;
+
+export function onBackendConnectionChange(listener: BackendConnectionListener | null): void {
+  connectionListener = listener;
+}
+
+function notifyConnection(edge: keyof BackendConnectionListener): void {
+  try {
+    connectionListener?.[edge]();
+  } catch (error) {
+    console.warn(`[backend-inventory] connection listener failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
 /** How long a snapshot is served before another `list()` is issued. */
 export const INVENTORY_TTL_MS = 5_000;
 
@@ -528,6 +553,7 @@ async function openEventStream(deps: BackendInventoryDeps, reopening: boolean): 
       stream.close();
       return;
     }
+    if (!inventoryDegraded) notifyConnection('restored');
   }
   const generation = ++streamGeneration;
   eventStreamClose = () => stream.close();
@@ -551,6 +577,7 @@ async function openEventStream(deps: BackendInventoryDeps, reopening: boolean): 
     // Stopped, or superseded by a newer stream: nothing to re-open.
     if (generation !== streamGeneration || !inventoryStarted) return;
     eventStreamClose = null;
+    notifyConnection('lost');
     if (Date.now() - openedAt >= EVENT_STREAM_STABLE_MS) {
       // A stream that held (even a quiet one) resets the backoff and the warning.
       retryDelayMs = EVENT_STREAM_RETRY_MIN_MS;
@@ -592,4 +619,5 @@ export function _resetBackendInventoryForTests(): void {
   inFlight = null;
   stopBackendInventory();
   paneListener = null;
+  connectionListener = null;
 }

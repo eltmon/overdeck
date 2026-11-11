@@ -19,6 +19,7 @@ import { AgentRequestCard } from './AgentRequestCard';
 import { DiskAlertCard } from './DiskAlertCard';
 import { UnreachableMachineCard } from './UnreachableMachineCard';
 import { HarnessUpdateCard } from './HarnessUpdateCard';
+import { BackendRestartCard } from './BackendRestartCard';
 import { McpSignInCard } from './McpSignInCard';
 import { AwaitingInputIndicator } from './AwaitingInputIndicator';
 import { formatRelativeTime } from '../lib/formatRelativeTime';
@@ -156,6 +157,9 @@ function Group({ title, hint, decisions, onOpenSubject }: { title: string; hint:
           // PAN-5108 — a failed harness update has its own card: nothing to answer or open.
           : d.harnessUpdate
           ? <HarnessUpdateCard key={`harness-update:${d.id}`} decision={d} />
+          // PAN-5091: conversations a terminal-backend restart stopped, with Resume all.
+          : d.backendRestart
+          ? <BackendRestartCard key="backend-restart" decision={d} />
           // PAN-4946 — an MCP sign-in has its own card, checked before agentRequest.
           : d.mcpSignIn
           ? <McpSignInCard key={`mcp-sign-in:${d.id}`} decision={d} />
@@ -174,7 +178,8 @@ export function DecisionsPanel({ onOpenSubject }: { onOpenSubject?: (d: Decision
   // gets its own group and never "Blocking work"'s hint, even at critical.
   // PAN-5108 — a failed harness update is machine state too.
   // PAN-5111 — so is an unreachable linked machine.
-  const isSystem = (d: Decision) => Boolean(d.diskAlert || d.harnessUpdate || d.unreachableMachine);
+  // PAN-5091: and the conversations a terminal-backend restart stopped.
+  const isSystem = (d: Decision) => Boolean(d.diskAlert || d.harnessUpdate || d.unreachableMachine || d.backendRestart);
   const system = decisions.filter(isSystem);
   const blocking = decisions.filter((d) => d.blocking && !isSystem(d));
   const waiting = decisions.filter((d) => !d.blocking && !isSystem(d));

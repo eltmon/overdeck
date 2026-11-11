@@ -49,6 +49,9 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/github-quota',                         kind: 'http', disposition: 'READ',       door: 'refreshGitHubQuotaSnapshot (PAN-4264); the same snapshot as the read model githubQuota' },
   { surface: 'GET /api/disk-alert',                           kind: 'http', disposition: 'READ',       door: 'getDiskAlertSnapshot (PAN-5093): disk alert level, free bytes and space holders' },
   { surface: 'GET /api/harness-auto-update',                  kind: 'http', disposition: 'READ',       door: 'getHarnessAutoUpdateSnapshot (PAN-5108): background harness CLI updater state and failures' },
+  { surface: 'GET /api/backend-restart-recovery',              kind: 'http', disposition: 'READ',       door: 'getBackendRestartRecoverySnapshot (PAN-5091): conversations a terminal-backend restart left stopped, and the Resume all run' },
+  { surface: 'POST /api/backend-restart-recovery/resume-all',   kind: 'http', disposition: 'WRITE',      door: 'startBackendRestartResumeAll (PAN-5091): handleConversationResume one at a time, waiting under memory pressure' },
+  { surface: 'POST /api/backend-restart-recovery/dismiss',      kind: 'http', disposition: 'WRITE',      door: 'dismissBackendRestartRecovery (PAN-5091): drop the in-memory offer' },
   { surface: 'GET /api/telemetry/client-config',              kind: 'http', disposition: 'READ',       door: 'telemetryClientConfig (PAN-5100): the machine telemetry setting for the phone app' },
 
   // ── admin.ts ──────────────────────────────────────────────────────────────

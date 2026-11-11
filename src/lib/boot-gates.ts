@@ -74,15 +74,14 @@ export function resolveBootGates(
           source: deaconSource ?? (deaconEnvDisabled ? 'env' as const : 'default' as const),
         };
 
-  // Agent auto-resume is ON by default (operator decision 2026-07-18, reversing
-  // the PAN-1963 default-off). A dashboard restart never touches live agents —
-  // running tmux sessions survive and are not reconciliation candidates. Stopped
-  // agents are still gated at boot by the operator popup (boot reconciliation
-  // opens the grace window in `pending`; a timeout with no answer resolves to
-  // `hold_all`, so nothing floods unattended). With resume on, the steady-state
-  // deacon patrols also auto-resume crashed/stopped agents mid-run. Opt out with
-  // `--no-resume` / OVERDECK_NO_RESUME=1 (an explicit no-resume still fast-paths
-  // boot reconciliation to hold_all).
+  // The resume gate is ON by default. It no longer resumes anything: the deacon
+  // auto-resume ladder and the boot `hold_all` reconciliation were deleted. A
+  // stopped conversation comes back only on a trigger (a queued or scheduled
+  // message, native /compact, `pan flywheel resume`, a Resume action). A dashboard
+  // restart never touches live sessions. `--no-resume` / OVERDECK_NO_RESUME=1
+  // still marks a human-driven boot: no autonomous backlog sequencer pass runs and
+  // `pan status` reports it. Conversations a terminal-backend restart stopped
+  // are offered, never resumed, as one Needs-you row (PAN-5091).
   const resume = options.resume === true
     ? { enabled: true, source: 'flag' as const }
     : explicitNoResume
