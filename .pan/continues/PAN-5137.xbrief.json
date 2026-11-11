@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5137",
   "created": "2026-11-11T18:41:59.017Z",
-  "updated": "2026-11-11T19:06:31.132Z",
+  "updated": "2026-11-11T19:06:36.480Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -140,6 +140,11 @@
     "docs-release.ac4": {
       "status": "completed",
       "doneAt": "2026-11-11T19:06:31.131Z"
+    },
+    "docs-agent-pointers": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5137",
+      "claimedAt": "2026-11-11T19:06:36.480Z"
     }
   }
 }
