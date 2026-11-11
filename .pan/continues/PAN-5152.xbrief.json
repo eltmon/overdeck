@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5152",
   "created": "2026-11-11T14:36:40.308Z",
-  "updated": "2026-11-11T15:33:40.189Z",
+  "updated": "2026-11-11T15:39:13.125Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -268,9 +268,22 @@
       "doneAt": "2026-11-11T15:33:38.398Z"
     },
     "wi14-reopen-reset-jira": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5152",
-      "claimedAt": "2026-11-11T15:33:40.189Z"
+      "claimedAt": "2026-11-11T15:33:40.189Z",
+      "doneAt": "2026-11-11T15:39:13.124Z"
+    },
+    "wi14-reopen-reset-jira.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:39:13.124Z"
+    },
+    "wi14-reopen-reset-jira.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:39:13.124Z"
+    },
+    "wi14-reopen-reset-jira.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:39:13.124Z"
     }
   }
 }
