@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5152",
   "created": "2026-11-11T14:36:40.308Z",
-  "updated": "2026-11-11T14:59:06.130Z",
+  "updated": "2026-11-11T14:59:08.329Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -70,6 +70,11 @@
     "wi3-jira-routing.ac4": {
       "status": "completed",
       "doneAt": "2026-11-11T14:59:06.130Z"
+    },
+    "wi4-prefix-collision-message": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5152",
+      "claimedAt": "2026-11-11T14:59:08.329Z"
     }
   }
 }
