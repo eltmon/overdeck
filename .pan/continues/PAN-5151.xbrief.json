@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5151",
   "created": "2026-11-11T14:34:32.001Z",
-  "updated": "2026-11-11T15:12:14.758Z",
+  "updated": "2026-11-11T15:16:42.960Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -182,9 +182,22 @@
       "doneAt": "2026-11-11T15:12:00.780Z"
     },
     "remote-refuse-auto": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5151",
-      "claimedAt": "2026-11-11T15:12:14.758Z"
+      "claimedAt": "2026-11-11T15:12:14.758Z",
+      "doneAt": "2026-11-11T15:16:42.959Z"
+    },
+    "remote-refuse-auto.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:16:42.959Z"
+    },
+    "remote-refuse-auto.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:16:42.959Z"
+    },
+    "remote-refuse-auto.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:16:42.959Z"
     }
   }
 }
