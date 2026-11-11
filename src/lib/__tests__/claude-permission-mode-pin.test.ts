@@ -163,4 +163,34 @@ describe('pinClaudePermissionModeOnce', () => {
 
     expect(result.outcome).toBe('skipped-test-runner');
   });
+
+  it('serializes two concurrent first decisions on the same new home (PAN-5151)', async () => {
+    const [a, b] = await Promise.all([
+      pinClaudePermissionModeOnce({ overdeckHome: home }),
+      pinClaudePermissionModeOnce({ overdeckHome: home }),
+    ]);
+
+    const outcomes = [a.outcome, b.outcome].sort();
+    expect(outcomes).toEqual(['already-decided', 'new-install']);
+    expect(existsSync(join(home, '.claude-permission-mode-pin.lock'))).toBe(false);
+  });
+
+  it('serializes two concurrent first decisions on an existing home without a valid key', async () => {
+    writeFileSync(yamlPath(), 'ui:\n  theme: broadsheet\n', 'utf8');
+
+    const [a, b] = await Promise.all([
+      pinClaudePermissionModeOnce({ overdeckHome: home }),
+      pinClaudePermissionModeOnce({ overdeckHome: home }),
+    ]);
+
+    const outcomes = [a.outcome, b.outcome].sort();
+    expect(outcomes).toEqual(['already-decided', 'pinned-bypass']);
+    expect(await parseYamlPermissionMode()).toBe('bypass');
+    expect(existsSync(join(home, '.claude-permission-mode-pin.lock'))).toBe(false);
+  });
+
+  async function parseYamlPermissionMode(): Promise<unknown> {
+    const { parseDocument } = await import('yaml');
+    return parseDocument(readFileSync(yamlPath(), 'utf8')).getIn(['claude', 'permissionMode']);
+  }
 });

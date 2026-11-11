@@ -259,6 +259,13 @@ const postPlanningMessageRoute = HttpRouter.add(
           );
         }
 
+        // PAN-5151: same before-any-side-effect principle as the model
+        // resolution above. A refused launch must leave output.jsonl and
+        // CONTINUATION_PROMPT.md untouched so the retry still has the prior
+        // conversation to rebuild from — this used to run after the output
+        // rename below, which left a retry with nothing to read.
+        await ensureAutoApproveHookReady();
+
         const outputFile = join(planningDir, 'output.jsonl');
         let conversationLog = '';
         const outputContent = await readFile(outputFile, 'utf-8').catch(() => null);
@@ -328,7 +335,6 @@ Continue the PLANNING session. Do NOT implement anything.
 
         const { getAgentCommand } = await import('../../../../lib/settings.js');
         const msgAgentCmd = getAgentCommand(msgPlanningModel);
-        await ensureAutoApproveHookReady(); // PAN-5151
         const msgPermissionFlags = getClaudePermissionFlagsString();
         const msgCmdWithArgs =
           msgAgentCmd.args.length > 0

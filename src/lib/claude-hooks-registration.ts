@@ -132,9 +132,26 @@ function isHookConfigured(
   );
 }
 
-/** True when Overdeck's PreToolUse auto-approve hook is registered (PAN-5151). */
+/**
+ * True when Overdeck's PreToolUse auto-approve hook is registered AND covers
+ * every tool (PAN-5151). Unlike {@link isHookConfigured} (used for the
+ * generic delta-install check, where other hooks intentionally register
+ * under a narrower matcher like `Bash` or `AskUserQuestion`), this hook gates
+ * every tool call under resolved mode `auto` — a registration under a
+ * narrower matcher (e.g. a hand-edited settings.json with `matcher: 'Bash'`)
+ * would pass a naive command-substring check while leaving Edit/Write
+ * ungated, so a launch guard relying on it would wave through a conversation
+ * that still prompts on every non-matched tool.
+ */
 export function isAutoApproveHookRegistered(settings: ClaudeSettings, binDir: string): boolean {
-  return isHookConfigured(settings, 'PreToolUse', binDir, 'auto-approve-hook');
+  const hooks = settings?.hooks?.PreToolUse || [];
+  return hooks.some((hookConfig: HookConfig) =>
+    hookConfig.matcher === '.*'
+    && hookConfig.hooks?.some((hook: { type: string; command: string }) =>
+      (hook.command?.includes(join(binDir, 'auto-approve-hook')) ?? false) ||
+      (hook.command?.includes('overdeck/bin/auto-approve-hook') ?? false)
+    )
+  );
 }
 
 /**
