@@ -20,6 +20,7 @@ import {
   Globe,
   Trash2,
   KeyRound,
+  Mail,
   Smartphone,
   Archive,
 } from 'lucide-react';
@@ -27,12 +28,18 @@ import { type BackgroundAiFeature } from './types';
 import { type NavItem } from './primitives';
 
 // Tracker definitions
-export type TrackerType = 'linear' | 'github' | 'gitlab' | 'rally';
-export const TRACKERS: { id: TrackerType; name: string; icon: any; envVar: string; placeholder: string }[] = [
+/** One Settings row per `tracker_keys` entry; Jira has three (token, email, site) (PAN-5152). */
+export type TrackerKeyId = 'linear' | 'github' | 'gitlab' | 'rally' | 'jira' | 'jira_email' | 'jira_base_url';
+export type TrackerType = TrackerKeyId;
+/** `secret: false` rows (the Jira email and site URL) render as plain text inputs. */
+export const TRACKERS: { id: TrackerKeyId; name: string; icon: any; envVar: string; placeholder: string; secret?: boolean }[] = [
   { id: 'linear', name: 'Linear', icon: BarChart3, envVar: 'LINEAR_API_KEY', placeholder: 'lin_api_...' },
   { id: 'github', name: 'GitHub', icon: Code, envVar: 'GITHUB_TOKEN', placeholder: 'ghp_...' },
   { id: 'gitlab', name: 'GitLab', icon: GitBranch, envVar: 'GITLAB_TOKEN', placeholder: 'glpat-...' },
   { id: 'rally', name: 'Rally', icon: Flag, envVar: 'RALLY_API_KEY', placeholder: '_abc123...' },
+  { id: 'jira', name: 'Jira API token', icon: KeyRound, envVar: 'JIRA_API_TOKEN', placeholder: 'ATATT3x...' },
+  { id: 'jira_email', name: 'Jira account email', icon: Mail, envVar: 'JIRA_EMAIL', placeholder: 'you@company.com', secret: false },
+  { id: 'jira_base_url', name: 'Jira site URL', icon: Globe, envVar: 'JIRA_BASE_URL', placeholder: 'https://acme.atlassian.net', secret: false },
 ];
 
 /** Cost-ledger source tag per background feature (matches the backend tags). */
