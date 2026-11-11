@@ -17,6 +17,7 @@ import { requireModelOverride } from '../model-validation.js';
 import type { EffortLevel, EffortSource, MemoryIdentity } from '@overdeck/contracts';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import type { RuntimeName } from '../runtimes/types.js';
+import { ensureAutoApproveHookReady } from './hook-readiness.js';
 import { readTierOverrides, readWorkspacePlanSync, type TierOverridesMap } from '../xbrief/io.js';
 import type { XBriefDocument, XBriefDifficulty, XBriefItem, XBriefItemStatus } from '../xbrief/types.js';
 import { type Role } from './agent-state.js';
@@ -773,6 +774,7 @@ export async function buildAgentLaunchConfig(opts: {
     // --dangerously-skip-permissions on resume too.
     // Use the shared helper so the only string literal for DSP lives in
     // claude-permissions.ts (see scripts/lint-permissions.sh allowlist).
+    if (behavior.launchCommandKind === 'claude-code') await ensureAutoApproveHookReady(); // PAN-5151
     const launcherContent = generateLauncherScript({
       role: launchRole,
       spawnMode: 'resume',
