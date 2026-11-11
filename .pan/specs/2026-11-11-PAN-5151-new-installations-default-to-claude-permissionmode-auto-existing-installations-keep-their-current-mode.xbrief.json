@@ -1,0 +1,888 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-11T14:24:12Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5151: New installations default to claude.permissionMode auto; existing installations keep their current mode",
+    "updated": "2026-11-11T14:31:56.896Z"
+  },
+  "plan": {
+    "id": "pan-5151",
+    "title": "New installations default to claude.permissionMode auto; existing installations keep their current mode",
+    "status": "proposed",
+    "uid": "0700f5ea-4b39-464a-8642-72f52936a0c5",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-11T14:24:12Z",
+    "updated": "2026-11-11T14:31:56.896Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5151",
+        "label": "PAN-5151",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5151.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "permissions",
+      "config",
+      "claude-code",
+      "hooks",
+      "upgrade"
+    ],
+    "metadata": {
+      "sizeJustification": "34 files across 8 path prefixes, but nearly every file gets a 1-15 line change and the parts cannot ship separately: flipping the default without the pin changes the flags of every existing installation (violates FR-2), and flipping it without the launch guard and doctor row strands new installations on per-tool-call prompts (violates FR-5). Docs and the changelog describe the combined behavior. Items are already split per concern so each is reviewable alone.",
+      "canonicalFilename": "2026-11-11-PAN-5151-new-installations-default-to-claude-permissionmode-auto-existing-installations-keep-their-current-mode.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "New Overdeck installations launch every Claude Code agent with --permission-mode bypassPermissions because DEFAULT_CONFIG.claude.permissionMode and every fallback say bypass (decision of 2026-07-12). The operator wants new installations in Overdeck's hook-moderated auto mode while every installation that exists today keeps the mode it runs with.",
+      "Proposal": "Flip DEFAULT_CONFIG and all fallbacks to auto. Add a one-time pin (CLI entry + dashboard boot, marker file) that writes claude.permissionMode: bypass into config.yaml on homes that already had config.yaml, config.toml or overdeck.db and no valid key. Add a launch guard that registers the auto-approve hook or refuses the launch under auto at every local Claude Code launch site, refuse remote Fly agents under auto, add a pan doctor row, mark Auto recommended in Settings, and update docs and the changelog.",
+      "NonGoals": "- Changing Codex or ACP permission defaults\n- Mapping Overdeck auto to a different Claude Code flag (#3760)\n- Provisioning Overdeck hooks on Fly VMs\n- Removing the project-layer (.pan.yaml) claude.permissionMode setting\n- Changing runModelSummary (headless -p)\n- Making config load write anything\n- Re-running the pin after its marker exists"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Meet FR-2 with a one-time pin plus marker (~/.overdeck/.claude-permission-mode-pin.json), run at CLI entry before parseAsync and at dashboard boot before the listener",
+        "rationale": "pan start/strike/knowledge spawn in the CLI process, so neither pan sync nor dashboard boot alone runs before the first post-upgrade spawn; postinstall is best-effort. Running once with a marker avoids pinning new installs whose config.yaml a single-key writer created later."
+      },
+      {
+        "summary": "Classify a home as existing when config.yaml, config.toml or overdeck.db exists at the pin's first run",
+        "rationale": "The issue's Why requires every current installation to keep bypass; pan install writes config.toml (not config.yaml) and desktop installs may only have overdeck.db. On a fresh home the pin runs before any of these is written."
+      },
+      {
+        "summary": "An invalid present claude.permissionMode value is replaced with bypass by the pin",
+        "rationale": "It resolves to the bypass default today; leaving it would silently flip that installation to auto."
+      },
+      {
+        "summary": "Config-load failure fallback is auto",
+        "rationale": "The issue's proposed default; auto is less permissive and the launch guard prevents stranding."
+      },
+      {
+        "summary": "Remote Fly agents under auto are refused with an error, not pinned to bypass",
+        "rationale": "Fly VMs never have Overdeck hooks (fly-provider writes only theme + defaultMode), so auto there prompts forever; silently bypassing would break the locked remote no-leak trust property."
+      },
+      {
+        "summary": "Launch guard sits in both command builders, the claude-code resume branch, spawnConversationSession and the planning message route; runModelSummary is exempt",
+        "rationale": "These are every local interactive Claude Code launch path not already covered by ensureLifecycleHooksBeforeLaunch; headless -p denies rather than prompts."
+      },
+      {
+        "summary": "The issue's claudish bypass pin (NFR-1) is not preserved because it no longer exists in code; the stale docs caveat is removed",
+        "rationale": "git grep finds claudish only in two comments, and permission-mode-leak.test.ts asserts non-Anthropic providers honor auto."
+      },
+      {
+        "summary": "The pin writes atomically with comments preserved, without a separate backup file or the settings write queue",
+        "rationale": "One key is edited via yaml setIn; the in-process queue cannot protect cross-process writes, and the pin runs before the dashboard serves requests."
+      }
+    ],
+    "items": [
+      {
+        "id": "pin-module",
+        "title": "Add the one-time Claude permission-mode pin module",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-11T14:24:12Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5151",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/lib/claude-permission-mode-pin.ts",
+            "src/lib/__tests__/claude-permission-mode-pin.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/claude-permission-mode-pin.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "claude-permission-mode-pin.test.ts passes all cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-2",
+            "NFR-3",
+            "NFR-4"
+          ],
+          "foundationFor": [
+            "pin-cli-entry",
+            "pin-dashboard-boot"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/claude-permission-mode-pin.ts exporting pinClaudePermissionModeOnce(opts?: {overdeckHome?}) exactly as PRD WI-1 specifies: VITEST guard without explicit home; marker <home>/.claude-permission-mode-pin.json; new-install when none of config.yaml/config.toml/overdeck.db exists; parse config.yaml with the `yaml` package parseDocument (lazy import); valid auto|bypass => already-set; absent/null/invalid => setIn(['claude','permissionMode'],'bypass') written with writeFileAtomic(...,0o600) from ./model-presets/state.js; parse errors => skipped-unparseable with no marker; any other error => skipped-error, never throws; notice text from PRD Decision 10. Do not import config-yaml/load.ts or settings-api.ts. Add src/lib/__tests__/claude-permission-mode-pin.test.ts with the WI-1 cases using mkdtemp homes. Full spec: .pan/drafts/PAN-5151.md "
+        },
+        "items": [
+          {
+            "id": "pin-module.ac1",
+            "title": "Given an empty Overdeck home, when pinClaudePermissionModeOnce runs, then it returns new-install, creates the marker file, and creates no config.yaml",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pin-module.ac2",
+            "title": "Given a home whose config.yaml has other keys and a comment but no claude.permissionMode (or only config.toml, or only overdeck.db), when the pin runs, then config.yaml parses to claude.permissionMode bypass and still contains the original keys and comment",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pin-module.ac3",
+            "title": "Given config.yaml with claude.permissionMode auto or bypass, when the pin runs, then it returns already-set and the file bytes are unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pin-module.ac4",
+            "title": "Given an unparseable config.yaml, when the pin runs, then it returns skipped-unparseable, leaves the file unchanged and writes no marker",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pin-module.ac5",
+            "title": "Given a home whose marker exists (including a new-install home where a writer later created config.yaml without the key), when the pin runs again, then it returns already-decided and writes nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pin-cli-entry",
+        "title": "Run the pin at CLI entry before any verb runs",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-11T14:24:12Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5151",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/index.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run build"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "build completes and dist/cli/index.js exists"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/cli/index.ts insert, immediately above the final `await runCliWithTelemetry(() => program.parseAsync(...))` line, the dynamic-import pin call from PRD WI-2. Print the notice to stderr only; swallow import errors. Full spec: .pan/drafts/PAN-5151.md "
+        },
+        "items": [
+          {
+            "id": "pin-cli-entry.ac1",
+            "title": "Given OVERDECK_HOME pointing at a scratch dir that holds only config.toml, when `node dist/cli/index.js --help` runs, then stderr contains the bypass notice and config.yaml contains permissionMode: bypass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pin-cli-entry.ac2",
+            "title": "Given the same home, when the command runs a second time, then no notice is printed and config.yaml is unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pin-cli-entry.ac3",
+            "title": "Given any pan invocation, when the pin writes a notice, then stdout receives none of it (stderr only)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pin-cli-entry.ac4",
+            "title": "Given OVERDECK_HOME pointing at an empty scratch dir, when `node dist/cli/index.js --help` runs, then the dir contains a .claude-permission-mode-pin.json marker whose outcome is new-install and no config.yaml",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pin-dashboard-boot",
+        "title": "Run the pin at dashboard boot and move the desktop hook block out of main.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-11T14:24:12Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5151",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/main.ts",
+            "src/lib/claude-hooks-provision.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "wc -l src/dashboard/server/main.ts",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "wc prints a count <= 1000",
+            "lint-file-size exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Move the desktop-only hook provisioning block (main.ts lines ~300-320, starting `// Desktop installs never run`) into a new exported provisionClaudeHooksForDesktopBoot() in src/lib/claude-hooks-provision.ts with the same log lines. In main.ts, directly after `await mkdir(getOverdeckHome(), { recursive: true });`, add the two one-line calls from PRD WI-3 (pin awaited with console.log notice; desktop provisioning fire-and-forget). main.ts must end at <= 1000 lines. Full spec: .pan/drafts/PAN-5151.md "
+        },
+        "items": [
+          {
+            "id": "pin-dashboard-boot.ac1",
+            "title": "Given the edited main.ts, when wc -l runs, then it prints 1000 or fewer lines and scripts/lint-file-size.sh exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pin-dashboard-boot.ac2",
+            "title": "Given dashboard boot, when main.ts executes, then the pin call is awaited before createOverdeckDatabase and before whenDashboardListening",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pin-dashboard-boot.ac3",
+            "title": "Given OVERDECK_MODE=desktop, when the server boots, then provisionClaudeHooksForDesktopBoot runs without being awaited and logs the same three outcome messages as before",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "default-flip",
+        "title": "Flip the Claude permission default and every fallback to auto",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-11T14:24:12Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5151",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/config-yaml/defaults.ts",
+            "src/lib/claude-permissions.ts",
+            "src/lib/settings-api.ts",
+            "src/lib/config.ts",
+            "src/lib/config-yaml/schema.ts",
+            "src/lib/__tests__/claude-permissions.test.ts",
+            "src/lib/__tests__/claude-permission-mode-merge.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/claude-permissions.test.ts src/lib/__tests__/claude-permission-mode-merge.test.ts src/lib/__tests__/claude-permission-config-to-spawn.test.ts src/lib/__tests__/permission-mode-leak.test.ts src/lib/__tests__/agent-state-harness.test.ts tests/lib/agents-auth-routing.test.ts src/lib/__tests__/settings-api.test.ts",
+            "git grep -n \"?? 'bypass'\" -- src/lib/claude-permissions.ts src/lib/settings-api.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "all listed test files pass",
+            "git grep prints nothing",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-6",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply PRD WI-4: DEFAULT_CONFIG.claude.permissionMode = 'auto' with the new comment; resolvePermissionMode catch returns 'auto'; rewrite claude-permissions.ts header item 4; settings-api.ts line 757 falls back to DEFAULT_CONFIG.claude.permissionMode (no added lines); config.ts and schema.ts line 659 comments state auto is the default for new installations. Update claude-permissions.test.ts (default is auto; config-load throw => auto and ['--permission-mode','default']) and claude-permission-mode-merge.test.ts (invalid value keeps auto; mergeConfigs(null)/({}) => auto). Full spec: .pan/drafts/PAN-5151.md "
+        },
+        "items": [
+          {
+            "id": "default-flip.ac1",
+            "title": "Given no config file and no PAN_YOLO, when the config is merged, then config.claude.permissionMode defaults to auto and getClaudePermissionFlags() returns ['--permission-mode','default']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "default-flip.ac2",
+            "title": "Given loadConfigSync throws, when resolvePermissionMode() runs with no env or argument, then it returns auto",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "default-flip.ac3",
+            "title": "Given PAN_YOLO=true, when resolvePermissionMode() runs, then it still returns bypass (precedence preserved)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "default-flip.ac4",
+            "title": "Given the settings API reads a config without a claude block, when it builds the response, then claude.permissionMode falls back to DEFAULT_CONFIG.claude.permissionMode (auto)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-ui",
+        "title": "Mark Auto as recommended in Settings → Permissions and default the radio to auto",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-11T14:24:12Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5151",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/sections/PermissionsSection.tsx",
+            "src/dashboard/frontend/src/components/Settings/types.ts",
+            "src/dashboard/frontend/src/components/Settings/sections/__tests__/PermissionsSection.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/Settings/sections/__tests__/PermissionsSection.test.tsx",
+            "npm run test:frontend-subset -- --dry-run",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "PermissionsSection.test.tsx passes",
+            "dry-run lists PermissionsSection.test.tsx",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply PRD WI-5 to PermissionsSection.tsx (Auto first, titles 'Auto (recommended)' / 'Bypass (yolo)', new descriptions, `?? 'auto'`), fix the stale comment in Settings/types.ts, add Settings/sections/__tests__/PermissionsSection.test.tsx, and append its path (relative to src/dashboard/frontend) to scripts/frontend-test-subset.txt in sorted position. Full spec: .pan/drafts/PAN-5151.md "
+        },
+        "items": [
+          {
+            "id": "settings-ui.ac1",
+            "title": "Given formData without a claude block, when PermissionsSection renders, then permission-mode-auto has aria-checked=true and permission-mode-bypass has aria-checked=false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-ui.ac2",
+            "title": "Given formData.claude.permissionMode = 'bypass', when it renders, then permission-mode-bypass has aria-checked=true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-ui.ac3",
+            "title": "Given the Claude Code option list, when it renders, then the first radio is Auto titled 'Auto (recommended)' and the Bypass title does not contain 'recommended'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-ui.ac4",
+            "title": "Given the frontend subset list, when npm run test:frontend-subset runs, then it includes PermissionsSection.test.tsx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "launch-guard-helper",
+        "title": "Add ensureAutoApproveHookReady and isAutoApproveHookRegistered",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-11T14:24:12Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5151",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/hook-readiness.ts",
+            "src/lib/claude-hooks-registration.ts",
+            "src/lib/agents/__tests__/hook-readiness.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/agents/__tests__/hook-readiness.test.ts",
+            "npm run lint:circular",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "hook-readiness.test.ts passes",
+            "lint:circular reports no new cycle",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ],
+          "foundationFor": [
+            "guard-agent-builders",
+            "guard-conversations-planning",
+            "doctor-permission-row"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply PRD WI-6: export isAutoApproveHookRegistered(settings, binDir) from src/lib/claude-hooks-registration.ts (wraps isHookConfigured for PreToolUse auto-approve-hook); add ensureAutoApproveHookReady(opts?) to src/lib/agents/hook-readiness.ts with the exact control flow and error text in the PRD (bypass => return; VITEST without settingsPath => return; registered on disk => return; else provisionClaudeHooks then re-check; else throw naming pan sync). Extend src/lib/agents/__tests__/hook-readiness.test.ts with the four WI-6 cases. Run npm run lint:circular. Full spec: .pan/drafts/PAN-5151.md "
+        },
+        "items": [
+          {
+            "id": "launch-guard-helper.ac1",
+            "title": "Given mode bypass, when ensureAutoApproveHookReady runs, then it resolves and provisionClaudeHooks is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launch-guard-helper.ac2",
+            "title": "Given mode auto and a settings file that registers <binDir>/auto-approve-hook with the script present, when it runs, then it resolves without provisioning",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launch-guard-helper.ac3",
+            "title": "Given mode auto, no registration, and provisioning returning ok:false reason 'jq is not installed', when it runs, then it rejects with a message containing 'pan sync' and 'jq is not installed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launch-guard-helper.ac4",
+            "title": "Given mode auto, no registration, and provisioning that registers the hook, when it runs, then it resolves",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "guard-agent-builders",
+        "title": "Call the launch guard from the agent command builders and the resume branch",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-11T14:24:12Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5151",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/runtime-command.ts",
+            "src/lib/agents/spawn-prep.ts",
+            "src/lib/agents/__tests__/auto-approve-launch-guard.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/agents/__tests__/auto-approve-launch-guard.test.ts src/lib/__tests__/agent-state-harness.test.ts src/lib/__tests__/permission-mode-leak.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "listed tests pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply PRD WI-7: in src/lib/agents/runtime-command.ts add `await ensureAutoApproveHookReady();` on the line directly above `const permissionFlags = getClaudePermissionFlagsString();` in getAgentRuntimeBaseCommand (after the registered-agent-name --agent branch) and directly above the permissionFlags line in getRoleRuntimeBaseCommand; in src/lib/agents/spawn-prep.ts resume branch add the claude-code-only guard before generateLauncherScript. Add src/lib/agents/__tests__/auto-approve-launch-guard.test.ts mocking ../hook-readiness.js. Full spec: .pan/drafts/PAN-5151.md "
+        },
+        "items": [
+          {
+            "id": "guard-agent-builders.ac1",
+            "title": "Given a claude-code model, when getAgentRuntimeBaseCommand or getRoleRuntimeBaseCommand builds a command, then ensureAutoApproveHookReady is called once before the command is returned",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "guard-agent-builders.ac2",
+            "title": "Given harness codex or ohmypi, or a registered agent name such as pan-review-agent, when getAgentRuntimeBaseCommand runs, then the guard is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "guard-agent-builders.ac3",
+            "title": "Given the guard rejects, when a builder runs, then the builder rejects with the same error message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "guard-agent-builders.ac4",
+            "title": "Given a claude-code resume through buildAgentLaunchConfig, when the launcher is built, then the guard is called before generateLauncherScript",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "guard-conversations-planning",
+        "title": "Call the launch guard for Claude Code conversations and the planning message route",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-11T14:24:12Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5151",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-runtime.ts",
+            "src/dashboard/server/routes/misc/planning.ts",
+            "src/lib/overdeck/__tests__/conversation-auto-approve-guard.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/conversation-auto-approve-guard.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversation-auto-approve-guard.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply PRD WI-8: in spawnConversationSession (src/lib/overdeck/conversation-runtime.ts) add `if (behavior.launchCommandKind === 'claude-code') await ensureAutoApproveHookReady();` directly after `const behavior = getHarnessBehavior(harness);`; in src/dashboard/server/routes/misc/planning.ts add `await ensureAutoApproveHookReady();` immediately before `const msgPermissionFlags = getClaudePermissionFlagsString();` without swallowing the error. Add src/lib/overdeck/__tests__/conversation-auto-approve-guard.test.ts. Full spec: .pan/drafts/PAN-5151.md "
+        },
+        "items": [
+          {
+            "id": "guard-conversations-planning.ac1",
+            "title": "Given the guard rejects, when spawnConversationSession launches a claude-code conversation, then it rejects with the guard's message before creating the state dir or a terminal session",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "guard-conversations-planning.ac2",
+            "title": "Given harness codex, when spawnConversationSession runs, then the guard is not called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "guard-conversations-planning.ac3",
+            "title": "Given the planning message route, when the guard rejects, then the HTTP response carries the guard's error instead of launching Claude Code",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "remote-refuse-auto",
+        "title": "Refuse remote Fly agent launches under auto",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-11T14:24:12Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5151",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/remote/remote-agents.ts",
+            "tests/lib/remote/remote-agents.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/remote/remote-agents.test.ts tests/lib/remote/fly-provider.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "remote-agents and fly-provider tests pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply PRD WI-9: export assertRemotePermissionModeSupported(mode = resolvePermissionMode()) from src/lib/remote/remote-agents.ts with the PRD error text and call it as the first statement of spawnRemoteAgentWithoutConsentClaim. Add tests to tests/lib/remote/remote-agents.test.ts. Full spec: .pan/drafts/PAN-5151.md  Existing remote-agents tests that never set the mode now resolve auto: set PAN_YOLO=true in those cases rather than weakening the refusal."
+        },
+        "items": [
+          {
+            "id": "remote-refuse-auto.ac1",
+            "title": "Given mode auto, when assertRemotePermissionModeSupported runs, then it throws a message containing 'bypass' and 'PAN_YOLO'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remote-refuse-auto.ac2",
+            "title": "Given mode bypass, when it runs, then it returns without throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remote-refuse-auto.ac3",
+            "title": "Given PAN_YOLO=false, when spawnRemoteAgent runs, then it rejects before the Fly getStatus call is made",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "doctor-permission-row",
+        "title": "Add the Claude Permission Mode row to pan doctor",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-11T14:24:12Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5151",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/doctor-permission-mode.ts",
+            "src/cli/commands/doctor.ts",
+            "src/cli/commands/__tests__/doctor-permission-mode.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/doctor-permission-mode.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "doctor-permission-mode.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply PRD WI-10: create src/cli/commands/doctor-permission-mode.ts with checkClaudePermissionMode(deps) (pure) and checkClaudePermissionModeLive() using resolvePermissionMode, ~/.claude/settings.json, BIN_DIR and isAutoApproveHookRegistered; push it from src/cli/commands/doctor.ts next to checkDeployedHooksDrift via dynamic import; add src/cli/commands/__tests__/doctor-permission-mode.test.ts with the four rule cases. Full spec: .pan/drafts/PAN-5151.md "
+        },
+        "items": [
+          {
+            "id": "doctor-permission-row.ac1",
+            "title": "Given resolved mode auto and settings JSON with no auto-approve-hook entry, when checkClaudePermissionMode runs, then it returns status error named 'Claude Permission Mode' whose fix contains 'pan sync'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-permission-row.ac2",
+            "title": "Given resolved mode auto, a registered hook and the script present, when it runs, then it returns status ok",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-permission-row.ac3",
+            "title": "Given resolved mode bypass, when it runs, then it returns status ok regardless of settings",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-permission-row.ac4",
+            "title": "Given resolved mode auto and unparseable settings JSON, when it runs, then it returns status error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document the new default and the existing-installation pin",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-11T14:24:12Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5151",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/CONFIGURATION.md",
+            "configuration/mcp.mdx",
+            "docs/fly-provider.md",
+            "changelog.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'skipAutoPermissionPrompt' docs/CONFIGURATION.md",
+            "grep -n 'claude-permission-mode-pin.json' docs/CONFIGURATION.md",
+            "grep -n '5151' changelog.mdx"
+          ],
+          "expected_outputs": [
+            "first grep prints 0",
+            "second grep prints a match",
+            "third grep prints a match inside the Upcoming block"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply PRD WI-11: rewrite the Permission Mode section of docs/CONFIGURATION.md (lines ~150-240) to state auto (--permission-mode default + Overdeck auto-approve hook) is the default for new installations, add the 'Existing installations' subsection describing the one-time pin and marker file, describe the doctor row, launch refusal and remote bypass requirement, and delete the claudish, skipAutoPermissionPrompt and plan-tier text; update configuration/mcp.mdx line 608, docs/fly-provider.md near line 362, and add the changelog.mdx Upcoming bullet linking #5151. Full spec: .pan/drafts/PAN-5151.md "
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "Given docs/CONFIGURATION.md, when a reader opens the Permission Mode section, then it states auto is the default for new installations and emits --permission-mode default",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "Given docs/CONFIGURATION.md, when grepped, then it names ~/.overdeck/.claude-permission-mode-pin.json and contains no skipAutoPermissionPrompt or claudish caveat",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "Given configuration/mcp.mdx line ~608 and docs/fly-provider.md, when read, then they say auto is the new-install default and that remote agents under auto are refused",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac4",
+            "title": "Given changelog.mdx, when the Upcoming v0.78.0 block is read, then it contains a bullet about new installations starting in Auto that links #5151",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "pin-module",
+        "to": "pin-cli-entry",
+        "type": "blocks"
+      },
+      {
+        "from": "pin-module",
+        "to": "pin-dashboard-boot",
+        "type": "blocks"
+      },
+      {
+        "from": "launch-guard-helper",
+        "to": "guard-agent-builders",
+        "type": "blocks"
+      },
+      {
+        "from": "launch-guard-helper",
+        "to": "guard-conversations-planning",
+        "type": "blocks"
+      },
+      {
+        "from": "launch-guard-helper",
+        "to": "doctor-permission-row",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
