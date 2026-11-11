@@ -1,0 +1,602 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-11T12:21:58Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4374: Memory extraction: add a claude-cli provider so subscription-only hosts extract observations",
+    "updated": "2026-11-11T12:37:48.021Z"
+  },
+  "plan": {
+    "id": "pan-4374",
+    "title": "Memory extraction: add a claude-cli provider so subscription-only hosts extract observations",
+    "status": "running",
+    "uid": "ca57f4d9-399c-4a8b-b706-ed0ca6773263",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-11T12:21:58Z",
+    "updated": "2026-11-11T12:37:48.021Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4374",
+        "label": "PAN-4374",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-4374.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "memory",
+      "extraction",
+      "claude-cli",
+      "background-ai",
+      "subscription"
+    ],
+    "metadata": {
+      "sizeJustification": "One provider feature: the lint counts docs/MODEL-CALLS.md and configuration/workspaces.mdx as two separate subsystems and the CLI doctor text plus its test as two more, so 22 files land in 7 path groups. The provider is unusable from Settings without the union widening, and the doctor/docs changes describe the provider, so splitting them into sibling issues would ship a provider nobody can select or find.",
+      "canonicalFilename": "2026-11-11-PAN-4374-memory-extraction-add-a-claude-cli-provider-so-subscription-only-hosts-extract-observations.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "memory.extraction.provider has two providers: anthropic (Anthropic SDK, needs ANTHROPIC_API_KEY or ANTHROPIC_AUTH_TOKEN in the process env; a Claude subscription login does not authenticate it) and cliproxy (default model gpt-4.1-nano, which the local CLIProxy rejects). A host with only a Claude subscription has no working provider, so no observations have been extracted on the operator's host since 2026-08-13 (every health.json shows 'Could not resolve authentication method').",
+      "Proposal": "Add a claude-cli extraction provider (src/lib/memory/providers/claude-cli.ts) that runs claude -p with the PAN-2657 hardened args plus --no-session-persistence and --system-prompt, through a shared runner (src/lib/background-ai/claude-structured.ts) that titles also use. The runner parses the stdout envelope on every exit code and keys errors on is_error, so a 'Not logged in' result becomes ExtractionProviderAuthError and health reason provider-auth-failed. The provider declares latencyClass 'background'; query expansion filters the selection to interactive providers on every surface and falls back with reason provider-non-interactive without spawning or writing health. Config types, the settings API and both Settings pickers accept claude-cli; pan doctor's fix text and the docs name it.",
+      "NonGoals": "- Changing the default extraction provider (stays anthropic) or auto-detecting a subscription login\n- Fixing cliproxy's hardcoded gpt-4.1-nano default model (the issue lists it 'Separately')\n- Changing registry.classification.provider unions (schema.ts lines 130, 142, 227; domain-mergers.ts line 21)\n- Changing the Anthropic model preset (presets.ts line 141 still writes memory.extraction.provider: anthropic)\n- Adding --no-session-persistence or --system-prompt to conversation title/About calls; buildStructuredClaudeArgs output must stay byte-identical\n- Validating that a claude-cli model is a Claude model\n- A Settings UI hint that query expansion skips claude-cli\n- A new concurrency pool, queue or CPU admission for memory spawns\n- Any synchronous child-process call (execSync/spawnSync) in server-reachable code"
+    },
+    "autoDecisions": [
+      {
+        "summary": "claude-cli is a tool-less utility completion, not an agent, so the no-oneshot-agents rule does not apply",
+        "rationale": "It runs with --tools '', --disallowedTools mcp__*, --permission-mode dontAsk, --safe-mode, --setting-sources '', a scratch cwd and no session file; it has no lifecycle to lose. Titles and About summaries (PAN-2657) are the accepted precedent."
+      },
+      {
+        "summary": "Extract one shared spawn runner used by titles and the provider instead of writing a second spawn",
+        "rationale": "Repo invariant 'one variant per operation in src/lib'; the title spawn has the same stdout-envelope bug (probe: exit 1, empty stderr, cause only in stdout)."
+      },
+      {
+        "summary": "--no-session-persistence and --system-prompt are provider-only extraArgs; title args stay unchanged",
+        "rationale": "Probes showed no session JSONL is written and input tokens halve; keeping buildStructuredClaudeArgs byte-identical keeps the PAN-2657 hardening tests and title behavior stable."
+      },
+      {
+        "summary": "Record total_cost_usd and count it toward the per-issue daily cap",
+        "rationale": "Matches recordTitleCost, matches the operator's request to show hypothetical cost without subscriptions, and the cap stays a brake on spawn count; probed cost ~$0.0004-0.0013 per call."
+      },
+      {
+        "summary": "claude-cli defaultModel reuses the anthropic extraction default through one exported constant",
+        "rationale": "claude-haiku-5-5 is the documented memory extraction default (model-presets.mdx line 118, MODEL-CALLS.md line 60); no new hardcoded model literal is introduced."
+      },
+      {
+        "summary": "The non-interactive gate lives in query expansion and passes a filtered selection through the policy's existing deps.selection",
+        "rationale": "Covers primary and fallback without widening the policy result union used by extract.ts, rollup.ts and feature-registry-population.ts, and never writes health.json for a skip."
+      },
+      {
+        "summary": "Query expansion skips background providers on every surface, not only user-prompt",
+        "rationale": "The spawn surface awaits expansion with no timeout (injection.ts resolveQueryExpansion), so a 2-6 s spawn would delay every agent launch."
+      },
+      {
+        "summary": "60 s extraction timeout; temperature and maxTokens ignored by claude-cli",
+        "rationale": "Probed worst case 5.8 s; the CLI exposes no temperature or max-token flags, and effort is already pinned low by buildStructuredClaudeArgs."
+      },
+      {
+        "summary": "cliproxy's gpt-4.1-nano default stays out of scope",
+        "rationale": "The issue body marks it 'Separately'; it is a different provider and needs its own decision about the replacement default."
+      }
+    ],
+    "items": [
+      {
+        "id": "shared-claude-runner",
+        "title": "Move the hardened claude -p spawn into a shared runner that reads the stdout envelope",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-11T12:21:58Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4374",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "claude-cli-provider"
+          ],
+          "files_scope": [
+            "src/lib/background-ai/claude-structured.ts",
+            "src/lib/background-ai/__tests__/claude-structured.test.ts",
+            "src/lib/conversations/transcript-summary.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/background-ai/__tests__/claude-structured.test.ts src/lib/conversations/__tests__/transcript-summary.test.ts src/lib/conversations/__tests__/transcript-summary-preflight.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "claude-structured.test.ts, transcript-summary.test.ts and transcript-summary-preflight.test.ts pass",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Create src/lib/background-ai/claude-structured.ts: move buildStructuredClaudeArgs() and backgroundAiScratchCwd() verbatim (with the PAN-2657 comment); add ClaudeStructuredFailure, ClaudeStructuredCallError, isClaudeAuthFailure (401/403 or /not logged in|please run \\/login|invalid api key|oauth token has expired|authentication_error|unauthorized/i) and runClaudeStructured(input, deps). Input: model, prompt, schema, timeoutMs, signal?, extraArgs? (appended after the hardening flags), providerEnv?: (model) => Promise<Record<string,string>> (resolved AFTER the min-version check and overlaid on buildChildEnv()). Deps: spawn?, resolveBinary? (default dynamically imports ../harness-binary.js prepareHarnessLaunch('claude-code', {model})). The module must NEVER import ../agents.js or ../agents/provider-env.js, statically or dynamically: madge counts dynamic edges and provider-env reaches memory/providers/registry.ts, so that import would close a new cycle. On close it parses stdout first: is_error true -> ClaudeStructuredCallError; non-zero exit -> ClaudeStructuredCallError with stderr || result text; unparseable -> Error; else resolve the envelope. Timeout and abort kill with SIGTERM; an already-aborted signal spawns nothing. In transcript-summary.ts re-export the two moved helpers, make invokeClaudeStructured call runClaudeStructured({model, prompt, schema, timeoutMs, providerEnv: (m) => getProviderEnvForModel(m)}) then recordTitleCost and return structured_output; keep the static ../agents.js import; remove only the imports left unused (spawn, mkdirSync, join, buildChildEnv, getOverdeckHome, getModelEffortLevels). transcript-summary.test.ts and transcript-summary-preflight.test.ts must stay unedited and green. New tests per PRD WI-1 step 5 with a fake child process and vi.useFakeTimers() for the timeout case."
+        },
+        "items": [
+          {
+            "id": "shared-claude-runner.ac1",
+            "title": "Given a fake child that exits 1 with empty stderr and the stdout envelope {is_error:true,result:'Not logged in · Please run /login'}, runClaudeStructured rejects with ClaudeStructuredCallError whose failure.authFailure is true and whose message contains 'Not logged in'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "shared-claude-runner.ac2",
+            "title": "Given exit 0 with is_error true, runClaudeStructured rejects; given exit 0 with is_error false and structured_output, it resolves the parsed envelope",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "shared-claude-runner.ac3",
+            "title": "Under vi.useFakeTimers(), advancing past timeoutMs calls kill('SIGTERM') and rejects with 'claude invocation timed out after <n>ms'; an aborting signal kills and rejects, and an already-aborted signal spawns nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "shared-claude-runner.ac4",
+            "title": "The spawned argv equals buildStructuredClaudeArgs(schema, model) followed by extraArgs, and git diff origin/main shows no change to transcript-summary.test.ts or transcript-summary-preflight.test.ts while vitest reports both files green",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "shared-claude-runner.ac5",
+            "title": "claude-structured.ts contains no import of agents.js or agents/provider-env.js, npm run lint:circular passes with scripts/circular-deps-baseline.txt unchanged, and transcript-summary.ts has fewer lines than on origin/main",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "claude-cli-provider",
+        "title": "Add the claude-cli extraction provider with a background latency class",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-11T12:21:58Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-4374",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "claude-cli-extraction-e2e",
+            "query-expansion-gate"
+          ],
+          "files_scope": [
+            "src/lib/memory/providers/claude-cli.ts",
+            "src/lib/memory/providers/types.ts",
+            "src/lib/memory/providers/registry.ts",
+            "src/lib/memory/providers/index.ts",
+            "src/lib/memory/providers/anthropic.ts",
+            "tests/lib/memory/claude-cli-provider.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/memory/claude-cli-provider.test.ts tests/lib/memory/providers.test.ts tests/lib/memory/provider-policy.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "claude-cli-provider.test.ts, providers.test.ts and provider-policy.test.ts pass",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "NFR-2",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Add optional latencyClass ('interactive' | 'background', absent = interactive) to ExtractionProvider in types.ts and map 'claude-cli' to 'anthropic' in extractionProviderToAiProvider. Export DEFAULT_ANTHROPIC_EXTRACTION_MODEL from anthropic.ts. Create claude-cli.ts (module header states the no-oneshot argument, background latency, cost rule, ignored temperature/maxTokens): ClaudeCliExtractionProvider(run = runClaudeStructured) with name 'claude-cli', latencyClass 'background', timeout 60_000, extraArgs ['--no-session-persistence', '--system-prompt', CLAUDE_CLI_EXTRACTION_SYSTEM_PROMPT], prompt = buildJsonExtractionPrompt(prompt, schema); maps an authFailure ClaudeStructuredCallError to ExtractionProviderAuthError; data = structured_output or parseJsonPayload(result); cost = total_cost_usd or calculateExtractionCost; recordExtractionCost with provider 'claude-cli' and requestId 'claude-cli-<session_id>'. Register it in registry.ts and add isInteractiveExtractionProvider() and interactiveExtractionSelection() (code in PRD); export them and the class from index.ts. Tests per PRD WI-2 step 5 with an injected run stub; re-register the default provider in afterEach. The provider passes no providerEnv (getProviderEnvForModel returns {} for Anthropic models and buildChildEnv strips ANTHROPIC_* keys, so the child authenticates with the Claude Code login) and must not import agents.js or agents/provider-env.js. IMPLEMENTATION CHECKPOINT after the tests pass: run the live one-liner from the PRD section 'Implementation checkpoint (live CLI)' (npx tsx -e ... new ClaudeCliExtractionProvider().extract('Name one color.', schema)) and paste its output into the PR description; if the host has no Claude Code login, say so in the PR description and rely on claude-cli-extraction-e2e."
+        },
+        "items": [
+          {
+            "id": "claude-cli-provider.ac1",
+            "title": "Given a run stub returning {structured_output:{summary:'ok'}, total_cost_usd:0.0009, session_id:'s1'}, extract() returns data {summary:'ok'}, cost.usd 0.0009, provider 'claude-cli' and requestId 'claude-cli-s1', and records one cost event",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "claude-cli-provider.ac2",
+            "title": "extract() passes timeoutMs 60000 and extraArgs containing '--no-session-persistence' and '--system-prompt' to the runner, and falls back to parsing the result string when structured_output is absent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "claude-cli-provider.ac3",
+            "title": "When the runner throws a Not-logged-in ClaudeStructuredCallError, extract() throws ExtractionProviderAuthError, and extractWithProviderPolicy records health reason 'provider-auth-failed'; a non-auth failure throws a plain error and records 'extraction-failed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "claude-cli-provider.ac4",
+            "title": "getExtractionProvider('claude-cli') returns a provider with latencyClass 'background' and defaultModel 'claude-haiku-5-5'; interactiveExtractionSelection drops claude-cli from primary or fallback and returns null when only claude-cli remains",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "claude-cli-extraction-e2e",
+        "title": "End-to-end test: provider claude-cli writes an observation through the pipeline",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T12:21:58Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-4374",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/lib/memory/claude-cli-extraction.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/memory/claude-cli-extraction.test.ts"
+          ],
+          "expected_outputs": [
+            "claude-cli-extraction.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. New test file modeled on tests/lib/memory/e2e.test.ts setup (setupOverdeckTestDb, upsertProjectFromConfig, createWorkspace, closeMemoryFtsDatabases). Unset OVERDECK_MEMORY_PROVIDER/OVERDECK_MEMORY_MODEL in beforeEach and restore after. Register new ClaudeCliExtractionProvider(stubRun) with a valid observation structured_output, append one transcript turn, call extractFromTranscriptDelta with settings {provider:'claude-cli', model:'claude-haiku-5-5'}, emitObservationCreated stub and rollupOptions.loadThreshold 100, and no extract override. Test timeout 20_000. Re-register the default provider in afterEach."
+        },
+        "items": [
+          {
+            "id": "claude-cli-extraction-e2e.ac1",
+            "title": "Given settings provider 'claude-cli' and a stubbed runner, extractFromTranscriptDelta returns status 'written' and the workspace observations/<date>.jsonl contains exactly one line whose summary equals the stub's summary",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "claude-cli-extraction-e2e.ac2",
+            "title": "The stubbed runner is called exactly once with model 'claude-haiku-5-5', proving the pipeline routes through the claude-cli provider rather than an injected extract",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "query-expansion-gate",
+        "title": "Query expansion never runs a background provider and falls back with provider-non-interactive",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-11T12:21:58Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4374",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/memory/query-expansion.ts",
+            "tests/lib/memory/query-expansion.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/lib/memory/query-expansion.test.ts tests/lib/memory/injection.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "query-expansion.test.ts and injection.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. Add 'provider-non-interactive' to QueryExpansionResult['reason']. In expandMemoryQuery, after the feature gate and cache check and inside the try: when input.expand is not passed, compute interactiveExtractionSelection(await resolveExtractionProviderSelection(input.settings ?? null)); if null, return fallback(input, cacheKey, 'provider-non-interactive'); otherwise pass the filtered selection as deps.selection to extractWithProviderPolicy. Injected expand calls are unchanged. Add the test 'never runs claude-cli for query expansion and falls back with provider-non-interactive' with a registered ClaudeCliExtractionProvider(runSpy) and OVERDECK_MEMORY_PROVIDER/MODEL unset."
+        },
+        "items": [
+          {
+            "id": "query-expansion-gate.ac1",
+            "title": "Given settings provider 'claude-cli' and no injected expand, expandMemoryQuery returns status 'fallback' with reason 'provider-non-interactive' and the registered claude-cli runner spy is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "query-expansion-gate.ac2",
+            "title": "The skip logs one rag-runs entry with outcome 'expansion-failed' and reason 'provider-non-interactive', and writes no health.json update",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-config-union",
+        "title": "Config types and the settings API accept claude-cli as a memory extraction provider",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T12:21:58Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-4374",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/config-yaml/schema.ts",
+            "src/lib/settings-api.ts",
+            "src/lib/__tests__/settings-api.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/settings-api.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "settings-api.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. Widen 'anthropic' | 'cliproxy' to 'anthropic' | 'cliproxy' | 'claude-cli' at schema.ts lines 60, 63, 926, 929 and settings-api.ts lines 165, 168 (keep | ''), 170. Do not touch schema.ts lines 130, 142, 227 or domain-mergers.ts line 21. Add the test 'persists memory.extraction.provider claude-cli through saveSettingsApi' modeled on the round-trip test at settings-api.test.ts line 498."
+        },
+        "items": [
+          {
+            "id": "settings-config-union.ac1",
+            "title": "saveSettingsApi with memory {provider:'claude-cli', model:'claude-haiku-5-5'} writes YAML that contains 'provider: claude-cli'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-config-union.ac2",
+            "title": "The registry.classification provider types (schema.ts lines 130, 142, 227) still accept only 'anthropic' | 'cliproxy' and typecheck passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-ui-options",
+        "title": "Settings pickers offer Claude Code (subscription) as a memory provider",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T12:21:58Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-4374",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/types.ts",
+            "src/dashboard/frontend/src/components/Settings/sections/MemorySection.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/BackgroundAiSection.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "typecheck:frontend completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. Widen the three unions in Settings/types.ts (lines 109, 112, 114) to include 'claude-cli'. In MemorySection.tsx (provider select line 45-51, fallback select line 74-82) and BackgroundAiSection.tsx (line 127-130), widen the 'as' casts and add <option value=\"claude-cli\">Claude Code (subscription)</option> after the cliproxy option. Leave the model placeholders unchanged. No new frontend test file."
+        },
+        "items": [
+          {
+            "id": "settings-ui-options.ac1",
+            "title": "MemorySection.tsx renders an <option value=\"claude-cli\"> labeled 'Claude Code (subscription)' in both the extraction provider and fallback provider selects",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-ui-options.ac2",
+            "title": "BackgroundAiSection.tsx renders the same claude-cli option in the memoryExtraction/memoryQueryExpansion provider select, and npm run typecheck:frontend passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "doctor-fix-text",
+        "title": "pan doctor's provider-auth-failed fix names claude-cli and /login",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T12:21:58Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "backend",
+          "issueLabel": "pan-4374",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/doctor-memory-provider.ts",
+            "tests/cli/commands/doctor-memory-provider.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/cli/commands/doctor-memory-provider.test.ts"
+          ],
+          "expected_outputs": [
+            "doctor-memory-provider.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7. Replace the provider-auth-failed string in fixForReason (doctor-memory-provider.ts lines 59-61) with the exact text in the PRD. Rename the test at doctor-memory-provider.test.ts line 47 to drop 'and PAN-4374' and assert the fix contains 'ANTHROPIC_API_KEY', 'claude-cli' and '/login' and does not contain 'PAN-4374'."
+        },
+        "items": [
+          {
+            "id": "doctor-fix-text.ac1",
+            "title": "Given a newest provider-auth-failed health.json, checkMemoryExtraction returns status 'warn' with a fix that contains 'ANTHROPIC_API_KEY', 'claude-cli' and '/login'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-fix-text.ac2",
+            "title": "The returned fix text contains no 'PAN-4374' and no 'tracked in'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-claude-cli-provider",
+        "title": "Document the claude-cli provider in MODEL-CALLS.md and the workspaces memory section",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T12:21:58Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4374",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/MODEL-CALLS.md",
+            "configuration/workspaces.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n \"claude-cli\" docs/MODEL-CALLS.md configuration/workspaces.mdx",
+            "grep -n \"provider-non-interactive\" docs/MODEL-CALLS.md configuration/workspaces.mdx",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "claude-cli appears in the memoryExtraction row of MODEL-CALLS.md and in the workspaces.mdx extraction section",
+            "provider-non-interactive appears in the memoryQueryExpansion row and in the workspaces.mdx reasons table",
+            "lint:docs passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8. In docs/MODEL-CALLS.md: line 53 now names src/lib/background-ai/claude-structured.ts as the home of backgroundAiScratchCwd() and says the claude-cli provider passes --no-session-persistence; lines 57-59 carry the post-WI-1 transcript-summary.ts line numbers (find them with grep, see PRD); add the claude-cli sentence to the memoryExtraction row (line 60) and the background-provider sentence to the memoryQueryExpansion row (line 61), exact text in the PRD. In configuration/workspaces.mdx 'Extraction providers and memory health' (lines 338-373): add the claude-cli paragraph after the anthropic paragraph (selection via config or Settings 'Claude Code (subscription)', uses the dashboard user's Claude Code login, background latency 2-6 s bounded by memory.worker_concurrency, skipped by query expansion, notional cost counts toward the daily cap, Anthropic preset resets it), update the provider-auth-failed row to name both fixes, add a provider-non-interactive row, and extend the sentence before the table so it says timeout and provider-non-interactive never appear in health.json."
+        },
+        "items": [
+          {
+            "id": "docs-claude-cli-provider.ac0",
+            "title": "grep -n backgroundAiScratchCwd docs/MODEL-CALLS.md returns the line naming src/lib/background-ai/claude-structured.ts, and that line contains --no-session-persistence for the claude-cli provider",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-claude-cli-provider.ac1",
+            "title": "docs/MODEL-CALLS.md memoryExtraction row names src/lib/memory/providers/claude-cli.ts, latency class 'background' and that total_cost_usd counts toward per_day_cost_cap_usd; the memoryQueryExpansion row contains 'provider-non-interactive'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-claude-cli-provider.ac2",
+            "title": "configuration/workspaces.mdx shows 'memory.extraction.provider: claude-cli', '/login' and 'memory.worker_concurrency' in the extraction section, and its reasons table contains a provider-non-interactive row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-claude-cli-provider.ac3",
+            "title": "npm run lint:docs passes after the edits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "shared-claude-runner",
+        "to": "claude-cli-provider",
+        "type": "blocks"
+      },
+      {
+        "from": "claude-cli-provider",
+        "to": "claude-cli-extraction-e2e",
+        "type": "blocks"
+      },
+      {
+        "from": "claude-cli-provider",
+        "to": "query-expansion-gate",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

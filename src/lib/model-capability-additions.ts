@@ -473,7 +473,7 @@ export const AUDITED_MODEL_ADDITIONS = {
       speed: 70,
       'context-length': 95,
     },
-    notes: 'OpenAI GPT-6.1 workhorse tier (October 26, 2026), below gpt-6.1-sol in the slot gpt-5.6-terra fills for GPT-5.6. Pinned to the 272K billing tier (CLIPROXY_GPT56_CONTEXT_WINDOW) — >272K input is billed 2x in / 1.5x out for the full request (PAN-3388). No [372k] variant. 1.05M marketing context. Codex under ChatGPT sign-in needs CLI 0.159.0+. CLIProxy 7.3.16 does not serve it (PAN-4634).',
+    notes: 'OpenAI GPT-6.1 workhorse tier (October 26, 2026), below gpt-6.1-sol in the slot gpt-5.6-terra fills for GPT-5.6. Pinned to the 272K billing tier (CLIPROXY_GPT56_CONTEXT_WINDOW) — >272K input is billed 2x in / 1.5x out for the full request (PAN-3388). No [372k] variant. 1.05M marketing context. Codex under ChatGPT sign-in needs CLI 0.159.0+. The claude-code route through CLIProxy 7.3.16 was verified on 2026-11-11 (PAN-4634).',
   },
 
   // GPT-6 Rosalind (life sciences, released 2026-10-30) and GPT-6 Astra for Law: prices per

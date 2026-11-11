@@ -11,7 +11,8 @@
  *  - `summarizeTranscriptAbout()` — a few-sentence description of what the
  *    conversation has been about, used by the conversation "About" drawer.
  *
- * All three call the Claude CLI with the model from
+ * All three call the Claude CLI, via `runClaudeStructured()` in
+ * `background-ai/claude-structured.ts` (PAN-4374 WI-1), with the model from
  * `conversations.title_model`, or `CONVERSATION_TITLE_MODEL` when unset — fast
  * and cheap for short structured outputs. Each call first runs the Claude Code
  * minimum-version check for that model (PAN-5124 FR-5), so a too-old Claude
@@ -30,16 +31,11 @@
  * scope of work still in context — the summarized earlier work plus anything
  * new since — rather than only the most recent message.
  */
-import { spawn } from 'node:child_process';
-import { mkdirSync } from 'node:fs';
-import { join } from 'node:path';
 import type { ChatMessage } from '@overdeck/contracts';
-import { buildChildEnv } from '../child-env.js';
 import { getProviderEnvForModel } from '../agents.js';
-import { getOverdeckHome } from '../paths.js';
-import { getModelEffortLevels } from '../model-capabilities.js';
 import { recordBackgroundAiCost } from '../background-ai/cost.js';
 import type { BackgroundAiFeature } from '../background-ai/registry.js';
+import { runClaudeStructured } from '../background-ai/claude-structured.js';
 
 /** Haiku 5.5 — fast/cheap, used for every conversation title and about-summary (PAN-5124). */
 export const CONVERSATION_TITLE_MODEL = 'claude-haiku-5-5';
@@ -307,55 +303,18 @@ export function titleTranscriptWindow(transcript: string): string {
 }
 
 /**
+ * `buildStructuredClaudeArgs` and `backgroundAiScratchCwd` moved to
+ * `background-ai/claude-structured.ts` (PAN-4374 WI-1) so the memory
+ * extraction `claude-cli` provider can share the same hardened spawn.
+ * Re-exported here so existing imports (and the PAN-2657 hardening tests)
+ * keep working unchanged.
+ */
+export { backgroundAiScratchCwd, buildStructuredClaudeArgs } from '../background-ai/claude-structured.js';
+
+/**
  * Invoke `claude -p` with a JSON schema and return the structured output.
  * Throws on non-zero exit, timeout, spawn error, or unparseable output.
  */
-
-/**
- * PAN-2657 hardening: these utility calls emit one schema-constrained JSON
- * object and must be COMPLETELY unable to act. A summarizer spawned with
- * default tool access once adopted the transcript's momentum and wrote
- * production code into the live checkout (main saw `fs-lock.ts` appear from a
- * dead session). Three independent gates:
- *
- *  - `--safe-mode` + `--setting-sources ''` skip hooks, settings allowlists,
- *    MCP, and CLAUDE.md from the cwd and `~/.claude` — a repo's permissive
- *    settings can never re-arm it. (Formerly `--bare`, but as of Claude Code
- *    2.1.209 `--bare` also skips credential reads, so every spawn failed with
- *    "Not logged in" under subscription OAuth; `--safe-mode` explicitly keeps
- *    auth working.)
- *  - `--tools ''` + `--disallowedTools mcp__*` strip every built-in and MCP
- *    tool so the model never sees a tool definition;
- *  - `--permission-mode dontAsk` auto-denies (never prompts, never hangs) if
- *    anything slips through.
- *
- * The spawn cwd is an empty scratch directory so even a hypothetical escape
- * has no repository to land in. Locked by transcript-summary-hardening tests.
- */
-export function buildStructuredClaudeArgs(schema: Record<string, unknown>, model: string): string[] {
-  return [
-    '-p',
-    '--safe-mode',
-    '--setting-sources', '',
-    '--tools', '',
-    '--disallowedTools', 'mcp__*',
-    '--permission-mode', 'dontAsk',
-    '--output-format', 'json',
-    '--json-schema', JSON.stringify(schema),
-    '--model', model,
-    // PAN-5124 FR-3: titles and the About summary need no reasoning. Pin low
-    // effort only for models whose own row lists it (D2); Haiku 4.5 has none.
-    ...(getModelEffortLevels(model)?.includes('low') ? ['--effort', 'low'] : []),
-  ];
-}
-
-/** Empty scratch cwd for background AI utility spawns — never a repository. */
-export function backgroundAiScratchCwd(): string {
-  const dir = join(getOverdeckHome(), 'tmp', 'background-ai');
-  mkdirSync(dir, { recursive: true });
-  return dir;
-}
-
 async function invokeClaudeStructured(
   model: string,
   prompt: string,
@@ -363,55 +322,10 @@ async function invokeClaudeStructured(
   timeoutMs = 30_000,
   feature: BackgroundAiFeature = 'conversationTitles',
 ): Promise<Record<string, unknown>> {
-  // PAN-5124 FR-5: refuse a model this Claude Code is too old for, with the
-  // standard upgrade message, before any process starts (D5-D7). The dynamic
-  // import keeps this leaf module free of a static harness-binary cycle.
-  const { prepareHarnessLaunch } = await import('../harness-binary.js');
-  const { binaryPath } = await prepareHarnessLaunch('claude-code', { model });
-
-  const providerEnv = await getProviderEnvForModel(model);
-  const childEnv = { ...buildChildEnv(), ...providerEnv };
-
-  const stdout = await new Promise<string>((resolve, reject) => {
-    const child = spawn(
-      binaryPath,
-      buildStructuredClaudeArgs(schema, model),
-      { env: childEnv, cwd: backgroundAiScratchCwd() },
-    );
-    let out = '';
-    let errOut = '';
-    const timeout = setTimeout(() => {
-      child.kill('SIGTERM');
-      reject(new Error(`claude invocation timed out after ${timeoutMs}ms`));
-    }, timeoutMs);
-    child.stdout.setEncoding('utf-8');
-    child.stderr.setEncoding('utf-8');
-    child.stdout.on('data', (data: string) => { out += data; });
-    child.stderr.on('data', (data: string) => { errOut += data; });
-    child.on('error', (err: Error) => {
-      clearTimeout(timeout);
-      reject(err);
-    });
-    child.on('close', (code: number | null) => {
-      clearTimeout(timeout);
-      if (code !== 0) {
-        reject(new Error(errOut || `claude invocation exited with code ${code}`));
-      } else {
-        resolve(out);
-      }
-    });
-    try {
-      child.stdin.write(prompt, 'utf-8');
-      child.stdin.end();
-    } catch (err) {
-      clearTimeout(timeout);
-      child.kill('SIGTERM');
-      reject(err);
-    }
+  const parsed = await runClaudeStructured({
+    model, prompt, schema, timeoutMs,
+    providerEnv: (m) => getProviderEnvForModel(m),
   });
-
-  // Claude CLI returns { structured_output: {...}, ... } or the bare object.
-  const parsed = JSON.parse(stdout.trim()) as Record<string, unknown>;
 
   // Record token spend so background title/about generation is visible in the
   // cost ledger. The `claude -p` JSON envelope carries usage + total_cost_usd.

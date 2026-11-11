@@ -107,8 +107,9 @@ A steer never falls back silently to a queued message. A harness without steer a
   provider's eval-backed lineup in one step, use a
   [model preset](/configuration/model-presets).
 - Proxied models use a dedicated Claude Code context policy rather than copying
-  every value from the generic model registry. GPT-6 Astra, Sol, and Luna and
-  GPT-5.6 Sol, Terra, and Luna default to a `272000`-token pin for both
+  every value from the generic model registry. GPT-6 Astra, Sol, and Luna,
+  GPT-6.1 Sol and Terra, and GPT-5.6 Sol, Terra, and Luna default to a
+  `272000`-token pin for both
   `CLAUDE_CODE_MAX_CONTEXT_TOKENS` and
   `CLAUDE_CODE_AUTO_COMPACT_WINDOW` — OpenAI bills prompts with more than 272K
   input tokens at 2x input / 1.5x output for the full request, so the default
@@ -326,7 +327,7 @@ internal configuration records are excluded from the chat feed.
   `pan install` does not manage the Codex CLI. `pan doctor` shows a
   `Codex model floor` row per model. On the claude-code harness through
   CLIProxy, CLIProxy `7.3.16` (the version `pan install` pins) was verified
-  on 2026-09-29 to serve `gpt-6-sol`, `gpt-6-luna` and `gpt-6.1-sol` under ChatGPT sign-in. It does not serve `gpt-6.1-terra` (probed 2026-10-26), so use Terra on the Codex harness until [PAN-4634](https://github.com/eltmon/overdeck/issues/4634) lands, and it was not probed for `gpt-6-rosalind` or `gpt-6-astra-law`.
+  on 2026-09-29 to serve `gpt-6-sol`, `gpt-6-luna` and `gpt-6.1-sol` under ChatGPT sign-in. The same version served `gpt-6.1-terra` on the claude-code harness on 2026-11-11 ([PAN-4634](https://github.com/eltmon/overdeck/issues/4634)); on 2026-10-26 it did not. CLIProxy refreshes its model list from a remote catalog every three hours, so which models it serves can change without a version change. It does not list `gpt-6-rosalind` or `gpt-6-astra-law`; use those on the Codex harness.
 - Work agents use a persistent `codex app-server` child by default. Overdeck
   talks newline-delimited JSON-RPC over stdio, so message delivery, approvals,
   readiness, and interruption are structured protocol events rather than TUI

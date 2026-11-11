@@ -12,7 +12,7 @@ import {
   type ExtractionUsage,
 } from './types.js';
 
-const DEFAULT_MODEL = 'claude-haiku-5-5';
+export const DEFAULT_ANTHROPIC_EXTRACTION_MODEL = 'claude-haiku-5-5';
 
 function hasAnthropicEnvCredentials(): boolean {
   return Boolean(process.env.ANTHROPIC_API_KEY?.trim() || process.env.ANTHROPIC_AUTH_TOKEN?.trim());
@@ -20,7 +20,7 @@ function hasAnthropicEnvCredentials(): boolean {
 
 export class AnthropicExtractionProvider implements ExtractionProvider {
   readonly name = 'anthropic';
-  readonly defaultModel = DEFAULT_MODEL;
+  readonly defaultModel = DEFAULT_ANTHROPIC_EXTRACTION_MODEL;
 
   private defaultClient: Anthropic | null = null;
 
