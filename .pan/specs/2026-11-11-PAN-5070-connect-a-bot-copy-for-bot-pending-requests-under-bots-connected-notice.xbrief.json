@@ -4,17 +4,17 @@
     "created": "2026-11-11T07:14:20Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5070: Connect a bot: Copy for <bot>, pending requests under Bots, connected notice",
-    "updated": "2026-11-11T07:24:42.447Z"
+    "updated": "2026-11-11T07:26:07.850Z"
   },
   "plan": {
     "id": "pan-5070",
     "title": "Connect a bot: Copy for <bot>, pending requests under Bots, connected notice",
-    "status": "proposed",
+    "status": "running",
     "uid": "2e864ad6-6abc-4ecd-88c7-729df0386023",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-11T07:14:20Z",
-    "updated": "2026-11-11T07:24:42.447Z",
+    "updated": "2026-11-11T07:26:07.850Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5070",
@@ -1016,5 +1016,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
