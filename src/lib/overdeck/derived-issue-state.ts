@@ -650,9 +650,19 @@ export async function listPanesWithBackend(now: number): Promise<readonly Backen
  */
 export async function readIssueFromTracker(issueId: string): Promise<TrackerIssueFacts | null> {
   const { loadConfigSync } = await import('../config.js');
-  const { createTracker, createTrackerFromConfig } = await import('../tracker/factory.js');
-  const { resolveGitHubIssue } = await import('../tracker-utils.js');
+  const { createJiraTrackerForIssue, createTracker, createTrackerFromConfig } = await import('../tracker/factory.js');
+  const { resolveGitHubIssue, resolveTrackerType } = await import('../tracker-utils.js');
   const { Effect } = await import('effect');
+
+  // PAN-5152: a Jira issue is read from its project's Jira tracker first.
+  if (resolveTrackerType(issueId) === 'jira') {
+    try {
+      const issue = await Effect.runPromise(createJiraTrackerForIssue(issueId).getIssue(issueId));
+      return { open: issue.state !== 'closed', labels: issue.labels ?? [], ...(issue.title ? { title: issue.title } : {}) };
+    } catch {
+      // Jira did not answer; the configured trackers below may.
+    }
+  }
 
   let trackers;
   try {
