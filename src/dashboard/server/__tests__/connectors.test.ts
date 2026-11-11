@@ -18,6 +18,7 @@ vi.mock('../../../lib/activity-logger.js', () => ({ emitActivityEntry: vi.fn() }
 const { pairingSecrets } = await import('@overdeck/anywhere-channel');
 const { nodeCrypto } = await import('@overdeck/anywhere-channel/node');
 const { parseConnectorPairLink } = await import('@overdeck/contracts');
+const { UUID_V4 } = await import('../../../lib/access-token-records.js');
 const {
   _resetAccessTokensForTests,
   _settleAccessTokenWritesForTests,
@@ -31,7 +32,7 @@ const {
 } = await import('../../../lib/access-tokens.js');
 const { openChannel } = await import('../../../lib/anywhere/channel/open.js');
 const { _resetChannelListenerForTests, installChannelListener, liveChannelCount } = await import('../channel-listener.js');
-const { _resetConnectorPairingForTests, takeConnectorIntent } = await import('../connector-pairing.js');
+const { _resetConnectorPairingForTests, listConnectorNotices, listConnectorRequests, takeConnectorIntent } = await import('../connector-pairing.js');
 const { _resetPairingCredentialsForTests, issuePairingCredential } = await import('../pairing-credentials.js');
 const { remoteGateRejection } = await import('../remote-request-gate.js');
 const { resolveDashboardCredential } = await import('../routes/dashboard-auth.js');
@@ -108,6 +109,22 @@ describe('POST /api/connectors/pairing (PAN-4949 D-11, D-12, D-14)', () => {
   it('stores the bot defaults without scopes, and always adds read:state', async () => {
     expect((await pairedIntent({ name: 'bot:defaults' }))?.scopes).toEqual([...BOT_DEFAULT_SCOPES]);
     expect((await pairedIntent({ name: 'bot:tell', scopes: ['tell'] }))?.scopes).toEqual(['read:state', 'tell']);
+  });
+
+  it('accepts a platform in CONNECT_PLATFORMS and returns a UUID requestId; a body without platform still succeeds', async () => {
+    const withPlatform = await read(await handleConnectorPairing('internal-token', JSON.stringify({ name: 'bot:grok', platform: 'grok-bot' })));
+    expect(withPlatform.status).toBe(200);
+    expect(UUID_V4.test(withPlatform.json.requestId as string)).toBe(true);
+
+    const withoutPlatform = await read(await handleConnectorPairing('internal-token', JSON.stringify({ name: 'bot:other' })));
+    expect(withoutPlatform.status).toBe(200);
+    expect(UUID_V4.test(withoutPlatform.json.requestId as string)).toBe(true);
+  });
+
+  it('refuses a platform outside CONNECT_PLATFORMS with 400 naming the allowed list', async () => {
+    const { status, json } = await read(await handleConnectorPairing('internal-token', JSON.stringify({ name: 'bot:grok', platform: 'xai-api' })));
+    expect(status).toBe(400);
+    expect(json.error).toBe('platform must be one of grok-bot, grok-build, hermes, openclaw, other');
   });
 });
 
@@ -236,11 +253,11 @@ describe('GET /api/connectors/self (PAN-5069 FR-10)', () => {
   });
 });
 
-/** Issue a connector pairing as root and return a pairing marker for its code, as the handshake would produce. */
-async function connectorPairingMarker(remoteKeyHex: string, body: Record<string, unknown> = { name: 'bot:desk', scopes: ['tell'] }): Promise<ChannelMarker> {
+/** Issue a connector pairing as root and return a pairing marker and requestId for its code, as the handshake would produce. */
+async function connectorPairingMarker(remoteKeyHex: string, body: Record<string, unknown> = { name: 'bot:desk', scopes: ['tell'] }): Promise<ChannelMarker & { requestId: string }> {
   const { json } = await read(await handleConnectorPairing('internal-token', JSON.stringify(body)));
   const code = parseConnectorPairLink(json.pairingString as string)!.code;
-  return { mode: 'pairing', remoteKeyHex, pairingId: pairingSecrets(nodeCrypto, code).pairingId };
+  return { mode: 'pairing', remoteKeyHex, pairingId: pairingSecrets(nodeCrypto, code).pairingId, requestId: json.requestId as string };
 }
 
 function exchangeBody(overrides: Record<string, unknown> = {}): string {
@@ -299,6 +316,29 @@ describe('POST /api/connectors/exchange (PAN-4949 D-8, D-17)', () => {
     expect(verifyAccessToken(first.json.token as string)).toEqual({ ok: false });
     expect((await listAccessTokens()).find((record) => record.id === first.json.tokenId)?.revokedAt).toEqual(expect.any(String));
     expect(listActiveRecordsOfKind('connector').map((record) => record.id)).toEqual([second.json.tokenId]);
+  });
+
+  it('leaves one notice with the connectorId after a successful exchange', async () => {
+    const { json } = await read(await handleConnectorsExchange(exchangeBody(), await connectorPairingMarker(CONNECTOR_KEY)));
+    expect(listConnectorNotices()).toMatchObject([{ connectorId: json.tokenId }]);
+  });
+
+  it('shows the request as used after a 409 link-key-in-use or a 400 body, without pairing it', async () => {
+    await createAccessToken({ name: 'phone', kind: 'phone', scopes: [...PHONE_TOKEN_SCOPES], phoneKey: 'a1'.repeat(32), clientId: '55555555-5555-4555-8555-555555555555' });
+    const conflictMarker = await connectorPairingMarker('a1'.repeat(32));
+    const conflict = await read(await handleConnectorsExchange(exchangeBody(), conflictMarker));
+    expect(conflict.status).toBe(409);
+    const conflictView = listConnectorRequests().find((request) => request.id === conflictMarker.requestId);
+    expect(conflictView).toMatchObject({ state: 'used' });
+    expect(conflictView?.pairingString).toBeUndefined();
+
+    const badBodyMarker = await connectorPairingMarker(CONNECTOR_KEY);
+    const badBody = await read(await handleConnectorsExchange('not json', badBodyMarker));
+    expect(badBody.status).toBe(400);
+    const badBodyView = listConnectorRequests().find((request) => request.id === badBodyMarker.requestId);
+    expect(badBodyView).toMatchObject({ state: 'used' });
+    expect(badBodyView?.pairingString).toBeUndefined();
+    expect(listConnectorNotices()).toEqual([]);
   });
 
   it('remoteGateRejection admits the exchange only from a pairing marker', async () => {

@@ -39,7 +39,7 @@ import { UUID_V4 } from '../../../lib/access-token-records.js';
 import { emitActivityEntry } from '../../../lib/activity-logger.js';
 import { closeChannelsForPeer } from '../channel-listener.js';
 import { type ChannelMarker, channelOfRequest } from '../channel-peer.js';
-import { issueConnectorPairing, takeConnectorIntent } from '../connector-pairing.js';
+import { CONNECT_PLATFORMS, type ConnectPlatform, issueConnectorPairing, markConnectorRequestPaired, takeConnectorIntent } from '../connector-pairing.js';
 import { closeDeviceConnections } from '../device-connections.js';
 import { jsonResponse } from '../http-helpers.js';
 import {
@@ -65,8 +65,8 @@ function rejectNonRoot(kind: CredentialKind): HttpServerResponse.HttpServerRespo
   return noStore(jsonResponse({ error: 'only the internal token or the root session can manage connectors' }, { status: 403 }));
 }
 
-/** D-12: `{ name, scopes? }` → the name and the final scope set (D-14), or an error message. */
-function parsePairingBody(text: string): { name: string; scopes: AccessTokenScope[] } | string {
+/** D-12: `{ name, scopes?, platform? }` → the name, final scope set (D-14) and platform, or an error message. */
+function parsePairingBody(text: string): { name: string; scopes: AccessTokenScope[]; platform: ConnectPlatform } | string {
   let value: unknown;
   try {
     value = text ? JSON.parse(text) : null;
@@ -91,7 +91,14 @@ function parsePairingBody(text: string): { name: string; scopes: AccessTokenScop
   }
   // D-14: read:state is always on, in CONNECTOR_SCOPE_CHOICES order.
   const scopes = CONNECTOR_SCOPE_CHOICES.filter((scope) => scope === 'read:state' || chosen.includes(scope));
-  return { name, scopes };
+  let platform: ConnectPlatform = 'other';
+  if (body.platform !== undefined) {
+    if (!(CONNECT_PLATFORMS as readonly unknown[]).includes(body.platform)) {
+      return `platform must be one of ${CONNECT_PLATFORMS.join(', ')}`;
+    }
+    platform = body.platform as ConnectPlatform;
+  }
+  return { name, scopes, platform };
 }
 
 export async function handleConnectorPairing(credentialKind: CredentialKind, bodyText: string): Promise<HttpServerResponse.HttpServerResponse> {
@@ -99,14 +106,14 @@ export async function handleConnectorPairing(credentialKind: CredentialKind, bod
   if (refused) return refused;
   const body = parsePairingBody(bodyText);
   if (typeof body === 'string') return noStore(jsonResponse({ error: body }, { status: 400 }));
-  const { pairingString, expiresAt } = await issueConnectorPairing(body);
+  const { requestId, pairingString, expiresAt } = await issueConnectorPairing(body);
   emitActivityEntry({
     source: 'dashboard',
     level: 'info',
     message: `Issued a connector pairing code for "${body.name}"`,
-    details: JSON.stringify({ expiresAt, scopes: body.scopes }),
+    details: JSON.stringify({ expiresAt, scopes: body.scopes, platform: body.platform, requestId }),
   });
-  return noStore(jsonResponse({ pairingString, expiresAt }));
+  return noStore(jsonResponse({ requestId, pairingString, expiresAt }));
 }
 
 export async function handleConnectorList(credentialKind: CredentialKind): Promise<HttpServerResponse.HttpServerResponse> {
@@ -221,6 +228,7 @@ export async function handleConnectorsExchange(
     connectorKey: channel.remoteKeyHex,
     clientId: body.clientId,
   });
+  markConnectorRequestPaired(intent.requestId, record.id);
 
   const replaced = listActiveRecordsOfKind('connector').filter((other) => other.clientId === body.clientId && other.id !== record.id);
   for (const other of replaced) await revokeAccessToken(other.id);
