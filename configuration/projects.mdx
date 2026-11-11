@@ -245,6 +245,7 @@ projects:
 | `path` | Yes | Absolute path to project root |
 | `issue_prefix` | Yes* | Issue prefix for standard format IDs (e.g., "MIN", "PAN"). Automatically proposed during registration based on the repository name. 1 to 10 uppercase letters; digits are rejected because issue IDs must match `LETTERS-NUMBER`. For tracker IDs that do not fit, use `issue_pattern`. |
 | `tracker` | No | Issue tracker type: `linear`, `github`, `gitlab`, `rally`, `jira`. Set it explicitly when the code host and issue tracker differ. |
+| `owner` | No | The label of the dashboard sidebar group this project shows under. Display only: it never changes which account acts on the repository. See [Sidebar owner groups](#sidebar-owner-groups). |
 | `jira` | No | Jira settings for a `tracker: jira` project: `site` (Jira site URL), `deployment` (`cloud` or `datacenter`), and `status_map` (Jira status name per Overdeck state). See [Issue Tracker Integration](/configuration/issue-trackers#jira-integration). |
 | `issue_prefixes` | No | Array of prefixes for multi-prefix trackers (e.g., `[F, US, DE, TA]`) |
 | `issue_pattern` | No | Custom regex for issue ID parsing: `^(PREFIX)-(\\d+)$` |
@@ -262,6 +263,29 @@ projects:
 | `workspace.env.secrets_file` | No | Absolute or `~/` path to a dotenv file whose values reach this project's agents and host-run gates; see [Project credentials](#project-credentials). |
 
 *Not required if `issue_prefixes` or `issue_pattern` is specified.
+
+### Sidebar owner groups
+
+When your projects have two or more owners, the dashboard sidebar groups them by owner. Each project's owner is the first of these that is set:
+
+1. `owner`
+2. The GitHub owner, the first part of `github_repo`
+3. The GitLab group, the first part of `gitlab_repo`
+
+A project with none of the three shows under **Other**, the last group. Owners compare without regard to case, so `MindYourNow` and `mindyournow` share one group.
+
+Set `owner` when the repository's account is not the group you want. For example, a GitLab project under a personal account can join its organization's group:
+
+```yaml
+projects:
+  mind-your-now:
+    name: Mind Your Now
+    path: /home/you/Projects/myn
+    gitlab_repo: eltmon/mind-your-now
+    owner: mindyournow
+```
+
+The grouping is display only. Which identity acts on a repository is still resolved per repository.
 
 ### Quality gates
 
