@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5151",
   "created": "2026-11-11T14:34:32.001Z",
-  "updated": "2026-11-11T15:16:42.960Z",
+  "updated": "2026-11-11T15:16:51.420Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -198,6 +198,11 @@
     "remote-refuse-auto.ac3": {
       "status": "completed",
       "doneAt": "2026-11-11T15:16:42.959Z"
+    },
+    "doctor-permission-row": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5151",
+      "claimedAt": "2026-11-11T15:16:51.420Z"
     }
   }
 }
