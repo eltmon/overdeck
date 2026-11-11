@@ -135,6 +135,8 @@ const getRegisteredProjectsRoute = HttpRouter.add(
           linearTeam: getIssuePrefix(p.config) || null,
           membershipQueryable: Boolean(getIssuePrefix(p.config)),
           githubRepo: p.config.github_repo || null,
+          gitlabRepo: p.config.gitlab_repo || null, // PAN-5161
+          owner: p.config.owner?.trim() || null, // PAN-5161
           tracker: tryResolveProjectTrackerType(p.config),
           linearProject: (p.config as { linear_project?: string }).linear_project || null,
         })),
