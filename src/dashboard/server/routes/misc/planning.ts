@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
+import { ensureAutoApproveHookReady } from '../../../../lib/agents/hook-readiness.js';
 import { ensureSessionContextBriefingFile } from '../../../../lib/briefing-freshness.js';
 import { getClaudePermissionFlagsString } from '../../../../lib/claude-permissions.js';
 import { loadConfigSync as loadYamlConfig, resolveModel } from '../../../../lib/config-yaml.js';
@@ -257,6 +258,13 @@ const postPlanningMessageRoute = HttpRouter.add(
             { status: 500 },
           );
         }
+
+        // PAN-5151: same before-any-side-effect principle as the model
+        // resolution above. A refused launch must leave output.jsonl and
+        // CONTINUATION_PROMPT.md untouched so the retry still has the prior
+        // conversation to rebuild from — this used to run after the output
+        // rename below, which left a retry with nothing to read.
+        await ensureAutoApproveHookReady();
 
         const outputFile = join(planningDir, 'output.jsonl');
         let conversationLog = '';

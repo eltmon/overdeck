@@ -28,8 +28,13 @@ const mocks = vi.hoisted(() => ({
   launchAgentPane: vi.fn(),
   deliverAgentMessage: vi.fn(),
   resolveModel: vi.fn(),
+  ensureAutoApproveHookReady: vi.fn(async () => undefined),
   appended: [] as Record<string, unknown>[],
   launcherConfigs: [] as Record<string, unknown>[],
+}));
+
+vi.mock('../../../../../src/lib/agents/hook-readiness.js', () => ({
+  ensureAutoApproveHookReady: mocks.ensureAutoApproveHookReady,
 }));
 
 vi.mock('../../../../../src/lib/agents/liveness.js', async (importOriginal) => {
@@ -80,6 +85,11 @@ vi.mock('../../../../../src/lib/briefing-freshness.js', () => ({
 
 vi.mock('../../../../../src/lib/claude-permissions.js', () => ({
   getClaudePermissionFlagsString: () => '--permission-mode auto',
+  // PAN-5151: ensureAutoApproveHookReady() resolves the mode via this module;
+  // 'bypass' keeps it a no-op so these tests, which exercise planner
+  // relaunch/launch-window coordination rather than permission mode, are
+  // unaffected by the auto-approve hook guard.
+  resolvePermissionMode: () => 'bypass',
 }));
 
 vi.mock('../../../../../src/lib/settings.js', async (importOriginal) => {
@@ -155,6 +165,7 @@ beforeEach(async () => {
   });
   mocks.deliverAgentMessage.mockResolvedValue({ ok: true, path: 'herdr' });
   mocks.resolveModel.mockReturnValue('claude-sonnet-5');
+  mocks.ensureAutoApproveHookReady.mockImplementation(async () => undefined);
 });
 
 afterEach(async () => {
@@ -349,6 +360,24 @@ describe('POST /api/planning/:issueId/message: plan model resolution (PAN-4160)'
     expect(getAgentState(PLANNER)).toBeNull();
     // The conversation log is not moved aside, so a retry after fixing the
     // config still rebuilds the continuation prompt from it.
+    expect(existsSync(outputFile)).toBe(true);
+    expect(existsSync(join(planningDir, 'CONTINUATION_PROMPT.md'))).toBe(false);
+  });
+
+  it('returns a 500 and touches nothing when the auto-approve-hook guard refuses the launch (PAN-5151)', async () => {
+    mocks.isAlive.mockResolvedValue({ alive: false, reason: 'pane-dead' });
+    mocks.ensureAutoApproveHookReady.mockRejectedValue(new Error('auto-approve hook not registered; run pan sync'));
+    const planningDir = join(mocks.projectPath, 'workspaces', 'feature-pan-3960', '.pan');
+    const outputFile = join(planningDir, 'output.jsonl');
+    await writeFile(outputFile, '{}\n');
+
+    const response = await call('POST', `/api/planning/${ISSUE}/message`, { message: 'continue' });
+
+    expect(response.status).toBe(500);
+    expect(String(response.body.error)).toContain('auto-approve hook not registered');
+    expect(mocks.launchAgentPane).not.toHaveBeenCalled();
+    // A refused launch must not rename output.jsonl or overwrite
+    // CONTINUATION_PROMPT.md — the retry still needs the prior conversation.
     expect(existsSync(outputFile)).toBe(true);
     expect(existsSync(join(planningDir, 'CONTINUATION_PROMPT.md'))).toBe(false);
   });

@@ -1,0 +1,379 @@
+{
+  "version": "1",
+  "issueId": "PAN-5151",
+  "created": "2026-11-11T14:34:32.001Z",
+  "updated": "2026-11-11T17:51:03.951Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-11-11T15:58Z] ci-monitor → FAILED — seq 1",
+      "timestamp": "2026-11-11T15:58:31.200Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-11T15:59Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-11-11T15:59:22.224Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-11T16:28:33.177Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-11T16:35Z] coderabbit → FINDINGS — seq 3",
+      "timestamp": "2026-11-11T16:35:07.454Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-11T16:41Z] ci-monitor → FAILED — seq 4",
+      "timestamp": "2026-11-11T16:41:51.400Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-11T17:00:06.597Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-11T17:02Z] ci-monitor → FAILED — seq 5",
+      "timestamp": "2026-11-11T17:02:32.152Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-11T17:05Z] review-agent → CHANGES-REQUESTED — seq 6",
+      "timestamp": "2026-11-11T17:05:16.157Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-5",
+      "timestamp": "2026-11-11T17:05:17.233Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-11T17:23:59.510Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-11T17:27Z] review-agent → CHANGES-REQUESTED — seq 7",
+      "timestamp": "2026-11-11T17:27:07.917Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-11T17:39Z] verification-gate → FAILED — seq 8",
+      "timestamp": "2026-11-11T17:39:43.931Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-11T17:51Z] verification-gate → FAILED — seq 9",
+      "timestamp": "2026-11-11T17:51:03.950Z"
+    }
+  ],
+  "items": {
+    "pin-module": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5151",
+      "claimedAt": "2026-11-11T14:34:32.001Z",
+      "doneAt": "2026-11-11T14:38:25.486Z"
+    },
+    "pin-module.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T14:38:25.486Z"
+    },
+    "pin-module.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T14:38:25.486Z"
+    },
+    "pin-module.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T14:38:25.486Z"
+    },
+    "pin-module.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T14:38:25.486Z"
+    },
+    "pin-module.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-11T14:38:25.486Z"
+    },
+    "pin-cli-entry": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5151",
+      "claimedAt": "2026-11-11T14:38:34.343Z",
+      "doneAt": "2026-11-11T14:42:15.301Z"
+    },
+    "pin-cli-entry.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T14:42:15.301Z"
+    },
+    "pin-cli-entry.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T14:42:15.301Z"
+    },
+    "pin-cli-entry.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T14:42:15.301Z"
+    },
+    "pin-cli-entry.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T14:42:15.301Z"
+    },
+    "pin-dashboard-boot": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5151",
+      "claimedAt": "2026-11-11T14:42:25.548Z",
+      "doneAt": "2026-11-11T14:47:51.328Z"
+    },
+    "pin-dashboard-boot.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T14:47:51.328Z"
+    },
+    "pin-dashboard-boot.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T14:47:51.328Z"
+    },
+    "pin-dashboard-boot.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T14:47:51.328Z"
+    },
+    "default-flip": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5151",
+      "claimedAt": "2026-11-11T14:50:24.545Z",
+      "doneAt": "2026-11-11T14:56:11.853Z"
+    },
+    "default-flip.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T14:56:11.853Z"
+    },
+    "default-flip.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T14:56:11.853Z"
+    },
+    "default-flip.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T14:56:11.853Z"
+    },
+    "default-flip.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T14:56:11.853Z"
+    },
+    "settings-ui": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5151",
+      "claimedAt": "2026-11-11T14:56:22.619Z",
+      "doneAt": "2026-11-11T14:59:15.091Z"
+    },
+    "settings-ui.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T14:59:15.091Z"
+    },
+    "settings-ui.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T14:59:15.091Z"
+    },
+    "settings-ui.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T14:59:15.091Z"
+    },
+    "settings-ui.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T14:59:15.091Z"
+    },
+    "launch-guard-helper": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5151",
+      "claimedAt": "2026-11-11T14:59:24.298Z",
+      "doneAt": "2026-11-11T15:02:15.473Z"
+    },
+    "launch-guard-helper.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:02:15.473Z"
+    },
+    "launch-guard-helper.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:02:15.473Z"
+    },
+    "launch-guard-helper.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:02:15.473Z"
+    },
+    "launch-guard-helper.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:02:15.473Z"
+    },
+    "guard-agent-builders": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5151",
+      "claimedAt": "2026-11-11T15:02:26.502Z",
+      "doneAt": "2026-11-11T15:06:28.355Z"
+    },
+    "guard-agent-builders.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:06:28.355Z"
+    },
+    "guard-agent-builders.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:06:28.355Z"
+    },
+    "guard-agent-builders.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:06:28.355Z"
+    },
+    "guard-agent-builders.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:06:28.355Z"
+    },
+    "guard-conversations-planning": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5151",
+      "claimedAt": "2026-11-11T15:06:38.664Z",
+      "doneAt": "2026-11-11T15:12:00.780Z"
+    },
+    "guard-conversations-planning.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:12:00.780Z"
+    },
+    "guard-conversations-planning.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:12:00.780Z"
+    },
+    "guard-conversations-planning.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:12:00.780Z"
+    },
+    "remote-refuse-auto": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5151",
+      "claimedAt": "2026-11-11T15:12:14.758Z",
+      "doneAt": "2026-11-11T15:16:42.959Z"
+    },
+    "remote-refuse-auto.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:16:42.959Z"
+    },
+    "remote-refuse-auto.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:16:42.959Z"
+    },
+    "remote-refuse-auto.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:16:42.959Z"
+    },
+    "doctor-permission-row": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5151",
+      "claimedAt": "2026-11-11T15:16:51.420Z",
+      "doneAt": "2026-11-11T15:19:18.814Z"
+    },
+    "doctor-permission-row.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:19:18.814Z"
+    },
+    "doctor-permission-row.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:19:18.814Z"
+    },
+    "doctor-permission-row.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:19:18.814Z"
+    },
+    "doctor-permission-row.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:19:18.814Z"
+    },
+    "docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5151",
+      "claimedAt": "2026-11-11T15:19:29.355Z",
+      "doneAt": "2026-11-11T15:21:52.284Z"
+    },
+    "docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:21:52.284Z"
+    },
+    "docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:21:52.284Z"
+    },
+    "docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:21:52.284Z"
+    },
+    "docs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:21:52.284Z"
+    }
+  },
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-11T15:58:31Z",
+      "markdownBody": "# CI Failure Feedback for PAN-5151\n\nPull request: https://github.com/eltmon/overdeck/pull/5158 (head `499a9c0d`)\n\nSource: check_run:test-shard (1/4)\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\n## Failing checks (2)\n\n### test-shard (1/4)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/130628498357/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/43051190015/job/130628498357  \n```\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/lib/remote/remote-agent-provenance.test.ts\u001b[2m > \u001b[22mremote agent provenance\u001b[2m > \u001b[22mpersists and exports the accepted immediate origin\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/lib/remote/remote-agent-provenance.test.ts\u001b[2m > \u001b[22mremote agent provenance\u001b[2m > \u001b[22mpersists and exports the accepted immediate origin\n\u001b[31m\u001b[1mError\u001b[22m: Remote Fly agents need claude.permissionMode: bypass. The Fly VM has no Overdeck auto-approve hook, so under auto every tool call would wait for approval. Set Bypass in Settings → Permissions, or start with PAN_YOLO=true.\u001b[39m\n\u001b[36m \u001b[2m❯\u001b[22m assertRemotePermissionModeSupported src/lib/remote/remote-agents.ts:\u001b[2m611:9\u001b[22m\u001b[39m\n    \u001b[90m609|\u001b[39m export function assertRemotePermissionModeSupported(mode: ClaudePermis…\n    \u001b[90m610|\u001b[39m   \u001b[35mif\u001b[39m (mode \u001b[33m!==\u001b[39m \u001b[32m'auto'\u001b[39m) \u001b[35mreturn\u001b[39m\u001b[33m;\u001b[39m\n    \u001b[90m611|\u001b[39m   \u001b[35mthrow\u001b[39m \u001b[35mnew\u001b[39m \u001b[33mError\u001b[39m(\n    \u001b[90m   |\u001b[39m         \u001b[31m^\u001b[39m\n    \u001b[90m612|\u001b[39m     'Remote Fly agents need claude.permissionMode: bypass. The Fly VM …\n    \u001b[90m613|\u001b[39m       + 'so under auto every tool call would wait for approval. Set By…\n\u001b[90m \u001b[2m❯\u001b[22m spawnRemoteAgentWithoutConsentClaim src/lib/remote/remote-agents.ts:\u001b[2m621:3\u001b[22m\u001b[39m\n\u001b[90m \u001b[2m❯\u001b[22m spawnRemoteAgent src/lib/remote/remote-agents.ts:\u001b[2m594:12\u001b[22m\u001b[39m\n\u001b[90m \u001b[2m❯\u001b[22m tests/lib/remote/remote-agent-provenance.test.ts:\u001b[2m102:25\u001b[22m\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/18]⎯\u001b[22m\u001b[39m\n\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/lib/remote/remote-agent-provenance.test.ts\u001b[2m > \u001b[22mremote agent provenance\u001b[2m > \u001b[22mlets an explicit operator remote start proceed when planning consent is unreadable\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/lib/r\n…\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m1 failed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[1m\u001b[32m631 passed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[33m2 skipped\u001b[39m\u001b[90m (634)\u001b[39m\n```\n\n### test-shard (3/4)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/130628498333/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/43051190015/job/130628498333  \n```\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/dashboard/server/routes/planning-routes.test.ts\u001b[2m > \u001b[22mPOST /api/planning/:issueId/message (M1)\u001b[2m > \u001b[22mcloses a dead planner on Herdr, then relaunches it — the message is not sent to the residue\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/dashboard/server/routes/planning-routes.test.ts\u001b[2m > \u001b[22mPOST /api/planning/:issueId/message (M1)\u001b[2m > \u001b[22mcloses a dead planner on Herdr, then relaunches it — the message is not sent to the residue\n\u001b[31m\u001b[1mAssertionError\u001b[22m: expected 500 to be 200 // Object.is equality\u001b[39m\n\n\u001b[32m- Expected\u001b[39m\n\u001b[31m+ Received\u001b[39m\n\n\u001b[32m- 200\u001b[39m\n\u001b[31m+ 500\u001b[39m\n\n\u001b[36m \u001b[2m❯\u001b[22m tests/unit/dashboard/server/routes/planning-routes.test.ts:\u001b[2m172:29\u001b[22m\u001b[39m\n    \u001b[90m170|\u001b[39m     const response = await call('POST', `/api/planning/${ISSUE}/messag…\n    \u001b[90m171|\u001b[39m\n    \u001b[90m172|\u001b[39m     \u001b[34mexpect\u001b[39m(response\u001b[33m.\u001b[39mstatus)\u001b[33m.\u001b[39m\u001b[34mtoBe\u001b[39m(\u001b[34m200\u001b[39m)\u001b[33m;\u001b[39m\n    \u001b[90m   |\u001b[39m                             \u001b[31m^\u001b[39m\n    \u001b[90m173|\u001b[39m     expect(response.body.message).toBe('Planning session restarted in …\n    \u001b[90m174|\u001b[39m     \u001b[34mexpect\u001b[39m(mocks\u001b[33m.\u001b[39misAlive)\u001b[33m.\u001b[39m\u001b[34mtoHaveBeenCalledWith\u001b[39m(\u001b[33mPLANNER\u001b[39m)\u001b[33m;\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/18]⎯\u001b[22m\u001b[39m\n\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/dashboard/server/routes/planning-routes.test.ts\u001b[2m > \u001b[22mPOST /api/planning/:issueId/message (M1)\u001b[2m > \u001b[22mgives the continued planner the overdeck MCP server (PAN-4932)\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/dashboard/server/routes/planning-routes.test.ts\u001b[2m > \u001b[22mPOST /api/planning/:issueId/message (M1)\u001b[2m > \u001b[22mgives the continued planner the overdeck MCP server (PAN-4932)\n\u001b[31m\u001b[1mAssertionError\u001b[22\n…\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m1 failed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[1m\u001b[32m631 passed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[33m1 skipped\u001b[39m\u001b[90m (633)\u001b[39m\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    },
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-11-11T15:59:22Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-5151\n\n# Review — PAN-5151\n## Verdict: CHANGES REQUESTED — two existing test files break under the new default/guard (18 failures, CI test-shard 1/4 and 3/4 red)\n\n## Context\n- Run ID: agent-pan-5151-review-499a9c0d\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-5151/.pan/review/agent-pan-5151-review-499a9c0d/context.json\n- Branch / workspace: feature/pan-5151 / /home/eltmon/Projects/overdeck/workspaces/feature-pan-5151\n- PR: https://github.com/eltmon/overdeck/pull/5158\n- HEAD reviewed: 499a9c0d74e2470dab13cc6ba93091d051be3719\n- Base / prior cycle SHA: merge-base f3c0a10e3a2e6d4d84466288277a9db2328a56aa; no prior review cycle\n- Spec: .pan/drafts/PAN-5151.md (FR-1..FR-6, NFR-1..NFR-4, WI-1..WI-11, AC 1..10)\n\n## Blocking Findings\n\n### [validation] Remote provenance tests now hit the new `auto` refusal — `tests/lib/remote/remote-agent-provenance.test.ts`\n- Severity: !\n- Classification / requirement scope: validation gap (tests not updated for an intended behavior change); in_pr_scope\n- Trigger and changed-code connection: the default flip (`DEFAULT_CONFIG.claude.permissionMode = 'auto'`, `src/lib/config-yaml/defaults.ts`) plus the new `assertRemotePermissionModeSupported()` as the first statement of `spawnRemoteAgentWithoutConsentClaim` (`src/lib/remote/remote-agents.ts:~621`). These tests never set a mode or `PAN_YOLO`, so they now resolve `auto` and are refused.\n- Expected / observed / impact: 9 tests fail with `promise rejected \"Error: Remote Fly agents need claude.permissionMode: bypass…\"` (e.g. \"persists and exports the accepted immediate origin\", \"rejects an invalid --effort before any Fly VM status call\", \"spends autonomous consent when remote setup fails…\"). CI `test-shard (1/4)` is red on this HEAD: 1 file failed, 9 tests failed.\n- Evidence: CI job 130628498357 log; reproduced locally with `npx vitest run tests/lib/remote/remote-agent-provenance.test.ts`. The PRD's own Hazards section predicted this (\"Existing remote tests may now resolve auto … Set PAN_YOLO=true … in those cases; do not weaken the refusal\"), but only `tests/lib/remote/remote-agents.test.ts` was updated.\n- Fix: in `remote-agent-provenance.test.ts`, set `process.env.PAN_YOLO = 'true'` in `beforeEach` (restore in `afterEach`), or mock `resolvePermissionMode` to return `'bypass'`. Keep the refusal as is.\n\n### [validation] Planning-route tests mock `claude-permissions.js` without `resolvePermissionMode` — `tests/unit/dashboard/server/routes/planning-routes.test.ts:81`\n- Severity: !\n- Classification / requirement scope: validation gap; in_pr_scope\n- Trigger and changed-code connection: the new `await ensureAutoApproveHookReady()` in `/api/planning/:issueId/message` (`src/dashboard/server/routes/misc/planning.ts:331`) calls `resolvePermissionMode()` from `claude-permissions.js`. The test's `vi.mock('…/claude-permissions.js', () => ({…}))` factory does not export it, so the handler throws `[vitest] No \"resolvePermissionMode\" export is defined on the … mock` and returns 500.\n- Expected / observed / impact: 9 tests in \"POST /api/planning/:issueId/message (M1)\" and \"plan model resolution (PAN-4160)\" fail. CI `test-shard (3/4)` is red on this HEAD: 1 file failed, 9 tests failed.\n- Evidence: CI job 130628498333 log (\"Error sending planning message: Error: [vitest] No \"resolvePermissionMode\" export…\"); reproduced locally (18 failures total across the two files).\n- Fix: add `resolvePermissionMode: vi.fn(() => 'bypass')` to that mock factory (or mock `../hook-readiness.js`'s `ensureAutoApproveHookReady` as a resolved no-op). Then run both files plus the PRD's hazard list (`npx vitest run src/lib/__tests__/claude-permission*.test.ts src/lib/__tests__/permission-mode-leak.test.ts src/lib/__tests__/agent-state-harness.test.ts tests/lib/agents-auth-routing.test.ts src/lib/__tests__/settings-api.test.ts`) and grep `tests/` for other `vi.mock(…claude-permissions…)` factories missing `resolvePermissionMode`.\n\nThe production code itself showed no defect; both blockers are test updates the PRD called for.\n\n## Non-blocking Findings\n\n### [requirements] NFR-4 says \"mode 0600\", the pin preserves an existing file's mode — `src/lib/claude-permission-mode-pin.ts:83`\n- Severity: ~\n- Classification / scope: specification defect (internal PRD inconsistency); in_pr_scope\n- Trigger: an existing `config.yaml` with mode 0644 is pinned.\n- Observed: `writeFileAtomic` (`src/lib/model-presets/state.ts:63`) keeps the existing mode; a probe left a 0644 file at 0644. A newly created `config.yaml` gets 0600.\n- Impact: none harmful. PRD Decision 9 says the writer \"preserves mode\", which contradicts NFR-4's wording. Preserving is the safer behavior (no surprise permission change on the operator's file). Fix the NFR-4 wording, not the code.\n\n### [correctness] A scalar `claude:` value is replaced without being named in the notice — `src/lib/claude-permission-mode-pin.ts:74-88`\n- Severity: ?\n- Trigger: `config.yaml` holds `claude: bypassPermissions` (a scalar, not a map).\n- Observed (probe): the scalar is replaced with `claude: { permissionMode: bypass }`, but `replacedValue` is undefined and the notice does not mention the old value, because `getIn(['claude','permissionMode'])` returns undefined on a scalar.\n- Impact: cosmetic; the resulting mode is correct (bypass, the value that home resolved before). Optional: record `doc.getIn(['claude'])` as the replaced value when it is a non-map scalar.\n\n### [ux] Notice text hard-codes `~/.overdeck/config.yaml` — `src/lib/claude-permission-mode-pin.ts:29`\n- Severity: ?\n- Under an `OVERDECK_HOME` override the notice names the wrong path. Cosmetic; the text is the PRD's Decision 10 verbatim.\n\n### [docs] Stale comment left in `src/lib/settings-api.ts:238-239`\n- Severity: ?\n- Classification: pre_existing (not in the FR-6 file list). It still says `'auto' (default) → --permission-mode auto (classifier…)`. Worth a one-line fix in a later change.\n\n### [correctness] Planning-message route writes the continuation prompt before the guard can refuse — `src/dashboard/server/routes/misc/planning.ts:~319-331`\n- Severity: ?\n- When the guard throws, the route returns HTTP 500 with the guard's message (the handler's existing catch at ~line 425), but `continuationPrompt` has already been written to disk. Harmless leftover file; the next retry overwrites it.\n\n### [correctness] Concurrent first runs of the pin\n- Severity: ?\n- If the CLI and a dashboard boot run the pin at the same moment on first upgrade, both classify the same way and write the same value plus marker; the writes are atomic renames, so the outcome is idempotent. A third writer that edits `config.yaml` in the same few-ms window could lose an update (read-modify-write race). Very narrow; no action needed now.\n\n### [requirements] Fresh `OVERDECK_HOME`s (peer test dashboards, feature containers) now resolve `auto`\n- Severity: ?\n- Intended by FR-1: a fresh home is a new installation. Such environments now need the auto-approve hook (the guard provisions it, which requires `jq`) or an explicit `bypass`/`PAN_YOLO`. The guard refuses with an actionable message, so nothing hangs silently.\n\n### [correctness] Relaunch paths can now reject mid-relaunch under `auto`\n- Severity: ?\n- `getRoleRuntimeBaseCommand` is awaited inside `recovery.ts:~827` and `messaging.ts:~513` after earlier relaunch preparation. When the hook cannot be registered, the relaunch now throws instead of starting an agent that would prompt forever. That is the FR-5 intent. Whether a prior step there (stop / state save) leaves the agent stopped was not fully traced; it would only matter on a machine without `jq`, where no launch can succeed anyway.\n\n## Coverage\n\n### Changed-file ledger\n| File | Status |\n|---|---|\n| src/lib/claude-permission-mode-pin.ts | reviewed; probed live (new / pinned / already-decided / mode / scalar claude) |\n| src/cli/index.ts | reviewed; pin runs before `program.parseAsync`; notice on stderr; failures swallowed |\n| src/dashboard/server/main.ts | reviewed; pin after `mkdir(OVERDECK_HOME)`, before `createOverdeckDatabase` and listener; 981 lines |\n| src/lib/claude-hooks-provision.ts | reviewed; desktop block moved verbatim into `provisionClaudeHooksForDesktopBoot`, still fire-and-forget |\n| src/lib/claude-hooks-registration.ts | reviewed; `isAutoApproveHookRegistered` reuses `isHookConfigured` |\n| src/lib/agents/hook-readiness.ts | reviewed; guard is a no-op under bypass and under VITEST without explicit path; provisions then re-checks; error names `pan sync` and the reason |\n| src/lib/agents/runtime-command.ts | reviewed; guard placed after non-claude early returns, the test-harness return and the registered-agent-name branch, in both builders |\n| src/lib/agents/spawn-prep.ts | reviewed; claude-code resume branch guarded |\n| src/lib/overdeck/conversation-runtime.ts | reviewed; guard first in `spawnConversationSession` for claude-code, before stateDir/launcher creation |\n| src/dashboard/server/routes/misc/planning.ts | reviewed; guard before flags; rejection reaches the 500 response |\n| src/lib/remote/remote-agents.ts | reviewed; `assertRemotePermissionModeSupported` first in `spawnRemoteAgentWithoutConsentClaim`, before model resolution and Fly calls; consent wrapper releases the claim on throw (`auto-spawn-consent.ts:230-241`) |\n| src/lib/overdeck/paths.ts | reviewed; `OVERDECK_DB_FILENAME` constant, `getOverdeckDatabasePath` unchanged in value |\n| src/cli/commands/doctor-permission-mode.ts, doctor.ts | reviewed; row rules match WI-10 |\n| src/lib/claude-permissions.ts | reviewed; catch → `auto`; header updated |\n| src/lib/config-yaml/defaults.ts, schema.ts, config.ts | reviewed; default `auto`, comments updated |\n| src/lib/settings-api.ts | reviewed; fallback now `DEFAULT_CONFIG.claude.permissionMode` |\n| src/dashboard/frontend/.../PermissionsSection.tsx, types.ts | reviewed; Auto first and recommended, fallback `auto` |\n| scripts/frontend-test-subset.txt | reviewed; new test listed in sorted position |\n| tests: pin, claude-permissions, merge, hook-readiness, launch-guard, conversation guard, doctor, remote-agents, PermissionsSection | reviewed; all run (see Verification) |\n| docs/CONFIGURATION.md, configuration/mcp.mdx, docs/fly-provider.md, changelog.mdx | reviewed; new default, existing-install pin, remote refusal, changelog bullet with #5151; `skipAutoPermissionPrompt` and claudish caveat removed |\n| .pan/continues/*.xbrief.json, .pan/drafts/PAN-5151.md, .pan/specs/*.xbrief.json | not applicable (planning artifacts); PRD read as the spec |\n\n### Dimensions\n- **Correctness:** every `getClaudePermissionFlags*` / `ensureClaudePermissionFlag` call site in `src` is either guarded (builders, resume branch, conversation spawn, planning route), refused (remote Fly), or exempt per spec (`smart-compaction.ts` headless `-p`). Specialists launch with `--agent pan-*-agent` and skip the guard by design (non-goal). The guard and the flag builder both call `resolvePermissionMode()` with no argument, so they assess the same resolved mode (PAN_YOLO → config → default). No reachable defect found.\n- **Security:** the change moves the default toward the less permissive mode. Config-load failure now falls back to `auto`. The pin edits only `claude.permissionMode` and refuses to touch an unparseable file. No new trust boundary or attacker-controlled input.\n- **Performance:** the pin's fast path is one `stat` per `pan` invocation and imports only light modules (`paths`, `overdeck/paths`, `model-presets/state`); `yaml` is imported lazily. The guard costs one config resolve under bypass and one `settings.json` read plus `existsSync` under auto. Bounded.\n- **Requirements/UX:** see the AC matrix. The refusal messages are actionable (name `pan sync`, `jq`, Settings → Permissions, `PAN_YOLO`).\n\n### Acceptance criteria\n| AC | Status | Evidence |\n|---|---|---|\n| 1 (WI-1 pin) | met | `claude-permission-mode-pin.test.ts` 12 cases pass; live probe: empty home → new-install, marker only; second call → already-decided |\n| 2 (WI-2 CLI entry) | met | `OVERDECK_HOME=<scratch with config.toml> node dist/cli/index.js --version` printed the notice on stderr and wrote `claude:\\n  permissionMode: bypass`; second run printed nothing; fresh home got only the marker. dist built 10:37, before the last commit (door-constant refactor, no behavior change); CI `build (22)` passed on this HEAD |\n| 3 (WI-3 dashboard boot) | met | `wc -l main.ts` = 981; `scripts/lint-file-size.sh` exit 0; pin line sits above `createOverdeckDatabase` and the listener |\n| 4 (WI-4 default flip) | met | `claude-permissions.test.ts` (default `auto`, throw → `auto` + `['--permission-mode','default']`), merge test (`null`/`{}` → auto); PAN_YOLO precedence tests unchanged and passing; `git grep \"?? 'bypass'\"` over the three FR-3 files is empty |\n| 5 (WI-5 Settings UI) | met | `PermissionsSection.test.tsx` 4/4 pass; file listed in `frontend-test-subset.txt` |\n| 6 (WI-6 guard helper) | met | `hook-readiness.test.ts` new cases pass (bypass no-op, registered no-op, failure names `pan sync` + reason, provisioning success) |\n| 7 (WI-7/8 wiring) | met (behavior); planning-route suite regression above | `auto-approve-launch-guard.test.ts` and `conversation-auto-approve-guard.test.ts` pass; static check of the resume branch and planning route |\n| 8 (WI-9 remote) | met (behavior); suite regression above | `remote-agents.test.ts` new cases pass; assert is the first statement before model resolution/Fly calls |\n| 9 (WI-10 doctor) | met | `doctor-permission-mode.test.ts` passes; row wired in `collectDoctorChecks` |\n| 10 (WI-11 docs) | met | `grep` finds no `skipAutoPermissionPrompt`/claudish in `docs/CONFIGURATION.md`; \"Existing installations\" section present; changelog bullet links #5151 |\n\nNon-goals respected: Codex/ACP defaults unchanged; `auto` still emits `--permission-mode default`; no Fly hook provisioning; `.pan.yaml` layer untouched; `runModelSummary` untouched; config load still writes nothing; the pin returns `already-decided` once the marker exists.\n\n## Verification\n- `npx vitest run` on the 9 backend test files touched or most affected (pin, claude-permissions, merge, hook-readiness, launch guard, conversation guard, doctor row, remote-agents, permission-mode-leak): 9 files, 121 tests passed.\n- Frontend: `npx vitest run src/components/Settings/sections/__tests__/PermissionsSection.test.tsx`: 4 passed.\n- `npm run lint:effect-diagnostics`: passed, 227 known findings, none new.\n- `bash scripts/lint-file-size.sh`: exit 0; `main.ts` 981 lines.\n- Live probes of the pin module (tsx) and CLI entry (dist) on scratch homes under the session scratchpad: results above.\n- CI on HEAD 499a9c0d (`gh pr checks 5158`, re-checked at end of review): build, lint-group core/state/skills, clean-install smoke, integrations, prompt-trailer gate and the `overdeck/verification` gate (typecheck + `npm run lint`, which includes `lint:circular`) pass. **test-shard (1/4) and (3/4) FAIL** (the two blockers above; each shard shows exactly 1 failed file, 9 failed tests). test-shard 2/4 and 4/4, test-e2e and the flake lane were still pending.\n- Local repro: `npx vitest run tests/lib/remote/remote-agent-provenance.test.ts tests/unit/dashboard/server/routes/planning-routes.test.ts src/lib/__tests__/agent-state-harness.test.ts tests/lib/agents-auth-routing.test.ts src/lib/__tests__/settings-api.test.ts` → 18 failed | 113 passed; all 18 failures are in the two blocker files.\n- AC-2 evidence limit: the dist used was built before the last commit `a803ccec77c`, which only moves the db filename into the `OVERDECK_DB_FILENAME` constant (`git show --stat`: pin module 3 lines, `overdeck/paths.ts` 10 lines); behavior is unchanged.\n- Not run: full `npm test` (forbidden on host; CI owns it).\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-5151/.pan/review/agent-pan-5151-review-499a9c0d/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-5151 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 3,
+      "specialist": "coderabbit",
+      "outcome": "findings",
+      "timestamp": "2026-11-11T16:35:07Z",
+      "markdownBody": "# CodeRabbit findings for PAN-5151 (PR #5158)\n\nCodeRabbit posted 3 inline finding(s). CodeRabbit is advisory: nothing waits for these,\nbut each one gets an answer, either a fix or a reply with your reason.\n\n- Thread 4540547539 · src/dashboard/server/routes/misc/planning.ts:331 [Major]: Run the guard before archiving the planning output.\n  https://github.com/eltmon/overdeck/pull/5158#discussion_r4540547539\n- Thread 4540547556 · src/lib/claude-hooks-registration.ts:137 [Major]: Require registration that covers all tools.\n  https://github.com/eltmon/overdeck/pull/5158#discussion_r4540547556\n- Thread 4540547572 · src/lib/claude-permission-mode-pin.ts:50 [Major]: Serialize the first permission-mode decision across processes.\n  https://github.com/eltmon/overdeck/pull/5158#discussion_r4540547572\n\n## What to do\n\n1. Read each thread (open its link, or the code at the path and line).\n2. If you agree with a finding, fix it.\n3. If you reject a finding, reply on its thread with your reason:\n   `gh api repos/eltmon/overdeck/pulls/5158/comments/<thread id>/replies -f body=\"<reason>\"`\n4. If you changed code: run the quality gates on what you touched, commit, push, then run `pan review request PAN-5151`.\n   If you only replied, you are done.\n5. If PR #5158 has already merged when you read this, nothing more lands on it: open a follow-up issue\n   for the findings you agree with instead of pushing."
+    },
+    {
+      "seq": 4,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-11T16:41:51Z",
+      "markdownBody": "# CI Failure Feedback for PAN-5151\n\nPull request: https://github.com/eltmon/overdeck/pull/5158 (head `36db8fe4`)\n\nSource: check_run:test-shard (2/4)\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\n## Failing checks (1)\n\n### test-shard (2/4)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/130655200510/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/43058684092/job/130655200510  \n```\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/__tests__/agents-spawn-supervisor.test.ts\u001b[2m > \u001b[22mspawnAgent PTY supervisor wiring\u001b[2m > \u001b[22mrole-file runs honor an explicit effort over the roles/review.md frontmatter (PAN-4256)\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/__tests__/agents-spawn-supervisor.test.ts\u001b[2m > \u001b[22mspawnAgent PTY supervisor wiring\u001b[2m > \u001b[22mrole-file runs honor an explicit effort over the roles/review.md frontmatter (PAN-4256)\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/__tests__/agents-spawn-supervisor.test.ts\u001b[2m > \u001b[22mspawnAgent PTY supervisor wiring\u001b[2m > \u001b[22mrole-file runs honor an explicit effort over the roles/test.md frontmatter (PAN-4256)\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/__tests__/agents-spawn-supervisor.test.ts\u001b[2m > \u001b[22mspawnAgent PTY supervisor wiring\u001b[2m > \u001b[22mrole-file runs honor an explicit effort over the roles/test.md frontmatter (PAN-4256)\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/__tests__/agents-spawn-supervisor.test.ts\u001b[2m > \u001b[22mspawnAgent PTY supervisor wiring\u001b[2m > \u001b[22mrole-file runs honor an explicit effort over the roles/worker.md frontmatter (PAN-4256)\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/__tests__/agents-spawn-supervisor.test.ts\u001b[2m > \u001b[22mspawnAgent PTY supervisor wiring\u001b[2m > \u001b[22mrole-file runs honor an explicit effort over the roles/worker.md frontmatter (PAN-4256)\n\u001b[31m\u001b[1mError\u001b[22m: [vitest] No \"ensureAutoApproveHookReady\" export is defined on the \"../agents/hook-readiness.js\" mock. Did you forget to return it from \"vi.mock\"?\nIf you need to partially mock a module, you can use \"importOriginal\" helper inside:\n\u001b[39m\nvi.mock(import(\"../agents/hook-readiness.js\"), async (importOriginal) => {\n  const actual = await importOriginal()\n  return {\n…\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m1 failed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[1m\u001b[32m632 passed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[33m1 skipped\u001b[39m\u001b[90m (634)\u001b[39m\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    },
+    {
+      "seq": 5,
+      "specialist": "ci-monitor",
+      "outcome": "failed",
+      "timestamp": "2026-11-11T17:02:32Z",
+      "markdownBody": "# CI Failure Feedback for PAN-5151\n\nPull request: https://github.com/eltmon/overdeck/pull/5158 (head `27f8022b`)\n\nSource: check_run:test-shard (4/4)\n\nFailed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job is the verification test gate. Reproduce with the project's test runner scoped to the failing test files; do not run the full suite locally.\n\n## Failing checks (1)\n\n### test-shard (4/4)\n\nJob log: `gh api repos/eltmon/overdeck/actions/jobs/130671603736/logs`  \nCheck: https://github.com/eltmon/overdeck/actions/runs/43063357818/job/130671603736  \n```\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/lanes/__tests__/launch-remote.test.ts\u001b[2m > \u001b[22mlaunchLane on another machine (PAN-4638 WI-4)\u001b[2m > \u001b[22ma local launch refuses with 500 when every name candidate is taken, and removes its directory\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/lanes/__tests__/launch-remote.test.ts\u001b[2m > \u001b[22mlaunchLane on another machine (PAN-4638 WI-4)\u001b[2m > \u001b[22ma local launch refuses with 500 when every name candidate is taken, and removes its directory\n\u001b[31m\u001b[1mLaneLaunchError\u001b[22m: could not allocate a free conversation name in 5 attempts\u001b[39m\n\u001b[36m \u001b[2m❯\u001b[22m allocateRemoteName src/lib/lanes/launch.ts:\u001b[2m716:9\u001b[22m\u001b[39m\n    \u001b[90m714|\u001b[39m     if (!getConversationByName(name) && (await reserveRemoteLane(name)…\n\n    \u001b[90m715|\u001b[39m   }\n    \u001b[90m716|\u001b[39m   throw new LaneLaunchError(500, `could not allocate a free conversati…\n    \u001b[90m   |\u001b[39m         \u001b[31m^\u001b[39m\n    \u001b[90m717|\u001b[39m }\n    \u001b[90m718|\u001b[39m\n\u001b[90m \u001b[2m❯\u001b[22m launchOnOwner src/lib/lanes/launch.ts:\u001b[2m728:18\u001b[22m\u001b[39m\n\u001b[90m \u001b[2m❯\u001b[22m withProjectLock src/lib/lanes/launch.ts:\u001b[2m164:12\u001b[22m\u001b[39m\n\u001b[90m \u001b[2m❯\u001b[22m src/lib/lanes/__tests__/launch-remote.test.ts:\u001b[2m290:7\u001b[22m\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\u001b[22m\u001b[39m\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m1 failed\u001b[39m\u001b[22m\u001b[2m | \u001b[22m\u001b[1m\u001b[32m632 passed\u001b[39m\u001b[22m\u001b[90m (633)\u001b[39m\n```\n\n## Required action\n\nFix the failing checks, commit the fixes, and push an update. If a failure is marked [INHERITED FROM MAIN], it is not caused by your PR and does not need to be fixed in this branch.\n"
+    },
+    {
+      "seq": 6,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-11-11T17:05:16Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-5151\n\n# Review — PAN-5151\n## Verdict: CHANGES REQUESTED — the new pin lock fails when ~/.overdeck does not exist yet, so a fresh CLI install gets pinned to bypass (FR-1)\n\n## Context\n- Run ID: agent-pan-5151-review-27f8022b\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-5151/.pan/review/agent-pan-5151-review-27f8022b/context.json\n- Branch / workspace: feature/pan-5151 / /home/eltmon/Projects/overdeck/workspaces/feature-pan-5151\n- PR: https://github.com/eltmon/overdeck/pull/5158\n- HEAD reviewed: 27f8022be12ee5d4240d443ce0c3ea9a45f762aa\n- Prior cycles:\n  - Cycle 1 reviewed `499a9c0d74e` and requested changes.\n  - Cycle 2 reviewed `36db8fe4c2e` and approved (`.pan/review/agent-pan-5151-review-36db8fe4/review.md`).\n\n## Delta since the approved HEAD 36db8fe4\n- `693f61c66a9` addresses three CodeRabbit findings:\n  - **Pin lock:** `src/lib/claude-permission-mode-pin.ts` now wraps the decision in `withFileLock` (`src/lib/vault/file-lock.ts`) and rechecks the marker under the lock.\n  - **Stricter hook check:** `isAutoApproveHookRegistered` now requires `matcher === '.*'`. A new test, `claude-hooks-registration.test.ts`, covers it.\n  - **Planning guard moved:** `ensureAutoApproveHookReady()` now runs before the planning route reads or renames `output.jsonl`. A new route test confirms a refused launch leaves both files untouched.\n- `7fdad66269e` adds `ensureAutoApproveHookReady` to the `hook-readiness.js` mocks in `agents-spawn-supervisor.test.ts` and `agents-spawn-tier-fitness.test.ts`.\n- `27f8022be12` changes only `.pan/` workspace state.\n\n## Blocking Findings\n\n### [correctness] The pin lock throws ENOENT on a missing home, which turns a fresh CLI install into \"existing\" — `src/lib/claude-permission-mode-pin.ts:56`\n- Severity: ! (demonstrated failure of FR-1, the issue's headline requirement)\n- Classification / requirement scope: implementation defect introduced this cycle by `693f61c66a9`; in_pr_scope\n- **Trigger and changed-code connection:** on a new machine, `~/.overdeck` does not exist when the CLI-entry pin runs:\n  - `npm i -g` runs the postinstall, but `syncHooksIfInitialized` in `scripts/postinstall.mjs` returns early when `~/.overdeck` is missing.\n  - The CLI creates nothing before the pin (verified below).\n  - `withFileLock` calls `open(join(home, '.claude-permission-mode-pin.lock'), 'wx')` before anything creates `home`. `acquire()` rethrows every error except `EEXIST`, so the call throws ENOENT. The outer catch turns that into `skipped-error`, and no marker is written.\n  - The same `pan install` then creates `~/.overdeck/config.toml`. On the next `pan` invocation the marker is still absent and `config.toml` exists, so the home is classified as existing and pinned to `bypass`.\n- **Baseline:** at the approved HEAD 36db8fe4 the same case produced `new-install`. The first `writeMarker` went through `writeFileAtomic`, and that call runs `mkdir(dirname(path), { recursive: true })` on ENOENT (`src/lib/model-presets/state.ts:63-70`).\n- **Expected / observed / impact:**\n  - Expected: a brand-new CLI install resolves `auto` (FR-1, AC-4).\n  - Observed: it is silently and permanently written to `claude.permissionMode: bypass`, with the \"kept this installation on bypass\" notice.\n  - Impact: this is the main install path, so new users never get the new default. The dashboard and desktop boot paths are unaffected, because `main.ts` runs `mkdir(getOverdeckHome())` before the pin.\n- **Evidence:** runtime reproduction in a scratch dir, with HEAD source run through `tsx`:\n  1. `pinClaudePermissionModeOnce({ overdeckHome: <missing dir> })` returns `{\"outcome\":\"skipped-error\"}`, and the directory is still absent afterward.\n  2. `OVERDECK_HOME=<missing dir> npx tsx src/cli/index.ts --version` prints `0.77.0` and leaves the directory absent, so the CLI creates nothing before the pin.\n  3. After `mkdir <dir> && : > <dir>/config.toml` (what `pan install` writes), the same command prints the bypass notice. It writes `claude:\\n  permissionMode: bypass` and the marker `{\"outcome\":\"pinned-bypass\"}`.\n  - Limit: I simulated `pan install` by creating `config.toml` instead of running it, to avoid touching the real `~/.claude`.\n- **Fix:**\n  - Create the home before taking the lock: `await mkdir(home, { recursive: true })` inside the `try`, before `withFileLock`. Do this only after the fast-path marker check, so NFR-3's one-`stat` fast path stays intact.\n  - Alternatively, treat ENOENT on the home directory as `new-install`.\n  - Add a pin test where `overdeckHome` points at a directory that does not exist yet. Expect `new-install`, the marker written, and no `config.yaml`.\n  - Note: creating `~/.overdeck` early is harmless. The three classification files (`config.yaml`, `config.toml`, `overdeck.db`) are what the pin reads, not the directory itself.\n\n## Non-blocking Findings\n- `?` **Stricter hook check vs. the installer** (`claude-hooks-registration.ts:146`):\n  - `isAutoApproveHookRegistered` now requires `matcher === '.*'`, but the delta installer `addOverdeckHookIfMissing` still uses the matcher-blind `isHookConfigured`.\n  - So a `settings.json` that registers `auto-approve-hook` under any other matcher (for example a hand-edited `\"*\"` or `\"\"`) fails the guard. `pan sync` then never re-adds it, and the `pan doctor` fix text (\"Run: pan sync\") does not fix it.\n  - Every Overdeck version has registered `'.*'`: the original `352637709e5` and the registration table default. This machine's live `~/.claude/settings.json` also has `'.*'`. So only hand-edited settings hit this.\n  - Option: name the matcher in the guard error and doctor message, or have the installer add a `'.*'` entry when only a narrower one exists.\n- `?` The pin now loads `vault/file-lock.js` statically on every `pan` invocation. It imports only `node:fs/promises`, so this is negligible for NFR-3.\n- `?` CI `test-shard (4/4)` failed one test: `src/lib/lanes/__tests__/launch-remote.test.ts` › \"a local launch refuses with 500 when every name candidate is taken…\". The error is the scenario's own `LaneLaunchError: could not allocate a free conversation name in 5 attempts`, raised from `allocateRemoteName` (`src/lib/lanes/launch.ts:716`). The stack never reaches the permission guard, and the test passes locally 15/15 on two runs at this HEAD. I'm treating it as an unrelated flake, but a re-run should confirm.\n- These carry over from earlier cycles and are unchanged:\n  - The NFR-4 \"0600\" wording conflicts with mode preservation.\n  - The comment at `settings-api.ts:238` is stale.\n  - Fresh `OVERDECK_HOME`s in test environments now resolve `auto`.\n  - Relaunch paths can now reject in the middle of a relaunch.\n- Resolved this cycle:\n  - The planning route no longer touches `output.jsonl` before the guard runs. The cycle-1 advisory is fixed and has a test.\n  - The concurrent first-run race is now serialized, apart from the blocker above.\n\n## Coverage\n- **Changed-file ledger:** all 43 files are covered.\n  - The 34 non-`.pan` files that are unchanged since `36db8fe4` keep the cycle-1 and cycle-2 ledger and evidence.\n  - This cycle I reviewed the 8 files changed since `36db8fe4` that are not `.pan`: the pin module and its test, `claude-hooks-registration.ts` and its new test, `planning.ts` and its route test, and the two spawn test mocks.\n  - The `.pan/*` files are planning and state artifacts and are not applicable.\n- **Correctness:**\n  - The lock serializes concurrent decisions correctly once `home` exists.\n  - The stale-lock reclaim (30 s) keeps a crashed holder from wedging the pin. A wedged pin would surface as `skipped-error`, which is retried on the next run.\n  - The missing-home case is the blocker above.\n  - Moving the guard in `planning.ts` is correct. It runs after model resolution and before every file side effect, and only on the relaunch branch, never the live-session delivery branch.\n  - The matcher tightening matches what Overdeck has always registered.\n- **Security:**\n  - The blocker makes the result more permissive than intended: new installs get `bypass`. No attacker-reachable path is involved.\n  - Nothing else in the security picture changes this cycle.\n- **Performance:** the fast path is still one `stat` with no lock. The lock is held only during the one-time decision.\n- **Requirements/AC:**\n  - **FR-1 / AC-4: unmet** for the fresh-CLI-install journey (the blocker). They are met for dashboard and desktop boot.\n  - **AC-1: met** for the cases it lists. Its test suite lacks the missing-home case.\n  - All other ACs keep their cycle-1 status (met).\n\n## Verification\n- Local, exact HEAD: `npx vitest run` on the 7 test files changed or most affected this cycle (the pin, `claude-hooks-registration`, `planning-routes`, `agents-spawn-supervisor`, `agents-spawn-tier-fitness`, `hook-readiness`, `doctor-permission-mode`). Result: 7 files, 109 tests passed.\n- `src/lib/lanes/__tests__/launch-remote.test.ts`: passed 15/15, twice.\n- Runtime probes, in the session scratchpad: see the blocker's Evidence.\n- CI run 43063357818 on HEAD `27f8022be12`: `test-shard (4/4)` failed (the unrelated lanes flake above). `test-shard (3/4)`, `test-e2e` and the flake lane were still pending. All other jobs passed.\n- Not run: the full `npm test`, which is CI-owned. `lint:effect-diagnostics` was not re-run: this cycle's source changes are small non-Effect edits, and CI `lint-group (effect)` passed on this HEAD.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-5151/.pan/review/agent-pan-5151-review-27f8022b/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-5151 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 7,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-11-11T17:27:07Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-5151\n\n# Review — PAN-5151\n## Verdict: CHANGES REQUESTED — the merge left the PAN-5151 changelog bullet inside the already-released v0.78.0 block, which did not ship this change\n\n## Context\n- Run ID: agent-pan-5151-review-8ef78ad9\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-5151/.pan/review/agent-pan-5151-review-8ef78ad9/context.json\n- Branch / workspace: feature/pan-5151 / /home/eltmon/Projects/overdeck/workspaces/feature-pan-5151\n- PR: https://github.com/eltmon/overdeck/pull/5158\n- HEAD reviewed: 8ef78ad97d144c1a177436230e535e2a7368c61d\n- Prior cycles:\n  - Cycle 1, `499a9c0d`: changes requested.\n  - Cycle 2, `36db8fe4`: approved.\n  - Cycle 3, `27f8022b`: changes requested (`.pan/review/agent-pan-5151-review-27f8022b/review.md`).\n\n## Delta since cycle 3 (27f8022b)\n- **`9fbdd67f3f5`** fixes the cycle-3 blocker and one advisory:\n  - The pin now runs `mkdir(home, { recursive: true })` after the fast-path marker check and before `withFileLock`. A new test covers a home that does not exist yet.\n  - `addOverdeckHookIfMissing` now widens an existing `auto-approve-hook` entry to `matcher: '.*'` when it was registered under a narrower matcher, and leaves other hooks alone. Three new tests cover this.\n- **`05f1968de77`** changes only `.pan/` state.\n- **`8ef78ad97d1`** merges `origin/main`, which brings in the v0.78.0 release (`a99ef7df611`, `1466c068c47`) and PAN-5153 (#5159).\n  - Three files overlap with this PR: `changelog.mdx`, `scripts/frontend-test-subset.txt` and `src/cli/commands/doctor.ts`.\n  - `doctor.ts` still has the permission row (line 793), and the subset still lists `PermissionsSection.test.tsx`. Both resolved correctly.\n  - `changelog.mdx` did not resolve correctly; see the blocker.\n  - The merge adds no Claude launch site. All 11 permission-flag call sites in `src/` are the same ones covered in cycle 1.\n\n## Blocking Findings\n\n### [requirements] PAN-5151's changelog bullet now sits in the released v0.78.0 block — `changelog.mdx:26`\n- Severity: ! (fails AC-10 and FR-6 and publishes a false release note)\n- Classification / scope: implementation defect from the merge resolution; in_pr_scope\n- **Trigger:** this PR added its bullet to the `<Update label=\"v0.78.0\" description=\"Unreleased\" tags={[\"Upcoming\"]}>` block. Main then cut v0.78.0, which turned that block into `<Update label=\"v0.78.0\" description=\"2026-11-11\">` without this PR. Merge `8ef78ad97d1` kept the bullet (\"**New installations start in Auto permission mode:** … installs that existed before this release keep bypass …\") under that released heading.\n- **Expected:** AC-10 says \"`changelog.mdx` Upcoming block contains a bullet linking #5151\". The bullet belongs in an unreleased block for the next version.\n- **Observed:** no Upcoming block exists on the branch, and the public changelog would say v0.78.0 changed the permission default.\n- **Impact:**\n  - v0.78.0 users would read that their default flipped and that the one-time pin ran, when neither happened.\n  - \"Before this release\" would name the wrong version boundary for the existing-installation rule.\n- **Evidence:**\n  - Tag `v0.78.0` (`7ea053b79de`) has `permissionMode: 'bypass'` in `src/lib/config-yaml/defaults.ts:285`.\n  - `git show v0.78.0:changelog.mdx | grep -c 5151` prints `0`.\n  - The branch's `changelog.mdx` has the bullet at line 26, under `<Update label=\"v0.78.0\" description=\"2026-11-11\">` (line 13).\n- **Fix:**\n  1. Remove the bullet from the v0.78.0 block.\n  2. Add a new block at the top, for example `<Update label=\"v0.79.0\" description=\"Unreleased\" tags={[\"Upcoming\"]}>`, following the `## Upcoming release` / `#### Improved` shape that main used before tagging.\n  3. Put the bullet in that block, unchanged.\n\n## Non-blocking Findings\n- `?` **Matcher widening also widens hooks that share the group.** `widenAutoApproveHookMatcher` (`src/lib/claude-hooks-registration.ts:235`) changes the matcher on the whole `PreToolUse` group that contains `auto-approve-hook`. A hand-edited group that also holds another hook under `Bash` would widen that hook too. This only affects hand-edited settings, because Overdeck always writes one hook per group. The fix would be to move the auto-approve command into its own `'.*'` group instead.\n- These carry over from earlier cycles and are unchanged:\n  - The NFR-4 \"0600\" wording conflicts with mode preservation.\n  - The comment at `settings-api.ts:238` is stale.\n  - Fresh test `OVERDECK_HOME`s now resolve `auto`.\n  - Relaunch paths can now reject in the middle of a relaunch.\n  - The pin statically imports the light `vault/file-lock.js`.\n- **Resolved this cycle:**\n  - The cycle-3 missing-home blocker is fixed and verified at runtime (see Verification).\n  - The cycle-3 advisory is fixed: `pan sync` can now repair a narrow-matcher auto-approve registration.\n\n## Coverage\n- **Changed-file ledger:** all 43 files are covered.\n  - I reviewed the 4 source/test files in `9fbdd67f3f5`.\n  - I reviewed the three merge-overlap files.\n  - The remaining files are unchanged since cycle 3, so cycles 1–3 still cover them.\n  - The `.pan/*` files are planning and state artifacts and are not applicable.\n  - Merge-only files from main (PAN-5153, the release) are outside this PR's scope. I checked them only for new permission-flag call sites, and found none.\n- **Correctness:**\n  - The `mkdir` comes after the lock-free fast path, so NFR-3 still costs one `stat` on decided homes.\n  - The classification still reads only the three files, so creating the directory does not affect it.\n  - Widening runs only for `auto-approve-hook`, and only when the strict check fails.\n- **Security:** no change this cycle. The cycle-3 blocker (new installs wrongly pinned to the more permissive `bypass`) is closed.\n- **Performance:** no change.\n- **Requirements/AC:**\n  - **AC-1: met**, now including a home that does not exist yet.\n  - **AC-4 / FR-1: met** on the fresh-CLI-install journey (runtime probe below).\n  - **AC-10: unmet** (the blocker).\n  - All other ACs keep the status from earlier cycles (met).\n\n## Verification\n- **Local, exact HEAD:** `npx vitest run` on 13 files. Result: **13 files, 215 tests passed**. The files:\n  - the pin, `claude-hooks-registration` and `claude-hooks-provision`\n  - `planning-routes`, `remote-agent-provenance` and `remote-agents`\n  - `claude-permissions` and `permission-mode-leak`\n  - `hook-readiness`, the launch guard and the conversation guard\n  - `doctor-permission-mode` and `agents-spawn-supervisor`\n- **Runtime probe** (HEAD source run through `tsx`, scratch `OVERDECK_HOME` that does not exist yet):\n  1. `pan --version` wrote the marker `{\"outcome\":\"new-install\"}`.\n  2. I then created `config.toml`, as `pan install` would.\n  3. A second `pan --version` printed no bypass notice and created no `config.yaml`.\n  - The fresh-install journey now resolves `auto`.\n- **Tag check:** `git show v0.78.0:…` checks for the changelog blocker (see Evidence).\n- **CI:** run 43067783537 on HEAD `8ef78ad97d1` had just started; every job was pending at review time, so CI is unverified.\n- **Not run:**\n  - The full `npm test` (CI owns it).\n  - `lint:effect-diagnostics`: this cycle's source change is a few non-Effect lines, and CI `lint-group (effect)` is pending.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-5151/.pan/review/agent-pan-5151-review-8ef78ad9/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-5151 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 8,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-11-11T17:39:43Z",
+      "markdownBody": "VERIFICATION FAILED for PAN-5151 (attempt 1/3):\n\nFailed check: sync-target-branch\n\nSync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - changelog.mdx\n\n## REQUIRED: Resolve merge conflicts BEFORE resubmitting\n\n1. Run: `git fetch origin main && git merge origin/main`\n2. Resolve all conflicts in the listed files\n3. Run the project's build and tests to verify nothing broke\n4. Commit and push ALL changes\n\nAfter fixing:\n1. Run the project's build and tests\n2. Commit and push ALL changes\n3. ONLY THEN resubmit: pan review request PAN-5151 -m \"Fixed sync-target-branch\"\n\nDo NOT resubmit until all repos sync cleanly and tests pass."
+    },
+    {
+      "seq": 9,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-11-11T17:51:03Z",
+      "markdownBody": "VERIFICATION FAILED for PAN-5151 (attempt 1/3):\n\nFailed check: sync-target-branch\n\nSync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - changelog.mdx\n\n## REQUIRED: Resolve merge conflicts BEFORE resubmitting\n\n1. Run: `git fetch origin main && git merge origin/main`\n2. Resolve all conflicts in the listed files\n3. Run the project's build and tests to verify nothing broke\n4. Commit and push ALL changes\n\nAfter fixing:\n1. Run the project's build and tests\n2. Commit and push ALL changes\n3. ONLY THEN resubmit: pan review request PAN-5151 -m \"Fixed sync-target-branch\"\n\nDo NOT resubmit until all repos sync cleanly and tests pass."
+    }
+  ],
+  "agentModel": "claude-opus-5-5"
+}

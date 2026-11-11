@@ -279,10 +279,11 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
     showHarnessModelPermutations: false,
   },
   claude: {
-    // 'bypass' (yolo) is the recommended default (operator decision, 2026-07-12):
-    // 'auto' depends on the auto-approve hooks being installed on the machine —
-    // on a fresh install without them it prompts for every tool call.
-    permissionMode: 'bypass',
+    // 'auto' is the default for new installations (PAN-5151, 2026-11-11). Existing
+    // installations were pinned to their previous 'bypass' default by
+    // claude-permission-mode-pin.ts; launches refuse 'auto' when the auto-approve
+    // hook cannot be registered (hook-readiness.ts ensureAutoApproveHookReady).
+    permissionMode: 'auto',
   },
   codex: {
     permissionMode: 'auto-review',

@@ -10,6 +10,7 @@ import { promisify } from 'node:util';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { MODEL_ID_PATTERN } from '../model-validation.js';
 import { getClaudePermissionFlagsString, ensureClaudePermissionFlag } from '../claude-permissions.js';
+import { ensureAutoApproveHookReady } from '../agents/hook-readiness.js';
 import { getDefaultCwd } from '../default-cwd.js';
 import {
   listConversations,
@@ -580,6 +581,7 @@ export async function spawnConversationSession(
 ): Promise<void> {
   const bareContext = launch.bareContext === true;
   const behavior = getHarnessBehavior(harness);
+  if (behavior.launchCommandKind === 'claude-code') await ensureAutoApproveHookReady(); // PAN-5151
   const launchEffort = resolveConversationEffort({ effort, model, harness, issueId });
   const harnessLaunch = await prepareHarnessLaunch(harness, { model });
   const stateDir = conversationStateDir(tmuxSession);

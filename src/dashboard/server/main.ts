@@ -146,6 +146,9 @@ void (async () => {
 // Ensure OVERDECK_HOME exists before any service that needs it (e.g. CacheService opening cache.db)
 await mkdir(getOverdeckHome(), { recursive: true });
 
+await import('../../lib/claude-permission-mode-pin.js').then(async (m) => { const r = await m.pinClaudePermissionModeOnce(); if (r.notice) console.log(`[overdeck] ${r.notice}`); }).catch(() => undefined); // PAN-5151
+if (process.env.OVERDECK_MODE === 'desktop') void import('../../lib/claude-hooks-provision.js').then((m) => m.provisionClaudeHooksForDesktopBoot()); // PAN-2595
+
 // Ensure the internal token exists before any in-process CLI sender resolves it (PAN-891).
 // Generates and persists a random token at <OVERDECK_HOME>/internal-token (mode 0600)
 // on first start; reused on subsequent starts. Used by /api/internal/pipeline/notify.
@@ -296,28 +299,6 @@ console.log('[overdeck] AgentOutputService started');
 // gone. Mergeability, review state, and check state are read from the forge at
 // request time through services/derived-issue-state.ts — there is no stored
 // copy left for a poller to reconcile.
-
-// Desktop installs never run `pan install`, so provision the Claude Code hook
-// bundle (auto-approve, heartbeat, cost, lifecycle) at boot (PAN-2595).
-// Idempotent + delta-only; skips (with a logged reason) rather than failing
-// the boot, and never overwrites an unparseable settings.json (PAN-1137).
-if (process.env.OVERDECK_MODE === 'desktop') {
-  void (async () => {
-    try {
-      const { provisionClaudeHooks } = await import('../../lib/claude-hooks-provision.js');
-      const result = await provisionClaudeHooks();
-      if (!result.ok) {
-        console.warn(`[overdeck] Claude hook provisioning skipped: ${result.reason}`);
-      } else if (result.changed) {
-        console.log(`[overdeck] Claude hooks provisioned: ${result.binariesSynced} scripts, registered ${result.registered.length} hook(s)${result.pruned.length ? `, pruned ${result.pruned.length} stale` : ''}`);
-      } else {
-        console.log('[overdeck] Claude hooks already provisioned (no settings change)');
-      }
-    } catch (err) {
-      console.warn('[overdeck] Claude hook provisioning failed:', err instanceof Error ? err.message : String(err));
-    }
-  })();
-}
 
 // Wire up pipeline notifier → domain events, so the frontend Zustand store
 // updates on review and test outcomes. PAN-3917: there is no `status_changed`

@@ -15,6 +15,10 @@ This page starts at v0.60.0, the release that removed Overdeck's state layer. Ol
 
   Drafted from the changes merged to `main` since v0.79.0. The date is set when the release is tagged.
 
+  #### Improved
+
+  - **New installations start in Auto permission mode:** a new install launches Claude Code with `--permission-mode default` and Overdeck's auto-approve hook instead of bypass; installs that existed before this release keep bypass, written once into `~/.overdeck/config.yaml`; `pan doctor` reports a missing hook, and a launch is refused rather than prompting on every tool call. ([#5151](https://github.com/eltmon/overdeck/issues/5151))
+
   #### Fixed
 
   - **Polyrepo CI test verdicts are read for the member repo's head:** in a polyrepo project with `verification.tests: ci`, the verification gate looked up the CI test result under the wrapper repo's HEAD, which no PR points at, so a red CI test job never failed the `test` gate and verification passed on typecheck and lint alone. It now reads the verdict for the primary member repo's head, both at the start of the run and after an agent commit moves it. Standalone projects are unchanged. ([#4624](https://github.com/eltmon/overdeck/issues/4624))
