@@ -118,20 +118,23 @@ export interface ShadowConfig {
 /**
  * Permission mode for spawned Claude Code agents.
  *
- * - `bypass` (default): pass `--permission-mode bypassPermissions` (the standalone
+ * - `bypass`: pass `--permission-mode bypassPermissions` (the standalone
  *   `--dangerously-skip-permissions` flag was removed). Fully autonomous — no approval
  *   prompts. This is the value to set when you want dashboard-launched conversations
  *   and agents to never stop on a permission prompt. For the Codex harness it maps to
  *   Full Access (`approval_policy=never` + `sandbox_mode=danger-full-access`).
- * - `auto`: pass `--permission-mode default`. `auto` is Overdeck's internal mode name,
- *   NOT a Claude Code flag value — Claude Code accepts only
+ * - `auto` (default): pass `--permission-mode default`. `auto` is Overdeck's internal mode
+ *   name, NOT a Claude Code flag value — Claude Code accepts only
  *   acceptEdits/bypassPermissions/default/plan and rejects anything else. Under this mode
  *   Claude Code prompts as usual and Overdeck relies on the PermissionRequest/PreToolUse
  *   auto-approve hooks being installed on the machine to keep agents unblocked. Without
  *   those hooks, every tool call prompts.
  *
+ * New installations default to `auto`; installations that existed before PAN-5151 were
+ * pinned to `bypass` on upgrade.
+ *
  * Override precedence (highest first): PAN_YOLO env var → `--yolo` CLI flag → this config
- * → 'bypass' (DEFAULT_CONFIG.claude.permissionMode).
+ * → 'auto' (DEFAULT_CONFIG.claude.permissionMode).
  *
  * The persisted setting lives in `~/.overdeck/config.yaml` under `claude.permissionMode`
  * (loaded by `config-yaml.ts` and surfaced through `loadConfig().config.claude`). The

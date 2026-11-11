@@ -1,4 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+let configLoadShouldThrow = false;
+
+vi.mock('../config-yaml.js', async () => {
+  const actual = await vi.importActual<typeof import('../config-yaml.js')>('../config-yaml.js');
+  return {
+    ...actual,
+    loadConfigSync: (...args: Parameters<typeof actual.loadConfigSync>) => {
+      if (configLoadShouldThrow) throw new Error('config load failed (test)');
+      return actual.loadConfigSync(...args);
+    },
+  };
+});
+
 import {
   buildClaudeUserSettings,
   bypassPrefixForAgentFlag,
@@ -14,12 +28,14 @@ const ORIGINAL_YOLO = process.env.PAN_YOLO;
 describe('claude-permissions', () => {
   beforeEach(() => {
     delete process.env.PAN_YOLO;
+    configLoadShouldThrow = false;
     vi.resetModules();
   });
 
   afterEach(() => {
     if (ORIGINAL_YOLO === undefined) delete process.env.PAN_YOLO;
     else process.env.PAN_YOLO = ORIGINAL_YOLO;
+    configLoadShouldThrow = false;
   });
 
   describe('readYoloEnv', () => {
@@ -177,12 +193,15 @@ describe('claude-permissions', () => {
       expect(resolvePermissionMode('bypass')).toBe('bypass');
     });
 
-    it("defaults to 'bypass' when env, argument, and config are all unset (operator decision, 2026-07-12)", async () => {
-      // 'auto' depends on the auto-approve hooks being installed on the
-      // machine — on a fresh install it prompts for every tool call, so the
-      // unset default must be bypass.
+    it("defaults to 'auto' when env, argument, and config are all unset (PAN-5151)", async () => {
       const { DEFAULT_CONFIG } = await import('../config-yaml/defaults.js');
-      expect(DEFAULT_CONFIG.claude.permissionMode).toBe('bypass');
+      expect(DEFAULT_CONFIG.claude.permissionMode).toBe('auto');
+    });
+
+    it("falls back to 'auto' when config loading throws (PAN-5151)", () => {
+      configLoadShouldThrow = true;
+      expect(resolvePermissionMode()).toBe('auto');
+      expect(getClaudePermissionFlags()).toEqual(['--permission-mode', 'default']);
     });
   });
 });
