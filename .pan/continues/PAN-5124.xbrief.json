@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5124",
   "created": "2026-11-11T07:40:41.890Z",
-  "updated": "2026-11-11T07:43:07.825Z",
+  "updated": "2026-11-11T07:43:25.633Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
     "mid-workhorse-default.ac3": {
       "status": "completed",
       "doneAt": "2026-11-11T07:43:07.824Z"
+    },
+    "title-effort-low": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5124",
+      "claimedAt": "2026-11-11T07:43:25.633Z"
     }
   }
 }
