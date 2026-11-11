@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4634",
   "created": "2026-11-11T12:26:38.426Z",
-  "updated": "2026-11-11T12:39:31.759Z",
+  "updated": "2026-11-11T12:39:35.510Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -44,6 +44,11 @@
     "terra-probe-notes.ac3": {
       "status": "completed",
       "doneAt": "2026-11-11T12:39:31.759Z"
+    },
+    "terra-docs": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4634",
+      "claimedAt": "2026-11-11T12:39:35.510Z"
     }
   }
 }
