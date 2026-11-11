@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5152",
   "created": "2026-11-11T14:36:40.308Z",
-  "updated": "2026-11-11T16:44:16.356Z",
+  "updated": "2026-11-11T16:44:17.694Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -480,6 +480,11 @@
     "wi28-generic-tracker-sites.ac3": {
       "status": "completed",
       "doneAt": "2026-11-11T16:44:16.356Z"
+    },
+    "wi29-gate-autostart-text": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5152",
+      "claimedAt": "2026-11-11T16:44:17.694Z"
     }
   }
 }
