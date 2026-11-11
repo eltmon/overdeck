@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4634",
   "created": "2026-11-11T12:26:38.426Z",
-  "updated": "2026-11-11T12:35:38.589Z",
+  "updated": "2026-11-11T12:35:43.040Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
     "terra-route-set.ac3": {
       "status": "completed",
       "doneAt": "2026-11-11T12:35:38.589Z"
+    },
+    "terra-probe-notes": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4634",
+      "claimedAt": "2026-11-11T12:35:43.040Z"
     }
   }
 }
