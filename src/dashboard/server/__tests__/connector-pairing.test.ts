@@ -31,7 +31,13 @@ import {
   issueConnectorPairing,
   takeConnectorIntent,
 } from '../connector-pairing.js';
-import { _resetPairingCredentialsForTests, issuePairingCredential } from '../pairing-credentials.js';
+import {
+  _resetPairingCredentialsForTests,
+  issuePairingCredential,
+  pairingCredentialState,
+  revokePairingById,
+  takePairingById,
+} from '../pairing-credentials.js';
 import { buildEnvironmentDescriptor } from '../routes/environment.js';
 
 const MINUTE_MS = 60_000;
@@ -98,17 +104,51 @@ describe('connector pairing intents (PAN-4949 D-6, D-7)', () => {
     const lapsed = await issue();
     const taken = await issue();
 
-    vi.setSystemTime(new Date(Date.now() + 10 * MINUTE_MS + 1));
+    vi.setSystemTime(new Date(Date.now() + 30 * MINUTE_MS + 1));
     expect(takeConnectorIntent(taken.pairingId)).toBeNull();
     expect(hasConnectorIntent(lapsed.pairingId)).toBe(true);
 
-    vi.setSystemTime(new Date(Date.parse('2026-11-04T00:00:00.000Z') + 20 * MINUTE_MS));
+    vi.setSystemTime(new Date(Date.parse('2026-11-04T00:00:00.000Z') + 40 * MINUTE_MS));
     await issue();
     expect(hasConnectorIntent(lapsed.pairingId)).toBe(true);
 
     vi.setSystemTime(new Date(Date.now() + 1));
     await issue();
     expect(hasConnectorIntent(lapsed.pairingId)).toBe(false);
+  });
+
+  it('issues a connector pairing whose expiresAt is exactly 30 minutes after issue (PAN-5070 FR-13)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-11T00:00:00.000Z'));
+    const { expiresAt } = await issueConnectorPairing({ name: 'bot:desk', scopes: ['read:state'] });
+    expect(Date.parse(expiresAt)).toBe(Date.parse('2026-11-11T00:00:00.000Z') + 30 * MINUTE_MS);
+  });
+
+  it('leaves the plain pairing credential at a 10-minute expiry (PAN-5070 FR-25)', () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-11T00:00:00.000Z'));
+    const { expiresAt } = issuePairingCredential();
+    expect(Date.parse(expiresAt)).toBe(Date.parse('2026-11-11T00:00:00.000Z') + 10 * MINUTE_MS);
+  });
+
+  it('pairingCredentialState tracks live, expired, then gone without consuming (PAN-5070 FR-25)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-11T00:00:00.000Z'));
+    const { pairingId } = await issue();
+    expect(pairingCredentialState(pairingId)).toBe('live');
+
+    vi.setSystemTime(new Date(Date.now() + 30 * MINUTE_MS + 1));
+    expect(pairingCredentialState(pairingId)).toBe('expired');
+
+    expect(takePairingById(pairingId)).not.toBe('unknown');
+    expect(pairingCredentialState(pairingId)).toBe('gone');
+  });
+
+  it('revokePairingById burns a credential once and leaves a second call a no-op (PAN-5070 FR-25)', async () => {
+    const { pairingId } = await issue();
+    expect(revokePairingById(pairingId)).toBe(true);
+    expect(revokePairingById(pairingId)).toBe(false);
+    expect(takePairingById(pairingId)).toBe('unknown');
   });
 });
 

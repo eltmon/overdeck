@@ -8,7 +8,7 @@
  * connector code.
  *
  * Intents live only in this process's memory, like the codes themselves, so a
- * dashboard restart drops both together. An intent expires with its code (10
+ * dashboard restart drops both together. An intent expires with its code (30
  * minutes) but is kept one more TTL, so a lapsed connector code still never
  * pairs anything else; it is pruned on the next issue after that.
  */
@@ -20,6 +20,8 @@ import type { AccessTokenScope } from '../../lib/access-token-records.js';
 import { ensureMachineKey, publicKeyHex } from '../../lib/anywhere/machine-key.js';
 import { ensureEnvironmentIdentity } from '../../lib/environment-identity.js';
 import { issuePairingCredential, PAIRING_CREDENTIAL_TTL_MS } from './pairing-credentials.js';
+
+export const CONNECTOR_PAIRING_TTL_MS = 30 * 60_000;
 
 export interface ConnectorPairingIntent {
   name: string;
@@ -37,12 +39,12 @@ function prune(now: number): void {
   }
 }
 
-/** Issue a pairing code for a connector and remember its intent by pairingId (10-minute expiry). */
+/** Issue a pairing code for a connector and remember its intent by pairingId (30-minute expiry). */
 export async function issueConnectorPairing(input: { name: string; scopes: readonly AccessTokenScope[] }): Promise<{ pairingString: string; expiresAt: string }> {
   const identity = await ensureEnvironmentIdentity();
   const machineKeyHex = publicKeyHex(await ensureMachineKey());
   prune(Date.now());
-  const issued = issuePairingCredential();
+  const issued = issuePairingCredential({ ttlMs: CONNECTOR_PAIRING_TTL_MS });
   const { pairingId } = pairingSecrets(nodeCrypto, issued.credential);
   intents.set(pairingId, { name: input.name, scopes: [...input.scopes], expiresAt: Date.parse(issued.expiresAt) });
   const pairingString = buildConnectorPairLink({ environmentId: identity.environmentId, machineKeyHex, code: issued.credential, machineLabel: identity.label });
