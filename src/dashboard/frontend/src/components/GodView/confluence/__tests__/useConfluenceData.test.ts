@@ -4,7 +4,7 @@ import { createElement, type ReactNode } from 'react';
 import type { AgentSnapshot, BackendPane, DomainEvent } from '@overdeck/contracts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useDashboardStore } from '../../../../lib/store';
-import { CLOSE_OUT_PAUSE_REASON } from '../model';
+import { CLOSE_OUT_PAUSE_REASON, orbIdleMinutes } from '../model';
 import {
   useConfluenceData,
   useConfluenceMeta,
@@ -777,7 +777,7 @@ describe('event-driven liveness (operator directive: event-based, not polling)',
 
     const orb = result.current.find((candidate) => candidate.id === 'PAN-5');
     expect(orb?.state).toBe('active');
-    expect(orb?.idleMin).toBeLessThan(1);
+    expect(orbIdleMinutes(orb!, Date.now())).toBeLessThan(1);
   });
 
   it('an agent with fresh snapshot stamps but NO runtime events goes stale on evidence', async () => {
@@ -821,7 +821,7 @@ describe('event-driven liveness (operator directive: event-based, not polling)',
     await act(async () => { await vi.advanceTimersByTimeAsync(0); });
     const orb = result.current.find((candidate) => candidate.id === 'PAN-7');
     expect(orb?.state).toBe('active');
-    expect(orb?.idleMin).toBeLessThan(1);
+    expect(orbIdleMinutes(orb!, Date.now())).toBeLessThan(1);
   });
 });
 

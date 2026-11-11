@@ -14,13 +14,14 @@ import {
   STAGE_COLORS,
   SWEEP_BEAM_COLOR,
   SWEEP_FLARE_COLOR,
-  advanceFrostAccrual,
   clamp,
   computeLayout,
   fitText,
   fmtAge,
+  frostFromIdleMinutes,
   hexA,
   modelGlyph,
+  orbIdleMinutes,
   parkedOrbitColor,
   parkedOrbitTag,
   pickOrb,
@@ -68,7 +69,6 @@ interface RenderOrb extends ConfluenceOrb {
   mergeDwell: number;
   fading: number | null;
   frost: number;
-  frostHold: number;
   flashT: number;
   convoy: Satellite[] | null;
 }
@@ -309,7 +309,6 @@ function createEngine(
       mergeDwell: source.stage === 'MERGE' ? 1.5 + Math.random() * 2 : 0,
       fading: null,
       frost: 0,
-      frostHold: 0,
       flashT: 0,
     };
     renderOrbs.set(orb.id, orb);
@@ -336,10 +335,7 @@ function createEngine(
   const thaw = (orb: RenderOrb) => {
     orb.state = 'active';
     orb.stage = 'WORK';
-    orb.staleMin = 0;
-    orb.idleMin = 0;
     orb.frost = 0;
-    orb.frostHold = 0;
     orb.heat = 0.8;
     anchorAll();
     burst(orb.x, orb.y, ICE, 40, 90, 1.6, 2.4);
@@ -492,7 +488,7 @@ function createEngine(
       ? `${props.parkedTotal} parked · showing ${staleShown}`
       : `${staleShown} frozen`;
     fx.fillStyle = 'rgba(159,199,255,0.55)'; fx.fillText(`❄ DOLDRUMS — stalled, nothing autonomous will advance · ${census}`, width - layout.padX - 8, layout.doldrumsHeaderY); fx.textAlign = 'left';
-    if (Math.random() < 0.12) frostMotes(layout.padX + Math.random() * (width - layout.padX * 2), layout.doldrumsY - 20, 1);
+    if (staleShown > 0 && Math.random() < 0.12) frostMotes(layout.padX + Math.random() * (width - layout.padX * 2), layout.doldrumsY - 20, 1);
   };
 
   const drawPortal = () => {
@@ -565,7 +561,7 @@ function createEngine(
         fx.fillStyle = 'rgba(70,90,130,.9)'; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 0.7, 0, 7); fx.fill(); fx.strokeStyle = hexA(tint, 0.75); fx.beginPath(); fx.arc(orb.x, orb.y, radius * 0.85, 0, 7); fx.stroke(); drawFrostCrown(orb, radius * 0.9, 1);
         const orbitTag = parkedOrbitTag(orb.parkedOrbit);
         const staleLabelY = orb.ty < layout.doldrumsY ? layout.doldrumsUpperLabelY : layout.doldrumsLowerLabelY;
-        const staleLabelText = orbitTag ? `❄ ${orb.id} · ${orbitTag} ${fmtAge(orb.staleMin)}` : `❄ ${orb.id} · ${fmtAge(orb.staleMin)} idle`;
+        const staleLabelText = orbitTag ? `❄ ${orb.id} · ${orbitTag} ${fmtAge(orbIdleMinutes(orb, now))}` : `❄ ${orb.id} · ${fmtAge(orbIdleMinutes(orb, now))} idle`;
         fx.font = '600 10px "JetBrains Mono"';
         drawLabel(orb, fitText(staleLabelText, staleSlotWidth(layout, staleCount), measureText), hexA(tint, 0.85), staleLabelY);
         fx.globalAlpha = 1; continue;
@@ -581,7 +577,7 @@ function createEngine(
         // risk overprinting its shelf-row neighbours.
         fx.fillStyle = hexA(SWEEP_FLARE_COLOR, 0.16); fx.beginPath(); fx.arc(orb.x, orb.y, radius * 1.5, 0, 7); fx.fill(); fx.fillStyle = 'rgba(40,34,14,.92)'; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 0.62, 0, 7); fx.fill(); fx.strokeStyle = hexA(SWEEP_FLARE_COLOR, 0.85); fx.lineWidth = 1.8; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 0.95, 0, 7); fx.stroke();
         fx.font = '600 10px "JetBrains Mono"';
-        drawLabel(orb, fitText(`⚑ ${orb.id} · needs you ${fmtAge(orb.staleMin)}`, shelfSlotWidth(layout, shelfCount), measureText), hexA(SWEEP_FLARE_COLOR, 0.9), layout.shelfLabelY); fx.globalAlpha = 1; continue;
+        drawLabel(orb, fitText(`⚑ ${orb.id} · needs you ${fmtAge(orbIdleMinutes(orb, now))}`, shelfSlotWidth(layout, shelfCount), measureText), hexA(SWEEP_FLARE_COLOR, 0.9), layout.shelfLabelY); fx.globalAlpha = 1; continue;
       }
       if (orb.state === 'shelf') {
         fx.fillStyle = 'rgba(255,184,0,.18)'; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 1.5, 0, 7); fx.fill(); fx.fillStyle = 'rgba(140,110,40,.9)'; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 0.62, 0, 7); fx.fill(); fx.strokeStyle = 'rgba(255,184,0,.55)'; fx.setLineDash([3, 3]); fx.beginPath(); fx.arc(orb.x, orb.y, radius * 0.95, 0, 7); fx.stroke(); fx.setLineDash([]); fx.fillStyle = 'rgba(10,14,26,.9)'; fx.font = '700 8px "JetBrains Mono"'; fx.textAlign = 'center'; fx.fillText('⏸', orb.x, orb.y + 2);
@@ -604,7 +600,7 @@ function createEngine(
       if (orb.id === props.selectedId) { fx.save(); fx.translate(orb.x, orb.y); fx.rotate(simT * 1.4); fx.strokeStyle = 'rgba(255,255,255,.85)'; fx.setLineDash([6, 5]); fx.beginPath(); fx.arc(0, 0, radius + 9, 0, 7); fx.stroke(); fx.restore(); fx.setLineDash([]); }
       if (orb.flashT > simT) { const flash = clamp((orb.flashT - simT) / 0.8, 0, 1); fx.strokeStyle = `rgba(255,255,255,${flash * 0.9})`; fx.beginPath(); fx.arc(orb.x, orb.y, radius + 5 + (1 - flash) * 12, 0, 7); fx.stroke(); }
       drawLabel(orb, orb.broken || orb.warn ? `${orb.id} ⚠` : orb.id, orb.broken ? 'rgba(255,120,120,.95)' : orb.warn ? 'rgba(255,184,0,.95)' : orb.frost > 0.5 ? 'rgba(191,227,255,.9)' : 'rgba(232,237,248,.92)');
-      fx.font = '400 7px "JetBrains Mono"'; fx.textAlign = 'center'; const tag = orb.broken ? '⚠ stack broken' : orb.frost > 0.5 ? `stale ${fmtAge(orb.idleMin)}` : orb.waitUntil > now ? 'waiting…' : orb.thinkUntil > now ? 'thinking…' : `${orb.role} · ~${Math.round(orb.heat * 34)} ev/m`; fx.fillStyle = orb.broken ? 'rgba(255,68,68,.85)' : 'rgba(122,138,170,.6)'; fx.fillText(tag, orb.x, orb.y + radius + 16); fx.textAlign = 'left'; fx.globalAlpha = 1;
+      fx.font = '400 7px "JetBrains Mono"'; fx.textAlign = 'center'; const tag = orb.broken ? '⚠ stack broken' : orb.frost > 0.5 ? `stale ${fmtAge(orbIdleMinutes(orb, now))}` : orb.waitUntil > now ? 'waiting…' : orb.thinkUntil > now ? 'thinking…' : `${orb.role} · ~${Math.round(orb.heat * 34)} ev/m`; fx.fillStyle = orb.broken ? 'rgba(255,68,68,.85)' : 'rgba(122,138,170,.6)'; fx.fillText(tag, orb.x, orb.y + radius + 16); fx.textAlign = 'left'; fx.globalAlpha = 1;
     }
   };
 
@@ -664,6 +660,7 @@ function createEngine(
   const drawSequencer = () => { if (props.sequencer === false) return; const x = layout.sunX + 118; const y = layout.sunY - 2; const pulse = 0.5 + 0.5 * Math.sin(simT * 1.1 + 2); fx.save(); fx.translate(x, y); fx.rotate(simT * 0.7); fx.strokeStyle = `rgba(255,119,0,${0.3 + pulse * 0.3})`; fx.setLineDash([2, 4]); fx.beginPath(); fx.arc(0, 0, 10 + pulse * 2, 0, 7); fx.stroke(); fx.rotate(-simT * 1.3); fx.strokeStyle = `rgba(255,119,0,${0.16 + pulse * 0.18})`; fx.setLineDash([2, 7]); fx.beginPath(); fx.arc(0, 0, 16 + pulse * 2, 0, 7); fx.stroke(); fx.restore(); fx.setLineDash([]); fx.fillStyle = 'rgba(255,150,60,.9)'; fx.beginPath(); fx.arc(x, y, 5, 0, 7); fx.fill(); fx.font = '600 8.5px "JetBrains Mono"'; fx.fillStyle = 'rgba(255,150,60,.7)'; fx.fillText('SEQUENCER', x - 28, y + 28); };
 
   const advance = (dt: number) => {
+    const nowMs = Date.now();
     for (const orb of list()) {
       orb.heat = Math.max(orb.state === 'stale' ? 0.04 : 0.12, orb.heat * Math.pow(0.5, dt / 9));
       orb.wobA += dt * orb.wobSpeed * (1 + orb.heat * 2.2); orb.wobB += dt * orb.wobSpeed * 0.7; orb.compactT = Math.max(0, orb.compactT - dt);
@@ -676,8 +673,8 @@ function createEngine(
       }
       if (orb.state === 'shelf' || orb.state === 'needs-you') { orb.y += (layout.shelfY - orb.y) * dt * 3; orb.x += (orb.tx - orb.x) * dt * 1.5; continue; }
       if (orb.state === 'failed') { orb.y += Math.sin(simT * 0.5 + orb.wobA) * dt * 3; orb.x += Math.cos(simT * 0.4 + orb.wobB) * dt * 2; if (Math.random() < dt * 0.8) burst(orb.x, orb.y, '#ff2d7c', 1, 22, 1.2, 1.4); continue; }
-      if (orb.state === 'stale') { orb.staleMin += dt * 2; orb.x += (orb.tx + Math.sin(simT * 0.3 + orb.wobA) * 8 - orb.x) * dt * 1.2; orb.y += (orb.ty + Math.cos(simT * 0.22 + orb.wobB) * 4 - orb.y) * dt * 1.2; if (Math.random() < dt * 0.5) frostMotes(orb.x, orb.y, 1); continue; }
-      const frost = advanceFrostAccrual(orb.idleMin, orb.frostHold, dt); orb.idleMin = frost.idleMinutes; orb.frost = frost.frost; orb.frostHold = frost.frostHoldSeconds; if (orb.frost > 0.55 && Math.random() < dt * 5) snow(orb.x, orb.y); if (frost.sinkToDoldrums) { orb.state = 'stale'; orb.staleMin = Math.max(31, Math.round(orb.idleMin)); anchorAll(); ticker(`${orb.id} ❄ frozen`, ICE); continue; }
+      if (orb.state === 'stale') { orb.x += (orb.tx + Math.sin(simT * 0.3 + orb.wobA) * 8 - orb.x) * dt * 1.2; orb.y += (orb.ty + Math.cos(simT * 0.22 + orb.wobB) * 4 - orb.y) * dt * 1.2; if (Math.random() < dt * 0.5) frostMotes(orb.x, orb.y, 1); continue; }
+      orb.frost = frostFromIdleMinutes(orbIdleMinutes(orb, nowMs)); if (orb.frost > 0.55 && Math.random() < dt * 5) snow(orb.x, orb.y);
       const orbitRadius = orb.heat * 26; orb.orbitA += dt * (1 + orb.heat * 4); const targetX = orb.tx + Math.cos(orb.orbitA) * orbitRadius + Math.sin(orb.wobA) * 10; const targetY = orb.ty + Math.sin(orb.orbitA) * orbitRadius * 0.7 + Math.cos(orb.wobB) * 8; orb.x += (targetX - orb.x) * dt * 3.2; orb.y += (targetY - orb.y) * dt * 3.2;
       for (const neighbor of list()) { if (neighbor === orb || neighbor.state !== 'active' || neighbor.stage !== orb.stage || neighbor.merging) continue; const dx = orb.x - neighbor.x; const dy = orb.y - neighbor.y; const distanceSquared = dx * dx + dy * dy; if (distanceSquared > 1 && distanceSquared < 74 * 74) { const distance = Math.sqrt(distanceSquared); const push = (74 - distance) / 74 * 26 * dt; orb.x += dx / distance * push; orb.y += dy / distance * push; } }
       if (orb.convoy) for (const satellite of orb.convoy) { satellite.angle += dt * (0.6 + satellite.heat); satellite.flash = Math.max(0, satellite.flash - dt * 2); const baseRadius = 30 + orb.convoy.length * 3; if (satellite.arriving) { satellite.orbitR = Math.max(baseRadius, satellite.orbitR - dt * 36); if (satellite.orbitR <= baseRadius) { satellite.arriving = false; ring(orb.x, orb.y, '#ffb800', 60, 2); } } else satellite.orbitR = baseRadius; }

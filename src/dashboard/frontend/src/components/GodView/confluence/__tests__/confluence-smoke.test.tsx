@@ -5,7 +5,14 @@ import { useDashboardStore } from '../../../../lib/store';
 import { GodViewConfluence } from '../GodViewConfluence';
 import type { ConfluenceData, ConfluenceOrb } from '../useConfluenceData';
 
-function orb(id: string, state: ConfluenceOrb['state'], stage: ConfluenceOrb['stage']): ConfluenceOrb {
+const FRAME_NOW = '2026-08-02T12:45:00.000Z';
+
+function orb(
+  id: string,
+  state: ConfluenceOrb['state'],
+  stage: ConfluenceOrb['stage'],
+  lastActivity = state === 'stale' ? '2026-08-02T12:00:00.000Z' : FRAME_NOW,
+): ConfluenceOrb {
   return {
     id,
     project: 'overdeck',
@@ -13,7 +20,6 @@ function orb(id: string, state: ConfluenceOrb['state'], stage: ConfluenceOrb['st
     stage,
     title: `${id} smoke test orb`,
     heat: .7,
-    staleMin: state === 'stale' ? 45 : 0,
     state,
     convoy: null,
     yieldReason: state === 'shelf' ? 'yield: freeing a slot' : null,
@@ -24,14 +30,16 @@ function orb(id: string, state: ConfluenceOrb['state'], stage: ConfluenceOrb['st
     harness: 'claude-code',
     labels: [],
     glyph: 'S',
-    lastActivity: '2026-08-02T12:00:00.000Z',
-    idleMin: state === 'stale' ? 45 : 0,
+    lastActivity,
     waitUntil: 0,
     thinkUntil: 0,
     compactT: 0,
     spend: 0,
     issueState: null,
     attention: null,
+    parkedOrbit: null,
+    parkedAt: null,
+    orbitReason: null,
   };
 }
 
@@ -114,7 +122,7 @@ describe('Confluence canvas smoke test', () => {
     frames = new Map();
     nextFrameId = 1;
     vi.spyOn(performance, 'now').mockReturnValue(0);
-    vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-08-02T12:45:00.000Z'));
+    vi.spyOn(Date, 'now').mockReturnValue(Date.parse(FRAME_NOW));
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(900);
     vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(600);
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
@@ -199,5 +207,36 @@ describe('Confluence canvas smoke test', () => {
 
     expect(screen.getByText('PAN-ACTIVE smoke test orb')).toBeInTheDocument();
     expect(screen.getByText('PAN-ACTIVE')).toBeInTheDocument();
+  });
+
+  it('draws ages and frost from the orb timestamps at frame time', () => {
+    context.fillText.mockClear();
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    queryClient.setQueryData(['god-view-activity'], []);
+    render(
+      <QueryClientProvider client={queryClient}>
+        <GodViewConfluence
+          data={{
+            ...data,
+            orbs: [
+              orb('PAN-FRESH', 'active', 'PLAN'),
+              orb('PAN-COOLING', 'active', 'WORK', '2026-08-02T12:20:00.000Z'),
+              orb('PAN-STALE', 'stale', 'REVIEW'),
+            ],
+          }}
+          helpOpen={false}
+          onHelpOpenChange={vi.fn()}
+          onToggleFullscreen={vi.fn()}
+        />
+      </QueryClientProvider>,
+    );
+
+    act(() => advanceFrame(16));
+
+    const labels = context.fillText.mock.calls.map(([text]) => String(text));
+    // 25 idle minutes is a frost of 0.65, so the active tag reads the real age.
+    expect(labels).toContain('stale 25m');
+    expect(labels.filter((text) => text.startsWith('work ·'))).toHaveLength(1);
+    expect(labels).toContain('❄ PAN-STALE · 45m idle');
   });
 });

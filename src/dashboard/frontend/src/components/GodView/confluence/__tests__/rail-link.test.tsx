@@ -38,7 +38,6 @@ const data = {
     title: 'God View Confluence',
     state: 'active',
     labels: [],
-    staleMin: 0,
     yieldReason: null,
     warn: null,
     broken: false,

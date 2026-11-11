@@ -25,7 +25,6 @@ function orb(id: string, overrides: Partial<ConfluenceOrb> = {}): ConfluenceOrb 
     stage: 'WORK',
     title: id,
     heat: 0.4,
-    staleMin: 0,
     state: 'active',
     convoy: null,
     yieldReason: null,
@@ -37,7 +36,6 @@ function orb(id: string, overrides: Partial<ConfluenceOrb> = {}): ConfluenceOrb 
     labels: [],
     glyph: 'G',
     lastActivity: '2026-08-02T12:00:00.000Z',
-    idleMin: 0,
     waitUntil: 0,
     thinkUntil: 0,
     compactT: 0,
@@ -45,7 +43,7 @@ function orb(id: string, overrides: Partial<ConfluenceOrb> = {}): ConfluenceOrb 
     issueState: null,
     attention: null,
     parkedOrbit: null,
-    parkedMin: null,
+    parkedAt: null,
     orbitReason: null,
     ...overrides,
   };
@@ -114,7 +112,7 @@ describe('Confluence choreography dispatch table', () => {
 
     const previous = new Map([
       ['PAN-1', orb('PAN-1')],
-      ['PAN-2', orb('PAN-2', { state: 'stale', staleMin: 42 })],
+      ['PAN-2', orb('PAN-2', { state: 'stale' })],
       ['PAN-3', orb('PAN-3', { state: 'shelf', yieldReason: 'yield: older' })],
       ['PAN-4', orb('PAN-4', { issueState: 'ready' })],
       ['PAN-5', orb('PAN-5')],
@@ -326,8 +324,8 @@ describe('evictionFor (PAN-4523 render-layer eviction)', () => {
 
 describe('honest thaw semantics (PAN-3490 follow-up)', () => {
   it('a hook beat on an orb that STAYS stale sparks but never thaws', () => {
-    const previous = new Map([['PAN-2', orb('PAN-2', { state: 'stale', staleMin: 42 })]]);
-    const current = new Map([['PAN-2', orb('PAN-2', { state: 'stale', staleMin: 43 })]]);
+    const previous = new Map([['PAN-2', orb('PAN-2', { state: 'stale' })]]);
+    const current = new Map([['PAN-2', orb('PAN-2', { state: 'stale' })]]);
     const commands = planConfluenceChoreography({
       previous,
       current,

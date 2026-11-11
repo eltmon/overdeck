@@ -415,10 +415,8 @@ export function modelGlyph(model: string | null | undefined): string | null {
   return '?';
 }
 
-export const FROST_IDLE_RATE = 2;
 export const FROST_START_MINUTES = 8;
 export const FROST_SPAN_MINUTES = 26;
-export const FROST_SINK_HOLD_SECONDS = 6;
 
 export function frostFromIdleMinutes(idleMinutes: number): number {
   return clamp((idleMinutes - FROST_START_MINUTES) / FROST_SPAN_MINUTES, 0, 1);
@@ -433,29 +431,6 @@ export function orbIdleMinutes(
   const parked = orb.state === 'stale' && orb.parkedAt ? Date.parse(orb.parkedAt) : Number.NaN;
   const stamp = Number.isFinite(parked) ? parked : orb.lastActivity ? Date.parse(orb.lastActivity) : Number.NaN;
   return Number.isFinite(stamp) ? Math.max(0, (now - stamp) / 60_000) : 0;
-}
-
-export interface FrostAccrual {
-  idleMinutes: number;
-  frost: number;
-  frostHoldSeconds: number;
-  sinkToDoldrums: boolean;
-}
-
-export function advanceFrostAccrual(
-  idleMinutes: number,
-  frostHoldSeconds: number,
-  elapsedSeconds: number,
-): FrostAccrual {
-  const nextIdleMinutes = idleMinutes + elapsedSeconds * FROST_IDLE_RATE;
-  const frost = frostFromIdleMinutes(nextIdleMinutes);
-  const nextFrostHoldSeconds = frost >= 1 ? frostHoldSeconds + elapsedSeconds : 0;
-  return {
-    idleMinutes: nextIdleMinutes,
-    frost,
-    frostHoldSeconds: nextFrostHoldSeconds,
-    sinkToDoldrums: nextFrostHoldSeconds > FROST_SINK_HOLD_SECONDS,
-  };
 }
 
 export const TRACE_WINDOW_MS = 60_000;

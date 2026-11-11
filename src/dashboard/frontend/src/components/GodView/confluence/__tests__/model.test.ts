@@ -3,7 +3,6 @@ import {
   CLOSE_OUT_PAUSE_REASON,
   ROLE_COLORS,
   acquireRadius,
-  advanceFrostAccrual,
   aggregateTracePerSecond,
   bucketTraceRow,
   classifyOrb,
@@ -230,20 +229,10 @@ describe('Confluence model', () => {
     expect(modelGlyph('unknown-model')).toBe('?');
   });
 
-  it('accrues frost gradually and sinks only after the full-frost hold', () => {
+  it('maps real idle minutes to frost', () => {
     expect(frostFromIdleMinutes(8)).toBe(0);
     expect(frostFromIdleMinutes(21)).toBe(0.5);
     expect(frostFromIdleMinutes(34)).toBe(1);
-
-    const fullyFrosted = advanceFrostAccrual(32, 5, 1);
-    expect(fullyFrosted).toEqual({
-      idleMinutes: 34,
-      frost: 1,
-      frostHoldSeconds: 6,
-      sinkToDoldrums: false,
-    });
-    expect(advanceFrostAccrual(34, 6, 0.1).sinkToDoldrums).toBe(true);
-    expect(advanceFrostAccrual(20, 3, 1).frostHoldSeconds).toBe(0);
   });
 
   it('computes idle minutes from the timestamp the orb state selects', () => {
