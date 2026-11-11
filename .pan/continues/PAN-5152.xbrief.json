@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5152",
   "created": "2026-11-11T14:36:40.308Z",
-  "updated": "2026-11-11T14:55:57.087Z",
+  "updated": "2026-11-11T14:59:06.130Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -50,9 +50,26 @@
       "doneAt": "2026-11-11T14:55:52.587Z"
     },
     "wi3-jira-routing": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5152",
-      "claimedAt": "2026-11-11T14:55:57.087Z"
+      "claimedAt": "2026-11-11T14:55:57.087Z",
+      "doneAt": "2026-11-11T14:59:06.130Z"
+    },
+    "wi3-jira-routing.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T14:59:06.130Z"
+    },
+    "wi3-jira-routing.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T14:59:06.130Z"
+    },
+    "wi3-jira-routing.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T14:59:06.130Z"
+    },
+    "wi3-jira-routing.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T14:59:06.130Z"
     }
   }
 }
