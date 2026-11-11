@@ -27,6 +27,7 @@ This page starts at v0.60.0, the release that removed Overdeck's state layer. Ol
 
   #### Fixed
 
+  - **A stranded review request is re-requested again:** when a review was requested but never dispatched, and the review had no run state yet, the background patrol's recovery did nothing, so the review stayed stuck until someone requested it again. The patrol now re-requests it through the same guarded review route that `pan review request` uses, 15 minutes after the request. ([#4623](https://github.com/eltmon/overdeck/issues/4623))
   - **`pan review request` no longer races PR adoption:** when a PR opened outside a pipeline workspace is still being adopted into one, `pan review request` now answers that adoption is in progress and starts nothing. Before, it could start a second verification on the half-built workspace, which made adoption refuse with `workspace-head-mismatch` and showed a false Needs you. ([#4995](https://github.com/eltmon/overdeck/issues/4995))
 
   [Compare v0.77.0...v0.78.0](https://github.com/eltmon/overdeck/compare/v0.77.0...v0.78.0)

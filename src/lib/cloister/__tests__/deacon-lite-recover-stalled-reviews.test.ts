@@ -17,7 +17,6 @@ const mocks = vi.hoisted(() => ({
   liveAgentInventory: vi.fn(),
   listWorkspaces: vi.fn(),
   recoverMissingConvoyReviewers: vi.fn(),
-  getRequestReviewStarter: vi.fn(),
   notifyPipeline: vi.fn(),
   getIssuePause: vi.fn(),
   isAlive: vi.fn(),
@@ -30,7 +29,6 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../../terminal-backends/inventory.js', () => ({ liveAgentInventory: mocks.liveAgentInventory }));
 vi.mock('../../workspaces/resolver.js', () => ({ listWorkspaces: mocks.listWorkspaces }));
 vi.mock('../review-convoy.js', () => ({ recoverMissingConvoyReviewers: mocks.recoverMissingConvoyReviewers }));
-vi.mock('../request-review-pipeline.js', () => ({ getRequestReviewStarter: mocks.getRequestReviewStarter }));
 vi.mock('../../pipeline-notifier.js', () => ({ notifyPipeline: mocks.notifyPipeline }));
 vi.mock('../review-request-route.js', () => ({ requestReviewThroughRoute: mocks.requestReviewThroughRoute }));
 vi.mock('../../agents/agent-state.js', async (importOriginal) => ({
@@ -47,6 +45,7 @@ vi.mock('../deferred-verdict-replay.js', () => ({ replayDeferredReviewVerdict: m
 
 const { appendPipelineEntry, readPipelineJournal } = await import('../pipeline-journal.js');
 const { recoverStalledReviews, __resetStalledReviewCooldownForTests } = await import('../deacon-lite.js');
+const { getRequestReviewStarter } = await import('../request-review-pipeline.js');
 
 const NOW = Date.parse('2026-09-19T12:00:00.000Z');
 const MINUTE = 60_000;
@@ -311,19 +310,55 @@ describe('recoverStalledReviews', () => {
     },
   );
 
-  it('falls back to the full review door when the parent has no run state', async () => {
+  it('falls back to the guarded review route when the parent has no run state', async () => {
     journal([{ type: 'review.dispatched', minutesAgo: 30 }]);
     mocks.recoverMissingConvoyReviewers.mockResolvedValue({
       success: false, message: 'No review parent state for PAN-3705 — cannot recover reviewers',
     });
-    const startReview = vi.fn(async () => ({ started: true as const }));
-    mocks.getRequestReviewStarter.mockReturnValue(startReview);
 
     const actions = await recoverStalledReviews(NOW);
 
-    expect(startReview).toHaveBeenCalledWith('PAN-3705', expect.objectContaining({ source: 'deacon-lite' }));
+    expect(mocks.requestReviewThroughRoute).toHaveBeenCalledWith('PAN-3705', expect.objectContaining({ source: 'deacon-lite' }));
     expect(actions[0]).toContain('via request-review');
     expect(readPipelineJournal(workspace).at(-1)?.data).toMatchObject({ via: 'request-review' });
+  });
+
+  // PAN-4623: deacon-lite runs in the deacon child, where no in-process review
+  // starter is ever registered. The fallback must still re-request the review.
+  it('re-requests a stale, never-dispatched review through the route when no starter is registered (the deacon child)', async () => {
+    expect(getRequestReviewStarter()).toBeNull();
+    journal([{ type: 'review.requested', minutesAgo: 40 }]);
+    mocks.recoverMissingConvoyReviewers.mockResolvedValue({
+      success: false, message: 'No review parent state for PAN-3705 — cannot recover reviewers',
+    });
+
+    const actions = await recoverStalledReviews(NOW);
+
+    expect(mocks.requestReviewThroughRoute).toHaveBeenCalledTimes(1);
+    expect(mocks.requestReviewThroughRoute).toHaveBeenCalledWith('PAN-3705', {
+      message: expect.stringMatching(/^deacon-lite: /),
+      source: 'deacon-lite',
+    });
+    expect(actions).toEqual([expect.stringContaining('re-dispatched PAN-3705 via request-review')]);
+    const last = readPipelineJournal(workspace).at(-1);
+    expect(last?.type).toBe('review.redispatched');
+    expect(last?.data).toMatchObject({ via: 'request-review' });
+  });
+
+  it('journals nothing when the route refuses the re-request, and does not retry it within the hour', async () => {
+    journal([{ type: 'review.requested', minutesAgo: 40 }]);
+    mocks.recoverMissingConvoyReviewers.mockResolvedValue({
+      success: false, message: 'No review parent state for PAN-3705 — cannot recover reviewers',
+    });
+    mocks.requestReviewThroughRoute.mockResolvedValue({ requested: false, reason: 'dashboard unreachable (ECONNREFUSED)' });
+
+    expect(await recoverStalledReviews(NOW)).toEqual([]);
+    expect(readPipelineJournal(workspace).at(-1)?.type).toBe('review.requested');
+    expect(vi.mocked(console.warn).mock.calls.some(([line]) => String(line).includes('ECONNREFUSED'))).toBe(true);
+
+    vi.setSystemTime(NOW + 10 * MINUTE);
+    expect(await recoverStalledReviews(NOW + 10 * MINUTE)).toEqual([]);
+    expect(mocks.requestReviewThroughRoute).toHaveBeenCalledTimes(1);
   });
 
   it('does not re-dispatch a paused issue, and logs the pause once (PAN-3911)', async () => {
@@ -338,7 +373,7 @@ describe('recoverStalledReviews', () => {
 
     expect(mocks.getIssuePause).toHaveBeenCalledWith('PAN-3705');
     expect(mocks.recoverMissingConvoyReviewers).not.toHaveBeenCalled();
-    expect(mocks.getRequestReviewStarter).not.toHaveBeenCalled();
+    expect(mocks.requestReviewThroughRoute).not.toHaveBeenCalled();
     expect(readPipelineJournal(workspace).at(-1)?.type).toBe('review.dispatched');
     const pauseLines = log.mock.calls.filter(([line]) => String(line).includes('PAN-3705 is paused'));
     expect(pauseLines).toHaveLength(1);
@@ -365,7 +400,6 @@ describe('recoverStalledReviews', () => {
     expect(await recoverStalledReviews(NOW)).toEqual(['recoverStalledReviews: re-requested the halted PAN-3705 review']);
     expect(mocks.requestReviewThroughRoute).toHaveBeenCalledWith('PAN-3705', expect.objectContaining({ source: 'deacon-lite' }));
     expect(mocks.recoverMissingConvoyReviewers).not.toHaveBeenCalled();
-    expect(mocks.getRequestReviewStarter).not.toHaveBeenCalled();
   });
 
   it('holds a halted review while the issue is paused or its pause is unreadable (PAN-3911)', async () => {
