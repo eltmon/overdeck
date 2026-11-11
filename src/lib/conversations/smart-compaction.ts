@@ -668,6 +668,7 @@ const CHUNK_BUDGET_CHARS_BY_MODEL: Record<string, number> = {
   'claude-haiku-4-5-20251001': 300_000,   // ~75k tokens content, 200k window
   // Haiku 5.5 has a 1M window, but prompts over 100K tokens cost 5x, and its
   // tokenizer yields ~30% more tokens per char: keep each chunk under 100K.
+  // Kept by PAN-5124 D1.
   'claude-haiku-5-5': 240_000,
   'claude-sonnet-5-5': 1_200_000,         // ~300k tokens content, 1M window
   'claude-sonnet-5': 1_200_000,           // ~300k tokens content, 1M window
@@ -682,8 +683,9 @@ const CHUNK_BUDGET_CHARS_BY_MODEL: Record<string, number> = {
 const DEFAULT_CHUNK_BUDGET_CHARS = 300_000;
 
 export function getChunkBudgetChars(model: string | undefined): number {
-  if (!model) return DEFAULT_CHUNK_BUDGET_CHARS;
-  return CHUNK_BUDGET_CHARS_BY_MODEL[model === 'claude-opus-5-5' ? 'claude-opus-5' : model] ?? DEFAULT_CHUNK_BUDGET_CHARS;
+  // Size chunks for the model runModelSummary will actually run (PAN-5124 FR-4).
+  const effective = model || DEFAULT_SUMMARY_MODEL;
+  return CHUNK_BUDGET_CHARS_BY_MODEL[effective === 'claude-opus-5-5' ? 'claude-opus-5' : effective] ?? DEFAULT_CHUNK_BUDGET_CHARS;
 }
 
 function chunkEntriesByBudget(entries: any[], budgetChars: number): any[][] {
