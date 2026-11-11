@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4374",
   "created": "2026-11-11T12:38:14.502Z",
-  "updated": "2026-11-11T12:50:48.994Z",
+  "updated": "2026-11-11T13:10:11.915Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -36,9 +36,26 @@
       "doneAt": "2026-11-11T12:50:40.506Z"
     },
     "claude-cli-provider": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4374",
-      "claimedAt": "2026-11-11T12:50:48.994Z"
+      "claimedAt": "2026-11-11T12:50:48.994Z",
+      "doneAt": "2026-11-11T13:10:11.915Z"
+    },
+    "claude-cli-provider.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T13:10:11.915Z"
+    },
+    "claude-cli-provider.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T13:10:11.915Z"
+    },
+    "claude-cli-provider.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T13:10:11.915Z"
+    },
+    "claude-cli-provider.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T13:10:11.915Z"
     }
   }
 }
