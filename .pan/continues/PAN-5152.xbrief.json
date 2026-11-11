@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5152",
   "created": "2026-11-11T14:36:40.308Z",
-  "updated": "2026-11-11T15:03:47.321Z",
+  "updated": "2026-11-11T15:03:50.293Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -110,6 +110,11 @@
     "wi5-jira-http-client.ac5": {
       "status": "completed",
       "doneAt": "2026-11-11T15:03:47.321Z"
+    },
+    "wi6-jira-text-converters": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5152",
+      "claimedAt": "2026-11-11T15:03:50.293Z"
     }
   }
 }
