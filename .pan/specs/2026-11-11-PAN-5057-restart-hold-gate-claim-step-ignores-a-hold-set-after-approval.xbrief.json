@@ -4,17 +4,17 @@
     "created": "2026-11-11T10:50:34Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5057: Restart hold: gate claim step ignores a hold set after approval",
-    "updated": "2026-11-11T10:54:55.157Z"
+    "updated": "2026-11-11T10:56:09.563Z"
   },
   "plan": {
     "id": "pan-5057",
     "title": "Restart hold: gate claim step ignores a hold set after approval",
-    "status": "proposed",
+    "status": "running",
     "uid": "29ca3e0d-a63d-495d-b3cc-2ebbbeffc2b9",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-11T10:50:34Z",
-    "updated": "2026-11-11T10:54:55.157Z",
+    "updated": "2026-11-11T10:56:09.563Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5057",
@@ -284,5 +284,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
