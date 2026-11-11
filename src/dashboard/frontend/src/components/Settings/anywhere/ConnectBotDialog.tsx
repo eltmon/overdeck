@@ -220,7 +220,7 @@ function ConnectBotDialogBody({ onClose }: { onClose: () => void }) {
 
               <div className="space-y-1">
                 <span className="text-xs text-muted-foreground">3. Access</span>
-                {platform === 'grok-bot' ? (
+                {platform === 'grok-bot' && reach === 'public' ? (
                   <p className="text-xs text-foreground">
                     You choose the access level when you approve the sign-in in this dashboard.
                   </p>

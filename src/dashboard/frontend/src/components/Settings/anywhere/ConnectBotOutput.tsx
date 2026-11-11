@@ -37,9 +37,11 @@ function configLabelFor(platform: BotPlatform): string {
   return BOT_PLATFORMS.find((entry) => entry.id === platform)?.label ?? platform;
 }
 
-function connectorConfigFor(platform: BotPlatform): string {
+/** PAN-5070 W-7: null for Grok Bot — it connects with `connectMessage`, not a static config block. */
+function connectorConfigFor(platform: BotPlatform): string | null {
   if (platform === 'hermes') return hermesConfig({ reach: 'connector', url: CONNECTOR_LOCAL_URL });
   if (platform === 'openclaw') return openclawConfig({ reach: 'connector', url: CONNECTOR_LOCAL_URL });
+  if (platform === 'grok-bot') return null;
   return grokBuildMcpJson();
 }
 
@@ -55,6 +57,7 @@ export function ConnectBotOutput({ platform, result, onDone }: ConnectBotOutputP
   const { data: environment } = useQuery({ queryKey: ANYWHERE_ENVIRONMENT_QUERY_KEY, queryFn: loadEnvironment });
   const version = environment?.serverVersion ?? 'latest'; // D-11
   const label = configLabelFor(platform);
+  const connectorConfig = connectorConfigFor(platform);
 
   return (
     <div className="space-y-3">
@@ -67,7 +70,9 @@ export function ConnectBotOutput({ platform, result, onDone }: ConnectBotOutputP
             value={connectorCommands({ version, pairingString: result.pairingString, serve: platform !== 'grok-build' })}
             multiline
           />
-          <CopyField label={`${label} config`} value={connectorConfigFor(platform)} multiline />
+          {connectorConfig !== null && (
+            <CopyField label={`${label} config`} value={connectorConfig} multiline />
+          )}
         </>
       )}
       {result.kind === 'token' && (

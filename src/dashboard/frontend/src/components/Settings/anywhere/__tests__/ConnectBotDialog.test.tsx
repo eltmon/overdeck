@@ -223,14 +223,28 @@ describe('ConnectBotDialog (PAN-4951 WI-3, WI-4)', () => {
     expect(screen.getByText(/Tailscale Serve is not set up on this machine yet/)).toBeInTheDocument();
   });
 
-  it('renders only the Public MCP reach for Grok Bot', async () => {
+  it('offers the connector reach first for Grok Bot (PAN-5070 W-7)', async () => {
     mockServer();
     const { user } = await renderDialog({ publicMcp: publicMcpBody(false, null) });
 
     await user.click(screen.getByLabelText('Grok Bot'));
 
+    expect(screen.getByLabelText('Overdeck connector')).toBeChecked();
     expect(screen.getByLabelText('Public MCP')).toBeInTheDocument();
-    expect(screen.queryByLabelText('Overdeck connector')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Send messages')).toBeInTheDocument();
+  });
+
+  it('renders the OAuth approval note for Grok Bot on Public MCP, not on the connector reach', async () => {
+    mockServer();
+    const { user } = await renderDialog({ publicMcp: publicMcpBody(true, 'https://box.tail1.ts.net:8443/mcp') });
+
+    await user.click(screen.getByLabelText('Grok Bot'));
+    expect(screen.queryByText(/You choose the access level when you approve the sign-in/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Send messages')).toBeInTheDocument();
+
+    await user.click(screen.getByLabelText('Public MCP'));
+    expect(screen.getByText(/You choose the access level when you approve the sign-in/)).toBeInTheDocument();
+    expect(screen.queryByLabelText('Send messages')).not.toBeInTheDocument();
   });
 
   it('renders "Public MCP is off" and sends no POST when the switch is off', async () => {
@@ -238,6 +252,7 @@ describe('ConnectBotDialog (PAN-4951 WI-3, WI-4)', () => {
     const { user } = await renderDialog({ publicMcp: publicMcpBody(false, null) });
 
     await user.click(screen.getByLabelText('Grok Bot'));
+    await user.click(screen.getByLabelText('Public MCP'));
 
     expect(screen.getByText(/Public MCP is off/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Show Public MCP settings' })).toBeInTheDocument();
@@ -250,6 +265,7 @@ describe('ConnectBotDialog (PAN-4951 WI-3, WI-4)', () => {
     const { user } = await renderDialog();
 
     await user.click(screen.getByLabelText('Grok Bot'));
+    await user.click(screen.getByLabelText('Public MCP'));
 
     expect(await screen.findByText(/Public MCP is off/)).toBeInTheDocument();
     expect(fetchMock.mock.calls.some(([input]) => input.toString() === '/api/mcp/public')).toBe(true);
@@ -265,6 +281,7 @@ describe('ConnectBotDialog (PAN-4951 WI-3, WI-4)', () => {
     });
 
     await user.click(screen.getByLabelText('Grok Bot'));
+    await user.click(screen.getByLabelText('Public MCP'));
     await user.click(screen.getByRole('button', { name: 'Show setup' }));
 
     const mcpJson = await screen.findByLabelText("Grok Bot mcp.json");
