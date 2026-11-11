@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5153",
   "created": "2026-11-11T14:43:19.840Z",
-  "updated": "2026-11-11T15:39:47.071Z",
+  "updated": "2026-11-11T15:39:55.874Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -312,6 +312,11 @@
     "doctor-identity.ac5": {
       "status": "completed",
       "doneAt": "2026-11-11T15:39:47.070Z"
+    },
+    "cloister-status-bot-name": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5153",
+      "claimedAt": "2026-11-11T15:39:55.874Z"
     }
   }
 }
