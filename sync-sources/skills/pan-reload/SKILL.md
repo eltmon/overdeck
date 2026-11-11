@@ -31,7 +31,7 @@ Without `--resume`/`--no-resume`, `pan reload` keeps the running dashboard's res
 
 ## Operator restart hold (PAN-5007)
 
-While `pan restart hold` is active, `pan reload` refuses with exit 1 before it fetches or builds anything, and prints the hold's reason. The refused reload is not queued. **Never run `pan restart release` for a hold you did not set unless the operator asks you to**; report the refusal instead. Check with `pan restart hold --status`.
+While `pan restart hold` is active, `pan reload` refuses with exit 1 before it fetches or builds anything, and prints the hold's reason. The refused reload is not queued. A reload that was already waiting at the gate when the hold was set does not restart; if it was already approved, it restarts by itself after the release (PAN-5057). **Never run `pan restart release` for a hold you did not set unless the operator asks you to**; report the refusal instead. Check with `pan restart hold --status`.
 
 ## Concurrent reloads
 
