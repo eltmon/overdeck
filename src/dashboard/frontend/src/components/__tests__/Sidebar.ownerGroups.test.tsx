@@ -79,4 +79,16 @@ describe('Sidebar owner groups (PAN-5153)', () => {
     await screen.findByTestId('sidebar-project-Overdeck');
     expect(screen.queryByTestId(/^sidebar-owner-/)).not.toBeInTheDocument();
   });
+
+  it('ignores a stored collapse when only one group remains, so no project is hidden', async () => {
+    localStorage.setItem(COLLAPSED_OWNERS_KEY, JSON.stringify(['', 'eltmon']));
+    renderSidebar([
+      { key: 'overdeck', name: 'Overdeck', path: '/overdeck', githubRepo: 'eltmon/overdeck' },
+      { key: 'local', name: 'Local', path: '/local', githubRepo: null },
+    ]);
+
+    expect(await screen.findByTestId('sidebar-project-Overdeck')).toBeInTheDocument();
+    expect(screen.getByTestId('sidebar-project-Local')).toBeInTheDocument();
+    expect(screen.queryByTestId(/^sidebar-owner-/)).not.toBeInTheDocument();
+  });
 });

@@ -695,7 +695,7 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
                 <p className="px-3 py-1.5 text-xs text-muted-foreground/70">No projects</p>
               ) : (
                 ownerGroups.flatMap((group) => {
-                  const groupCollapsed = collapsedOwners.includes(group.owner ?? OTHER_OWNER_KEY);
+                  const groupCollapsed = ownerGroups.length > 1 && collapsedOwners.includes(group.owner ?? OTHER_OWNER_KEY);
                   const header = ownerGroups.length > 1 && (
                     <OwnerGroupHeader key={`owner-${group.owner ?? ''}`} owner={group.owner} collapsed={groupCollapsed} onToggle={toggleOwner}
                       holdsActive={activeTab === 'command-deck' && group.projects.some((p) => p.name === selectedProject)} />
