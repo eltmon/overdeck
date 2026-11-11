@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5071",
   "created": "2026-11-11T07:17:20.918Z",
-  "updated": "2026-11-11T07:35:00.828Z",
+  "updated": "2026-11-11T07:36:36.085Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -94,9 +94,26 @@
       "doneAt": "2026-11-11T07:34:54.015Z"
     },
     "docs-account-service": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5071",
-      "claimedAt": "2026-11-11T07:35:00.828Z"
+      "claimedAt": "2026-11-11T07:35:00.828Z",
+      "doneAt": "2026-11-11T07:36:36.084Z"
+    },
+    "docs-account-service.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T07:36:36.084Z"
+    },
+    "docs-account-service.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T07:36:36.084Z"
+    },
+    "docs-account-service.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T07:36:36.084Z"
+    },
+    "docs-account-service.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T07:36:36.084Z"
     }
   }
 }
