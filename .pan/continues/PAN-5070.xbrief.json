@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5070",
   "created": "2026-11-11T07:26:39.792Z",
-  "updated": "2026-11-11T07:44:48.952Z",
+  "updated": "2026-11-11T07:50:53.770Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -58,9 +58,26 @@
       "doneAt": "2026-11-11T07:44:41.162Z"
     },
     "w3-pairing-platform-exchange": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5070",
-      "claimedAt": "2026-11-11T07:44:48.952Z"
+      "claimedAt": "2026-11-11T07:44:48.952Z",
+      "doneAt": "2026-11-11T07:50:53.770Z"
+    },
+    "w3-pairing-platform-exchange.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T07:50:53.770Z"
+    },
+    "w3-pairing-platform-exchange.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T07:50:53.770Z"
+    },
+    "w3-pairing-platform-exchange.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T07:50:53.770Z"
+    },
+    "w3-pairing-platform-exchange.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T07:50:53.770Z"
     }
   }
 }
