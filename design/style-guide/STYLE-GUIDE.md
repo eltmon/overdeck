@@ -897,6 +897,38 @@ Recipe:
 
 **Canonical example:** "● Memory enabled · Files shared · 3 agents active" beneath a workspace card title. Broadsheet only; Ledger uses the existing Status Indicators pattern below for equivalent information.
 
+### Grouped List and Switch Tracks (both themes)
+
+Five named classes (`src/dashboard/frontend/src/index.css`) cover the tints a collapsible grouped list and a `role="switch"` track need. Each sets a `color-mix(in srgb, var(--token) <percent>%, transparent)` background:
+
+| Class | Token mix | Use it for |
+| --- | --- | --- |
+| `.list-group-bar` | `--muted` 55% | The header bar of a collapsible list group (e.g. a skill-pack header). |
+| `.list-row` | `--muted` 45% on hover | A single-line row inside a grouped list, hover state only. |
+| `.list-meta` | `--muted` 30% | A metadata strip rendered under an open group (URL, ref, counts). |
+| `.switch-track-on` | `--foreground` 62% | The track of a checked `role="switch"` button. |
+| `.switch-track-locked` | `--foreground` 28% | The track of a checked `role="switch"` button the user can't uncheck. |
+
+**Why named classes.** `bg-muted/40` and `bg-foreground/8` look like ordinary Tailwind opacity modifiers, but both `--muted` and `--foreground` are `var()`-based color tokens, and a Tailwind opacity modifier on a `var()`-based color token compiles to no CSS at all — the slash suffix is silently dropped and the element gets the full-opacity color instead of a tint. These five classes exist because that failure mode is invisible until you inspect the rendered DOM: hand-roll the tint with `@apply` + a literal `color-mix()` call, as these classes do, not with an opacity-modifier utility.
+
+```tsx
+// SkillControls.tsx — GroupHeader
+<div className="list-group-bar px-3 py-2">
+
+// SkillOverridesPanel.tsx — a single override row
+'list-row grid items-start gap-x-4 gap-y-1 px-3 py-2'
+
+// SkillPacksSection.tsx — the metadata strip under an open pack
+<div className="space-y-0.5 list-meta px-3 py-2 pl-9 text-xs leading-5 text-muted-foreground">
+
+// SkillControls.tsx — the switch track, checked state
+checked ? (locked ? 'switch-track-locked border-transparent' : 'switch-track-on border-transparent') : 'border-border bg-muted'
+```
+
+**Theme scope.** All five classes are plain CSS, not Tailwind utilities, so they render identically under Ledger and Broadsheet alike — there is no theme gate to add.
+
+**Adoption.** Apply these classes one page at a time, only where you are already touching grouped-list or switch markup. There is no bulk Tailwind config change that fixes the opacity-on-`var()` problem globally — each page that needs a muted/foreground tint on a `var()`-based token gets its own named class, following this pattern.
+
 ### Status Indicators
 
 ```
@@ -1017,6 +1049,8 @@ Thumb:
   Size: 20px (default), 16px (small)
   Translate on check
 ```
+
+New switches use the named track classes from "Grouped List and Switch Tracks" above — `.switch-track-on` for the checked state, `.switch-track-locked` for a checked switch the user can't uncheck — instead of a single solid `bg-primary` track, because that second, locked state has no equivalent in the original recipe. The `Checked: bg-primary` line above is the pre-PAN-5123 recipe: it still applies, unchanged, to any switch that has not migrated onto the named classes.
 
 In a modal's option rows (e.g. the New Conversation dialog's Context section), the whole row is a `role="switch"` button labelled by `aria-labelledby`/`aria-describedby`, with the consequence text written next to it rather than left to a separate hint (PAN-4755).
 
@@ -1558,6 +1592,7 @@ FONT CODE:     font-mono → SF Mono (Ledger) / Geist Mono Variable (Broadsheet)
 FONT UI-MONO:  font-mono-ui → SF Mono both themes (Ledger) / tighter system ui-monospace stack (Broadsheet) — chrome that isn't code or eyebrows (F-10)
 DISPLAY SCALE: display-xl / display-lg (Broadsheet only; Ledger-safe fallback = text-xl|text-lg font-medium)
 BROADSHEET-ONLY: .chip / .soft-card / .keycap / .dot-metadata (F-11) — no Ledger fallback, authoring discipline only
+LISTS/SWITCHES: .list-group-bar / .list-row / .list-meta / .switch-track-on / .switch-track-locked — both themes; never bg-muted/<n> or bg-foreground/<n>, which compile to no CSS on these var()-based tokens
 BACKGROUND:    Ledger = fractal-noise film (body::after, 3.5% opacity); Broadsheet = ambient corner wash via --wash, noise suppressed (F-5)
 MOTION:        --ease-* / --duration-* token vocabulary exists (F-9); not yet wired into existing keyframes/animations
 SCROLLBAR:     6px wide, transparent track, 10-15% opacity thumb

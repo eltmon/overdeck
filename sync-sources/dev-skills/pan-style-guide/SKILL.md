@@ -18,6 +18,8 @@ triggers:
   - mockup
   - kanban card
   - design tokens
+  - list row
+  - switch
 allowed-tools:
   - Read
   - Bash
@@ -48,7 +50,9 @@ allowed-tools:
    `.eyebrow` Broadsheet utilities, and, after `.dark` closes, the PAN-3706
    four-scope region carrying every color/surface/border/shadow/radius/
    type/motion token plus the `.chip`/`.soft-card`/`.large-cta`/`.keycap`/
-   `.dot-metadata` component patterns — and `src/dashboard/frontend/
+   `.dot-metadata` component patterns, plus the grouped-list and switch-track
+   classes `.list-group-bar`/`.list-row`/`.list-meta`/`.switch-track-on`/
+   `.switch-track-locked` — and `src/dashboard/frontend/
    tailwind.config.js` (`boxShadow`, `fontFamily.mono-ui`, and the
    `safelist` entries for classes not yet consumed by any `.tsx` file).
    Conformance is exercised by `tests/e2e/styleguide-conformance.spec.ts`.
@@ -256,6 +260,26 @@ Each has a `-foreground` text variant (≥ 4.5:1 on every surface, enforced by
 None of these exist under Ledger — don't backport them, and don't gate them
 behind a theme conditional (see "The theme rule for new surfaces" above).
 
+### Lists and switches — named classes, never opacity utilities (both themes)
+
+For list groups, list rows and switches, use the named classes below
+(guide §8, "Grouped List and Switch Tracks"). They exist because `--muted`
+and `--foreground` are `var()`-based color tokens, and a Tailwind opacity
+modifier on a `var()`-based color token (`bg-muted/40`, `bg-foreground/8`)
+compiles to no CSS — do not rebuild them from Tailwind opacity utilities.
+
+| Class | Use it for |
+|---|---|
+| `.list-group-bar` | A collapsible list group's header bar. |
+| `.list-row` | A single-line row inside a grouped list (hover tint). |
+| `.list-meta` | A metadata strip under an open group. |
+| `.switch-track-on` | A checked `role="switch"` track. |
+| `.switch-track-locked` | A checked, non-interactive `role="switch"` track. |
+
+Both themes — these are plain CSS classes, not Tailwind utilities, so they
+render identically under Ledger and Broadsheet. Adopt them one page at a time, on pages you are already touching; there is no bulk Tailwind config
+change that fixes opacity modifiers on `var()`-based tokens globally.
+
 ### Page-not-modal doctrine (theme-independent)
 
 Major creation/composition flows (new project, new workspace, future
@@ -309,3 +333,7 @@ Eye, the old stacked diamonds, or tan/copper colors. Canonical SVGs:
   `rounded-full.*badge`, `slate-`, and any hardcoded `font-family:` string in
   component code (it should always be `font-body`/`font-display`/`font-mono`)
   — each hit is a finding.
+- Reviewing list/switch markup: grep the diff for `bg-muted/` or
+  `bg-foreground/` on list groups, list rows, metadata strips, or switch
+  tracks — each hit is a finding; it should be `.list-group-bar`/`.list-row`/
+  `.list-meta`/`.switch-track-on`/`.switch-track-locked` instead.
