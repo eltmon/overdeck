@@ -122,12 +122,6 @@ export interface ConfluenceHookStream {
   costEvents: readonly CostPulse[];
 }
 
-export interface ConfluenceBeadCounts {
-  wip: number;
-  blocked: number;
-  ready: number;
-}
-
 export interface ConfluenceMeta {
   mergesToday: number;
   tokensToday: number | null;
@@ -136,7 +130,6 @@ export interface ConfluenceMeta {
   conversations: number | null;
   staleTotal: number;
   oldestIdle: number;
-  beads: ConfluenceBeadCounts | null;
   system: ReturnType<typeof useGodViewStore.getState>['systemHealth'];
   active: number;
   total: number;
@@ -872,7 +865,6 @@ export function useConfluenceMeta(
       conversations: liveConversations,
       staleTotal: orbs.filter((orb) => orb.state === 'stale').length,
       oldestIdle: orbs.reduce((oldest, orb) => Math.max(oldest, orbIdleMinutes(orb, now.getTime())), 0),
-      beads: null,
       system,
       // The operator's definition: an agent counts as active only while it is
       // actually producing (activity in the last 15 minutes, event-driven via

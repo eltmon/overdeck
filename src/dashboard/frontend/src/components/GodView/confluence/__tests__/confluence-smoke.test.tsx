@@ -73,7 +73,6 @@ const data: ConfluenceData = {
     conversations: 0,
     staleTotal: 1,
     oldestIdle: 45,
-    beads: null,
     system: null,
     active: 1,
     total: 3,

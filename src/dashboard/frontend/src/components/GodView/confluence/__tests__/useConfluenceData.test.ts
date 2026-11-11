@@ -606,13 +606,12 @@ describe('useHookStream', () => {
 });
 
 describe('useConfluenceData metadata fallback', () => {
-  it('returns unavailable beads and cost values without throwing when their sources are absent', () => {
+  it('returns unavailable cost values without throwing when their sources are absent', () => {
     const client = queryClient();
     client.setQueryData(['agents-fleet-cost-summary'], {});
     client.setQueryData(['conversations'], []);
     const { result } = renderHook(() => useConfluenceData(), { wrapper: wrapper(client) });
 
-    expect(result.current.meta.beads).toBeNull();
     expect(result.current.meta.tokensToday).toBeNull();
     expect(result.current.meta.costPerMin).toBeNull();
     expect(result.current.meta.conversations).toBe(0);
