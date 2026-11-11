@@ -16,7 +16,7 @@ export type ChoreographyCommand =
   | { type: 'ticker'; text: string; color: string }
   | { type: 'gate'; stage: Stage }
   | { type: 'merge'; issueId: string }
-  | { type: 'tide'; targetId: string; beneficiaryId?: string }
+  | { type: 'tide'; targetId: string }
   | { type: 'thaw'; issueId: string }
   | { type: 'sweep-tide' }
   | { type: 'flare'; issueId: string }
@@ -55,18 +55,6 @@ interface ChoreographyFrame {
   random?: () => number;
 }
 
-function governorNamedBeneficiary(orb: ConfluenceOrb, current: ReadonlyMap<string, ConfluenceOrb>): string | undefined {
-  const named = orb.yieldReason?.match(/\b[A-Z][A-Z0-9]+-\d+\b/)?.[0];
-  if (!named || named === orb.id || !current.has(named)) return undefined;
-  return named;
-}
-
-function latestReviewOrb(current: ReadonlyMap<string, ConfluenceOrb>): ConfluenceOrb | undefined {
-  return [...current.values()]
-    .filter((orb) => orb.stage === 'REVIEW' && orb.state === 'active')
-    .sort((first, second) => Date.parse(second.lastActivity ?? '') - Date.parse(first.lastActivity ?? ''))[0];
-}
-
 function familyColor(family: HookFamilyKey): string {
   return HOOKS[family].color;
 }
@@ -78,7 +66,6 @@ export function planConfluenceChoreography({
   random = Math.random,
 }: ChoreographyFrame): ChoreographyCommand[] {
   const commands: ChoreographyCommand[] = [];
-  const reviewBeneficiary = latestReviewOrb(current)?.id;
 
   for (const event of hookEvents) {
     if (!event.issueId) continue;
@@ -134,12 +121,8 @@ export function planConfluenceChoreography({
       commands.push({ type: 'thaw', issueId: orb.id });
     }
 
-    const yielded = orb.state === 'shelf' && (
-      orb.yieldedByScheduler || orb.yieldReason?.toLowerCase().startsWith('yield:') === true
-    );
-    if (before.state !== 'shelf' && yielded) {
-      const beneficiaryId = governorNamedBeneficiary(orb, current) ?? reviewBeneficiary;
-      commands.push({ type: 'tide', targetId: orb.id, ...(beneficiaryId ? { beneficiaryId } : {}) });
+    if (before.state !== 'shelf' && orb.state === 'shelf' && orb.yieldedByScheduler) {
+      commands.push({ type: 'tide', targetId: orb.id });
     } else if (before.state === 'shelf' && orb.state !== 'shelf') {
       commands.push(
         { type: 'ring', issueId: orb.id, color: STAGE_COLORS.WORK },
@@ -170,7 +153,7 @@ export function runConfluenceCommands(commands: readonly ChoreographyCommand[], 
         effects.playMerge(command.issueId);
         break;
       case 'tide':
-        effects.playTide(command.targetId, command.beneficiaryId);
+        effects.playTide(command.targetId);
         break;
       case 'sweep-tide':
         effects.playSweep();

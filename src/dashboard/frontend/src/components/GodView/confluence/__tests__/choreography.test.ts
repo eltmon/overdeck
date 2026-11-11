@@ -124,7 +124,7 @@ describe('Confluence choreography dispatch table', () => {
       ['PAN-2', orb('PAN-2', { state: 'active' })],
       ['PAN-3', orb('PAN-3')],
       ['PAN-4', orb('PAN-4', { issueState: 'merged' })],
-      ['PAN-5', orb('PAN-5', { state: 'shelf', yieldReason: 'yield: freeing a slot for PAN-50' })],
+      ['PAN-5', orb('PAN-5', { state: 'shelf', yieldedByScheduler: true, yieldReason: 'yield: freeing a slot for PAN-50' })],
       ['PAN-6', orb('PAN-6', { state: 'failed', attention: 'stuck' })],
       ['PAN-50', orb('PAN-50', { role: 'review', stage: 'REVIEW' })],
       ['PAN-99', orb('PAN-99', { role: 'plan', stage: 'PLAN' })],
@@ -153,7 +153,7 @@ describe('Confluence choreography dispatch table', () => {
     expect(commands).toContainEqual({ type: 'sparks', issueId: 'PAN-1', color: '#ffb800', heatBump: 0, specRateBump: 0 });
     expect(commands).toContainEqual({ type: 'gate', stage: 'REVIEW' });
     expect(commands).not.toContainEqual({ type: 'merge', issueId: 'PAN-4' });
-    expect(commands).toContainEqual({ type: 'tide', targetId: 'PAN-5', beneficiaryId: 'PAN-50' });
+    expect(commands.filter((command) => command.type === 'tide')).toStrictEqual([{ type: 'tide', targetId: 'PAN-5' }]);
     expect(commands).toContainEqual({ type: 'ring', issueId: 'PAN-3', color: '#39ff14' });
     expect(commands).toContainEqual({ type: 'sun' });
     expect(commands).toContainEqual({ type: 'spawn', issueId: 'PAN-99' });
@@ -166,21 +166,33 @@ describe('Confluence choreography dispatch table', () => {
     expect(api.emitRing).toHaveBeenCalledWith('PAN-1', '#ffb800');
     expect(api.gateFlash).toHaveBeenCalledWith('REVIEW');
     expect(api.playMerge).not.toHaveBeenCalled();
-    expect(api.playTide).toHaveBeenCalledWith('PAN-5', 'PAN-50');
+    expect(vi.mocked(api.playTide).mock.calls).toEqual([['PAN-5']]);
     expect(api.pulseSun).toHaveBeenCalledOnce();
     expect(api.spawnFromSun).toHaveBeenCalledWith('PAN-99');
   });
 
-  it('uses the most recently active review orb when a yield reason names no beneficiary', () => {
+  it('plays a tide that names only its target when the scheduler yields an orb', () => {
     const previous = new Map([['PAN-5', orb('PAN-5')]]);
     const current = new Map([
-      ['PAN-5', orb('PAN-5', { state: 'shelf', yieldReason: 'yield: freeing a slot' })],
-      ['PAN-10', orb('PAN-10', { role: 'review', stage: 'REVIEW', lastActivity: '2026-08-02T11:00:00.000Z' })],
-      ['PAN-11', orb('PAN-11', { role: 'review', stage: 'REVIEW', lastActivity: '2026-08-02T12:00:00.000Z' })],
+      ['PAN-5', orb('PAN-5', { state: 'shelf', yieldedByScheduler: true, yieldReason: 'yield: freeing a slot' })],
+      ['PAN-11', orb('PAN-11', { role: 'review', stage: 'REVIEW' })],
     ]);
 
-    expect(planConfluenceChoreography({ previous, current, hookEvents: [] }))
-      .toContainEqual({ type: 'tide', targetId: 'PAN-5', beneficiaryId: 'PAN-11' });
+    const commands = planConfluenceChoreography({ previous, current, hookEvents: [] });
+    expect(commands).toStrictEqual([{ type: 'tide', targetId: 'PAN-5' }]);
+
+    const api = effects();
+    runConfluenceCommands(commands, api);
+    expect(vi.mocked(api.playTide).mock.calls).toEqual([['PAN-5']]);
+  });
+
+  it('plays no tide for a pause the scheduler did not make', () => {
+    const previous = new Map([['PAN-5', orb('PAN-5')]]);
+    const current = new Map([
+      ['PAN-5', orb('PAN-5', { state: 'shelf', yieldedByScheduler: false, yieldReason: 'operator hold' })],
+    ]);
+
+    expect(planConfluenceChoreography({ previous, current, hookEvents: [] })).toEqual([]);
   });
 
   it('emits sparks for same-second events with distinct domain sequences', () => {

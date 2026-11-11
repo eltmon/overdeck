@@ -91,7 +91,7 @@ interface Particle {
 interface Pulse { x: number; y: number; r: number; maxR: number; color: string; alpha: number; width: number }
 interface Ticker { text: string; color: string; x: number; y: number; life: number; maxLife: number }
 interface GateFlash { x: number; t: number }
-interface Tide { active: boolean; x: number; targetId: string | null; beneficiaryId: string | null; t: number }
+interface Tide { active: boolean; x: number; targetId: string | null; ringed: boolean; t: number }
 /** The sweeper's lantern beam (PAN-3490): an ice-blue light that travels the
  * Doldrums band on a real population change, glinting each frozen orb it
  * passes. Distinct from the governor tide (amber, river+shelf) in color,
@@ -107,7 +107,7 @@ export interface RiverEffectsApi {
   emitSparks(issueId: string, color?: string, agentId?: string, heatBump?: number): void;
   emitRing(issueId: string, color?: string): void;
   emitTicker(text: string, color?: string): void;
-  playTide(targetId?: string, beneficiaryId?: string): void;
+  playTide(targetId: string): void;
   playMerge(issueId: string): void;
   playThaw(issueId: string): void;
   playSweep(): void;
@@ -229,7 +229,7 @@ function createEngine(
   const pulses: Pulse[] = [];
   const tickers: Ticker[] = [];
   const gateFlashes: GateFlash[] = [];
-  const tide: Tide = { active: false, x: 0, targetId: null, beneficiaryId: null, t: 0 };
+  const tide: Tide = { active: false, x: 0, targetId: null, ringed: false, t: 0 };
   const sweepBeam: SweepBeam = { active: false, x: 0, t: 0 };
   const flares: Flare[] = [];
   let props = initial;
@@ -345,11 +345,7 @@ function createEngine(
     emitSparks(issueId, color = '#00d4ff', agentId, heatBump = 0) { const orb = orbAt(issueId); if (orb) { orb.heat = Math.min(1, orb.heat + heatBump); orb.flashT = simT + 0.8; const satellite = orb.convoy?.find((member) => member.agentId === agentId); if (satellite) satellite.flash = 1; burst(orb.x, orb.y, color, 26, 90, 1.4, 2.6); } },
     emitRing(issueId, color = '#00d4ff') { const orb = orbAt(issueId); if (orb) ring(orb.x, orb.y, color, 70, 2.5); },
     emitTicker(text, color = '#00d4ff') { ticker(text, color); },
-    playTide(targetId, beneficiaryId) {
-      tide.active = true; tide.x = layout.padX - 40; tide.t = 0;
-      tide.targetId = targetId ?? list().find((orb) => orb.state === 'active' && orb.stage === 'WORK')?.id ?? null;
-      tide.beneficiaryId = beneficiaryId ?? list().find((orb) => orb.state === 'shelf')?.id ?? null;
-    },
+    playTide(targetId) { tide.active = true; tide.x = layout.padX - 40; tide.t = 0; tide.targetId = targetId; tide.ringed = false; },
     playMerge(issueId) { const orb = orbAt(issueId); if (orb) startMerge(orb); },
     playThaw(issueId) { const orb = orbAt(issueId); if (orb) thaw(orb); },
     playSweep() {
@@ -681,7 +677,7 @@ function createEngine(
     for (let index = pulses.length - 1; index >= 0; index--) { const pulse = pulses[index]!; pulse.r += dt * (pulse.maxR - 6) * 1.6; pulse.alpha -= dt * 1.1; if (pulse.alpha <= 0 || pulse.r >= pulse.maxR) pulses.splice(index, 1); }
     for (let index = tickers.length - 1; index >= 0; index--) { const item = tickers[index]!; item.life += dt; item.x += dt * 34; if (item.life > item.maxLife) tickers.splice(index, 1); }
     for (let index = gateFlashes.length - 1; index >= 0; index--) { gateFlashes[index]!.t += dt; if (gateFlashes[index]!.t > 0.8) gateFlashes.splice(index, 1); }
-    if (tide.active) { tide.t += dt; tide.x = layout.padX - 40 + tide.t / 1.6 * (width - layout.padX * 2 + 80); for (const orb of list()) { if (Math.abs(orb.x - tide.x) >= 30) continue; if (orb.id === tide.targetId && orb.state === 'active') { orb.state = 'shelf'; orb.yieldReason ||= 'yield: freeing a slot'; burst(orb.x, orb.y, '#ffb800', 20, 70, 1.2, 2.2); ring(orb.x, orb.y, '#ffb800', 60, 2); } if (orb.id === tide.beneficiaryId && orb.state === 'shelf') thaw(orb); } if (tide.x > width - layout.padX + 40) tide.active = false; }
+    if (tide.active) { tide.t += dt; tide.x = layout.padX - 40 + tide.t / 1.6 * (width - layout.padX * 2 + 80); const target = tide.ringed || !tide.targetId ? undefined : orbAt(tide.targetId); if (target && tide.x >= target.x - 30) { ring(target.x, target.y, '#ffb800', 60, 2); tide.ringed = true; } if (tide.x > width - layout.padX + 40) tide.active = false; }
     // Sweeper beam: crosses the Doldrums in ~1.8s; every frozen orb the light
     // touches glints — the scan visibly TOUCHES each parked issue it scanned.
     if (sweepBeam.active) {
