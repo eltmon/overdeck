@@ -2,8 +2,10 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { connectMessage } from '../../../src/dashboard/frontend/src/components/Settings/anywhere/connectMessage';
 import {
   connectorCommands,
+  defaultBotName,
   grokBuildMcpJson,
   tokenSetup,
 } from '../../../src/dashboard/frontend/src/components/Settings/anywhere/botSnippets';
@@ -47,6 +49,15 @@ describe('integrations/grok-build README', () => {
     const readme = readFileSync(readmePath, 'utf-8');
 
     expect(readme).toMatch(/https:\/\/github\.com\/eltmon\/overdeck\/issues\//);
+  });
+
+  it('leads with the one-paste flow and its Copy message', () => {
+    const readme = readFileSync(readmePath, 'utf-8');
+
+    expect(readme.match(/^## .*/m)?.[0]).toBe('## Connect in one paste');
+    expect(readme).toContain(
+      connectMessage({ platform: 'grok-build', botName: defaultBotName('grok-build'), machineLabel: '<machine>', version: '<version>', pairingString: '<pairing string>' }),
+    );
   });
 });
 
