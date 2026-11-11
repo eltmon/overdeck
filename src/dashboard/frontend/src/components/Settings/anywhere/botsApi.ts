@@ -67,12 +67,16 @@ async function readResult<T>(response: Response): Promise<ApiResult<T>> {
   return { status: response.status, body };
 }
 
-/** Query function for `['anywhere-connectors']`: the active connector rows; a 403 throws `BotsForbiddenError`. */
-export async function loadConnectors(): Promise<ConnectorRow[]> {
-  const result = await readResult<{ connectors: ConnectorRow[] }>(await fetch('/api/connectors'));
+/**
+ * Query function for `['anywhere-connectors']`: the active connector rows and waiting requests;
+ * `requests` is `[]` when the server has none (an older server sends no `requests` key). A 403
+ * throws `BotsForbiddenError`.
+ */
+export async function loadConnectors(): Promise<{ connectors: ConnectorRow[]; requests: ConnectorRequestRow[] }> {
+  const result = await readResult<{ connectors: ConnectorRow[]; requests?: ConnectorRequestRow[] }>(await fetch('/api/connectors'));
   if (result.status === 403) throw new BotsForbiddenError(apiError(result));
   if (!isOk(result)) throw new Error(apiError(result));
-  return result.body.connectors;
+  return { connectors: result.body.connectors, requests: Array.isArray(result.body.requests) ? result.body.requests : [] };
 }
 
 export async function removeConnector(id: string): Promise<ApiResult<{ ok: true }>> {

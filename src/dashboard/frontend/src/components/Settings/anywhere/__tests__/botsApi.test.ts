@@ -52,10 +52,17 @@ describe('loadConnectors', () => {
     await expect(loadConnectors()).rejects.toBeInstanceOf(BotsForbiddenError);
   });
 
-  it('resolves the connector rows on success', async () => {
+  it('resolves the connector rows and requests on success', async () => {
+    const connectors = [{ id: 'c1', name: 'Hermes bot', scopes: ['read:state'], createdAt: '2026-11-03T00:00:00Z', lastUsedAt: null }];
+    const requests = [{ id: 'r1', name: 'bot', platform: 'hermes', scopes: ['read:state'], createdAt: '2026-11-03T00:00:00Z', expiresAt: '2026-11-03T00:30:00Z', state: 'live' }];
+    fetchMock.mockResolvedValue(jsonResponse({ connectors, requests }));
+    await expect(loadConnectors()).resolves.toEqual({ connectors, requests });
+  });
+
+  it('resolves requests as [] when an older server sends none', async () => {
     const connectors = [{ id: 'c1', name: 'Hermes bot', scopes: ['read:state'], createdAt: '2026-11-03T00:00:00Z', lastUsedAt: null }];
     fetchMock.mockResolvedValue(jsonResponse({ connectors }));
-    await expect(loadConnectors()).resolves.toEqual(connectors);
+    await expect(loadConnectors()).resolves.toEqual({ connectors, requests: [] });
   });
 });
 
