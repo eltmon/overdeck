@@ -4,17 +4,17 @@
     "created": "2026-11-11T14:25:32Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5153: GitHub organizations: resolve the acting identity per repository and show which owner a project belongs to",
-    "updated": "2026-11-11T14:32:26.532Z"
+    "updated": "2026-11-11T14:33:58.806Z"
   },
   "plan": {
     "id": "pan-5153",
     "title": "GitHub organizations: resolve the acting identity per repository and show which owner a project belongs to",
-    "status": "proposed",
+    "status": "running",
     "uid": "9c8c8f86-30eb-47e2-9c32-14b7b97dac69",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-11T14:25:32Z",
-    "updated": "2026-11-11T14:32:26.532Z",
+    "updated": "2026-11-11T14:33:58.806Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5153",
@@ -1657,5 +1657,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
