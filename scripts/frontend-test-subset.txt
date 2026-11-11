@@ -52,6 +52,7 @@ src/components/GodView/confluence/__tests__/topbar-enrichment.test.tsx
 src/components/GodView/confluence/__tests__/useConfluenceData.test.ts
 src/components/HealthDashboard.test.tsx
 src/components/IssueActionMenu/__tests__/useIssueActions.render-count.test.tsx
+src/components/KanbanBoard/cards/KanbanCards.jira.test.tsx
 src/components/RestartApprovalBanner.test.tsx
 src/components/Settings/__tests__/ColorThemeEditor.test.tsx
 src/components/Settings/__tests__/ColorThemeEditorPreview.test.tsx
@@ -92,6 +93,7 @@ src/components/Settings/anywhere/__tests__/botSnippets.test.ts
 src/components/Settings/anywhere/__tests__/botsApi.test.ts
 src/components/Settings/anywhere/__tests__/mcpOAuthApi.test.ts
 src/components/Settings/primitives/__tests__/SettingsSection.test.tsx
+src/components/Settings/sections/TrackerKeysSection.test.tsx
 src/components/Settings/sections/__tests__/AccessTokensSection.test.tsx
 src/components/Settings/sections/__tests__/AutoSettleIdleRow.test.tsx
 src/components/Settings/sections/__tests__/AutoSettleOnMergeRow.test.tsx
@@ -204,12 +206,14 @@ src/components/newConversation/__tests__/NewConversationDialog.test.tsx
 src/components/newConversation/__tests__/NewConversationSplitButton.test.tsx
 src/components/palette-conversation-hits.test.ts
 src/components/primitives/issuePullRequest.test.ts
+src/components/project/new/ProjectCreateForm.jira.test.tsx
 src/components/project/new/__tests__/AddProjectCloneCreate.test.tsx
 src/components/project/new/__tests__/AddProjectDialog.test.tsx
 src/components/project/new/__tests__/AddProjectFolderStep.test.tsx
 src/components/project/new/__tests__/AddProjectNestedStep.test.tsx
 src/components/project/new/__tests__/AddProjectSuggestions.test.tsx
 src/components/push/__tests__/TurnOnNotificationsButton.test.tsx
+src/components/search/SearchModal.test.tsx
 src/components/sessionFeed/__tests__/ActivityFeedCard.test.tsx
 src/components/sessionFeed/__tests__/BucketSection.test.tsx
 src/components/sessionFeed/__tests__/ConversationFeedCard.test.tsx
