@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-5070",
+  "created": "2026-11-11T07:26:39.792Z",
+  "updated": "2026-11-11T07:26:39.792Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "w1-connector-ttl": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5070",
+      "claimedAt": "2026-11-11T07:26:39.792Z"
+    }
+  }
+}
