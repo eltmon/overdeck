@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { execFileMock, isGitHubAppConfiguredMock, listPullRequestsForHeadMock } = vi.hoisted(() => ({
+const { appCoversRepoMock, execFileMock, isGitHubAppConfiguredMock, listPullRequestsForHeadMock } = vi.hoisted(() => ({
+  appCoversRepoMock: vi.fn<(owner: string, repo: string) => Promise<boolean | undefined>>(),
   execFileMock: vi.fn<[string, string[], any?], Promise<{ stdout: string; stderr: string }>>(),
   isGitHubAppConfiguredMock: vi.fn(),
   listPullRequestsForHeadMock: vi.fn(),
@@ -12,6 +13,11 @@ vi.mock('node:child_process', () => {
   (execFile as any)[kCustom] = execFileMock;
   return { execFile };
 });
+
+vi.mock('../../../src/lib/github-app-installations.js', () => ({
+  // PAN-5153: coverage follows isGitHubAppConfigured() unless a test overrides it.
+  appCoversRepo: async (owner: string, repo: string) => (await appCoversRepoMock(owner, repo)) ?? isGitHubAppConfiguredMock(),
+}));
 
 vi.mock('../../../src/lib/github-app.js', () => ({
   isGitHubAppConfigured: isGitHubAppConfiguredMock,
@@ -40,6 +46,32 @@ const open4251 = {
 describe('lookupPullRequestForBranch (PAN-4263)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    appCoversRepoMock.mockReset();
+  });
+
+  it('lists through gh with --repo on a repository the App does not cover (PAN-5153)', async () => {
+    isGitHubAppConfiguredMock.mockReturnValue(true);
+    appCoversRepoMock.mockResolvedValue(false);
+    execFileMock.mockResolvedValue({
+      stdout: JSON.stringify([{ number: 7, state: 'OPEN', mergedAt: null, updatedAt: '2026-11-11T00:00:00Z' }]),
+      stderr: '',
+    });
+
+    await expect(lookupPullRequestForBranch('o', 'r', 'feature/x'))
+      .resolves.toEqual({ number: 7, state: 'OPEN', mergedAt: null });
+    expect(appCoversRepoMock).toHaveBeenCalledWith('o', 'r');
+    expect(execFileMock).toHaveBeenCalledWith('gh', expect.arrayContaining(['pr', 'list', '--repo', 'o/r', '--head', 'feature/x']), expect.anything());
+    expect(listPullRequestsForHeadMock).not.toHaveBeenCalled();
+  });
+
+  it('lists through the App and runs no gh command on a covered repository (PAN-5153)', async () => {
+    appCoversRepoMock.mockResolvedValue(true);
+    listPullRequestsForHeadMock.mockResolvedValue([open4251]);
+
+    await expect(lookupPullRequestForBranch('o', 'r', 'feature/x'))
+      .resolves.toEqual({ number: 4251, state: 'OPEN', mergedAt: null });
+    expect(listPullRequestsForHeadMock).toHaveBeenCalledWith('o', 'r', 'feature/x', 'all');
+    expect(execFileMock).not.toHaveBeenCalled();
   });
 
   it('returns the open PR on the App path when a newer closed PR is listed first', async () => {

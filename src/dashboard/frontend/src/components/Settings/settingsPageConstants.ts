@@ -77,6 +77,7 @@ export const SETTINGS_NAV_ITEMS: NavItem[] = [
   { id: 'terminal', label: 'Terminal', icon: Terminal },
   { id: 'tts', label: 'TTS', icon: Volume2 },
   { id: 'tracker-keys', label: 'Tracker Keys', icon: GitBranch },
+  { id: 'github-identities', label: 'GitHub Identities', icon: GitBranch },
   { id: 'appearance', label: 'Appearance', icon: Palette },
   { id: 'diff', label: 'Diff', icon: SplitSquareVertical },
   { id: 'desktop', label: 'Desktop App', icon: Monitor },

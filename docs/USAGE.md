@@ -145,6 +145,8 @@ Overdeck supports multiple issue trackers:
 
 Secondary trackers sync issues to the dashboard alongside Linear issues, allowing unified project management.
 
+For GitHub repositories under several owners (your account and organizations), Overdeck acts as the GitHub App's bot where the App is installed and as your `gh` account elsewhere. See [GitHub organizations and identities](../configuration/issue-trackers.mdx#github-organizations-and-identities).
+
 #### Rally Features and Derived Status
 
 Rally Features (PortfolioItems) get special treatment in the dashboard:

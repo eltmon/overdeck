@@ -111,13 +111,15 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
 
   // GitHub App status (PAN-536)
   try {
-    const { getAppStatus } = await import('../../../lib/github-app.js');
+    const { getAppStatus, getBotIdentity } = await import('../../../lib/github-app.js');
     const appStatus = getAppStatus();
     console.log('');
     console.log(chalk.bold('GitHub App:'));
     if (appStatus.configured) {
-      console.log(`  ${chalk.green('✓')} panopticon-agent (App ID: ${appStatus.appId})`);
-      console.log(`  Mode: ${chalk.green('App')} — agents push as panopticon-agent[bot]`);
+      const botName = getBotIdentity().name;
+      console.log(`  ${chalk.green('✓')} ${botName.replace(/\[bot\]$/, '')} (App ID: ${appStatus.appId})`);
+      // PAN-5153: the App acts only on repositories it is installed on.
+      console.log(`  Mode: ${chalk.green('App')} — agents push as ${botName} where the App is installed`);
     } else {
       console.log(`  ${chalk.yellow('⚠')} Not configured — agents push as your SSH identity`);
       console.log(`  ${chalk.dim('  Run: node scripts/create-github-app.mjs')}`);

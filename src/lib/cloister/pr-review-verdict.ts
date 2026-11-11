@@ -20,10 +20,9 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
-import { Effect } from 'effect';
-
 import { parseArtifactRef } from '../forge.js';
-import { generateInstallationToken, isGitHubAppConfigured } from '../github-app.js';
+import { isGitHubAppConfigured } from '../github-app.js';
+import { getRepoInstallationToken } from '../github-app-installations.js';
 import {
   formatVerdictMarker,
   getPrFacts,
@@ -85,7 +84,8 @@ export interface PostReviewVerdictDeps {
   runGh?: (args: string[], options?: RunGhOptions) => Promise<void>;
   runGlab?: (args: string[]) => Promise<void>;
   isAppConfigured?: () => boolean;
-  getAppToken?: () => Promise<string>;
+  /** PAN-5153: the token of the installation that covers owner/repo; null where the App is not installed. */
+  getAppToken?: (owner: string, repo: string) => Promise<string | null>;
 }
 
 async function defaultRunGh(args: string[], options: RunGhOptions = {}): Promise<void> {
@@ -97,9 +97,8 @@ async function defaultRunGh(args: string[], options: RunGhOptions = {}): Promise
   });
 }
 
-async function defaultAppToken(): Promise<string> {
-  const { token } = await Effect.runPromise(generateInstallationToken());
-  return token;
+function defaultAppToken(owner: string, repo: string): Promise<string | null> {
+  return getRepoInstallationToken(owner, repo);
 }
 
 /** `gh` errors carry the forge's refusal on stderr, not always in `message`. */
@@ -111,15 +110,16 @@ function errorText(cause: unknown): string {
 
 /**
  * Author the verdict as the App's bot (`<app-slug>[bot]`) when the GitHub App is
- * installed. The bot is never the PR author, so GitHub accepts the review that
- * it refuses from the operator's own account. A token failure is not a verdict
- * failure: fall through to the plain `gh` identity and let the marker fallback
- * catch a refusal.
+ * installed on the PR's repository. The bot is never the PR author, so GitHub
+ * accepts the review that it refuses from the operator's own account. Where the
+ * App is not installed (PAN-5153), or a token failure occurs, the verdict posts
+ * as the plain `gh` identity and the marker fallback catches a refusal.
  */
-async function appTokenEnv(deps: PostReviewVerdictDeps): Promise<NodeJS.ProcessEnv | undefined> {
+async function appTokenEnv(deps: PostReviewVerdictDeps, ownerRepo: string): Promise<NodeJS.ProcessEnv | undefined> {
   try {
     if (!(deps.isAppConfigured ?? isGitHubAppConfigured)()) return undefined;
-    const token = await (deps.getAppToken ?? defaultAppToken)();
+    const [owner, repo] = ownerRepo.split('/');
+    const token = await (deps.getAppToken ?? defaultAppToken)(owner, repo);
     return token ? { ...process.env, GH_TOKEN: token } : undefined;
   } catch (cause) {
     console.warn(`[pr-review-verdict] GitHub App token unavailable, posting as the gh CLI user: ${errorText(cause)}`);
@@ -183,7 +183,7 @@ export async function postReviewVerdict(
       };
     }
     const runGh = deps.runGh ?? defaultRunGh;
-    const env = await appTokenEnv(deps);
+    const env = await appTokenEnv(deps, repo);
     const options: RunGhOptions = env ? { env } : {};
     try {
       await runGh(pin

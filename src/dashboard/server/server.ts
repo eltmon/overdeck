@@ -146,6 +146,7 @@ import { adminRouteLayer } from './routes/admin.js';
 import { prereqsRouteLayer } from './routes/prereqs.js';
 import { cliproxyRouteLayer } from './routes/cliproxy.js';
 import { githubQuotaRouteLayer } from './routes/github-quota.js';
+import { githubIdentitiesRouteLayer } from './routes/github-identities.js';
 import { diskAlertRouteLayer } from './routes/disk-alert.js';
 import { backendRestartRecoveryRouteLayer } from './routes/backend-restart-recovery.js';
 import { harnessAutoUpdateRouteLayer } from './routes/harness-auto-update.js';
@@ -445,6 +446,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   prereqsRouteLayer,
   cliproxyRouteLayer,
   githubQuotaRouteLayer,
+  githubIdentitiesRouteLayer,
   diskAlertRouteLayer,
   backendRestartRecoveryRouteLayer,
   harnessAutoUpdateRouteLayer,

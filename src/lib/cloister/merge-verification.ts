@@ -2,7 +2,8 @@ import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 
 import { resolveProjectFromIssueSync } from '../projects.js';
-import { isGitHubAppConfigured, listPullRequestsForHead } from '../github-app.js';
+import { listPullRequestsForHead } from '../github-app.js';
+import { appCoversRepo } from '../github-app-installations.js';
 import { getMergeSet } from '../merge-set.js';
 import { resolveGitHubIssue } from '../tracker-utils.js';
 import { assessMergeCompleteness, hasPositiveMergedEvidence } from './merge-completeness.js';
@@ -175,7 +176,7 @@ export async function verifyMergedBeforeLifecycle(
 
   const { owner, repo } = ghResolved;
   try {
-    if (isGitHubAppConfigured()) {
+    if (await appCoversRepo(owner, repo)) {
       const prs = await listPullRequestsForHead(owner, repo, branchName, 'all');
       const mergedPr = prs.find((pr) => pr.merged === true || pr.mergedAt != null);
       if (mergedPr) {

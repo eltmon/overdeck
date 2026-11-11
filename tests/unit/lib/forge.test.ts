@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
+  appCoversRepoMock,
   execMock,
   getPullRequestStateMock,
   isGitHubAppConfiguredMock,
@@ -8,6 +9,7 @@ const {
   mergePullRequestWithAppMock,
   parsePullRequestRefMock,
 } = vi.hoisted(() => ({
+  appCoversRepoMock: vi.fn<(owner: string, repo: string) => Promise<boolean | undefined>>(),
   execMock: vi.fn<[string, any?], Promise<{ stdout: string; stderr: string }>>(),
   getPullRequestStateMock: vi.fn(),
   isGitHubAppConfiguredMock: vi.fn(),
@@ -29,6 +31,11 @@ vi.mock('child_process', () => {
   (exec as any)[kCustom] = execMock;
   return { exec };
 });
+
+vi.mock('../../../src/lib/github-app-installations.js', () => ({
+  // PAN-5153: coverage follows isGitHubAppConfigured() unless a test overrides it.
+  appCoversRepo: async (owner: string, repo: string) => (await appCoversRepoMock(owner, repo)) ?? isGitHubAppConfiguredMock(),
+}));
 
 vi.mock('../../../src/lib/github-app.js', () => ({
   getPullRequestState: getPullRequestStateMock,
@@ -82,6 +89,7 @@ describe('forge adapters', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useRealTimers();
+    appCoversRepoMock.mockReset();
     isGitHubAppConfiguredMock.mockReturnValue(false);
     listPullRequestsForHeadMock.mockResolvedValue([]);
     parsePullRequestRefMock.mockReturnValue({ owner: 'org', repo: 'repo', number: 42 });
@@ -374,6 +382,44 @@ describe('forge adapters', () => {
     expect(mergePullRequestWithAppMock).not.toHaveBeenCalled();
   });
 
+  it('merges through gh on a repository the App does not cover (PAN-5153)', async () => {
+    isGitHubAppConfiguredMock.mockReturnValue(true);
+    appCoversRepoMock.mockResolvedValue(false);
+    execMock.mockResolvedValueOnce({ stdout: '', stderr: '' });
+
+    await getForgeAdapter('github').mergeReviewArtifact({
+      forge: 'github',
+      url: 'https://github.com/org/repo/pull/42',
+      cwd: '/tmp/repo',
+      method: 'squash',
+    });
+
+    expect(appCoversRepoMock).toHaveBeenCalledWith('org', 'repo');
+    expect(execMock).toHaveBeenCalledWith(
+      'gh pr merge https://github.com/org/repo/pull/42 --squash',
+      expect.objectContaining({ cwd: '/tmp/repo' }),
+    );
+    expect(mergePullRequestWithAppMock).not.toHaveBeenCalled();
+    expect(getPullRequestStateMock).not.toHaveBeenCalled();
+  });
+
+  it('merges through gh when the input names no parseable repository (PAN-5153)', async () => {
+    isGitHubAppConfiguredMock.mockReturnValue(true);
+    parsePullRequestRefMock.mockImplementation(() => { throw new Error('Cannot parse GitHub PR reference'); });
+    execMock.mockResolvedValueOnce({ stdout: '', stderr: '' });
+
+    await getForgeAdapter('github').mergeReviewArtifact({
+      forge: 'github',
+      id: '42',
+      cwd: '/tmp/repo',
+      method: 'squash',
+    });
+
+    expect(execMock).toHaveBeenCalledWith(expect.stringMatching(/^gh pr merge 42 --squash/), expect.anything());
+    expect(mergePullRequestWithAppMock).not.toHaveBeenCalled();
+    expect(getPullRequestStateMock).not.toHaveBeenCalled();
+  });
+
   it('pins a gh merge to the expected head commit (#3983)', async () => {
     execMock.mockResolvedValueOnce({ stdout: '', stderr: '' });
 
@@ -470,6 +516,7 @@ describe('forge adapters', () => {
     await vi.runAllTimersAsync();
     await mergePromise;
 
+    expect(appCoversRepoMock).toHaveBeenCalledWith('org', 'repo');
     expect(getPullRequestStateMock).toHaveBeenCalledTimes(2);
     expect(mergePullRequestWithAppMock).toHaveBeenCalledWith('org', 'repo', 42, 'squash', 'abc123');
     expect(execMock).not.toHaveBeenCalled();

@@ -1,6 +1,7 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { isGitHubAppConfigured, listPullRequestsForHead } from '../github-app.js';
+import { listPullRequestsForHead } from '../github-app.js';
+import { appCoversRepo } from '../github-app-installations.js';
 import { resolveGitHubPullRequestRepo } from '../tracker-utils.js';
 
 const execAsync = promisify(exec);
@@ -26,7 +27,7 @@ export async function verifyMergedBeforeLifecycle(
 
   const { owner, repo } = ghResolved;
   try {
-    if (isGitHubAppConfigured()) {
+    if (await appCoversRepo(owner, repo)) {
       const prs = await listPullRequestsForHead(owner, repo, branchName, 'all');
       const mergedPr = prs.find((pr) => pr.merged || pr.mergedAt || pr.mergeCommit);
       if (mergedPr) {

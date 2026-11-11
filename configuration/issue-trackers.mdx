@@ -80,6 +80,23 @@ gh auth login
 GITHUB_TOKEN=ghp_xxxxx
 ```
 
+### GitHub organizations and identities
+
+A project's GitHub **owner** is the first part of its `github_repo` (`mindyournow` in `mindyournow/myn-cli`). Overdeck decides per repository who acts there:
+
+- **The GitHub App's bot** (for example `overdeck-agent[bot]`) acts on every repository where the App is installed. Agents push, open and merge pull requests, and post review verdicts as the bot.
+- **Your `gh` account** acts everywhere else. Agents keep the remote and credentials the clone came with, and verdicts post as your account.
+
+Overdeck finds the installation that covers each repository by itself (`GET /repos/{owner}/{repo}/installation`) and remembers the answer for six hours.
+
+**To cover an organization with the bot**, make the App public in its GitHub settings, install it on the organization, then run `pan doctor` so Overdeck asks GitHub again. Until then, a review verdict there posts as your `gh` account, and an approving verdict marker counts from any trusted author on that repository. Installing the App restores bot-only approval.
+
+**If the organization enforces SAML single sign-on**, authorize your `gh` token for it: run `gh auth refresh -h github.com` and authorize the organization in the browser.
+
+**Where to see the identity:** the sidebar groups projects by owner when they span more than one; the Command Deck project header shows `<owner> · <identity>`; **Settings → GitHub Identities** lists every project; and `pan doctor` prints one `GitHub identity: <owner>` row per owner, with a fix when the identity cannot push.
+
+A separate work GitHub account and GitHub Enterprise Server hosts are not supported yet ([#5154](https://github.com/eltmon/overdeck/issues/5154)).
+
 ### Issue Prefix
 
 GitHub Issues use an uppercase project key as prefix, derived from the project name in `projects.yaml`:

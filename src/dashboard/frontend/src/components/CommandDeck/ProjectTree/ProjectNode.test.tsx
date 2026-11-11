@@ -43,6 +43,9 @@ vi.mock('./FeatureItem', () => ({
   },
 }));
 
+// PAN-5153: the identity chip has its own test and fetches on mount.
+vi.mock('./ProjectIdentityChip', () => ({ ProjectIdentityChip: () => null }));
+
 vi.mock('../styles/command-deck.module.css', () => ({
   default: {
     projectNode: 'projectNode',

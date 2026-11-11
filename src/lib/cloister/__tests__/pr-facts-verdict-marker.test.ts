@@ -4,7 +4,13 @@
  * The marker is the only verdict a single-account install can record, so the
  * merge-ready set and the rework delivery both depend on these mappings.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+
+// PAN-5153: tests that do not inject `appCoversRepo` see an uncovered
+// repository, so none of them sends a real installation lookup.
+vi.mock('../../github-app-installations.js', () => ({
+  appCoversRepo: async () => false,
+}));
 
 import { evaluateMergeReadiness, getPrFacts, parseVerdictMarker, parseVerdictMarkerWithSha, resetPrFactsCache, type ForgeAuthor } from '../pr-facts.js';
 import type { IssuePullRequestData } from '../../overdeck/pull-requests.js';
@@ -231,6 +237,7 @@ describe('getPrFacts — with the GitHub App, only its bot approves by marker (#
       fetchGitHubPr: async () => ({ issueId: 'PAN-3705', pr: prFixture({ comments }) }),
       overdeckLogins: async () => ['eltmon', ...(appBot ? [appBot] : [])],
       appBotLogin: async () => appBot,
+      appCoversRepo: async () => true,
       readAuthorKinds: authorKinds(kinds),
     });
   }
@@ -278,6 +285,7 @@ describe('getPrFacts — with the GitHub App, only its bot approves by marker (#
       fetchGitHubPr: async () => ({ issueId: 'PAN-3705', pr: prFixture({ comments: [botComment(approveHead)] }) }),
       overdeckLogins: async () => ['eltmon', BOT],
       appBotLogin: async () => BOT,
+      appCoversRepo: async () => true,
       readAuthorKinds: async () => { throw new Error('gh: rate limited'); },
     });
     expect(facts.approved).toBe(false);
@@ -309,7 +317,67 @@ describe('getPrFacts — with the GitHub App, only its bot approves by marker (#
       fetchGitHubPr: async () => ({ issueId: 'PAN-3705', pr: prFixture({ comments: ownerApproval }) }),
       overdeckLogins: async () => ['eltmon'],
       appBotLogin: async () => { throw new Error('unreadable'); },
+      appCoversRepo: async () => true,
     });
     expect(facts.approved).toBe(false);
+  });
+});
+
+describe('getPrFacts — the marker approver follows the repository (PAN-5153)', () => {
+  const BOT = 'overdeck-agent[bot]';
+  const approveHead = `<!-- overdeck-verdict: APPROVED sha=${HEAD} -->\n\nreview verdict: passed`;
+  const BOT_KIND = { IC_bot: { __typename: 'Bot', login: 'overdeck-agent' } };
+  const ownerApproval = [{
+    author: { login: 'eltmon' },
+    authorAssociation: 'OWNER',
+    body: approveHead,
+    createdAt: '2026-09-19T10:05:00Z',
+  }];
+  const botApproval = [{
+    id: 'IC_bot', author: { login: 'overdeck-agent' }, authorAssociation: 'CONTRIBUTOR', body: approveHead, createdAt: '2026-09-19T10:05:00Z',
+  }];
+
+  async function factsWith(
+    comments: IssuePullRequestData['comments'],
+    covered: boolean,
+    url = 'https://github.com/mindyournow/myn-cli/pull/3933',
+  ) {
+    resetPrFactsCache();
+    return getPrFacts('PAN-3705', {
+      fetchGitHubPr: async () => ({ issueId: 'PAN-3705', pr: prFixture({ comments, url }) }),
+      overdeckLogins: async () => ['eltmon', BOT],
+      appBotLogin: async () => BOT,
+      appCoversRepo: async () => covered,
+      isAppConfigured: () => true,
+      readAuthorKinds: authorKinds(BOT_KIND),
+    });
+  }
+
+  it('accepts a trusted owner marker on a repository the App does not cover', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const facts = await factsWith(ownerApproval, false);
+    warn.mockRestore();
+    expect(facts.approved).toBe(true);
+    expect(facts.approvedAtHead).toBe(true);
+  });
+
+  it('keeps bot-only approval on a covered repository', async () => {
+    const owner = await factsWith(ownerApproval, true, 'https://github.com/eltmon/overdeck/pull/3933');
+    expect(owner.approved).toBe(false);
+    const bot = await factsWith(botApproval, true, 'https://github.com/eltmon/overdeck/pull/3933');
+    expect(bot.approved).toBe(true);
+    expect(bot.approvedAtHead).toBe(true);
+  });
+
+  it('warns once per uncovered repository', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const url = 'https://github.com/acme/warn-once/pull/3933';
+    await factsWith(ownerApproval, false, url);
+    await factsWith(ownerApproval, false, url);
+    const messages = warn.mock.calls.map((call) => String(call[0])).filter((m) => m.includes('does not cover acme/warn-once'));
+    warn.mockRestore();
+    expect(messages).toEqual([
+      '[pr-facts] GitHub App does not cover acme/warn-once: an APPROVED verdict marker counts from any trusted author there. Install the App on acme to close this.',
+    ]);
   });
 });

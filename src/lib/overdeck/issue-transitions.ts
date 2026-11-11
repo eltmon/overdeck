@@ -573,14 +573,21 @@ export function reopenIssueTransition(options: {
       // Reopen closed (not merged) PR for the feature branch if one exists
       yield* Effect.promise(async () => {
         try {
+          // PAN-5153: name the issue's own repository, never the cwd's.
+          if (!githubCheck.owner || !githubCheck.repo) {
+            console.log(`[reopen] No GitHub repository for ${id}; not reopening a PR`);
+            return;
+          }
+          const repoArg = `${githubCheck.owner}/${githubCheck.repo}`;
           const branchName = `feature/${id.toLowerCase()}`;
-          const { stdout } = await execAsync(
-            `gh pr list --head ${branchName} --state closed --json number,mergedAt --limit 1`,
+          const { stdout } = await execFileAsync(
+            'gh',
+            ['pr', 'list', '--repo', repoArg, '--head', branchName, '--state', 'closed', '--json', 'number,mergedAt', '--limit', '1'],
             { encoding: 'utf-8', timeout: 15000 }
           );
           const prs = JSON.parse(stdout.trim() || '[]');
           if (prs.length > 0 && !prs[0].mergedAt) {
-            await execAsync(`gh pr reopen ${prs[0].number}`, { encoding: 'utf-8', timeout: 15000 });
+            await execFileAsync('gh', ['pr', 'reopen', String(prs[0].number), '--repo', repoArg], { encoding: 'utf-8', timeout: 15000 });
             console.log(`[reopen] Reopened PR #${prs[0].number} for ${id}`);
           }
         } catch (err: any) {

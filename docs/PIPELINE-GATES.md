@@ -968,17 +968,18 @@ declares nothing.
 
 **Who may approve by marker** (#4066 review). Agents run with the operator's
 `gh` credentials, which GitHub reports as `OWNER`, so any agent can post an
-`overdeck-verdict: APPROVED sha=<head>` comment. When the GitHub App is
-configured, an `APPROVED` review marker therefore counts only when the App's
+`overdeck-verdict: APPROVED sha=<head>` comment. When the GitHub App covers
+the PR's repository, an `APPROVED` review marker therefore counts only when the App's
 bot posted it (a `Bot`-typed author with the App's slug, above); a marker
 from any other author, the owner included, is skipped as if it were not
 there. The review agent's verdict is normally a real review under the App's
 token, so this costs the normal path nothing; the one approval it loses is a
 verdict that fell back to a marker because the App token failed, which then
 needs a fresh review. A `CHANGES_REQUESTED` marker still counts from every
-trusted author: it can only hold a merge back. Without the App, any trusted
-author's `APPROVED` marker counts, which is trust in the operator's
-credentials; the server logs that once per process.
+trusted author: it can only hold a merge back. Without the App, or on a
+repository it does not cover, any trusted author's `APPROVED` marker counts,
+which is trust in the operator's credentials; the server logs that once per
+process, and once per uncovered repository (PAN-5153).
 
 **Failed UAT.** The newest trusted UAT marker that applies to the current
 head decides. A marker applies when its commit is the head (an abbreviated SHA
@@ -1629,6 +1630,14 @@ against GraphQL's own reported 2,424 at the same moment — REST's GraphQL
 count does not track what `/graphql` actually charges (PAN-4291). REST
 `/rate_limit` remains the source for the `rest` (`core`) bucket and for the
 App pool's usage, which has no separate GraphQL source wired up.
+
+**Installation lookup (PAN-5153).** Before an App call, Overdeck looks up
+which installation covers the repository (`GET /repos/{owner}/{repo}/installation`
+with the App JWT) and caches the answer for 6 hours: a positive answer in
+memory, a 404 in `repo-notes.json`. The lookup is not recorded in the quota
+ledger. `pan doctor` forgets the cached answers and asks again. Every
+process re-reads `repo-notes.json` when the file changes, so a running
+dashboard sees a note that `pan doctor` cleared on its next lookup.
 
 **The ledger.** Every metered call and every `/rate_limit` sample appends one
 JSON line to `~/.overdeck/github-quota/ledger-<YYYYMMDDHH>.jsonl` (UTC hour):

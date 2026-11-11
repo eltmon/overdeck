@@ -830,23 +830,16 @@ async function spawnAgentWithoutConsentClaim(
   const claudeCmd = `bash ${launcherScript}`;
   console.log(`[claude-invoke] purpose=work-agent | model=${state.model} | source=agents.ts:spawnAgent | session=${agentId} | command="${claudeCmd}"`);
 
-  // Configure workspace for GitHub App bot identity (PAN-536)
-  // Agents push as panopticon-agent[bot] with short-lived installation tokens
+  // Per-repository GitHub identity: the App's bot where it is installed, else the gh user (PAN-5153)
   try {
-    const { isGitHubAppConfigured, generateInstallationToken, configureWorkspaceForBot } = await import('../github-app.js');
-    if (isGitHubAppConfigured()) {
-      const { findProjectByPath } = await import('../projects.js');
-      const project = findProjectByPath(resolve(options.workspace, '..', '..'));
-      const ghRepo = project?.github_repo;
-      if (ghRepo) {
-        const [owner, repo] = ghRepo.split('/');
-        const { token } = await Effect.runPromise(generateInstallationToken());
-        await configureWorkspaceForBot(options.workspace, owner, repo, token);
-        console.log(`[${agentId}] Configured workspace for bot push (panopticon-agent[bot])`);
-      }
+    const { findProjectByPath } = await import('../projects.js');
+    const ghRepo = findProjectByPath(resolve(options.workspace, '..', '..'))?.github_repo;
+    if (ghRepo) {
+      const { configureWorkspaceGitHubIdentity } = await import('../github-repo-identity.js');
+      await configureWorkspaceGitHubIdentity(agentId, options.workspace, ghRepo);
     }
   } catch (err: any) {
-    console.warn(`[${agentId}] GitHub App config failed (falling back to SSH): ${err.message}`);
+    console.warn(`[${agentId}] GitHub identity setup failed (git remote left unchanged): ${err.message}`);
   }
 
   clearReadySignal(agentId);
