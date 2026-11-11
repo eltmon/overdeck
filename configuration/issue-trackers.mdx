@@ -1,6 +1,6 @@
 ---
 title: Issue Tracker Integration
-description: Connect GitHub, Linear, GitLab, and Rally
+description: Connect GitHub, Linear, GitLab, Rally, and Jira
 ---
 
 # Issue Tracker Integration
@@ -15,6 +15,7 @@ Overdeck integrates with popular issue tracking systems to provide unified proje
 | **Linear** | `LINEAR_API_KEY` in `.overdeck.env` |
 | **GitLab Issues** | `GITLAB_TOKEN` or `glab auth login` |
 | **Rally** | `RALLY_API_KEY` in `.overdeck.env` |
+| **Jira** (Cloud and Data Center) | `JIRA_API_TOKEN`, `JIRA_EMAIL`, `JIRA_BASE_URL` in `.overdeck.env`, or Settings → Tracker Keys |
 
 All trackers are equal — configure whichever your projects use. The dashboard displays issues from all configured trackers in a unified Kanban board.
 
@@ -27,6 +28,9 @@ GITHUB_TOKEN=ghp_xxxxx     # For GitHub-tracked projects
 LINEAR_API_KEY=lin_api_xxxxx  # For Linear-tracked projects
 GITLAB_TOKEN=glpat-xxxxx  # For GitLab-tracked projects
 RALLY_API_KEY=_xxxxx       # For Rally-tracked projects
+JIRA_API_TOKEN=xxxxx       # For Jira-tracked projects (API token or personal access token)
+JIRA_EMAIL=you@acme.com    # Jira Cloud only: the account that owns the token
+JIRA_BASE_URL=https://acme.atlassian.net  # Default Jira site
 ```
 
 ## Unified Issue ID Parser
@@ -40,12 +44,13 @@ Overdeck uses a unified issue ID parser that handles multiple formats through co
 | **Standard** | `MIN-123`, `PAN-456` | Prefix and number separated by dash |
 | **Rally** | `F29698`, `US12345` | Type prefix directly concatenated with number |
 | **Custom** | `PROJ12345` | Per-project regex pattern via `issue_pattern` |
+| **Jira** | `PROJ-123` | Standard format; `issue_prefix` is the Jira project key |
 
 ### Configuration Fields
 
 | Field | Description |
 |-------|-------------|
-| `tracker` | Tracker type: `linear`, `github`, `gitlab`, `rally` |
+| `tracker` | Tracker type: `linear`, `github`, `gitlab`, `rally`, `jira` |
 | `issue_prefix` | Single prefix (e.g., `"MIN"`) |
 | `issue_prefixes` | Array of prefixes mapping to one project (e.g., `[F, US, DE, TA]`) |
 | `issue_pattern` | Custom regex with two capture groups: `^(PREFIX)-(\d+)$` |
@@ -281,6 +286,110 @@ Rally workspace and project IDs are numeric strings prefixed with `/workspace/` 
 2. Navigate to desired workspace/project
 3. Check URL: `https://rally1.rallydev.com/#/workspace/12345/project/67890`
 4. Use: `RALLY_WORKSPACE=/workspace/12345` and `RALLY_PROJECT=/project/67890`
+
+## Jira Integration
+
+Jira Cloud and Jira Data Center are supported. A project selects Jira with `tracker: jira`; its code can still live on GitHub or GitLab, and Overdeck finds its pull requests there.
+
+### Setup (Jira Cloud)
+
+1. Create an API token at [id.atlassian.com/manage-profile/security/api-tokens](https://id.atlassian.com/manage-profile/security/api-tokens).
+2. Add the token, the email of the account that owns it, and your site to `~/.overdeck.env`:
+   ```bash
+   JIRA_API_TOKEN=xxxxx
+   JIRA_EMAIL=you@acme.com
+   JIRA_BASE_URL=https://acme.atlassian.net
+   ```
+   Or fill the three Jira rows under **Settings → Tracker Keys**. Settings values win over the environment.
+3. Run `pan doctor` to check the credentials.
+
+Jira Cloud uses REST API v3 and HTTP Basic authentication with `email:token`.
+
+### Setup (Jira Data Center)
+
+1. Create a personal access token in your Jira profile (**Profile → Personal Access Tokens**).
+2. Set `JIRA_API_TOKEN` to that token and `JIRA_BASE_URL` to your site, for example `https://jira.acme.com`. The email is not needed.
+
+Overdeck sends the personal access token as a `Bearer` token and uses REST API v2. It detects the deployment once per site: a host ending in `.atlassian.net` is Cloud; any other site is asked `GET /rest/api/2/serverInfo`. Set `jira.deployment` to skip the probe.
+
+### Configuration
+
+```yaml
+# ~/.overdeck/projects.yaml
+projects:
+  acme-app:
+    name: "Acme App"
+    path: /home/user/projects/acme-app
+    tracker: jira
+    issue_prefix: ACME             # The Jira project key (letters only)
+    github_repo: acme/app          # Where the code and pull requests live
+    jira:
+      site: https://acme.atlassian.net   # Optional; defaults to JIRA_BASE_URL
+      deployment: cloud                  # Optional: cloud | datacenter
+      status_map:                        # Optional: your workflow's status names
+        in_review: Code Review
+        in_planning: Refinement          # Only written when set
+```
+
+You can also register a Jira project with `pan project add <path> --tracker jira --jira-site https://acme.atlassian.net`, or choose **Issue tracker → Jira** under Options in the dashboard's Add-project dialog.
+
+### Status mapping
+
+Overdeck maps a Jira status to its own state by status name first, then by status category. `jira.status_map` entries replace the defaults below.
+
+| Overdeck state | Default Jira status |
+|----------------|---------------------|
+| `backlog` | Backlog |
+| `todo` | To Do |
+| `in_progress` | In Progress |
+| `in_review` | In Review |
+| `verifying_on_main` | In Review |
+| `done` | Done |
+| `canceled` | Canceled |
+
+A name match is case-insensitive, and the first state in this table wins, so `In Review` reads as `in_review`. A status with no name match uses its category: To Do → `todo`, In Progress → `in_progress`, Done → `done`. Overdeck writes no workflow labels to Jira.
+
+### Lifecycle writes
+
+Jira does not let a client set a status directly, so Overdeck posts the workflow transition that reaches the wanted status.
+
+| Action | Target status |
+|--------|---------------|
+| `pan start` (work begins) | In Progress |
+| Planning starts | `status_map.in_planning`, only when set |
+| `pan done` | In Review |
+| Merge handoff | Verifying on main (default: In Review) |
+| Close-out | Done |
+| Reopen, reset, aborted planning | To Do (a reopen after a merge goes to Verifying on main) |
+| Cancel | Canceled |
+
+Overdeck picks the transition whose target status has the wanted name. For To Do, In Progress and Done it also accepts the single transition into the matching category. When no transition fits, it changes nothing and logs the choices, for example:
+
+```text
+[jira] Jira ACME-12: no transition reaches "Canceled" (available: Start → In Progress, Finish → Done); status left unchanged.
+```
+
+A Jira write never blocks a merge, a close-out or `pan done`: network, authentication and missing-transition failures are logged and the pipeline continues.
+
+### Pull request links
+
+`pan done` attaches each pull request to the Jira issue as a remote link and moves the issue to In Review. With `--comment`, it also posts the same agent-completed comment Linear gets. Close-out links the merged pull request again (the link is keyed by its URL, so it is not duplicated), moves the issue to Done, and comments `Closed by Overdeck after merge of <PR URL>.`
+
+### Limits
+
+- Jira issues are polled every 120 seconds, on the same cadence as Rally. There are no Jira webhooks yet.
+- Jira Service Management, sprints and boards are not supported.
+- Authentication is an API token (Cloud) or a personal access token (Data Center); OAuth is not supported.
+- Project keys must be 1 to 10 letters; keys with digits or underscores (`AB2`, `MY_PROJ`) are not supported.
+- Shadow mode does not apply to Jira.
+- The automatic closed-issue workspace cleanup does not read Jira; Jira workspaces are cleaned up by close-out.
+
+### Troubleshooting
+
+- `pan doctor` shows one `Jira (<site>)` row per site. `Authenticated as <name>` means the credentials work.
+- HTTP 401 or 403 means Jira rejected the credentials. On Cloud, check that `JIRA_EMAIL` is the account that owns the token.
+- HTTP 429 (rate limited) is retried after the `Retry-After` delay, up to three times.
+- Search the dashboard log for `[jira]` (lifecycle writes) and `[jira-poll]` (polling) lines.
 
 ## Unified Dashboard
 

@@ -10,9 +10,11 @@ import { getReadableWorkspacePanPaths, readWorkspaceContext, readFeedback, write
 import { findPlanSync, readWorkspacePlanSync, readPlanSync, readWorkspacePlan } from '../xbrief/io.js';
 import { createActiveSlice, getDispatchableItems } from '../xbrief/dag.js';
 import { loadConfigSync } from '../config.js';
-import { createTrackerFromConfig } from '../tracker/factory.js';
+import { createJiraTrackerForProject, createTrackerFromConfig } from '../tracker/factory.js';
 import { NotImplementedError } from '../tracker/interface.js';
-import type { TrackerType } from '../tracker/interface.js';
+import type { IssueTracker, TrackerType } from '../tracker/interface.js';
+import type { TrackersConfig } from '../config.js';
+import { resolveTrackerType } from '../tracker-utils.js';
 
 export interface WorkAgentPromptContext {
   issueId: string;
@@ -169,6 +171,24 @@ const COMMENT_BODY_LIMIT = 500;
 const TOTAL_CONTEXT_LIMIT = 2000;
 
 /**
+ * The trackers to try for an issue, in order. A `tracker: jira` issue uses
+ * only its project's Jira tracker, so it works without a global
+ * `[trackers]` section (PAN-5152). Every other issue tries the global
+ * primary, then the secondary.
+ */
+function trackersToTry(issueId: string, trackersConfig: TrackersConfig | undefined): Array<() => IssueTracker> {
+  if (resolveTrackerType(issueId) === 'jira') {
+    const prefix = extractTeamPrefix(issueId);
+    const project = prefix ? findProjectByTeam(prefix) : null;
+    if (prefix && project?.tracker === 'jira') return [() => createJiraTrackerForProject(prefix, project)];
+  }
+  if (!trackersConfig) return [];
+  const trackerTypes: TrackerType[] = [trackersConfig.primary];
+  if (trackersConfig.secondary) trackerTypes.push(trackersConfig.secondary);
+  return trackerTypes.map(trackerType => () => createTrackerFromConfig(trackersConfig, trackerType));
+}
+
+/**
  * Fetch tracker context (new comments + issue status) since continue file was last modified.
  * Returns a formatted markdown string for injection into the work agent prompt.
  */
@@ -194,20 +214,15 @@ export async function getTrackerContext(
     return '_Tracker unavailable: could not load configuration. Check tracker settings manually._';
   }
 
-  const trackersConfig = config.trackers;
-  if (!trackersConfig) {
+  // Try each candidate tracker until one can resolve the issue
+  const candidates = trackersToTry(issueId, config.trackers);
+  if (candidates.length === 0) {
     return '';
   }
 
-  // Try each configured tracker until one can resolve the issue
-  const trackerTypes: TrackerType[] = [trackersConfig.primary];
-  if (trackersConfig.secondary) {
-    trackerTypes.push(trackersConfig.secondary);
-  }
-
-  for (const trackerType of trackerTypes) {
+  for (const makeTracker of candidates) {
     try {
-      const tracker = createTrackerFromConfig(trackersConfig, trackerType);
+      const tracker = makeTracker();
 
       // Fetch issue and comments in parallel
       const [issue, allComments] = await Promise.all([
@@ -242,6 +257,17 @@ export async function getTrackerContext(
         );
       } else {
         lines.push(`**Current state:** ${stateLabel}`);
+      }
+
+      // PAN-5152: Jira issues carry their title and Markdown description here (FR-7).
+      if (tracker.name === 'jira') {
+        lines.push(`**Title:** ${issue.title}`);
+        if (issue.description) {
+          const description = issue.description.length > TOTAL_CONTEXT_LIMIT
+            ? issue.description.slice(0, TOTAL_CONTEXT_LIMIT) + ' [truncated — read the full description on the tracker]'
+            : issue.description;
+          lines.push('', '**Description:**', '', description);
+        }
       }
 
       if (newComments.length > 0) {
@@ -289,7 +315,7 @@ export async function getTrackerContext(
 
       const result = lines.join('\n').trim();
       // If only "no new comments" and not reopened, return empty to suppress the section
-      if (!isReopened && newComments.length === 0) {
+      if (!isReopened && newComments.length === 0 && tracker.name !== 'jira') {
         return '';
       }
       return result;
@@ -355,15 +381,9 @@ export async function readFeatureContext(workspacePath: string, issueId: string)
   // Deterministic O(1) lookup: query tracker for parentRef, then load directly
   try {
     const config = loadConfigSync();
-    const trackersConfig = config.trackers;
-    if (!trackersConfig) return null;
-
-    const trackerTypes: TrackerType[] = [trackersConfig.primary];
-    if (trackersConfig.secondary) trackerTypes.push(trackersConfig.secondary);
-
-    for (const trackerType of trackerTypes) {
+    for (const makeTracker of trackersToTry(issueId, config.trackers)) {
       try {
-        const tracker = createTrackerFromConfig(trackersConfig, trackerType);
+        const tracker = makeTracker();
         const issue = await Effect.runPromise(tracker.getIssue(issueId));
         if (issue.parentRef) {
           const projectRoot = dirname(dirname(workspacePath));
@@ -395,15 +415,9 @@ export async function writeStoryFeatureContext(workspacePath: string, issueId: s
 
   try {
     const config = loadConfigSync();
-    const trackersConfig = config.trackers;
-    if (!trackersConfig) return;
-
-    const trackerTypes: TrackerType[] = [trackersConfig.primary];
-    if (trackersConfig.secondary) trackerTypes.push(trackersConfig.secondary);
-
-    for (const trackerType of trackerTypes) {
+    for (const makeTracker of trackersToTry(issueId, config.trackers)) {
       try {
-        const tracker = createTrackerFromConfig(trackersConfig, trackerType);
+        const tracker = makeTracker();
         const issue = await Effect.runPromise(tracker.getIssue(issueId));
         if (!issue.parentRef) return;
 

@@ -171,7 +171,7 @@ export function SearchModal({
             <span className="text-xs text-muted-foreground">Filters:</span>
 
             {/* Source toggles */}
-            {(['linear', 'github', 'rally'] as IssueSource[]).map((source) => (
+            {(['linear', 'github', 'rally', 'jira'] as IssueSource[]).map((source) => (
               <button
                 key={source}
                 onClick={() => toggleSource(source)}

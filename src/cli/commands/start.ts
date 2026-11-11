@@ -22,7 +22,8 @@ import { syncMainIntoWorkspace } from '../../lib/cloister/merge-agent.js';
 import { resolveWorkspaceRepoRoots } from '../../lib/project-repos.js';
 import { resolveProjectFromIssueSync, hasProjects, type ResolvedProject } from '../../lib/projects.js';
 import { hasPRDDraft, getPRDDraftPath } from '../../lib/prd-draft.js';
-import { resolveGitHubIssue } from '../../lib/tracker-utils.js';
+import { resolveGitHubIssue, resolveTrackerType } from '../../lib/tracker-utils.js';
+import { createJiraTrackerForIssue } from '../../lib/tracker/factory.js';
 import { Effect } from 'effect';
 import { getLinearApiKey } from '../../lib/shadow-utils.js';
 import { getReadableWorkspacePanPaths } from '../../lib/pan-dir/index.js';
@@ -235,7 +236,7 @@ function findWorkspace(issueId: string, labels: string[] = []): string | null {
   return findLocalWorkspace(issueId, labels);
 }
 
-async function fetchIssueForAutoStart(issueId: string): Promise<AutoSynthesizeIssueInput> {
+export async function fetchIssueForAutoStart(issueId: string): Promise<AutoSynthesizeIssueInput> {
   const github = resolveGitHubIssue(issueId);
   if (github.isGitHub) {
     try {
@@ -245,6 +246,16 @@ async function fetchIssueForAutoStart(issueId: string): Promise<AutoSynthesizeIs
       });
       const parsed = JSON.parse(stdout) as { title?: string; body?: string; url?: string };
       return { issueId, title: parsed.title || issueId, body: parsed.body || '', url: parsed.url };
+    } catch {
+      return { issueId, title: issueId, body: '' };
+    }
+  }
+
+  // PAN-5152: a Jira issue's title, Markdown description and browse URL.
+  if (resolveTrackerType(issueId) === 'jira') {
+    try {
+      const issue = await Effect.runPromise(createJiraTrackerForIssue(issueId).getIssue(issueId));
+      return { issueId, title: issue.title || issueId, body: issue.description, url: issue.url };
     } catch {
       return { issueId, title: issueId, body: '' };
     }

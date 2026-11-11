@@ -6,11 +6,13 @@ import { setupOverdeckTestDb, teardownOverdeckTestDb, type OverdeckTestDb } from
 
 const {
   mockGetProjectSync,
+  mockRegisterProject,
   mockResolveProjectCreateIntent,
   mockPerformProjectCreate,
   mockFinishProjectSetup,
 } = vi.hoisted(() => ({
   mockGetProjectSync: vi.fn(),
+  mockRegisterProject: vi.fn(),
   mockResolveProjectCreateIntent: vi.fn(),
   mockPerformProjectCreate: vi.fn(),
   mockFinishProjectSetup: vi.fn(),
@@ -18,7 +20,7 @@ const {
 
 vi.mock('../../../src/lib/projects.js', async () => {
   const actual = await vi.importActual<typeof import('../../../src/lib/projects.js')>('../../../src/lib/projects.js');
-  return { ...actual, getProjectSync: mockGetProjectSync };
+  return { ...actual, getProjectSync: mockGetProjectSync, registerProject: mockRegisterProject };
 });
 
 // Only the resolve half is mocked; toPublicProjectIntent and the error class are
@@ -208,6 +210,53 @@ describe('pan project add (PAN-3836: resolve-before-create)', () => {
     expect(mockResolveProjectCreateIntent).toHaveBeenCalled();
     expect(mockPerformProjectCreate).toHaveBeenCalled();
     expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('✓ Added project'));
+  });
+});
+
+describe('pan project add --tracker jira (PAN-5152)', () => {
+  let projectDir: string;
+
+  beforeEach(() => {
+    projectDir = mkdtempSync(join(tmpdir(), 'pan-5152-project-add-'));
+    mockRegisterProject.mockReset();
+    mockResolveProjectCreateIntent.mockResolvedValue({
+      mode: 'existing', key: 'acme', name: 'Acme', path: projectDir, notices: [], findings: [],
+      isGitRepository: true, wouldClone: false, wouldGitInit: false, willCreateMainWorkspace: false,
+      cloneUrl: null, provider: 'github', repoSlug: 'o/acme', defaultBranch: 'main', remoteChecked: false,
+      proposedIssuePrefix: 'ACME', parentDir: projectDir, homeDir: '/home/user', gitRoot: null, registeredKeyAtPath: null,
+    });
+    mockPerformProjectCreate.mockResolvedValue({
+      key: 'acme', name: 'Acme', path: projectDir, mainWorkspaceId: 'ws-1', seededContextLayer: false, hooksInstalled: 0,
+    });
+    mockGetProjectSync.mockReturnValue({ name: 'Acme', path: projectDir, issue_prefix: 'ACME', github_repo: 'o/acme' });
+  });
+
+  afterEach(() => {
+    rmSync(projectDir, { recursive: true, force: true });
+  });
+
+  it('persists tracker: jira and jira.site next to the detected GitHub repo', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    await projectAddCommand(projectDir, { tracker: 'jira', jiraSite: 'https://acme.atlassian.net' });
+
+    expect(mockRegisterProject).toHaveBeenCalledWith('acme', expect.objectContaining({
+      tracker: 'jira',
+      jira: { site: 'https://acme.atlassian.net' },
+      github_repo: 'o/acme',
+      issue_prefix: 'ACME',
+    }));
+  });
+
+  it('rejects any other --tracker value before registering anything', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    mockResolveProjectCreateIntent.mockClear();
+
+    await expectExit(1, () => projectAddCommand(projectDir, { tracker: 'linear' }));
+
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('Only --tracker jira is supported'));
+    expect(mockResolveProjectCreateIntent).not.toHaveBeenCalled();
+    expect(mockRegisterProject).not.toHaveBeenCalled();
   });
 });
 

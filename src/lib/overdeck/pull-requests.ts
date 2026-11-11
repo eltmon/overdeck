@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
 import { githubPrLookupSource, lookupPullRequestForBranch } from '../github-pr-lookup.js';
-import { resolveGitHubIssue } from '../tracker-utils.js';
+import { resolveGitHubPullRequestRepo } from '../tracker-utils.js';
 import {
   getCachedIssuePrTabResponse,
   getIssuePrTabCacheGeneration,
@@ -10,19 +10,6 @@ import {
 } from '../../dashboard/server/services/pr-tab-cache.js';
 
 const execFileAsync = promisify(execFile);
-
-function isGitHubIssue(issueId: string): {
-  isGitHub: boolean;
-  owner?: string;
-  repo?: string;
-  number?: number;
-} {
-  const resolved = resolveGitHubIssue(issueId);
-  if (resolved.isGitHub) {
-    return { isGitHub: true, owner: resolved.owner, repo: resolved.repo, number: resolved.number };
-  }
-  return { isGitHub: false };
-}
 
 const GH_PR_VIEW_FIELDS = [
   'number',
@@ -199,8 +186,9 @@ async function resolveIssuePullRequestRef(issueId: string, preferBranch?: string
   | { issueId: string; repoArg: null; prNumber: null; error?: string }
 > {
   const upper = issueId.toUpperCase();
-  const githubCheck = isGitHubIssue(issueId);
-  if (!githubCheck.isGitHub || !githubCheck.owner || !githubCheck.repo) {
+  // PAN-5152: a Jira issue's PRs still live in its project's github_repo.
+  const githubCheck = resolveGitHubPullRequestRepo(issueId);
+  if (!githubCheck) {
     return { issueId: upper, repoArg: null, prNumber: null };
   }
 

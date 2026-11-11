@@ -18,7 +18,7 @@ vi.mock('../../src/lib/projects.js', () => ({
   getIssuePrefix: (config: any) => config?.issue_prefix,
 }));
 
-import { resolveTrackerType } from '../../src/lib/tracker-utils.js';
+import { resolveGitHubIssue, resolveGitHubPullRequestRepo, resolveTrackerType } from '../../src/lib/tracker-utils.js';
 import { loadProjectsConfigSync } from '../../src/lib/projects.js';
 
 const mockLoadProjectsConfig = vi.mocked(loadProjectsConfigSync);
@@ -109,5 +109,50 @@ describe('resolveTrackerType', () => {
     });
 
     expect(resolveTrackerType('ANYTHING-1')).toBe('linear');
+  });
+});
+
+describe('Jira routing (PAN-5152)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(existsSync).mockReturnValue(false);
+  });
+
+  it('routes a tracker: jira project with github_repo to Jira, but finds its PRs on GitHub', () => {
+    mockLoadProjectsConfig.mockReturnValue({
+      projects: {
+        acme: { name: 'Acme', path: '/home/user/acme', tracker: 'jira', issue_prefix: 'ACME', github_repo: 'o/acme' },
+      },
+    });
+
+    expect(resolveTrackerType('ACME-1')).toBe('jira');
+    expect(resolveGitHubIssue('ACME-1').isGitHub).toBe(false);
+    expect(resolveGitHubPullRequestRepo('ACME-1')).toEqual({ owner: 'o', repo: 'acme' });
+  });
+
+  it('keeps the PAN-2449 shape (tracker: linear + github_repo) on GitHub', () => {
+    mockLoadProjectsConfig.mockReturnValue({
+      projects: {
+        lex: { name: 'Lex', path: '/home/user/lex', tracker: 'linear', issue_prefix: 'LEX', github_repo: 'acme/lex' },
+      },
+    });
+
+    expect(resolveTrackerType('LEX-1')).toBe('github');
+    expect(resolveGitHubIssue('LEX-1').isGitHub).toBe(true);
+    expect(resolveGitHubPullRequestRepo('LEX-1')).toEqual({ owner: 'acme', repo: 'lex' });
+  });
+
+  it('resolves a Linear project and a Jira project side by side', () => {
+    mockLoadProjectsConfig.mockReturnValue({
+      projects: {
+        mind: { name: 'Mind', path: '/home/user/mind', issue_prefix: 'MIN' },
+        proj: { name: 'Proj', path: '/home/user/proj', tracker: 'jira', issue_prefix: 'PROJ' },
+      },
+    });
+
+    expect(resolveTrackerType('MIN-1')).toBe('linear');
+    expect(resolveTrackerType('PROJ-1')).toBe('jira');
+    expect(resolveGitHubPullRequestRepo('PROJ-1')).toBeNull();
+    expect(resolveGitHubPullRequestRepo('MIN-1')).toBeNull();
   });
 });

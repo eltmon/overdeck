@@ -32,6 +32,7 @@ export function TrackerKeysSection({ formData, onSettingsChange }: TrackerKeysSe
       <div className="space-y-1">
         {TRACKERS.map((tracker) => {
           const trackerKey = formData.tracker_keys?.[tracker.id] || '';
+          const secret = tracker.secret !== false;
 
           return (
             <div key={tracker.id} className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
@@ -49,7 +50,7 @@ export function TrackerKeysSection({ formData, onSettingsChange }: TrackerKeysSe
               </div>
               <div className="relative w-[200px] shrink-0">
                 <input
-                  type={showTrackerKey[tracker.id] ? 'text' : 'password'}
+                  type={!secret || showTrackerKey[tracker.id] ? 'text' : 'password'}
                   value={trackerKey.startsWith('$') ? '' : trackerKey}
                   onChange={(e) => handleTrackerKeyChange(tracker.id, e.target.value)}
                   placeholder={trackerKey.startsWith('$') ? 'Override env value...' : tracker.placeholder}
@@ -60,9 +61,10 @@ export function TrackerKeysSection({ formData, onSettingsChange }: TrackerKeysSe
                   data-lpignore="true"
                   data-1p-ignore="true"
                   data-form-type="other"
+                  aria-label={tracker.name}
                   className="w-full bg-background border border-border rounded-md px-2.5 py-1.5 pr-8 text-xs font-mono focus:ring-1 focus:ring-primary focus:border-primary text-foreground"
                 />
-                {(trackerKey && !trackerKey.startsWith('$')) && (
+                {(secret && trackerKey && !trackerKey.startsWith('$')) && (
                   <button
                     onClick={() => setShowTrackerKey({ ...showTrackerKey, [tracker.id]: !showTrackerKey[tracker.id] })}
                     className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"

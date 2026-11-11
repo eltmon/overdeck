@@ -26,12 +26,28 @@ vi.mock('../../../src/lib/config.js', () => ({
 
 vi.mock('../../../src/lib/tracker/factory.js', () => ({
   createTrackerFromConfig: vi.fn(),
+  createJiraTrackerForProject: vi.fn(),
 }));
+
+// Non-Jira routing by default (fs is mocked, so the real resolver cannot read
+// its env file here); the Jira cases override it (PAN-5152).
+vi.mock('../../../src/lib/tracker-utils.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/lib/tracker-utils.js')>();
+  return { ...actual, resolveTrackerType: vi.fn(() => 'github') };
+});
+
+vi.mock('../../../src/lib/projects.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/lib/projects.js')>();
+  return { ...actual, findProjectByTeam: vi.fn(actual.findProjectByTeam) };
+});
 
 import { getTrackerContext } from '../../../src/lib/cloister/work-agent-prompt.js';
 import { loadConfigSync } from '../../../src/lib/config.js';
-import { createTrackerFromConfig } from '../../../src/lib/tracker/factory.js';
+import { createJiraTrackerForProject, createTrackerFromConfig } from '../../../src/lib/tracker/factory.js';
 import { NotImplementedError } from '../../../src/lib/tracker/interface.js';
+import { JiraTracker } from '../../../src/lib/tracker/jira.js';
+import { resolveTrackerType } from '../../../src/lib/tracker-utils.js';
+import { findProjectByTeam } from '../../../src/lib/projects.js';
 
 const mockExistsSync = vi.mocked(fs.existsSync);
 const mockStatSync = vi.mocked(fs.statSync);
@@ -347,3 +363,65 @@ describe('getTrackerContext', () => {
     });
   });
 });
+
+describe('getTrackerContext for Jira issues (PAN-5152)', () => {
+  // Built at runtime so push protection never sees a token-shaped literal (NFR-3).
+  const fakeToken = ['fake', 'jira', 'token'].join('-');
+
+  function stubJira(): JiraTracker {
+    const fetchImpl: typeof fetch = async (input) => {
+      const path = new URL(String(input)).pathname;
+      if (path.endsWith('/comment')) return new Response(JSON.stringify({ comments: [] }));
+      return new Response(JSON.stringify({
+        id: '10001',
+        key: 'PROJ-1',
+        fields: {
+          summary: 'Add Jira support',
+          status: { name: 'In Progress', statusCategory: { key: 'indeterminate' } },
+          description: {
+            type: 'doc',
+            version: 1,
+            content: [
+              { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Scope' }] },
+              { type: 'paragraph', content: [{ type: 'text', text: 'Read ' }, { type: 'text', text: 'every', marks: [{ type: 'strong' }] }, { type: 'text', text: ' Jira field.' }] },
+            ],
+          },
+        },
+      }));
+    };
+    return new JiraTracker({
+      credentials: { token: fakeToken, email: 'dev@example.com', site: 'https://acme.atlassian.net' },
+      projectKey: 'PROJ',
+      project: { deployment: 'cloud' },
+      fetchImpl,
+    });
+  }
+
+  it('uses the project Jira tracker without a global [trackers] section and renders the Markdown description', async () => {
+    setupStateMtime(null);
+    mockLoadConfig.mockReturnValue({ trackers: undefined } as any);
+    vi.mocked(resolveTrackerType).mockReturnValueOnce('jira');
+    vi.mocked(findProjectByTeam).mockReturnValueOnce({ name: 'Acme', path: '/p', tracker: 'jira', issue_prefix: 'PROJ' });
+    vi.mocked(createJiraTrackerForProject).mockReturnValue(stubJira());
+
+    const result = await getTrackerContext('PROJ-1', '/workspace');
+
+    expect(createJiraTrackerForProject).toHaveBeenCalledWith('PROJ', expect.objectContaining({ tracker: 'jira' }));
+    expect(mockCreateTrackerFromConfig).not.toHaveBeenCalled();
+    expect(result).toContain('**Title:** Add Jira support');
+    expect(result).toContain('## Scope\nRead **every** Jira field.');
+    expect(result).toContain('**Current state:** In Progress');
+  });
+
+  it('still tries the global primary tracker for a non-Jira issue', async () => {
+    setupStateMtime();
+    setupConfig('github');
+    mockCreateTrackerFromConfig.mockReturnValue(makeTracker() as any);
+
+    await getTrackerContext('PAN-253', '/workspace');
+
+    expect(mockCreateTrackerFromConfig).toHaveBeenCalledWith(expect.anything(), 'github');
+    expect(createJiraTrackerForProject).not.toHaveBeenCalled();
+  });
+});
+

@@ -10,8 +10,12 @@ import { LinearTracker } from './linear.js';
 import { GitHubTracker } from './github.js';
 import { GitLabTracker } from './gitlab.js';
 import { RallyTracker } from './rally.js';
+import { JiraTracker } from './jira.js';
+import { jiraCredentialFix, type JiraProjectConfig } from './jira-config.js';
 import type { TrackersConfig } from '../config.js';
 import { loadConfigSync as loadYamlConfig } from '../config-yaml.js';
+import { findProjectByTeam, getIssuePrefix, type ProjectConfig } from '../projects.js';
+import { extractPrefix } from '../issue-id.js';
 
 // Configuration for a single tracker
 export interface TrackerConfig {
@@ -29,10 +33,14 @@ export interface TrackerConfig {
   // GitLab-specific
   projectId?: string;
 
-  // Rally-specific
+  // Rally-specific (`project` is also the Jira project key)
   server?: string;
   workspace?: string;
   project?: string;
+
+  // Jira-specific (PAN-5152)
+  site?: string;
+  jiraProject?: JiraProjectConfig;
 }
 
 // Multi-tracker configuration (re-exported from config.ts)
@@ -42,13 +50,54 @@ export interface TrackerConfig {
  * Get tracker API key from config.yaml (Settings page).
  * This is checked FIRST — env vars are the fallback, not the other way around.
  */
-function getTrackerKeyFromConfig(trackerType: TrackerType): string | undefined {
+function getTrackerKeyFromConfig(trackerType: TrackerType | 'jiraEmail' | 'jiraBaseUrl'): string | undefined {
   try {
     const { config: yamlConfig } = loadYamlConfig();
     return yamlConfig.trackerKeys[trackerType];
   } catch {
     return undefined;
   }
+}
+
+/**
+ * Build a JiraTracker (D-22). The project key comes from `config.project`,
+ * else `config.team` (generic callers pass the issue prefix as `team`). The
+ * project's `jira:` block is looked up by that prefix when not passed. The
+ * site is `config.site`, else the project's `jira.site`, else Settings.
+ */
+function createJiraTracker(config: TrackerConfig): JiraTracker {
+  const projectKey = config.project ?? config.team;
+  const jiraProject = config.jiraProject ?? (projectKey ? findProjectByTeam(projectKey)?.jira : undefined);
+  const token = getTrackerKeyFromConfig('jira') || process.env.JIRA_API_TOKEN;
+  const email = getTrackerKeyFromConfig('jiraEmail') || process.env.JIRA_EMAIL;
+  const site = config.site || jiraProject?.site || getTrackerKeyFromConfig('jiraBaseUrl') || process.env.JIRA_BASE_URL;
+
+  if (!token || !site) {
+    throw new TrackerAuthError({ tracker: 'jira', message: jiraCredentialFix() });
+  }
+  if (!projectKey) {
+    throw new Error('Jira tracker requires the project key (issue_prefix)');
+  }
+
+  return new JiraTracker({
+    credentials: { token, site, ...(email ? { email } : {}) },
+    projectKey,
+    project: { ...jiraProject, site },
+  });
+}
+
+/** Build the JiraTracker for a registered `tracker: jira` project. */
+export function createJiraTrackerForProject(key: string, project: ProjectConfig): JiraTracker {
+  const prefix = getIssuePrefix(project);
+  if (!prefix) throw new Error(`Project ${key} has no issue_prefix; Jira uses it as the project key`);
+  return createJiraTracker({ type: 'jira', project: prefix, site: project.jira?.site, jiraProject: project.jira ?? {} });
+}
+
+/** Build the JiraTracker that owns an issue key such as `PROJ-123`. */
+export function createJiraTrackerForIssue(issueId: string): JiraTracker {
+  const prefix = extractPrefix(issueId);
+  if (!prefix) throw new Error(`Not a Jira issue key: ${issueId}`);
+  return createJiraTracker({ type: 'jira', project: prefix });
 }
 
 /**
@@ -139,6 +188,9 @@ export function createTracker(config: TrackerConfig): IssueTracker {
         project: config.project,
       });
     }
+
+    case 'jira':
+      return createJiraTracker(config);
 
     default:
       throw new Error(`Unknown tracker type: ${config.type}`);

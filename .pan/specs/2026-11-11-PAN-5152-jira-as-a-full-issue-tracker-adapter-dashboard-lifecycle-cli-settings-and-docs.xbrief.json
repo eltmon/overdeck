@@ -1,0 +1,2235 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-11T14:34:38.180Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5152: Jira as a full issue tracker: adapter, dashboard, lifecycle, CLI, settings and docs",
+    "updated": "2026-11-11T14:36:16.352Z"
+  },
+  "plan": {
+    "id": "pan-5152",
+    "title": "Jira as a full issue tracker: adapter, dashboard, lifecycle, CLI, settings and docs",
+    "status": "running",
+    "uid": "ff0e7235-df4a-4e43-93da-e6fdfa815e79",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-11T14:34:38.180Z",
+    "updated": "2026-11-11T14:36:16.352Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5152",
+        "label": "PAN-5152",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5152.md",
+        "label": "PRD",
+        "type": "document"
+      }
+    ],
+    "tags": [
+      "tracker",
+      "jira",
+      "integration",
+      "dashboard",
+      "lifecycle",
+      "cli",
+      "docs"
+    ],
+    "metadata": {
+      "sizeJustification": "The operator scoped one issue whose acceptance criteria span the adapter, dashboard, lifecycle, CLI, settings and docs. A tracker: jira project is unsafe to ship while any write path still falls through to Linear or GitHub (close-out aborts with HTTP 422, the merge handoff rethrows, GitHub-first routing writes to GitHub issue #N), so independently shipped slices would release a tracker that corrupts state. The plan is decomposed into 29 small items with a strict DAG so the work agent can fan out; the surface is wide but each item is narrow.",
+      "canonicalFilename": "2026-11-11-PAN-5152-jira-as-a-full-issue-tracker-adapter-dashboard-lifecycle-cli-settings-and-docs.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Teams that track work in Jira cannot use Overdeck. Jira exists only as three dead leftovers. No adapter, config, credentials, polling or docs exist, and every write path falls through to Linear, while GitHub-first routing would misroute a Jira project whose code lives on GitHub.",
+      "Proposal": "Add a fetch-based JiraTracker (Cloud v3 and Data Center v2) with its own HTTP client, ADF/wiki converters and status mapper; route tracker: jira projects away from GitHub issue resolution while keeping PR lookup; send every Jira write through one non-failing seam (jira-lifecycle.ts) that lifecycle, close-out, reopen, spawn and pan done call; poll Jira into the dashboard on the Rally cycle; add Settings rows, Add-project and CLI support, pan doctor checks and full docs. The PRD at .pan/drafts/PAN-5152.md is the implementation brief; every item names its PRD work item.",
+      "NonGoals": "- Jira webhooks, Jira Service Management request types, sprints, boards and time tracking.\n- OAuth 2.0 (3LO) sign-in; API token and personal access token only.\n- Trello support.\n- Jira project keys containing digits or underscores.\n- Shadow mode for Jira (no shadow.trackers.jira key).\n- Jira in the command-deck.ts sync-discussions endpoint.\n- Changing GitHub-first precedence for any tracker other than jira; the PAN-2449 shape (tracker: linear + github_repo) must keep resolving to GitHub.\n- Writing workflow labels to Jira or auto-creating missing Jira statuses.\n- Any new npm dependency, any Jira SDK, or any scripts/file-size-allowlist.txt cap raise.\n- A Jira write that fails or blocks a merge, close-out, reopen or pan done.\n- Reaper (isTrackerIssueClosed) reading Jira issues as closed; it stays false for Jira (D-23).\n- Jira branches for pan close --abandon and the pan sync drift checks (D-24)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Keep one plan with plan.metadata.sizeJustification instead of sibling issues.",
+        "rationale": "The operator scoped one issue; partial slices would ship a Jira tracker whose writes fall through to Linear or GitHub (close-out 422, merge-handoff rethrow)."
+      },
+      {
+        "summary": "Only tracker: jira outranks github_repo in routing; other trackers keep GitHub-first precedence.",
+        "rationale": "Registered projects shaped tracker: linear + github_repo have GitHub issues and depend on GitHub-first order (PAN-2449)."
+      },
+      {
+        "summary": "Add resolveGitHubPullRequestRepo for the PR-repo callers instead of changing resolveGitHubIssue semantics everywhere.",
+        "rationale": "resolveGitHubIssue has about 40 callers; only 3 need the PR repo, so the narrow split keeps every other caller unchanged."
+      },
+      {
+        "summary": "Every Jira write goes through jira-lifecycle.ts, which never rejects.",
+        "rationale": "FR-6 says a tracker write never blocks a merge; merge-agent rethrows and close-out returns 422 on a failed write, so the guarantee belongs at one seam."
+      },
+      {
+        "summary": "FR-8 reinterpreted: pan done and close-out call linkJiraPullRequest; pan done --comment posts the Linear agent-completed text; close-out posts a close comment with the PR URL.",
+        "rationale": "linkPR has no caller today and pan done posts no PR comment on any tracker, so the issue premise does not match the code."
+      },
+      {
+        "summary": "AC2 satisfied through getTrackerContext (work agent) and buildPlanningPrompt (planner).",
+        "rationale": "The work prompt template has no title or description slot; tracker content reaches the work agent only through getTrackerContext."
+      },
+      {
+        "summary": "The Jira project key is the project issue_prefix; keys are letters only.",
+        "rationale": "parseIssueId and the issue-prefix-invalid check accept letters only (PAN-4860); one value cannot drift."
+      },
+      {
+        "summary": "Credentials are three flat tracker_keys (jira, jira_email, jira_base_url) shown as three Settings rows.",
+        "rationale": "TrackerKeysSection renders one string input per key; a nested object would need a new component."
+      },
+      {
+        "summary": "The Add-project dialog gains an Issue tracker select (Detect from remote / Jira) and a Jira site URL field.",
+        "rationale": "FR-11 asks the flow to accept jira and the dialog has no tracker picker today."
+      },
+      {
+        "summary": "The state-mapping.ts jira entry becomes the live default status map; in_planning writes only when status_map.in_planning is set.",
+        "rationale": "It already holds sensible Jira default names; Jira has no default planning status."
+      }
+    ],
+    "items": [
+      {
+        "id": "wi1-jira-types",
+        "title": "Widen tracker unions to include jira and add Jira config types (PRD WI-1)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-11T14:34:38.180Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "refactor",
+          "issueLabel": "pan-5152",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "wi2-jira-credentials",
+            "wi3-jira-routing",
+            "wi5-jira-http-client",
+            "wi7-jira-status-mapping",
+            "wi8-jira-adapter",
+            "wi10-dashboard-poller",
+            "wi22-cli-project-jira",
+            "wi25-add-project-dialog"
+          ],
+          "files_scope": [
+            "src/lib/tracker/interface.ts",
+            "src/lib/tracker/jira-config.ts",
+            "src/lib/tracker/tracker-projects.ts",
+            "src/lib/projects.ts",
+            "src/lib/config.ts",
+            "src/lib/tracker-utils.ts",
+            "packages/contracts/src/context-layers.ts",
+            "src/lib/planning/spawn-planning-session.ts",
+            "src/lib/overdeck/planning-sessions.ts",
+            "src/dashboard/server/services/issue-data-service.ts",
+            "tests/unit/lib/tracker/tracker-projects.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/tracker/tracker-projects.test.ts",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "tracker-projects.test.ts passes",
+            "file-size guard passes with src/lib/projects.ts at or under 1217 lines"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Runs first with no predecessors; every later item depends on it through blocks edges, so nothing runs beside it on its files.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD section 7 WI-1 exactly. Add 'jira' to TrackerType (src/lib/tracker/interface.ts), ProjectConfig.tracker (src/lib/projects.ts:442, in place), TrackerTypeResolution (src/lib/tracker-utils.ts:116), the contracts context-layers literal (packages/contracts/src/context-layers.ts:18), and the planning source unions (spawn-planning-session.ts:108, planning-sessions.ts:254). Add `canonicalState?: CanonicalState` to the tracker Issue interface. Create src/lib/tracker/jira-config.ts with JiraProjectConfig, JiraCredentials and jiraCredentialFix() (resolveJiraCredentials belongs to WI-2). Add JiraTrackersConfig to src/lib/config.ts TrackersConfig (D-21). Add one line `jira?: import('./tracker/jira-config.js').JiraProjectConfig; // PAN-5152` to ProjectConfig. Make room by moving findProjectsByRallyProject verbatim from projects.ts into new src/lib/tracker/tracker-projects.ts (plus findJiraProjectsAsync), and update its only importer in issue-data-service.ts:1639. Then run typecheck and fix every compile error the widening causes, adding only the jira member or case with no behaviour; list each fixed site in the commit body. projects.ts must not grow."
+        },
+        "items": [
+          {
+            "id": "wi1-jira-types.ac1",
+            "title": "Given the widened unions, when `npm run typecheck` runs, then it exits 0 and `git grep -n \"'jira'\" -- src/lib/tracker/interface.ts src/lib/projects.ts src/lib/tracker-utils.ts packages/contracts/src/context-layers.ts` returns a match in each file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-jira-types.ac2",
+            "title": "Given the extraction, when `bash scripts/lint-file-size.sh` runs, then it exits 0 and `wc -l src/lib/projects.ts` reports at most 1217 lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-jira-types.ac3",
+            "title": "Given projects with tracker rally and jira, when findProjectsByRallyProject and findJiraProjectsAsync run from src/lib/tracker/tracker-projects.ts, then each returns only its own projects (tracker-projects.test.ts passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi2-jira-credentials",
+        "title": "Add Jira credential keys to config.yaml, env loading and the settings API (PRD WI-2)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T14:34:38.180Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5152",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/config-yaml/schema.ts",
+            "src/lib/config-yaml/merge.ts",
+            "src/lib/config-yaml/load.ts",
+            "src/lib/settings-api.ts",
+            "src/lib/tracker/jira-config.ts",
+            "tests/unit/lib/tracker/jira-config.test.ts",
+            "tests/lib/settings-api.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/tracker/jira-config.test.ts tests/lib/settings-api.test.ts",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "jira-config.test.ts passes",
+            "file-size guard passes for schema.ts, merge.ts and settings-api.ts"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-3",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-2. Add tracker_keys.jira / jira_email / jira_base_url (raw) and trackerKeys.jira / jiraEmail / jiraBaseUrl (normalized) in schema.ts; one-line merge blocks in merge.ts; JIRA_API_TOKEN / JIRA_EMAIL / JIRA_BASE_URL env fill in load.ts next to the RALLY_API_KEY line; the three keys in settings-api.ts tracker_keys (4 spare lines: add exactly 3) with the GET mapping back to snake_case without adding lines. Add resolveJiraCredentials (async, via loadConfig) to src/lib/tracker/jira-config.ts per D-15. Extend tests/lib/settings-api.test.ts."
+        },
+        "items": [
+          {
+            "id": "wi2-jira-credentials.ac1",
+            "title": "Given JIRA_API_TOKEN, JIRA_EMAIL and JIRA_BASE_URL in process.env and no tracker_keys, when config loads, then trackerKeys.jira, jiraEmail and jiraBaseUrl equal those values",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-jira-credentials.ac2",
+            "title": "Given a settings PUT with tracker_keys.jira_email, when settings are read back with GET, then the response returns tracker_keys.jira_email with the same value",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-jira-credentials.ac3",
+            "title": "Given a project jira.site and a global jiraBaseUrl, when resolveJiraCredentials runs, then it returns the project site; and given an .atlassian.net site with no email, then it returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-jira-credentials.ac4",
+            "title": "Given the edits, when `bash scripts/lint-file-size.sh` runs, then it exits 0 and no line of scripts/file-size-allowlist.txt changed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi3-jira-routing",
+        "title": "Route tracker: jira projects away from GitHub issue resolution while keeping PR lookup (PRD WI-3)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-11T14:34:38.180Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-5152",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "wi12-lifecycle-service-jira",
+            "wi13-close-out-jira",
+            "wi14-reopen-reset-jira",
+            "wi15-planning-prompt-jira",
+            "wi16-work-agent-context-jira",
+            "wi17-discussions-jira",
+            "wi19-pan-done-jira"
+          ],
+          "files_scope": [
+            "src/lib/tracker-utils.ts",
+            "src/lib/overdeck/pull-requests.ts",
+            "src/lib/cloister/merged-pr-verification.ts",
+            "src/lib/flywheel-merge-order.ts",
+            "tests/lib/tracker-utils.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/lib/tracker-utils.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "tracker-utils.test.ts passes including the jira, PAN-2449-shape and side-by-side cases"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Touches only tracker-utils.ts and three PR-repo callers that no other item edits; it runs after wi1, which shares tracker-utils.ts.",
+          "traces": [
+            "FR-3",
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-3 and decision D-7. In parseGitHubRepos skip projects whose tracker is exactly 'jira'. In resolveTrackerType return 'jira' before the GitHub check when the prefix project has tracker: jira (before/after snippet in the PRD). Add resolveGitHubPullRequestRepo(issueId), which returns resolveGitHubIssue's repo when isGitHub is true, else the github_repo of a tracker: jira project, else null. Switch only the three PR-repo callers (pull-requests.ts:202 resolveIssuePullRequestRef, merged-pr-verification.ts:22, flywheel-merge-order.ts:180). Do not change precedence for any other tracker value: the PAN-2449 shape (tracker: linear + github_repo) must still resolve to github."
+        },
+        "items": [
+          {
+            "id": "wi3-jira-routing.ac1",
+            "title": "Given a project {tracker: jira, issue_prefix: ACME, github_repo: o/acme}, when resolveTrackerType('ACME-1') runs, then it returns 'jira' and resolveGitHubIssue('ACME-1').isGitHub is false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-jira-routing.ac2",
+            "title": "Given the same project, when resolveGitHubPullRequestRepo('ACME-1') runs, then it returns {owner: 'o', repo: 'acme'}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-jira-routing.ac3",
+            "title": "Given the PAN-2449 shape {tracker: linear, issue_prefix: LEX, github_repo: acme/lex}, when resolveTrackerType('LEX-1') runs, then it still returns 'github' and isGitHub is true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-jira-routing.ac4",
+            "title": "Given a Linear project MIN and a Jira project PROJ side by side, when MIN-1 and PROJ-1 resolve, then they return 'linear' and 'jira' respectively",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi4-prefix-collision-message",
+        "title": "Name both projects when an issue prefix is already taken (PRD WI-4)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T14:34:38.180Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5152",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/projects/create.ts",
+            "tests/unit/lib/projects/create-intent.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/projects/create-intent.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the issue-prefix-taken test passes with both project keys in the message"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-4. In src/lib/projects/create.ts (anchor `code: 'issue-prefix-taken'`) use .find to get the other project, and set the message to `Issue prefix '<P>' is already used by project '<other>'; project '<key>' needs a different prefix.` Extend the existing test that covers issue-prefix-taken."
+        },
+        "items": [
+          {
+            "id": "wi4-prefix-collision-message.ac1",
+            "title": "Given project alpha owns prefix ACME, when project beta resolves with issuePrefix ACME, then the finding code is issue-prefix-taken and its message contains both 'alpha' and 'beta'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-prefix-collision-message.ac2",
+            "title": "Given no other project owns the prefix, when the resolve runs, then it emits no issue-prefix-taken finding",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi5-jira-http-client",
+        "title": "Add the Jira REST client with auth, 30 s timeout, 429 retry and deployment detection (PRD WI-5)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-11T14:34:38.180Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-5152",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/tracker/jira-api.ts",
+            "tests/unit/lib/tracker/jira-api.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/tracker/jira-api.test.ts",
+            "npm run lint:effect-facades"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "jira-api.test.ts passes under fake timers",
+            "lint:effect-facades reports no new violations"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Creates a new file (jira-api.ts) and its own test; no other item edits them.",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-5 and decision D-16. Create JiraRestApi in src/lib/tracker/jira-api.ts: site normalization, apiPath (v3 cloud / v2 datacenter), Basic auth for cloud and Bearer for datacenter, AbortController + setTimeout 30 s timeout (never AbortSignal.timeout), 429 retry honoring Retry-After (default 5, cap 60, max 3 retries), 401/403 to TrackerAuthError with jiraCredentialFix(), 404 on an issue path to IssueNotFoundError, other non-2xx to TrackerError with method, path and status only. Add detectJiraDeployment with the .atlassian.net shortcut and a per-site cache of GET /rest/api/2/serverInfo. Never put the token, email or Authorization header in any message or log. Tests use vi.useFakeTimers and runtime-built fake tokens."
+        },
+        "items": [
+          {
+            "id": "wi5-jira-http-client.ac1",
+            "title": "Given a 429 with Retry-After: 2 followed by a 200, when request runs under vi.useFakeTimers, then the second fetch fires only after vi.advanceTimersByTimeAsync(2000) and the call returns the second body",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-jira-http-client.ac2",
+            "title": "Given a 401 response, when request runs, then it fails with TrackerAuthError whose message contains JIRA_API_TOKEN and does not contain the fake token value",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-jira-http-client.ac3",
+            "title": "Given deployment cloud, when request runs, then the request uses a Basic Authorization header and a /rest/api/3/ path; given datacenter, then it uses Bearer and /rest/api/2/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-jira-http-client.ac4",
+            "title": "Given a fetch that never settles, when vi.advanceTimersByTimeAsync(30000) runs, then the request aborts and fails with TrackerError",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-jira-http-client.ac5",
+            "title": "Given site https://x.atlassian.net, when detectJiraDeployment runs, then it returns cloud without any fetch; given serverInfo deploymentType Server, then it returns datacenter",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi6-jira-text-converters",
+        "title": "Add ADF and wiki-markup to and from Markdown converters (PRD WI-6)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T14:34:38.180Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-5152",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/tracker/jira-text.ts",
+            "tests/unit/lib/tracker/jira-text.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/tracker/jira-text.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "jira-text.test.ts passes"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Pure functions in a new file (jira-text.ts) with no imports from other plan items.",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-6 and checkpoint CP-2. Create pure functions adfToMarkdown, markdownToAdf, wikiToMarkdown and markdownToWiki in src/lib/tracker/jira-text.ts covering the node, mark and markup lists in the PRD. Unknown ADF nodes render their text children and never throw. markdownToAdf always returns {type:'doc', version:1, content:[...]} with at least one paragraph. No new npm dependency."
+        },
+        "items": [
+          {
+            "id": "wi6-jira-text-converters.ac1",
+            "title": "Given an ADF document containing every CP-2 node type, when adfToMarkdown runs, then it returns the golden Markdown string in the test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-jira-text-converters.ac2",
+            "title": "Given an ADF node of an unknown type with text children, when adfToMarkdown runs, then it renders the child text and does not throw",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-jira-text-converters.ac3",
+            "title": "Given a 6-line Markdown sample with a heading, list, code block and link, when it round-trips through markdownToAdf then adfToMarkdown, then the output equals the input",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-jira-text-converters.ac4",
+            "title": "Given the same sample, when it round-trips through markdownToWiki then wikiToMarkdown, then the output equals the input",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi7-jira-status-mapping",
+        "title": "Add Jira status-to-canonical mapping and transition choice (PRD WI-7)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T14:34:38.180Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5152",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/tracker/jira-status.ts",
+            "tests/unit/lib/tracker/jira-status.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/tracker/jira-status.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "jira-status.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-7 and decisions D-12, D-13 and D-14. Create jiraStatusMap (merge DEFAULT_STATE_MAPPINGS.jira.stateMap from src/core/state-mapping.ts with project status_map), jiraStatusToCanonical (name first, first CANONICAL_STATES key wins, then category new/indeterminate/done, then todo), pickJiraTransition (already, exact to.name, single-category fallback only for todo/in_progress/done, else no-transition with wanted and available), formatNoTransition, and the JiraTransition/JiraTransitionTarget/JiraTransitionOutcome types. WI-18 later adds trackerStateToJiraTarget to this file."
+        },
+        "items": [
+          {
+            "id": "wi7-jira-status-mapping.ac1",
+            "title": "Given status name In Review, when jiraStatusToCanonical runs with default map, then it returns in_review",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7-jira-status-mapping.ac2",
+            "title": "Given an unknown status name with category indeterminate, when jiraStatusToCanonical runs, then it returns in_progress",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7-jira-status-mapping.ac3",
+            "title": "Given status_map {in_review: 'Code Review'}, when the read maps Code Review and pickJiraTransition targets in_review, then the read returns in_review and the choice is the transition to Code Review",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7-jira-status-mapping.ac4",
+            "title": "Given target canceled and no transition to Canceled, when pickJiraTransition runs, then it returns no-transition and formatNoTransition lists every available transition name",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi7-jira-status-mapping.ac5",
+            "title": "Given two indeterminate transitions and no name match for target in_progress, when pickJiraTransition runs, then it returns no-transition",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi8-jira-adapter",
+        "title": "Implement JiraTracker and the createTracker jira case (PRD WI-8)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-11T14:34:38.180Z",
+        "metadata": {
+          "difficulty": "expert",
+          "kind": "backend",
+          "issueLabel": "pan-5152",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "wi9-jira-write-seam",
+            "wi10-dashboard-poller",
+            "wi15-planning-prompt-jira",
+            "wi16-work-agent-context-jira",
+            "wi17-discussions-jira",
+            "wi20-pan-issues-jira",
+            "wi28-generic-tracker-sites",
+            "wi29-gate-autostart-text"
+          ],
+          "files_scope": [
+            "src/lib/tracker/jira.ts",
+            "src/lib/tracker/factory.ts",
+            "src/lib/tracker/index.ts",
+            "tests/lib/tracker/jira.test.ts",
+            "tests/lib/tracker/factory.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/lib/tracker/jira.test.ts tests/lib/tracker/factory.test.ts",
+            "npm run lint:effect-facades"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "jira.test.ts passes for both cloud and datacenter",
+            "factory.test.ts passes",
+            "lint:effect-facades reports no new violations"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Creates jira.ts and edits factory.ts and tracker/index.ts, which no other item touches; all its inputs arrive through blocks edges.",
+          "traces": [
+            "FR-1",
+            "FR-7",
+            "FR-9",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-8, decisions D-3, D-4, D-5, D-10 and checkpoints CP-1 and CP-3. Create JiraTracker implementing every IssueTracker method plus transitionToCanonical, using JiraRestApi (WI-5), the converters (WI-6) and the status mapping (WI-7). Escape every JQL string value. Add case 'jira' to createTracker (key from config.project ?? config.team, project block from findProjectByTeam, per D-22), createJiraTrackerForProject(key, project) and createJiraTrackerForIssue(issueId) in factory.ts; export JiraTracker from src/lib/tracker/index.ts. Tests use a URL-routing stub fetch and describe.each over cloud and datacenter."
+        },
+        "items": [
+          {
+            "id": "wi8-jira-adapter.ac1",
+            "title": "Given a stub Jira returning one High-priority issue in status In Progress, when listIssues runs for each deployment, then the Issue has tracker jira, canonicalState in_progress, priority 2, parentRef, url <site>/browse/<key> and the expected JQL was sent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8-jira-adapter.ac2",
+            "title": "Given more than one page, when listIssues runs, then cloud follows nextPageToken and datacenter follows startAt until the limit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8-jira-adapter.ac3",
+            "title": "Given a workflow with a transition to In Review, when transitionToCanonical(key, 'in_review') runs, then it POSTs that transition id; given no match, then it resolves no-transition and sends no POST",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8-jira-adapter.ac4",
+            "title": "Given a PR URL, when linkPR runs, then it POSTs a remote link whose globalId equals the PR URL",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi8-jira-adapter.ac5",
+            "title": "Given createTracker({type: 'jira'}) with no token, when it runs, then it throws TrackerAuthError whose message names JIRA_API_TOKEN; and given createTracker({type: 'jira', team: 'PROJ'}) with a registered tracker: jira project PROJ whose jira.site is https://p.example, then the returned tracker sends requests to https://p.example (D-22)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi9-jira-write-seam",
+        "title": "Add the non-failing Jira write seam for transitions, comments and PR links (PRD WI-9)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T14:34:38.180Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5152",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "wi12-lifecycle-service-jira",
+            "wi13-close-out-jira",
+            "wi14-reopen-reset-jira",
+            "wi18-spawn-transition-jira",
+            "wi19-pan-done-jira"
+          ],
+          "files_scope": [
+            "src/lib/tracker/jira-lifecycle.ts",
+            "tests/unit/lib/tracker/jira-lifecycle.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/tracker/jira-lifecycle.test.ts",
+            "npm run lint:effect-facades"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "jira-lifecycle.test.ts passes",
+            "lint:effect-facades reports no new violations"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-8",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-9 and decision D-8. Create transitionJiraIssue, commentOnJiraIssue and linkJiraPullRequest in src/lib/tracker/jira-lifecycle.ts. Each resolves the project via resolveProjectFromIssueSync, builds the adapter with createJiraTrackerForProject, wraps Effect.runPromise in try/catch and never rejects. It returns a JiraWriteOutcome and logs exactly one [jira] line: warn for no-transition (formatNoTransition) and error, log for ok. Never log credentials."
+        },
+        "items": [
+          {
+            "id": "wi9-jira-write-seam.ac1",
+            "title": "Given an adapter that fails with TrackerError, when transitionJiraIssue runs, then the promise resolves {kind: 'error'} and does not reject",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi9-jira-write-seam.ac2",
+            "title": "Given a workflow with no matching transition, when transitionJiraIssue runs, then console.warn receives a [jira] line containing the wanted status and the available transition names",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi9-jira-write-seam.ac3",
+            "title": "Given a non-Jira issue id, when any seam function runs, then it resolves {kind: 'error', message: 'not a Jira issue'} without building an adapter",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi10-dashboard-poller",
+        "title": "Poll Jira issues into the dashboard read model (PRD WI-10)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T14:34:38.180Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-5152",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/jira-issue-poller.ts",
+            "src/dashboard/server/services/issue-data-service.ts",
+            "src/dashboard/server/services/poll-cadence.ts",
+            "src/dashboard/server/services/cache-service.ts",
+            "src/dashboard/server/services/__tests__/jira-issue-poller.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/services/__tests__/jira-issue-poller.test.ts",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "jira-issue-poller.test.ts passes",
+            "file-size guard passes with issue-data-service.ts at or under 1754 lines"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Only item editing poll-cadence.ts, cache-service.ts and the poller module; its shared issue-data-service.ts edit is ordered after wi1 by a blocks edge.",
+          "traces": [
+            "FR-4",
+            "NFR-1",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-10. Create fetchJiraDashboardIssues and formatJiraIssue in src/dashboard/server/services/jira-issue-poller.ts (per-project failures caught and logged). In issue-data-service.ts add 'jira' to every hard-coded tracker list at the PRD anchors, the jira spreads in computeIssues and getCachedTrackerIssues, start/invalidateTracker/scheduleNext cases, and a pollJira method of at most 15 lines. Add jira to poll-cadence.ts and cache-service.ts DEFAULT_TTLS and getStatus. issue-data-service.ts must stay at or under 1754 lines."
+        },
+        "items": [
+          {
+            "id": "wi10-dashboard-poller.ac1",
+            "title": "Given a stub Jira project with issues in In Progress and Code Review (status_map in_review: Code Review), when fetchJiraDashboardIssues runs, then it returns rows with source jira and canonicalStatus in_progress and in_review",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi10-dashboard-poller.ac2",
+            "title": "Given two Jira projects where one fails, when fetchJiraDashboardIssues runs, then it still returns the other project's rows and logs a [jira-poll] line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi10-dashboard-poller.ac3",
+            "title": "Given the edits, when `bash scripts/lint-file-size.sh` runs, then it exits 0 and `git grep -n \"'jira'\" -- src/dashboard/server/services/poll-cadence.ts src/dashboard/server/services/cache-service.ts` returns a match in each file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi11-tracker-status-jira",
+        "title": "Report Jira in tracker status and refresh routes (PRD WI-11)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T14:34:38.180Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-5152",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/misc/trackers.ts",
+            "tests/unit/dashboard/routes/tracker-status-jira.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/dashboard/routes/tracker-status-jira.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the tracker-status test passes with a jira entry"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-11. In src/dashboard/server/routes/misc/trackers.ts add invalidateTracker('jira') to POST /api/trackers/refresh, and jira entries to trackerEnvVars (JIRA_API_TOKEN), trackerNames (Jira), trackerHasProjects (any tracker: jira project) and the hasKey rule (token plus a site from jiraBaseUrl or a project jira.site). Put the test in new tests/unit/dashboard/routes/tracker-status-jira.test.ts."
+        },
+        "items": [
+          {
+            "id": "wi11-tracker-status-jira.ac1",
+            "title": "Given a tracker: jira project and a Jira token plus site, when GET /api/tracker-status runs, then configured includes {type: 'jira', name: 'Jira', hasKey: true}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi11-tracker-status-jira.ac2",
+            "title": "Given a Jira project with no token, when GET /api/tracker-status runs, then the jira entry has hasKey false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi12-lifecycle-service-jira",
+        "title": "Route dashboard lifecycle transitions and close for Jira through the seam (PRD WI-12)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T14:34:38.180Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5152",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/issue-lifecycle.ts",
+            "src/dashboard/server/services/__tests__/issue-lifecycle-jira.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/services/__tests__/issue-lifecycle-jira.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "issue-lifecycle-jira.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-12 and decision D-11. In src/dashboard/server/services/issue-lifecycle.ts add a jira branch before the rally branch in transitionTo and close that calls transitionJiraIssue via Effect.promise, with a private dashboardStateToJiraTarget mapper. This covers the merge handoff (merge-agent transitionIssueToVerifyingOnMain) so it can no longer throw for Jira. No workflow labels for Jira."
+        },
+        "items": [
+          {
+            "id": "wi12-lifecycle-service-jira.ac1",
+            "title": "Given resolveTrackerType returns jira, when transitionTo('PROJ-1', 'verifying_on_main') runs, then transitionJiraIssue receives ('PROJ-1', 'verifying_on_main') and no Linear client method is called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi12-lifecycle-service-jira.ac2",
+            "title": "Given the seam resolves {kind: 'error'}, when transitionTo or close runs, then the Effect succeeds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi12-lifecycle-service-jira.ac3",
+            "title": "Given close('PROJ-1'), when it runs, then transitionJiraIssue receives target done; and transitionTo with in_planning passes in_planning",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi13-close-out-jira",
+        "title": "Close-out moves the Jira issue to Done, links the PR and posts the close comment (PRD WI-13)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T14:34:38.180Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5152",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/lifecycle/close-issue.ts",
+            "src/lib/lifecycle/types.ts",
+            "src/lib/overdeck/issue-close-out.ts",
+            "tests/unit/lib/lifecycle/close-issue-jira.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/lifecycle/close-issue-jira.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "close-issue-jira.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-13 and decision D-9. In closeViaDirect (src/lib/lifecycle/close-issue.ts) add the Jira branch before `// Try Linear`: link the PR, transition to done, post the close comment with the PR URL, and always return an ok step. Add prUrl?: string to LifecycleContext if absent and populate it in issue-close-out.ts from the merged PR URL close-out already reads; include jira in the cache invalidation and keep Jira ids off the Linear-only paths."
+        },
+        "items": [
+          {
+            "id": "wi13-close-out-jira.ac1",
+            "title": "Given a Jira issue PROJ-7 with prUrl, when closeViaDirect runs, then linkJiraPullRequest, transitionJiraIssue('PROJ-7', 'done') and commentOnJiraIssue run in that order and the comment contains the PR URL",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi13-close-out-jira.ac2",
+            "title": "Given the seam returns error or no-transition, when closeViaDirect runs, then it returns an ok close step whose message starts with Jira:",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi13-close-out-jira.ac3",
+            "title": "Given a Jira issue, when closeViaDirect runs, then the Linear SDK is never imported",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi14-reopen-reset-jira",
+        "title": "Reopen, reset-to-todo and cancel for Jira issues (PRD WI-14)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T14:34:38.180Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5152",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/lifecycle/workflows.ts",
+            "src/lib/overdeck/issue-transitions.ts",
+            "src/cli/commands/reopen.ts",
+            "src/cli/commands/reopen-jira.ts",
+            "tests/cli/commands/reopen-tracker-routing.test.ts",
+            "tests/unit/lib/lifecycle/workflows-jira-reset.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/cli/commands/reopen-tracker-routing.test.ts tests/unit/lib/lifecycle/workflows-jira-reset.test.ts",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "both test files pass",
+            "file-size guard passes with workflows.ts at or under 1160 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-14. Add Jira branches before the Linear fallthroughs in resetIssueToTodoImpl (target todo) and resetIssueToCanceledImpl (target canceled) in workflows.ts; a Jira issueSource in issue-transitions.ts with reopen to verifying_on_main or todo and jira in cache invalidation; a jira branch in src/cli/commands/reopen.ts that calls reopenJiraIssueCommand from new src/cli/commands/reopen-jira.ts; update the supported-trackers text to github, linear, jira."
+        },
+        "items": [
+          {
+            "id": "wi14-reopen-reset-jira.ac1",
+            "title": "Given a Jira issue, when the workflows.ts reset-to-To-Do step runs, then transitionJiraIssue receives the To Do canonical target; and resetIssueToCanceledImpl passes canceled",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi14-reopen-reset-jira.ac2",
+            "title": "Given resolveTrackerType returns jira, when `pan reopen` routing runs, then the Jira reopen runs and the Linear reopen never runs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi14-reopen-reset-jira.ac3",
+            "title": "Given the edits, when `bash scripts/lint-file-size.sh` runs, then it exits 0 with workflows.ts at most 1160 lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi15-planning-prompt-jira",
+        "title": "Load Jira issue title, Markdown description and comments into planning (PRD WI-15)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T14:34:38.180Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5152",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/planning-sessions.ts",
+            "src/lib/overdeck/__tests__/start-planning-jira.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/overdeck/__tests__/start-planning-jira.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "start-planning-jira.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-15. In startPlanningForIssue add a Jira branch before the rally branch (planning-sessions.ts:287) that fetches title, Markdown description, comments (caught) and epic children through createJiraTrackerForProject and never falls through to Linear; a failed getIssue returns the same error shape as the GitHub branch. In the abort path call transitionJiraIssue(id, 'todo'). Put the test in new src/lib/overdeck/__tests__/start-planning-jira.test.ts, reusing the mocks of start-planning-harness-gate.test.ts."
+        },
+        "items": [
+          {
+            "id": "wi15-planning-prompt-jira.ac1",
+            "title": "Given a Jira issue whose description is ADF heading plus paragraph, when startPlanningForIssue runs, then the issue passed to spawnPlanningSession has source jira, the Jira summary as title and a description starting with \"# \"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi15-planning-prompt-jira.ac2",
+            "title": "Given a Jira getIssue failure, when startPlanningForIssue runs, then it returns the could-not-load error and no Linear client method is called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi16-work-agent-context-jira",
+        "title": "Include the Jira issue in the work-agent tracker context (PRD WI-16)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T14:34:38.180Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5152",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/work-agent-prompt.ts",
+            "tests/lib/cloister/work-agent-prompt.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/lib/cloister/work-agent-prompt.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the getTrackerContext test passes with the Jira case"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-16. In getTrackerContext (work-agent-prompt.ts:175), before the primary/secondary loop and before the `!trackersConfig` early return, use the project's Jira tracker (createJiraTrackerForProject) as the only tracker when resolveTrackerType returns jira. Apply the same project-first rule at :361 and :401 only if those sites fetch the issue."
+        },
+        "items": [
+          {
+            "id": "wi16-work-agent-context-jira.ac1",
+            "title": "Given a Jira issue with an ADF description and no global [trackers] section, when getTrackerContext runs, then the returned context contains the issue title and the Markdown description",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi16-work-agent-context-jira.ac2",
+            "title": "Given a non-Jira issue, when getTrackerContext runs, then it still tries the global primary tracker first (existing test cases still pass)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi17-discussions-jira",
+        "title": "Show Jira comments in the issue view Discussions tab (PRD WI-17)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T14:34:38.180Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5152",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/discussions.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/queries.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/DiscussionsTab.tsx",
+            "tests/unit/dashboard/server/routes/issue-discussions.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/dashboard/server/routes/issue-discussions.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the discussions test passes with the Jira case"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-17. Add a jiraTask to fetchIssueDiscussions that returns Jira comments as items with source jira; use resolveGitHubPullRequestRepo for the PR-thread repo lookup so Jira projects still load PR threads. Add 'jira' to DiscussionSource (queries.ts) and a jira case in DiscussionsTab.tsx with the linear badge style and label Jira."
+        },
+        "items": [
+          {
+            "id": "wi17-discussions-jira.ac1",
+            "title": "Given a Jira issue with two comments, when fetchIssueDiscussions runs, then it returns two items with source jira and Markdown bodies",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi17-discussions-jira.ac2",
+            "title": "Given a Jira project with github_repo and an open PR, when fetchIssueDiscussions runs, then PR thread items are still included",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi18-spawn-transition-jira",
+        "title": "Move the Jira issue on agent spawn instead of writing to GitHub (PRD WI-18)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T14:34:38.180Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5152",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/spawn-prep.ts",
+            "src/lib/tracker/jira-status.ts",
+            "tests/unit/lib/agents/spawn-prep-jira.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/agents/spawn-prep-jira.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "spawn-prep-jira.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-18. Add trackerStateToJiraTarget (D-10 mapping) to src/lib/tracker/jira-status.ts. In transitionIssueState (spawn-prep.ts:564) add the tracker === jira branch before `if (projectConfig.github_repo)` that calls transitionJiraIssue and returns."
+        },
+        "items": [
+          {
+            "id": "wi18-spawn-transition-jira.ac1",
+            "title": "Given a tracker: jira project with github_repo, when transitionIssueState(issue, 'in_progress') runs, then transitionJiraIssue receives target in_progress and createTracker is never called with type github",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi18-spawn-transition-jira.ac2",
+            "title": "Given the tracker IssueState closed, when trackerStateToJiraTarget runs, then it returns done",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi19-pan-done-jira",
+        "title": "pan done links the PR, moves the Jira issue to In Review and posts the comment (PRD WI-19)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T14:34:38.180Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5152",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/done.ts",
+            "src/cli/commands/done-jira.ts",
+            "tests/cli/commands/done-jira.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/cli/commands/done-jira.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "done-jira.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-19 and decision D-9. Create updateJiraToInReview(issueId, prUrls, comment?) in src/cli/commands/done-jira.ts (link each PR, transition in_review, comment with the Linear agent-completed text when given). In done.ts add the Jira branch first at the tracker-update ternary (:425) and a Jira branch in refuseIfIssueClosed that refuses on done/canceled and warns but continues on a Jira read error."
+        },
+        "items": [
+          {
+            "id": "wi19-pan-done-jira.ac1",
+            "title": "Given PROJ-3 with one PR and a comment, when updateJiraToInReview runs, then linkJiraPullRequest, transitionJiraIssue('PROJ-3', 'in_review') and commentOnJiraIssue run and the comment starts with the agent-completed text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi19-pan-done-jira.ac2",
+            "title": "Given the seam returns error, when updateJiraToInReview runs, then it returns false and does not throw",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi19-pan-done-jira.ac3",
+            "title": "Given a Jira issue whose canonical state is done, when refuseIfIssueClosed runs, then it returns a refusal; given a Jira read error, then it returns null and prints a Could not verify Jira state warning",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi20-pan-issues-jira",
+        "title": "pan issues lists Jira issues and --tracker accepts jira (PRD WI-20)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T14:34:38.180Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5152",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/issues.ts",
+            "src/cli/index.ts",
+            "packages/contracts/src/composer-commands.generated.ts",
+            "tests/cli/commands/issues-jira.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/cli/commands/issues-jira.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the pan issues test passes with the Jira case",
+            "composer-commands.generated.ts is regenerated by the repo generator"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-20. In src/cli/commands/issues.ts accept jira in the valid list and message, push jira from getConfiguredTrackers when any project has tracker: jira, and list per Jira project via createJiraTrackerForProject. Fix the stale header comment. Update the --tracker help text in src/cli/index.ts:243 and regenerate composer-commands.generated.ts with the generator found via `git grep -n \"composer-commands.generated\" -- package.json scripts`."
+        },
+        "items": [
+          {
+            "id": "wi20-pan-issues-jira.ac1",
+            "title": "Given two Jira projects, when `pan issues --tracker jira` runs, then it prints both projects' refs under a JIRA header",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi20-pan-issues-jira.ac2",
+            "title": "Given --tracker trello, when pan issues runs, then it prints Valid trackers: linear, github, gitlab, rally, jira",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi21-doctor-jira",
+        "title": "pan doctor checks Jira credentials once per site (PRD WI-21)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T14:34:38.180Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5152",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/doctor-jira.ts",
+            "src/cli/commands/doctor.ts",
+            "src/cli/commands/doctor-project-config.ts",
+            "tests/cli/commands/doctor-jira.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/cli/commands/doctor-jira.test.ts",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "doctor-jira.test.ts passes",
+            "file-size guard passes with doctor.ts at or under 1000 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-21. Create checkJiraCredentials in src/cli/commands/doctor-jira.ts with injectable deps: [] with no Jira project; one GET myself per distinct site; ok, error (missing or rejected credentials, fix = jiraCredentialFix()) or warn (unreachable) rows. In doctor.ts push its rows next to checkProjectTrackerConfig (:843) and add jira to the lists at :329 and :342 (at most +3 lines). Update the doctor-project-config.ts fix text."
+        },
+        "items": [
+          {
+            "id": "wi21-doctor-jira.ac1",
+            "title": "Given a Jira site that returns 401, when checkJiraCredentials runs, then it returns one row with status error whose fix contains JIRA_API_TOKEN and Settings",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi21-doctor-jira.ac2",
+            "title": "Given a site whose myself call succeeds, when checkJiraCredentials runs, then it returns an ok row containing the display name",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi21-doctor-jira.ac3",
+            "title": "Given no tracker: jira project, when checkJiraCredentials runs, then it returns an empty array and makes no request",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi22-cli-project-jira",
+        "title": "pan project add accepts --tracker jira and --jira-site; list and show print Jira (PRD WI-22)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T14:34:38.180Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5152",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/project.ts",
+            "src/cli/commands/admin/migrate-plan-home.ts",
+            "packages/contracts/src/composer-commands.generated.ts",
+            "tests/unit/cli/project-commands.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/cli/project-commands.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the pan project add test passes with the Jira case"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-22 and decision D-18. Add --tracker <type> (jira only, others rejected with the PRD message) and --jira-site <url> to pan project add; write tracker: jira and jira.site in the extras block; print Jira in list and show; make migrate-plan-home.ts resolve jira projects. Regenerate composer-commands.generated.ts."
+        },
+        "items": [
+          {
+            "id": "wi22-cli-project-jira.ac1",
+            "title": "Given `pan project add <path> --tracker jira --jira-site https://acme.atlassian.net`, when it runs, then projects.yaml persists tracker: jira and jira.site https://acme.atlassian.net",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi22-cli-project-jira.ac2",
+            "title": "Given --tracker linear, when pan project add runs, then it rejects with Only --tracker jira is supported",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi23-settings-jira-rows",
+        "title": "Settings Tracker Keys section shows Jira token, email and site rows (PRD WI-23)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T14:34:38.180Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5152",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/settingsPageConstants.ts",
+            "src/dashboard/frontend/src/components/Settings/types.ts",
+            "src/dashboard/frontend/src/components/Settings/sections/TrackerKeysSection.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/TrackerKeysSection.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "cd src/dashboard/frontend && npx vitest run src/components/Settings/sections/TrackerKeysSection.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "TrackerKeysSection.test.tsx passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-23 and decision D-17. Widen the settings TrackerType to TrackerKeyId with jira, jira_email and jira_base_url; add the three TRACKERS rows with lucide icons KeyRound, Mail and Globe and a secret flag (false for email and site); extend TrackerKeysConfig; render email and site inputs as type text. Browser UAT must use an isolated Playwright browser context, never a shared profile."
+        },
+        "items": [
+          {
+            "id": "wi23-settings-jira-rows.ac1",
+            "title": "Given the Settings Tracker Keys section, when it renders, then it shows rows named Jira API token, Jira account email and Jira site URL",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi23-settings-jira-rows.ac2",
+            "title": "Given the Jira site URL row, when the operator types a URL, then onSettingsChange receives tracker_keys.jira_base_url with that value and the input has type text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi23-settings-jira-rows.ac3",
+            "title": "Given an isolated Playwright browser context, when it opens /settings#tracker-keys, then the screenshot shows the three Jira rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi24-dashboard-jira-labels",
+        "title": "Kanban cards, shadow badge tooltip and search filter name Jira (PRD WI-24)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T14:34:38.180Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5152",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/KanbanBoard/cards/KanbanCards.tsx",
+            "src/dashboard/frontend/src/components/KanbanBoard/badges/TrackerShadowBadges.tsx",
+            "src/dashboard/frontend/src/components/search/SearchModal.tsx",
+            "src/dashboard/frontend/src/components/KanbanBoard/cards/KanbanCards.jira.test.tsx",
+            "src/dashboard/frontend/src/components/search/SearchModal.test.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "cd src/dashboard/frontend && npx vitest run src/components/KanbanBoard/cards/KanbanCards.jira.test.tsx src/components/search/SearchModal.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the KanbanCards and SearchModal tests pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-24. Add the jira case to the KanbanCards trackerRef ternary (Jira <identifier>), make the TrackerShadowBadges tooltip prefix follow the issue source (pass source from its caller), and add jira to the SearchModal source toggles. Leave BadgeBar.tsx and FeatureItem.tsx unchanged."
+        },
+        "items": [
+          {
+            "id": "wi24-dashboard-jira-labels.ac1",
+            "title": "Given an issue with source jira and identifier PROJ-1, when the kanban card renders, then it shows Jira PROJ-1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi24-dashboard-jira-labels.ac2",
+            "title": "Given the search modal, when it renders, then a Jira source toggle is present",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi24-dashboard-jira-labels.ac3",
+            "title": "Given a jira issue with rawTrackerState In Progress, when TrackerShadowBadges renders, then its tooltip starts with Jira:",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi25-add-project-dialog",
+        "title": "Add-project dialog offers Jira as the issue tracker with a site URL (PRD WI-25)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T14:34:38.180Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5152",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/projects/create.ts",
+            "src/lib/projects/create-perform.ts",
+            "src/dashboard/frontend/src/components/project/new/ProjectCreateForm.tsx",
+            "src/dashboard/frontend/src/components/project/new/useProjectCreateIntent.ts",
+            "src/dashboard/frontend/src/components/project/new/projectCreateTypes.ts",
+            "src/dashboard/server/routes/projects.ts",
+            "tests/unit/lib/projects/create-perform.test.ts",
+            "src/dashboard/frontend/src/components/project/new/ProjectCreateForm.jira.test.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/projects/create-perform.test.ts",
+            "cd src/dashboard/frontend && npx vitest run src/components/project/new/ProjectCreateForm.jira.test.tsx",
+            "bash scripts/lint-file-size.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the create-perform test passes with the Jira case",
+            "file-size guard passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-25 and decision D-18. Add tracker?: 'jira' and jiraSite to ProjectCreateInput with jira-site-invalid validation; write tracker: jira and jira.site in create-perform.ts after the provider block so github_repo is still written; add the Issue tracker select and Jira site URL field to ProjectCreateForm.tsx; pass both fields through useProjectCreateIntent.ts, projectCreateTypes.ts and, if it whitelists body fields, src/dashboard/server/routes/projects.ts. Browser UAT must use an isolated Playwright context."
+        },
+        "items": [
+          {
+            "id": "wi25-add-project-dialog.ac1",
+            "title": "Given a create intent with provider github, tracker jira and jiraSite, when create-perform builds extras, then it writes tracker jira, jira.site and github_repo together",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi25-add-project-dialog.ac2",
+            "title": "Given jiraSite not-a-url, when the resolver runs, then it emits finding jira-site-invalid on field jiraSite",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi25-add-project-dialog.ac3",
+            "title": "Given the Add-project form, when the operator selects Jira, then the Jira site URL field renders and the create request body includes tracker jira",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi25-add-project-dialog.ac4",
+            "title": "Given an isolated Playwright browser context on /projects/new?mode=existing, when Jira is selected, then the screenshot shows the Jira site URL field",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi28-generic-tracker-sites",
+        "title": "Generic tracker-construction sites resolve Jira projects (PRD WI-28)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T14:34:38.180Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5152",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/issue-title-fallback.ts",
+            "src/lib/cloister/auto-merge-eligibility.ts",
+            "src/lib/overdeck/derived-issue-state.ts",
+            "src/dashboard/server/services/__tests__/issue-title-fallback.test.ts",
+            "src/lib/cloister/__tests__/auto-merge-labels-tracker.test.ts",
+            "tests/unit/lib/pipeline-membership-gather.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/services/__tests__/issue-title-fallback.test.ts src/lib/cloister/__tests__/auto-merge-labels-tracker.test.ts tests/unit/lib/pipeline-membership-gather.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the three test files pass with their Jira cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-28 and decision D-22. Add narrow jira branches using createJiraTrackerForIssue(issueId) in issue-title-fallback.ts trackerForIssue, auto-merge-eligibility.ts readTrackerIssueLabels (instead of createTrackerFromConfig, which throws for jira) and derived-issue-state.ts (try Jira first when resolveTrackerType returns jira). pipeline-membership-gather.ts needs no edit; prove it with a test."
+        },
+        "items": [
+          {
+            "id": "wi28-generic-tracker-sites.ac1",
+            "title": "Given an aged-out Jira issue, when issue-title-fallback resolves it, then it builds a Jira tracker and returns the Jira title",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi28-generic-tracker-sites.ac2",
+            "title": "Given a tracker: jira project, when readTrackerIssueLabels runs, then it returns the Jira labels and does not throw No configuration found for tracker: jira",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi28-generic-tracker-sites.ac3",
+            "title": "Given a tracker: jira project with issue_prefix PROJ, when pipeline membership gathers, then the member ids equal the Jira keys (PROJ-n)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi29-gate-autostart-text",
+        "title": "Test-requirement gate and auto-start read the Jira issue body (PRD WI-29)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T14:34:38.180Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5152",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/work/test-requirement-gate.ts",
+            "src/cli/commands/start.ts",
+            "src/lib/work/__tests__/test-requirement-gate.test.ts",
+            "tests/cli/commands/start-autostart-jira.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/work/__tests__/test-requirement-gate.test.ts tests/cli/commands/start-autostart-jira.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "both test files pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-29. In fetchIssueBodyForGate (test-requirement-gate.ts:135) add a jira branch after the GitHub branch and before the Linear lookup that returns the Markdown description (errors map to TrackerFetchError). In fetchIssueForAutoStart (start.ts:238) add a jira branch before isLinearIssue that returns title, body and url, falling back to the existing empty-body result on error; export the function for the test if needed."
+        },
+        "items": [
+          {
+            "id": "wi29-gate-autostart-text.ac1",
+            "title": "Given a Jira id, when fetchIssueBodyForGate runs, then it returns the Jira Markdown description and no Linear module is imported",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi29-gate-autostart-text.ac2",
+            "title": "Given PROJ-4, when fetchIssueForAutoStart runs, then it returns the Jira title and body; given a Jira read error, then it returns title PROJ-4 and an empty body",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi26-docs-jira-section",
+        "title": "Document Jira setup, configuration, mapping and limits in issue-trackers.mdx (PRD WI-26)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T14:34:38.180Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-5152",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/issue-trackers.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n \"## Jira Integration\" configuration/issue-trackers.mdx",
+            "grep -n \"### Setup (Jira Cloud)\\|### Setup (Jira Data Center)\" configuration/issue-trackers.mdx"
+          ],
+          "expected_outputs": [
+            "one ## Jira Integration heading is printed",
+            "both setup headings are printed"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-26. Update the frontmatter description, the Supported Trackers table, the env block, the ID-format row and the tracker row; add the ## Jira Integration section between the Rally section and ## Unified Dashboard with the eight subsections listed in the PRD. The status-mapping table must match DEFAULT_STATE_MAPPINGS.jira in src/core/state-mapping.ts, and the config keys must match JiraProjectConfig and the tracker_keys names."
+        },
+        "items": [
+          {
+            "id": "wi26-docs-jira-section.ac1",
+            "title": "Given the updated page, when `grep -n \"## Jira Integration\" configuration/issue-trackers.mdx` runs, then it prints exactly one line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi26-docs-jira-section.ac2",
+            "title": "Given the Jira section, when it is read, then it contains ### Setup (Jira Cloud) naming JIRA_API_TOKEN, JIRA_EMAIL and JIRA_BASE_URL, and ### Setup (Jira Data Center) stating the personal access token is sent as a Bearer token",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi26-docs-jira-section.ac3",
+            "title": "Given the Status mapping subsection, when compared with DEFAULT_STATE_MAPPINGS.jira, then each canonical state shows the same default Jira status name",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi27-docs-tracker-lists",
+        "title": "List Jira in every doc that enumerates trackers and add the changelog entry (PRD WI-27)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T14:34:38.180Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5152",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "concepts.mdx",
+            "cli/overview.mdx",
+            "configuration/projects.mdx",
+            "configuration/setup-wizard.mdx",
+            "introduction.mdx",
+            "docs/USAGE.md",
+            "docs/KANBAN-MODEL.md",
+            "docs/WORKSPACES-AND-PROJECTS.md",
+            "changelog.mdx",
+            ".overdeck/context/codebase/architecture.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "git grep -n -i \"rally\" -- configuration/issue-trackers.mdx concepts.mdx cli/overview.mdx",
+            "git grep -n -i \"jira\" -- concepts.mdx cli/overview.mdx changelog.mdx docs/KANBAN-MODEL.md"
+          ],
+          "expected_outputs": [
+            "every tracker enumeration that names Rally also names Jira",
+            "Jira appears in each listed file"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD WI-27 exactly: concepts.mdx (5 trackers plus a Jira bullet), cli/overview.mdx:31, configuration/projects.mdx (tracker row, jira field row, :727), configuration/setup-wizard.mdx menu, introduction.mdx:93 and :118, docs/USAGE.md env line and table row, docs/KANBAN-MODEL.md Jira column and implications line, docs/WORKSPACES-AND-PROJECTS.md registration sentence, the changelog.mdx #### New bullet under the top Update entry, and architecture.md tracker sentence (last-verified line unchanged)."
+        },
+        "items": [
+          {
+            "id": "wi27-docs-tracker-lists.ac1",
+            "title": "Given the docs sweep, when `git grep -n -i \"rally\" -- configuration/issue-trackers.mdx concepts.mdx cli/overview.mdx` runs, then every line that enumerates trackers also names Jira",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi27-docs-tracker-lists.ac2",
+            "title": "Given concepts.mdx, when it is read, then it says Overdeck integrates with 5 issue trackers and lists Jira (Cloud and Data Center)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi27-docs-tracker-lists.ac3",
+            "title": "Given changelog.mdx, when the top Update entry is read, then its #### New section contains a Jira as an issue tracker bullet linking /configuration/issue-trackers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi27-docs-tracker-lists.ac4",
+            "title": "Given docs/KANBAN-MODEL.md, when the canonical mapping table is read, then it has a Jira (defaults) column matching DEFAULT_STATE_MAPPINGS.jira",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "wi1-jira-types",
+        "to": "wi2-jira-credentials",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-jira-types",
+        "to": "wi3-jira-routing",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-jira-types",
+        "to": "wi5-jira-http-client",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-jira-types",
+        "to": "wi7-jira-status-mapping",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-jira-types",
+        "to": "wi8-jira-adapter",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-jira-types",
+        "to": "wi10-dashboard-poller",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-jira-types",
+        "to": "wi15-planning-prompt-jira",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-jira-types",
+        "to": "wi22-cli-project-jira",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-jira-types",
+        "to": "wi25-add-project-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "wi2-jira-credentials",
+        "to": "wi8-jira-adapter",
+        "type": "blocks"
+      },
+      {
+        "from": "wi2-jira-credentials",
+        "to": "wi11-tracker-status-jira",
+        "type": "blocks"
+      },
+      {
+        "from": "wi2-jira-credentials",
+        "to": "wi21-doctor-jira",
+        "type": "blocks"
+      },
+      {
+        "from": "wi2-jira-credentials",
+        "to": "wi23-settings-jira-rows",
+        "type": "blocks"
+      },
+      {
+        "from": "wi5-jira-http-client",
+        "to": "wi8-jira-adapter",
+        "type": "blocks"
+      },
+      {
+        "from": "wi5-jira-http-client",
+        "to": "wi21-doctor-jira",
+        "type": "blocks"
+      },
+      {
+        "from": "wi6-jira-text-converters",
+        "to": "wi8-jira-adapter",
+        "type": "blocks"
+      },
+      {
+        "from": "wi7-jira-status-mapping",
+        "to": "wi8-jira-adapter",
+        "type": "blocks"
+      },
+      {
+        "from": "wi7-jira-status-mapping",
+        "to": "wi18-spawn-transition-jira",
+        "type": "blocks"
+      },
+      {
+        "from": "wi8-jira-adapter",
+        "to": "wi9-jira-write-seam",
+        "type": "blocks"
+      },
+      {
+        "from": "wi8-jira-adapter",
+        "to": "wi10-dashboard-poller",
+        "type": "blocks"
+      },
+      {
+        "from": "wi8-jira-adapter",
+        "to": "wi15-planning-prompt-jira",
+        "type": "blocks"
+      },
+      {
+        "from": "wi8-jira-adapter",
+        "to": "wi16-work-agent-context-jira",
+        "type": "blocks"
+      },
+      {
+        "from": "wi8-jira-adapter",
+        "to": "wi17-discussions-jira",
+        "type": "blocks"
+      },
+      {
+        "from": "wi8-jira-adapter",
+        "to": "wi20-pan-issues-jira",
+        "type": "blocks"
+      },
+      {
+        "from": "wi3-jira-routing",
+        "to": "wi9-jira-write-seam",
+        "type": "blocks"
+      },
+      {
+        "from": "wi3-jira-routing",
+        "to": "wi12-lifecycle-service-jira",
+        "type": "blocks"
+      },
+      {
+        "from": "wi3-jira-routing",
+        "to": "wi13-close-out-jira",
+        "type": "blocks"
+      },
+      {
+        "from": "wi3-jira-routing",
+        "to": "wi14-reopen-reset-jira",
+        "type": "blocks"
+      },
+      {
+        "from": "wi3-jira-routing",
+        "to": "wi15-planning-prompt-jira",
+        "type": "blocks"
+      },
+      {
+        "from": "wi3-jira-routing",
+        "to": "wi16-work-agent-context-jira",
+        "type": "blocks"
+      },
+      {
+        "from": "wi3-jira-routing",
+        "to": "wi17-discussions-jira",
+        "type": "blocks"
+      },
+      {
+        "from": "wi3-jira-routing",
+        "to": "wi19-pan-done-jira",
+        "type": "blocks"
+      },
+      {
+        "from": "wi9-jira-write-seam",
+        "to": "wi12-lifecycle-service-jira",
+        "type": "blocks"
+      },
+      {
+        "from": "wi9-jira-write-seam",
+        "to": "wi13-close-out-jira",
+        "type": "blocks"
+      },
+      {
+        "from": "wi9-jira-write-seam",
+        "to": "wi14-reopen-reset-jira",
+        "type": "blocks"
+      },
+      {
+        "from": "wi9-jira-write-seam",
+        "to": "wi15-planning-prompt-jira",
+        "type": "blocks"
+      },
+      {
+        "from": "wi9-jira-write-seam",
+        "to": "wi18-spawn-transition-jira",
+        "type": "blocks"
+      },
+      {
+        "from": "wi9-jira-write-seam",
+        "to": "wi19-pan-done-jira",
+        "type": "blocks"
+      },
+      {
+        "from": "wi10-dashboard-poller",
+        "to": "wi11-tracker-status-jira",
+        "type": "blocks"
+      },
+      {
+        "from": "wi20-pan-issues-jira",
+        "to": "wi22-cli-project-jira",
+        "type": "blocks"
+      },
+      {
+        "from": "wi4-prefix-collision-message",
+        "to": "wi25-add-project-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "wi8-jira-adapter",
+        "to": "wi28-generic-tracker-sites",
+        "type": "blocks"
+      },
+      {
+        "from": "wi3-jira-routing",
+        "to": "wi28-generic-tracker-sites",
+        "type": "blocks"
+      },
+      {
+        "from": "wi8-jira-adapter",
+        "to": "wi29-gate-autostart-text",
+        "type": "blocks"
+      },
+      {
+        "from": "wi3-jira-routing",
+        "to": "wi29-gate-autostart-text",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

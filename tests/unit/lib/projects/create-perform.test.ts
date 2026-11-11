@@ -481,6 +481,24 @@ describe('performProjectCreate — partial registration is repairable, not stran
     expect(config?.workspace?.default_branch).toBe('main');
     expect(config?.issue_prefix).toBe('WIDGET');
   });
+
+  it('writes tracker: jira and jira.site next to the detected github_repo (PAN-5152)', async () => {
+    const parent = join(TEST_HOME, 'jira');
+    mkdirSync(parent, { recursive: true });
+    const intent = { ...(await cloneIntentInto(parent)), tracker: 'jira' as const, jiraSite: 'https://acme.atlassian.net' };
+    const child = armCloneChild();
+
+    const running = performProjectCreate(intent);
+    await vi.waitFor(() => expect(spawnMock).toHaveBeenCalled());
+    child.emit('close', 0);
+    await running;
+
+    const config = getProjectSync('widget');
+    expect(config?.tracker).toBe('jira');
+    expect(config?.jira).toEqual({ site: 'https://acme.atlassian.net' });
+    expect(config?.github_repo).toBe('acme/widget');
+    expect(config?.issue_prefix).toBe('WIDGET');
+  });
 });
 
 describe('performProjectCreate — multi-repo project (PAN-4281 WI-3)', () => {

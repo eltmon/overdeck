@@ -30,6 +30,7 @@ const postTrackersRefreshRoute = HttpRouter.add(
         svc.invalidateTracker('linear'),
         svc.invalidateTracker('github'),
         svc.invalidateTracker('rally'),
+        svc.invalidateTracker('jira'),
       ]);
       return jsonResponse({ success: true });
     }    catch (error: unknown) {
@@ -54,6 +55,7 @@ const getTrackerStatusRoute = HttpRouter.add(
         github: 'GITHUB_TOKEN',
         gitlab: 'GITLAB_TOKEN',
         rally: 'RALLY_API_KEY',
+        jira: 'JIRA_API_TOKEN',
       };
 
       const trackerNames: Record<string, string> = {
@@ -61,6 +63,7 @@ const getTrackerStatusRoute = HttpRouter.add(
         github: 'GitHub',
         gitlab: 'GitLab',
         rally: 'Rally',
+        jira: 'Jira',
       };
 
       const configured: Array<{
@@ -79,9 +82,15 @@ const getTrackerStatusRoute = HttpRouter.add(
         github: cfgs.some(c => !!c.github_repo),
         rally: cfgs.some(c => !!c.rally_project),
         gitlab: cfgs.some(c => !!c.gitlab_repo),
+        jira: cfgs.some(c => c.tracker === 'jira'),
       };
 
       const trackersToCheck = [primary, secondary].filter(Boolean) as string[];
+      // PAN-5152: Jira is configured per project, never as the global primary.
+      if (trackerHasProjects.jira && !trackersToCheck.includes('jira')) trackersToCheck.push('jira');
+      const jiraKeys = yamlConfig.config?.trackerKeys;
+      const jiraHasKey = !!(jiraKeys?.jira && (jiraKeys.jiraBaseUrl
+        || cfgs.some(c => c.tracker === 'jira' && !!(c.jira as { site?: string } | undefined)?.site)));
       for (const trackerType of trackersToCheck) {
         // Skip trackers that no project uses
         if (trackerHasProjects[trackerType] === false) continue;
@@ -98,7 +107,7 @@ const getTrackerStatusRoute = HttpRouter.add(
         configured.push({
           type: trackerType,
           name: trackerNames[trackerType] || trackerType,
-          hasKey: hasEnvKey || hasConfigKey || hasEnvFileKey,
+          hasKey: trackerType === 'jira' ? jiraHasKey : hasEnvKey || hasConfigKey || hasEnvFileKey,
           envVar,
           isPrimary: trackerType === primary,
         });

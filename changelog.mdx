@@ -15,6 +15,10 @@ This page starts at v0.60.0, the release that removed Overdeck's state layer. Ol
 
   Drafted from the changes merged to `main` since v0.78.0. The date is set when the release is tagged.
 
+  #### New
+
+  - **Jira as an issue tracker:** projects with `tracker: jira` show Jira issues on the board and move them through the Jira workflow from start to close-out. See [Issue trackers](/configuration/issue-trackers).
+
   #### Fixed
 
   - **Polyrepo CI test verdicts are read for the member repo's head:** in a polyrepo project with `verification.tests: ci`, the verification gate looked up the CI test result under the wrapper repo's HEAD, which no PR points at, so a red CI test job never failed the `test` gate and verification passed on typecheck and lint alone. It now reads the verdict for the primary member repo's head, both at the start of the run and after an agent commit moves it. Standalone projects are unchanged. ([#4624](https://github.com/eltmon/overdeck/issues/4624))

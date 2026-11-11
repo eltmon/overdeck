@@ -43,6 +43,7 @@ import { commitPendingIssueArtifacts, commitPlanArtifacts, planArtifactCommitMes
 
 export { commitPendingIssueArtifacts };
 import { linkCreatedPullRequestToIssueConversations } from '../../lib/overdeck/conversation-pull-requests.js';
+import { refuseIfJiraIssueClosed, updateJiraToInReview } from './done-jira.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -146,7 +147,8 @@ async function updateGitHubToInReview(issueId: string, comment?: string): Promis
 
 /** Refuse a done on an issue the tracker already closed. */
 async function refuseIfIssueClosed(issueId: string): Promise<string | null> {
-  const { resolveGitHubIssue } = await import('../../lib/tracker-utils.js');
+  const { resolveGitHubIssue, resolveTrackerType } = await import('../../lib/tracker-utils.js');
+  if (resolveTrackerType(issueId) === 'jira') return refuseIfJiraIssueClosed(issueId);
   const ghInfo = resolveGitHubIssue(issueId);
   if (ghInfo.isGitHub) {
     try {
@@ -422,7 +424,10 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
 
     // Step 3: move the tracker to In Review.
     spinner.text = 'Updating the tracker...';
-    const trackerUpdated = issueId.startsWith('PAN-')
+    const { resolveTrackerType } = await import('../../lib/tracker-utils.js');
+    const trackerUpdated = resolveTrackerType(issueId) === 'jira'
+      ? await updateJiraToInReview(issueId, opened.flatMap((pr) => (pr.url ? [pr.url] : [])), options.comment)
+      : issueId.startsWith('PAN-')
       ? await updateGitHubToInReview(issueId, options.comment)
       : await (async () => {
         const apiKey = await Effect.runPromise(getLinearApiKey());
