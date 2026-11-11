@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5137",
   "created": "2026-11-11T18:41:59.017Z",
-  "updated": "2026-11-11T18:53:55.952Z",
+  "updated": "2026-11-11T18:54:09.241Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,6 +34,11 @@
     "fold-module.ac5": {
       "status": "completed",
       "doneAt": "2026-11-11T18:53:55.952Z"
+    },
+    "release-wiring": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5137",
+      "claimedAt": "2026-11-11T18:54:09.241Z"
     }
   }
 }
