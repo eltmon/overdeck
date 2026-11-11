@@ -19,7 +19,9 @@ import { appendContinueSessionEntryForIssue } from '../xbrief/lifecycle-io.js';
 import { isPlanningComplete, findPlan } from '../xbrief/io.js';
 import { extractPrefix } from '../issue-id.js';
 import { spawnPlanningSession, type PlanningIssue } from '../planning/spawn-planning-session.js';
-import { findProjectByTeam, getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
+import { findProjectByTeam, getProjectSync, loadProjectsConfig, resolveProjectFromIssue, resolveProjectFromIssueSync } from '../projects.js';
+import { createJiraTrackerForProject } from '../tracker/factory.js';
+import { transitionJiraIssue } from '../tracker/jira-lifecycle.js';
 import { requireModelOverride } from '../model-validation.js';
 import { resolveGitHubIssue, resolveTrackerType } from '../tracker-utils.js';
 import { killSession, listSessionNames, sessionExists } from '../tmux.js';
@@ -96,6 +98,48 @@ function getGitHubLocalPaths(): Record<string, string> {
     }
   }
   return out;
+}
+
+/**
+ * Load a Jira issue for planning (PAN-5152, FR-7): title, Markdown
+ * description, Markdown comments (best effort) and epic children. Any
+ * failure becomes the same TrackerApiError the GitHub branch returns, so a
+ * Jira issue never falls through to Linear.
+ */
+function loadJiraPlanningIssue(id: string) {
+  return Effect.gen(function* () {
+    const resolved = yield* resolveProjectFromIssue(id);
+    const { projects } = yield* loadProjectsConfig();
+    const project = resolved ? projects[resolved.projectKey] : undefined;
+    if (!resolved || project?.tracker !== 'jira') {
+      return yield* Effect.fail(new Error('no tracker: jira project owns this issue prefix'));
+    }
+    const tracker = yield* Effect.try({ try: () => createJiraTrackerForProject(resolved.projectKey, project), catch: error => error });
+    const jiraIssue = yield* tracker.getIssue(id);
+    const comments = yield* tracker.getComments(id).pipe(Effect.catch(() => Effect.succeed([])));
+    const children = jiraIssue.artifactType === 'Epic'
+      ? yield* tracker.getChildIssues(id).pipe(Effect.catch(() => Effect.succeed([])))
+      : [];
+    return {
+      id: jiraIssue.id,
+      identifier: jiraIssue.ref,
+      title: jiraIssue.title,
+      description: jiraIssue.description,
+      url: jiraIssue.url,
+      source: 'jira' as const,
+      comments: comments.length > 0 ? comments.map(c => ({ author: c.author, body: c.body, createdAt: c.createdAt })) : undefined,
+      artifactType: jiraIssue.artifactType,
+      childStories: children.length > 0
+        ? children.map(child => ({ ref: child.ref, title: child.title, status: child.rawState ?? '', description: child.description }))
+        : undefined,
+    };
+  }).pipe(
+    Effect.mapError(err => new TrackerApiError({
+      tracker: 'jira',
+      message: `could not fetch ${id.toUpperCase()} from Jira: ${(err as { message?: string })?.message ?? String(err)}`,
+      cause: err,
+    })),
+  );
 }
 
 function getProjectPath(linearProjectId?: string, issuePrefix?: string): string {
@@ -283,6 +327,9 @@ export function startPlanningForIssue(options: {
 
       // Add "planning" label (ensure it exists, then apply to issue)
       yield* lifecycle.addLabel(id, 'planning').pipe(Effect.catch(() => Effect.void));
+
+    } else if (trackerTypeForIssue === 'jira') {
+      issue = yield* loadJiraPlanningIssue(id);
 
     } else if (trackerTypeForIssue === 'rally') {
       const rallyIssue = yield* rally.getIssue(id);
@@ -495,6 +542,11 @@ export function abortPlanningForIssue(options: {
       // Remove planning label via IssueLifecycle
       yield* lifecycle.removeLabel(id, 'planning').pipe(Effect.catch(() => Effect.void));
       revertedState = 'Todo';
+    } else if (resolveTrackerType(id) === 'jira') {
+      // PAN-5152: a Jira issue never reaches the Linear client.
+      issueIdentifier = id.toUpperCase();
+      yield* Effect.promise(() => transitionJiraIssue(id, 'todo'));
+      revertedState = 'To Do';
     } else {
       // Resolve issue identifier and session name via LinearClient, then transition to 'open' (Todo)
       const linearIssue = yield* linear.getIssue(id).pipe(Effect.catch(() => Effect.succeed(null)));
