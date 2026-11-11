@@ -35,6 +35,12 @@ export interface ExtractionProviderResult<T> {
 export interface ExtractionProvider {
   name: string;
   defaultModel: string;
+  /**
+   * 'interactive' answers inside a prompt-time budget (an HTTP call);
+   * 'background' does not (a process spawn). Absent means 'interactive'.
+   * Query expansion never uses a background provider (PAN-4374).
+   */
+  latencyClass?: 'interactive' | 'background';
   extract<T>(prompt: string, jsonSchema: unknown, options?: ExtractionProviderOptions): Promise<ExtractionProviderResult<T>>;
 }
 
@@ -140,7 +146,7 @@ export function recordExtractionCost(input: {
 }
 
 function extractionProviderToAiProvider(provider: string): AIProvider {
-  if (provider === 'anthropic') return 'anthropic';
+  if (provider === 'anthropic' || provider === 'claude-cli') return 'anthropic';
   if (provider === 'cliproxy' || provider === 'openai') return 'openai';
   if (provider === 'google') return 'google';
   return 'custom';

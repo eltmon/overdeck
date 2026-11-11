@@ -124,9 +124,10 @@ export function BackgroundAiSection({
           applyBackgroundModelPatch({ ...formData, memory: { ...formData.memory, ...patch } }, opts);
         return (
           <div className="flex items-center gap-1">
-            <select value={provider} onChange={(e) => setMem({ provider: e.target.value as 'anthropic' | 'cliproxy' })} className={`${bgSelectClass} max-w-[110px]`}>
+            <select value={provider} onChange={(e) => setMem({ provider: e.target.value as 'anthropic' | 'cliproxy' | 'claude-cli' })} className={`${bgSelectClass} max-w-[110px]`}>
               <option value="anthropic">Anthropic</option>
               <option value="cliproxy">cliproxy</option>
+              <option value="claude-cli">Claude Code (subscription)</option>
             </select>
             <input type="text" value={formData.memory?.model || ''}
               onChange={(e) => setMem({ model: e.target.value || undefined }, { debounce: true })}

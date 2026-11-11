@@ -1,6 +1,7 @@
 import { loadMemorySettings } from '../settings.js';
 import { AnthropicExtractionProvider } from './anthropic.js';
 import { CliproxyExtractionProvider } from './cliproxy.js';
+import { ClaudeCliExtractionProvider } from './claude-cli.js';
 import type {
   ExtractionProvider,
   ExtractionProviderSelection,
@@ -15,6 +16,7 @@ const registry = new Map<string, ExtractionProvider>();
 
 registerExtractionProvider(new AnthropicExtractionProvider());
 registerExtractionProvider(new CliproxyExtractionProvider());
+registerExtractionProvider(new ClaudeCliExtractionProvider());
 
 export function registerExtractionProvider(provider: ExtractionProvider): void {
   registry.set(provider.name, provider);
@@ -83,4 +85,21 @@ function getProviderDefaultModel(providerName: string): string {
 function normalizeEnv(value: string | undefined): string | null {
   const trimmed = value?.trim();
   return trimmed ? trimmed : null;
+}
+
+export function isInteractiveExtractionProvider(name: string): boolean {
+  return registry.get(name)?.latencyClass !== 'background';
+}
+
+/**
+ * Keep only interactive targets (primary first, then the fallback chain).
+ * Returns null when none remain. An unknown provider name counts as
+ * interactive, so the policy still reports it as an unknown provider.
+ */
+export function interactiveExtractionSelection(selection: ExtractionProviderSelection): ExtractionProviderSelection | null {
+  const targets = [{ provider: selection.provider, model: selection.model }, ...selection.fallbackChain]
+    .filter((target) => isInteractiveExtractionProvider(target.provider));
+  const [primary, ...rest] = targets;
+  if (!primary) return null;
+  return { provider: primary.provider, model: primary.model, fallbackChain: rest, source: selection.source };
 }
