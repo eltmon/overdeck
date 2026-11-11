@@ -24,6 +24,10 @@ This page starts at v0.60.0, the release that removed Overdeck's state layer. Ol
 
   - **New default models:** on built-in defaults, work, test, ship and worker agents and three review lanes now run on Claude Opus 5.5 instead of Sonnet 5.5 (the mid workhorse), which roughly doubles what those agents cost; the Anthropic cost-saver preset keeps Sonnet 5.5 for 30% of work. The cheap workhorse, conversation titles, compaction and memory extraction now use Claude Haiku 5.5 instead of Haiku 4.5 (&#36;0.10/&#36;0.50 per MTok against &#36;1/&#36;5), which needs Claude Code 2.1.293 or newer. Installs that set these models in config keep them. ([#5124](https://github.com/eltmon/overdeck/issues/5124))
 
+  #### Fixed
+
+  - **`pan review request` no longer races PR adoption:** when a PR opened outside a pipeline workspace is still being adopted into one, `pan review request` now answers that adoption is in progress and starts nothing. Before, it could start a second verification on the half-built workspace, which made adoption refuse with `workspace-head-mismatch` and showed a false Needs you. ([#4995](https://github.com/eltmon/overdeck/issues/4995))
+
   [Compare v0.77.0...v0.78.0](https://github.com/eltmon/overdeck/compare/v0.77.0...v0.78.0)
 </Update>
 

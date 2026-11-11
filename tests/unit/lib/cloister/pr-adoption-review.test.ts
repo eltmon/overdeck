@@ -6,6 +6,7 @@ import {
   __resetPrAdoptionForTests,
   adoptionRefusalComment,
   adoptPrAndStartReview,
+  answerAdoptionInFlight,
   answerMissingWorkspace,
   findOpenPipelinePr,
   type AdoptAndReviewOutcome,
@@ -108,6 +109,36 @@ describe('adoptPrAndStartReview (PAN-4605)', () => {
 
     expect(outcome).toMatchObject({ kind: 'refused', adoption: { adopted: false, reason: 'create-failed', detail: 'git exploded' } });
     expect(deps.announce).toHaveBeenCalledWith('PAN-1', 'PR #7 adoption failed: git exploded', expect.any(Object));
+  });
+});
+
+describe('answerAdoptionInFlight (PAN-4995)', () => {
+  it('answers 202 adopting while adoption runs, and adoption then starts exactly one review', async () => {
+    let release!: (outcome: AdoptionOutcome) => void;
+    const deps = harness(() => new Promise<AdoptionOutcome>((resolve) => { release = resolve; }));
+
+    const adoption = adoptPrAndStartReview(PR, { source: 'webhook', ...deps });
+    const answer = answerAdoptionInFlight('pan-1');
+
+    expect(answer).toEqual({
+      status: 202,
+      body: {
+        success: true,
+        queued: true,
+        adopting: true,
+        message: 'Adoption of PR #7 is in progress; verification starts when it is ready.',
+      },
+    });
+    expect(deps.startReview).not.toHaveBeenCalled();
+
+    release({ adopted: true, workspacePath: WS });
+    await expect(adoption).resolves.toEqual<AdoptAndReviewOutcome>({ kind: 'started', workspacePath: WS });
+    expect(deps.startReview).toHaveBeenCalledTimes(1);
+    expect(answerAdoptionInFlight('PAN-1')).toBeNull();
+  });
+
+  it('returns null when no adoption is in flight', () => {
+    expect(answerAdoptionInFlight('PAN-1')).toBeNull();
   });
 });
 
