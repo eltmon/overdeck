@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
-import { collectPublishedPages, findMdxProblems, stripInlineCode } from '../../../scripts/lint-docs.js';
+import { collectPublishedPages, findChangelogEntryProblems, findMdxProblems, stripInlineCode } from '../../../scripts/lint-docs.js';
 
 const DOLLAR = '&#36;';
 const LT = '&lt;';
@@ -108,6 +108,60 @@ describe('stripInlineCode', () => {
   });
 });
 
+describe('findChangelogEntryProblems', () => {
+  it('returns no problems for a valid two-section entry', () => {
+    const content = '#### New\n\n- **Bullet one.**\n\n#### Fixed\n\n- **Bullet two.**\n';
+    expect(findChangelogEntryProblems('pan-1.md', content)).toEqual([]);
+  });
+
+  it('rejects a misnamed file', () => {
+    const problems = findChangelogEntryProblems('Pan-1.md', '#### New\n\n- bullet\n');
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toMatchObject({ line: 0 });
+    expect(problems[0].message).toContain('kebab-case');
+  });
+
+  it('rejects an unknown heading', () => {
+    const problems = findChangelogEntryProblems('pan-1.md', '#### Changed\n\n- bullet\n');
+    expect(problems.some((p) => p.message.includes('unknown heading'))).toBe(true);
+  });
+
+  it('rejects a bullet before any heading', () => {
+    const problems = findChangelogEntryProblems('pan-1.md', '- bullet\n');
+    expect(problems.some((p) => p.message.includes('before any heading'))).toBe(true);
+  });
+
+  it('rejects a line that is neither a bullet nor a continuation', () => {
+    const problems = findChangelogEntryProblems('pan-1.md', '#### New\n\nstray text\n');
+    expect(problems.some((p) => p.message.includes('neither a bullet nor a continuation'))).toBe(true);
+  });
+
+  it('rejects an empty heading', () => {
+    const problems = findChangelogEntryProblems('pan-1.md', '#### New\n\n#### Fixed\n\n- bullet\n');
+    expect(problems.some((p) => p.message.includes('New has no bullets'))).toBe(true);
+  });
+
+  it('rejects a duplicate heading', () => {
+    const problems = findChangelogEntryProblems('pan-1.md', '#### New\n\n- bullet\n\n#### New\n\n- bullet2\n');
+    expect(problems.some((p) => p.message.includes('more than once'))).toBe(true);
+  });
+
+  it('rejects a file with no bullets', () => {
+    const problems = findChangelogEntryProblems('pan-1.md', '#### New\n');
+    expect(problems.some((p) => p.message.includes('New has no bullets'))).toBe(true);
+  });
+
+  it('returns the dollar-sign message for a bullet containing $2', () => {
+    const problems = findChangelogEntryProblems('pan-1.md', '#### New\n\n- costs $2 each\n');
+    expect(problems.some((p) => p.message.includes(DOLLAR))).toBe(true);
+  });
+
+  it('returns the lt-digit message for a bullet containing <3', () => {
+    const problems = findChangelogEntryProblems('pan-1.md', '#### New\n\n- i love you <3\n');
+    expect(problems.some((p) => p.message.includes(LT))).toBe(true);
+  });
+});
+
 describe('collectPublishedPages', () => {
   it('flattens a nested { group, pages } object inside a pages array', () => {
     const docsJson = {
@@ -193,5 +247,47 @@ describe('lint-docs CLI', () => {
 
     expect(ok).toBe(false);
     expect(output).toContain('missing');
+  });
+
+  it('fails with Upcoming/Unreleased block found when changelog.mdx has an Upcoming block', () => {
+    const root = makeRoot();
+    writeDocsJson(root, []);
+    writeFileSync(
+      join(root, 'changelog.mdx'),
+      '<Update label="v0.80.0" description="Unreleased" tags={["Upcoming"]}>\n  #### Fixed\n\n  - bullet\n</Update>\n',
+    );
+
+    const { ok, output } = run(root);
+
+    expect(ok).toBe(false);
+    expect(output).toContain('Upcoming/Unreleased block found');
+    expect(output).toContain('changelog.d/<issue>.md');
+  });
+
+  it('fails and names the offending changelog.d entry', () => {
+    const root = makeRoot();
+    writeDocsJson(root, []);
+    writeFileSync(join(root, 'changelog.mdx'), 'No update blocks here.\n');
+    mkdirSync(join(root, 'changelog.d'));
+    writeFileSync(join(root, 'changelog.d', 'pan-1.md'), '#### Changed\n\n- bullet\n');
+
+    const { ok, output } = run(root);
+
+    expect(ok).toBe(false);
+    expect(output).toContain('changelog.d/pan-1.md');
+  });
+
+  it('passes with a valid entry plus README.md, and does not validate README.md as an entry', () => {
+    const root = makeRoot();
+    writeDocsJson(root, []);
+    writeFileSync(join(root, 'changelog.mdx'), 'No update blocks here.\n');
+    mkdirSync(join(root, 'changelog.d'));
+    writeFileSync(join(root, 'changelog.d', 'README.md'), '# changelog.d\n\nNot a valid entry heading.\n');
+    writeFileSync(join(root, 'changelog.d', 'pan-1.md'), '#### New\n\n- **Bullet.**\n');
+
+    const { ok, output } = run(root);
+
+    expect(ok).toBe(true);
+    expect(output).toContain('1 changelog entries');
   });
 });
