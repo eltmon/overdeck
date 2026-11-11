@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5152",
   "created": "2026-11-11T14:36:40.308Z",
-  "updated": "2026-11-11T15:39:16.663Z",
+  "updated": "2026-11-11T15:44:06.588Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -286,9 +286,18 @@
       "doneAt": "2026-11-11T15:39:13.124Z"
     },
     "wi15-planning-prompt-jira": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5152",
-      "claimedAt": "2026-11-11T15:39:16.663Z"
+      "claimedAt": "2026-11-11T15:39:16.663Z",
+      "doneAt": "2026-11-11T15:44:06.588Z"
+    },
+    "wi15-planning-prompt-jira.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:44:06.588Z"
+    },
+    "wi15-planning-prompt-jira.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:44:06.588Z"
     }
   }
 }
