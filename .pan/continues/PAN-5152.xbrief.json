@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5152",
   "created": "2026-11-11T14:36:40.308Z",
-  "updated": "2026-11-11T16:44:17.694Z",
+  "updated": "2026-11-11T16:46:40.380Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -482,9 +482,18 @@
       "doneAt": "2026-11-11T16:44:16.356Z"
     },
     "wi29-gate-autostart-text": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5152",
-      "claimedAt": "2026-11-11T16:44:17.694Z"
+      "claimedAt": "2026-11-11T16:44:17.694Z",
+      "doneAt": "2026-11-11T16:46:40.379Z"
+    },
+    "wi29-gate-autostart-text.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T16:46:40.379Z"
+    },
+    "wi29-gate-autostart-text.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T16:46:40.379Z"
     }
   }
 }
