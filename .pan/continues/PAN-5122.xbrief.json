@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5122",
   "created": "2026-11-11T10:01:02.133Z",
-  "updated": "2026-11-11T10:34:34.250Z",
+  "updated": "2026-11-11T10:34:40.480Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -59,6 +59,11 @@
     "select-host.ac3": {
       "status": "completed",
       "doneAt": "2026-11-11T10:34:34.249Z"
+    },
+    "attach-resolve-companion": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5122",
+      "claimedAt": "2026-11-11T10:34:40.480Z"
     }
   }
 }
