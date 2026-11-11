@@ -1,6 +1,6 @@
 ---
 name: pan-conversations
-description: "pan conversations scan/search/list/show/current/cost/enrich/embed/move/link-pr/schedule/pull/reclaim — discover, index, search, reassign, link PRs to, schedule prompts in, and pull conversations between machines in Claude Code session history"
+description: "pan conversations scan/search/list/show/current/cost/enrich/embed/move/link-pr/schedule/pull/reclaim/resume: discover, index, search, reassign, link PRs to, schedule prompts in, resume, and pull conversations between machines in Claude Code session history"
 triggers:
   - pan conversations
   - pan conv
@@ -11,6 +11,7 @@ triggers:
   - conv schedule
   - conv pull
   - conv reclaim
+  - conv resume
 allowed-tools:
   - Bash
   - Read
@@ -45,6 +46,7 @@ pan conversations schedule resume <id>
 pan conversations schedule rm <id>
 pan conversations pull <conv> [--stop-turn] [--json]
 pan conversations reclaim <conv> [--force]
+pan conversations resume <name> [--json]
 pan conversations current [--json]
 pan conversations cost [--since <time>] [--workspace <path>] [--by <field>] [--json]
 pan conversations embed [ids...] [--regenerate] [--status] [--provider <name>] [--model <name>] [--max-parallel <n>]
@@ -122,6 +124,11 @@ pan conversations enrich [ids...] [--tier <n>] [--deep] [--full] [--upgrade] [--
   when the machine it went to does not run it. It refuses with
   `still-running-there` while that machine runs it (pull it back instead), and
   with `target-offline` when that machine cannot be asked, unless `--force`.
+- **`resume`** (PAN-5091) resumes a stopped conversation through the dashboard's
+  `POST /api/conversations/:name/resume` route (scope `operate`), the door the
+  dashboard's Resume button uses. A conversation that still runs is reattached, not
+  started twice; `@<machine>/<name>` resumes one on a linked machine. Exit codes: 0
+  resumed or already running, 1 refused or failed, 2 not found.
 - **`enrich`**/**`embed`** call out to an LLM/embedding provider and cost money;
   `enrich` prompts for confirmation unless `--yes` is passed. `--tier 3`
   (`--deep`) and `--full` are the expensive, most-thorough options.

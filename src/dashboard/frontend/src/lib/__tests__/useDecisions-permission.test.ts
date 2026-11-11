@@ -9,6 +9,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import { DISK_ALERT_QUERY_KEY } from '../diskAlert';
 import { HARNESS_AUTO_UPDATE_QUERY_KEY } from '../harnessAutoUpdate';
+import { BACKEND_RESTART_RECOVERY_QUERY_KEY } from '../backendRestartRecovery';
 import { useDashboardStore } from '../store';
 import { useDecisions, usePendingInputSubjects, type ConversationPendingInputRow } from '../useDecisions';
 
@@ -44,6 +45,7 @@ function renderWithRows<T>(hook: () => T, rows: ConversationPendingInputRow[]) {
   queryClient.setQueryData(['anywhere-connector-notices'], []); // PAN-5070
   queryClient.setQueryData(DISK_ALERT_QUERY_KEY, null); // PAN-5093
   queryClient.setQueryData(HARNESS_AUTO_UPDATE_QUERY_KEY, null); // PAN-5108
+  queryClient.setQueryData(BACKEND_RESTART_RECOVERY_QUERY_KEY, null); // PAN-5091
   return renderHook(hook, {
     wrapper: ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: queryClient }, children),
   });

@@ -26,7 +26,8 @@ import {
 import { fetchWithTimeout } from './apiFetch';
 import { DISK_ALERT_QUERY_KEY, fetchDiskAlert } from './diskAlert';
 import { fetchHarnessAutoUpdate, HARNESS_AUTO_UPDATE_QUERY_KEY } from './harnessAutoUpdate';
-import type { DiskAlertSnapshot, HarnessAutoUpdateFailure, HarnessAutoUpdateSnapshot } from '@overdeck/contracts';
+import { BACKEND_RESTART_RECOVERY_QUERY_KEY, fetchBackendRestartRecovery } from './backendRestartRecovery';
+import type { BackendRestartRecoverySnapshot, DiskAlertSnapshot, HarnessAutoUpdateFailure, HarnessAutoUpdateSnapshot } from '@overdeck/contracts';
 import { formatIssueRef } from './issueLabel';
 import type { PendingPaneChoice } from './paneChoice';
 import type { TerminalPendingPermission } from '../components/TerminalPermissionDialog';
@@ -149,6 +150,8 @@ export interface Decision {
   unreachableMachine?: UnreachableMachineRow;
   /** PAN-5108 — set on a harness update failure; the card ignores `source`. */
   harnessUpdate?: HarnessAutoUpdateFailure;
+  /** PAN-5091: set on the terminal-backend restart recovery offer; the card ignores `source`. */
+  backendRestart?: BackendRestartRecoverySnapshot;
   /** PAN-5070 — set on a connector-paired notice; the card ignores `source`. */
   connectorNotice?: ConnectorNoticeRow;
 }
@@ -303,6 +306,25 @@ export function harnessUpdateDecisions(snapshot: HarnessAutoUpdateSnapshot | nul
     blocking: false,
     harnessUpdate: failure,
   }));
+}
+
+/** PAN-5091: the restart recovery offer as one Needs-you item, shown while there is something to resume or a run is in progress. */
+export function backendRestartDecisions(snapshot: BackendRestartRecoverySnapshot | null): Decision[] {
+  if (!snapshot || !Array.isArray(snapshot.conversations)) return [];
+  const running = snapshot.run?.state === 'running';
+  const count = snapshot.conversations.length;
+  if (count === 0 && !running) return [];
+  return [{
+    id: 'backend-restart',
+    source: 'agent',
+    label: running && count === 0
+      ? 'Resuming conversations after a terminal-backend restart'
+      : `${count} ${count === 1 ? 'conversation' : 'conversations'} stopped when the terminal backend restarted`,
+    kinds: ['backendRestart'],
+    since: snapshot.lostAt ?? snapshot.run?.startedAt ?? '',
+    blocking: false,
+    backendRestart: snapshot,
+  }];
 }
 
 /** PAN-4651 D-4651-15 — `GET /api/fleet/needs-you`: what waits on the operator on each online linked machine. */
@@ -487,6 +509,14 @@ export function useDecisions(): Decision[] {
     retry: false,
   });
 
+  // PAN-5091: like the disk alert, a rejected refetch keeps the last snapshot.
+  const { data: backendRestart } = useQuery({
+    queryKey: BACKEND_RESTART_RECOVERY_QUERY_KEY,
+    queryFn: ({ signal }) => fetchBackendRestartRecovery(signal),
+    refetchInterval: 5000,
+    retry: false,
+  });
+
   // PAN-4946 — only a root viewer (this machine's own session or the internal
   // token) can decide an MCP sign-in; a paired device never polls for one.
   const { data: anywhereStatus } = useQuery({
@@ -560,6 +590,7 @@ export function useDecisions(): Decision[] {
     out.push(...agentRequestDecisions(Array.isArray(agentRequestRows) ? agentRequestRows : []));
     out.push(...diskAlertDecisions(diskAlert ?? null));
     out.push(...harnessUpdateDecisions(harnessAutoUpdate ?? null));
+    out.push(...backendRestartDecisions(backendRestart ?? null));
     // PAN-4946 review — a disabled query still returns its last cached rows
     // (`enabled: false` only stops refetching), so a viewer that just dropped
     // from root to device could otherwise still see a stale approval's detail.
@@ -576,5 +607,5 @@ export function useDecisions(): Decision[] {
       return a.since.localeCompare(b.since);
     });
     return out;
-  }, [agentSubjects, convRows, fleet, agentRequestRows, mcpSignInApprovals, connectorNotices, canSeeMcpSignIns, titleByIssueId, diskAlert, harnessAutoUpdate]);
+  }, [agentSubjects, convRows, fleet, agentRequestRows, mcpSignInApprovals, connectorNotices, canSeeMcpSignIns, titleByIssueId, diskAlert, harnessAutoUpdate, backendRestart]);
 }

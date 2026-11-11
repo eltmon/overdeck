@@ -201,6 +201,10 @@ export const ROUTE_SCOPES: ReadonlyArray<RouteScope> = [
   { method: 'POST', path: '/api/conversations/:name/compact', scope: 'operate' },
   { method: 'POST', path: '/api/conversations/:name/thinking-level', scope: 'operate' },
   { method: 'POST', path: '/api/conversations/:name/resume', scope: 'operate' },
+  // PAN-5091: the terminal-backend restart recovery offer and its Resume all.
+  { method: 'GET', path: '/api/backend-restart-recovery', scope: 'read:conversations' },
+  { method: 'POST', path: '/api/backend-restart-recovery/resume-all', scope: 'operate' },
+  { method: 'POST', path: '/api/backend-restart-recovery/dismiss', scope: 'operate' },
   // PAN-4654: a linked machine reads this machine's version report for the fleet table.
   { method: 'GET', path: '/api/versions/self', scope: 'read:state' },
   // PAN-4654: an operator-level link starts, escalates or cancels this machine's

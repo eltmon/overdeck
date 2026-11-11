@@ -1,7 +1,8 @@
 /**
  * The write tools of the Overdeck MCP server (PAN-4649 FR-5, FR-6):
  * `send_message`, `start_conversation`, `start_worker` and (PAN-4938 FR-6,
- * FR-7) `start_issue`, `stop_conversation` and `interrupt_conversation`. Each
+ * FR-7) `start_issue`, `stop_conversation`, `interrupt_conversation` and
+ * (PAN-5091) `resume_conversation`. Each
  * proxies one dashboard route; the route enforces the scope (`tell` or
  * `operate`).
  * PAN-4651 D-4651-18: the start tools go through the fleet routes, which
@@ -176,7 +177,7 @@ const CONVERSATION_PROPERTY = {
 } as const;
 
 /** A tool that posts `{}` to `/api/conversations/<conversation>/<action>`. */
-function conversationControlTool(name: string, action: 'stop' | 'abort', description: string): OverdeckTool {
+function conversationControlTool(name: string, action: 'stop' | 'abort' | 'resume', description: string): OverdeckTool {
   return {
     name,
     description,
@@ -197,10 +198,16 @@ function conversationControlTool(name: string, action: 'stop' | 'abort', descrip
 
 const stopConversation = conversationControlTool('stop_conversation', 'stop', 'Stop a conversation: end its agent session.');
 
+const resumeConversation = conversationControlTool(
+  'resume_conversation',
+  'resume',
+  'Resume a stopped conversation: start its agent session again on its transcript. A conversation that still runs is reattached, not started twice.',
+);
+
 const interruptConversation = conversationControlTool(
   'interrupt_conversation',
   'abort',
   'Interrupts the current turn of a Pi conversation. Other harnesses answer an error; use stop_conversation to end them.',
 );
 
-export const WRITE_TOOLS: readonly OverdeckTool[] = [sendMessage, startConversation, startWorker, startIssue, stopConversation, interruptConversation];
+export const WRITE_TOOLS: readonly OverdeckTool[] = [sendMessage, startConversation, startWorker, startIssue, stopConversation, resumeConversation, interruptConversation];

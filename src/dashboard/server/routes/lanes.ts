@@ -32,6 +32,7 @@ import { markRemoteLaneArchived, readRemoteLane } from '../../../lib/lanes/remot
 import { LaneLaunchError, type LaneLaunchRequest } from '../../../lib/lanes/types.js';
 import { invalidateLaneViews, listLaneViews, type LaneViewFilter } from '../../../lib/lanes/views.js';
 import { stopConversationRuntime } from '../../../lib/overdeck/conversation-runtime.js';
+import { recordConversationStop } from '../../../lib/overdeck/conversation-stop-marks.js';
 import { getConversationByName, LANE_ROLES, markConversationEnded, type LaneRole, type LegacyConversation } from '../../../lib/overdeck/conversations.js';
 import { channelOfRequest } from '../channel-peer.js';
 import { jsonResponse } from '../http-helpers.js';
@@ -89,6 +90,7 @@ export const defaultLaneRouteDeps = (): LaneRouteDeps => {
     flyEnvironmentIds: async () => (await listFlyMachines()).flatMap((record) => (record.environmentId ? [record.environmentId] : [])),
     follow: followRemoteLane,
     stopLocal: async (conv) => {
+      recordConversationStop(conv.name); // PAN-5091: a stopped lane is never offered for restart recovery
       await stopConversationRuntime(conv, conv.name);
       markConversationEnded(conv.name);
     },
