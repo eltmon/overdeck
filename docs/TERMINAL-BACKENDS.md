@@ -1299,3 +1299,37 @@ opencode-port removed                   → restart-required; no companion creat
 ```
 
 Teardown: `tmux -L pan3974-test kill-server`; port 54333 no longer answers.
+
+## Live verification record — companion terminal on Herdr (PAN-5122)
+
+2026-11-11, Herdr the host terminal backend (default, no tmux session involved). Driven against a
+real, idle Codex conversation on this host (`conv-20261110-b6d6`, harness `codex`, cwd
+`~/Projects/dfai`) through a one-off `npx tsx` script calling the real
+`getCompanionTerminalLifecycle()` and `resolveHerdrTerminalId` from the workspace build — never
+`stop`, `resume`, or `pan tell` against the owner. No OpenCode conversation was live on this host
+at verification time, so only the Codex path was exercised end to end; every operation it
+exercises (`ownerStamp`, `create`, `readGeneration`, `kill`, `resolveHerdrTerminalId`) is
+harness-agnostic — only the adapter's `resolveTarget` differs by harness kind.
+
+```
+open(owner)                              → { status: 'attached', kind: 'codex-resume-remote',
+                                              sessionName: 'companion-conv-20261110-b6d6',
+                                              generation: '88cf5b329fb7aba5f42430cc', reused: false }
+herdr pane list (companion row)          → tokens { companion: 'companion-conv-20261110-b6d6',
+                                              companionGeneration: '88cf5b329fb7aba5f42430cc' } —
+                                              no agentId/role/issue/harness/model token
+resolveHerdrTerminalId('companion-…')    → term_65ffe384c666b2bc (non-null)
+herdr pane read <companion pane>, 3s in  → the real Codex TUI, attached to the owner's own thread
+                                              ("Working (31m 30s · esc to interrupt)",
+                                              "GPT-6.1-Sol high · ~/Projects/dfai",
+                                              the owner's own running turn, not a second session)
+close(owner, generation)                 → { status: 'closed', kind: 'codex-resume-remote' }
+resolveHerdrTerminalId('companion-…')     → null
+herdr pane list                          → no pane titled companion-conv-20261110-b6d6
+owner pane (conv-20261110-b6d6)          → unchanged: same pane_id, tokens, agent_status idle
+```
+
+The owner's own pane was never touched: before and after the run it is the same `w2:p8Q` with the
+same `agentId`/`harness`/`model` tokens and `idle` status. The companion carried only the
+`companion` and `companionGeneration` tokens, so it never appeared in `listHerdrAgents()` or as an
+Overdeck agent anywhere in the inventory.
