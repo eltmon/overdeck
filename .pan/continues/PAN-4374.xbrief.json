@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4374",
   "created": "2026-11-11T12:38:14.502Z",
-  "updated": "2026-11-11T13:19:00.578Z",
+  "updated": "2026-11-11T13:19:06.769Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -112,6 +112,11 @@
     "settings-ui-options.ac2": {
       "status": "completed",
       "doneAt": "2026-11-11T13:19:00.578Z"
+    },
+    "doctor-fix-text": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4374",
+      "claimedAt": "2026-11-11T13:19:06.769Z"
     }
   }
 }
