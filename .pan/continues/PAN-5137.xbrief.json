@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5137",
   "created": "2026-11-11T18:41:59.017Z",
-  "updated": "2026-11-11T18:57:33.703Z",
+  "updated": "2026-11-11T18:57:57.283Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -60,6 +60,11 @@
     "release-wiring.ac5": {
       "status": "completed",
       "doneAt": "2026-11-11T18:57:33.703Z"
+    },
+    "migrate-upcoming": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5137",
+      "claimedAt": "2026-11-11T18:57:57.283Z"
     }
   }
 }
