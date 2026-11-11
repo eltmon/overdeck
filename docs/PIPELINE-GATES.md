@@ -276,6 +276,18 @@ the **CI test job on the PR head is the test gate**:
   cancels the previous commit's in-progress jobs, and GitHub reports them with
   the PR's new head) is not reported, so no feedback is written. A failing
   job whose check also fails on main is marked inherited from main.
+- **A later failure on the same head (PAN-4625).** The relay records, per
+  issue, the head it last delivered feedback for and the failed check names
+  that feedback named. A later relay for the same head (a `test-shard (4/4)`
+  that fails after `lint` already relayed) reads the failing checks again and
+  writes a new feedback file that names only the checks not yet delivered,
+  with one line naming the earlier ones that are still failing. The agent gets
+  a new CI FAILED message for it. A relay that finds no undelivered check, or
+  whose triggering check was already delivered, sends nothing. The record is
+  in memory only, so a dashboard restart forgets it. In a
+  `verification.tests: ci` project, a counted test-gate failure on a head
+  replaces this rule: its feedback names every failing check, and a later
+  relay for that head is a replay that is not delivered.
 - **Attempt budget.** A CI test failure counts against the local gate's budget
   (`VERIFICATION_MAX_CYCLES` = 3, `cloister/verification-cycles.ts`), read
   from the same per-run artifacts. The local count is per head — every commit

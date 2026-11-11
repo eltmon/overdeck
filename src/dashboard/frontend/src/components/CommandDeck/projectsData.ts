@@ -20,6 +20,10 @@ export interface RegisteredProjectLite {
   path: string;
   /** PAN-5153: "owner/repo" from projects.yaml `github_repo`, or null. */
   githubRepo?: string | null;
+  /** PAN-5161: "group/repo" from projects.yaml `gitlab_repo`, or null. */
+  gitlabRepo?: string | null;
+  /** PAN-5161: projects.yaml `owner`, the sidebar group label, or null. */
+  owner?: string | null;
 }
 
 /**
@@ -87,6 +91,10 @@ export interface ProjectData {
   path: string;
   /** PAN-5153: "owner/repo" for registered projects; undefined for issue-only groups. */
   githubRepo?: string | null;
+  /** PAN-5161: "group/repo" for registered projects; undefined for issue-only groups. */
+  gitlabRepo?: string | null;
+  /** PAN-5161: the projects.yaml `owner` label for registered projects. */
+  owner?: string | null;
   features: ProjectFeature[];
 }
 
@@ -241,7 +249,7 @@ export async function fetchProjects(): Promise<ProjectData[]> {
   if (!registeredRes.ok) throw new Error('Failed to fetch registered projects');
 
   const issues = await issuesRes.json() as ProjectFeature[];
-  const registered = await registeredRes.json() as { key: string; name: string; path: string; githubRepo?: string | null }[];
+  const registered = await registeredRes.json() as RegisteredProjectLite[];
 
   // Start with projects that have qualifying issues
   const projectMap = new Map(groupProjects(issues).map(p => [p.name, p]));
@@ -250,9 +258,10 @@ export async function fetchProjects(): Promise<ProjectData[]> {
   for (const proj of registered) {
     const name = proj.name ?? proj.key;
     const existing = projectMap.get(name);
+    const repos = { githubRepo: proj.githubRepo ?? null, gitlabRepo: proj.gitlabRepo ?? null, owner: proj.owner ?? null };
     projectMap.set(name, existing
-      ? { ...existing, key: proj.key, path: proj.path, githubRepo: proj.githubRepo ?? null }
-      : { key: proj.key, name, path: proj.path, githubRepo: proj.githubRepo ?? null, features: [] });
+      ? { ...existing, key: proj.key, path: proj.path, ...repos }
+      : { key: proj.key, name, path: proj.path, ...repos, features: [] });
   }
 
   return [...projectMap.values()].sort((a, b) => a.name.localeCompare(b.name));

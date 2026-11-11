@@ -1,6 +1,8 @@
 /**
- * PAN-5153: group the sidebar's projects by GitHub owner (the first part of
- * `github_repo`), with each owner's collapsed state kept per browser.
+ * PAN-5153: group the sidebar's projects by owner, with each owner's collapsed
+ * state kept per browser. PAN-5161: the owner is projects.yaml `owner`, else
+ * the GitHub owner from `github_repo`, else the GitLab group from `gitlab_repo`.
+ * Display only: it never changes which identity acts on a repository.
  */
 import { useCallback, useState } from 'react';
 
@@ -15,6 +17,23 @@ export function githubOwnerOf(repo: string | null | undefined): string | null {
   return match ? match[1]! : null;
 }
 
+/** "group/repo" or "group/sub/repo" → "group"; anything else → null. */
+export function gitlabGroupOf(repo: string | null | undefined): string | null {
+  const match = /^([^/\s]+)(?:\/[^/\s]+)+$/.exec((repo ?? '').trim());
+  return match ? match[1]! : null;
+}
+
+export interface OwnedProject {
+  owner?: string | null;
+  githubRepo?: string | null;
+  gitlabRepo?: string | null;
+}
+
+/** PAN-5161: the explicit owner, then the GitHub owner, then the GitLab group; null when none is set. */
+export function projectOwnerOf(project: OwnedProject): string | null {
+  return project.owner?.trim() || githubOwnerOf(project.githubRepo) || gitlabGroupOf(project.gitlabRepo);
+}
+
 export interface ProjectOwnerGroup<T> {
   owner: string | null;
   projects: T[];
@@ -25,11 +44,11 @@ export interface ProjectOwnerGroup<T> {
  * sort by owner with the no-owner group last; projects keep their input
  * order. Fewer than two owners give one group with owner null.
  */
-export function groupProjectsByOwner<T extends { githubRepo?: string | null }>(projects: T[]): ProjectOwnerGroup<T>[] {
+export function groupProjectsByOwner<T extends OwnedProject>(projects: T[]): ProjectOwnerGroup<T>[] {
   const groups = new Map<string, ProjectOwnerGroup<T>>();
   const other: T[] = [];
   for (const project of projects) {
-    const owner = githubOwnerOf(project.githubRepo);
+    const owner = projectOwnerOf(project);
     if (!owner) {
       other.push(project);
       continue;
