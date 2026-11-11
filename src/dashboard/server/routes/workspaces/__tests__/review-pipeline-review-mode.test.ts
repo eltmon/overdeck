@@ -14,7 +14,7 @@ vi.mock('../../../../../lib/agents.js', () => ({ transitionIssueToInReview: vi.f
 
 
 
-import { parseRequestedReviewMode } from '../review-pipeline.js';
+import { parseRequestedReviewMode } from '../review-mode-param.js';
 
 describe('parseRequestedReviewMode', () => {
   it.each(['quick', 'full', 'none'] as const)('accepts %s', (reviewMode) => {

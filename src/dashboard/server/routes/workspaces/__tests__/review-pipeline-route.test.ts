@@ -5,7 +5,9 @@
  * review-mode record write and the per-item tier escalation — is gone.
  */
 
-import { rmSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Effect } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
@@ -35,6 +37,16 @@ const routeMocks = vi.hoisted(() => ({
   answerMissingWorkspace: vi.fn(),
   answerAdoptionInFlight: vi.fn(),
   isDeftPipelineIssue: vi.fn(),
+  clearVerificationDispatchOwed: vi.fn(),
+  confirmResumedDispatch: vi.fn(),
+}));
+
+vi.mock('../../../../../lib/cloister/verification-worker-supervisor.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../../lib/cloister/verification-worker-supervisor.js')>()),
+  clearVerificationDispatchOwed: routeMocks.clearVerificationDispatchOwed,
+}));
+vi.mock('../../../../../lib/cloister/verification-resume-dispatch.js', () => ({
+  confirmResumedDispatch: routeMocks.confirmResumedDispatch,
 }));
 
 vi.mock('../../../../../lib/deft/issue-pipeline.js', () => ({
@@ -119,7 +131,7 @@ vi.mock('../../../../../lib/cloister/flywheel.js', () => ({}));
 vi.mock('../../../../../lib/agents/spawn.js', () => ({ spawnRun: vi.fn(), spawnAgent: vi.fn(), spawnRunPromise: vi.fn() }));
 
 import { EventStoreService } from '../../../services/domain-services.js';
-import { reviewPipelineRouteLayer, _resetAutoRequeueCountsForTests, requestReviewGuarded } from '../review-pipeline.js';
+import { reviewPipelineRouteLayer, _resetAutoRequeueCountsForTests, requestReviewGuarded, startRequestReviewPipeline } from '../review-pipeline.js';
 import { requestReviewPipeline } from '../../../../../lib/cloister/request-review-pipeline.js';
 
 function derived(overrides: Partial<DerivedIssueState> = {}): DerivedIssueState {
@@ -574,5 +586,79 @@ describe('POST /api/review/:issueId/request — Deft issue (PAN-4820)', () => {
     expect(result).toEqual({ status: 409, body: { success: false, error: 'PAN-3340 runs on Deft; Overdeck review is off' } });
     expect(routeMocks.transitionIssueToInReview).not.toHaveBeenCalled();
     expect(vi.mocked(appendPipelineEntry).mock.calls.filter(([, entry]) => entry.type === 'review.requested')).toEqual([]);
+  });
+});
+
+// PAN-4622: boot adoption resumes a request Overdeck already accepted. A worker
+// installing dependencies can leave a tracked file modified at boot, so the
+// resumed request skips the dirty-tree refusal and checks head and tree at
+// dispatch time instead; the owed dispatch is cleared only once review spawns.
+describe('startRequestReviewPipeline — resumed by boot adoption (PAN-4622)', () => {
+  let dirtyWorkspace: string;
+
+  beforeEach(() => {
+    dirtyWorkspace = mkdtempSync(join(tmpdir(), 'review-door-resume-'));
+    const git = (...args: string[]) => execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { cwd: dirtyWorkspace, stdio: 'ignore' });
+    git('init', '-q');
+    writeFileSync(join(dirtyWorkspace, 'package.json'), '{}');
+    git('add', 'package.json');
+    git('commit', '-q', '-m', 'base');
+    writeFileSync(join(dirtyWorkspace, 'package.json'), '{"installing":true}');
+    routeMocks.getWorkspaceInfoForIssue.mockReturnValue({ exists: true, isRemote: false, localPath: dirtyWorkspace });
+    routeMocks.pushLocalReviewBranches.mockResolvedValue(undefined);
+    routeMocks.runVerificationForIssue.mockReturnValue(Effect.succeed({ outcome: 'passed' }));
+    routeMocks.spawnReviewRoleForIssue.mockReturnValue(Effect.succeed({ success: true, message: 'spawned' }));
+  });
+
+  afterEach(() => {
+    rmSync(dirtyWorkspace, { recursive: true, force: true });
+  });
+
+  it('a fresh request is refused on a dirty tree, but a resumed one starts and checks the tree at dispatch', async () => {
+    expect(await startRequestReviewPipeline('PAN-3340')).toMatchObject({ started: false, reason: 'dirty-workspace' });
+    expect(routeMocks.runVerificationForIssue).not.toHaveBeenCalled();
+
+    let treeError: string | null | undefined;
+    routeMocks.confirmResumedDispatch.mockImplementation(async (_issueId: string, _path: string, dirtyError: () => Promise<string | null>) => {
+      treeError = await dirtyError();
+      return treeError === null;
+    });
+
+    expect(await startRequestReviewPipeline('PAN-3340', { source: 'verification-adoption', resume: true })).toEqual({ started: true });
+    await vi.waitFor(() => expect(routeMocks.confirmResumedDispatch).toHaveBeenCalledWith('PAN-3340', dirtyWorkspace, expect.any(Function)));
+    await vi.waitFor(() => expect(requestReviewPipeline.isInFlight('PAN-3340')).toBe(false));
+
+    expect(routeMocks.runVerificationForIssue).toHaveBeenCalledOnce();
+    expect(treeError).toContain('uncommitted changes');
+    expect(routeMocks.pushLocalReviewBranches).not.toHaveBeenCalled();
+    expect(routeMocks.spawnReviewRoleForIssue).not.toHaveBeenCalled();
+  });
+
+  it('the dispatch-time tree check fails closed when git cannot read the tree', async () => {
+    routeMocks.getWorkspaceInfoForIssue.mockReturnValue({ exists: true, isRemote: false, localPath: join(dirtyWorkspace, 'gone') });
+    let treeError: string | null | undefined;
+    routeMocks.confirmResumedDispatch.mockImplementation(async (_issueId: string, _path: string, dirtyError: () => Promise<string | null>) => {
+      treeError = await dirtyError();
+      return false;
+    });
+
+    await startRequestReviewPipeline('PAN-3340', { source: 'verification-adoption', resume: true });
+    await vi.waitFor(() => expect(treeError).toEqual(expect.stringContaining('Could not read the working tree')));
+  });
+
+  it('clears the owed dispatch when review spawns, and keeps it when the spawn is gated', async () => {
+    routeMocks.confirmResumedDispatch.mockResolvedValue(true);
+
+    await startRequestReviewPipeline('PAN-3340', { source: 'verification-adoption', resume: true });
+    await vi.waitFor(() => expect(routeMocks.spawnReviewRoleForIssue).toHaveBeenCalledOnce());
+    await vi.waitFor(() => expect(requestReviewPipeline.isInFlight('PAN-3340')).toBe(false));
+    expect(routeMocks.clearVerificationDispatchOwed).toHaveBeenCalledWith('PAN-3340');
+
+    routeMocks.clearVerificationDispatchOwed.mockClear();
+    routeMocks.spawnReviewRoleForIssue.mockReturnValue(Effect.succeed({ success: false, gated: true, message: 'Review dispatch deferred: conflicts' }));
+    await startRequestReviewPipeline('PAN-3340', { source: 'verification-adoption', resume: true });
+    await vi.waitFor(() => expect(routeMocks.spawnReviewRoleForIssue).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() => expect(requestReviewPipeline.isInFlight('PAN-3340')).toBe(false));
+    expect(routeMocks.clearVerificationDispatchOwed).not.toHaveBeenCalled();
   });
 });
