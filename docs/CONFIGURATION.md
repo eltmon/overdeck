@@ -156,25 +156,17 @@ permission flags to `claude`. Overdeck ships with two modes for those flags:
 
 | Mode | Flags passed | Behavior |
 |------|--------------|----------|
-| `auto` (**default since 0.8.16**) | `--permission-mode auto` | Claude Code's built-in classifier auto-approves safe tool calls and **blocks destructive ones** — force pushes, exfiltration, `rm -rf`, writes outside the workspace, etc. |
-| `bypass` | `--dangerously-skip-permissions --permission-mode bypassPermissions` | Historical Overdeck behavior: every tool call auto-approved, no classifier. Use when you genuinely want zero gating, or when an agent runs against a non-Anthropic backend that rejects the `auto` flag. |
+| `auto` (**default for new installations**, PAN-5151) | `--permission-mode default` | Claude Code prompts as usual; Overdeck's own PreToolUse auto-approve hook approves safe tool calls and **blocks destructive ones** — force pushes, exfiltration, `rm -rf`, writes outside the workspace, etc. |
+| `bypass` | `--permission-mode bypassPermissions` | Every tool call auto-approved, no gating. Use when you genuinely want zero gating, or when an agent runs against a backend that has no Overdeck hooks (remote Fly agents require this — see Caveats). |
 
 ### Prereq for `auto` mode
 
-Each user must have **`skipAutoPermissionPrompt: true`** in their own `~/.claude/settings.json`.
-Without it, fresh tmux-spawned agents hang on the one-time auto-mode opt-in dialog (Claude
-Code waits for keyboard confirmation that no autonomous agent will ever provide).
-
-```json
-{
-  "skipDangerousModePermissionPrompt": true,
-  "skipAutoPermissionPrompt": true
-}
-```
-
-`auto` is also gated by Anthropic plan tier — it's available on Max, Team, Enterprise, and
-direct API plans. Pro / Bedrock / Vertex / Foundry users may need to explicitly switch to
-`bypass` (see Override below).
+`pan sync` registers Overdeck's auto-approve hook in `~/.claude/settings.json` (it needs
+`jq`). `pan doctor` reports a `Claude Permission Mode` row that is `error` when resolved
+mode is `auto` and the hook is not registered. Every local Claude Code launch site runs a
+launch guard (`ensureAutoApproveHookReady`, `src/lib/agents/hook-readiness.ts`) that
+registers the hook on demand or refuses the launch — rather than spawning an agent that
+prompts on every tool call with nobody watching.
 
 ### Setting the mode
 
@@ -219,20 +211,31 @@ Highest wins:
 1. **`PAN_YOLO` env var** (`true`/`yes`/`on`/`1` → bypass; `false`/`no`/`off`/`0` → auto)
 2. **`--yolo` CLI flag** (normalized into `PAN_YOLO` before commander parses)
 3. **`claude.permissionMode` in config** (`~/.overdeck/config.yaml`, then `.overdeck.yaml`)
-4. **Default**: `auto`
+4. **Default**: `auto` (new installations)
+
+### Existing installations
+
+Flipping the default would silently change behavior for every installation that
+already resolved `bypass` under the old default. So the first run of the Overdeck
+version that made `auto` the default checks each home once: if `~/.overdeck/config.yaml`,
+`config.toml`, or `overdeck.db` already existed and `claude.permissionMode` was absent or
+held an unrecognized value, it writes `claude.permissionMode: bypass` into
+`~/.overdeck/config.yaml` explicitly. The decision is recorded in
+`~/.overdeck/.claude-permission-mode-pin.json` and never repeats. Delete the
+`claude.permissionMode` key afterward (or set it to `auto` in Settings → Permissions) to
+opt an existing installation into `auto`.
 
 ### Caveats
 
-- **`claudish`-routed providers** (Kimi, MiniMax, GLM, OpenRouter, Mimo, OpenAI non-subscription, Google CodeAssist) are **always pinned to `bypass`**, regardless of config. `auto` is a Claude Code research-preview feature that doesn't translate through claudish to the upstream provider. Tracked in [#1015](https://github.com/eltmon/overdeck/issues/1015) — once claudish is fully replaced by CLIProxy, every provider will honor the config.
-- **CLIProxy-routed OpenAI subscription** does honor the config — `claude` is still the binary, only `ANTHROPIC_BASE_URL` points at the local sidecar.
-- Settings on **`~/.claude/settings.json`** are per-user, not per-project. Each developer needs `skipAutoPermissionPrompt: true` on their own machine. Overdeck doesn't write this for you.
+- **CLIProxy-routed OpenAI subscription** honors the config — `claude` is still the binary, only `ANTHROPIC_BASE_URL` points at the local sidecar.
+- **Remote Fly agents require `bypass`.** A Fly VM carries no Overdeck hooks, so `auto` there would prompt forever on a machine nobody is watching; a remote launch under `auto` is refused with an error naming `bypass` or `PAN_YOLO=true`.
+- Settings on **`~/.claude/settings.json`** are per-user, not per-project. `pan sync` registers the auto-approve hook for the current user; it is not shared across machines.
 
-### When to switch back to `bypass`
+### When to switch to `bypass`
 
-- Running an Anthropic plan that doesn't include the auto-mode preview
-- Using Bedrock / Vertex / Foundry routing where the `auto` flag is rejected
-- Doing intentionally destructive automation (data migration, bulk file rewrites, etc.) where the classifier is just adding latency
-- Reproducing pre-0.8.16 behavior for a regression hunt
+- Doing intentionally destructive automation (data migration, bulk file rewrites, etc.) where the hook's gating is just adding latency
+- An agent runs against a backend with no Overdeck hooks (e.g. a remote Fly agent)
+- You want zero gating and accept the risk
 
 ---
 
