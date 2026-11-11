@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5124",
   "created": "2026-11-11T07:40:41.890Z",
-  "updated": "2026-11-11T08:33:40.106Z",
+  "updated": "2026-11-11T08:33:46.741Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -250,6 +250,11 @@
     "docs-config-routing.ac3": {
       "status": "completed",
       "doneAt": "2026-11-11T08:33:40.105Z"
+    },
+    "docs-model-calls": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5124",
+      "claimedAt": "2026-11-11T08:33:46.740Z"
     }
   }
 }
