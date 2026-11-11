@@ -715,3 +715,9 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
 - Cause: a launch from a non-live-generation process rewrites the shim to its own bundle (pan-cli-shim D-3). Filed PAN-5139.
 - Handoff PRs have no work agent, so conflict repair escalates as `unreachable`; relay conflicts to the handoff conversation with `pan tell`. Check `git merge-tree` output before saying "changelog only".
 - Workspace Docker stacks keep a 1.9 GB `container-node-modules` volume each, not counted in the workspace folder size; `docker compose -p overdeck-feature-<id> down -v` frees it for an issue that no longer needs its stack.
+
+## 2026-11-11 — operator priority: PAN-5153, then PAN-5152, then PAN-5151
+- Operator (via conv-20261111-9538): PAN-5153 (GitHub org acting identity) first, PAN-5152 (Jira tracker) second, PAN-5151 (permissionMode auto default) third, all ahead of the rest of the released list.
+- Release is owned by conv-20261111-9538: the Flywheel does NOT run `pan release`. Tell that conversation the merge commit when PAN-5153 merges with main CI green, and when PAN-5152 merges; `pan reload` after each. Report any stall or park on these three to it in one message.
+- PAN-5153 touches the agents runtime and merge routes; started with `pan start` on the operator's explicit order (TENET-10 bars only auto-starts).
+- CI runner flake seen on PR #5150: "Temporary failure resolving 'azure.archive.ubuntu.com'" while installing Playwright browsers kills test shards in setup. Not a code failure: `gh run rerun <run> --failed` after the run completes.
