@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5070",
   "created": "2026-11-11T07:26:39.792Z",
-  "updated": "2026-11-11T07:37:20.463Z",
+  "updated": "2026-11-11T07:37:29.993Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -30,6 +30,11 @@
     "w1-connector-ttl.ac4": {
       "status": "completed",
       "doneAt": "2026-11-11T07:37:20.463Z"
+    },
+    "w2-request-store": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5070",
+      "claimedAt": "2026-11-11T07:37:29.993Z"
     }
   }
 }
