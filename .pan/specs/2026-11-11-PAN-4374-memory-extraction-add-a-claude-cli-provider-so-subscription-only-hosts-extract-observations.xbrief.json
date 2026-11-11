@@ -4,17 +4,17 @@
     "created": "2026-11-11T12:21:58Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4374: Memory extraction: add a claude-cli provider so subscription-only hosts extract observations",
-    "updated": "2026-11-11T12:36:23.613Z"
+    "updated": "2026-11-11T12:37:48.021Z"
   },
   "plan": {
     "id": "pan-4374",
     "title": "Memory extraction: add a claude-cli provider so subscription-only hosts extract observations",
-    "status": "proposed",
+    "status": "running",
     "uid": "ca57f4d9-399c-4a8b-b706-ed0ca6773263",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-11T12:21:58Z",
-    "updated": "2026-11-11T12:36:23.613Z",
+    "updated": "2026-11-11T12:37:48.021Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4374",
@@ -598,5 +598,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
