@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5124",
   "created": "2026-11-11T07:40:41.890Z",
-  "updated": "2026-11-11T07:46:57.059Z",
+  "updated": "2026-11-11T07:46:58.708Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -80,6 +80,11 @@
     "requirements-background-models.ac3": {
       "status": "completed",
       "doneAt": "2026-11-11T07:46:57.058Z"
+    },
+    "chunk-budget-default-model": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5124",
+      "claimedAt": "2026-11-11T07:46:58.708Z"
     }
   }
 }
