@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5072",
   "created": "2026-11-11T10:00:36.495Z",
-  "updated": "2026-11-11T10:23:53.360Z",
+  "updated": "2026-11-11T10:24:02.873Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -164,6 +164,11 @@
     "w8-grokbuild-readme.ac3": {
       "status": "completed",
       "doneAt": "2026-11-11T10:23:53.360Z"
+    },
+    "w9-cli-docs": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5072",
+      "claimedAt": "2026-11-11T10:24:02.873Z"
     }
   }
 }
