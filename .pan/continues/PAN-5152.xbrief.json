@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5152",
   "created": "2026-11-11T14:36:40.308Z",
-  "updated": "2026-11-11T16:06:13.675Z",
+  "updated": "2026-11-11T16:09:38.471Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -392,9 +392,18 @@
       "doneAt": "2026-11-11T16:06:05.158Z"
     },
     "wi22-cli-project-jira": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5152",
-      "claimedAt": "2026-11-11T16:06:13.675Z"
+      "claimedAt": "2026-11-11T16:06:13.675Z",
+      "doneAt": "2026-11-11T16:09:38.470Z"
+    },
+    "wi22-cli-project-jira.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T16:09:38.470Z"
+    },
+    "wi22-cli-project-jira.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T16:09:38.470Z"
     }
   }
 }
