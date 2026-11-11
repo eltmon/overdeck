@@ -33,7 +33,8 @@
   <li>A random install id that the app creates, so your machines can tell your phones apart.</li>
   <li>The push token Apple or Google gives the app, so we can deliver notifications to your phone.</li>
   <li>If you use the relay plan: the number of bytes relayed for your account, to meter the plan. We count bytes; we cannot read them.</li>
-  <li>When the Overdeck machine you open has anonymous telemetry on, the app sends anonymous diagnostics to PostHog: which API route failed and its HTTP status (exact for common codes, otherwise the status class), link failures and recoveries, and app crashes without their messages. Events carry the machine's anonymous install id, the platform and app version, never conversation content, names, labels, URLs or your GitHub identity. Turning telemetry off in the machine's Settings stops it.</li>
+  <li>When the Overdeck machine you open has anonymous telemetry on, the app sends anonymous diagnostics to PostHog: which API route failed and its HTTP status (exact for common codes, otherwise the status class), link failures and recoveries, and app crashes without their messages. Events carry the machine's anonymous install id, the platform and app version, never conversation content, notification text, names, labels or URLs. Turning telemetry off in the machine's Settings stops it.</li>
+  <li>Operator grouping is a separate machine setting and is off by default. Only when it is on do the diagnostics also carry an operator hash, which links them to your GitHub account like the data above.</li>
 </ul>
 
 <h2>What we cannot see</h2>
