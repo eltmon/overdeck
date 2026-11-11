@@ -23,7 +23,7 @@ import {
 import { CopyField } from './McpUrlDialog';
 
 export type ConnectBotResult =
-  | { kind: 'connector'; pairingString: string; expiresAt: string }
+  | { kind: 'connector'; pairingString: string; expiresAt: string; message: string; copied: boolean }
   | { kind: 'token'; reach: 'tailscale' | 'this-computer'; token: string; origin: string; tailscaleSetUp: boolean }
   | { kind: 'public'; url: string; urlUnknown: boolean; name: string; scopes: readonly string[] };
 
@@ -37,9 +37,11 @@ function configLabelFor(platform: BotPlatform): string {
   return BOT_PLATFORMS.find((entry) => entry.id === platform)?.label ?? platform;
 }
 
-function connectorConfigFor(platform: BotPlatform): string {
+/** PAN-5070 W-7: null for Grok Bot — it connects with `connectMessage`, not a static config block. */
+function connectorConfigFor(platform: BotPlatform): string | null {
   if (platform === 'hermes') return hermesConfig({ reach: 'connector', url: CONNECTOR_LOCAL_URL });
   if (platform === 'openclaw') return openclawConfig({ reach: 'connector', url: CONNECTOR_LOCAL_URL });
+  if (platform === 'grok-bot') return null;
   return grokBuildMcpJson();
 }
 
@@ -55,19 +57,34 @@ export function ConnectBotOutput({ platform, result, onDone }: ConnectBotOutputP
   const { data: environment } = useQuery({ queryKey: ANYWHERE_ENVIRONMENT_QUERY_KEY, queryFn: loadEnvironment });
   const version = environment?.serverVersion ?? 'latest'; // D-11
   const label = configLabelFor(platform);
+  const connectorConfig = connectorConfigFor(platform);
 
   return (
     <div className="space-y-3">
       {result.kind === 'connector' && (
         <>
-          <CopyField label="Pairing string" value={result.pairingString} />
+          <p className="text-xs text-foreground">
+            {result.copied ? `Copied — paste it into ${label}.` : 'Could not copy automatically. Copy the message below.'}
+          </p>
           <p className="text-xs text-muted-foreground">{pairingExpiresInText(Date.parse(result.expiresAt))}</p>
-          <CopyField
-            label="Connector commands"
-            value={connectorCommands({ version, pairingString: result.pairingString, serve: platform !== 'grok-build' })}
-            multiline
-          />
-          <CopyField label={`${label} config`} value={connectorConfigFor(platform)} multiline />
+          <CopyField label="Message" value={result.message} multiline />
+          <p className="text-xs text-muted-foreground">
+            It also waits under Settings → Anywhere → Bots until the bot connects.
+          </p>
+          <details className="text-xs">
+            <summary className="cursor-pointer text-muted-foreground">Set up by hand instead</summary>
+            <div className="space-y-3 pt-2">
+              <CopyField label="Pairing string" value={result.pairingString} />
+              <CopyField
+                label="Connector commands"
+                value={connectorCommands({ version, pairingString: result.pairingString, serve: platform !== 'grok-build' })}
+                multiline
+              />
+              {connectorConfig !== null && (
+                <CopyField label={`${label} config`} value={connectorConfig} multiline />
+              )}
+            </div>
+          </details>
         </>
       )}
       {result.kind === 'token' && (

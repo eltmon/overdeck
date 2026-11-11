@@ -38,6 +38,11 @@ import {
   loadAnywhereStatus,
   type McpSignInApproval,
 } from '../components/Settings/anywhere/anywhereApi';
+import {
+  BOTS_CONNECTOR_NOTICES_QUERY_KEY,
+  fetchConnectorNotices,
+  type ConnectorNoticeRow,
+} from '../components/Settings/anywhere/botsApi';
 
 /** A conversation with an open blocking surface, as served by the REST door. */
 export interface ConversationPendingInputRow {
@@ -147,6 +152,8 @@ export interface Decision {
   harnessUpdate?: HarnessAutoUpdateFailure;
   /** PAN-5091: set on the terminal-backend restart recovery offer; the card ignores `source`. */
   backendRestart?: BackendRestartRecoverySnapshot;
+  /** PAN-5070 — set on a connector-paired notice; the card ignores `source`. */
+  connectorNotice?: ConnectorNoticeRow;
 }
 
 /**
@@ -255,6 +262,19 @@ export function mcpSignInDecisions(rows: ReadonlyArray<McpSignInApproval>): Deci
     since: row.createdAt,
     blocking: true,
     mcpSignIn: row,
+  }));
+}
+
+/** PAN-5070 — one non-blocking notice per bot that paired in the last 24 h. */
+export function connectorNoticeDecisions(rows: ReadonlyArray<ConnectorNoticeRow>): Decision[] {
+  return rows.map((row) => ({
+    id: `connector-notice:${row.id}`,
+    source: 'agent',
+    label: `${row.name} connected`,
+    kinds: ['connectorConnected'],
+    since: row.pairedAt,
+    blocking: false,
+    connectorNotice: row,
   }));
 }
 
@@ -512,6 +532,13 @@ export function useDecisions(): Decision[] {
     refetchInterval: 5000,
     enabled: canSeeMcpSignIns,
   });
+  // PAN-5070 — same stale-cache reason as the MCP sign-in block above.
+  const { data: connectorNotices = [] } = useQuery({
+    queryKey: BOTS_CONNECTOR_NOTICES_QUERY_KEY,
+    queryFn: ({ signal }) => fetchConnectorNotices(signal),
+    refetchInterval: 5000,
+    enabled: canSeeMcpSignIns,
+  });
 
   return useMemo(() => {
     const out: Decision[] = [...fleetDecisions(fleet.machines), ...unreachableMachineDecisions(fleet.unreachable)];
@@ -569,6 +596,7 @@ export function useDecisions(): Decision[] {
     // from root to device could otherwise still see a stale approval's detail.
     if (canSeeMcpSignIns) {
       out.push(...mcpSignInDecisions(Array.isArray(mcpSignInApprovals) ? mcpSignInApprovals : []));
+      out.push(...connectorNoticeDecisions(Array.isArray(connectorNotices) ? connectorNotices : []));
     }
 
     // Blocking first, then oldest first — the longest-stalled agent is the one
@@ -579,5 +607,5 @@ export function useDecisions(): Decision[] {
       return a.since.localeCompare(b.since);
     });
     return out;
-  }, [agentSubjects, convRows, fleet, agentRequestRows, mcpSignInApprovals, canSeeMcpSignIns, titleByIssueId, diskAlert, harnessAutoUpdate, backendRestart]);
+  }, [agentSubjects, convRows, fleet, agentRequestRows, mcpSignInApprovals, connectorNotices, canSeeMcpSignIns, titleByIssueId, diskAlert, harnessAutoUpdate, backendRestart]);
 }

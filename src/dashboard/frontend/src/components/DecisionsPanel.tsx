@@ -18,6 +18,7 @@ import { getPendingQuestionTitle } from '../lib/pipeline-state';
 import { AgentRequestCard } from './AgentRequestCard';
 import { DiskAlertCard } from './DiskAlertCard';
 import { UnreachableMachineCard } from './UnreachableMachineCard';
+import { ConnectorNoticeCard } from './ConnectorNoticeCard';
 import { HarnessUpdateCard } from './HarnessUpdateCard';
 import { BackendRestartCard } from './BackendRestartCard';
 import { McpSignInCard } from './McpSignInCard';
@@ -160,6 +161,9 @@ function Group({ title, hint, decisions, onOpenSubject }: { title: string; hint:
           // PAN-5091: conversations a terminal-backend restart stopped, with Resume all.
           : d.backendRestart
           ? <BackendRestartCard key="backend-restart" decision={d} />
+          // PAN-5070 — a connector-paired notice has its own card, checked before mcpSignIn.
+          : d.connectorNotice
+          ? <ConnectorNoticeCard key={`connector-notice:${d.id}`} decision={d} />
           // PAN-4946 — an MCP sign-in has its own card, checked before agentRequest.
           : d.mcpSignIn
           ? <McpSignInCard key={`mcp-sign-in:${d.id}`} decision={d} />
@@ -179,7 +183,7 @@ export function DecisionsPanel({ onOpenSubject }: { onOpenSubject?: (d: Decision
   // PAN-5108 — a failed harness update is machine state too.
   // PAN-5111 — so is an unreachable linked machine.
   // PAN-5091: and the conversations a terminal-backend restart stopped.
-  const isSystem = (d: Decision) => Boolean(d.diskAlert || d.harnessUpdate || d.unreachableMachine || d.backendRestart);
+  const isSystem = (d: Decision) => Boolean(d.diskAlert || d.harnessUpdate || d.unreachableMachine || d.connectorNotice || d.backendRestart);
   const system = decisions.filter(isSystem);
   const blocking = decisions.filter((d) => d.blocking && !isSystem(d));
   const waiting = decisions.filter((d) => !d.blocking && !isSystem(d));

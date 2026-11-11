@@ -83,9 +83,11 @@ function postedTo(path: string): boolean {
   return fetchMock.mock.calls.some(([input, init]) => input.toString() === path && (init as RequestInit | undefined)?.method === 'POST');
 }
 
-async function renderDialog(opts: { serveUrl?: string | null; publicMcp?: PublicMcpStatus } = {}) {
+async function renderDialog(opts: { serveUrl?: string | null; publicMcp?: PublicMcpStatus; clipboardRejects?: boolean } = {}) {
   const user = userEvent.setup();
-  const writeText = vi.fn(async () => undefined);
+  const writeText = opts.clipboardRejects
+    ? vi.fn(async () => { throw new Error('clipboard refused'); })
+    : vi.fn(async () => undefined);
   Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   if ('serveUrl' in opts) {
@@ -102,7 +104,7 @@ async function renderDialog(opts: { serveUrl?: string | null; publicMcp?: Public
       <ConnectBotDialog open onClose={() => undefined} />
     </QueryClientProvider>,
   );
-  return { user };
+  return { user, writeText };
 }
 
 describe('ConnectBotDialog (PAN-4951 WI-3, WI-4)', () => {
@@ -114,12 +116,13 @@ describe('ConnectBotDialog (PAN-4951 WI-3, WI-4)', () => {
     mockServer();
     const { user } = await renderDialog();
 
-    await user.click(screen.getByRole('button', { name: 'Create pairing code' }));
-    await screen.findByLabelText('Pairing string');
+    await user.click(screen.getByRole('button', { name: 'Copy for Hermes' }));
+    await screen.findByLabelText('Message');
 
     const body = postedBody('/api/connectors/pairing');
     expect(body.scopes).toEqual(['read:state', 'read:conversations', 'tell']);
     expect(body.name).toBe('Hermes bot');
+    expect(body.platform).toBe('hermes');
   });
 
   it('adds approve to the body once it is ticked', async () => {
@@ -127,8 +130,8 @@ describe('ConnectBotDialog (PAN-4951 WI-3, WI-4)', () => {
     const { user } = await renderDialog();
 
     await user.click(screen.getByLabelText('Approve', { exact: false }));
-    await user.click(screen.getByRole('button', { name: 'Create pairing code' }));
-    await screen.findByLabelText('Pairing string');
+    await user.click(screen.getByRole('button', { name: 'Copy for Hermes' }));
+    await screen.findByLabelText('Message');
 
     expect(postedBody('/api/connectors/pairing').scopes).toContain('approve');
   });
@@ -141,17 +144,19 @@ describe('ConnectBotDialog (PAN-4951 WI-3, WI-4)', () => {
     expect(screen.getByLabelText('Read state (always on)')).toBeDisabled();
 
     await user.click(screen.getByLabelText('Send messages'));
-    await user.click(screen.getByRole('button', { name: 'Create pairing code' }));
-    await screen.findByLabelText('Pairing string');
+    await user.click(screen.getByRole('button', { name: 'Copy for Hermes' }));
+    await screen.findByLabelText('Message');
 
     expect(postedBody('/api/connectors/pairing').scopes).not.toContain('tell');
   });
 
-  it('renders a parseable pairing string and the connector pair command with the server version', async () => {
+  it('renders a parseable pairing string and the connector pair command with the server version, inside "Set up by hand instead"', async () => {
     mockServer();
     const { user } = await renderDialog();
 
-    await user.click(screen.getByRole('button', { name: 'Create pairing code' }));
+    await user.click(screen.getByRole('button', { name: 'Copy for Hermes' }));
+    await screen.findByLabelText('Message');
+    await user.click(screen.getByText('Set up by hand instead'));
 
     const pairingField = await screen.findByLabelText('Pairing string');
     expect(parseConnectorPairLink((pairingField as HTMLInputElement).value)).not.toBeNull();
@@ -166,9 +171,38 @@ describe('ConnectBotDialog (PAN-4951 WI-3, WI-4)', () => {
     mockServer({ pairingStatus: 403 });
     const { user } = await renderDialog();
 
-    await user.click(screen.getByRole('button', { name: 'Create pairing code' }));
+    await user.click(screen.getByRole('button', { name: 'Copy for Hermes' }));
 
     expect(await screen.findByText('Only a browser on this machine can connect bots.')).toBeInTheDocument();
+  });
+
+  it('copies the connect message to the clipboard and shows "Copied — paste it into Hermes." (PAN-5070 W-9)', async () => {
+    mockServer();
+    const { user, writeText } = await renderDialog();
+
+    await user.click(screen.getByRole('button', { name: 'Copy for Hermes' }));
+    await screen.findByLabelText('Message');
+
+    expect(postedBody('/api/connectors/pairing').platform).toBe('hermes');
+    expect(writeText).toHaveBeenCalledTimes(1);
+    const copiedText = String(writeText.mock.calls[0]![0]);
+    expect(copiedText).toContain("mcp connector connect '");
+    expect(copiedText).toContain('--platform hermes');
+    expect(screen.getByText('Copied — paste it into Hermes.')).toBeInTheDocument();
+
+    const messageField = screen.getByLabelText('Message');
+    expect(String((messageField as HTMLTextAreaElement).value)).toBe(copiedText);
+  });
+
+  it('shows the fallback sentence and the same message text when the clipboard write rejects', async () => {
+    mockServer();
+    const { user } = await renderDialog({ clipboardRejects: true });
+
+    await user.click(screen.getByRole('button', { name: 'Copy for Hermes' }));
+    const messageField = await screen.findByLabelText('Message');
+
+    expect(screen.getByText('Could not copy automatically. Copy the message below.')).toBeInTheDocument();
+    expect(String((messageField as HTMLTextAreaElement).value)).toContain("mcp connector connect '");
   });
 
   it('defaults Grok Build to the This computer reach and sends the default scopes to /api/access-tokens', async () => {
@@ -223,14 +257,28 @@ describe('ConnectBotDialog (PAN-4951 WI-3, WI-4)', () => {
     expect(screen.getByText(/Tailscale Serve is not set up on this machine yet/)).toBeInTheDocument();
   });
 
-  it('renders only the Public MCP reach for Grok Bot', async () => {
+  it('offers the connector reach first for Grok Bot (PAN-5070 W-7)', async () => {
     mockServer();
     const { user } = await renderDialog({ publicMcp: publicMcpBody(false, null) });
 
     await user.click(screen.getByLabelText('Grok Bot'));
 
+    expect(screen.getByLabelText('Overdeck connector')).toBeChecked();
     expect(screen.getByLabelText('Public MCP')).toBeInTheDocument();
-    expect(screen.queryByLabelText('Overdeck connector')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Send messages')).toBeInTheDocument();
+  });
+
+  it('renders the OAuth approval note for Grok Bot on Public MCP, not on the connector reach', async () => {
+    mockServer();
+    const { user } = await renderDialog({ publicMcp: publicMcpBody(true, 'https://box.tail1.ts.net:8443/mcp') });
+
+    await user.click(screen.getByLabelText('Grok Bot'));
+    expect(screen.queryByText(/You choose the access level when you approve the sign-in/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Send messages')).toBeInTheDocument();
+
+    await user.click(screen.getByLabelText('Public MCP'));
+    expect(screen.getByText(/You choose the access level when you approve the sign-in/)).toBeInTheDocument();
+    expect(screen.queryByLabelText('Send messages')).not.toBeInTheDocument();
   });
 
   it('renders "Public MCP is off" and sends no POST when the switch is off', async () => {
@@ -238,6 +286,7 @@ describe('ConnectBotDialog (PAN-4951 WI-3, WI-4)', () => {
     const { user } = await renderDialog({ publicMcp: publicMcpBody(false, null) });
 
     await user.click(screen.getByLabelText('Grok Bot'));
+    await user.click(screen.getByLabelText('Public MCP'));
 
     expect(screen.getByText(/Public MCP is off/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Show Public MCP settings' })).toBeInTheDocument();
@@ -250,6 +299,7 @@ describe('ConnectBotDialog (PAN-4951 WI-3, WI-4)', () => {
     const { user } = await renderDialog();
 
     await user.click(screen.getByLabelText('Grok Bot'));
+    await user.click(screen.getByLabelText('Public MCP'));
 
     expect(await screen.findByText(/Public MCP is off/)).toBeInTheDocument();
     expect(fetchMock.mock.calls.some(([input]) => input.toString() === '/api/mcp/public')).toBe(true);
@@ -265,6 +315,7 @@ describe('ConnectBotDialog (PAN-4951 WI-3, WI-4)', () => {
     });
 
     await user.click(screen.getByLabelText('Grok Bot'));
+    await user.click(screen.getByLabelText('Public MCP'));
     await user.click(screen.getByRole('button', { name: 'Show setup' }));
 
     const mcpJson = await screen.findByLabelText("Grok Bot mcp.json");

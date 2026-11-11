@@ -167,6 +167,8 @@ function ReadOnlyAction({ decision }: { decision: Decision }) {
   if (decision.harnessUpdate) return <p className="px-4 pb-3 text-xs text-muted-foreground">Update failed. Overdeck retries at the next daily check.</p>;
   // PAN-5091: Resume all runs from the desktop dashboard's Needs you card.
   if (decision.backendRestart) return <p className="px-4 pb-3 text-xs text-muted-foreground">Resume all from the desktop dashboard.</p>;
+  // PAN-5070 — a connector notice is revoked or dismissed only under Settings → Anywhere → Bots.
+  if (decision.connectorNotice) return <p className="px-4 pb-3 text-xs text-muted-foreground">Connected. Revoke it under Settings → Anywhere → Bots.</p>;
   // PAN-4946 — an MCP sign-in is approved or denied only on this machine's own desktop dashboard.
   if (decision.mcpSignIn) return <p className="px-4 pb-3 text-xs text-muted-foreground">Approve on the desktop</p>;
   // PAN-4941 — a secret request is answered only on this machine's own desktop dashboard.

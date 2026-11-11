@@ -36,7 +36,9 @@ export type PendingInputKind =
   /** PAN-5108 — the daily background update of a coding-agent CLI failed. */
   | 'harnessUpdateFailed'
   /** PAN-5091: conversations stopped when the terminal backend restarted. */
-  | 'backendRestart';
+  | 'backendRestart'
+  /** PAN-5070 — a bot connector just paired with this machine. */
+  | 'connectorConnected';
 
 /** Short label for a single kind (used in tooltips, joined by comma). */
 export const PENDING_INPUT_KIND_LABEL: Record<string, string> = {
@@ -58,6 +60,7 @@ export const PENDING_INPUT_KIND_LABEL: Record<string, string> = {
   machineUnreachable: "Can't reach machine",
   harnessUpdateFailed: 'Coding agent update failed',
   backendRestart: 'Stopped by a terminal-backend restart',
+  connectorConnected: 'Bot connected',
 };
 
 /** PAN-4371 — replaces "Answer the agent" when Jev read the turn end with confidence. */

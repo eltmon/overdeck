@@ -63,16 +63,30 @@ function prune(now: number): void {
   }
 }
 
-export function issuePairingCredential(): { credential: string; expiresAt: string } {
+export function issuePairingCredential(opts: { ttlMs?: number } = {}): { credential: string; expiresAt: string } {
   const now = Date.now();
   prune(now);
   const credential = `${PAIRING_CREDENTIAL_PREFIX}${randomBytes(32).toString('hex')}`;
-  const expiresAt = now + PAIRING_CREDENTIAL_TTL_MS;
+  const expiresAt = now + (opts.ttlMs ?? PAIRING_CREDENTIAL_TTL_MS);
   const { psk, pairingId } = pairingSecrets(nodeCrypto, credential);
   const hash = hashCredential(credential);
   pending.set(hash, { expiresAt, psk, pairingId });
   byPairingId.set(pairingId, hash);
   return { credential, expiresAt: new Date(expiresAt).toISOString() };
+}
+
+/** 'live' before expiry, 'expired' after, 'gone' once used, revoked or pruned. Never consumes. */
+export function pairingCredentialState(pairingId: string): 'live' | 'expired' | 'gone' {
+  const hash = byPairingId.get(pairingId);
+  const entry = hash === undefined ? undefined : pending.get(hash);
+  if (entry === undefined) return 'gone';
+  return Date.now() > entry.expiresAt ? 'expired' : 'live';
+}
+
+/** Burn the credential behind `pairingId` (a cancelled connector request). True when one was removed. */
+export function revokePairingById(pairingId: string): boolean {
+  const hash = byPairingId.get(pairingId);
+  return hash !== undefined && remove(hash) !== undefined;
 }
 
 /** Consume a credential. Any outcome removes it, so a second attempt is `unknown`. */
