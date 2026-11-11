@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5072",
   "created": "2026-11-11T10:00:36.495Z",
-  "updated": "2026-11-11T10:17:14.201Z",
+  "updated": "2026-11-11T10:19:42.674Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -112,9 +112,22 @@
       "doneAt": "2026-11-11T10:17:04.347Z"
     },
     "w6-hermes-readme": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5072",
-      "claimedAt": "2026-11-11T10:17:14.201Z"
+      "claimedAt": "2026-11-11T10:17:14.201Z",
+      "doneAt": "2026-11-11T10:19:42.674Z"
+    },
+    "w6-hermes-readme.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T10:19:42.674Z"
+    },
+    "w6-hermes-readme.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T10:19:42.674Z"
+    },
+    "w6-hermes-readme.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T10:19:42.674Z"
     }
   }
 }
