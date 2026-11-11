@@ -4,7 +4,8 @@
  * POST /oauth/device/code mints a device code and an 8-letter user code (both stored as hashes); the user types
  * the code at /activate, confirms, and completes the GitHub leg; the CLI polls POST /oauth/token with
  * grant_type=urn:ietf:params:oauth:grant-type:device_code and gets authorization_pending, slow_down,
- * access_denied, expired_token or the token.
+ * access_denied, expired_token or the token. The device-code request may also carry client_name/target_name
+ * (the bot and the machine, PAN-5071 FR-19); they are stored as display-only claims and shown on the confirm step.
  */
 import { randomHex, sha256Hex, userCode } from './crypto.ts';
 import { defaultLabel, isValidEnvironmentId, isValidPlatform, mintDevice } from './devices.ts';
@@ -40,6 +41,8 @@ interface DeviceGrantRow {
   user_code_hash: string;
   platform: string;
   environment_id: string;
+  client_name: string | null;
+  target_name: string | null;
   status: GrantStatus;
   user_id: string | null;
   interval_s: number;
@@ -68,15 +71,17 @@ export const issueCode: Handler = async (req, rc) => {
   const deviceCode = `oddc_${randomHex(32)}`;
   const deviceCodeHash = await sha256Hex(deviceCode);
   const now = rc.deps.now();
+  const clientName = deviceName(form.get('client_name'));
+  const targetName = deviceName(form.get('target_name'));
   let code = '';
   for (let attempt = 0; attempt < 3; attempt++) {
     code = userCode();
     try {
       await rc.env.DB.prepare(
-        `INSERT INTO device_grants (device_code_hash, user_code_hash, platform, environment_id, status, interval_s, created_at, expires_at)
-         VALUES (?, ?, ?, ?, 'pending', ?, ?, ?)`,
+        `INSERT INTO device_grants (device_code_hash, user_code_hash, platform, environment_id, client_name, target_name, status, interval_s, created_at, expires_at)
+         VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)`,
       )
-        .bind(deviceCodeHash, await sha256Hex(code), platform, environmentId, DEVICE_POLL_INTERVAL_S, now, now + DEVICE_GRANT_TTL_MS)
+        .bind(deviceCodeHash, await sha256Hex(code), platform, environmentId, clientName, targetName, DEVICE_POLL_INTERVAL_S, now, now + DEVICE_GRANT_TTL_MS)
         .run();
       break;
     } catch (error) {
@@ -93,6 +98,16 @@ export const issueCode: Handler = async (req, rc) => {
     interval: DEVICE_POLL_INTERVAL_S,
   });
 };
+
+export const DEVICE_NAME_MAX = 64;
+const NAME_STRIP = /[\p{Cc}‎‏‪-‮⁦-⁩]/gu;
+
+/** A bot or machine name from a device-code request (PAN-5071 FR-25): a display-only claim, cleaned, at most 64 code points, else null. */
+export function deviceName(value: string | null | undefined): string | null {
+  if (value === null || value === undefined) return null;
+  const cleaned = Array.from(value.replace(NAME_STRIP, '').trim()).slice(0, DEVICE_NAME_MAX).join('').trim();
+  return cleaned === '' ? null : cleaned;
+}
 
 function activateForm(prefill: string, error: string | null): string {
   const notice = error ? `<p class="warn">${escapeHtml(error)}</p>` : '';

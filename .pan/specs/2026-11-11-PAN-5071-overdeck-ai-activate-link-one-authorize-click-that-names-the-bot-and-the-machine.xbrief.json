@@ -4,17 +4,17 @@
     "created": "2026-11-11T07:11:22Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5071: overdeck.ai activate link: one Authorize click that names the bot and the machine",
-    "updated": "2026-11-11T07:15:27.452Z"
+    "updated": "2026-11-11T07:16:46.251Z"
   },
   "plan": {
     "id": "pan-5071",
     "title": "overdeck.ai activate link: one Authorize click that names the bot and the machine",
-    "status": "proposed",
+    "status": "running",
     "uid": "6d9be57e-e5b6-47e1-8339-bc1159e0b6a9",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-11T07:11:22Z",
-    "updated": "2026-11-11T07:15:27.452Z",
+    "updated": "2026-11-11T07:16:46.251Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5071",
@@ -455,5 +455,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }

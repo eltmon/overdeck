@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEVICE_GRANT_TTL_MS, DEVICE_CONNECTED_MESSAGE, INVALID_CODE_MESSAGE, REQUEST_REJECTED_MESSAGE, TOO_MANY_WRONG_CODES_MESSAGE } from '../../../../services/account/src/device-flow.ts';
+import { DEVICE_GRANT_TTL_MS, DEVICE_CONNECTED_MESSAGE, DEVICE_NAME_MAX, deviceName, INVALID_CODE_MESSAGE, REQUEST_REJECTED_MESSAGE, TOO_MANY_WRONG_CODES_MESSAGE } from '../../../../services/account/src/device-flow.ts';
 import { verifyDeviceToken } from '../../../../services/account/src/devices.ts';
 import type { Env } from '../../../../services/account/src/env.ts';
 import type { GitHubIdentity } from '../../../../services/account/src/github.ts';
@@ -228,5 +228,48 @@ describe('device flow (PAN-4293 account-device-flow, RFC 8628)', () => {
     const failed = a.status === 400 ? a : b;
     expect(await failed.json()).toEqual({ error: 'invalid_grant' });
     expect(await dbOf(env).prepare('SELECT COUNT(*) AS n FROM devices').first<number>('n')).toBe(1);
+  });
+
+  describe('device grant names (PAN-5071)', () => {
+    it('cleans and stores client_name and target_name', async () => {
+      const { env, deps } = setup();
+      const res = await call('POST', '/oauth/device/code', { env, deps, ip: CLI_IP, ...form({ platform: 'linux-x64', environment_id: ENV_ID, client_name: '  grok-bot  ', target_name: 'eltmon-desktop' }) });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as CodeResponse;
+      expect(Object.keys(body).sort()).toEqual(['device_code', 'expires_in', 'interval', 'user_code', 'verification_uri', 'verification_uri_complete'].sort());
+      const row = await dbOf(env).prepare('SELECT client_name, target_name FROM device_grants').first<{ client_name: string | null; target_name: string | null }>();
+      expect(row).toEqual({ client_name: 'grok-bot', target_name: 'eltmon-desktop' });
+    });
+
+    it('cuts a client_name over 64 characters to the first 64', async () => {
+      const { env, deps } = setup();
+      const long = 'a'.repeat(70);
+      await call('POST', '/oauth/device/code', { env, deps, ip: CLI_IP, ...form({ platform: 'linux-x64', environment_id: ENV_ID, client_name: long, target_name: '' }) });
+      const row = await dbOf(env).prepare('SELECT client_name, target_name FROM device_grants').first<{ client_name: string | null; target_name: string | null }>();
+      expect(row).toEqual({ client_name: 'a'.repeat(64), target_name: null });
+    });
+
+    it('stores null for a whitespace-only client_name and an absent target_name', async () => {
+      const { env, deps } = setup();
+      await call('POST', '/oauth/device/code', { env, deps, ip: CLI_IP, ...form({ platform: 'linux-x64', environment_id: ENV_ID, client_name: '   ' }) });
+      const row = await dbOf(env).prepare('SELECT client_name, target_name FROM device_grants').first<{ client_name: string | null; target_name: string | null }>();
+      expect(row).toEqual({ client_name: null, target_name: null });
+    });
+
+    it('strips bidi controls and newlines from client_name', async () => {
+      const { env, deps } = setup();
+      await call('POST', '/oauth/device/code', { env, deps, ip: CLI_IP, ...form({ platform: 'linux-x64', environment_id: ENV_ID, client_name: 'grok‮bot\n' }) });
+      const row = await dbOf(env).prepare('SELECT client_name FROM device_grants').first<{ client_name: string | null }>();
+      expect(row).toEqual({ client_name: 'grokbot' });
+    });
+
+    it('deviceName(): null/undefined → null; over-length input is cut to DEVICE_NAME_MAX code points', () => {
+      expect(deviceName(null)).toBeNull();
+      expect(deviceName(undefined)).toBeNull();
+      const emoji = '\u{1F600}'.repeat(65);
+      const cut = deviceName(emoji);
+      expect(cut).not.toBeNull();
+      expect(Array.from(cut ?? '').length).toBe(DEVICE_NAME_MAX);
+    });
   });
 });

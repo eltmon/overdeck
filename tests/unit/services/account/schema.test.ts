@@ -37,7 +37,19 @@ function deviceInsert(db: ReturnType<typeof createTestD1>, id: string, user: str
 describe('account service schema (PAN-4293 account-schema)', () => {
   it('applies the migrations on an empty database', () => {
     const { files } = migrated();
-    expect(files).toEqual(['0001_init.sql', '0002_account_page.sql']);
+    expect(files).toEqual(['0001_init.sql', '0002_account_page.sql', '0003_device_grant_names.sql']);
+  });
+
+  it('device_grants rows inserted without client_name/target_name read both as null (PAN-5071)', async () => {
+    const { db } = migrated();
+    await db
+      .prepare(
+        "INSERT INTO device_grants (device_code_hash, user_code_hash, platform, environment_id, status, created_at, expires_at) VALUES (?, ?, ?, ?, 'pending', ?, ?)",
+      )
+      .bind('dch1', 'uch1', 'linux-x64', '11111111-2222-4333-8444-555555555555', 1, 2)
+      .run();
+    const row = await db.prepare('SELECT client_name, target_name FROM device_grants WHERE device_code_hash = ?').bind('dch1').first<{ client_name: string | null; target_name: string | null }>();
+    expect(row).toEqual({ client_name: null, target_name: null });
   });
 
   it('creates all eleven tables', () => {
