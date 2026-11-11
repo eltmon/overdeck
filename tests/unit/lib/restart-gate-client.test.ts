@@ -21,6 +21,7 @@ import {
   waitForRestartApproval,
   type RestartGateRequest,
 } from '../../../src/lib/restart-gate-client.js';
+import type { RestartHold } from '../../../src/lib/restart-hold.js';
 
 const DASHBOARD_URL = 'http://127.0.0.1:3011';
 
@@ -52,6 +53,7 @@ function createGate(options: { withdrawRoute?: boolean } = {}) {
     approved: false,
     claimedBy: null as string | null,
     restarted: false,
+    held: null as RestartHold | null,
   };
 
   const fetchImpl = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
@@ -76,6 +78,9 @@ function createGate(options: { withdrawRoute?: boolean } = {}) {
 
     if (url.endsWith('/api/restart-gate/claim')) {
       const requesterId = String(body.requesterId);
+      if (state.held) {
+        return jsonResponse(200, { granted: false, status: 'approved', restartHold: state.held });
+      }
       if (state.claimedBy === null) state.claimedBy = requesterId;
       return jsonResponse(200, {
         granted: state.claimedBy === requesterId,
@@ -279,6 +284,57 @@ describe('restart-gate client (PAN-3729)', () => {
     const fetchImpl = vi.fn(async () => jsonResponse(200, snapshot));
 
     await expect(readRestartGate({ dashboardUrl: DASHBOARD_URL, fetchImpl })).resolves.toEqual(snapshot);
+  });
+
+  it('keeps polling while a hold refuses the claim, then restarts after release with no second approval (PAN-5057)', async () => {
+    const hold: RestartHold = { reason: 'live check', who: 'operator', setAt: '2026-08-14T12:00:00.000Z' };
+    const gate = createGate();
+    gate.state.approved = true;
+    gate.state.held = hold;
+    const log = vi.fn();
+
+    const outcome = waitForRestartApproval(request(), {
+      dashboardUrl: DASHBOARD_URL,
+      fetchImpl: gate.fetchImpl,
+      log,
+    });
+
+    await tickPolls(3);
+    expect(gate.state.claimedBy).toBeNull();
+    const holdLines = log.mock.calls.flat().filter((line) => String(line).includes('operator restart hold is active'));
+    expect(holdLines).toHaveLength(1);
+
+    const approveCallsBefore = gate.fetchImpl.mock.calls.filter(([url]) => String(url).endsWith('/api/restart-gate/approve')).length;
+    gate.state.held = null;
+    await tickPolls(1);
+
+    await expect(outcome).resolves.toEqual({
+      proceed: true,
+      reason: 'claimed',
+      detail: 'operator approved and this requester holds the claim',
+    });
+    const approveCallsAfter = gate.fetchImpl.mock.calls.filter(([url]) => String(url).endsWith('/api/restart-gate/approve')).length;
+    expect(approveCallsAfter).toBe(approveCallsBefore);
+  });
+
+  it('heartbeats about the hold, not approval, while held (PAN-5057)', async () => {
+    const hold: RestartHold = { reason: 'live check', who: 'operator', setAt: '2026-08-14T12:00:00.000Z' };
+    const gate = createGate();
+    gate.state.approved = true;
+    gate.state.held = hold;
+    const log = vi.fn();
+
+    void waitForRestartApproval(request(), {
+      dashboardUrl: DASHBOARD_URL,
+      fetchImpl: gate.fetchImpl,
+      log,
+    });
+
+    await tickPolls(13);
+
+    const lines = log.mock.calls.flat().map(String);
+    expect(lines.some((line) => line.includes('Still waiting for the operator restart hold to be released'))).toBe(true);
+    expect(lines.some((line) => line.includes('Still waiting for operator approval'))).toBe(false);
   });
 });
 
