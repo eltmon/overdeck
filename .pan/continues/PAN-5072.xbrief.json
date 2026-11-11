@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5072",
   "created": "2026-11-11T10:00:36.495Z",
-  "updated": "2026-11-11T10:11:25.316Z",
+  "updated": "2026-11-11T10:13:21.892Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -76,9 +76,22 @@
       "doneAt": "2026-11-11T10:08:08.760Z"
     },
     "w4-grokbot-mcpjson": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5072",
-      "claimedAt": "2026-11-11T10:11:25.315Z"
+      "claimedAt": "2026-11-11T10:11:25.315Z",
+      "doneAt": "2026-11-11T10:13:21.892Z"
+    },
+    "w4-grokbot-mcpjson.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T10:13:21.892Z"
+    },
+    "w4-grokbot-mcpjson.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T10:13:21.892Z"
+    },
+    "w4-grokbot-mcpjson.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T10:13:21.892Z"
     }
   }
 }
