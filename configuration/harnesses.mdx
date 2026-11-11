@@ -81,8 +81,9 @@ A steer never falls back silently to a queued message. A harness without steer a
   reads (cut from &#36;0.20/M on 2026-10-07). It requires Claude
   Code 2.1.284 or newer; older versions treat it as an unrecognized model
   with a 200K window. It is the default for the Sonnet tier
-  (`workhorses.mid`, the default conversation model, status review, fork
-  summaries and provider fallback). Overdeck omits `temperature` for models
+  (the default conversation model, status review, fork summaries and
+  provider fallback). Claude Opus 5.5 is the built-in `workhorses.mid`
+  default since PAN-5124. Overdeck omits `temperature` for models
   that reject sampling parameters (Sonnet 5 and newer, Opus 4.7 and newer,
   Haiku 5.5, Fable).
 - The model picker includes Claude Haiku 5.5 (`claude-haiku-5-5`): 1M
@@ -92,8 +93,9 @@ A steer never falls back silently to a queued message. A harness without steer a
   API pricing depends on prompt size: up to 100K tokens it is &#36;0.10/M
   input, &#36;0.50/M output and &#36;0.01/M cache reads; above 100K tokens every
   rate is 5×. Its tokenizer counts about 30% more tokens than Haiku 4.5 for
-  the same text. It requires Claude Code 2.1.293 or newer. Haiku 4.5 remains
-  the default for the cheap slot and background calls.
+  the same text. It requires Claude Code 2.1.293 or newer. It is the
+  built-in default for the cheap slot and background calls (titles,
+  compaction, memory extraction).
 - Overdeck passes every Claude model to `claude --model` as its full API ID,
   never the short `opus`, `sonnet` or `haiku` alias. Claude Code moves those
   aliases to each new release: 2.1.293 points `haiku` at Haiku 5.5, and
@@ -153,6 +155,10 @@ before every `claude-code` launch:
 | Claude Fable 5.1 (`claude-fable-5-1`) | 2.1.255 |
 | Claude Sonnet 5.5 (`claude-sonnet-5-5`) | 2.1.284 |
 | Claude Haiku 5.5 (`claude-haiku-5-5`) | 2.1.293 |
+
+Background calls that run through Claude Code — conversation titles, title
+refinement, the About summary and smart compaction — run the same check, and
+fail with the same message instead of switching models.
 
 A launch whose Claude Code is too old is refused before a terminal session is
 created. The error names the model, the installed and required versions, the
