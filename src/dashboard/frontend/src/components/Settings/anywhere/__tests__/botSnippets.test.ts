@@ -1,3 +1,4 @@
+import { buildConnectorPairLink } from '@overdeck/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -16,6 +17,7 @@ import {
   tokenSetup,
   xaiExample,
 } from '../botSnippets';
+import { connectMessage, connectMessageFor, connectPlatformFor, writeClipboard } from '../connectMessage';
 
 const TAILSCALE_URL = 'https://box.tail1.ts.net/mcp';
 const TOKEN = 'odk_0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcd';
@@ -173,5 +175,64 @@ describe('every function except tokenSetup never emits a secret-shaped token', (
 
   it('does appear in tokenSetup output', () => {
     expect(tokenSetup({ platform: 'hermes', reach: 'tailscale', token: TOKEN, origin: TAILSCALE_URL })).toMatch(TOKEN_PATTERN);
+  });
+});
+
+describe('connectMessage', () => {
+  const PAIRING_STRING = buildConnectorPairLink({
+    environmentId: '0b5c6c1e-3f2a-4d8e-9a7b-1c2d3e4f5a6b',
+    machineKeyHex: 'aa'.repeat(32),
+    code: `odp_${'a1'.repeat(32)}`,
+    machineLabel: "Ed's desk",
+  });
+
+  it('contains the exact connect command for grok-bot, version and names', () => {
+    const text = connectMessage({ platform: 'grok-bot', botName: 'Grok Bot', machineLabel: "Ed's desk", version: '0.61.0', pairingString: PAIRING_STRING });
+    expect(text).toContain(`npx -y @overdeck/core@0.61.0 mcp connector connect ${shellQuote(PAIRING_STRING)} --name 'Grok Bot' --platform grok-bot`);
+  });
+
+  it("quotes a bot name with an apostrophe as 'Ed'\\''s bot', and emits no token, export or mcp_servers text", () => {
+    const text = connectMessage({ platform: 'hermes', botName: "Ed's bot", machineLabel: 'desk', version: '0.61.0', pairingString: PAIRING_STRING });
+    expect(text).toContain("'Ed'\\''s bot'");
+    expect(text).not.toContain('token');
+    expect(text).not.toContain('export ');
+    expect(text).not.toContain('mcp_servers');
+  });
+
+  it('is byte-identical across two calls with the same inputs; connectPlatformFor maps xai-api to other and every other platform to itself', () => {
+    const input = { platform: 'openclaw' as const, botName: 'bot', machineLabel: 'desk', version: '0.61.0', pairingString: PAIRING_STRING };
+    expect(connectMessage(input)).toBe(connectMessage(input));
+
+    expect(connectPlatformFor('xai-api')).toBe('other');
+    for (const platform of ['hermes', 'openclaw', 'grok-build', 'grok-bot'] as const) {
+      expect(connectPlatformFor(platform)).toBe(platform);
+    }
+  });
+
+  it('connectMessageFor with no environment uses @overdeck/core@latest and the pairing string machine label', () => {
+    const text = connectMessageFor({ platform: 'grok-bot', botName: 'bot', pairingString: PAIRING_STRING });
+    expect(text).toContain('npx -y @overdeck/core@latest mcp connector connect');
+    expect(text).toContain('"Ed\'s desk"');
+  });
+
+  it('connectMessageFor prefers the environment label and server version when given', () => {
+    const text = connectMessageFor({
+      platform: 'grok-bot',
+      botName: 'bot',
+      pairingString: PAIRING_STRING,
+      environment: { label: 'office tower', serverVersion: '0.70.0' },
+    });
+    expect(text).toContain('npx -y @overdeck/core@0.70.0 mcp connector connect');
+    expect(text).toContain('"office tower"');
+  });
+
+  it('writeClipboard resolves false when navigator.clipboard is undefined', async () => {
+    const original = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+    Object.defineProperty(globalThis, 'navigator', { value: {}, configurable: true });
+    try {
+      expect(await writeClipboard('x')).toBe(false);
+    } finally {
+      if (original) Object.defineProperty(globalThis, 'navigator', original);
+    }
   });
 });
