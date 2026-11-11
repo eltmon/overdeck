@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
+import { ensureAutoApproveHookReady } from '../../../../lib/agents/hook-readiness.js';
 import { ensureSessionContextBriefingFile } from '../../../../lib/briefing-freshness.js';
 import { getClaudePermissionFlagsString } from '../../../../lib/claude-permissions.js';
 import { loadConfigSync as loadYamlConfig, resolveModel } from '../../../../lib/config-yaml.js';
@@ -327,6 +328,7 @@ Continue the PLANNING session. Do NOT implement anything.
 
         const { getAgentCommand } = await import('../../../../lib/settings.js');
         const msgAgentCmd = getAgentCommand(msgPlanningModel);
+        await ensureAutoApproveHookReady(); // PAN-5151
         const msgPermissionFlags = getClaudePermissionFlagsString();
         const msgCmdWithArgs =
           msgAgentCmd.args.length > 0
