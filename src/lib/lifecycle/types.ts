@@ -69,6 +69,8 @@ export interface LifecycleContext {
   };
   /** Issue tracker abstraction used by lifecycle operations when available */
   tracker?: IssueTracker;
+  /** Merged pull request URL, when close-out knows it (PAN-5152: linked and quoted on Jira) */
+  prUrl?: string;
   /** True when lifecycle work was started by Deacon automation rather than an operator */
   auto?: boolean;
 }

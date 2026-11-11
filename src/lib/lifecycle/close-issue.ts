@@ -20,6 +20,8 @@ import type { LifecycleContext, StepResult } from './types.js';
 import { stepOk, stepSkipped, stepFailed, getLinearApiKey } from './types.js';
 import { extractNumber, extractPrefix, normalizeIssueId } from '../issue-id.js';
 import { getAgentState, markAgentStoppedState, saveAgentState } from '../agents.js';
+import { resolveTrackerType } from '../tracker-utils.js';
+import { commentOnJiraIssue, linkJiraPullRequest, transitionJiraIssue } from '../tracker/jira-lifecycle.js';
 
 const execAsync = promisify(exec);
 
@@ -150,6 +152,11 @@ function closeViaDirect(
     return closeRallyDirect(ctx);
   }
 
+  // Jira issue (PAN-5152): the seam never rejects, so a Jira write never blocks close-out.
+  if (resolveTrackerType(ctx.issueId) === 'jira') {
+    return Effect.promise(() => closeJiraDirect(ctx));
+  }
+
   // Try Linear
   return Effect.gen(function* () {
     const linearApiKey = yield* Effect.promise(() => getLinearApiKey());
@@ -158,6 +165,19 @@ function closeViaDirect(
     }
     return stepFailed(step, 'No tracker available and cannot determine issue type');
   });
+}
+
+/** Link the merged PR, move the Jira issue to Done and post the close comment (D-9). */
+async function closeJiraDirect(ctx: LifecycleContext): Promise<StepResult> {
+  const step = 'close-issue:transition';
+  const prUrl = ctx.prUrl;
+  if (prUrl) await linkJiraPullRequest(ctx.issueId, prUrl);
+  const moved = await transitionJiraIssue(ctx.issueId, 'done');
+  await commentOnJiraIssue(ctx.issueId, prUrl ? `Closed by Overdeck after merge of ${prUrl}.` : 'Closed by Overdeck.');
+  await markWorkAgentStoppedForIssue(ctx.issueId);
+  return moved.kind === 'error' || moved.kind === 'no-transition'
+    ? stepOk(step, [`Jira: ${moved.message}`])
+    : stepOk(step, ['Jira issue moved to Done']);
 }
 
 /**
@@ -414,6 +434,11 @@ function applyClosedOutLabel(
 
   if (ctx.github) {
     return applyLabelGitHub(ctx);
+  }
+
+  // PAN-5152 (FR-5): Overdeck writes no workflow labels to Jira.
+  if (resolveTrackerType(ctx.issueId) === 'jira') {
+    return Effect.succeed(stepSkipped(step, ['Jira: Overdeck writes no workflow labels']));
   }
 
   return Effect.gen(function* () {
