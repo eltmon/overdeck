@@ -5,7 +5,7 @@
  */
 import { createRequire } from 'node:module';
 import { createServer } from 'node:http';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -33,10 +33,20 @@ const {
 const { openChannel } = await import('../../../lib/anywhere/channel/open.js');
 const { _resetChannelListenerForTests, installChannelListener, liveChannelCount } = await import('../channel-listener.js');
 const { _resetConnectorPairingForTests, listConnectorNotices, listConnectorRequests, takeConnectorIntent } = await import('../connector-pairing.js');
+const { _resetInternalTokenCacheForTests, INTERNAL_TOKEN_HEADER } = await import('../../../lib/internal-token.js');
 const { _resetPairingCredentialsForTests, issuePairingCredential } = await import('../pairing-credentials.js');
 const { remoteGateRejection } = await import('../remote-request-gate.js');
 const { resolveDashboardCredential } = await import('../routes/dashboard-auth.js');
-const { connectorsRouteLayer, handleConnectorList, handleConnectorsExchange, handleConnectorPairing, handleConnectorRevoke, handleConnectorSelf, handleConnectorSelfRevoke } = await import('../routes/connectors.js');
+const {
+  connectorsRouteLayer,
+  handleConnectorList,
+  handleConnectorRequestCancel,
+  handleConnectorsExchange,
+  handleConnectorPairing,
+  handleConnectorRevoke,
+  handleConnectorSelf,
+  handleConnectorSelfRevoke,
+} = await import('../routes/connectors.js');
 const { buildEnvironmentDescriptor } = await import('../routes/environment.js');
 type MachineKeyPair = import('../../../lib/anywhere/machine-key.js').MachineKeyPair;
 type ChannelMarker = import('../channel-peer.js').ChannelMarker;
@@ -143,6 +153,61 @@ describe('GET /api/connectors (PAN-4949 D-15)', () => {
 
   it('refuses a non-root credential kind', async () => {
     expect((await read(await handleConnectorList('device'))).status).toBe(403);
+  });
+
+  it('lists a fresh pairing request as live, with a pairing string (PAN-5070 W-4)', async () => {
+    const { json: paired } = await read(await handleConnectorPairing('internal-token', JSON.stringify({ name: 'bot:waiting' })));
+    const { json } = await read(await handleConnectorList('root-session'));
+    const requests = json.requests as Array<Record<string, unknown>>;
+    expect(requests).toMatchObject([{ id: paired.requestId, name: 'bot:waiting', state: 'live', pairingString: paired.pairingString }]);
+  });
+});
+
+describe('DELETE /api/connectors/requests/:id (PAN-5070 W-4)', () => {
+  it('cancels a pending request once, then 404s on a second try', async () => {
+    const { json: paired } = await read(await handleConnectorPairing('internal-token', JSON.stringify({ name: 'bot:cancel' })));
+    const first = await read(await handleConnectorRequestCancel('root-session', paired.requestId as string));
+    expect(first.status).toBe(200);
+    expect(first.json).toEqual({ ok: true });
+
+    const second = await read(await handleConnectorRequestCancel('root-session', paired.requestId as string));
+    expect(second.status).toBe(404);
+    expect(second.json.error).toBe(`no pending connector request with id ${paired.requestId}`);
+  });
+
+  it('refuses a non-root credential kind', async () => {
+    expect((await read(await handleConnectorRequestCancel('device', 'whatever'))).status).toBe(403);
+  });
+
+  it('cancels through the real route with the internal token, and 404s with its own message on a second try', async () => {
+    const INTERNAL_TOKEN = 'pan-5070-connectors-internal-token-0123456789';
+    await writeFile(join(home, 'internal-token'), INTERNAL_TOKEN, { mode: 0o600 });
+    _resetInternalTokenCacheForTests();
+    cleanups.push(async () => {
+      await rm(join(home, 'internal-token'), { force: true });
+      _resetInternalTokenCacheForTests();
+    });
+
+    const { json: paired } = await read(await handleConnectorPairing('internal-token', JSON.stringify({ name: 'bot:route-cancel' })));
+    const runCancel = async () => {
+      const request = HttpServerRequest.fromWeb(new Request(`http://localhost/api/connectors/requests/${paired.requestId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', [INTERNAL_TOKEN_HEADER]: INTERNAL_TOKEN },
+      })).modify({ remoteAddress: Option.some('127.0.0.1') });
+      const response = await Effect.runPromise(Effect.scoped(Effect.flatMap(
+        HttpRouter.toHttpEffect(connectorsRouteLayer),
+        (app) => Effect.provideService(app, HttpServerRequest.HttpServerRequest, request),
+      )));
+      return read(response);
+    };
+
+    const first = await runCancel();
+    expect(first.status).toBe(200);
+
+    const second = await runCancel();
+    expect(second.status).toBe(404);
+    expect(second.json.error).toBe(`no pending connector request with id ${paired.requestId}`);
+    expect(second.json.error).not.toContain('no connector with id');
   });
 });
 

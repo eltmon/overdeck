@@ -1,13 +1,16 @@
 /**
  * Overdeck connector routes (PAN-4927 W-CONN1; PAN-4949 D-11 to D-16).
  *
- * `POST /api/connectors/pairing`, `GET /api/connectors` and
- * `DELETE /api/connectors/:id` are root only: the handlers accept the internal
- * token or the root session and nothing else, because an `admin`-scoped device
- * or token would otherwise pass the scope gate (unlisted routes need `admin`).
- * Pairing issues an `odp_` code, notes its intent by pairingId
- * (`connector-pairing.ts`) and returns the connector pairing string; the scopes
- * always include `read:state`, so every connector can revoke itself (D-14).
+ * `POST /api/connectors/pairing`, `GET /api/connectors`, `DELETE /api/connectors/:id`
+ * and `DELETE /api/connectors/requests/:id` are root only: the handlers accept
+ * the internal token or the root session and nothing else, because an
+ * `admin`-scoped device or token would otherwise pass the scope gate (unlisted
+ * routes need `admin`). Pairing issues an `odp_` code, notes its request by
+ * pairingId (`connector-pairing.ts`) and returns the connector pairing string
+ * and requestId; the scopes always include `read:state`, so every connector
+ * can revoke itself (D-14). `GET /api/connectors` also lists the waiting,
+ * unpaired requests (PAN-5070 W-4); `DELETE /api/connectors/requests/:id`
+ * cancels one, burning its code.
  *
  * `DELETE /api/connectors/self` is the connector's own logout: the scope table
  * admits it with `read:state`, and the handler then requires a `connector`
@@ -39,7 +42,15 @@ import { UUID_V4 } from '../../../lib/access-token-records.js';
 import { emitActivityEntry } from '../../../lib/activity-logger.js';
 import { closeChannelsForPeer } from '../channel-listener.js';
 import { type ChannelMarker, channelOfRequest } from '../channel-peer.js';
-import { CONNECT_PLATFORMS, type ConnectPlatform, issueConnectorPairing, markConnectorRequestPaired, takeConnectorIntent } from '../connector-pairing.js';
+import {
+  cancelConnectorRequest,
+  CONNECT_PLATFORMS,
+  type ConnectPlatform,
+  issueConnectorPairing,
+  listConnectorRequests,
+  markConnectorRequestPaired,
+  takeConnectorIntent,
+} from '../connector-pairing.js';
 import { closeDeviceConnections } from '../device-connections.js';
 import { jsonResponse } from '../http-helpers.js';
 import {
@@ -123,7 +134,22 @@ export async function handleConnectorList(credentialKind: CredentialKind): Promi
   const connectors = records
     .filter((record) => record.kind === 'connector' && !record.revokedAt)
     .map(({ id, name, scopes, clientId, createdAt, lastUsedAt }) => ({ id, name, scopes, clientId, createdAt, lastUsedAt }));
-  return noStore(jsonResponse({ connectors }));
+  return noStore(jsonResponse({ connectors, requests: listConnectorRequests() }));
+}
+
+/** Cancel a pending connector pairing request, burning its code (FR-14, FR-25, FR-27). */
+export async function handleConnectorRequestCancel(credentialKind: CredentialKind, id: string): Promise<HttpServerResponse.HttpServerResponse> {
+  const refused = rejectNonRoot(credentialKind);
+  if (refused) return refused;
+  const cancelled = cancelConnectorRequest(id);
+  if (!cancelled) return noStore(jsonResponse({ error: `no pending connector request with id ${id}` }, { status: 404 }));
+  emitActivityEntry({
+    source: 'dashboard',
+    level: 'info',
+    message: `Cancelled the connector pairing request for "${cancelled.name}"`,
+    details: JSON.stringify({ requestId: id }),
+  });
+  return noStore(jsonResponse({ ok: true }));
 }
 
 export async function handleConnectorRevoke(credentialKind: CredentialKind, id: string): Promise<HttpServerResponse.HttpServerResponse> {
@@ -309,4 +335,16 @@ const revokeRoute = HttpRouter.add(
   }),
 );
 
-export const connectorsRouteLayer = Layer.mergeAll(exchangeRoute, pairingRoute, listRoute, selfRoute, selfRevokeRoute, revokeRoute);
+const requestCancelRoute = HttpRouter.add(
+  'DELETE',
+  '/api/connectors/requests/:id',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return noStore(authError);
+    const id = (yield* HttpRouter.params)['id'] ?? '';
+    return yield* Effect.promise(() => handleConnectorRequestCancel(resolveRequestCredential(request)?.kind, id));
+  }),
+);
+
+export const connectorsRouteLayer = Layer.mergeAll(exchangeRoute, pairingRoute, listRoute, selfRoute, selfRevokeRoute, revokeRoute, requestCancelRoute);
