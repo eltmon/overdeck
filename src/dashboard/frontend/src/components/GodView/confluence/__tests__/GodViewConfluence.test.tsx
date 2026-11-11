@@ -166,7 +166,7 @@ describe('GodViewConfluence field guide and fullscreen controls', () => {
       'Review Convoys',
       'The Shelf & Governor Tides',
       'Frost & The Doldrums',
-      'Merge Portal & Wrecks',
+      'Merge Portal & Red Rings',
       'Flywheel Sun & Sequencer',
       'Conversation Constellation',
       'Hook Bus · Dark Fiber',
