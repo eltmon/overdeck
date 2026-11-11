@@ -10,24 +10,22 @@ This page starts at v0.60.0, the release that removed Overdeck's state layer. Ol
 
 {/* RELEASE STEP: before tagging vX.Y.Z, add a new <Update label="vX.Y.Z" description="YYYY-MM-DD"> block at the top with the user-facing changes since the previous tag, and point its compare link at the new tag. See docs/RELEASING.md "Update the public changelog". If a new model needs a newer Claude Code, say so and confirm its minClaudeCodeVersion is set. */}
 
-<Update label="v0.77.0" description="Unreleased" tags={["Upcoming"]}>
-  ## Upcoming release
-
-  Drafted from the changes merged to `main` since v0.76.0. The date is set when the release is tagged.
-
+<Update label="v0.77.0" description="2026-11-11">
   #### New
 
-  - **Recent notifications:** Settings → Anywhere → Phone notifications lists the last 50 notifications Overdeck sent, where each went, and whether the question is still waiting, was answered from Overdeck, or was answered or withdrawn elsewhere. ([PAN-5111](https://github.com/eltmon/overdeck/issues/5111))
-  - **Coding-agent CLIs stay up to date:** Overdeck now updates npm-installed Claude Code, Codex CLI and OpenCode in the background once a day, and updates Claude Code before a launch that needs a newer version, so a new model no longer stops at "needs Claude Code X or newer". Running sessions keep their version. Turn it off in Settings, Coding Agents, or with `harnesses.auto_update: false`. See [Harnesses](/configuration/harnesses).
+  - **Grok Build harness:** run agents and conversations on xAI's Grok Build CLI (`grok`) with the `grok` harness. Overdeck reuses your Grok Build sign-in, keeps sessions persistent over ACP, reports cost, and lists the Grok models in pickers once `grok` is installed and signed in. `pan doctor` checks it. See [Harnesses](/configuration/harnesses). ([#5119](https://github.com/eltmon/overdeck/pull/5119))
+
+  - **Recent notifications:** Settings → Anywhere → Phone notifications lists the last 50 notifications Overdeck sent, where each went, and whether the question is still waiting, was answered from Overdeck, or was answered or withdrawn elsewhere. ([#5115](https://github.com/eltmon/overdeck/pull/5115))
+  - **Coding-agent CLIs stay up to date:** Overdeck now updates npm-installed Claude Code, Codex CLI and OpenCode in the background once a day, and updates Claude Code before a launch that needs a newer version, so a new model no longer stops at "needs Claude Code X or newer". Running sessions keep their version. Turn it off in Settings, Coding Agents, or with `harnesses.auto_update: false`. See [Harnesses](/configuration/harnesses). ([#5114](https://github.com/eltmon/overdeck/pull/5114))
 
   #### Improved
 
-  - **Can't reach rows in Needs you:** when this machine cannot read a linked machine's Needs you, the desktop and the phone show `Can't reach <machine>; it may have items waiting.` until a fetch succeeds. ([PAN-5111](https://github.com/eltmon/overdeck/issues/5111))
-  - **Close an item and its acceptance criteria in one call:** `pan task done <issue> <item> <item>.ac1 <item>.ac2 ...` and the `task_done` tool's `itemIds` take many ids at once. They record every id with one commit, or none of them and name each one that lacks its `Item:` line, so a plan with 85 acceptance criteria no longer costs 85 commits and pushes. ([PAN-5118](https://github.com/eltmon/overdeck/issues/5118))
+  - **Can't reach rows in Needs you:** when this machine cannot read a linked machine's Needs you, the desktop and the phone show `Can't reach <machine>; it may have items waiting.` until a fetch succeeds. ([#5115](https://github.com/eltmon/overdeck/pull/5115))
+  - **Close an item and its acceptance criteria in one call:** `pan task done <issue> <item> <item>.ac1 <item>.ac2 ...` and the `task_done` tool's `itemIds` take many ids at once. They record every id with one commit, or none of them and name each one that lacks its `Item:` line, so a plan with 85 acceptance criteria no longer costs 85 commits and pushes. ([#5121](https://github.com/eltmon/overdeck/pull/5121))
 
   #### Fixed
 
-  - **No more false "stopped responding" push after a PR merges.** The merged work agent is recorded as stopped when its terminal closes, and the crash watcher never counts a paused agent as crashed.
+  - **No more false "stopped responding" push after a PR merges.** The merged work agent is recorded as stopped when its terminal closes, and the crash watcher never counts a paused agent as crashed. ([#5113](https://github.com/eltmon/overdeck/pull/5113))
 
   [Compare v0.76.0...v0.77.0](https://github.com/eltmon/overdeck/compare/v0.76.0...v0.77.0)
 </Update>
