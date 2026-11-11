@@ -103,6 +103,53 @@ describe('planChangelogFold', () => {
     expect(readFileSync(join(repoRoot, 'changelog.d', 'pan-2.md'), 'utf8')).toBe('#### Fixed\n\n- **Second bullet.**\n');
   });
 
+  it('refuses to apply, and deletes nothing, when changelog.mdx changed after planning', () => {
+    writeChangelog(BASE_CHANGELOG);
+    writeEntry('pan-1.md', '#### New\n\n- **Bullet.**\n');
+
+    const outcome = planChangelogFold(repoRoot, 'stable', '0.80.0', new Date(2026, 10, 12));
+    if (outcome.kind !== 'fold') throw new Error('expected fold');
+
+    // Simulates an operator editing changelog.mdx by hand during preflight.
+    writeChangelog(BASE_CHANGELOG + '\n');
+
+    expect(() => applyChangelogFold(outcome.plan)).toThrow(/changelog\.mdx changed after planning/);
+    expect(readFileSync(join(repoRoot, 'changelog.mdx'), 'utf8')).toBe(BASE_CHANGELOG + '\n');
+    expect(readFileSync(join(repoRoot, 'changelog.d', 'pan-1.md'), 'utf8')).toBe('#### New\n\n- **Bullet.**\n');
+  });
+
+  it('refuses to apply, and deletes nothing, when an entry was added after planning', () => {
+    writeChangelog(BASE_CHANGELOG);
+    writeEntry('pan-1.md', '#### New\n\n- **Bullet.**\n');
+
+    const outcome = planChangelogFold(repoRoot, 'stable', '0.80.0', new Date(2026, 10, 12));
+    if (outcome.kind !== 'fold') throw new Error('expected fold');
+
+    // Simulates a new PR's entry landing in changelog.d/ during preflight; it must
+    // never ride along in this release (unfolded) just because it now exists on disk.
+    writeEntry('pan-2.md', '#### Fixed\n\n- **New since planning.**\n');
+
+    expect(() => applyChangelogFold(outcome.plan)).toThrow(/changelog\.d\/ changed after planning/);
+    expect(readFileSync(join(repoRoot, 'changelog.mdx'), 'utf8')).toBe(BASE_CHANGELOG);
+    expect(readFileSync(join(repoRoot, 'changelog.d', 'pan-1.md'), 'utf8')).toBe('#### New\n\n- **Bullet.**\n');
+    expect(readFileSync(join(repoRoot, 'changelog.d', 'pan-2.md'), 'utf8')).toBe('#### Fixed\n\n- **New since planning.**\n');
+  });
+
+  it('refuses to apply, and deletes nothing, when an entry was removed after planning', () => {
+    writeChangelog(BASE_CHANGELOG);
+    writeEntry('pan-1.md', '#### New\n\n- **Bullet one.**\n');
+    writeEntry('pan-2.md', '#### Fixed\n\n- **Bullet two.**\n');
+
+    const outcome = planChangelogFold(repoRoot, 'stable', '0.80.0', new Date(2026, 10, 12));
+    if (outcome.kind !== 'fold') throw new Error('expected fold');
+
+    rmSync(join(repoRoot, 'changelog.d', 'pan-2.md'));
+
+    expect(() => applyChangelogFold(outcome.plan)).toThrow(/changelog\.d\/ changed after planning/);
+    expect(readFileSync(join(repoRoot, 'changelog.mdx'), 'utf8')).toBe(BASE_CHANGELOG);
+    expect(readFileSync(join(repoRoot, 'changelog.d', 'pan-1.md'), 'utf8')).toBe('#### New\n\n- **Bullet one.**\n');
+  });
+
   it('throws on a misnamed file and writes nothing', () => {
     writeChangelog(BASE_CHANGELOG);
     writeEntry('Pan-1.md', '#### New\n\n- **Bullet.**\n');

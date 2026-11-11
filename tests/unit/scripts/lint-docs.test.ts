@@ -183,6 +183,11 @@ describe('hasUpcomingBlock', () => {
     expect(hasUpcomingBlock("<Update label='v0.80.0' description='Unreleased' tags={['Upcoming']}>")).toBe(true);
   });
 
+  it('detects Upcoming as one value in a multi-value tags array', () => {
+    expect(hasUpcomingBlock('<Update label="v0.80.0" description="2026-11-12" tags={["Preview", "Upcoming"]}>')).toBe(true);
+    expect(hasUpcomingBlock('<Update label="v0.80.0" description="2026-11-12" tags={["Upcoming", "Preview"]}>')).toBe(true);
+  });
+
   it('does not flag a dated release block', () => {
     expect(hasUpcomingBlock('<Update label="v0.79.0" description="2026-11-11">')).toBe(false);
   });

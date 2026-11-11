@@ -138,10 +138,12 @@ export function findChangelogEntryProblems(fileName, content) {
   return problems;
 }
 
-// Matches tags={["Upcoming"]}/tags={['Upcoming']} and description="Unreleased"/'Unreleased',
-// independent of quote style or incidental whitespace inside the braces.
-// Mirrors hasUpcomingBlock in src/lib/release/changelog-fold.ts; keep both identical.
-const UPCOMING_TAG = /tags\s*=\s*\{\s*\[\s*['"]Upcoming['"]\s*\]\s*\}/;
+// Matches "Upcoming" as one element of a tags={[...]} array, single- or double-quoted,
+// alongside any other tag values (tags={["Upcoming"]}, tags={['Preview', 'Upcoming']}),
+// and description="Unreleased"/'Unreleased'. Independent of quote style, element order,
+// or incidental whitespace. Mirrors hasUpcomingBlock in src/lib/release/changelog-fold.ts;
+// keep both identical.
+const UPCOMING_TAG = /tags\s*=\s*\{\s*\[[^\]]*['"]Upcoming['"][^\]]*\]\s*\}/;
 const UNRELEASED_DESCRIPTION = /description\s*=\s*['"]Unreleased['"]/;
 
 export function hasUpcomingBlock(content) {

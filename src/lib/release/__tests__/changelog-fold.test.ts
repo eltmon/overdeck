@@ -4,6 +4,7 @@ import {
   foldChangelogEntries,
   formatReleaseDate,
   hasUpcomingBlock,
+  hasVersionBlock,
   parseChangelogEntry,
 } from '../changelog-fold.js';
 
@@ -156,6 +157,20 @@ Intro text.
       }),
     ).toThrow(/already has a v0\.79\.0 block/);
   });
+
+  it('reads a single-quoted previous label', () => {
+    const singleQuoted = `<Update label='v0.79.0' description='2026-11-11'>
+  #### Fixed
+
+  - **Prior fix.**
+</Update>
+`;
+    const entry: ChangelogEntryFile = { fileName: 'pan-1.md', content: '#### New\n\n- **Bullet.**\n' };
+
+    const result = foldChangelogEntries({ changelog: singleQuoted, entries: [entry], version: '0.80.0', date: '2026-11-12' });
+
+    expect(result).toContain('[Compare v0.79.0...v0.80.0]');
+  });
 });
 
 describe('parseChangelogEntry', () => {
@@ -235,8 +250,27 @@ describe('hasUpcomingBlock', () => {
     expect(hasUpcomingBlock("<Update label='v0.80.0' description='Unreleased' tags={['Upcoming']}>")).toBe(true);
   });
 
+  it('detects Upcoming as one value in a multi-value tags array', () => {
+    expect(hasUpcomingBlock('<Update label="v0.80.0" description="2026-11-12" tags={["Preview", "Upcoming"]}>')).toBe(true);
+    expect(hasUpcomingBlock('<Update label="v0.80.0" description="2026-11-12" tags={["Upcoming", "Preview"]}>')).toBe(true);
+  });
+
   it('does not flag a dated release block', () => {
     expect(hasUpcomingBlock('<Update label="v0.79.0" description="2026-11-11">')).toBe(false);
+  });
+});
+
+describe('hasVersionBlock', () => {
+  it('detects a double-quoted label', () => {
+    expect(hasVersionBlock('<Update label="v0.80.0" description="2026-11-12">', '0.80.0')).toBe(true);
+  });
+
+  it('detects a single-quoted label', () => {
+    expect(hasVersionBlock("<Update label='v0.80.0' description='2026-11-12'>", '0.80.0')).toBe(true);
+  });
+
+  it('does not match a different version', () => {
+    expect(hasVersionBlock('<Update label="v0.79.0" description="2026-11-11">', '0.80.0')).toBe(false);
   });
 });
 

@@ -154,14 +154,27 @@ export function formatReleaseDate(now: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-// Matches tags={["Upcoming"]}/tags={['Upcoming']} and description="Unreleased"/'Unreleased',
-// independent of quote style or incidental whitespace inside the braces.
-// Mirrors hasUpcomingBlock in scripts/lint-docs.js; keep both identical.
-const UPCOMING_TAG = /tags\s*=\s*\{\s*\[\s*['"]Upcoming['"]\s*\]\s*\}/;
+// Matches "Upcoming" as one element of a tags={[...]} array, single- or double-quoted,
+// alongside any other tag values (tags={["Upcoming"]}, tags={['Preview', 'Upcoming']}),
+// and description="Unreleased"/'Unreleased'. Independent of quote style, element order,
+// or incidental whitespace. Mirrors hasUpcomingBlock in scripts/lint-docs.js; keep both
+// identical.
+const UPCOMING_TAG = /tags\s*=\s*\{\s*\[[^\]]*['"]Upcoming['"][^\]]*\]\s*\}/;
 const UNRELEASED_DESCRIPTION = /description\s*=\s*['"]Unreleased['"]/;
 
 export function hasUpcomingBlock(changelog: string): boolean {
   return UPCOMING_TAG.test(changelog) || UNRELEASED_DESCRIPTION.test(changelog);
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Quote-agnostic: a release label may be written with either quote style (the fold
+// itself always writes double quotes, but an operator-edited or hand-authored block
+// may use single quotes).
+export function hasVersionBlock(changelog: string, version: string): boolean {
+  return new RegExp(`<Update label=['"]v${escapeRegExp(version)}['"]`).test(changelog);
 }
 
 export function foldChangelogEntries(params: {
@@ -175,7 +188,7 @@ export function foldChangelogEntries(params: {
   if (hasUpcomingBlock(changelog)) {
     throw new Error('changelog.mdx still has an Upcoming block; move its bullets to changelog.d/ first');
   }
-  if (changelog.includes(`<Update label="v${version}"`)) {
+  if (hasVersionBlock(changelog, version)) {
     throw new Error(`changelog.mdx already has a v${version} block`);
   }
 
@@ -184,7 +197,7 @@ export function foldChangelogEntries(params: {
   if (insertIndex === -1) {
     throw new Error('changelog.mdx has no <Update block to insert the new release before');
   }
-  const previousLabelMatch = /label="(v[^"]+)"/.exec(lines[insertIndex]);
+  const previousLabelMatch = /label=['"](v[^'"]+)['"]/.exec(lines[insertIndex]);
   if (!previousLabelMatch) {
     throw new Error('changelog.mdx <Update block has no label to read the previous version from');
   }

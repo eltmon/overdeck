@@ -12,6 +12,7 @@ import {
   foldChangelogEntries,
   formatReleaseDate,
   hasUpcomingBlock,
+  hasVersionBlock,
   parseChangelogEntry,
 } from '../../lib/release/changelog-fold.js';
 
@@ -222,7 +223,10 @@ function getCurrentBranch(repoRoot: string): string {
 }
 
 function isWorkingTreeClean(repoRoot: string): boolean {
-  return run('git status --short', repoRoot) === '';
+  // --untracked-files=normal overrides a status.showUntrackedFiles=no config: without
+  // it, an untracked changelog.d entry (or any other untracked file) could pass this
+  // check, and applyChangelogFold would later delete it with no HEAD copy to restore.
+  return run('git status --short --untracked-files=normal', repoRoot) === '';
 }
 
 function getLatestTag(repoRoot: string): string | null {
@@ -537,6 +541,8 @@ async function releaseCheckCommand(): Promise<void> {
 
 export interface ChangelogFoldPlan {
   changelogPath: string;
+  originalChangelog: string;
+  dir: string;
   content: string;
   entries: { path: string; content: string }[];
 }
@@ -578,7 +584,7 @@ export function planChangelogFold(
   const entries = names.map((fileName) => ({ fileName, content: readFileSync(join(dir, fileName), 'utf8') }));
   entries.forEach((entry) => parseChangelogEntry(entry)); // validate even when skipping below
 
-  if (changelog.includes(`<Update label="v${version}"`)) {
+  if (hasVersionBlock(changelog, version)) {
     const noun = names.length === 1 ? 'entry' : 'entries';
     return {
       kind: 'skip',
@@ -589,20 +595,36 @@ export function planChangelogFold(
 
   const content = foldChangelogEntries({ changelog, entries, version, date: formatReleaseDate(now) });
   const planEntries = entries.map((entry) => ({ path: join(dir, entry.fileName), content: entry.content }));
-  return { kind: 'fold', plan: { changelogPath, content, entries: planEntries } };
+  return { kind: 'fold', plan: { changelogPath, originalChangelog: changelog, dir, content, entries: planEntries } };
 }
 
-// PAN-5137: re-reads every entry right before writing/deleting, in case an operator (or
-// another process) edited one of them during the minutes-long preflight that runs
-// between planChangelogFold and this call. Throws before any write if one changed, so a
-// late edit is never silently folded with stale content and then deleted.
+// PAN-5137: re-checks everything this fold depends on immediately before writing or
+// deleting anything, in case an operator (or another process) touched it during the
+// minutes-long preflight that runs between planChangelogFold and this call: changelog.mdx
+// itself, the exact set of pending entries (none added, none removed), and each entry's
+// content. Throws before any write on any mismatch, so a late edit is never silently
+// folded over, omitted, or deleted with stale content.
 export function applyChangelogFold(plan: ChangelogFoldPlan): void {
+  const currentChangelog = readFileSync(plan.changelogPath, 'utf8');
+  if (currentChangelog !== plan.originalChangelog) {
+    throw new Error('changelog.mdx changed after planning; rerun pan release stable');
+  }
+
+  const currentNames = readdirSync(plan.dir)
+    .filter((name) => name !== 'README.md')
+    .sort();
+  const plannedNames = plan.entries.map((entry) => basename(entry.path)).sort();
+  if (currentNames.join('\n') !== plannedNames.join('\n')) {
+    throw new Error('changelog.d/ changed after planning (an entry was added or removed); rerun pan release stable');
+  }
+
   for (const entry of plan.entries) {
     const current = readFileSync(entry.path, 'utf8');
     if (current !== entry.content) {
       throw new Error(`changelog.d/${basename(entry.path)} changed after planning; rerun pan release stable`);
     }
   }
+
   writeFileSync(plan.changelogPath, plan.content);
   for (const entry of plan.entries) rmSync(entry.path);
 }
@@ -698,7 +720,12 @@ async function releaseCreateCommand(
       `git add package.json apps/desktop/package.json packages/contracts/package.json bun.lock ${releaseNotesPath}`,
       repoRoot
     );
-    if (changelogApplied) run('git add -A -- changelog.mdx changelog.d', repoRoot);
+    if (changelogFold.kind === 'fold') {
+      // Exact paths, never -A: a changelog.d entry that appeared after planning (and so
+      // was never folded into changelog.mdx) must not ride along in this release commit.
+      const entryPaths = changelogFold.plan.entries.map((entry) => entry.path);
+      run(`git add -- changelog.mdx ${entryPaths.join(' ')}`, repoRoot);
+    }
     // Idempotent: when retagging the same version after a CI failure, the package
     // bumps and release notes are already on HEAD. Skip the commit if nothing
     // staged. Tagging is still meaningful because the tag may have been deleted.
