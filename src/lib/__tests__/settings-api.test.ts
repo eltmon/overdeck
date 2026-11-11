@@ -541,6 +541,19 @@ describe('saveSettingsApi', () => {
     expect(mockClearConfigCache).toHaveBeenCalledOnce();
   });
 
+  it('persists memory.extraction.provider claude-cli through saveSettingsApi (PAN-4374)', async () => {
+    const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
+    const settings = loadSettingsApi();
+
+    await saveSettingsApi({
+      ...settings,
+      memory: { provider: 'claude-cli', model: 'claude-haiku-5-5' },
+    });
+
+    const written = String(mockWriteFile.mock.calls[0]?.[1]);
+    expect(written).toContain('provider: claude-cli');
+  });
+
   it('drops the retired agents.tldr key on save (PAN-4429)', async () => {
     mockReadFile.mockResolvedValue('agents:\n  tldr:\n    enabled: true\n  rtk:\n    enabled: true\n');
     const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
