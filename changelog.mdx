@@ -23,6 +23,7 @@ This page starts at v0.60.0, the release that removed Overdeck's state layer. Ol
   #### Improved
 
   - **New default models:** on built-in defaults, work, test, ship and worker agents and three review lanes now run on Claude Opus 5.5 instead of Sonnet 5.5 (the mid workhorse), which roughly doubles what those agents cost; the Anthropic cost-saver preset keeps Sonnet 5.5 for 30% of work. The cheap workhorse, conversation titles, compaction and memory extraction now use Claude Haiku 5.5 instead of Haiku 4.5 (&#36;0.10/&#36;0.50 per MTok against &#36;1/&#36;5), which needs Claude Code 2.1.293 or newer. Installs that set these models in config keep them. ([#5124](https://github.com/eltmon/overdeck/issues/5124))
+  - **GPT-6.1 Terra on the Claude Code harness:** `gpt-6.1-terra` now runs on the Claude Code harness through CLIProxy as well as on the Codex harness, with the same 272K context pin as the other GPT-6 models. CLIProxy 7.3.16 picked it up from its remote model catalog; no CLIProxy upgrade is needed. ([PAN-4634](https://github.com/eltmon/overdeck/issues/4634))
 
   [Compare v0.77.0...v0.78.0](https://github.com/eltmon/overdeck/compare/v0.77.0...v0.78.0)
 </Update>
