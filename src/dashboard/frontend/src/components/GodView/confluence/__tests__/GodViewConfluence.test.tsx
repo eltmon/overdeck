@@ -281,6 +281,15 @@ describe('GodViewConfluence field guide and fullscreen controls', () => {
   });
 });
 
+describe('God View footer (PAN-5131 FR-9)', () => {
+  it('lists the five pipeline stages of the model and names no other stage', () => {
+    const { container } = render(<GodViewPage />);
+
+    expect(screen.getByText('PLAN → WORK → REVIEW → TEST → MERGE')).toBeInTheDocument();
+    expect(container.textContent).not.toContain('VERIFY');
+  });
+});
+
 describe('GodViewConfluence landmarks (PAN-5131 FR-6)', () => {
   function lastRiverProps(meta: Record<string, unknown>) {
     render(
