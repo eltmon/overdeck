@@ -5,7 +5,10 @@
  * work agent's workspace and messages the agent so it can address the failure
  * instead of waiting for a human to notice a red merge gate.
  *
- * - Debounces per head SHA so retries do not spam the agent.
+ * - Debounces per head SHA so retries do not spam the agent. PAN-4625: the
+ *   failed check names delivered for the head are recorded, so a check that
+ *   fails later on the same head (a test shard after lint) is delivered in a
+ *   new feedback file naming only it; a relay with nothing new stays quiet.
  * - Fetches failed log excerpts with `gh run view --log-failed`.
  * - Diff's the PR's failing check names against main's current failing set so
  *   inherited main-red failures are labelled as such.
@@ -130,8 +133,11 @@ export interface CiFailureFeedbackDeps {
   surfaceNeedsYou?: (issueId: string, reason: string, details: Record<string, unknown>) => Promise<void>;
 }
 
-/** Per-issue head SHA we last sent CI failure feedback for. */
-const lastNotifiedSha = new Map<string, string>();
+/**
+ * Per-issue head SHA we last sent CI failure feedback for, with the failed
+ * check names already delivered for it (PAN-4625).
+ */
+const lastNotified = new Map<string, { headSha: string; delivered: Set<string> }>();
 /** Per-issue head SHA we last journaled a CI test-gate failure for. */
 const lastJournaledTestFailureSha = new Map<string, string>();
 /**
@@ -157,7 +163,7 @@ async function withIssueQueue<T>(issueId: string, fn: () => Promise<T>): Promise
 
 /** Reset internal debounce state — for tests only. */
 export function resetCiFailureFeedbackStateForTests(): void {
-  lastNotifiedSha.clear();
+  lastNotified.clear();
   lastJournaledTestFailureSha.clear();
   issueQueues.clear();
 }
@@ -542,6 +548,8 @@ function buildFeedbackBody(opts: {
   testGateFailed?: boolean;
   /** PAN-4589: failing test checks reported as commit statuses (Dagger Cloud). */
   statusFailures?: readonly FailedCheck[];
+  /** PAN-4625: failed checks on this head already named in an earlier feedback file. */
+  earlierDelivered?: readonly string[];
 }): string {
   const shortSha = opts.headSha.slice(0, 8);
   const prLine = opts.prUrl
@@ -549,6 +557,10 @@ function buildFeedbackBody(opts: {
     : `Pull request #${opts.prNumber} in ${opts.repo} (head \`${shortSha}\`)`;
 
   let body = `# CI Failure Feedback for ${opts.issueId}\n\n${prLine}\n\nSource: ${opts.source}\n\n`;
+  if (opts.earlierDelivered && opts.earlierDelivered.length > 0) {
+    body += `This file names only checks that failed after earlier feedback for this head. ` +
+      `Still failing from that earlier feedback: ${opts.earlierDelivered.join(', ')}.\n\n`;
+  }
   if (opts.testGateFailed) {
     body +=
       'Failed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job ' +
@@ -684,9 +696,12 @@ async function relayCiFailureFeedbackInQueue(
   // Debounce per head SHA so duplicate webhook deliveries / retries do not spam.
   // A newly counted test-gate failure is the exception: an earlier generic
   // "CI FAILED" (a faster non-test check) must not swallow the rework message.
-  const lastSha = lastNotifiedSha.get(issueId);
-  if (lastSha === opts.headSha && !testGateFailed) {
-    console.log(`[ci-failure-feedback] Skipping duplicate feedback for ${issueId} @ ${opts.headSha.slice(0, 8)}`);
+  // PAN-4625: a check that fails later on the same head is delivered too, so
+  // a same-head relay only stops here when its trigger was already delivered.
+  const previous = lastNotified.get(issueId);
+  const delivered = previous?.headSha === opts.headSha ? previous.delivered : undefined;
+  if (delivered && !testGateFailed && opts.trigger && delivered.has(opts.trigger.name)) {
+    console.log(`[ci-failure-feedback] Skipping duplicate feedback for ${issueId} @ ${opts.headSha.slice(0, 8)}: ${opts.trigger.name} already delivered`);
     return { agentMessageSent: false, ...testGateFlag };
   }
 
@@ -706,6 +721,18 @@ async function relayCiFailureFeedbackInQueue(
   if (failures.length === 0 && opts.trigger && FAILED_CHECK_RUN_CONCLUSIONS.has(opts.trigger.conclusion.toLowerCase())) {
     const { name, url, jobId } = opts.trigger;
     failures.push({ name, ...(url ? { url } : {}), ...(jobId !== undefined ? { jobId } : {}), excerpt: '', inheritedFromMain: mainFailingNames.has(name) });
+  }
+
+  // PAN-4625: on a head already delivered, name only the checks not yet
+  // delivered; nothing new stays debounced. A counted test-gate failure keeps
+  // every failure: it is the verification feedback for this head.
+  if (delivered && !testGateFailed) {
+    const fresh = failures.filter((f) => !delivered.has(f.name));
+    if (fresh.length === 0) {
+      console.log(`[ci-failure-feedback] Skipping duplicate feedback for ${issueId} @ ${opts.headSha.slice(0, 8)}: no failed check not already delivered`);
+      return { agentMessageSent: false, ...testGateFlag };
+    }
+    failures.splice(0, failures.length, ...fresh);
   }
 
   // If we cannot find any failing workflow run for this SHA, still write a short
@@ -738,6 +765,7 @@ async function relayCiFailureFeedbackInQueue(
     source: opts.source,
     testGateFailed,
     statusFailures,
+    ...(delivered && !testGateFailed ? { earlierDelivered: [...delivered] } : {}),
   });
 
   const fileResult = await writeFeedbackFile({
@@ -762,10 +790,15 @@ async function relayCiFailureFeedbackInQueue(
     return { agentMessageSent: false, ...testGateFlag };
   }
 
+  // PAN-4625: from here on, these checks are delivered for this head.
+  const deliveredNow = delivered ?? new Set<string>();
+  for (const f of failures) deliveredNow.add(f.name);
+  for (const f of statusFailures) deliveredNow.add(f.name);
+  lastNotified.set(issueId, { headSha: opts.headSha, delivered: deliveredNow });
+
   if (counted) {
     recordCiTestGateFailure(issueId, opts, counted);
     const agentMessageSent = await deliverCiTestGateFeedback(issueId, opts, fileResult.filePath, counted, deps);
-    lastNotifiedSha.set(issueId, opts.headSha);
     return { feedbackPath: fileResult.filePath, agentMessageSent, ...testGateFlag };
   }
 
@@ -804,7 +837,6 @@ async function relayCiFailureFeedbackInQueue(
     );
   }
 
-  lastNotifiedSha.set(issueId, opts.headSha);
   return { feedbackPath: fileResult.filePath, agentMessageSent, ...testGateFlag };
 }
 

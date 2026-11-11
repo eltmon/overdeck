@@ -271,8 +271,11 @@ describe('relayCiFailureFeedback', () => {
     await relayCiFailureFeedback(opts);
     await relayCiFailureFeedback(opts);
 
-    // 2 list + 2 view + 2 check-runs reads (head and main, PAN-4534), all once because debounced
-    expect(execFile).toHaveBeenCalledTimes(6);
+    // PAN-4625: the second relay re-reads the checks (2 list + 2 view + 2
+    // check-runs reads each) to look for a newly failed one, finds none, and
+    // stays debounced.
+    expect(execFile).toHaveBeenCalledTimes(12);
+    expect(mockWriteFeedbackFile).toHaveBeenCalledTimes(1);
     expect(mockMessageAgent).toHaveBeenCalledTimes(1);
   });
 
@@ -1145,6 +1148,40 @@ describe('PAN-4534: failures come from the head\'s check runs, with the failing 
 
     expect(body).toContain('### test-shard (3/4)');
     expect(body).toContain('FAIL  tests/unit/lib/access-tokens.test.ts');
+  });
+
+  it('delivers a check that fails later on the same head, naming only it (PAN-4625)', async () => {
+    const lint = { id: 457, name: 'lint', conclusion: 'failure', details_url: 'https://github.com/test-owner/test-repo/actions/runs/900/job/457', app: { slug: 'github-actions' } };
+    mockGh([lint], () => ({ stdout: 'eslint: 1 error' }));
+    await relay({ name: 'lint', conclusion: 'failure', jobId: 457 });
+
+    mockGh([lint, shard('test-shard (4/4)', 456)], ([, path]) => ({ stdout: path!.includes('/456/') ? VITEST_LOG : 'eslint: 1 error' }));
+    await relay({ name: 'test-shard (4/4)', conclusion: 'failure', url: SHARD_URL, jobId: 456 });
+
+    expect(mockWriteFeedbackFile).toHaveBeenCalledTimes(2);
+    expect(mockMessageAgent).toHaveBeenCalledTimes(2);
+    const body = mockWriteFeedbackFile.mock.calls[1]![0].markdownBody as string;
+    expect(body).toContain('## Failing checks (1)');
+    expect(body).toContain('### test-shard (4/4)');
+    expect(body).toContain('FAIL  tests/unit/lib/access-tokens.test.ts > refreshAccessTokens > keeps the newest token');
+    expect(body).not.toContain('### lint');
+    expect(body).toContain('Still failing from that earlier feedback: lint.');
+  });
+
+  it('sends no duplicate feedback for a repeated event on an already-delivered check (PAN-4625)', async () => {
+    mockGh([shard('test-shard (4/4)', 456)], () => ({ stdout: VITEST_LOG }));
+    await relay({ name: 'test-shard (4/4)', conclusion: 'failure', url: SHARD_URL, jobId: 456 });
+    // The aggregate `test` check echoes the shard; the collector drops it, so
+    // it is never in the delivered set, and the trigger fallback must not
+    // turn it into a new failure.
+    await relay({ name: 'test', conclusion: 'failure' });
+    const callsBeforeRepeat = (execFile as unknown as ReturnType<typeof vi.fn>).mock.calls.length;
+    await relay({ name: 'test-shard (4/4)', conclusion: 'failure', url: SHARD_URL, jobId: 456 });
+
+    expect(mockWriteFeedbackFile).toHaveBeenCalledTimes(1);
+    expect(mockMessageAgent).toHaveBeenCalledTimes(1);
+    // The repeat of a delivered trigger reads nothing from GitHub.
+    expect((execFile as unknown as ReturnType<typeof vi.fn>).mock.calls.length).toBe(callsBeforeRepeat);
   });
 
   it('lists the failing check names and URLs when no job log ever appears', async () => {
