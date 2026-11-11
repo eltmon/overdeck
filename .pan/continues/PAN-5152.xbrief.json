@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5152",
   "created": "2026-11-11T14:36:40.308Z",
-  "updated": "2026-11-11T15:57:22.067Z",
+  "updated": "2026-11-11T16:01:05.723Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -342,9 +342,22 @@
       "doneAt": "2026-11-11T15:57:20.617Z"
     },
     "wi19-pan-done-jira": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5152",
-      "claimedAt": "2026-11-11T15:57:22.067Z"
+      "claimedAt": "2026-11-11T15:57:22.067Z",
+      "doneAt": "2026-11-11T16:01:05.722Z"
+    },
+    "wi19-pan-done-jira.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T16:01:05.722Z"
+    },
+    "wi19-pan-done-jira.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T16:01:05.722Z"
+    },
+    "wi19-pan-done-jira.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T16:01:05.722Z"
     }
   }
 }
