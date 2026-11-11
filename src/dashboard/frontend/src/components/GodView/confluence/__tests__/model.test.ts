@@ -12,6 +12,7 @@ import {
   fmtAge,
   frostFromIdleMinutes,
   heatFromEventRate,
+  landmarkMotion,
   modelGlyph,
   orbIdleMinutes,
   pickOrb,
@@ -235,6 +236,17 @@ describe('Confluence model', () => {
     expect(frostFromIdleMinutes(8)).toBe(0);
     expect(frostFromIdleMinutes(21)).toBe(0.5);
     expect(frostFromIdleMinutes(34)).toBe(1);
+  });
+
+  it('holds a landmark still and dim unless its agent is live', () => {
+    expect(landmarkMotion(false, 12.3, 1.8)).toEqual({ pulse: 0, spin: 0, alpha: 0.35 });
+    expect(landmarkMotion(false, 0, 1.1, 2)).toEqual({ pulse: 0, spin: 0, alpha: 0.35 });
+
+    const live = landmarkMotion(true, 2, 1.8);
+    expect(live.spin).toBe(2);
+    expect(live.alpha).toBe(1);
+    expect(live.pulse).toBeCloseTo(0.5 + 0.5 * Math.sin(3.6), 10);
+    expect(landmarkMotion(true, 2, 1.1, 2).pulse).toBeCloseTo(0.5 + 0.5 * Math.sin(4.2), 10);
   });
 
   it('counts real hook events per issue inside the trailing 60 seconds', () => {

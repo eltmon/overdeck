@@ -681,6 +681,50 @@ describe('ages are computed at read time (PAN-5131 FR-3)', () => {
   });
 });
 
+describe('meta.flywheelLive reads the cached Flywheel status (PAN-5131 FR-6, NFR-1)', () => {
+  function renderMeta(client: QueryClient) {
+    client.setQueryData(['agents-fleet-cost-summary'], {});
+    client.setQueryData(['conversations'], []);
+    return renderHook(() => useConfluenceData(), { wrapper: wrapper(client) });
+  }
+
+  function requestedUrls(): string[] {
+    return vi.mocked(globalThis.fetch).mock.calls.map(([input]) => (input instanceof Request ? input.url : String(input)));
+  }
+
+  it('is true when the cached status says the run is running, and makes no request', async () => {
+    const client = queryClient();
+    client.setQueryData(['flywheel', 'status'], { run: 'running' });
+    const { result } = renderMeta(client);
+    await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+
+    expect(result.current.meta.flywheelLive).toBe(true);
+    expect(requestedUrls().filter((url) => url.includes('/api/flywheel'))).toEqual([]);
+  });
+
+  it('is false for a cached status that is not running, and follows a cache update', async () => {
+    const client = queryClient();
+    client.setQueryData(['flywheel', 'status'], { run: 'paused' });
+    const { result } = renderMeta(client);
+    expect(result.current.meta.flywheelLive).toBe(false);
+
+    await act(async () => {
+      client.setQueryData(['flywheel', 'status'], { run: 'running' });
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(result.current.meta.flywheelLive).toBe(true);
+    expect(requestedUrls().filter((url) => url.includes('/api/flywheel'))).toEqual([]);
+  });
+
+  it('is false when no status is cached, and makes no request', async () => {
+    const { result } = renderMeta(queryClient());
+    await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+
+    expect(result.current.meta.flywheelLive).toBe(false);
+    expect(requestedUrls().filter((url) => url.includes('/api/flywheel'))).toEqual([]);
+  });
+});
+
 describe('useConfluenceOrbs — parked cast (PAN-3490)', () => {
   it('synthesizes a Doldrums orb for a parked issue with no live agent', async () => {
     const parkedAt = new Date(NOW.getTime() - 16 * 60 * 60_000).toISOString();

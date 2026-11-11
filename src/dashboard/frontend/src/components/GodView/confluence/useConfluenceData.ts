@@ -7,6 +7,7 @@ import {
   useDashboardStore,
 } from '../../../lib/store';
 import type { DerivedIssueState, DerivedIssueStateName, IssueAttention, Issue } from '../../../types';
+import { useFlywheelStatus } from '../../../lib/flywheelApi';
 import { getPipelineIssuePhase, type PipelineIssuePhase } from '../../../lib/pipeline-state';
 import { useWorkspaceStackHealthQuery } from '../../CommandDeck/ZoneCOverviewTabs/queries';
 import {
@@ -140,6 +141,8 @@ export interface ConfluenceMeta {
   active: number;
   total: number;
   roleCounts: Readonly<Record<string, number>>;
+  /** The Flywheel run is live: the same cached status the app sidebar's badge reads. */
+  flywheelLive: boolean;
   /** PAN-3490: parked population size + orbit histogram (null while /api/parked has never answered). */
   parkedTotal: number | null;
   parkedByOrbit: Readonly<Record<string, number>> | null;
@@ -825,6 +828,8 @@ export function useConfluenceMeta(
   });
   const parked = useParked();
   const nowTick = useNowTick();
+  // enabled: false — this observer never fetches; the app sidebar polls this query (PAN-5131 NFR-1).
+  const { data: flywheel } = useFlywheelStatus({ enabled: false });
   const { data: velocity } = useQuery({
     queryKey: ['pipeline-velocity'],
     queryFn: fetchVelocity,
@@ -873,13 +878,14 @@ export function useConfluenceMeta(
       active: liveAgents.filter((agent) => recentlyActive(agent, agentRuntimeById[agent.id], now.getTime())).length,
       total: liveAgents.length,
       roleCounts,
+      flywheelLive: flywheel?.run === 'running',
       parkedTotal: parked?.summary.total ?? null,
       parkedByOrbit: parked?.summary.byOrbit ?? null,
       velocity: velocity?.transitionsPerHour != null
         ? { transitionsPerHour: velocity.transitionsPerHour, byStage: velocity.byStage ?? {} }
         : null,
     };
-  }, [agentsById, agentRuntimeById, backendPanesById, conversations, costSummary, hookStream.costEvents, orbs, recentActivity, derivedIssueStateByIssueId, system, parked, velocity, nowTick]);
+  }, [agentsById, agentRuntimeById, backendPanesById, conversations, costSummary, hookStream.costEvents, orbs, recentActivity, derivedIssueStateByIssueId, system, parked, velocity, nowTick, flywheel]);
 }
 
 export function useConfluenceData(): ConfluenceData {

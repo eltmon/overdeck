@@ -422,6 +422,13 @@ export function frostFromIdleMinutes(idleMinutes: number): number {
   return clamp((idleMinutes - FROST_START_MINUTES) / FROST_SPAN_MINUTES, 0, 1);
 }
 
+/** A landmark (sun, sequencer) pulses and spins only while its agent is live (PAN-5131 FR-6). */
+export function landmarkMotion(live: boolean, simT: number, pulseRate: number, phase = 0): { pulse: number; spin: number; alpha: number } {
+  return live
+    ? { pulse: 0.5 + 0.5 * Math.sin(simT * pulseRate + phase), spin: simT, alpha: 1 }
+    : { pulse: 0, spin: 0, alpha: 0.35 };
+}
+
 /** Real hook events per issue inside the trailing 60 s window (PAN-5131 FR-1). */
 export function eventsPerMinuteByIssue(
   entries: readonly { issueId: string | null; ts: number }[],

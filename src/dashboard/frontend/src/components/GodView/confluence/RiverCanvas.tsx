@@ -22,6 +22,7 @@ import {
   frostFromIdleMinutes,
   heatFromEventRate,
   hexA,
+  landmarkMotion,
   modelGlyph,
   orbIdleMinutes,
   parkedOrbitColor,
@@ -124,7 +125,8 @@ export interface RiverCanvasProps {
   selectedId?: string | null;
   conversations?: number | null;
   mergeQueue?: number;
-  sequencer?: boolean;
+  flywheelLive: boolean;
+  sequencerLive: boolean;
   /** True parked census for the Doldrums label (null while /api/parked is unanswered). */
   parkedTotal?: number | null;
   onHover?: (orb: ConfluenceOrb | null, point: { x: number; y: number; canvasWidth: number } | null) => void;
@@ -490,11 +492,11 @@ function createEngine(
   };
 
   const drawSun = () => {
-    const pulse = 0.5 + 0.5 * Math.sin(simT * 1.8); const radius = 16 + pulse * 3;
+    const { pulse, spin, alpha } = landmarkMotion(props.flywheelLive, simT, 1.8); const radius = 16 + pulse * 3; fx.globalAlpha = alpha;
     const glow = fx.createRadialGradient(layout.sunX, layout.sunY, 0, layout.sunX, layout.sunY, radius * 3.2); glow.addColorStop(0, 'rgba(157,78,221,.75)'); glow.addColorStop(0.35, 'rgba(157,78,221,.22)'); glow.addColorStop(1, 'rgba(157,78,221,0)');
     fx.fillStyle = glow; fx.beginPath(); fx.arc(layout.sunX, layout.sunY, radius * 3.2, 0, 7); fx.fill(); fx.fillStyle = '#cfa8ff'; fx.shadowColor = '#9d4edd'; fx.shadowBlur = 16; fx.beginPath(); fx.arc(layout.sunX, layout.sunY, radius * 0.55, 0, 7); fx.fill(); fx.shadowBlur = 0;
-    fx.save(); fx.translate(layout.sunX, layout.sunY); fx.rotate(simT * 0.5); fx.strokeStyle = 'rgba(157,78,221,.6)'; fx.setLineDash([3, 7]); fx.lineWidth = 1.4; fx.beginPath(); fx.arc(0, 0, radius + 7, 0, 7); fx.stroke(); fx.rotate(-simT * 0.9); fx.strokeStyle = 'rgba(157,78,221,.3)'; fx.setLineDash([2, 9]); fx.beginPath(); fx.arc(0, 0, radius + 14, 0, 7); fx.stroke(); fx.setLineDash([]); fx.restore();
-    fx.font = '600 9px "JetBrains Mono"'; fx.fillStyle = 'rgba(207,168,255,.85)'; fx.textAlign = 'center'; fx.fillText('FLYWHEEL', layout.sunX, layout.sunY + radius + 20); fx.textAlign = 'left';
+    fx.save(); fx.translate(layout.sunX, layout.sunY); fx.rotate(spin * 0.5); fx.strokeStyle = 'rgba(157,78,221,.6)'; fx.setLineDash([3, 7]); fx.lineWidth = 1.4; fx.beginPath(); fx.arc(0, 0, radius + 7, 0, 7); fx.stroke(); fx.rotate(-spin * 0.9); fx.strokeStyle = 'rgba(157,78,221,.3)'; fx.setLineDash([2, 9]); fx.beginPath(); fx.arc(0, 0, radius + 14, 0, 7); fx.stroke(); fx.setLineDash([]); fx.restore();
+    fx.font = '600 9px "JetBrains Mono"'; fx.fillStyle = 'rgba(207,168,255,.85)'; fx.textAlign = 'center'; fx.fillText('FLYWHEEL', layout.sunX, layout.sunY + radius + 20); fx.textAlign = 'left'; fx.globalAlpha = 1;
   };
 
   const drawStageHeaders = () => {
@@ -648,7 +650,7 @@ function createEngine(
     }
   };
   const drawConstellation = () => { const count = props.conversations ?? 0; if (!count) return; const start = (width - (count * 14 + 150)) / 2; fx.font = '600 9px "JetBrains Mono"'; fx.fillStyle = 'rgba(0,212,255,.5)'; fx.fillText(`◈ ${count} CONVERSATIONS`, start, 33); for (let index = 0; index < count; index++) { const x = start + 130 + index * 14 + Math.sin(index * 3.7) * 3; const y = 30 + Math.sin(simT * 1.3 + index * 1.7) * 4; const twinkle = 0.4 + 0.6 * Math.abs(Math.sin(simT * 2 + index)); fx.fillStyle = `rgba(0,212,255,${0.2 + twinkle * 0.55})`; fx.beginPath(); fx.arc(x, y, 2 + twinkle * 1.2, 0, 7); fx.fill(); } };
-  const drawSequencer = () => { if (props.sequencer === false) return; const x = layout.sunX + 118; const y = layout.sunY - 2; const pulse = 0.5 + 0.5 * Math.sin(simT * 1.1 + 2); fx.save(); fx.translate(x, y); fx.rotate(simT * 0.7); fx.strokeStyle = `rgba(255,119,0,${0.3 + pulse * 0.3})`; fx.setLineDash([2, 4]); fx.beginPath(); fx.arc(0, 0, 10 + pulse * 2, 0, 7); fx.stroke(); fx.rotate(-simT * 1.3); fx.strokeStyle = `rgba(255,119,0,${0.16 + pulse * 0.18})`; fx.setLineDash([2, 7]); fx.beginPath(); fx.arc(0, 0, 16 + pulse * 2, 0, 7); fx.stroke(); fx.restore(); fx.setLineDash([]); fx.fillStyle = 'rgba(255,150,60,.9)'; fx.beginPath(); fx.arc(x, y, 5, 0, 7); fx.fill(); fx.font = '600 8.5px "JetBrains Mono"'; fx.fillStyle = 'rgba(255,150,60,.7)'; fx.fillText('SEQUENCER', x - 28, y + 28); };
+  const drawSequencer = () => { const x = layout.sunX + 118; const y = layout.sunY - 2; const { pulse, spin, alpha } = landmarkMotion(props.sequencerLive, simT, 1.1, 2); fx.globalAlpha = alpha; fx.save(); fx.translate(x, y); fx.rotate(spin * 0.7); fx.strokeStyle = `rgba(255,119,0,${0.3 + pulse * 0.3})`; fx.setLineDash([2, 4]); fx.beginPath(); fx.arc(0, 0, 10 + pulse * 2, 0, 7); fx.stroke(); fx.rotate(-spin * 1.3); fx.strokeStyle = `rgba(255,119,0,${0.16 + pulse * 0.18})`; fx.setLineDash([2, 7]); fx.beginPath(); fx.arc(0, 0, 16 + pulse * 2, 0, 7); fx.stroke(); fx.restore(); fx.setLineDash([]); fx.fillStyle = 'rgba(255,150,60,.9)'; fx.beginPath(); fx.arc(x, y, 5, 0, 7); fx.fill(); fx.font = '600 8.5px "JetBrains Mono"'; fx.fillStyle = 'rgba(255,150,60,.7)'; fx.fillText('SEQUENCER', x - 28, y + 28); fx.globalAlpha = 1; };
 
   const advance = (dt: number) => {
     const nowMs = Date.now();

@@ -142,6 +142,8 @@ export function GodViewConfluence({
             conversations={meta.conversations}
             mergeQueue={meta.mergeQ}
             parkedTotal={meta.parkedTotal}
+            flywheelLive={meta.flywheelLive === true}
+            sequencerLive={(meta.roleCounts.sequencer ?? 0) > 0}
             onHover={(orb, point) => setHover(orb && point ? { orb, ...point } : null)}
             onSelect={(orb) => setRailId(orb ? orb.id : null)}
           />

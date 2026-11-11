@@ -78,6 +78,7 @@ const data: ConfluenceData = {
     active: 1,
     total: 3,
     roleCounts: { work: 3 },
+    flywheelLive: false,
   },
 };
 

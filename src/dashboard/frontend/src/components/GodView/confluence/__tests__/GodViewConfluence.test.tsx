@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   resize: vi.fn(),
+  riverProps: [] as Array<Record<string, unknown>>,
 }));
 
 vi.mock('../../../../hooks/useGodViewSocket', () => ({
@@ -53,7 +54,8 @@ vi.mock('../useConfluenceData', () => ({
 vi.mock('../RiverCanvas', async () => {
   const React = await import('react');
   return {
-    RiverCanvas: React.forwardRef(function RiverCanvasMock(_props, ref) {
+    RiverCanvas: React.forwardRef(function RiverCanvasMock(props: Record<string, unknown>, ref) {
+      mocks.riverProps.push(props);
       React.useImperativeHandle(ref, () => ({
         emitSparks: vi.fn(),
         emitRing: vi.fn(),
@@ -122,6 +124,7 @@ beforeEach(() => {
   requestFullscreen = vi.fn();
   exitFullscreen = vi.fn(() => Promise.resolve());
   mocks.resize.mockClear();
+  mocks.riverProps.length = 0;
 
   Object.defineProperty(document, 'fullscreenElement', {
     configurable: true,
@@ -277,5 +280,31 @@ describe('GodViewConfluence field guide and fullscreen controls', () => {
     const unrelated = new KeyboardEvent('keydown', { key: 'x', bubbles: true, cancelable: true });
     fireEvent(window, unrelated);
     expect(unrelated.defaultPrevented).toBe(false);
+  });
+});
+
+describe('GodViewConfluence landmarks (PAN-5131 FR-6)', () => {
+  function lastRiverProps(meta: Record<string, unknown>) {
+    render(
+      <GodViewConfluence
+        data={{ ...confluenceData, meta: { ...confluenceData.meta, ...meta } } as unknown as ConfluenceData}
+        helpOpen={false}
+        onHelpOpenChange={vi.fn()}
+        onToggleFullscreen={vi.fn()}
+      />,
+    );
+    return mocks.riverProps.at(-1);
+  }
+
+  it('tells the canvas the sequencer and the Flywheel are not live when no data says so', () => {
+    expect(lastRiverProps({ roleCounts: {} })).toMatchObject({ sequencerLive: false, flywheelLive: false });
+  });
+
+  it('tells the canvas the sequencer is live when a sequencer agent is hosted', () => {
+    expect(lastRiverProps({ roleCounts: { sequencer: 1 } })).toMatchObject({ sequencerLive: true, flywheelLive: false });
+  });
+
+  it('passes the Flywheel run state from meta to the canvas', () => {
+    expect(lastRiverProps({ roleCounts: {}, flywheelLive: true })).toMatchObject({ sequencerLive: false, flywheelLive: true });
   });
 });
