@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5122",
   "created": "2026-11-11T10:01:02.133Z",
-  "updated": "2026-11-11T11:04:03.366Z",
+  "updated": "2026-11-11T11:04:09.923Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -99,6 +99,11 @@
     "lifecycle-herdr-test.ac4": {
       "status": "completed",
       "doneAt": "2026-11-11T11:04:03.366Z"
+    },
+    "docs-companion-both-backends": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5122",
+      "claimedAt": "2026-11-11T11:04:09.923Z"
     }
   }
 }
