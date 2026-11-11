@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5072",
   "created": "2026-11-11T10:00:36.495Z",
-  "updated": "2026-11-11T10:21:51.916Z",
+  "updated": "2026-11-11T10:21:58.722Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -146,6 +146,11 @@
     "w7-openclaw-readme.ac3": {
       "status": "completed",
       "doneAt": "2026-11-11T10:21:51.915Z"
+    },
+    "w8-grokbuild-readme": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5072",
+      "claimedAt": "2026-11-11T10:21:58.722Z"
     }
   }
 }
