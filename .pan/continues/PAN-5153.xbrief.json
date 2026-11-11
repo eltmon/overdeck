@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5153",
   "created": "2026-11-11T14:43:19.840Z",
-  "updated": "2026-11-11T15:26:08.587Z",
+  "updated": "2026-11-11T15:26:14.542Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -218,6 +218,11 @@
     "check-run-per-repo.ac2": {
       "status": "completed",
       "doneAt": "2026-11-11T15:26:08.587Z"
+    },
+    "marker-approver-per-repo": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5153",
+      "claimedAt": "2026-11-11T15:26:14.542Z"
     }
   }
 }
