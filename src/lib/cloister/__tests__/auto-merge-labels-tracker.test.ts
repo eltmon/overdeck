@@ -13,6 +13,8 @@ const mocks = vi.hoisted(() => ({
   resolveGitHubIssue: vi.fn(),
   loadConfigSync: vi.fn(),
   getIssue: vi.fn(),
+  createTrackerFromConfig: vi.fn(),
+  createJiraTrackerForIssue: vi.fn(),
 }));
 
 vi.mock('node:child_process', async (importOriginal) => ({
@@ -26,7 +28,14 @@ vi.mock('../../projects.js', () => ({
 vi.mock('../../tracker-utils.js', () => ({ resolveGitHubIssue: mocks.resolveGitHubIssue }));
 vi.mock('../../config.js', () => ({ loadConfigSync: mocks.loadConfigSync }));
 vi.mock('../../tracker/factory.js', () => ({
-  createTrackerFromConfig: () => ({ getIssue: mocks.getIssue }),
+  createTrackerFromConfig: (...args: unknown[]) => {
+    mocks.createTrackerFromConfig(...args);
+    return { getIssue: mocks.getIssue };
+  },
+  createJiraTrackerForIssue: (...args: unknown[]) => {
+    mocks.createJiraTrackerForIssue(...args);
+    return { getIssue: mocks.getIssue };
+  },
 }));
 
 import { issueHoldsForUat } from '../auto-merge-eligibility.js';
@@ -77,6 +86,18 @@ describe('issueHoldsForUat label source', () => {
     ghLabels(['hold-for-uat']);
 
     await expect(issueHoldsForUat('LEX-7', { auto_merge_default: 'auto' }, false)).resolves.toBe(false);
+    expect(mocks.execFile).not.toHaveBeenCalled();
+  });
+
+  it('reads a Jira-tracked issue\'s labels from Jira without a global [trackers] entry (PAN-5152)', async () => {
+    mocks.getProjectSync.mockReturnValue({ tracker: 'jira', issue_prefix: 'LEX', github_repo: 'eltmon/lexerra', auto_merge_default: 'auto' });
+    mocks.loadConfigSync.mockReturnValue({ trackers: { primary: 'linear', linear: { type: 'linear' } } });
+    mocks.getIssue.mockReturnValue(Effect.succeed({ labels: ['hold-for-uat'] }));
+    ghLabels(['auto-merge']);
+
+    await expect(issueHoldsForUat('LEX-7', { auto_merge_default: 'auto' }, false)).resolves.toBe(true);
+    expect(mocks.createJiraTrackerForIssue).toHaveBeenCalledWith('LEX-7');
+    expect(mocks.createTrackerFromConfig).not.toHaveBeenCalled();
     expect(mocks.execFile).not.toHaveBeenCalled();
   });
 });

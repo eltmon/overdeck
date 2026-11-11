@@ -11,6 +11,7 @@ import type {
   GitHubApiError,
   LinearApiError,
 } from '../errors.js';
+import type { CanonicalState } from '../../core/state-mapping.js';
 
 /**
  * Union of every typed error a tracker implementation can produce while
@@ -22,7 +23,7 @@ import type {
 export type TrackerApiError = TrackerError | GitHubApiError | LinearApiError;
 
 // Supported tracker types
-export type TrackerType = 'linear' | 'github' | 'gitlab' | 'rally';
+export type TrackerType = 'linear' | 'github' | 'gitlab' | 'rally' | 'jira';
 
 // Normalized issue state (lowest common denominator)
 export type IssueState = 'open' | 'in_progress' | 'in_review' | 'closed';
@@ -82,6 +83,9 @@ export interface Issue {
 
   /** Raw tracker state name before normalization (e.g., "Discovering", "In-Progress") */
   rawState?: string;
+
+  /** Canonical Overdeck state, when the adapter maps it directly (Jira fills it on every read) */
+  canonicalState?: CanonicalState;
 }
 
 // Comment on an issue

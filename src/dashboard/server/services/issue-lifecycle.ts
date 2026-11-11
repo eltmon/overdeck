@@ -2,7 +2,7 @@
  * IssueLifecycle Effect service (PAN-449)
  *
  * High-level issue state management that dispatches to the correct tracker
- * client (Linear, GitHub, Rally) based on the issue ID prefix.
+ * client (Linear, GitHub, Rally, Jira) based on the issue ID prefix.
  *
  * Routes should use IssueLifecycle instead of calling tracker clients directly.
  * The service handles:
@@ -23,6 +23,8 @@ import type { LinearState } from './linear-client.js';
 import { TrackerNotConfigured, TrackerApiError, IssueNotFound, RateLimited } from './typed-errors.js';
 import { EventStoreService } from './domain-services.js';
 import { getSharedIssueService } from './issue-service-singleton.js';
+import { transitionJiraIssue } from '../../../lib/tracker/jira-lifecycle.js';
+import type { JiraTransitionTarget } from '../../../lib/tracker/jira-status.js';
 
 // ─── Event emission helper ────────────────────────────────────────────────────
 
@@ -177,6 +179,15 @@ function githubLabelMetadata(label: string): { color: string; description: strin
 // ─── Live layer implementation ────────────────────────────────────────────────
 
 /** Map IssueState to canonical status string for cache patching. */
+/** Dashboard IssueState to the Jira transition target (PAN-5152, D-11). */
+function dashboardStateToJiraTarget(state: IssueState): JiraTransitionTarget {
+  switch (state) {
+    case 'open': return 'todo';
+    case 'closed': return 'done';
+    default: return state;
+  }
+}
+
 function canonicalStatus(state: IssueState): string {
   switch (state) {
     case 'open': return 'open';
@@ -222,6 +233,9 @@ export const IssueLifecycleLive = Layer.effect(
                 Effect.catch(() => Effect.void) // Non-fatal if already open
               );
             }
+          } else if (trackerType === 'jira') {
+            // The seam never rejects, so a Jira write cannot fail the merge handoff (D-8).
+            yield* Effect.promise(() => transitionJiraIssue(issueId, dashboardStateToJiraTarget(state)));
           } else if (trackerType === 'rally') {
             const normalizedState =
               state === 'in_planning' || state === 'open' ? 'open'
@@ -280,6 +294,8 @@ export const IssueLifecycleLive = Layer.effect(
               yield* github.removeLabel(ghInfo.owner, ghInfo.repo, ghInfo.number, label);
             }
             yield* github.closeIssue(ghInfo.owner, ghInfo.repo, ghInfo.number);
+          } else if (trackerType === 'jira') {
+            yield* Effect.promise(() => transitionJiraIssue(issueId, 'done'));
           } else if (trackerType === 'rally') {
             yield* rally.updateState(issueId, 'closed');
           } else {

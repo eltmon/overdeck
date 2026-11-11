@@ -207,7 +207,9 @@ so an unknown host still clones and still yields a usable folder name.
 **Detected configuration.** Registration writes `tracker`,
 `github_repo`/`gitlab_repo`, `workspace.default_branch`, and a proposed
 `issue_prefix` (the key's letters only, max 10), then creates the main
-workspace row. A detached or unborn HEAD yields *no* default branch rather
+workspace row. When the operator chooses Jira (`--tracker jira`, or Issue
+tracker → Jira in the dialog), registration keeps the detected code repo and
+writes `tracker: jira` plus `jira.site`. A detached or unborn HEAD yields *no* default branch rather
 than a guessed `main`.
 
 **Notices.** Resolve returns blocking `findings` and non-blocking `notices`; a

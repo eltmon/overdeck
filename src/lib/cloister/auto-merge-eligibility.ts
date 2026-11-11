@@ -91,10 +91,15 @@ export async function defaultGetIssueLabels(issueId: string): Promise<string[]> 
 
 /** Labels read through the configured tracker client; [] when it is not configured. */
 async function readTrackerIssueLabels(issueId: string, tracker: TrackerType): Promise<string[]> {
-  const [{ loadConfigSync }, { createTrackerFromConfig }] = await Promise.all([
+  const [{ loadConfigSync }, { createJiraTrackerForIssue, createTrackerFromConfig }] = await Promise.all([
     import('../config.js'),
     import('../tracker/factory.js'),
   ]);
+  // PAN-5152: Jira is configured per project, never in the global [trackers] table.
+  if (tracker === 'jira') {
+    const issue = await Effect.runPromise(createJiraTrackerForIssue(issueId).getIssue(issueId));
+    return [...(issue.labels ?? [])];
+  }
   const trackers = loadConfigSync().trackers;
   if (!trackers?.[tracker]) return [];
   const issue = await Effect.runPromise(createTrackerFromConfig(trackers, tracker).getIssue(issueId));

@@ -107,6 +107,9 @@ export function useProjectCreateIntent({
   const [parentOverride, setParentOverride] = useState<string | undefined>(undefined);
   const [nameOverride, setNameOverride] = useState<string | undefined>(undefined);
   const [prefixOverride, setPrefixOverride] = useState<string | undefined>(undefined);
+  // PAN-5152: an explicit issue-tracker choice; '' means detect from the remote.
+  const [tracker, setTracker] = useState<'' | 'jira'>('');
+  const [jiraSite, setJiraSite] = useState('');
 
   const [intent, setIntent] = useState<ResolvedProjectIntent | null>(null);
   const [checking, setChecking] = useState(false);
@@ -160,8 +163,9 @@ export function useProjectCreateIntent({
       ...(parentOverride ? { parentDir: parentOverride } : {}),
       ...(nameOverride ? { name: nameOverride } : {}),
       ...(prefixOverride ? { issuePrefix: prefixOverride } : {}),
+      ...(tracker === 'jira' ? { tracker, ...(jiraSite.trim() ? { jiraSite: jiraSite.trim() } : {}) } : {}),
     }),
-    [mode, url, path, parentOverride, nameOverride, prefixOverride],
+    [mode, url, path, parentOverride, nameOverride, prefixOverride, tracker, jiraSite],
   );
 
   // ─── Resolve ───────────────────────────────────────────────────────────────
@@ -650,6 +654,10 @@ export function useProjectCreateIntent({
     setName: setNameOverride,
     issuePrefix: effectivePrefix,
     setIssuePrefix: setPrefixOverride,
+    tracker,
+    setTracker,
+    jiraSite,
+    setJiraSite,
     hasOverrides: nameOverride !== undefined || prefixOverride !== undefined || parentOverride !== undefined,
     resetOverrides,
     intent,

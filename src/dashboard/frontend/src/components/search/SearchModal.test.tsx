@@ -152,4 +152,14 @@ describe('SearchModal', () => {
     expect(items[0]).toHaveTextContent('MIN-857');
     expect(items[1]).toHaveTextContent('PAN-2467');
   });
+
+  it('offers a Jira source filter (PAN-5152)', () => {
+    mockUseSearch.mockReturnValue({
+      groupedResults: {}, isSearching: false, hasResults: false, resultCount: 0,
+    });
+
+    render(<SearchModal isOpen onClose={vi.fn()} onSelectIssue={vi.fn()} />);
+
+    expect(screen.getByRole('button', { name: 'Jira' })).toBeInTheDocument();
+  });
 });

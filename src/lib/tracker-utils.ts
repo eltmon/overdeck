@@ -8,7 +8,7 @@
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
-import { loadProjectsConfigSync, getIssuePrefix } from './projects.js';
+import { loadProjectsConfigSync, getIssuePrefix, type ProjectConfig } from './projects.js';
 import { extractPrefix, extractNumber, parseIssueId } from './issue-id.js';
 
 export interface GitHubRepoConfig {
@@ -61,7 +61,8 @@ export function parseGitHubRepos(): GitHubRepoConfig[] {
   try {
     const { projects } = loadProjectsConfigSync();
     for (const [key, project] of Object.entries(projects)) {
-      if (project.github_repo) {
+      // PAN-5152: a Jira project keeps its code on GitHub but its issues in Jira.
+      if (project.github_repo && project.tracker !== 'jira') {
         const [owner, repo] = project.github_repo.split('/');
         // Derive prefix: linear_team if set, otherwise uppercase project key
         const prefix = (getIssuePrefix(project) || key.toUpperCase().replace(/-/g, '')).toUpperCase();
@@ -107,23 +108,63 @@ export function resolveGitHubIssue(issueId: string): IssueResolution {
 }
 
 /**
+ * Find the registered project that owns an issue ID's prefix, using the same
+ * three prefix rules as {@link resolveTrackerType}: a single `issue_prefix`,
+ * an `issue_prefixes` entry, or the derived project key.
+ */
+function findProjectForIssueId(issueId: string): ProjectConfig | undefined {
+  const parsed = parseIssueId(issueId);
+  if (!parsed) return undefined;
+  try {
+    const { projects } = loadProjectsConfigSync();
+    for (const [key, project] of Object.entries(projects)) {
+      const singlePrefix = getIssuePrefix(project);
+      if (singlePrefix?.toUpperCase() === parsed.prefix) return project;
+      if (project.issue_prefixes?.some(p => p.toUpperCase() === parsed.prefix)) return project;
+      if (!singlePrefix && !project.issue_prefixes && key.toUpperCase().replace(/-/g, '') === parsed.prefix) return project;
+    }
+  } catch { /* ignore config errors */ }
+  return undefined;
+}
+
+/**
+ * Resolve the GitHub repo that holds an issue's pull requests (PAN-5152, D-7).
+ *
+ * Returns {@link resolveGitHubIssue}'s repo when the issue lives on GitHub.
+ * Otherwise, for a `tracker: jira` project with `github_repo`, returns that
+ * repo: its issues live in Jira but its pull requests live on GitHub.
+ */
+export function resolveGitHubPullRequestRepo(issueId: string): { owner: string; repo: string } | null {
+  const resolved = resolveGitHubIssue(issueId);
+  if (resolved.isGitHub) return { owner: resolved.owner, repo: resolved.repo };
+  const project = findProjectForIssueId(issueId);
+  if (project?.tracker !== 'jira' || !project.github_repo) return null;
+  const [owner, repo] = project.github_repo.split('/');
+  return owner && repo ? { owner, repo } : null;
+}
+
+/**
  * Check if an issue ID belongs to a GitHub-tracked project.
  */
 export function isGitHubIssue(issueId: string): boolean {
   return resolveGitHubIssue(issueId).isGitHub;
 }
 
-export type TrackerTypeResolution = 'github' | 'rally' | 'linear' | 'gitlab';
+export type TrackerTypeResolution = 'github' | 'rally' | 'linear' | 'gitlab' | 'jira';
 
 /**
  * Resolve the tracker type for an issue ID by checking projects.yaml configuration.
  *
  * Resolution order:
+ * 0. Jira — prefix matches a `tracker: jira` project (outranks its github_repo)
  * 1. GitHub — prefix matches a configured github_repo project
  * 2. Rally — prefix matches a project with rally_project or tracker: 'rally'
  * 3. Linear — fallback (matches linear_team or unknown prefix)
  */
 export function resolveTrackerType(issueId: string): TrackerTypeResolution {
+  // PAN-5152: an explicit `tracker: jira` outranks github_repo (code lives on GitHub,
+  // issues live in Jira). Other trackers keep the GitHub-first order (PAN-2449).
+  if (findProjectForIssueId(issueId)?.tracker === 'jira') return 'jira';
   // Check GitHub first (existing logic)
   if (resolveGitHubIssue(issueId).isGitHub) {
     return 'github';

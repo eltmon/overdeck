@@ -20,7 +20,7 @@
 import { Effect } from 'effect';
 
 import { resolveGitHubIssue, resolveTrackerType } from '../../../lib/tracker-utils.js';
-import { createTracker } from '../../../lib/tracker/factory.js';
+import { createJiraTrackerForIssue, createTracker } from '../../../lib/tracker/factory.js';
 import type { Issue, IssueTracker } from '../../../lib/tracker/interface.js';
 
 const FAILURE_RETRY_MS = 10 * 60 * 1000;
@@ -47,6 +47,8 @@ function trackerForIssue(issueId: string): IssueTracker | null {
     if (!resolution.isGitHub) return null;
     return createTracker({ type: 'github', owner: resolution.owner, repo: resolution.repo });
   }
+  // PAN-5152: a Jira tracker is bound to the issue's project (key, site, status map).
+  if (trackerType === 'jira') return createJiraTrackerForIssue(issueId);
   return createTracker({ type: trackerType });
 }
 

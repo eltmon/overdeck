@@ -1,7 +1,7 @@
 import { ExternalLink, Eye } from 'lucide-react';
 import type { Issue } from '../../../types';
 
-// Tracker vs Shadow state badges — shows when Rally state differs from Overdeck shadow state
+// Tracker vs Shadow state badges — shows when the tracker state (Rally, Jira) differs from Overdeck shadow state
 export function TrackerShadowBadges({ issue, compact = false }: { issue: Issue; compact?: boolean }) {
   const trackerState = issue.rawTrackerState || issue.shadowTrackerStatus;
   const shadowState = issue.shadowStatus || issue.targetCanonicalState;
@@ -25,7 +25,7 @@ export function TrackerShadowBadges({ issue, compact = false }: { issue: Issue; 
     return (
       <span
         className="w-2 h-2 rounded-full badge-bg-signal-review shrink-0"
-        title={`Rally: ${trackerState} → Pan: ${shadowLabel}`}
+        title={`${issue.source === 'jira' ? 'Jira' : 'Rally'}: ${trackerState} → Pan: ${shadowLabel}`}
       />
     );
   }

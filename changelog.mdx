@@ -15,6 +15,10 @@ This page starts at v0.60.0, the release that removed Overdeck's state layer. Ol
 
   Drafted from the changes merged to `main` since v0.78.0. The date is set when the release is tagged.
 
+  #### New
+
+  - **Jira as an issue tracker:** projects with `tracker: jira` show Jira issues on the board and move them through the Jira workflow from start to close-out. See [Issue trackers](/configuration/issue-trackers).
+
   #### Fixed
 
   - **A stranded review request is re-requested again:** when a review was requested but never dispatched, and the review had no run state yet, the background patrol's recovery did nothing, so the review stayed stuck until someone requested it again. The patrol now re-requests it through the same guarded review route that `pan review request` uses, 15 minutes after the request. ([#4623](https://github.com/eltmon/overdeck/issues/4623))

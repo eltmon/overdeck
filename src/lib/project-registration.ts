@@ -26,7 +26,7 @@ export class DuplicateProjectError extends Error {
 
 export type RegisterProjectExtras = Pick<
   ProjectConfig,
-  'issue_prefix' | 'github_repo' | 'gitlab_repo' | 'tracker' | 'workspace' | 'pan_records'
+  'issue_prefix' | 'github_repo' | 'gitlab_repo' | 'tracker' | 'workspace' | 'pan_records' | 'jira'
 >;
 
 export interface RegisterProjectOptions {

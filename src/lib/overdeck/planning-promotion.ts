@@ -31,7 +31,7 @@ import { extractTeamPrefix, findProjectByPath, findProjectByTeam, resolveProject
 import { commitPlanArtifacts, planArtifactCommitMessage } from './plan-artifact-commit.js';
 import { pushFeatureBranch } from './feature-branch-push.js';
 import { loadRemoteAgentState } from '../remote/remote-agents.js';
-import { resolveGitHubIssue } from '../tracker-utils.js';
+import { resolveGitHubIssue, resolveTrackerType } from '../tracker-utils.js';
 import { sessionExists } from '../tmux.js';
 import { agentPaneExists, closeAgentPane } from '../terminal-backends/launch.js';
 import { findPlan, findWorkspaceDraftPlan, readPlan } from '../xbrief/io.js';
@@ -784,7 +784,9 @@ export async function completePlanningForIssue(options: {
 
     // For Linear: check if already in a 'started' state — if so, skip the transition
     let skipStateUpdate = workAgentAlreadyRunning;
-    if (!skipStateUpdate && !githubCheck?.isGitHub) {
+    // PAN-5152: a Jira issue never reaches the Linear client.
+    const isJiraIssue = resolveTrackerType(id) === 'jira';
+    if (!skipStateUpdate && !githubCheck?.isGitHub && !isJiraIssue) {
       const currentIssue = await Effect.runPromise(linear.getIssue(id).pipe(Effect.catch(() => Effect.succeed(null)))) as any;
       if (currentIssue?.state.name && currentIssue.state.name.toLowerCase() !== 'in planning' && currentIssue.state.name.toLowerCase() !== 'planning') {
         // Check if already in a "started" state by seeing if it's not an unstarted/planning state
@@ -809,6 +811,10 @@ export async function completePlanningForIssue(options: {
         } else {
           console.warn(`[complete-planning] Spec ${specPath} not found for ${id.toUpperCase()} — not applying the planned label`);
         }
+      } else if (isJiraIssue) {
+        // Jira: back to To Do through the workflow (the lifecycle's Jira branch).
+        await Effect.runPromise(lifecycle.transitionTo(id, 'open').pipe(Effect.catch(() => Effect.void)));
+        newState = 'To Do';
       } else {
         // Linear: transition to 'open' (maps to unstarted — Planned/Todo/Ready)
         const updatedIssue = await Effect.runPromise(linear.getIssue(id).pipe(Effect.catch(() => Effect.succeed(null)))) as any;

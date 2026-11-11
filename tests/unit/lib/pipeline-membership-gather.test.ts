@@ -6,6 +6,7 @@ import {
   MEMBERSHIP_UNAVAILABLE_REASONS,
   type MembershipUnavailableReason,
 } from '@overdeck/contracts';
+import { Effect } from 'effect';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -27,6 +28,8 @@ import { resolvePipelineMembership } from '../../../src/lib/pipeline-membership.
 import type { ProjectConfig } from '../../../src/lib/projects.js';
 import type { Issue } from '../../../src/lib/tracker/interface.js';
 import { currentGitHubCaller } from '../../../src/lib/github-quota/caller-context.js';
+import { JiraTracker } from '../../../src/lib/tracker/jira.js';
+import { tryResolveProjectTrackerType } from '../../../src/lib/project-tracker-type.js';
 import { GitHubQuotaPausedError } from '../../../src/lib/github-quota/pause-gate.js';
 
 const project: ProjectConfig = {
@@ -681,6 +684,53 @@ describe('gatherProjectLensSignals', () => {
     expect(mocked.listPhaseLabeledIssues).not.toHaveBeenCalled();
     expect(mocked.listOpenPullRequests).toHaveBeenCalledWith('eltmon', 'lexerra');
     expect(mocked.listIssueStates).not.toHaveBeenCalled();
+  });
+
+  it('lists a Jira project\'s members by their Jira keys (PAN-5152, D-22)', async () => {
+    // A real JiraTracker over a stub fetch, read the way the default lister
+    // reads it: listIssues({ team: issuePrefix, includeClosed: true }) and then
+    // projectTrackerIssueRows. createTracker({ type: 'jira', team }) building
+    // this tracker from the prefix alone is covered in factory.test.ts.
+    const fakeToken = ['fake', 'jira', 'token'].join('-');
+    const jira = new JiraTracker({
+      credentials: { token: fakeToken, site: 'https://jira.example.com' },
+      projectKey: 'PROJ',
+      project: { deployment: 'datacenter' },
+      fetchImpl: async () => new Response(JSON.stringify({
+        total: 2,
+        issues: [
+          { id: '1', key: 'PROJ-1', fields: { summary: 'a', labels: ['in-progress'], status: { name: 'In Progress', statusCategory: { key: 'indeterminate' } } } },
+          { id: '2', key: 'PROJ-2', fields: { summary: 'b', labels: [], status: { name: 'To Do', statusCategory: { key: 'new' } } } },
+        ],
+      })),
+    });
+    const jiraProject: ProjectConfig = {
+      name: 'acme',
+      path: '/acme',
+      issue_prefix: 'PROJ',
+      tracker: 'jira',
+      github_repo: 'acme/app',
+    };
+    expect(tryResolveProjectTrackerType(jiraProject)).toBe('jira');
+
+    const mocked = deps();
+    mocked.listTrackerIssues = vi.fn(async () => projectTrackerIssueRows(
+      await Effect.runPromise(jira.listIssues({ team: 'PROJ', includeClosed: true })),
+      'jira',
+      'PROJ',
+    ));
+    mocked.listOpenIssues = vi.fn().mockRejectedValue(new Error('GitHub issues must not be queried'));
+    mocked.listPhaseLabeledIssues = vi.fn().mockRejectedValue(new Error('GitHub issue labels must not be queried'));
+    mocked.listOpenPullRequests = vi.fn().mockResolvedValue([]);
+    mocked.listMergedPullRequestHeads = vi.fn().mockResolvedValue([]);
+    mocked.listSpecIssueIds = vi.fn().mockResolvedValue([]);
+    mocked.run = vi.fn().mockImplementation(async (_command, args, cwd) => (args[0] === 'rev-parse' ? cwd : ''));
+
+    const signals = await gatherProjectLensSignals(jiraProject, mocked);
+
+    expect(signals.map((signal) => [signal.issueId, signal.issueOpen])).toEqual([['PROJ-1', true], ['PROJ-2', true]]);
+    expect(mocked.listOpenIssues).not.toHaveBeenCalled();
+    expect(mocked.listPhaseLabeledIssues).not.toHaveBeenCalled();
   });
 
   it('names the resolved tracker when its issue query fails', async () => {

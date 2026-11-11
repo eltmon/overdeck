@@ -51,6 +51,10 @@ vi.mock('node:child_process', () => ({
 
 vi.mock('../../../../../src/lib/tracker-utils.js', () => ({
   resolveGitHubIssue: (...args: unknown[]) => mockResolveGitHubIssue(...args),
+  resolveGitHubPullRequestRepo: (...args: unknown[]) => {
+    const resolved = mockResolveGitHubIssue(...args);
+    return resolved?.isGitHub ? { owner: resolved.owner, repo: resolved.repo } : null;
+  },
   resolveTrackerType: vi.fn(() => 'github'),
 }));
 

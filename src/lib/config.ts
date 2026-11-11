@@ -46,7 +46,13 @@ export interface RallyConfig {
   project?: string;      // Rally project OID (e.g., "/project/67890")
 }
 
-export type TrackerConfigItem = LinearConfig | GitHubConfig | GitLabConfig | RallyConfig;
+/** Optional global Jira entry (D-21); Jira is configured per project. */
+export interface JiraTrackersConfig {
+  type: 'jira';
+  site?: string;         // Default Jira site URL
+}
+
+export type TrackerConfigItem = LinearConfig | GitHubConfig | GitLabConfig | RallyConfig | JiraTrackersConfig;
 
 export interface TrackersConfig {
   primary: TrackerType;
@@ -55,6 +61,7 @@ export interface TrackersConfig {
   github?: GitHubConfig;
   gitlab?: GitLabConfig;
   rally?: RallyConfig;
+  jira?: JiraTrackersConfig;
 }
 
 export interface RemoteFlyConfig {

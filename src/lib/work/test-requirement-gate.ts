@@ -12,7 +12,8 @@ import chalk from 'chalk';
 import { Data, Effect } from 'effect';
 import { extractNumber, extractPrefix } from '../issue-id.js';
 import { getLinearApiKey } from '../shadow-utils.js';
-import { resolveGitHubIssue } from '../tracker-utils.js';
+import { resolveGitHubIssue, resolveTrackerType } from '../tracker-utils.js';
+import { createJiraTrackerForIssue } from '../tracker/factory.js';
 import { ProcessSpawnError } from '../errors.js';
 
 const execAsync = promisify(exec);
@@ -149,6 +150,15 @@ export function fetchIssueBodyForGate(issueId: string): Effect.Effect<string | n
       }).pipe(Effect.catch(() => Effect.succeed(null)));
       if (result === null) return null;
       return result.stdout.trim();
+    }
+
+    // PAN-5152: a Jira issue's body is its Markdown description.
+    if (resolveTrackerType(issueId) === 'jira') {
+      const jiraFailure = (cause: unknown) =>
+        new TrackerFetchError({ issueId, message: `Jira lookup failed for ${issueId}`, cause });
+      const tracker = yield* Effect.try({ try: () => createJiraTrackerForIssue(issueId), catch: jiraFailure });
+      const issue = yield* tracker.getIssue(issueId).pipe(Effect.mapError(jiraFailure));
+      return issue.description;
     }
 
     const issueNum = extractNumber(issueId);

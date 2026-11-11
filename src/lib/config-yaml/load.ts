@@ -253,6 +253,9 @@ function applyEnvironmentFallbacks(config: NormalizedConfig, explicitlyDisabled:
   if (process.env.GITHUB_TOKEN && !config.trackerKeys.github) config.trackerKeys.github = process.env.GITHUB_TOKEN;
   if (process.env.GITLAB_TOKEN && !config.trackerKeys.gitlab) config.trackerKeys.gitlab = process.env.GITLAB_TOKEN;
   if (process.env.RALLY_API_KEY && !config.trackerKeys.rally) config.trackerKeys.rally = process.env.RALLY_API_KEY;
+  if (process.env.JIRA_API_TOKEN && !config.trackerKeys.jira) config.trackerKeys.jira = process.env.JIRA_API_TOKEN;
+  if (process.env.JIRA_EMAIL && !config.trackerKeys.jiraEmail) config.trackerKeys.jiraEmail = process.env.JIRA_EMAIL;
+  if (process.env.JIRA_BASE_URL && !config.trackerKeys.jiraBaseUrl) config.trackerKeys.jiraBaseUrl = process.env.JIRA_BASE_URL;
   if (process.env.SHADOW_MODE !== undefined) {
     config.shadow.enabled = ['true', '1', 'yes'].includes(process.env.SHADOW_MODE.toLowerCase());
   }

@@ -46,6 +46,12 @@ function sourceStyle(source: DiscussionSource, item: DiscussionItem): SourceStyl
         fg: '#5e6ad2',
         label: 'linear',
       };
+    case 'jira':
+      return {
+        bg: 'color-mix(in srgb, #5e6ad2 18%, transparent)',
+        fg: '#5e6ad2',
+        label: 'Jira',
+      };
     case 'github-issue':
       return {
         bg: 'color-mix(in srgb, var(--muted-foreground) 18%, transparent)',
