@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5153",
   "created": "2026-11-11T14:43:19.840Z",
-  "updated": "2026-11-11T15:05:28.566Z",
+  "updated": "2026-11-11T15:09:23.826Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -58,9 +58,26 @@
       "doneAt": "2026-11-11T15:05:21.440Z"
     },
     "api-token-per-repo": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5153",
-      "claimedAt": "2026-11-11T15:05:28.566Z"
+      "claimedAt": "2026-11-11T15:05:28.566Z",
+      "doneAt": "2026-11-11T15:09:23.825Z"
+    },
+    "api-token-per-repo.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:09:23.825Z"
+    },
+    "api-token-per-repo.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:09:23.825Z"
+    },
+    "api-token-per-repo.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:09:23.825Z"
+    },
+    "api-token-per-repo.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:09:23.825Z"
     }
   }
 }
