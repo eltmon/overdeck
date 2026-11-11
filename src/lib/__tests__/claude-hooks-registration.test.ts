@@ -46,6 +46,27 @@ describe('addOverdeckHookIfMissing widens a narrow auto-approve-hook matcher (PA
     expect(isAutoApproveHookRegistered(settings, BIN_DIR)).toBe(true);
   });
 
+  it('moves auto-approve-hook into its own .* group without widening a sibling hook that shares the narrow group', () => {
+    const settings: ClaudeSettings = {
+      hooks: {
+        PreToolUse: [{
+          matcher: 'Bash',
+          hooks: [
+            { type: 'command', command: `${BIN_DIR}/auto-approve-hook` },
+            { type: 'command', command: `${BIN_DIR}/tmux-send-keys-guard` },
+          ],
+        }],
+      },
+    };
+
+    const changed = addOverdeckHookIfMissing(settings, 'PreToolUse', BIN_DIR, 'auto-approve-hook');
+
+    expect(changed).toBe(true);
+    expect(isAutoApproveHookRegistered(settings, BIN_DIR)).toBe(true);
+    const bashGroup = settings.hooks!.PreToolUse!.find((g) => g.matcher === 'Bash');
+    expect(bashGroup?.hooks).toEqual([{ type: 'command', command: `${BIN_DIR}/tmux-send-keys-guard` }]);
+  });
+
   it('does not touch a narrow-matcher registration for a different hook', () => {
     const settings: ClaudeSettings = {
       hooks: { PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: `${BIN_DIR}/gh-issue-trailer-hook` }] }] },

@@ -10,6 +10,18 @@ This page starts at v0.60.0, the release that removed Overdeck's state layer. Ol
 
 {/* RELEASE STEP: before tagging vX.Y.Z, add a new <Update label="vX.Y.Z" description="YYYY-MM-DD"> block at the top with the user-facing changes since the previous tag, and point its compare link at the new tag. See docs/RELEASING.md "Update the public changelog". If a new model needs a newer Claude Code, say so and confirm its minClaudeCodeVersion is set. */}
 
+<Update label="v0.79.0" description="Unreleased" tags={["Upcoming"]}>
+  ## Upcoming release
+
+  Drafted from the changes merged to `main` since v0.78.0. The date is set when the release is tagged.
+
+  #### Improved
+
+  - **New installations start in Auto permission mode:** a new install launches Claude Code with `--permission-mode default` and Overdeck's auto-approve hook instead of bypass; installs that existed before this release keep bypass, written once into `~/.overdeck/config.yaml`; `pan doctor` reports a missing hook, and a launch is refused rather than prompting on every tool call. ([#5151](https://github.com/eltmon/overdeck/issues/5151))
+
+  [Compare v0.78.0...v0.79.0](https://github.com/eltmon/overdeck/compare/v0.78.0...v0.79.0)
+</Update>
+
 <Update label="v0.78.0" description="2026-11-11">
   #### New
 
@@ -23,7 +35,6 @@ This page starts at v0.60.0, the release that removed Overdeck's state layer. Ol
 
   #### Improved
 
-  - **New installations start in Auto permission mode:** a new install launches Claude Code with `--permission-mode default` and Overdeck's auto-approve hook instead of bypass; installs that existed before this release keep bypass, written once into `~/.overdeck/config.yaml`; `pan doctor` reports a missing hook, and a launch is refused rather than prompting on every tool call. ([#5151](https://github.com/eltmon/overdeck/issues/5151))
   - **New default models:** on built-in defaults, work, test, ship and worker agents and three review lanes now run on Claude Opus 5.5 instead of Sonnet 5.5 (the mid workhorse), which roughly doubles what those agents cost; the Anthropic cost-saver preset keeps Sonnet 5.5 for 30% of work. The cheap workhorse, conversation titles, compaction and memory extraction now use Claude Haiku 5.5 instead of Haiku 4.5 (&#36;0.10/&#36;0.50 per MTok against &#36;1/&#36;5), which needs Claude Code 2.1.293 or newer. Installs that set these models in config keep them. ([#5124](https://github.com/eltmon/overdeck/issues/5124))
   - **GPT-6.1 Terra on the Claude Code harness:** `gpt-6.1-terra` now runs on the Claude Code harness through CLIProxy as well as on the Codex harness, with the same 272K context pin as the other GPT-6 models. CLIProxy 7.3.16 picked it up from its remote model catalog; no CLIProxy upgrade is needed. ([PAN-4634](https://github.com/eltmon/overdeck/issues/4634))
 

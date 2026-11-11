@@ -219,8 +219,9 @@ export function addOverdeckHookIfMissing(
     // PAN-5151: auto-approve-hook gates every tool call under resolved mode
     // auto, so a registration under a narrower matcher (e.g. a hand-edited
     // 'Bash') is not configured for isAutoApproveHookRegistered's purposes.
-    // Widen it in place rather than report "already configured" and leave
-    // `pan sync` unable to fix what the launch guard refuses on.
+    // Move it into its own '.*' group rather than report "already
+    // configured" and leave `pan sync` unable to fix what the launch guard
+    // refuses on.
     if (scriptName === 'auto-approve-hook' && widenAutoApproveHookMatcher(settings, binDir)) return true;
     return false;
   }
@@ -232,17 +233,24 @@ export function addOverdeckHookIfMissing(
   return true;
 }
 
+/**
+ * Moves a narrow-matcher auto-approve-hook command into its own `.*` group,
+ * rather than widening the shared group's matcher in place — a hand-edited
+ * group can hold another hook under that same narrow matcher, and widening
+ * the group would widen that other hook too.
+ */
 function widenAutoApproveHookMatcher(settings: ClaudeSettings, binDir: string): boolean {
   if (isAutoApproveHookRegistered(settings, binDir)) return false;
   const list = settings.hooks?.PreToolUse ?? [];
+  const isAutoApprove = (command: string | undefined): boolean =>
+    (command?.includes(join(binDir, 'auto-approve-hook')) ?? false)
+      || (command?.includes('overdeck/bin/auto-approve-hook') ?? false);
   for (const hookConfig of list) {
-    const matches = hookConfig.hooks?.some((hook) =>
-      (hook.command?.includes(join(binDir, 'auto-approve-hook')) ?? false) ||
-      (hook.command?.includes('overdeck/bin/auto-approve-hook') ?? false));
-    if (matches && hookConfig.matcher !== '.*') {
-      hookConfig.matcher = '.*';
-      return true;
-    }
+    if (hookConfig.matcher === '.*' || !hookConfig.hooks?.some((hook) => isAutoApprove(hook.command))) continue;
+    hookConfig.hooks = hookConfig.hooks.filter((hook) => !isAutoApprove(hook.command));
+    list.push({ matcher: '.*', hooks: [{ type: 'command', command: join(binDir, 'auto-approve-hook') }] });
+    settings.hooks!.PreToolUse = list.filter((entry) => (entry.hooks?.length ?? 0) > 0);
+    return true;
   }
   return false;
 }
