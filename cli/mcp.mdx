@@ -225,6 +225,17 @@ The stages, in order:
 6. **Report.** Print `Connected to <machine> over <route> with <scopes>.`, the registration in
    the platform's config shape, and the `ready` line.
 
+**Registration lines by platform.** Before the `ready` line, `connect` prints the registration
+in the shape the bot's platform reads:
+
+| `--platform` | What it prints |
+| --- | --- |
+| `grok-bot` | The `mcpServers` block for the Grok Bot plugin's `mcp.json`. |
+| `grok-build` | A note that the Overdeck plugin's `scripts/run-mcp.sh` starts the connector on its own, then the generic stdio JSON for use without the plugin. |
+| `hermes` | The `mcp_servers.overdeck` entry (`command`, `args`) for Hermes's `config.yaml`, then a reminder to run `/reload-mcp` and that the Overdeck Hermes plugin needs `mcp_allowlist: ["overdeck"]`. |
+| `openclaw` | The command `openclaw mcp set overdeck '<json>'`, which OpenClaw applies without a restart, then a note that the Overdeck OpenClaw plugin's summary and chat tools still need the connector's HTTP route. |
+| `other` | The generic stdio JSON `{ "command": "npx", "args": [...] }`. |
+
 The last line of stdout is always one status line: `OVERDECK_CONNECT ` and then one line of
 JSON with `"v":1`. A bot acts on this line only. The command never prints a token or the
 device code. Examples, one for each status:
