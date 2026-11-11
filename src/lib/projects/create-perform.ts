@@ -60,8 +60,15 @@ const execFileAsync = promisify(execFile);
  */
 export type ProjectRegistrationExtras = Pick<
   ProjectConfig,
-  'tracker' | 'github_repo' | 'gitlab_repo' | 'issue_prefix' | 'workspace' | 'pan_records'
+  'tracker' | 'github_repo' | 'gitlab_repo' | 'issue_prefix' | 'workspace' | 'pan_records' | 'jira'
 >;
+
+/** A Jira project keeps its detected code repo and adds its tracker and site (PAN-5152, D-18). */
+function applyJiraTracker(extras: ProjectRegistrationExtras, intent: ResolvedProjectIntent): void {
+  if (intent.tracker !== 'jira') return;
+  extras.tracker = 'jira';
+  if (intent.jiraSite) extras.jira = { site: intent.jiraSite };
+}
 
 function buildExtras(intent: ResolvedProjectIntent): ProjectRegistrationExtras {
   const extras: ProjectRegistrationExtras = {};
@@ -83,6 +90,7 @@ function buildExtras(intent: ResolvedProjectIntent): ProjectRegistrationExtras {
       })),
     };
     extras.pan_records = { repo: intent.workspaceRepos[0]!.name };
+    applyJiraTracker(extras, intent);
     return extras;
   }
 
@@ -93,6 +101,7 @@ function buildExtras(intent: ResolvedProjectIntent): ProjectRegistrationExtras {
     extras.tracker = 'gitlab';
     extras.gitlab_repo = intent.repoSlug;
   }
+  applyJiraTracker(extras, intent);
 
   if (intent.proposedIssuePrefix) {
     extras.issue_prefix = intent.proposedIssuePrefix;

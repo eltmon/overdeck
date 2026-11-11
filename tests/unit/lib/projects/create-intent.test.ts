@@ -598,6 +598,35 @@ describe('resolveProjectCreateIntent', () => {
     expect(intent.findings.some(finding => finding.code === 'issue-prefix-taken')).toBe(false);
   });
 
+  it('rejects a Jira site that is not an http(s) URL (PAN-5152)', async () => {
+    const intent = await resolveProjectCreateIntent({
+      mode: 'new',
+      name: 'jira-app',
+      tracker: 'jira',
+      jiraSite: 'not-a-url',
+      homeBoundary: true,
+      homeDir: TEST_HOME,
+    });
+
+    expect(intent.findings).toContainEqual(expect.objectContaining({ field: 'jiraSite', code: 'jira-site-invalid' }));
+    expect(intent.jiraSite).toBeNull();
+  });
+
+  it('carries a valid Jira site and the tracker onto the intent (PAN-5152)', async () => {
+    const intent = await resolveProjectCreateIntent({
+      mode: 'new',
+      name: 'jira-app',
+      tracker: 'jira',
+      jiraSite: ' https://acme.atlassian.net ',
+      homeBoundary: true,
+      homeDir: TEST_HOME,
+    });
+
+    expect(intent.findings.some(finding => finding.field === 'jiraSite')).toBe(false);
+    expect(intent.tracker).toBe('jira');
+    expect(intent.jiraSite).toBe('https://acme.atlassian.net');
+  });
+
   it('returns path-outside-home finding when homeBoundary=true and path escapes $HOME', async () => {
     const outsideDir = join(tmpdir(), `proj-outside-${process.pid}`);
     mkdirSync(outsideDir, { recursive: true });

@@ -68,7 +68,7 @@ const execFileAsync = promisify(execFile);
 
 export type ProjectCreateMode = 'clone' | 'existing' | 'new';
 
-export type ProjectIntentField = 'url' | 'path' | 'parentDir' | 'name' | 'issuePrefix';
+export type ProjectIntentField = 'url' | 'path' | 'parentDir' | 'name' | 'issuePrefix' | 'jiraSite';
 
 export type ProjectIntentCode =
   | 'url-invalid'
@@ -87,7 +87,9 @@ export type ProjectIntentCode =
   /** This exact folder is already registered under this key — open or repair it. */
   | 'project-exists-here'
   /** A `repos` entry is not a repository directly inside a non-git folder. */
-  | 'repos-invalid';
+  | 'repos-invalid'
+  /** The Jira site is not an http(s) URL (PAN-5152). */
+  | 'jira-site-invalid';
 
 export interface ProjectIntentFinding {
   field: ProjectIntentField;
@@ -120,6 +122,10 @@ export interface ProjectCreateInput {
    * multi-repo (`workspace.type: polyrepo`) project. Ignored in other modes.
    */
   repos?: string[];
+  /** Issue tracker override (PAN-5152): `jira`; every other tracker is detected from the remote. */
+  tracker?: 'jira';
+  /** Jira site URL for a `tracker: 'jira'` project, e.g. https://acme.atlassian.net. */
+  jiraSite?: string;
 }
 
 /** One repository of a multi-repo project, as registration writes it. */
@@ -165,6 +171,10 @@ export interface ResolvedProjectIntent {
   nestedRepositories: NestedRepository[];
   /** Set when `repos` selected a multi-repo project; registered as `workspace.repos`. */
   workspaceRepos: ProjectWorkspaceRepo[];
+  /** `jira` when the operator chose Jira as the issue tracker (PAN-5152). */
+  tracker: 'jira' | null;
+  /** The validated Jira site URL, when one was given. */
+  jiraSite: string | null;
 }
 
 export interface ProjectCreateProgress {
@@ -566,6 +576,8 @@ export async function resolveProjectCreateIntent(
     notices,
     nestedRepositories: [],
     workspaceRepos: [],
+    tracker: input.tracker === 'jira' ? 'jira' : null,
+    jiraSite: null,
   };
 
   // 1. Mode-specific source validation
@@ -835,6 +847,24 @@ export async function resolveProjectCreateIntent(
           detail: proposed,
         });
       }
+    }
+  }
+
+  // 5b. Jira site (PAN-5152): optional, but when given it must be an http(s) URL.
+  if (intent.tracker === 'jira' && input.jiraSite?.trim()) {
+    const site = input.jiraSite.trim();
+    let valid = false;
+    try {
+      valid = ['http:', 'https:'].includes(new URL(site).protocol);
+    } catch { /* not a URL */ }
+    if (valid) intent.jiraSite = site;
+    else {
+      findings.push({
+        field: 'jiraSite',
+        code: 'jira-site-invalid',
+        message: 'Jira site must be a URL such as https://acme.atlassian.net.',
+        detail: site,
+      });
     }
   }
 
