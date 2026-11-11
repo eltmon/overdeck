@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5152",
   "created": "2026-11-11T14:36:40.308Z",
-  "updated": "2026-11-11T15:29:48.551Z",
+  "updated": "2026-11-11T15:29:52.124Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -248,6 +248,11 @@
     "wi12-lifecycle-service-jira.ac3": {
       "status": "completed",
       "doneAt": "2026-11-11T15:29:48.551Z"
+    },
+    "wi13-close-out-jira": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5152",
+      "claimedAt": "2026-11-11T15:29:52.124Z"
     }
   }
 }
