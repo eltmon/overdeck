@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5131",
   "created": "2026-11-11T08:19:14.972Z",
-  "updated": "2026-11-11T08:39:41.964Z",
+  "updated": "2026-11-11T08:45:07.937Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -160,9 +160,30 @@
       "doneAt": "2026-11-11T08:39:39.648Z"
     },
     "landmarks-live-only": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5131",
-      "claimedAt": "2026-11-11T08:39:41.964Z"
+      "claimedAt": "2026-11-11T08:39:41.964Z",
+      "doneAt": "2026-11-11T08:45:07.936Z"
+    },
+    "landmarks-live-only.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:45:07.936Z"
+    },
+    "landmarks-live-only.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:45:07.936Z"
+    },
+    "landmarks-live-only.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:45:07.936Z"
+    },
+    "landmarks-live-only.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:45:07.936Z"
+    },
+    "landmarks-live-only.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:45:07.936Z"
     }
   }
 }
