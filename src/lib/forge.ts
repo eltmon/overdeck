@@ -6,12 +6,13 @@ import { unlink, writeFile } from 'node:fs/promises';
 import { Effect, Data } from 'effect';
 import {
   getPullRequestState,
-  isGitHubAppConfigured,
   listPullRequestsForHead,
   mergePullRequestWithApp,
   parsePullRequestRef,
+  type GitHubPullRequestRef,
   type GitHubPullRequestState,
 } from './github-app.js';
+import { appCoversRepo } from './github-app-installations.js';
 import { retryTransientForgeOp } from './forge-transient.js';
 import { selectPullRequestForHead } from './github-pr-selection.js';
 
@@ -161,7 +162,7 @@ async function getExistingGitHubArtifact(
   repository?: string
 ): Promise<CreateReviewArtifactResult | null> {
   const parsedRepo = parseRepository(repository);
-  if (isGitHubAppConfigured() && parsedRepo) {
+  if (parsedRepo && await appCoversRepo(parsedRepo.owner, parsedRepo.repo)) {
     const prs = await listPullRequestsForHead(parsedRepo.owner, parsedRepo.repo, branchName, 'all');
     // Open-only (PAN-4263): the REST list sorts by creation, so prs[0] could be a newer closed PR.
     const pr = selectPullRequestForHead(prs, { includeClosed: false });
@@ -252,7 +253,7 @@ async function findMergedGitHubArtifact(
     ? parsedId
     : parsedUrl?.forge === 'github' ? parsedUrl.number : undefined;
 
-  if (isGitHubAppConfigured() && parsedRepo) {
+  if (parsedRepo && await appCoversRepo(parsedRepo.owner, parsedRepo.repo)) {
     if (Number.isFinite(exactNumber)) {
       const state = await getPullRequestState(parsedRepo.owner, parsedRepo.repo, exactNumber!);
       if (!state.merged || !matchesCurrentArtifact(input, {
@@ -403,7 +404,11 @@ const githubForgeAdapter: ForgeAdapter = {
     const method = input.method || 'squash';
     const pin = pinnedHeadSha(input);
     console.log(`[forge] mergeReviewArtifact: ${input.forge} ${target} method=${method} repo=${input.repository ?? 'default'}${pin ? ` head=${pin.slice(0, 12)}` : ''}`);
-    if (!isGitHubAppConfigured()) {
+    // PAN-5153: the App merges only where it is installed; anything else, or
+    // an input without a parseable repository, goes through gh.
+    let ref: GitHubPullRequestRef | null = null;
+    try { ref = parsePullRequestRef(input); } catch { ref = null; }
+    if (!ref || !(await appCoversRepo(ref.owner, ref.repo))) {
       try {
         console.log(`[forge] gh pr merge: executing ${method} merge for ${target}`);
         await execAsync(
@@ -418,7 +423,6 @@ const githubForgeAdapter: ForgeAdapter = {
       }
     }
 
-    const ref = parsePullRequestRef(input);
     const deadline = Date.now() + GITHUB_MERGE_TIMEOUT_MS;
     console.log(`[forge] mergeReviewArtifact: GitHub App path for ${ref.owner}/${ref.repo}#${ref.number}, timeout=${GITHUB_MERGE_TIMEOUT_MS}ms`);
 
