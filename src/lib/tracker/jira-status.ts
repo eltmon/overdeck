@@ -11,6 +11,7 @@
 
 import { CANONICAL_STATES, DEFAULT_STATE_MAPPINGS, type CanonicalState } from '../../core/state-mapping.js';
 import type { JiraProjectConfig } from './jira-config.js';
+import type { IssueState } from './interface.js';
 
 /** A canonical state, plus `in_planning`, which writes only when the project maps it. */
 export type JiraTransitionTarget = CanonicalState | 'in_planning';
@@ -125,4 +126,14 @@ export function formatNoTransition(
     ? choice.available.map(transition => `${transition.name} → ${transition.toName}`).join(', ')
     : 'none';
   return `Jira ${issueKey}: no transition reaches "${choice.wanted}" (available: ${available}); status left unchanged.`;
+}
+
+/** Map the tracker IssueState to a Jira transition target (D-10). */
+export function trackerStateToJiraTarget(state: IssueState): JiraTransitionTarget {
+  switch (state) {
+    case 'open': return 'todo';
+    case 'in_progress': return 'in_progress';
+    case 'in_review': return 'in_review';
+    case 'closed': return 'done';
+  }
 }
