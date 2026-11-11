@@ -96,14 +96,14 @@ export function BackgroundAiSection({
       case 'conversationTitles':
       case 'titleRefinement':
         return (
-          <select value={formData.conversations?.title_model || 'claude-haiku-4-5'}
+          <select value={formData.conversations?.title_model || 'claude-haiku-5-5'}
             onChange={(e) => setConv({ title_model: e.target.value as ModelId })} className={`${bgSelectClass} max-w-[180px]`}>
             {chatModelOptionEls}
           </select>
         );
       case 'summaryFork':
         return (
-          <select value={formData.conversations?.compaction_model || 'claude-haiku-4-5'}
+          <select value={formData.conversations?.compaction_model || 'claude-haiku-5-5'}
             onChange={(e) => setConv({ compaction_model: e.target.value as ModelId })} className={`${bgSelectClass} max-w-[180px]`}>
             {chatModelOptionEls}
           </select>
@@ -130,7 +130,7 @@ export function BackgroundAiSection({
             </select>
             <input type="text" value={formData.memory?.model || ''}
               onChange={(e) => setMem({ model: e.target.value || undefined }, { debounce: true })}
-              placeholder={provider === 'cliproxy' ? 'gpt-4.1-nano' : 'claude-haiku-4-5-20251001'}
+              placeholder={provider === 'cliproxy' ? 'gpt-4.1-nano' : 'claude-haiku-5-5'}
               className="w-36 bg-background border border-border rounded-md px-2 py-1 text-[11px] font-mono text-foreground focus:ring-1 focus:ring-primary" />
           </div>
         );

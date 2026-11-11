@@ -9,7 +9,7 @@ import { CostWarningBadge, costWarningLevel } from '../costWarning';
 import { HarnessLogo, PROVIDER_BRANDS, ProviderLogo } from '../branding';
 import styles from './ModelPicker.module.css';
 
-export const FALLBACK_COMPACTION_MODEL = 'claude-haiku-4-5-20251001';
+export const FALLBACK_COMPACTION_MODEL = 'claude-haiku-5-5';
 
 
 export type Harness = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent' | 'grok';

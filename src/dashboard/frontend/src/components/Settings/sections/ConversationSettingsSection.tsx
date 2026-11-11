@@ -78,7 +78,7 @@ export function ConversationSettingsSection({
             <p className="text-xs text-muted-foreground mt-0.5">Used for native compaction and fork summaries</p>
           </div>
           <select
-            value={formData.conversations?.compaction_model || 'claude-haiku-4-5'}
+            value={formData.conversations?.compaction_model || 'claude-haiku-5-5'}
             onChange={(e) => handleCompactionModelChange(e.target.value as ModelId)}
             className="bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary max-w-[200px]"
           >
@@ -103,7 +103,7 @@ export function ConversationSettingsSection({
             <p className="text-xs text-muted-foreground mt-0.5">Generates conversation titles from first message</p>
           </div>
           <select
-            value={formData.conversations?.title_model || 'claude-haiku-4-5'}
+            value={formData.conversations?.title_model || 'claude-haiku-5-5'}
             onChange={(e) => handleTitleModelChange(e.target.value as ModelId)}
             className="bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary max-w-[200px]"
           >

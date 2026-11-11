@@ -60,7 +60,7 @@ export function MemorySection({ formData, onSettingsChange }: MemorySectionProps
             type="text"
             value={formData.memory?.model || ''}
             onChange={(e) => updateMemorySettings({ model: e.target.value || undefined }, { debounce: true })}
-            placeholder={formData.memory?.provider === 'cliproxy' ? 'gpt-4.1-nano' : 'claude-haiku-4-5-20251001'}
+            placeholder={formData.memory?.provider === 'cliproxy' ? 'gpt-4.1-nano' : 'claude-haiku-5-5'}
             className="w-64 bg-background border border-border rounded-md px-2 py-1.5 text-xs font-mono text-foreground focus:ring-1 focus:ring-primary"
           />
         </div>
