@@ -3,6 +3,51 @@
 This plugin connects [Hermes Agent](https://github.com/NousResearch/hermes-agent)
 to your Overdeck machine.
 
+## Connect in one paste
+
+In Overdeck, open Settings → Anywhere → Bots → Connect a bot, pick Hermes
+and its access, and click **Copy for Hermes**. Paste the copied message
+into Hermes's chat. It looks like this, with your machine, version and a
+one-time pairing string filled in:
+
+```text
+Please connect yourself to my Overdeck machine "<machine>" as "Hermes bot".
+
+Run this command in your shell. You can run it again at any time; each run continues where the last one stopped:
+
+npx -y @overdeck/core@<version> mcp connector connect '<pairing string>' --name 'Hermes bot' --platform hermes
+
+Then act on the last line it prints. That line starts with OVERDECK_CONNECT and holds JSON:
+- If "status" is "authorize", show me the "url" link. I will open it and click Authorize. When I tell you I did, run the same command again.
+- If "status" is "retry", do what "next" says, then run the same command again.
+- If "status" is "error", tell me the "code" and do what "next" says.
+- If "status" is "ready", register exactly the MCP server in "registration", call list_conversations once, and tell me the result.
+
+The pairing code in the command works once and expires soon. Do not save it anywhere. If it is refused, ask me to copy a new message from Overdeck.
+```
+
+Hermes runs the command and shows you one link. Open it, click
+**Authorize**, and tell Hermes you did. It runs the command again, pairs
+with your machine, and adds the connector to `~/.hermes/config.yaml` as a
+stdio server:
+
+```yaml
+mcp_servers:
+  overdeck:
+    command: "npx"
+    args: ["-y", "@overdeck/core@<version>", "mcp", "connector", "serve", "--stdio"]
+```
+
+Then run `/reload-mcp` (or start a new session) so the tools load. For the
+plugin's summary and `/overdeck` commands, [install the plugin](#install)
+and add the `plugins:` part of the block in
+[Connector route by hand](#connector-route-by-hand); keep the stdio
+`mcp_servers` entry above in place of that block's `url` entry.
+
+The pairing code works once and expires within 30 minutes. If it is
+refused, click **Copy again** under Settings → Anywhere → Bots and paste
+the new message.
+
 ## What it does
 
 Hermes reaches Overdeck's MCP tools through its own MCP client, so the model
@@ -44,10 +89,12 @@ mkdir -p ~/.hermes/plugins/overdeck && cp -r src/overdeck_hermes/. plugin.yaml s
 
 The plugin id is `overdeck` in every case.
 
-## Connector route (default)
+## Connector route by hand
 
-The Overdeck connector runs next to Hermes and serves the paired machine's
-tools on `http://127.0.0.1:7466/mcp`, with no Tailscale and no public address.
+This is the manual path: you run `login`, `pair` and `serve` yourself, and
+Hermes reaches the connector over HTTP. The Overdeck connector runs next to
+Hermes and serves the paired machine's tools on
+`http://127.0.0.1:7466/mcp`, with no Tailscale and no public address.
 Settings → Anywhere → Bots → Connect a bot shows the exact version and the
 pairing string:
 
