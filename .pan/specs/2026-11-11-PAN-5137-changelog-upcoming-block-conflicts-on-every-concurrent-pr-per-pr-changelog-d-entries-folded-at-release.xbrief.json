@@ -4,17 +4,17 @@
     "created": "2026-11-11T18:31:18Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5137: Changelog Upcoming block conflicts on every concurrent PR: per-PR changelog.d entries folded at release",
-    "updated": "2026-11-11T18:40:12.388Z"
+    "updated": "2026-11-11T18:41:33.003Z"
   },
   "plan": {
     "id": "pan-5137",
     "title": "Changelog Upcoming block conflicts on every concurrent PR: per-PR changelog.d entries folded at release",
-    "status": "proposed",
+    "status": "running",
     "uid": "0c28f9c0-dca6-4ad8-a981-7acd8a6ef698",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-11T18:31:18Z",
-    "updated": "2026-11-11T18:40:12.388Z",
+    "updated": "2026-11-11T18:41:33.003Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5137",
@@ -589,5 +589,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
