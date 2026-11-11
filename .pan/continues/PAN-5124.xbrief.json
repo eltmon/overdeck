@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5124",
   "created": "2026-11-11T07:40:41.890Z",
-  "updated": "2026-11-11T08:34:47.552Z",
+  "updated": "2026-11-11T08:35:41.085Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -274,9 +274,26 @@
       "doneAt": "2026-11-11T08:34:46.342Z"
     },
     "docs-presets-harnesses": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5124",
-      "claimedAt": "2026-11-11T08:34:47.551Z"
+      "claimedAt": "2026-11-11T08:34:47.551Z",
+      "doneAt": "2026-11-11T08:35:41.085Z"
+    },
+    "docs-presets-harnesses.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:35:41.085Z"
+    },
+    "docs-presets-harnesses.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:35:41.085Z"
+    },
+    "docs-presets-harnesses.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:35:41.085Z"
+    },
+    "docs-presets-harnesses.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:35:41.085Z"
     }
   }
 }
