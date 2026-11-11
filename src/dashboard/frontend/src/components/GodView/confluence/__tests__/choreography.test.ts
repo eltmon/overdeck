@@ -7,7 +7,6 @@ import {
   type RiverEffectsApi,
 } from '../RiverCanvas';
 import {
-  FEED_TICKER_CHANCE,
   HOOK_HEAT_BUMP,
   HOOK_RATE_BUMP,
   TOOL_TICKER_CHANCE,
@@ -104,7 +103,6 @@ describe('Confluence choreography dispatch table', () => {
     expect(HOOK_HEAT_BUMP).toBe(0.06);
     expect(HOOK_RATE_BUMP).toBe(0.13);
     expect(TOOL_TICKER_CHANCE).toBe(0.13);
-    expect(FEED_TICKER_CHANCE).toBe(0.16);
 
     const previous = new Map([
       ['PAN-1', orb('PAN-1')],
@@ -126,7 +124,7 @@ describe('Confluence choreography dispatch table', () => {
       ['PAN-50', orb('PAN-50', { role: 'review', stage: 'REVIEW' })],
       ['PAN-99', orb('PAN-99', { role: 'plan', stage: 'PLAN' })],
     ]);
-    const rolls = [0.12, 0.15];
+    const rolls = [0.12];
     const commands = planConfluenceChoreography({
       previous,
       current,
@@ -145,7 +143,6 @@ describe('Confluence choreography dispatch table', () => {
       specRateBump: 0.13,
     });
     expect(commands).toContainEqual({ type: 'ticker', text: 'PAN-2 · Read', color: '#00d4ff' });
-    expect(commands).toContainEqual({ type: 'ticker', text: 'PreToolUse · PAN-2', color: '#00d4ff' });
     expect(commands).toContainEqual({ type: 'ring', issueId: 'PAN-1', color: '#ffb800' });
     expect(commands).toContainEqual({ type: 'sparks', issueId: 'PAN-1', color: '#ffb800', heatBump: 0, specRateBump: 0 });
     expect(commands).toContainEqual({ type: 'gate', stage: 'REVIEW' });
@@ -164,6 +161,18 @@ describe('Confluence choreography dispatch table', () => {
     expect(api.emitRing).toHaveBeenCalledWith('PAN-1', '#ffb800');
     expect(api.gateFlash).toHaveBeenCalledWith('REVIEW');
     expect(vi.mocked(api.playTide).mock.calls).toEqual([['PAN-5']]);
+  });
+
+  it('plans at most one ticker for one hook event', () => {
+    const plan = (random: () => number) => planConfluenceChoreography({
+      previous: new Map([['PAN-1', orb('PAN-1')]]),
+      current: new Map([['PAN-1', orb('PAN-1')]]),
+      hookEvents: [hook('PAN-1')],
+      random,
+    }).filter((command) => command.type === 'ticker');
+
+    expect(plan(() => 0)).toEqual([{ type: 'ticker', text: 'PAN-1 · Read', color: '#00d4ff' }]);
+    expect(plan(() => 1)).toEqual([]);
   });
 
   it('plans no command for a new plan orb that the previous cast did not have', () => {

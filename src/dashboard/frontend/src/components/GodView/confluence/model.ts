@@ -80,18 +80,6 @@ export function fmtTokens(tokens: number): string {
   return tokens >= 1e6 ? `${(tokens / 1e6).toFixed(1)}M` : `${Math.round(tokens / 1e3)}k`;
 }
 
-export function pickWeighted<T>(items: readonly T[], weight: (item: T) => number): T | undefined {
-  let total = 0;
-  for (const item of items) total += weight(item);
-
-  let remaining = Math.random() * total;
-  for (const item of items) {
-    remaining -= weight(item);
-    if (remaining <= 0) return item;
-  }
-  return items[items.length - 1];
-}
-
 export interface LayoutRect {
   padX: number;
   riverTop: number;

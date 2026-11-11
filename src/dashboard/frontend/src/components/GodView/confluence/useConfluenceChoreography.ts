@@ -8,7 +8,6 @@ import type { ConfluenceOrb, HookStreamEntry } from './useConfluenceData';
 export const HOOK_HEAT_BUMP = 0.06;
 export const HOOK_RATE_BUMP = 0.13;
 export const TOOL_TICKER_CHANCE = 0.13;
-export const FEED_TICKER_CHANCE = 0.16;
 
 export type ChoreographyCommand =
   | { type: 'sparks'; issueId: string; color: string; agentId?: string; heatBump: number; specRateBump: number }
@@ -86,9 +85,6 @@ export function planConfluenceChoreography({
     });
     if (random() < TOOL_TICKER_CHANCE) {
       commands.push({ type: 'ticker', text: `${orb.id} · ${event.tool}`, color });
-    }
-    if (random() < FEED_TICKER_CHANCE) {
-      commands.push({ type: 'ticker', text: `${event.hookName} · ${orb.id}`, color });
     }
   }
 
