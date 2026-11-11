@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5152",
   "created": "2026-11-11T14:36:40.308Z",
-  "updated": "2026-11-11T15:03:50.293Z",
+  "updated": "2026-11-11T15:08:01.034Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -112,9 +112,26 @@
       "doneAt": "2026-11-11T15:03:47.321Z"
     },
     "wi6-jira-text-converters": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5152",
-      "claimedAt": "2026-11-11T15:03:50.293Z"
+      "claimedAt": "2026-11-11T15:03:50.293Z",
+      "doneAt": "2026-11-11T15:08:01.034Z"
+    },
+    "wi6-jira-text-converters.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:08:01.034Z"
+    },
+    "wi6-jira-text-converters.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:08:01.034Z"
+    },
+    "wi6-jira-text-converters.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:08:01.034Z"
+    },
+    "wi6-jira-text-converters.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:08:01.034Z"
     }
   }
 }
