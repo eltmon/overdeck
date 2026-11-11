@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5152",
   "created": "2026-11-11T14:36:40.308Z",
-  "updated": "2026-11-11T16:01:05.723Z",
+  "updated": "2026-11-11T16:01:07.453Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -358,6 +358,11 @@
     "wi19-pan-done-jira.ac3": {
       "status": "completed",
       "doneAt": "2026-11-11T16:01:05.722Z"
+    },
+    "wi20-pan-issues-jira": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5152",
+      "claimedAt": "2026-11-11T16:01:07.453Z"
     }
   }
 }
