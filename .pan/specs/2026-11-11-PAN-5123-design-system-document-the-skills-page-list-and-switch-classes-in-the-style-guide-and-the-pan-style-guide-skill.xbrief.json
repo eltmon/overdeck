@@ -1,0 +1,403 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-11T07:28:34Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5123: Design system: document the Skills page list and switch classes in the style guide and the pan-style-guide skill",
+    "updated": "2026-11-11T07:29:55.649Z"
+  },
+  "plan": {
+    "id": "pan-5123",
+    "title": "Design system: document the Skills page list and switch classes in the style guide and the pan-style-guide skill",
+    "status": "proposed",
+    "uid": "5a04674c-e741-42ad-9423-ab297c3de5d0",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-11T07:28:34Z",
+    "updated": "2026-11-11T07:29:55.649Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5123",
+        "label": "PAN-5123",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/pan-5123.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "docs",
+      "design-system",
+      "style-guide",
+      "dashboard",
+      "skills"
+    ],
+    "metadata": {
+      "sizeJustification": "Two documentation files; well under the surface limits.",
+      "canonicalFilename": "2026-11-11-PAN-5123-design-system-document-the-skills-page-list-and-switch-classes-in-the-style-guide-and-the-pan-style-guide-skill.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Commit a443ff0619a added five named CSS classes (.list-group-bar, .list-row, .list-meta, .switch-track-on, .switch-track-locked) for the Skills page. They exist because Tailwind opacity modifiers on the var()-based color tokens compile to no CSS. Neither the style guide nor the pan-style-guide skill mentions them, so the next page will rebuild the tints from opacity utilities that render nothing, and the guide's Switches recipe still says checked tracks are bg-primary.",
+      "Proposal": "Document the five classes in design/style-guide/STYLE-GUIDE.md (a new §8 subsection, a reconciling paragraph in Switches / Toggles, a §18 quick-reference line) and in sync-sources/dev-skills/pan-style-guide/SKILL.md (a subsection with the reuse rule, an extended sources list, two triggers, a review bullet). The exact inserted text is in the PRD .pan/drafts/pan-5123.md. Then verify that no src/ file changed, the Skills tests pass, and record the post-merge pan sync check in the PR body.",
+      "NonGoals": "- Renaming, removing or restyling any class in src/dashboard/frontend/src/index.css, or editing any file under src/\n- Migrating other switches (Settings/Shared/Toggle.tsx, NewConversationDialog.tsx, Settings sections, flywheel/primitives.tsx, MergeTrainSection.tsx) or other lists to the named classes\n- Changing tailwind.config.js, including any <alpha-value> rewrite of the color tokens\n- Rewriting other guide or skill recipes that use /<n> opacity notation (chips, soft card, keycap, inputs, board filter pills)\n- Removing the hardcoded #a078f7 from Settings/Shared/Toggle.tsx\n- Editing the OKF knowledge bundle (../overdeck-knowledge)\n- Writing to .claude/skills/, ~/.claude/skills/ or ~/.overdeck/skills/, or running the workspace-built CLI's sync to make the global skill copy match before merge"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Issue step 4 (pan sync, confirm the .claude/skills copy matches) becomes a post-merge check recorded in the PR body.",
+        "rationale": "pan sync --dry-run from the workspace prints 'Syncing from the checkout it was built from: /home/eltmon/Projects/overdeck/sync-sources' (resolveSyncSourcesRoot in src/lib/paths.ts), so it distributes main, not this branch; the workspace .claude/skills is gitignored and filled only at workspace creation. Step 4 is not in the issue's Acceptance list, so this is not a contradiction."
+      },
+      {
+        "summary": "Markup examples come from SkillControls.tsx, SkillOverridesPanel.tsx and SkillPacksSection.tsx, not only SkillOverridesPanel.tsx.",
+        "rationale": "SkillOverridesPanel.tsx contains only .list-row; the other four classes are used in SkillControls.tsx (lines 32, 97) and SkillPacksSection.tsx (line 213). Real class strings beat invented ones."
+      },
+      {
+        "summary": "The new subsection is labeled '(both themes)', not Broadsheet-only.",
+        "rationale": "The rules in index.css are not scoped to a data-theme and read only --muted and --foreground, which both themes define."
+      },
+      {
+        "summary": "Amend §8 Switches / Toggles with a paragraph instead of rewriting its bg-primary recipe.",
+        "rationale": "Other switches still use the old recipe until their page moves; the issue's one-page-at-a-time rule means the old recipe stays documented as pre-PAN-5123."
+      },
+      {
+        "summary": "Add 'list row' and 'switch' to the skill's triggers.",
+        "rationale": "The issue's stated failure mode is that the next page will not reuse the classes; the skill must load when an agent builds a list or switch."
+      },
+      {
+        "summary": "The new subsection goes in §8 after Dot-Metadata Line, and the quick-reference line goes directly after BROADSHEET-ONLY.",
+        "rationale": "§8 holds the other named-class component patterns; fixing placement removes a two-diffs-both-done ambiguity."
+      }
+    ],
+    "items": [
+      {
+        "id": "guide-list-section",
+        "title": "Style guide: add the Grouped List and Switch Tracks subsection to §8",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T07:28:34Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5123",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "design/style-guide/STYLE-GUIDE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n '### Grouped List and Switch Tracks (both themes)' design/style-guide/STYLE-GUIDE.md",
+            "grep -n '### Dot-Metadata Line\\|### Status Indicators' design/style-guide/STYLE-GUIDE.md"
+          ],
+          "expected_outputs": [
+            "grep prints exactly one heading line for the new subsection",
+            "the new heading's line number sits between the Dot-Metadata Line and Status Indicators headings"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Insert the PRD WI-1 block verbatim into design/style-guide/STYLE-GUIDE.md after the Dot-Metadata Line canonical-example paragraph and before '### Status Indicators'. The block names the five classes in a table (what each renders, when to use it), explains that opacity modifiers on the var() color tokens compile to no CSS, shows markup from SkillControls.tsx, SkillOverridesPanel.tsx and SkillPacksSection.tsx, states both-theme scope, and states the one-page-at-a-time adoption rule with no bulk Tailwind config change. Do not edit any other part of the file in this item."
+        },
+        "items": [
+          {
+            "id": "guide-list-section.ac1",
+            "title": "Given the edited STYLE-GUIDE.md, when grep runs for '### Grouped List and Switch Tracks (both themes)', then it prints exactly one line, located after '### Dot-Metadata Line' and before '### Status Indicators'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "guide-list-section.ac2",
+            "title": "The new subsection's table contains a row for each of `.list-group-bar`, `.list-row`, `.list-meta`, `.switch-track-on` and `.switch-track-locked`, each with its token percentage (55%, 45% on hover, 30%, 62%, 28%) and a 'Use it for' sentence",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "guide-list-section.ac3",
+            "title": "The subsection contains the 'Why named classes' paragraph naming `bg-muted/40` and `bg-foreground/8` as compiling to no CSS, and a tsx code block that contains the class strings `list-group-bar px-3 py-2`, `list-meta`, `list-row grid`, `switch-track-on` and `switch-track-locked`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "guide-list-section.ac4",
+            "title": "The subsection contains the phrase 'one page at a time' and states that there is no bulk Tailwind config change, and its Theme scope paragraph says the classes render under Ledger and Broadsheet alike",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "guide-switch-note",
+        "title": "Style guide: point the Switches / Toggles recipe at the named track classes",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T07:28:34Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5123",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "design/style-guide/STYLE-GUIDE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'New switches use the named track classes' design/style-guide/STYLE-GUIDE.md",
+            "grep -n 'Checked:   bg-primary' design/style-guide/STYLE-GUIDE.md"
+          ],
+          "expected_outputs": [
+            "grep prints one line for the new paragraph inside the Switches / Toggles subsection",
+            "grep still prints the original 'Checked:   bg-primary' recipe line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In design/style-guide/STYLE-GUIDE.md '### Switches / Toggles', insert the PRD WI-2 paragraph verbatim after the recipe code block (ending 'Translate on check') and before the paragraph starting 'In a modal's option rows'. Leave the existing recipe lines unchanged, because unmigrated switches still follow them."
+        },
+        "items": [
+          {
+            "id": "guide-switch-note.ac1",
+            "title": "Given the edited guide, when grep runs for 'New switches use the named track classes', then it prints one line located between '### Switches / Toggles' and '### Select / Dropdown'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "guide-switch-note.ac2",
+            "title": "The guide preserves the original recipe line 'Checked:   bg-primary' and the new paragraph names it as the pre-PAN-5123 recipe for switches that have not moved",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "guide-quickref",
+        "title": "Style guide: add a LISTS/SWITCHES line to the §18 Quick Reference Card",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T07:28:34Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5123",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "design/style-guide/STYLE-GUIDE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n -A1 '^BROADSHEET-ONLY:' design/style-guide/STYLE-GUIDE.md"
+          ],
+          "expected_outputs": [
+            "the line after BROADSHEET-ONLY: starts with LISTS/SWITCHES: and names all five classes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In the §18 Quick Reference Card code block of design/style-guide/STYLE-GUIDE.md, add the PRD WI-3 'LISTS/SWITCHES:' line directly below the unchanged 'BROADSHEET-ONLY:' line. It names the five classes, marks them both-theme, and warns that bg-muted/<n> and bg-foreground/<n> compile to no CSS."
+        },
+        "items": [
+          {
+            "id": "guide-quickref.ac1",
+            "title": "When `grep -n -A1 '^BROADSHEET-ONLY:'` runs on the guide, then the following line starts with 'LISTS/SWITCHES:' and contains `.list-group-bar`, `.list-row`, `.list-meta`, `.switch-track-on` and `.switch-track-locked`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "guide-quickref.ac2",
+            "title": "The guide preserves the existing 'BROADSHEET-ONLY:' line byte-for-byte (git diff shows it only as context, never as a removed line)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "skill-named-classes",
+        "title": "pan-style-guide skill: name the five classes and the reuse rule",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T07:28:34Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5123",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/dev-skills/pan-style-guide/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'list-group-bar\\|list-row\\|list-meta\\|switch-track-on\\|switch-track-locked' sync-sources/dev-skills/pan-style-guide/SKILL.md",
+            "grep -n 'rebuild them from Tailwind opacity utilities\\|one page at a time\\|  - list row\\|  - switch$' sync-sources/dev-skills/pan-style-guide/SKILL.md"
+          ],
+          "expected_outputs": [
+            "grep -c prints 5 or more",
+            "grep prints the reuse-rule line, the adoption line and both new trigger lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply the four PRD WI-4 edits to sync-sources/dev-skills/pan-style-guide/SKILL.md: add 'list row' and 'switch' triggers after '  - design tokens'; extend Sources of truth item 4 to list the five grouped-list classes; insert the 'Lists and switches — named classes, never opacity utilities (both themes)' subsection after the Broadsheet-only patterns block and before '### Page-not-modal doctrine'; append the review bullet that flags bg-muted/<n> or bg-foreground/<n> on lists and switches to the Workflow list."
+        },
+        "items": [
+          {
+            "id": "skill-named-classes.ac1",
+            "title": "Given the edited SKILL.md, when grep -c runs for the five class names, then it prints 5 or more, and the new subsection's table contains one row per class",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill-named-classes.ac2",
+            "title": "The skill contains the phrase 'For list groups, list rows and switches, use the named classes' (it may wrap across lines) and the single-line phrase 'rebuild them from Tailwind opacity utilities', preceded by 'do not'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill-named-classes.ac3",
+            "title": "The skill contains 'one page at a time' and states there is no bulk Tailwind config change, and states the classes render under both themes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill-named-classes.ac4",
+            "title": "The YAML frontmatter `triggers:` list contains the entries `list row` and `switch`, and the frontmatter still parses (the file starts with '---' and the closing '---' precedes '# Overdeck Style Guide (dev skill)')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "verify-skills-unchanged",
+        "title": "Verify the Skills page source is untouched and record the post-merge sync check",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T07:28:34Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-5123",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "design/style-guide/STYLE-GUIDE.md",
+            "sync-sources/dev-skills/pan-style-guide/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "git diff --name-only origin/main...HEAD",
+            "git diff --exit-code origin/main...HEAD -- src/dashboard/frontend/src/index.css",
+            "cd src/dashboard/frontend && npx vitest run --configLoader runner src/components/skills",
+            "pan sync --dry-run"
+          ],
+          "expected_outputs": [
+            "diff --name-only lists no path under src/ or .claude/",
+            "git diff --exit-code exits 0 for index.css",
+            "Vitest reports 2 test files passed (SkillOverridesPanel.test.tsx, SkillPacksSection.test.tsx)",
+            "pan sync --dry-run prints 'Syncing from the checkout it was built from: /home/eltmon/Projects/overdeck/sync-sources'"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Run the PRD WI-5 checks from the workspace root after all doc items land: confirm the branch diff touches no file under src/ or .claude/, confirm index.css is byte-identical to origin/main, run the two Skills Vitest files, and run pan sync --dry-run to confirm it reads the primary checkout. Add a 'Post-merge check' heading to the PR body with the diff command that compares sync-sources/dev-skills/pan-style-guide/SKILL.md to ~/.claude/skills/pan-style-guide/SKILL.md after merge and pan sync. Never copy the skill into any .claude directory and never run the workspace-built CLI's sync."
+        },
+        "items": [
+          {
+            "id": "verify-skills-unchanged.ac1",
+            "title": "When `git diff --name-only origin/main...HEAD` runs, then it prints no path under `src/` and no path under `.claude/`, and `git diff --exit-code origin/main...HEAD -- src/dashboard/frontend/src/index.css` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verify-skills-unchanged.ac2",
+            "title": "When the Skills Vitest command runs in src/dashboard/frontend, then it passes both SkillOverridesPanel.test.tsx and SkillPacksSection.test.tsx with zero failures",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verify-skills-unchanged.ac3",
+            "title": "The PR body contains a 'Post-merge check' heading with the command `diff sync-sources/dev-skills/pan-style-guide/SKILL.md ~/.claude/skills/pan-style-guide/SKILL.md`, and the branch contains no commit that writes to .claude/ or ~/.claude/skills/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "guide-list-section",
+        "to": "guide-switch-note",
+        "type": "blocks"
+      },
+      {
+        "from": "guide-switch-note",
+        "to": "guide-quickref",
+        "type": "blocks"
+      },
+      {
+        "from": "guide-quickref",
+        "to": "verify-skills-unchanged",
+        "type": "blocks"
+      },
+      {
+        "from": "skill-named-classes",
+        "to": "verify-skills-unchanged",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
