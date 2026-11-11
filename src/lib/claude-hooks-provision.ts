@@ -137,3 +137,24 @@ export async function provisionClaudeHooks(
     return { ok: false, reason: msg, ...none };
   }
 }
+
+/**
+ * Desktop installs never run `pan install`, so provision the Claude Code hook
+ * bundle (auto-approve, heartbeat, cost, lifecycle) at boot (PAN-2595). Moved
+ * out of main.ts to keep that file at its line ceiling (PAN-5151). Never
+ * throws; logs the outcome.
+ */
+export async function provisionClaudeHooksForDesktopBoot(): Promise<void> {
+  try {
+    const result = await provisionClaudeHooks();
+    if (!result.ok) {
+      console.warn(`[overdeck] Claude hook provisioning skipped: ${result.reason}`);
+    } else if (result.changed) {
+      console.log(`[overdeck] Claude hooks provisioned: ${result.binariesSynced} scripts, registered ${result.registered.length} hook(s)${result.pruned.length ? `, pruned ${result.pruned.length} stale` : ''}`);
+    } else {
+      console.log('[overdeck] Claude hooks already provisioned (no settings change)');
+    }
+  } catch (err) {
+    console.warn('[overdeck] Claude hook provisioning failed:', err instanceof Error ? err.message : String(err));
+  }
+}
