@@ -209,10 +209,17 @@ describe('account service on real workerd (PAN-4293 account-miniflare-integratio
 
   it('the device flow approves in the browser and the poll returns a token', async () => {
     githubIdentity = { id: OWNER_ID, login: 'owner' };
-    const issued = await req('/oauth/device/code', { ...formBody({ platform: 'darwin-arm64', environment_id: '66666666-7777-4888-9999-aaaaaaaaaaaa' }), ip: '192.0.2.77' });
+    const issued = await req('/oauth/device/code', { ...formBody({ platform: 'darwin-arm64', environment_id: '66666666-7777-4888-9999-aaaaaaaaaaaa', client_name: 'grok-bot', target_name: 'eltmon-desktop' }), ip: '192.0.2.77' });
     expect(issued.status).toBe(200);
     const code = (await issued.json()) as { device_code: string; user_code: string; verification_uri: string; interval: number };
     expect(code.verification_uri).toBe(`${BASE}/activate`);
+
+    const link = await req(`/activate?user_code=${code.user_code.replace('-', '')}`, { ip: '192.0.2.78' });
+    expect(link.status).toBe(200);
+    const linkBody = await link.text();
+    expect(linkBody).toContain('<strong>grok-bot</strong> (macOS device)');
+    expect(linkBody).toContain('eltmon-desktop');
+    expect(linkBody).toContain('>Authorize</button>');
 
     const crossSite = await req('/activate/confirm', { ...formBody({ user_code: code.user_code }), ip: '192.0.2.78' });
     expect(crossSite.status).toBe(403);
