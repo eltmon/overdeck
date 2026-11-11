@@ -127,8 +127,9 @@ export async function reconcileGitHubMergeStatus(issueId: string, prUrl: string 
   if (!prRef) return false;
 
   try {
-    const { getPullRequestState, isGitHubAppConfigured } = await import('../../../../lib/github-app.js');
-    if (!isGitHubAppConfigured()) return false;
+    const { getPullRequestState } = await import('../../../../lib/github-app.js');
+    const { appCoversRepo } = await import('../../../../lib/github-app-installations.js');
+    if (!(await appCoversRepo(prRef.owner, prRef.repo))) return false;
 
     const prState = await getPullRequestState(prRef.owner, prRef.repo, prRef.number);
     console.log(`[merge] reconcileGitHubMergeStatus: ${issueId} PR #${prRef.number} merged=${prState.merged} state=${prState.state}`);
@@ -802,8 +803,9 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
     // Reject stale prUrl state from cancel-flow or manual closure before rebase/merge (PAN-509).
     if (githubPrRef) {
       try {
-        const { getPullRequestState, isGitHubAppConfigured } = await import('../../../../lib/github-app.js');
-        if (isGitHubAppConfigured()) {
+        const { getPullRequestState } = await import('../../../../lib/github-app.js');
+        const { appCoversRepo } = await import('../../../../lib/github-app-installations.js');
+        if (await appCoversRepo(githubPrRef.owner, githubPrRef.repo)) {
           const prState = await getPullRequestState(githubPrRef.owner, githubPrRef.repo, githubPrRef.number);
           preMergePrState = prState;
           if (prState.state !== 'OPEN' && !prState.merged) {
@@ -994,9 +996,10 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
     if (primaryForge === 'github' && artifactUrl) {
       try {
         const { parsePullRequestRef, getCiCheckRunsState, isGitHubAppConfigured } = await import('../../../../lib/github-app.js');
+        const { appCoversRepo } = await import('../../../../lib/github-app-installations.js');
         if (isGitHubAppConfigured()) {
           const ref = parsePullRequestRef({ url: artifactUrl });
-          if (ref) {
+          if (ref && await appCoversRepo(ref.owner, ref.repo)) {
             const tipSha = approvedHead
               ? rebaseResult.newHead!
               : (await execAsync('git rev-parse HEAD', { cwd: workspacePath, encoding: 'utf-8', timeout: 10000 })).stdout.trim();
@@ -1069,8 +1072,9 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
     // Must happen AFTER rebase because rebase changes the HEAD SHA.
     setStatus(issueId, { step: 'reporting-statuses' });
     try {
-      const { getPullRequestState, isGitHubAppConfigured, reportCommitStatus } = await import('../../../../lib/github-app.js');
-      if (githubPrRef && isGitHubAppConfigured()) {
+      const { getPullRequestState, reportCommitStatus } = await import('../../../../lib/github-app.js');
+      const { appCoversRepo } = await import('../../../../lib/github-app-installations.js');
+      if (githubPrRef && await appCoversRepo(githubPrRef.owner, githubPrRef.repo)) {
         const prState = await getPullRequestState(githubPrRef.owner, githubPrRef.repo, githubPrRef.number);
         // An automatic merge stamps the commit it verified, never a later push.
         const sha = approvedHead ? rebaseResult.newHead! : prState.headSha.trim();
@@ -1104,8 +1108,9 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
     } catch (prMergeErr: any) {
       console.error(`[merge] Review artifact merge threw for ${issueId}:`, prMergeErr);
       try {
-        const { getPullRequestState, isGitHubAppConfigured } = await import('../../../../lib/github-app.js');
-        if (githubPrRef && isGitHubAppConfigured()) {
+        const { getPullRequestState } = await import('../../../../lib/github-app.js');
+        const { appCoversRepo } = await import('../../../../lib/github-app-installations.js');
+        if (githubPrRef && await appCoversRepo(githubPrRef.owner, githubPrRef.repo)) {
           const prState = await getPullRequestState(githubPrRef.owner, githubPrRef.repo, githubPrRef.number);
           artifactMerged = prState.merged;
           if (artifactMerged) {

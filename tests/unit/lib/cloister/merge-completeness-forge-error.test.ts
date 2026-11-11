@@ -34,6 +34,11 @@ vi.mock('child_process', () => {
   return { exec };
 });
 
+vi.mock('../../../../src/lib/github-app-installations.js', () => ({
+  // PAN-5153: coverage follows isGitHubAppConfigured().
+  appCoversRepo: async () => isGitHubAppConfiguredMock(),
+}));
+
 vi.mock('../../../../src/lib/github-app.js', () => ({
   getPullRequestState: vi.fn(),
   isGitHubAppConfigured: isGitHubAppConfiguredMock,

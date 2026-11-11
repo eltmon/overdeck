@@ -9,6 +9,8 @@ const PR_URL = 'https://github.com/eltmon/overdeck/pull/4251';
 const HEAD_SHA = 'a'.repeat(40);
 
 const mocks = vi.hoisted(() => ({
+  // PAN-5153: the App covers the PR's repository unless a test says otherwise.
+  appCoversRepo: vi.fn(async (..._args: unknown[]) => true),
   completePendingOperation: vi.fn(),
   ensureAgentReadyForMerge: vi.fn(),
   exec: vi.fn<[string, any?], Promise<{ stdout: string; stderr: string }>>(),
@@ -74,6 +76,9 @@ vi.mock('../../../../../lib/cloister/verification-runner.js', () => ({
   runVerificationForIssue: (...args: unknown[]) => mocks.runVerificationForIssue(...args),
 }));
 
+vi.mock('../../../../../lib/github-app-installations.js', () => ({
+  appCoversRepo: (...args: unknown[]) => mocks.appCoversRepo(...args),
+}));
 vi.mock('../../../../../lib/github-app.js', () => ({
   getCiCheckRunsState: vi.fn(async () => ({
     green: true,

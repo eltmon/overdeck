@@ -5,6 +5,7 @@ import { FeatureItem, sessionMatchesFilter, type TreeSessionFilter } from './Fea
 import { dashboardMutationJsonHeaders } from '../../../lib/wsTransport';
 import type { Harness } from '../../shared/ModelPicker';
 import { ProjectCiChip } from '../ProjectCiChip';
+import { ProjectIdentityChip } from './ProjectIdentityChip';
 import { ProjectDeployChip } from '../ProjectDeployChip';
 import styles from '../styles/command-deck.module.css';
 
@@ -289,6 +290,7 @@ export function ProjectNode({ projectKey, name, features, selectedFeature, onSel
         )}
         <span className={styles.featureCount}>{visibleFeatures.length}</span>
         <ProjectCiChip projectKey={projectKey} />
+        <ProjectIdentityChip projectKey={projectKey} />
         <ProjectDeployChip projectKey={projectKey} />
         {onNewConversation && (
           <span

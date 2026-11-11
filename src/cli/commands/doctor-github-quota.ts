@@ -87,7 +87,7 @@ function printReport(report: GitHubQuotaReport): void {
   console.log(chalk.bold('\nRepos where the GitHub App is not installed'));
   if (report.appMissingRepos.length === 0) console.log('  none');
   for (const repo of report.appMissingRepos) {
-    console.log(`  ${repo.repo} (issue listings use the gh user token until ${localTime(repo.expiresAt)})`);
+    console.log(`  ${repo.repo} (Overdeck acts as the gh user there until ${localTime(repo.expiresAt)})`);
   }
   console.log('');
 }
