@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5152",
   "created": "2026-11-11T14:36:40.308Z",
-  "updated": "2026-11-11T15:00:29.540Z",
+  "updated": "2026-11-11T15:03:47.321Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -86,9 +86,30 @@
       "doneAt": "2026-11-11T15:00:27.786Z"
     },
     "wi5-jira-http-client": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5152",
-      "claimedAt": "2026-11-11T15:00:29.540Z"
+      "claimedAt": "2026-11-11T15:00:29.540Z",
+      "doneAt": "2026-11-11T15:03:47.321Z"
+    },
+    "wi5-jira-http-client.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:03:47.321Z"
+    },
+    "wi5-jira-http-client.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:03:47.321Z"
+    },
+    "wi5-jira-http-client.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:03:47.321Z"
+    },
+    "wi5-jira-http-client.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:03:47.321Z"
+    },
+    "wi5-jira-http-client.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:03:47.321Z"
     }
   }
 }
