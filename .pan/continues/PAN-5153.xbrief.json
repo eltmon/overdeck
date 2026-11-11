@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5153",
   "created": "2026-11-11T14:43:19.840Z",
-  "updated": "2026-11-11T15:19:28.632Z",
+  "updated": "2026-11-11T15:19:37.437Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -158,6 +158,11 @@
     "sweep-forge.ac3": {
       "status": "completed",
       "doneAt": "2026-11-11T15:19:28.632Z"
+    },
+    "sweep-pr-lookup": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5153",
+      "claimedAt": "2026-11-11T15:19:37.437Z"
     }
   }
 }
