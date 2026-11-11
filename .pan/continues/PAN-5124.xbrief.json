@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5124",
   "created": "2026-11-11T07:40:41.890Z",
-  "updated": "2026-11-11T07:46:58.708Z",
+  "updated": "2026-11-11T07:47:51.917Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -82,9 +82,22 @@
       "doneAt": "2026-11-11T07:46:57.058Z"
     },
     "chunk-budget-default-model": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5124",
-      "claimedAt": "2026-11-11T07:46:58.708Z"
+      "claimedAt": "2026-11-11T07:46:58.708Z",
+      "doneAt": "2026-11-11T07:47:51.917Z"
+    },
+    "chunk-budget-default-model.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T07:47:51.917Z"
+    },
+    "chunk-budget-default-model.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T07:47:51.917Z"
+    },
+    "chunk-budget-default-model.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T07:47:51.917Z"
     }
   }
 }
