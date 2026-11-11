@@ -53,13 +53,16 @@ export interface ConfiguredModel {
 /**
  * Every model id the operator's config (with defaults applied) can launch:
  * role models — including each weighted-distribution entry and every
- * sub-role — workhorse slots, enabled tiered-execution tier models, and the
- * default conversation model. Workhorse refs are dereffed; an entry whose
+ * sub-role — workhorse slots, enabled tiered-execution tier models, the
+ * default conversation model, and the Claude Code background-call models
+ * (`conversations.title_model` and `conversations.compaction_model`, PAN-5124
+ * D8). Memory extraction is not listed: it uses the Anthropic SDK, not Claude
+ * Code. Workhorse refs are dereffed; an entry whose
  * deref fails (e.g. a dangling `workhorse:` reference) is skipped rather than
  * thrown. Duplicate models merge their sources.
  */
 export function listConfiguredModels(
-  config: Pick<NormalizedConfig, 'roles' | 'workhorses' | 'tieredExecution' | 'defaultConversationModel'>,
+  config: Pick<NormalizedConfig, 'roles' | 'workhorses' | 'tieredExecution' | 'defaultConversationModel' | 'conversations'>,
 ): ConfiguredModel[] {
   const sourcesByModel = new Map<string, string[]>();
 
@@ -113,6 +116,10 @@ export function listConfiguredModels(
   if (config.defaultConversationModel) {
     record(resolveModelId(config.defaultConversationModel), 'models.default_conversation_model');
   }
+
+  const conversations = config.conversations;
+  if (conversations?.titleModel) record(resolveModelId(conversations.titleModel), 'conversations.title_model');
+  if (conversations?.compactionModel) record(resolveModelId(conversations.compactionModel), 'conversations.compaction_model');
 
   return Array.from(sourcesByModel.entries()).map(([model, sources]) => ({ model, sources }));
 }

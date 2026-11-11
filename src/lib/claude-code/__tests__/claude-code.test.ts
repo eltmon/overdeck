@@ -21,7 +21,7 @@ import {
   type ClaudeInstall,
 } from '../version.js';
 
-type ConfigInput = Pick<NormalizedConfig, 'roles' | 'workhorses' | 'tieredExecution' | 'defaultConversationModel'>;
+type ConfigInput = Pick<NormalizedConfig, 'roles' | 'workhorses' | 'tieredExecution' | 'defaultConversationModel' | 'conversations'>;
 
 describe('version', () => {
   afterEach(() => {
@@ -216,6 +216,33 @@ describe('requirements', () => {
       expect(byModel.get('claude-haiku-4-5')).toEqual(['tieredExecution.tiers.quick.model']);
       expect(byModel.get('claude-opus-4-7')).toEqual(['models.default_conversation_model']);
       expect(byModel.has('parent')).toBe(false);
+      expect(byModel.has('claude-haiku-5-5')).toBe(false);
+    });
+
+    // PAN-5124 D8: title and compaction calls run Claude Code, so their models
+    // are requirement sources and a too-old install shows before a call fails.
+    it('lists the title and compaction models as one merged requirement source', () => {
+      const config = {
+        workhorses: {},
+        roles: {},
+        conversations: { titleModel: 'claude-haiku-5-5', compactionModel: 'claude-haiku-5-5' },
+      } as never as ConfigInput;
+
+      const models = listConfiguredModels(config);
+      const haiku = models.filter((m) => m.model === 'claude-haiku-5-5');
+      expect(haiku).toHaveLength(1);
+      expect(haiku[0].sources).toEqual(expect.arrayContaining(['conversations.title_model', 'conversations.compaction_model']));
+
+      const requirement = evaluateClaudeCodeRequirements('2.1.280', models).find((r) => r.model === 'claude-haiku-5-5');
+      expect(requirement).toMatchObject({ minVersion: '2.1.293', satisfied: false });
+    });
+
+    it('returns the same entries without a conversations block', () => {
+      const base = { workhorses: { mid: 'claude-sonnet-5-5' }, roles: {} };
+      const withEmpty = listConfiguredModels({ ...base, conversations: {} } as never as ConfigInput);
+      const without = listConfiguredModels(base as never as ConfigInput);
+      expect(without).toEqual(withEmpty);
+      expect(without.some((m) => m.sources.some((s) => s.startsWith('conversations.')))).toBe(false);
     });
   });
 
