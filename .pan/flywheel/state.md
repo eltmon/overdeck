@@ -708,3 +708,10 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
 - A planned issue deferred by the disk guard keeps retrying in deacon-lite and cannot be held with `pan pause` (PAN-5133). Held PAN-5122 and PAN-5123 with a `handoff.abandoned` journal entry; restart each with `pan start <id>` when the pacing rule allows.
 - Re-homing an outside-branch PR: push its head to `feature/pan-<id>`, open a new PR, and close the old one; the PR webhook adopts it. A PR deleting tests of removed behavior fails test-skip and needs the operator's waiver (Flywheel identity is refused).
 - Do not hand-merge while the merge train is rebasing: the pinned head moves and the merge route refuses. The train merges approved PRs itself.
+
+## 2026-11-11 — reload refused: shim on the non-live generation (PAN-5139)
+- Symptom: `pan reload` refuses with "Both dashboard deployment generations are held by hard occupants", and one occupant is a `.../generation-X/dist/cli/index.js` pid that keeps changing. That pid is the reload (or the approve loop) itself: `~/.overdeck/cli-bin/pan` points at the generation the live server is NOT on.
+- Check: `head -2 ~/.overdeck/cli-bin/pan` vs the generation in `ps -o args= -p $(ss -ltnp | grep :3011 ...)`. Deploy by running the live generation's CLI directly: `node ~/.overdeck/deployments/dashboard/.pan-reload-generation-<live>/dist/cli/index.js reload`, and approve only after the log shows "Build complete".
+- Cause: a launch from a non-live-generation process rewrites the shim to its own bundle (pan-cli-shim D-3). Filed PAN-5139.
+- Handoff PRs have no work agent, so conflict repair escalates as `unreachable`; relay conflicts to the handoff conversation with `pan tell`. Check `git merge-tree` output before saying "changelog only".
+- Workspace Docker stacks keep a 1.9 GB `container-node-modules` volume each, not counted in the workspace folder size; `docker compose -p overdeck-feature-<id> down -v` frees it for an issue that no longer needs its stack.
