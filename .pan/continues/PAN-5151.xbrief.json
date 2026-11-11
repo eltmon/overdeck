@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5151",
   "created": "2026-11-11T14:34:32.001Z",
-  "updated": "2026-11-11T15:06:28.355Z",
+  "updated": "2026-11-11T15:06:38.664Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -162,6 +162,11 @@
     "guard-agent-builders.ac4": {
       "status": "completed",
       "doneAt": "2026-11-11T15:06:28.355Z"
+    },
+    "guard-conversations-planning": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5151",
+      "claimedAt": "2026-11-11T15:06:38.664Z"
     }
   }
 }
