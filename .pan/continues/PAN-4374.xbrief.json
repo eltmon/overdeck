@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4374",
   "created": "2026-11-11T12:38:14.502Z",
-  "updated": "2026-11-11T12:38:14.502Z",
+  "updated": "2026-11-11T12:50:40.507Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,30 @@
   "sessionHistory": [],
   "items": {
     "shared-claude-runner": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4374",
-      "claimedAt": "2026-11-11T12:38:14.502Z"
+      "claimedAt": "2026-11-11T12:38:14.502Z",
+      "doneAt": "2026-11-11T12:50:40.506Z"
+    },
+    "shared-claude-runner.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T12:50:40.506Z"
+    },
+    "shared-claude-runner.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T12:50:40.506Z"
+    },
+    "shared-claude-runner.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T12:50:40.506Z"
+    },
+    "shared-claude-runner.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T12:50:40.506Z"
+    },
+    "shared-claude-runner.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-11T12:50:40.506Z"
     }
   }
 }
