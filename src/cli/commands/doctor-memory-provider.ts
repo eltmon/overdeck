@@ -57,7 +57,7 @@ export async function checkMemoryExtraction(options: CheckMemoryExtractionOption
 
 function fixForReason(reason: string): string {
   if (reason === 'provider-auth-failed') {
-    return 'The memory extraction provider has no working credentials in the dashboard and agent-hook environment. Export ANTHROPIC_API_KEY (or ANTHROPIC_AUTH_TOKEN) for the dashboard service and agent sessions, or set memory.extraction.provider in ~/.overdeck/config.yaml to a provider that can authenticate on this host (a Claude-subscription provider is tracked in PAN-4374).';
+    return 'The memory extraction provider could not authenticate. With provider anthropic, export ANTHROPIC_API_KEY (or ANTHROPIC_AUTH_TOKEN) for the dashboard service and agent sessions, or set memory.extraction.provider: claude-cli in ~/.overdeck/config.yaml to use this host\'s Claude Code login. With provider claude-cli and a "Not logged in" cause, run claude as the user that runs the dashboard and complete /login.';
   }
   if (reason === 'cost-cap') {
     return "Today's memory extraction spend reached memory.extraction.per_day_cost_cap_usd; raise it or wait for the next day.";

@@ -44,7 +44,7 @@ describe('checkMemoryExtraction', () => {
     expect(result).toEqual({ name: 'Memory extraction', status: 'ok', message: 'no memory extraction activity recorded' });
   });
 
-  it('returns warn for the newest provider-auth-failed failure across workspaces, with a fix mentioning ANTHROPIC_API_KEY and PAN-4374 (ac2)', async () => {
+  it('returns warn for the newest provider-auth-failed failure across workspaces, with a fix mentioning ANTHROPIC_API_KEY, claude-cli and /login (ac2)', async () => {
     await writeHealth('overdeck', 'ws-older', JSON.stringify(snapshot({
       status: 'failing',
       last_failure: '2026-09-28T00:00:00.000Z',
@@ -65,7 +65,9 @@ describe('checkMemoryExtraction', () => {
     expect(result.message).toContain('anthropic/claude-haiku-4-5: no ANTHROPIC_API_KEY');
     expect(result.message).toContain('overdeck/ws-newer');
     expect(result.fix).toContain('ANTHROPIC_API_KEY');
-    expect(result.fix).toContain('PAN-4374');
+    expect(result.fix).toContain('claude-cli');
+    expect(result.fix).toContain('/login');
+    expect(result.fix).not.toContain('PAN-4374');
   });
 
   it('returns ok when the newest event is a success, and skips a corrupt health.json instead of throwing (ac3)', async () => {
