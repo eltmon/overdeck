@@ -813,4 +813,13 @@ Live landmines a change in this repo can step on. Verified 2026-09-26 (Fly, link
   `7b953449633` (PAN-3917). Only `tests/scripts/pan-hook-lib-guards*.test.ts` exercise them. Before
   PAN-5117, the pure-bash fallback watchdog could orphan a `/bin/sleep` that held the caller's stdout
   open for up to 5 s when the parent signalled it between a fork and `sleep_pid=$!`.
+- **`resolveGitHubIssue` means "this issue lives on GitHub"; PR lookups use `resolveGitHubPullRequestRepo`**
+  (`src/lib/tracker-utils.ts`). `parseGitHubRepos` adds every project with `github_repo` except
+  `tracker: jira` ones, and `resolveTrackerType` checks GitHub before `project.tracker` for every other
+  tracker, so `tracker: linear` + `github_repo` with GitHub issues (PAN-2449) still resolves to GitHub.
+  `tracker: jira` (PAN-5152) is the one exception: its issues live in Jira, its PRs in `github_repo`, so
+  a PR-repo lookup must call `resolveGitHubPullRequestRepo`, never `resolveGitHubIssue`. Jira writes go
+  through the non-failing seam `src/lib/tracker/jira-lifecycle.ts`; other unknown trackers on write paths
+  (`issue-lifecycle.ts`, `close-issue.ts` `closeViaDirect`, `workflows.ts` reset steps,
+  `planning-sessions.ts`) still fall through to Linear.
 <!-- last-verified: 2026-11-04 -->
