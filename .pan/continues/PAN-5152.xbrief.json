@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5152",
   "created": "2026-11-11T14:36:40.308Z",
-  "updated": "2026-11-11T15:25:21.111Z",
+  "updated": "2026-11-11T15:27:28.702Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -218,9 +218,18 @@
       "doneAt": "2026-11-11T15:25:15.812Z"
     },
     "wi11-tracker-status-jira": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5152",
-      "claimedAt": "2026-11-11T15:25:21.111Z"
+      "claimedAt": "2026-11-11T15:25:21.111Z",
+      "doneAt": "2026-11-11T15:27:28.702Z"
+    },
+    "wi11-tracker-status-jira.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:27:28.702Z"
+    },
+    "wi11-tracker-status-jira.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:27:28.702Z"
     }
   }
 }
