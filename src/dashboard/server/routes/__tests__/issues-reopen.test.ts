@@ -210,4 +210,24 @@ describe('POST /api/issues/:id/reopen', () => {
       },
     }));
   });
+
+  it('reopens an unmerged Jira issue to To Do through the lifecycle (PAN-5152)', async () => {
+    issueDataServiceMock.getIssueSource.mockReturnValue('jira');
+    issueDataServiceMock.getIssues.mockReturnValue([{ identifier: 'PROJ-7' }]);
+    mockFetchIssuePullRequest.mockResolvedValue({ pr: null });
+    mockResolveGitHubIssue.mockReturnValue({ isGitHub: false });
+
+    const result = await postReopen('PROJ-7');
+
+    expect(result.status).toBe(200);
+    expect(result.body.newState).toBe('To Do');
+    expect(mockTransitionTo).toHaveBeenCalledWith('PROJ-7', 'open');
+    expect(mockLinearGetIssue).not.toHaveBeenCalled();
+    expect(issueDataServiceMock.invalidateTracker).toHaveBeenCalledWith('jira');
+    expect(issueDataServiceMock.patchIssue).toHaveBeenCalledWith('PROJ-7', { status: 'To Do', canonicalStatus: 'todo' });
+    expect(result.appendedEvents).toContainEqual(expect.objectContaining({
+      type: 'issue.statusChanged',
+      payload: { issueId: 'PROJ-7', status: 'To Do', canonicalStatus: 'todo' },
+    }));
+  });
 });

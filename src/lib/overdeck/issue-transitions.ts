@@ -13,7 +13,6 @@ import { getGitHubConfig, getRallyConfig } from '../../dashboard/server/services
 import { saveAgentStateAndEmitEvent, saveAgentStateAndEmitEventProgram } from '../../dashboard/server/services/agent-projection.js';
 import { extractTeamPrefix, findProjectByTeam, resolveProjectFromIssueSync } from '../projects.js';
 import { resolveGitHubIssue, resolveTrackerType } from '../tracker-utils.js';
-import { transitionJiraIssue } from '../tracker/jira-lifecycle.js';
 import { getAgentState } from '../agents.js';
 import { extractPrefix } from '../issue-id.js';
 import { reopenWorkspaceState } from '../reopen.js';
@@ -544,19 +543,19 @@ export function reopenIssueTransition(options: {
       }
     });
     const reopenToVerifying = mergedPr;
-    const targetState = reopenToVerifying ? 'verifying_on_main' : 'in_progress';
-    const targetCanonicalStatus = targetState;
+    // PAN-5152: a reopened Jira issue goes back to To Do (or Verifying on Main
+    // after a merge). The lifecycle's Jira branch maps 'open' to To Do, so the
+    // cache patch, the transitioned event and the canonical status all agree.
+    const reopenJiraToTodo = issueSource === 'jira' && !reopenToVerifying;
+    const targetState = reopenToVerifying ? 'verifying_on_main' : reopenJiraToTodo ? 'open' : 'in_progress';
+    const targetCanonicalStatus = reopenJiraToTodo ? 'todo' : targetState;
 
     let newState = reopenToVerifying ? 'Verifying on Main' : 'In Progress';
     let issueIdentifier = id;
 
-    // PAN-5152: a reopened Jira issue goes back to To Do (or Verifying on Main after a merge).
-    if (issueSource !== 'jira') {
-      yield* lifecycle.transitionTo(id, targetState).pipe(Effect.catch(() => Effect.void));
-    }
+    yield* lifecycle.transitionTo(id, targetState).pipe(Effect.catch(() => Effect.void));
 
     if (issueSource === 'jira') {
-      yield* Effect.promise(() => transitionJiraIssue(id, reopenToVerifying ? 'verifying_on_main' : 'todo'));
       issueDataService.invalidateTracker('jira').catch(() => {});
       if (!reopenToVerifying) newState = 'To Do';
 
