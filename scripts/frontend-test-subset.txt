@@ -39,10 +39,16 @@ src/components/CommandDeck/__tests__/useConversationMutations.triage.test.tsx
 src/components/CommandDeck/__tests__/useDefaultDeckSelection.test.ts
 src/components/CommandPalette.test.tsx
 src/components/EventRouter.test.tsx
+src/components/GodView/confluence/__tests__/GodViewConfluence.test.tsx
 src/components/GodView/confluence/__tests__/choreography.test.ts
+src/components/GodView/confluence/__tests__/confluence-help.test.tsx
+src/components/GodView/confluence/__tests__/confluence-smoke.test.tsx
+src/components/GodView/confluence/__tests__/feed-link.test.tsx
 src/components/GodView/confluence/__tests__/fit-text.test.ts
 src/components/GodView/confluence/__tests__/model.test.ts
+src/components/GodView/confluence/__tests__/orb-tooltip.test.tsx
 src/components/GodView/confluence/__tests__/rail-link.test.tsx
+src/components/GodView/confluence/__tests__/topbar-enrichment.test.tsx
 src/components/GodView/confluence/__tests__/useConfluenceData.test.ts
 src/components/HealthDashboard.test.tsx
 src/components/IssueActionMenu/__tests__/useIssueActions.render-count.test.tsx

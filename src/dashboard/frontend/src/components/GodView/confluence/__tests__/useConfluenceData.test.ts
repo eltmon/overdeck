@@ -4,9 +4,10 @@ import { createElement, type ReactNode } from 'react';
 import type { AgentSnapshot, BackendPane, DomainEvent } from '@overdeck/contracts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useDashboardStore } from '../../../../lib/store';
-import { CLOSE_OUT_PAUSE_REASON } from '../model';
+import { CLOSE_OUT_PAUSE_REASON, orbIdleMinutes } from '../model';
 import {
   useConfluenceData,
+  useConfluenceMeta,
   useConfluenceOrbs,
   useHookStream,
 } from '../useConfluenceData';
@@ -605,26 +606,162 @@ describe('useHookStream', () => {
 });
 
 describe('useConfluenceData metadata fallback', () => {
-  it('returns unavailable beads and cost values without throwing when their sources are absent', () => {
+  it('returns unavailable cost values without throwing when their sources are absent', () => {
     const client = queryClient();
     client.setQueryData(['agents-fleet-cost-summary'], {});
     client.setQueryData(['conversations'], []);
     const { result } = renderHook(() => useConfluenceData(), { wrapper: wrapper(client) });
 
-    expect(result.current.meta.beads).toBeNull();
     expect(result.current.meta.tokensToday).toBeNull();
     expect(result.current.meta.costPerMin).toBeNull();
     expect(result.current.meta.conversations).toBe(0);
   });
 });
 
+describe('ages are computed at read time (PAN-5131 FR-3)', () => {
+  function quietAgent() {
+    useDashboardStore.setState({
+      agentsById: {
+        'agent-pan-40': agent({
+          id: 'agent-pan-40',
+          issueId: 'PAN-40',
+          lastActivity: new Date(NOW.getTime() - 10 * 60_000).toISOString(),
+        }),
+      },
+      issuesRaw: [{ id: 'PAN-40', identifier: 'PAN-40', title: 'Quiet work', labels: [], state: 'open' }],
+    });
+  }
+
+  it('flips a quiet orb to stale when the clock passes 30 idle minutes with no store change', async () => {
+    quietAgent();
+    const { result } = renderHook(() => useConfluenceOrbs(), { wrapper: wrapper(queryClient()) });
+    // Settle the mount-time fetches first, so only the clock tick can recompute the cast below.
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    expect(result.current.find((orb) => orb.id === 'PAN-40')?.state).toBe('active');
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(21 * 60_000); });
+
+    expect(result.current.find((orb) => orb.id === 'PAN-40')?.state).toBe('stale');
+  });
+
+  it('grows meta.oldestIdle with the clock with no store change', async () => {
+    quietAgent();
+    const client = queryClient();
+    client.setQueryData(['agents-fleet-cost-summary'], {});
+    client.setQueryData(['conversations'], []);
+    const { result } = renderHook(() => useConfluenceData(), { wrapper: wrapper(client) });
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    const before = result.current.meta.oldestIdle;
+    expect(before).toBeCloseTo(10, 1);
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(5 * 60_000); });
+
+    expect(result.current.meta.oldestIdle).toBeCloseTo(before + 5, 1);
+  });
+
+  it('re-reads the clock in useConfluenceMeta when its cast and hook stream do not change', async () => {
+    quietAgent();
+    const client = queryClient();
+    client.setQueryData(['agents-fleet-cost-summary'], {});
+    client.setQueryData(['conversations'], []);
+    const cast = renderHook(() => useConfluenceOrbs(), { wrapper: wrapper(client) });
+    const stream = renderHook(() => useHookStream());
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    const orbs = cast.result.current;
+    const hookStream = stream.result.current;
+    const { result } = renderHook(() => useConfluenceMeta(orbs, hookStream), { wrapper: wrapper(client) });
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    const before = result.current.oldestIdle;
+    expect(before).toBeCloseTo(10, 1);
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(5 * 60_000); });
+
+    expect(result.current.oldestIdle).toBeCloseTo(before + 5, 1);
+  });
+});
+
+describe('orbs exist only for tracker issue ids (PAN-5131 FR-6)', () => {
+  function castFor(agents: AgentSnapshot[], issuesRaw: unknown[] = []) {
+    useDashboardStore.setState({
+      agentsById: Object.fromEntries(agents.map((row) => [row.id, row])),
+      issuesRaw: issuesRaw as never,
+    });
+    const { result } = renderHook(() => useConfluenceOrbs(), { wrapper: wrapper(queryClient()) });
+    return result.current.map((orb) => orb.id);
+  }
+
+  it('draws no orb for the sequencer agent, whose issue id is not a tracker id', () => {
+    expect(castFor([agent({ id: 'sequencer-runner', issueId: 'sequencer-runner', role: 'sequencer' })])).toEqual([]);
+  });
+
+  it('draws an orb for a hyphen-less Rally id the store knows', () => {
+    expect(castFor(
+      [agent({ id: 'agent-us123', issueId: 'US123' })],
+      [{ id: 'US123', identifier: 'US123', title: 'Rally story', labels: [], state: 'open' }],
+    )).toEqual(['US123']);
+  });
+
+  it('draws no orb for a hyphen-less id the store does not know', () => {
+    expect(castFor([agent({ id: 'agent-us123', issueId: 'US123' })])).toEqual([]);
+  });
+
+  it('still draws an orb for a prefix-number id with no issue row', () => {
+    expect(castFor([agent({ id: 'agent-pan-1', issueId: 'PAN-1' })])).toEqual(['PAN-1']);
+  });
+});
+
+describe('meta.flywheelLive reads the cached Flywheel status (PAN-5131 FR-6, NFR-1)', () => {
+  function renderMeta(client: QueryClient) {
+    client.setQueryData(['agents-fleet-cost-summary'], {});
+    client.setQueryData(['conversations'], []);
+    return renderHook(() => useConfluenceData(), { wrapper: wrapper(client) });
+  }
+
+  function requestedUrls(): string[] {
+    return vi.mocked(globalThis.fetch).mock.calls.map(([input]) => (input instanceof Request ? input.url : String(input)));
+  }
+
+  it('is true when the cached status says the run is running, and makes no request', async () => {
+    const client = queryClient();
+    client.setQueryData(['flywheel', 'status'], { run: 'running' });
+    const { result } = renderMeta(client);
+    await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+
+    expect(result.current.meta.flywheelLive).toBe(true);
+    expect(requestedUrls().filter((url) => url.includes('/api/flywheel'))).toEqual([]);
+  });
+
+  it('is false for a cached status that is not running, and follows a cache update', async () => {
+    const client = queryClient();
+    client.setQueryData(['flywheel', 'status'], { run: 'paused' });
+    const { result } = renderMeta(client);
+    expect(result.current.meta.flywheelLive).toBe(false);
+
+    await act(async () => {
+      client.setQueryData(['flywheel', 'status'], { run: 'running' });
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(result.current.meta.flywheelLive).toBe(true);
+    expect(requestedUrls().filter((url) => url.includes('/api/flywheel'))).toEqual([]);
+  });
+
+  it('is false when no status is cached, and makes no request', async () => {
+    const { result } = renderMeta(queryClient());
+    await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+
+    expect(result.current.meta.flywheelLive).toBe(false);
+    expect(requestedUrls().filter((url) => url.includes('/api/flywheel'))).toEqual([]);
+  });
+});
+
 describe('useConfluenceOrbs — parked cast (PAN-3490)', () => {
   it('synthesizes a Doldrums orb for a parked issue with no live agent', async () => {
+    const parkedAt = new Date(NOW.getTime() - 16 * 60 * 60_000).toISOString();
     parkedPayload = {
       rows: [{
         issueId: 'PAN-77',
         orbit: 'stuck-flag',
-        parkedAt: new Date(NOW.getTime() - 16 * 60 * 60_000).toISOString(),
+        parkedAt,
         parkReason: 'stuck flag set (feedback_delivery_needs_you)',
         unparkCondition: 'resume the work agent',
       }],
@@ -642,16 +779,17 @@ describe('useConfluenceOrbs — parked cast (PAN-3490)', () => {
     expect(orb?.state).toBe('stale');
     expect(orb?.parkedOrbit).toBe('stuck-flag');
     expect(orb?.orbitReason).toContain('feedback_delivery_needs_you');
-    expect(orb?.parkedMin).toBe(16 * 60);
+    expect(orb?.parkedAt).toBe(parkedAt);
     expect(orb?.title).toBe('Stuck thing');
   });
 
   it('a live orb on a parked issue carries the orbit without leaving the river', async () => {
+    const parkedAt = new Date(NOW.getTime() - 4 * 60 * 60_000).toISOString();
     parkedPayload = {
       rows: [{
         issueId: 'PAN-3',
         orbit: 'conflicts',
-        parkedAt: new Date(NOW.getTime() - 4 * 60 * 60_000).toISOString(),
+        parkedAt,
         parkReason: 'branch invalidated',
         unparkCondition: 'resolve conflicts',
       }],
@@ -668,7 +806,7 @@ describe('useConfluenceOrbs — parked cast (PAN-3490)', () => {
     const orb = result.current.find((candidate) => candidate.id === 'PAN-3');
     expect(orb?.state).toBe('active');
     expect(orb?.parkedOrbit).toBe('conflicts');
-    expect(orb?.parkedMin).toBe(240);
+    expect(orb?.parkedAt).toBe(parkedAt);
   });
 
   it('closed parked issues never render (residue is not cast)', async () => {
@@ -712,7 +850,7 @@ describe('event-driven liveness (operator directive: event-based, not polling)',
 
     const orb = result.current.find((candidate) => candidate.id === 'PAN-5');
     expect(orb?.state).toBe('active');
-    expect(orb?.idleMin).toBeLessThan(1);
+    expect(orbIdleMinutes(orb!, Date.now())).toBeLessThan(1);
   });
 
   it('an agent with fresh snapshot stamps but NO runtime events goes stale on evidence', async () => {
@@ -756,7 +894,7 @@ describe('event-driven liveness (operator directive: event-based, not polling)',
     await act(async () => { await vi.advanceTimersByTimeAsync(0); });
     const orb = result.current.find((candidate) => candidate.id === 'PAN-7');
     expect(orb?.state).toBe('active');
-    expect(orb?.idleMin).toBeLessThan(1);
+    expect(orbIdleMinutes(orb!, Date.now())).toBeLessThan(1);
   });
 });
 

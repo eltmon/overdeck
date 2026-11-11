@@ -55,12 +55,12 @@ export function ConfluenceHelp({ eventsPerMin, onClose }: ConfluenceHelpProps) {
           </div>
           <div className="h-card">
             <h4 style={{ color: 'var(--gv-blue)' }}>Issue Orbs &amp; Model Glyphs</h4>
-            <p>Every glowing orb is one <b>issue</b>. <b>Core color = role</b>; <b>ring = project</b> (cyan overdeck, magenta Mind Your Now); <b>size + glow = activity heat</b>; the <b>letter in the core is the model</b>: S sonnet · G gpt · O opus · F fable · K kimi-k3. Label below shows the id, and the tag line under it the live hook rate or state.</p>
+            <p>Every glowing orb is one <b>issue</b>. <b>Core color = role</b>; <b>ring = project</b> (cyan for PAN, magenta for MIN, one fixed color for each other issue prefix); <b>size + glow = the issue&apos;s real hook-event rate</b> over the last 60 seconds; the <b>letter in the core is the model family</b>: S sonnet · O opus · H haiku · F fable · G gpt · E gemini · X grok · Z glm · Q qwen · L quantum-llama · M muse · N minimax/mimo · I mistral · K kimi; any other model shows its first letter. The label shows the id. The tag line under it shows the state, or <b>role · n ev/m</b> (that issue&apos;s hook events in the last 60 seconds), or <b>role · quiet</b> when there were none.</p>
             <div className="h-demo">{HELP_ROLES.map((role) => <RoleLegend key={role} role={role} />)}</div>
           </div>
           <div className="h-card">
             <h4 style={{ color: 'var(--gv-blue)' }}>Motion</h4>
-            <p>Calm orbs drift gently around their anchor. <b>Hot orbs orbit in frantic little circles</b>. Fading comet-trails show where an orb has been. When an issue advances stage, its orb swims right through a gate flash, leaving a wake.</p>
+            <p>Calm orbs drift gently around their anchor. <b>An orb with a high event rate orbits in fast little circles.</b> Each orb has its own vertical slot in its stage column, so labels do not print over each other. Fading comet-trails show where an orb has been. When an issue advances stage, its orb swims right through a gate flash, leaving a wake.</p>
           </div>
           <div className="h-card">
             <h4 style={{ color: 'var(--gv-blue)' }}>Hook Sparks</h4>
@@ -79,23 +79,23 @@ export function ConfluenceHelp({ eventsPerMin, onClose }: ConfluenceHelpProps) {
           </div>
           <div className="h-card">
             <h4 style={{ color: 'var(--gv-amber)' }}>The Shelf &amp; Governor Tides</h4>
-            <p>When the preemptive scheduler or memory governor needs a slot, an <b>amber tide sweeps the river</b> and the yielded orb sinks onto the ⏸ SHELF with its reason attached. A green flash marks an agent resumed into the freed slot. Operator holds and paused agents wait on the shelf too, with the pause reason beside the orb (the full reason is in the hover card).</p>
+            <p>When the scheduler or the memory governor yields an agent, an <b>amber tide sweeps the river</b> and rings the yielded orb as it settles on the ⏸ SHELF with its reason attached. The tide names no beneficiary. Operator holds and paused agents wait on the shelf too, with the pause reason beside the orb (the full reason is in the hover card). A green ring marks an orb leaving the shelf.</p>
           </div>
           <div className="h-card">
             <h4 style={{ color: '#9fc7ff' }}>Frost &amp; The Doldrums</h4>
-            <p>An orb that stops emitting events <b>frosts over in place</b> — colors desaturate to ice, a frost crown grows, snow falls. Fully frozen orbs <b>sink into the ❄ DOLDRUMS</b> with idle-age labels (10h … 24d). Any activity thaws an orb in a burst of steam and floats it back to WORK.</p>
+            <p>Frost follows real idle time. An active orb starts to frost after <b>8 idle minutes</b> and is fully frosted at 34. At <b>30 minutes</b> with no activity the data marks the issue stale and its orb settles in the ❄ DOLDRUMS with its idle age. When the data says a stale issue is <b>active again</b>, a burst of ice marks the orb as it returns to its stage column. One hook event alone does not thaw an orb.</p>
           </div>
           <div className="h-card">
             <h4 style={{ color: '#bfe3ff' }}>The Stall Sweeper</h4>
-            <p>Parked issues (stuck flags, failed merges, gates, zombies) settle in the Doldrums with <b>orbit-tinted frost</b> — amber stuck, orange UAT, pink merge-failed, purple conflicts, ash zombie, ice idle — and an orbit tag under the id. When the parked population changes, an <b>ice-blue lantern beam sweeps the Doldrums</b>, glinting every orb the scan touched. A swept orb <b>thaws back up into the river</b>; an orb only a human can release fires a slow-rising <b>⚑ signal flare</b>. The 🧹 PARKED top-bar stat is the true census.</p>
+            <p>Parked issues settle in the Doldrums with <b>orbit-tinted frost</b> (slate operator-gate, ash zombie-session, ice idle-running) and an orbit tag with the park age under the id. When a sweeper scan reports a changed parked population, an <b>ice-blue lantern beam sweeps the Doldrums</b>, glinting every frozen orb it passes. An orb only a human can release fires a slow-rising <b>⚑ signal flare</b>. The 🧹 PARKED top-bar stat is the true census.</p>
           </div>
           <div className="h-card">
-            <h4 style={{ color: 'var(--gv-text-primary)' }}>Merge Portal &amp; Wrecks</h4>
-            <p>The white slit at the right edge is <b>main</b>. An issue reaching MERGE dwells briefly in the queue, then accelerates through the portal as a comet — the burst is the merge landing. <b>✗ blinking pink hulls are merge-failed wrecks</b> awaiting a human tow.</p>
+            <h4 style={{ color: 'var(--gv-text-primary)' }}>Merge Portal &amp; Red Rings</h4>
+            <p>The white slit at the right edge is <b>main</b>. An issue reaching MERGE waits in the queue; once it is <b>merged</b>, its orb accelerates through the portal as a comet, and the burst is the merge landing. An issue that leaves MERGE without merging fades out. A <b>✗ blinking red ring</b> in a stage column means the issue is <b>stuck, unpushed work</b> or hit an <b>API error</b>; the label says which.</p>
           </div>
           <div className="h-card">
             <h4 style={{ color: 'var(--gv-purple)' }}>Flywheel Sun &amp; Sequencer</h4>
-            <p>The purple sun top-left is the <b>flywheel orchestrator</b>; a ring pulse means it dispatched new work, and moments later a fresh orb enters PLAN from the sun. The double-ringed metronome beside it is the <b>sequencer</b>, evaluating admission priorities.</p>
+            <p>The purple sun top-left is the <b>flywheel</b>; the double-ringed metronome beside it is the <b>sequencer</b>. Each one pulses and spins only while it is running. When it is not running it is drawn dim and still.</p>
           </div>
           <div className="h-card">
             <h4 style={{ color: 'var(--gv-blue)' }}>Conversation Constellation</h4>
@@ -111,7 +111,7 @@ export function ConfluenceHelp({ eventsPerMin, onClose }: ConfluenceHelpProps) {
           </div>
           <div className="h-card">
             <h4 style={{ color: 'var(--gv-blue)' }}>Top Bar</h4>
-            <p>Clock · <b>events/s</b> (pulses on change) · an <b>ECG of events/min</b> · CPU/MEM meters · a <b>PSI</b> memory-pressure meter (amber/red only on real stalls or swap traffic; swap fill is hover detail) · load · beads <b>WIP/BLOCKED/READY</b> · merge queue depth · <b>$/min spend</b> · merges today · tokens today · ❄ stale count · oldest-idle · active-agents pill · <b>? HELP</b> · fullscreen <b>⛶</b>.</p>
+            <p>Clock · <b>events/s</b> (pulses on change) · an <b>ECG of events/min</b> · <b>VEL</b> stage transitions per hour · CPU/MEM meters · a <b>PSI</b> memory-pressure meter (amber/red only on real stalls or swap traffic; swap fill is hover detail) · load · merge queue depth · <b>$/min spend</b> · merges today · tokens today · ❄ stale count · 🧹 parked census · oldest-idle · active-agents pill · <b>? HELP</b> · fullscreen <b>⛶</b>.</p>
           </div>
           <div className="h-card">
             <h4 style={{ color: 'var(--gv-blue)' }}>Sidebar</h4>
@@ -119,7 +119,7 @@ export function ConfluenceHelp({ eventsPerMin, onClose }: ConfluenceHelpProps) {
           </div>
           <div className="h-card">
             <h4 style={{ color: 'var(--gv-amber)' }}>Data Honesty</h4>
-            <p>The <b>cast is real</b> — every orb, stage, convoy, yield, wreck, and idle age comes from the current dashboard issue, agent, review, and workspace-health read models. The <b>motion is real</b> — hook sparks, micro-states, cost rises, stage transitions, and river energy come from the live domain-event stream. <b>Provenance:</b> dashboard snapshot + /ws/rpc domain events; the current 60-second window contains {eventsPerMin} events.</p>
+            <p>The <b>cast is real</b>: every orb is a tracker issue, and its stage, convoy, yield, attention and timestamps come from the dashboard read models. The <b>motion is real</b>: hook sparks, micro-states, cost rises, stage transitions and river energy come from the live domain-event stream. <b>The canvas never writes an orb&apos;s state, and no displayed age or rate is stored:</b> ages are computed from timestamps when drawn, and rates are counted from the last 60 seconds of events. <b>Provenance:</b> dashboard snapshot + /ws/rpc domain events; the current 60-second window contains {eventsPerMin} events.</p>
           </div>
           <div className="h-card">
             <h4 style={{ color: 'var(--gv-blue)' }}>Keys &amp; Mouse</h4>

@@ -24,11 +24,16 @@ async function fetchFlywheelStatus(): Promise<FlywheelDerivedStatus> {
   return res.json() as Promise<FlywheelDerivedStatus>;
 }
 
-export function useFlywheelStatus(opts: { refetchInterval?: number } = {}) {
+/**
+ * `enabled: false` reads the cached status without ever fetching: for a reader
+ * on a page where another observer (the app sidebar) already polls this query.
+ */
+export function useFlywheelStatus(opts: { refetchInterval?: number; enabled?: boolean } = {}) {
   return useQuery({
     queryKey: FLYWHEEL_STATUS_QUERY_KEY,
     queryFn: fetchFlywheelStatus,
     refetchInterval: opts.refetchInterval ?? 5_000,
+    enabled: opts.enabled ?? true,
   });
 }
 

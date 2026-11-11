@@ -1,0 +1,415 @@
+{
+  "version": "1",
+  "issueId": "PAN-5131",
+  "created": "2026-11-11T08:19:14.972Z",
+  "updated": "2026-11-11T09:31:06.341Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "ages-read-time": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5131",
+      "claimedAt": "2026-11-11T08:19:14.972Z",
+      "doneAt": "2026-11-11T08:26:03.381Z"
+    },
+    "ages-read-time.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:26:03.381Z"
+    },
+    "ages-read-time.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:26:03.381Z"
+    },
+    "ages-read-time.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:26:03.381Z"
+    },
+    "ages-read-time.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:26:03.381Z"
+    },
+    "ages-read-time.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:26:03.381Z"
+    },
+    "canvas-real-frost": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5131",
+      "claimedAt": "2026-11-11T08:26:13.268Z",
+      "doneAt": "2026-11-11T08:29:41.925Z"
+    },
+    "canvas-real-frost.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:29:41.925Z"
+    },
+    "canvas-real-frost.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:29:41.925Z"
+    },
+    "canvas-real-frost.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:29:41.925Z"
+    },
+    "canvas-real-frost.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:29:41.925Z"
+    },
+    "canvas-real-frost.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:29:41.925Z"
+    },
+    "real-event-rate-heat": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5131",
+      "claimedAt": "2026-11-11T08:29:53.069Z",
+      "doneAt": "2026-11-11T08:32:19.388Z"
+    },
+    "real-event-rate-heat.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:32:19.388Z"
+    },
+    "real-event-rate-heat.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:32:19.388Z"
+    },
+    "real-event-rate-heat.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:32:19.388Z"
+    },
+    "real-event-rate-heat.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:32:19.388Z"
+    },
+    "real-event-rate-heat.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:32:19.388Z"
+    },
+    "honest-thaw": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5131",
+      "claimedAt": "2026-11-11T08:32:21.813Z",
+      "doneAt": "2026-11-11T08:34:05.258Z"
+    },
+    "honest-thaw.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:34:05.258Z"
+    },
+    "honest-thaw.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:34:05.258Z"
+    },
+    "honest-thaw.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:34:05.258Z"
+    },
+    "honest-tide": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5131",
+      "claimedAt": "2026-11-11T08:34:14.454Z",
+      "doneAt": "2026-11-11T08:36:05.978Z"
+    },
+    "honest-tide.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:36:05.978Z"
+    },
+    "honest-tide.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:36:05.978Z"
+    },
+    "honest-tide.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:36:05.978Z"
+    },
+    "honest-tide.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:36:05.978Z"
+    },
+    "merge-exit-merged-only": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5131",
+      "claimedAt": "2026-11-11T08:36:08.102Z",
+      "doneAt": "2026-11-11T08:37:55.679Z"
+    },
+    "merge-exit-merged-only.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:37:55.679Z"
+    },
+    "merge-exit-merged-only.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:37:55.679Z"
+    },
+    "merge-exit-merged-only.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:37:55.679Z"
+    },
+    "remove-sun-spawn": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5131",
+      "claimedAt": "2026-11-11T08:37:57.749Z",
+      "doneAt": "2026-11-11T08:39:39.648Z"
+    },
+    "remove-sun-spawn.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:39:39.648Z"
+    },
+    "remove-sun-spawn.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:39:39.648Z"
+    },
+    "landmarks-live-only": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5131",
+      "claimedAt": "2026-11-11T08:39:41.964Z",
+      "doneAt": "2026-11-11T08:45:07.936Z"
+    },
+    "landmarks-live-only.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:45:07.936Z"
+    },
+    "landmarks-live-only.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:45:07.936Z"
+    },
+    "landmarks-live-only.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:45:07.936Z"
+    },
+    "landmarks-live-only.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:45:07.936Z"
+    },
+    "landmarks-live-only.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:45:07.936Z"
+    },
+    "cast-tracker-ids": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5131",
+      "claimedAt": "2026-11-11T08:45:10.078Z",
+      "doneAt": "2026-11-11T08:46:41.992Z"
+    },
+    "cast-tracker-ids.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:46:41.992Z"
+    },
+    "cast-tracker-ids.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:46:41.992Z"
+    },
+    "cast-tracker-ids.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:46:41.992Z"
+    },
+    "cast-tracker-ids.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:46:41.992Z"
+    },
+    "top-bar-dead-stats": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5131",
+      "claimedAt": "2026-11-11T08:46:52.189Z",
+      "doneAt": "2026-11-11T08:48:34.008Z"
+    },
+    "top-bar-dead-stats.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:48:34.008Z"
+    },
+    "top-bar-dead-stats.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:48:34.008Z"
+    },
+    "top-bar-dead-stats.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:48:34.008Z"
+    },
+    "footer-from-stages": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5131",
+      "claimedAt": "2026-11-11T08:48:36.200Z",
+      "doneAt": "2026-11-11T08:50:19.588Z"
+    },
+    "footer-from-stages.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:50:19.588Z"
+    },
+    "footer-from-stages.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:50:19.588Z"
+    },
+    "failed-orb-labels": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5131",
+      "claimedAt": "2026-11-11T08:50:22.470Z",
+      "doneAt": "2026-11-11T08:52:34.750Z"
+    },
+    "failed-orb-labels.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:52:34.750Z"
+    },
+    "failed-orb-labels.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:52:34.750Z"
+    },
+    "failed-orb-labels.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:52:34.750Z"
+    },
+    "failed-orb-labels.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:52:34.750Z"
+    },
+    "failed-orb-labels.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:52:34.750Z"
+    },
+    "lane-slots": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5131",
+      "claimedAt": "2026-11-11T08:52:37.181Z",
+      "doneAt": "2026-11-11T08:54:27.697Z"
+    },
+    "lane-slots.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:54:27.697Z"
+    },
+    "lane-slots.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:54:27.697Z"
+    },
+    "lane-slots.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:54:27.697Z"
+    },
+    "project-ring-colors": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5131",
+      "claimedAt": "2026-11-11T08:54:30.089Z",
+      "doneAt": "2026-11-11T08:56:26.762Z"
+    },
+    "project-ring-colors.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:56:26.762Z"
+    },
+    "project-ring-colors.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:56:26.762Z"
+    },
+    "project-ring-colors.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:56:26.762Z"
+    },
+    "project-ring-colors.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:56:26.762Z"
+    },
+    "model-glyphs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5131",
+      "claimedAt": "2026-11-11T08:56:29.337Z",
+      "doneAt": "2026-11-11T08:58:23.322Z"
+    },
+    "model-glyphs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:58:23.322Z"
+    },
+    "model-glyphs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:58:23.322Z"
+    },
+    "model-glyphs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:58:23.322Z"
+    },
+    "model-glyphs.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:58:23.322Z"
+    },
+    "single-ticker": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5131",
+      "claimedAt": "2026-11-11T08:58:25.453Z",
+      "doneAt": "2026-11-11T09:00:32.663Z"
+    },
+    "single-ticker.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T09:00:32.663Z"
+    },
+    "single-ticker.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T09:00:32.663Z"
+    },
+    "field-guide-text": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5131",
+      "claimedAt": "2026-11-11T09:00:36.168Z",
+      "doneAt": "2026-11-11T09:05:20.318Z"
+    },
+    "field-guide-text.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T09:05:20.318Z"
+    },
+    "field-guide-text.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T09:05:20.318Z"
+    },
+    "field-guide-text.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T09:05:20.318Z"
+    },
+    "field-guide-text.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T09:05:20.318Z"
+    },
+    "docs-god-view": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5131",
+      "claimedAt": "2026-11-11T09:05:24.438Z",
+      "doneAt": "2026-11-11T09:06:51.770Z"
+    },
+    "docs-god-view.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T09:06:51.770Z"
+    },
+    "docs-god-view.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T09:06:51.770Z"
+    },
+    "docs-god-view.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T09:06:51.770Z"
+    },
+    "docs-god-view.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T09:06:51.770Z"
+    },
+    "e2e-honesty-spec": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5131",
+      "claimedAt": "2026-11-11T09:06:54.392Z",
+      "doneAt": "2026-11-11T09:31:06.341Z"
+    },
+    "e2e-honesty-spec.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T09:31:06.341Z"
+    },
+    "e2e-honesty-spec.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T09:31:06.341Z"
+    },
+    "e2e-honesty-spec.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T09:31:06.341Z"
+    },
+    "e2e-honesty-spec.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T09:31:06.341Z"
+    },
+    "e2e-honesty-spec.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-11T09:31:06.341Z"
+    }
+  }
+}

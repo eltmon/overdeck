@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   resize: vi.fn(),
+  riverProps: [] as Array<Record<string, unknown>>,
 }));
 
 vi.mock('../../../../hooks/useGodViewSocket', () => ({
@@ -41,7 +42,6 @@ vi.mock('../useConfluenceData', () => ({
       conversations: 0,
       staleTotal: 0,
       oldestIdle: 0,
-      beads: null,
       system: null,
       active: 0,
       total: 0,
@@ -53,18 +53,16 @@ vi.mock('../useConfluenceData', () => ({
 vi.mock('../RiverCanvas', async () => {
   const React = await import('react');
   return {
-    RiverCanvas: React.forwardRef(function RiverCanvasMock(_props, ref) {
+    RiverCanvas: React.forwardRef(function RiverCanvasMock(props: Record<string, unknown>, ref) {
+      mocks.riverProps.push(props);
       React.useImperativeHandle(ref, () => ({
         emitSparks: vi.fn(),
         emitRing: vi.fn(),
         emitTicker: vi.fn(),
         playTide: vi.fn(),
-        playMerge: vi.fn(),
         playThaw: vi.fn(),
         playSweep: vi.fn(),
         playFlare: vi.fn(),
-        pulseSun: vi.fn(),
-        spawnFromSun: vi.fn(),
         gateFlash: vi.fn(),
         resize: mocks.resize,
       }));
@@ -97,7 +95,6 @@ const confluenceData = {
     conversations: 0,
     staleTotal: 0,
     oldestIdle: 0,
-    beads: null,
     system: null,
     active: 0,
     total: 0,
@@ -125,6 +122,7 @@ beforeEach(() => {
   requestFullscreen = vi.fn();
   exitFullscreen = vi.fn(() => Promise.resolve());
   mocks.resize.mockClear();
+  mocks.riverProps.length = 0;
 
   Object.defineProperty(document, 'fullscreenElement', {
     configurable: true,
@@ -168,7 +166,7 @@ describe('GodViewConfluence field guide and fullscreen controls', () => {
       'Review Convoys',
       'The Shelf & Governor Tides',
       'Frost & The Doldrums',
-      'Merge Portal & Wrecks',
+      'Merge Portal & Red Rings',
       'Flywheel Sun & Sequencer',
       'Conversation Constellation',
       'Hook Bus · Dark Fiber',
@@ -280,5 +278,40 @@ describe('GodViewConfluence field guide and fullscreen controls', () => {
     const unrelated = new KeyboardEvent('keydown', { key: 'x', bubbles: true, cancelable: true });
     fireEvent(window, unrelated);
     expect(unrelated.defaultPrevented).toBe(false);
+  });
+});
+
+describe('God View footer (PAN-5131 FR-9)', () => {
+  it('lists the five pipeline stages of the model and names no other stage', () => {
+    const { container } = render(<GodViewPage />);
+
+    expect(screen.getByText('PLAN → WORK → REVIEW → TEST → MERGE')).toBeInTheDocument();
+    expect(container.textContent).not.toContain('VERIFY');
+  });
+});
+
+describe('GodViewConfluence landmarks (PAN-5131 FR-6)', () => {
+  function lastRiverProps(meta: Record<string, unknown>) {
+    render(
+      <GodViewConfluence
+        data={{ ...confluenceData, meta: { ...confluenceData.meta, ...meta } } as unknown as ConfluenceData}
+        helpOpen={false}
+        onHelpOpenChange={vi.fn()}
+        onToggleFullscreen={vi.fn()}
+      />,
+    );
+    return mocks.riverProps.at(-1);
+  }
+
+  it('tells the canvas the sequencer and the Flywheel are not live when no data says so', () => {
+    expect(lastRiverProps({ roleCounts: {} })).toMatchObject({ sequencerLive: false, flywheelLive: false });
+  });
+
+  it('tells the canvas the sequencer is live when a sequencer agent is hosted', () => {
+    expect(lastRiverProps({ roleCounts: { sequencer: 1 } })).toMatchObject({ sequencerLive: true, flywheelLive: false });
+  });
+
+  it('passes the Flywheel run state from meta to the canvas', () => {
+    expect(lastRiverProps({ roleCounts: {}, flywheelLive: true })).toMatchObject({ sequencerLive: false, flywheelLive: true });
   });
 });

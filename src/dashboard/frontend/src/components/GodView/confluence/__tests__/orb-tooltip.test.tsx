@@ -1,9 +1,20 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { OrbTooltip, resolveHoverOrb, tooltipPosition } from '../OrbTooltip';
 import type { ConfluenceOrb } from '../useConfluenceData';
+
+const NOW = new Date('2026-08-02T12:47:00.000Z');
+
+beforeEach(() => {
+  vi.useFakeTimers();
+  vi.setSystemTime(NOW);
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 function orb(overrides: Partial<ConfluenceOrb> = {}): ConfluenceOrb {
   return {
@@ -12,8 +23,6 @@ function orb(overrides: Partial<ConfluenceOrb> = {}): ConfluenceOrb {
     role: 'review',
     stage: 'REVIEW',
     title: 'God View Confluence',
-    heat: 0.8,
-    staleMin: 47,
     state: 'stale',
     convoy: [
       { agentId: 'security', role: 'security', model: 'claude-sonnet-5', status: 'running' },
@@ -27,14 +36,14 @@ function orb(overrides: Partial<ConfluenceOrb> = {}): ConfluenceOrb {
     harness: 'claude-code',
     labels: ['frontend'],
     glyph: 'O',
-    lastActivity: '2026-08-02T12:00:00.000Z',
-    idleMin: 21,
+    lastActivity: new Date(NOW.getTime() - 47 * 60_000).toISOString(),
     waitUntil: 0,
     thinkUntil: 0,
     compactT: 0,
     spend: 1.25,
     issueState: null,
     attention: null,
+    parkedAt: null,
     ...overrides,
   };
 }
@@ -84,7 +93,7 @@ describe('OrbTooltip', () => {
       'claude-opus-5', 'claude-code', '17 ev/m', '42', '47m', 'yield: review admission',
       'verification pending', 'security · synthesis', 'click for issue rail →',
     ]) expect(screen.getByText(text)).toBeInTheDocument();
-    expect(screen.getByText(/Frost/).parentElement).toHaveTextContent('50%');
+    expect(screen.getByText(/Frost/).parentElement).toHaveTextContent('100%');
     expect(tooltipPosition(anchor).flipped).toBe(true);
   });
 
