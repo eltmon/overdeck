@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5124",
   "created": "2026-11-11T07:40:41.890Z",
-  "updated": "2026-11-11T08:27:53.394Z",
+  "updated": "2026-11-11T08:29:32.131Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -201,6 +201,11 @@
       "status": "in_progress",
       "claimedBy": "agent-pan-5124",
       "claimedAt": "2026-11-11T08:27:53.394Z"
+    },
+    "haiku-settings-fallbacks": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5124",
+      "claimedAt": "2026-11-11T08:29:32.131Z"
     }
   }
 }
