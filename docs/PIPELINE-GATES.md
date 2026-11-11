@@ -523,7 +523,7 @@ With CI passed or unknown, every gate runs as before.
 
 The worker outlives a dashboard restart, but the request-review continuation
 that waits for its result (push the verified branch, dispatch review) lived in
-the old process. Two mechanisms carry it over, and neither re-runs a gate the
+the old process. These mechanisms carry it over, and none re-runs a gate the
 worker already ran:
 
 - **Results are adopted, not re-run.** The worker state
@@ -533,8 +533,9 @@ worker already ran:
   finished with a result nobody consumed, the supervisor returns that result
   instead of starting a fresh worker, provided the head is the same or synced
   head (above), the options match, and the outcome is not `error`. A result is
-  consumed at most once, so a second request on the same head is a real
-  re-run and still counts against the attempt budget. A live worker is joined
+  consumed at most once, so once its review is dispatched (below), a second
+  request on the same head is a real re-run and still counts against the
+  attempt budget. A live worker is joined
   under the same rule: same head and same options. A live worker running with
   other options (for example `skipPlanChecklist`, PAN-4786) is stopped and a
   fresh worker starts.
@@ -545,22 +546,44 @@ worker already ran:
   the live worker or adopts its result, then pushes and dispatches review as
   the original request would have. A `review` (`/trigger`) or `merge-verify`
   worker is not re-attached; its door owns the retry.
+- **An owed dispatch is kept until review spawns (PAN-4622).** When a
+  `request-review` waiter takes a `passed` result, the same atomic write that
+  records `resultConsumedAt` records `dispatchOwed: { head, takenAt }`. `head`
+  is the workspace head when the pass is taken, after the worker's own sync
+  merge, so it is the head the door pushes. The door clears the marker first
+  thing after the review role spawns; a gated or failed spawn keeps it. While
+  the marker is set, a `request-review` request on that exact head with the
+  same options gets the pass back with no new worker, whoever sends it (boot
+  adoption, deacon-lite, the agent). A head that moved is a new request: the
+  marker is cleared and the gates run. So "consumed at most once" means a
+  second request on the same head re-runs the gates only after review was
+  dispatched for the first. The marker is cache state about one run, not
+  pipeline status; the pipeline journal stays the record.
+- **A resumed request skips the dirty-tree refusal.** Boot adoption also
+  re-enters the door for a consumed pass whose dispatch is still owed, and it
+  passes `resume`, so the door does not refuse a dirty tree at the start. A
+  worker that is installing dependencies at boot can leave a tracked file
+  modified for a moment. Instead, after the pass and before the push,
+  `cloister/verification-resume-dispatch.ts` checks that the head still equals
+  `dispatchOwed.head` and that the tree is clean (an unreadable tree counts as
+  dirty). If either check fails, nothing is pushed or dispatched, the reason is
+  journalled as `review.resume-declined` (with the verified primary head8 in
+  `data.head`), and `recoverUndispatchedReviews` treats that tail like an
+  undispatched `verification.passed`: it re-requests the review through the
+  normal door once the entry is 5 minutes old and the head still matches. The
+  marker stays, so that request dispatches without re-running the gates.
 
-When either mechanism cannot apply, the old recovery still runs, and it re-runs
-the gates. A result whose consumption cannot be written to the state file is
-never used: adoption skips it, and a waiter returns an `error` outcome instead,
-so one result never dispatches twice. A worker
-started by a dashboard older than PAN-4532 has no `logPrefix` or `options`, so
-it is neither re-attached nor adopted on the restart that deploys this change.
-If boot adoption is refused (for example, the workspace is dirty), the worker
-still writes `verification.passed`, and `recoverUndispatchedReviews` re-requests
-the review. If the dashboard dies between taking an already-finished result and
-dispatching review, the journal tail is `review.requested`, and only
-`recoverStalledReviews` would re-request it. Its re-request fallback does not
-run in the deacon child yet
-([PAN-4623](https://github.com/eltmon/overdeck/issues/4623)), so that review
-waits for the next request. [PAN-4622](https://github.com/eltmon/overdeck/issues/4622)
-tracks closing this window.
+When none of these mechanisms applies, the old recovery still runs, and it
+re-runs the gates. A result whose consumption cannot be written to the state
+file is never used: adoption skips it, and a waiter returns an `error` outcome
+instead, so one result never dispatches twice. A worker started by a dashboard
+older than PAN-4532 has no `logPrefix` or `options`, so it is neither
+re-attached nor adopted. A pass taken before PAN-4622 deployed has no
+`dispatchOwed` marker, so its owed dispatch is not resumed on that restart.
+deacon-lite still recovers it: `recoverUndispatchedReviews` for a
+`verification.passed` tail, and `recoverStalledReviews` for a
+`review.requested` tail, whose re-request fallback does not run in the deacon
+child yet ([PAN-4623](https://github.com/eltmon/overdeck/issues/4623)).
 
 ### Review dispatch touches neither the stack nor tracked files (PAN-4690)
 

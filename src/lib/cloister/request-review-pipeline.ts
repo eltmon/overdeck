@@ -5,6 +5,11 @@ type MaybePromise = void | Promise<void>;
 
 export interface RequestReviewPipelineDeps {
   verify: () => Promise<VerificationRunnerOutcome>;
+  /**
+   * PAN-4622: a resumed request's dispatch-time check, run after a pass and
+   * before the push. `false` stops here; the check journals why.
+   */
+  confirmDispatch?: () => Promise<boolean>;
   pushBranch: () => Promise<void>;
   dispatchReview: () => Promise<void>;
   onVerificationFailed: (outcome: Extract<VerificationRunnerOutcome, { outcome: 'failed' }>) => MaybePromise;
@@ -42,6 +47,7 @@ export function createRequestReviewPipeline(): RequestReviewPipeline {
           return;
         }
 
+        if (deps.confirmDispatch && !await deps.confirmDispatch()) return;
         await deps.pushBranch();
         await deps.dispatchReview();
       }, deps.onError);
@@ -64,9 +70,16 @@ export type StartRequestReviewOutcome =
 /** Who asked for the review — journalled as the `review.requested` source. */
 export type RequestReviewSource = 'pan-done' | 'pan-review-request' | 'pan-unpause' | 'webhook' | 'deacon-lite' | 'api' | 'conflict-repair' | 'verification-adoption' | 'remote-reap' | 'merge-train' | 'stale-approval';
 
+/**
+ * `resume` (PAN-4622, boot adoption only): the request was accepted before a
+ * restart, so the door skips its dirty-tree refusal and checks head and tree
+ * at dispatch time instead (`verification-resume-dispatch.ts`).
+ */
+export type RequestReviewStartOptions = { note?: string; source?: RequestReviewSource; onReviewSpawned?: () => void; resume?: boolean };
+
 export type RequestReviewStarter = (
   issueId: string,
-  options?: { note?: string; source?: RequestReviewSource; onReviewSpawned?: () => void },
+  options?: RequestReviewStartOptions,
 ) => Promise<StartRequestReviewOutcome>;
 
 let requestReviewStarter: RequestReviewStarter | null = null;

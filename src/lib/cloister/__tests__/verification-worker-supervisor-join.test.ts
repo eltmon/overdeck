@@ -3,11 +3,15 @@
  * worker is still verifying the requested head.
  * PAN-4532: a finished result nobody consumed is adopted for the same head,
  * at most once, and a restarted dashboard re-attaches to surviving workers.
+ * PAN-4622: a taken pass whose review never dispatched is dispatched at boot
+ * without re-running the gates, and boot adoption resumes past a dirty tree,
+ * checking head and tree at dispatch time instead.
  */
-import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { execFile, execFileSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { promisify } from 'node:util';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -56,7 +60,9 @@ vi.mock('../verification-worker-launcher.js', () => ({
 
 import { createRequestReviewPipeline, registerRequestReviewStarter } from '../request-review-pipeline.js';
 import { adoptSurvivingVerificationWorkers } from '../verification-boot-adoption.js';
+import { confirmResumedDispatch } from '../verification-resume-dispatch.js';
 import {
+  clearVerificationDispatchOwed,
   listAdoptableVerificationWorkers,
   readVerificationWorkerState,
   runSupervisedVerification,
@@ -293,6 +299,8 @@ describe('adopting an unconsumed result (PAN-4532)', () => {
     expect(await joinAndFinish(liveResult, review)).toEqual({ outcome: 'passed' });
     vi.useRealTimers();
     alivePids.delete(LIVE_PID);
+    // PAN-4622: until review dispatches, the pass is still owed on this head.
+    clearVerificationDispatchOwed('PAN-1');
 
     expect(await review()).toEqual({ outcome: 'passed' });
     expect(mocks.launches).toHaveLength(1);
@@ -318,7 +326,9 @@ describe('adopting an unconsumed result (PAN-4532)', () => {
     expect(await review()).toEqual({ outcome: 'passed' });
     expect(mocks.launches).toHaveLength(0);
     expect(readVerificationWorkerState('PAN-1')?.resultConsumedAt).toEqual(expect.any(String));
-    // Handed to one continuation already: the next request is a real re-run.
+    // Handed to one continuation already, which dispatched review (PAN-4622):
+    // the next request is a real re-run.
+    clearVerificationDispatchOwed('PAN-1');
     expect(await review()).toEqual({ outcome: 'passed' });
     expect(mocks.launches).toHaveLength(1);
   });
@@ -409,5 +419,131 @@ describe('a run superseded by an agent commit (PAN-4531)', () => {
     expect(outcome).toMatchObject({ outcome: 'deferred' });
     expect(outcome).not.toHaveProperty('superseded');
     expect(mocks.launches).toHaveLength(4);
+  });
+});
+
+describe('a review dispatch owed across a restart (PAN-4622)', () => {
+  /** The door's fail-closed tree check, run for real against the workspace. */
+  const dirtyError = async (): Promise<string | null> => {
+    const { stdout } = await promisify(execFile)('git', ['status', '--porcelain', '-uno'], { cwd: mocks.workspace });
+    return stdout.trim() ? 'dirty' : null;
+  };
+
+  /** A boot starter that runs the real pipeline the way the resumed door does. */
+  function resumingStarter() {
+    const pipeline = createRequestReviewPipeline();
+    const pushBranch = vi.fn(async () => undefined);
+    const dispatchReview = vi.fn(async () => clearVerificationDispatchOwed('PAN-1'));
+    const starter = vi.fn(async (issueId: string) => ({
+      started: pipeline.start(issueId, {
+        verify: review,
+        confirmDispatch: () => confirmResumedDispatch(issueId, mocks.workspace, dirtyError),
+        pushBranch,
+        dispatchReview,
+        onVerificationFailed: vi.fn(),
+        onVerificationError: vi.fn(),
+      }) as true,
+    }));
+    registerRequestReviewStarter(starter);
+    return { pipeline, pushBranch, dispatchReview, starter };
+  }
+
+  function journalTail(): { type: string; source?: string; data?: Record<string, unknown> } | undefined {
+    const lines = readFileSync(join(mocks.workspace, '.overdeck', 'pipeline.jsonl'), 'utf-8').trim().split('\n');
+    return JSON.parse(lines[lines.length - 1]!);
+  }
+
+  it('records the owed head in the same write as the consumption, for a request-review pass only', async () => {
+    const head = commit('a');
+    registerFinishedWorker(head);
+    expect(await review()).toEqual({ outcome: 'passed' });
+    const state = readVerificationWorkerState('PAN-1');
+    expect(state?.resultConsumedAt).toEqual(expect.any(String));
+    expect(state?.dispatchOwed).toEqual({ head, takenAt: state?.resultConsumedAt });
+
+    registerFinishedWorker(head, { outcome: 'failed', failedCheck: 'lint', cycleCount: 1, maxCycles: 3 });
+    await review();
+    expect(readVerificationWorkerState('PAN-1')?.dispatchOwed).toBeUndefined();
+  });
+
+  it('AC-1: a consumed pass whose dispatch never completed dispatches review at boot with no fresh run', async () => {
+    registerFinishedWorker(commit('a'));
+    // The previous dashboard took the pass, then died before dispatching.
+    expect(await review()).toEqual({ outcome: 'passed' });
+    expect(listAdoptableVerificationWorkers('request-review').map((w) => w.pid)).toEqual([LIVE_PID]);
+    const { pipeline, pushBranch, dispatchReview, starter } = resumingStarter();
+
+    expect(await adoptSurvivingVerificationWorkers()).toEqual(['PAN-1']);
+    expect(starter).toHaveBeenCalledWith('PAN-1', expect.objectContaining({ source: 'verification-adoption', resume: true }));
+    await vi.waitFor(() => expect(pipeline.isInFlight('PAN-1')).toBe(false));
+
+    expect(pushBranch).toHaveBeenCalledTimes(1);
+    expect(dispatchReview).toHaveBeenCalledTimes(1);
+    expect(mocks.launches).toHaveLength(0);
+    // Dispatched: nothing is owed, and the next request on this head re-runs.
+    expect(readVerificationWorkerState('PAN-1')?.dispatchOwed).toBeUndefined();
+    expect(listAdoptableVerificationWorkers('request-review')).toEqual([]);
+    await review();
+    expect(mocks.launches).toHaveLength(1);
+  });
+
+  it('a moved head clears the marker and re-verifies the new head', async () => {
+    registerFinishedWorker(commit('a'));
+    await review();
+    const headB = commit('b');
+
+    expect(await confirmResumedDispatch('PAN-1', mocks.workspace, dirtyError)).toBe(false);
+    expect(journalTail()).toMatchObject({ type: 'review.resume-declined', data: { reason: 'the head moved after verification passed' } });
+
+    expect(await review()).toEqual({ outcome: 'passed' });
+    expect(mocks.launches).toHaveLength(1);
+    expect(readVerificationWorkerState('PAN-1')?.dispatchOwed?.head).toBe(headB);
+  });
+
+  /** A live worker at boot with a tracked file modified; it writes `passed` while joined. */
+  function liveWorkerWithDirtyTree(cleanBeforePass: boolean): void {
+    const liveResult = registerLiveWorker(commit('a'), { logPrefix: 'request-review', options: {} });
+    writeFileSync(join(mocks.workspace, 'a'), 'installing');
+    // Probe 1 is the boot listing; probe 2 the supervisor's join check.
+    waitProbeAt = 3;
+    onWaitProbe = () => {
+      if (cleanBeforePass) git('checkout', '--', 'a');
+      writeFileSync(liveResult, JSON.stringify({ outcome: 'passed' }));
+    };
+  }
+
+  it('AC-2: a live worker with a tracked file modified at boot dispatches review when it writes passed, with no re-request', async () => {
+    liveWorkerWithDirtyTree(true);
+    const { pipeline, pushBranch, dispatchReview, starter } = resumingStarter();
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+
+    expect(await adoptSurvivingVerificationWorkers()).toEqual(['PAN-1']);
+    await vi.advanceTimersByTimeAsync(250);
+    await vi.waitFor(() => expect(pipeline.isInFlight('PAN-1')).toBe(false));
+
+    expect(starter).toHaveBeenCalledTimes(1);
+    expect(pushBranch).toHaveBeenCalledTimes(1);
+    expect(dispatchReview).toHaveBeenCalledTimes(1);
+    expect(mocks.launches).toHaveLength(0);
+  });
+
+  it('a tree still dirty at dispatch falls back: nothing is pushed or dispatched, and the reason is journalled', async () => {
+    liveWorkerWithDirtyTree(false);
+    const { pipeline, pushBranch, dispatchReview } = resumingStarter();
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+
+    expect(await adoptSurvivingVerificationWorkers()).toEqual(['PAN-1']);
+    await vi.advanceTimersByTimeAsync(250);
+    await vi.waitFor(() => expect(pipeline.isInFlight('PAN-1')).toBe(false));
+
+    expect(pushBranch).not.toHaveBeenCalled();
+    expect(dispatchReview).not.toHaveBeenCalled();
+    expect(journalTail()).toMatchObject({
+      type: 'review.resume-declined',
+      source: 'verification-adoption',
+      data: { reason: 'the working tree has uncommitted changes', head: git('rev-parse', 'HEAD').slice(0, 8) },
+    });
+    // The pass stays owed, so the recovered request dispatches without re-running the gates.
+    expect(readVerificationWorkerState('PAN-1')?.dispatchOwed).toBeDefined();
   });
 });
