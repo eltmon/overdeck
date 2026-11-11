@@ -1,5 +1,7 @@
 export {
   getExtractionProvider,
+  interactiveExtractionSelection,
+  isInteractiveExtractionProvider,
   listExtractionProviders,
   registerExtractionProvider,
   resolveExtractionProvider,
@@ -26,3 +28,4 @@ export type {
   ExtractionUsage,
   MemoryProviderSettings,
 } from './types.js';
+export { ClaudeCliExtractionProvider } from './claude-cli.js';
