@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5131",
   "created": "2026-11-11T08:19:14.972Z",
-  "updated": "2026-11-11T08:52:37.181Z",
+  "updated": "2026-11-11T08:54:27.697Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -266,9 +266,22 @@
       "doneAt": "2026-11-11T08:52:34.750Z"
     },
     "lane-slots": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5131",
-      "claimedAt": "2026-11-11T08:52:37.181Z"
+      "claimedAt": "2026-11-11T08:52:37.181Z",
+      "doneAt": "2026-11-11T08:54:27.697Z"
+    },
+    "lane-slots.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:54:27.697Z"
+    },
+    "lane-slots.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:54:27.697Z"
+    },
+    "lane-slots.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:54:27.697Z"
     }
   }
 }
