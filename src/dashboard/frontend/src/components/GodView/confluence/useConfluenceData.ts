@@ -242,6 +242,8 @@ const MERGE_LANE_STATES = new Set<DerivedIssueStateName>(['ready', 'merged']);
 /** Doldrums emissary cap — mirrors the mockup's "few emissaries of the N frozen" pattern
  * so a large stale population never becomes an unreadable label wall. */
 const STALE_ORB_LIMIT = 14;
+/** An orb needs a tracker issue id (PAN-5131 FR-6): prefix-number, or an id the store knows (Rally ids have no hyphen). */
+const TRACKER_ISSUE_ID = /^[A-Za-z][A-Za-z0-9]*-\d+$/;
 /** Shelf emissary cap (PAN-4523 D5): the longest-idle shelf orbs represent the population. */
 const SHELF_ORB_LIMIT = 8;
 
@@ -658,6 +660,7 @@ export function useConfluenceOrbs(
     const now = Date.now();
     for (const [id, issueAgents] of agentsByIssue) {
       const issue = issuesById.get(id.toUpperCase());
+      if (issue === undefined && !TRACKER_ISSUE_ID.test(id)) continue;
       const derived = derivedIssueStateByIssueId[id];
       // Membership: an orb exists only for issues the pipeline is actually
       // touching — a live/paused agent or an in-flight merge. Closed-out issues

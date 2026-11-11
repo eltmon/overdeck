@@ -681,6 +681,36 @@ describe('ages are computed at read time (PAN-5131 FR-3)', () => {
   });
 });
 
+describe('orbs exist only for tracker issue ids (PAN-5131 FR-6)', () => {
+  function castFor(agents: AgentSnapshot[], issuesRaw: unknown[] = []) {
+    useDashboardStore.setState({
+      agentsById: Object.fromEntries(agents.map((row) => [row.id, row])),
+      issuesRaw: issuesRaw as never,
+    });
+    const { result } = renderHook(() => useConfluenceOrbs(), { wrapper: wrapper(queryClient()) });
+    return result.current.map((orb) => orb.id);
+  }
+
+  it('draws no orb for the sequencer agent, whose issue id is not a tracker id', () => {
+    expect(castFor([agent({ id: 'sequencer-runner', issueId: 'sequencer-runner', role: 'sequencer' })])).toEqual([]);
+  });
+
+  it('draws an orb for a hyphen-less Rally id the store knows', () => {
+    expect(castFor(
+      [agent({ id: 'agent-us123', issueId: 'US123' })],
+      [{ id: 'US123', identifier: 'US123', title: 'Rally story', labels: [], state: 'open' }],
+    )).toEqual(['US123']);
+  });
+
+  it('draws no orb for a hyphen-less id the store does not know', () => {
+    expect(castFor([agent({ id: 'agent-us123', issueId: 'US123' })])).toEqual([]);
+  });
+
+  it('still draws an orb for a prefix-number id with no issue row', () => {
+    expect(castFor([agent({ id: 'agent-pan-1', issueId: 'PAN-1' })])).toEqual(['PAN-1']);
+  });
+});
+
 describe('meta.flywheelLive reads the cached Flywheel status (PAN-5131 FR-6, NFR-1)', () => {
   function renderMeta(client: QueryClient) {
     client.setQueryData(['agents-fleet-cost-summary'], {});
