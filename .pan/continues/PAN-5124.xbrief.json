@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5124",
   "created": "2026-11-11T07:40:41.890Z",
-  "updated": "2026-11-11T08:34:46.343Z",
+  "updated": "2026-11-11T08:34:47.552Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -272,6 +272,11 @@
     "docs-model-calls.ac4": {
       "status": "completed",
       "doneAt": "2026-11-11T08:34:46.342Z"
+    },
+    "docs-presets-harnesses": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5124",
+      "claimedAt": "2026-11-11T08:34:47.551Z"
     }
   }
 }
