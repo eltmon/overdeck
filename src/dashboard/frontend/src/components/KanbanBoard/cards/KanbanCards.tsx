@@ -630,7 +630,9 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
     ? `GitHub ${issue.identifier}`
     : issue.source === 'linear'
       ? `Linear ${issue.identifier}`
-      : issue.identifier;
+      : issue.source === 'jira'
+        ? `Jira ${issue.identifier}`
+        : issue.identifier;
 
   return (
     // PAN-2908 C-CONVO: every card carries the hover peek (level 1 · glance) —
