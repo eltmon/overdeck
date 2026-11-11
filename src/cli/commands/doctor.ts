@@ -33,6 +33,7 @@ import { checkHerdr } from './doctor-herdr.js';
 import { checkPrimeAgent } from './doctor-prime-agent.js';
 import { checkClaudeCode } from './doctor-claude-code.js';
 import { checkCoreCommands, checkFirstRunLogins } from './doctor-first-run.js';
+import { checkGitHubIdentityRows } from './doctor-github-identity.js';
 import { checkClaudeLogin, checkGhLogin } from '../../lib/first-run-checks.js';
 import { hostTerminalBackendName } from '../../lib/terminal-backends/select.js';
 import { checkTierFitnessConfig } from './doctor-tier-fitness.js';
@@ -718,6 +719,8 @@ export async function collectDoctorChecks(options: DoctorOptions = {}): Promise<
     ghLogin: () => checkGhLogin(),
     has: checkCommand,
   }));
+  // PAN-5153: who acts on each GitHub owner; never crashes doctor.
+  checks.push(...await checkGitHubIdentityRows());
 
   // oh-my-pi / omp (ohmypi harness — PAN-1989, replaces pi PAN-636).
   // omp is optional: missing → warn (or error under --strict). When installed, version

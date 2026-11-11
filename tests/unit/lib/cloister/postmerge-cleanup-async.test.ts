@@ -194,6 +194,11 @@ vi.mock('../../../../src/lib/git-utils.js', () => ({
   cleanupStaleLocks: vi.fn().mockResolvedValue({ found: [], removed: [], errors: [] }),
 }));
 
+vi.mock('../../../../src/lib/github-app-installations.js', () => ({
+  // PAN-5153: no repository is covered, matching isGitHubAppConfigured() === false.
+  appCoversRepo: async () => false,
+}));
+
 vi.mock('../../../../src/lib/github-app.js', () => ({
   isGitHubAppConfigured: vi.fn().mockReturnValue(false),
   listPullRequestsForHead: vi.fn().mockResolvedValue([]),

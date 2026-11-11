@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
+  appCoversRepoMock,
   execMock,
   getPullRequestStateMock,
   isGitHubAppConfiguredMock,
   listPullRequestsForHeadMock,
 } = vi.hoisted(() => ({
+  appCoversRepoMock: vi.fn<(owner: string, repo: string) => Promise<boolean | undefined>>(),
   execMock: vi.fn<[string, any?], Promise<{ stdout: string; stderr: string }>>(),
   getPullRequestStateMock: vi.fn(),
   isGitHubAppConfiguredMock: vi.fn(),
@@ -25,6 +27,11 @@ vi.mock('child_process', () => {
   (exec as any)[kCustom] = execMock;
   return { exec };
 });
+
+vi.mock('../../../src/lib/github-app-installations.js', () => ({
+  // PAN-5153: coverage follows isGitHubAppConfigured() unless a test overrides it.
+  appCoversRepo: async (owner: string, repo: string) => (await appCoversRepoMock(owner, repo)) ?? isGitHubAppConfiguredMock(),
+}));
 
 vi.mock('../../../src/lib/github-app.js', () => ({
   getPullRequestState: getPullRequestStateMock,

@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
-import { join } from 'path';
+import { join, resolve } from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Effect } from 'effect';
 import type { AgentState } from '../agents.js';
@@ -516,6 +516,93 @@ describe('AgentState role persistence', () => {
     rmSync(workspace, { recursive: true, force: true });
   });
 
+  it('PAN-5153: sets up the repository identity and keeps spawning when it fails', async () => {
+    ensurePtySupervisorArtifact();
+    const workspace = mkdtempSync(join(tmpdir(), 'pan-spawn-identity-'));
+    mkdirSync(join(workspace, '.pan'), { recursive: true });
+    writeFileSync(join(workspace, '.pan', 'spec.vbrief.json'), JSON.stringify({
+      xBRIEFInfo: { version: '0.5', created: '2026-07-14T00:00:00.000Z' },
+      plan: {
+        id: 'PAN-1140',
+        title: 'Host override fixture',
+        status: 'running',
+        items: [{ id: 'host-override', title: 'Host override', status: 'pending' }],
+        edges: [],
+      },
+    }));
+    const createSessionAsync = vi.fn(async () => undefined);
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const emitActivityEntry = vi.fn();
+    vi.doMock('../config-yaml.js', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('../config-yaml.js')),
+      isClaudeCodeChannelsMcpEnabled: () => false,
+    }));
+    vi.doMock('../workspace/stack-health.js', () => ({
+      getWorkspaceStackHealth: vi.fn(() => Effect.succeed({
+        healthy: false,
+        reasons: ['overdeck-feature-pan-1140-server stuck Created for 180s'],
+        lastObserved: '2026-05-16T00:00:00.000Z',
+      })),
+    }));
+    vi.doMock('../tmux.js', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('../tmux.js')),
+      sessionExists: vi.fn(() => Effect.succeed(false)),
+      sessionExistsSync: vi.fn(() => false),
+      createSession: vi.fn((...args: unknown[]) => Effect.promise(() => Promise.resolve(createSessionAsync(...args)))),
+      capturePane: vi.fn(async () => 'Claude Code'),
+      setOption: vi.fn(() => Effect.void),
+    }));
+    // PAN-3917 FR-5/W8: launchAgentPane auto-selects Herdr when the dev host has
+    // a live `herdr` binary and `overdeck` session socket, which would make this
+    // test drive the real Herdr session instead of the mocked tmux.js path. Force
+    // tmux selection so createSessionAsync stays the single source of truth.
+    vi.doMock('../terminal-backends/select.js', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('../terminal-backends/select.js')),
+      selectTerminalBackend: vi.fn(async () => ({ backend: 'tmux' as const, diagnostic: 'test: forced tmux backend' })),
+    }));
+    vi.doMock('../tasks-query.js', () => ({ assertIssueHasTasks: vi.fn(() => Effect.succeed(undefined)) }));
+    vi.doMock('../activity-logger.js', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('../activity-logger.js')),
+      emitActivityEntry: emitActivityEntry,
+      emitActivityTts: vi.fn(),
+    }));
+    vi.doMock('../xbrief/io.js', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('../xbrief/io.js')),
+      readWorkspacePlanSync: vi.fn(() => ({ plan: { id: 'PAN-1140', items: [] } })),
+    }));
+    vi.doMock('../cloister/work-agent-prompt.js', () => ({
+      writeStoryFeatureContext: vi.fn(async () => undefined),
+    }));
+
+    const projectRoot = resolve(workspace, '..', '..');
+    vi.doMock('../projects.js', async (importOriginal) => {
+      const actual = (await importOriginal()) as typeof import('../projects.js');
+      return {
+        ...actual,
+        findProjectByPath: vi.fn((path: string) => (
+          path === projectRoot ? { github_repo: 'eltmon/overdeck' } : actual.findProjectByPath(path)
+        )),
+      };
+    });
+    const configureWorkspaceGitHubIdentity = vi.fn(async () => { throw new Error('identity boom'); });
+    vi.doMock('../github-repo-identity.js', () => ({ configureWorkspaceGitHubIdentity }));
+    const { spawnAgent } = await import('../agents.js');
+
+    const state = await spawnAgent({
+      issueId: 'PAN-1140',
+      workspace,
+      role: 'work',
+      model: 'claude-sonnet-4-6',
+      allowHost: true,
+    });
+
+    expect(configureWorkspaceGitHubIdentity).toHaveBeenCalledWith(state.id, workspace, 'eltmon/overdeck');
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('GitHub identity setup failed (git remote left unchanged): identity boom'));
+    expect(createSessionAsync).toHaveBeenCalled();
+    warnSpy.mockRestore();
+    rmSync(workspace, { recursive: true, force: true });
+  });
+
   it.each([
     ['strike', 'strike-pan-2771'],
     ['work', 'agent-pan-2771'],
@@ -566,8 +653,8 @@ describe('AgentState role persistence', () => {
       resolveHarness: vi.fn(async () => 'ohmypi'),
     }));
     vi.doMock('../workspace-manager.js', () => ({}));
-    vi.doMock('../github-app.js', () => ({
-      isGitHubAppConfigured: vi.fn(() => false),
+    vi.doMock('../github-repo-identity.js', () => ({
+      configureWorkspaceGitHubIdentity: vi.fn(async () => ({ mode: 'none', actor: null, detail: 'test' })),
     }));
     vi.doMock('../memory/injection.js', () => ({
       injectPromptTimeMemory: vi.fn(async () => ({ context: '' })),

@@ -5,6 +5,8 @@ const mocks = vi.hoisted(() => ({
   execFileAsync: vi.fn(),
   getIssueState: vi.fn(),
   isGitHubAppConfigured: vi.fn(),
+  // PAN-5153: coverage follows isGitHubAppConfigured unless a test overrides it.
+  appCoversRepo: vi.fn(),
   getShadowState: vi.fn(),
   resolveGitHubIssue: vi.fn(),
   // Linear branch
@@ -38,6 +40,10 @@ vi.mock('../../../lib/github-app.js', () => ({
   isGitHubAppConfigured: mocks.isGitHubAppConfigured,
 }));
 
+vi.mock('../../../lib/github-app-installations.js', () => ({
+  appCoversRepo: mocks.appCoversRepo,
+}));
+
 vi.mock('../../../lib/projects.js', () => ({
   resolveProjectFromIssueSync: mocks.resolveProjectFromIssueSync,
 }));
@@ -58,6 +64,7 @@ import {
   clearIssueClosedCache,
   isIssueClosed,
   isTrackerIssueClosed,
+  readLiveTrackerIssueState,
   TRACKER_CLOSED_CACHE_TTL_MS,
 } from '../issue-closed.js';
 
@@ -73,6 +80,7 @@ describe('issue closed detection', () => {
       number: 1613,
     });
     mocks.isGitHubAppConfigured.mockReturnValue(false);
+    mocks.appCoversRepo.mockImplementation(async () => mocks.isGitHubAppConfigured());
     mocks.getIssueState.mockResolvedValue({ state: 'open' });
     mocks.execFileAsync.mockResolvedValue({ stdout: JSON.stringify({ state: 'OPEN' }), stderr: '' });
   });
@@ -112,6 +120,19 @@ describe('issue closed detection', () => {
 
     expect(mocks.getIssueState).toHaveBeenCalledWith('eltmon', 'overdeck', 1613);
     expect(mocks.execFileAsync).not.toHaveBeenCalled();
+  });
+
+  it('reads an uncovered repository through gh even with the App configured (PAN-5153)', async () => {
+    mocks.isGitHubAppConfigured.mockReturnValue(true);
+    mocks.appCoversRepo.mockResolvedValue(false);
+    mocks.execFileAsync.mockResolvedValue({ stdout: JSON.stringify({ state: 'CLOSED' }), stderr: '' });
+
+    await expect(readLiveTrackerIssueState('PAN-1613')).resolves.toBe('closed');
+    await expect(isTrackerIssueClosed('PAN-1613')).resolves.toBe(true);
+
+    expect(mocks.appCoversRepo).toHaveBeenCalledWith('eltmon', 'overdeck');
+    expect(mocks.getIssueState).not.toHaveBeenCalled();
+    expect(mocks.execFileAsync).toHaveBeenCalledWith('gh', expect.arrayContaining(['issue', 'view', '1613', '--repo', 'eltmon/overdeck']), expect.anything());
   });
 
   it('returns false for an open issue', async () => {

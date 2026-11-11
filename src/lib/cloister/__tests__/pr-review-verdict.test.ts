@@ -67,6 +67,32 @@ describe('postReviewVerdict — GitHub App identity', () => {
     expect(options?.env).toBeUndefined();
   });
 
+  it('mints for the PR\'s own repository (PAN-5153)', async () => {
+    const runGh = vi.fn(async () => {});
+    const getAppToken = vi.fn(async (_owner: string, _repo: string) => 'acme-token');
+    await postReviewVerdict(
+      { issueId: 'PAN-1', verdict: 'approve', body: 'ok', facts: ghFacts({ url: 'https://github.com/acme/web/pull/7', number: 7 }) },
+      { runGh, isAppConfigured: () => true, getAppToken },
+    );
+
+    expect(getAppToken).toHaveBeenCalledWith('acme', 'web');
+    const [args, options] = runGh.mock.calls[0] as unknown as [string[], { env?: NodeJS.ProcessEnv }];
+    expect(args).toEqual(expect.arrayContaining(['--repo', 'acme/web']));
+    expect(options?.env?.GH_TOKEN).toBe('acme-token');
+  });
+
+  it('posts as the gh user where the App is not installed (PAN-5153)', async () => {
+    const runGh = vi.fn(async () => {});
+    const result = await postReviewVerdict(
+      { issueId: 'PAN-1', verdict: 'approve', body: 'ok', facts: ghFacts() },
+      { runGh, isAppConfigured: () => true, getAppToken: async () => null },
+    );
+
+    expect(result).toMatchObject({ posted: true, via: 'review' });
+    const [, options] = runGh.mock.calls[0] as unknown as [string[], { env?: NodeJS.ProcessEnv } | undefined];
+    expect(options?.env?.GH_TOKEN).toBeUndefined();
+  });
+
   it('sends no env when the app is not configured', async () => {
     const runGh = vi.fn(async () => {});
     await postReviewVerdict(

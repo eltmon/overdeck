@@ -5,14 +5,18 @@
  * Agents push via HTTPS with these tokens instead of the user's SSH key, so commits
  * show as the App's bot (`<app-slug>[bot]`, e.g. `overdeck-agent[bot]`) with a verified badge.
  *
+ * PAN-5153: tokens are minted per installation. A repository's App REST calls
+ * use the token of the installation that covers it, found by
+ * github-app-installations.ts; credentials and the token memo live in
+ * github-app-auth.ts. A repository the App is not installed on gets no status
+ * and no workspace token here; Overdeck acts as the gh user there.
+ *
  * Credentials stored at: ~/.overdeck/github-app/
  *   - app-id, private-key.pem, installation-id, app-slug
  */
 
-import { readFileSync, existsSync } from 'fs';
+import { readFileSync } from 'fs';
 import { join } from 'path';
-import { homedir } from 'os';
-import { createSign } from 'crypto';
 import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
 import { Effect } from 'effect';
@@ -21,80 +25,34 @@ import { ensureBotCredentialFile, resolveWorkspaceRemote } from './github-creden
 import { withConcurrencyLimit } from './concurrency.js';
 import { isAdvisoryCheckName } from './advisory-checks.js';
 import { beginAppRestCall, finishAppRestCall } from './github-quota/rest-meter.js';
+import {
+  APP_DIR,
+  generateAppJwt,
+  generateInstallationTokenBody,
+  isGitHubAppConfigured,
+  loadGitHubAppConfig,
+  withGitHubTimeout,
+  type GitHubAppConfig,
+  type InstallationToken,
+} from './github-app-auth.js';
+import {
+  appCoversRepo,
+  getRepoInstallationToken,
+  installationTokenForApiPath,
+} from './github-app-installations.js';
+
+export {
+  GITHUB_API_TIMEOUT_MS,
+  GitHubRequestTimeoutError,
+  isGitHubAppConfigured,
+  loadGitHubAppConfig,
+  resetInstallationTokenCacheForTests,
+  type GitHubAppConfig,
+  type InstallationToken,
+} from './github-app-auth.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
-
-const APP_DIR = join(homedir(), '.overdeck', 'github-app');
-
-/**
- * Upper bound on one GitHub App API request, including reading its body
- * (PAN-4047). Without it a hung connection blocks the caller forever.
- */
-export const GITHUB_API_TIMEOUT_MS = 30_000;
-
-/**
- * A GitHub App API request did not finish within its timeout. It is an Error,
- * so every caller that already catches a failed forge call handles it.
- */
-export class GitHubRequestTimeoutError extends Error {
-  readonly _tag = 'GitHubRequestTimeoutError';
-
-  constructor(
-    readonly operation: string,
-    readonly timeoutMs: number,
-  ) {
-    super(`GitHub API ${operation} timed out after ${timeoutMs}ms`);
-    this.name = 'GitHubRequestTimeoutError';
-  }
-}
-
-/**
- * Run one GitHub request under an AbortController that fires after
- * `timeoutMs`. `run` receives the signal to pass to fetch and should read the
- * response body inside the callback so a stalled body is bounded too. The
- * race makes the bound hold even if the request ignores the signal.
- */
-async function withGitHubTimeout<T>(
-  operation: string,
-  run: (signal: AbortSignal) => Promise<T>,
-  timeoutMs: number = GITHUB_API_TIMEOUT_MS,
-): Promise<T> {
-  const controller = new AbortController();
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const timedOut = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => {
-      const error = new GitHubRequestTimeoutError(operation, timeoutMs);
-      controller.abort(error);
-      reject(error);
-    }, timeoutMs);
-  });
-  const request = run(controller.signal);
-  try {
-    return await Promise.race([request, timedOut]);
-  } catch (error) {
-    if (controller.signal.aborted) {
-      throw new GitHubRequestTimeoutError(operation, timeoutMs);
-    }
-    throw error;
-  } finally {
-    clearTimeout(timer);
-    // The losing side of the race must not surface as an unhandled rejection.
-    request.catch(() => {});
-  }
-}
-
-export interface GitHubAppConfig {
-  appId: string;
-  installationId: string;
-  privateKey: string;
-}
-
-export interface InstallationToken {
-  token: string;
-  expiresAt: string; // ISO timestamp
-  permissions?: Record<string, string>;
-}
 
 /**
  * Detects the GitHub App 403 "Resource not accessible by integration" error
@@ -251,17 +209,6 @@ type GitHubCheckRunApiResponse = {
   }>;
 };
 
-/**
- * Check if the GitHub App is configured (credentials exist)
- */
-export function isGitHubAppConfigured(): boolean {
-  return (
-    existsSync(join(APP_DIR, 'app-id')) &&
-    existsSync(join(APP_DIR, 'private-key.pem')) &&
-    existsSync(join(APP_DIR, 'installation-id'))
-  );
-}
-
 async function defaultCheckGhAuth(): Promise<boolean> {
   try {
     await execFileAsync('gh', ['auth', 'status'], { timeout: 5000 });
@@ -295,111 +242,6 @@ export async function getMergeBackendStatus(deps: MergeBackendStatusDeps = {}): 
     mode: 'none',
     detail: 'No GitHub App credentials or gh CLI authentication found',
   };
-}
-
-/**
- * Load GitHub App credentials from ~/.overdeck/github-app/
- */
-export function loadGitHubAppConfig(): GitHubAppConfig | null {
-  if (!isGitHubAppConfigured()) return null;
-  try {
-    return {
-      appId: readFileSync(join(APP_DIR, 'app-id'), 'utf-8').trim(),
-      installationId: readFileSync(join(APP_DIR, 'installation-id'), 'utf-8').trim(),
-      privateKey: readFileSync(join(APP_DIR, 'private-key.pem'), 'utf-8'),
-    };
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Generate a JWT for GitHub App authentication
- */
-function generateJWT(appId: string, privateKey: string): string {
-  const now = Math.floor(Date.now() / 1000);
-  const header = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64url');
-  const payload = Buffer.from(JSON.stringify({
-    iat: now - 60, // 60s clock drift allowance
-    // GitHub rejects exp more than 600s ahead of *its* clock. A local clock
-    // running even a few seconds fast made `now + 600` land at 608s and 401 with
-    // "'Expiration time' claim ('exp') is too far in the future", so leave 60s
-    // of headroom instead of sitting exactly on the limit.
-    exp: now + 540,
-    iss: appId,
-  })).toString('base64url');
-
-  const signer = createSign('SHA256');
-  signer.update(`${header}.${payload}`);
-  const signature = signer.sign(privateKey, 'base64url');
-
-  return `${header}.${payload}.${signature}`;
-}
-
-async function generateInstallationTokenBody(
-  config?: GitHubAppConfig
-): Promise<InstallationToken> {
-  const appConfig = config || loadGitHubAppConfig();
-  if (!appConfig) {
-    throw new Error('GitHub App not configured. Run: node scripts/create-github-app.mjs');
-  }
-
-  const jwt = generateJWT(appConfig.appId, appConfig.privateKey);
-
-  const data = await withGitHubTimeout('POST installation access token', async (signal) => {
-    const response = await fetch(
-      `https://api.github.com/app/installations/${appConfig.installationId}/access_tokens`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${jwt}`,
-          'Accept': 'application/vnd.github+json',
-          'User-Agent': 'overdeck',
-        },
-        signal,
-      }
-    );
-
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`Failed to generate installation token: ${response.status} ${text}`);
-    }
-
-    return await response.json() as {
-      token: string;
-      expires_at: string;
-      permissions?: Record<string, string>;
-    };
-  });
-  return {
-    token: data.token,
-    expiresAt: data.expires_at,
-    permissions: data.permissions,
-  };
-}
-
-/** PAN-4264: a minted installation token is reused until 5 minutes before it expires. */
-const INSTALLATION_TOKEN_REUSE_MARGIN_MS = 5 * 60_000;
-let installationTokenMemo: { installationId: string; token: string; expiresAtMs: number } | null = null;
-
-/** Drop the memoized installation token (tests only). */
-export function resetInstallationTokenCacheForTests(): void {
-  installationTokenMemo = null;
-}
-
-async function getInstallationAccessToken(): Promise<string> {
-  const config = loadGitHubAppConfig();
-  if (!config) {
-    throw new Error('GitHub App not configured. Run: node scripts/create-github-app.mjs');
-  }
-  const memo = installationTokenMemo;
-  if (memo?.installationId === config.installationId && Date.now() < memo.expiresAtMs - INSTALLATION_TOKEN_REUSE_MARGIN_MS) {
-    return memo.token;
-  }
-  const { token, expiresAt } = await Effect.runPromise(generateInstallationToken(config));
-  const expiresAtMs = Date.parse(expiresAt);
-  installationTokenMemo = Number.isFinite(expiresAtMs) ? { installationId: config.installationId, token, expiresAtMs } : null;
-  return token;
 }
 
 async function githubApiWithToken<T>(
@@ -444,7 +286,7 @@ async function githubApi<T>(
   init: RequestInit = {},
   extraHeaders: Record<string, string> = {}
 ): Promise<T> {
-  const token = await getInstallationAccessToken();
+  const token = await installationTokenForApiPath(path);
   const { data } = await githubApiWithToken<T>(token, path, init, extraHeaders);
   return data;
 }
@@ -466,7 +308,7 @@ function nextPathFromLinkHeader(linkHeader: string | null): string | null {
 }
 
 async function githubApiAllCheckRunPages(path: string): Promise<NonNullable<GitHubCheckRunApiResponse['check_runs']>> {
-  const token = await getInstallationAccessToken();
+  const token = await installationTokenForApiPath(path);
   const allRuns: NonNullable<GitHubCheckRunApiResponse['check_runs']> = [];
   let nextPath: string | null = withPerPage(path, 100);
 
@@ -480,7 +322,7 @@ async function githubApiAllCheckRunPages(path: string): Promise<NonNullable<GitH
 }
 
 async function githubApiAllPages<T>(path: string): Promise<T[]> {
-  const token = await getInstallationAccessToken();
+  const token = await installationTokenForApiPath(path);
   const allItems: T[] = [];
   let nextPath: string | null = withPerPage(path, 100);
 
@@ -739,7 +581,7 @@ export async function mergePullRequestWithApp(
   method: 'merge' | 'squash' | 'rebase' = 'squash',
   sha?: string,
 ): Promise<{ merged: boolean; message?: string }> {
-  const token = await getInstallationAccessToken();
+  const token = await installationTokenForApiPath(`/repos/${owner}/${repo}/pulls`);
   const path = `/repos/${owner}/${repo}/pulls/${number}/merge`;
   return withGitHubTimeout(`PUT ${path}`, async (signal) => {
     const response = await fetch(
@@ -791,7 +633,7 @@ function readAppSlugFile(): string | null {
 
 /** The slug of the App the on-disk key belongs to, from `GET /app` under its JWT. */
 async function fetchAppSlug(config: GitHubAppConfig): Promise<string> {
-  const jwt = generateJWT(config.appId, config.privateKey);
+  const jwt = generateAppJwt(config.appId, config.privateKey);
   const data = await withGitHubTimeout('GET /app', async (signal) => {
     const response = await fetch('https://api.github.com/app', {
       headers: {
@@ -917,10 +759,8 @@ export async function reportCommitStatus(
   context: string,
   description: string,
 ): Promise<void> {
-  const config = loadGitHubAppConfig();
-  if (!config) return; // Silently skip in fallback mode
-
-  const { token } = await Effect.runPromise(generateInstallationToken(config));
+  const token = await getRepoInstallationToken(owner, repo);
+  if (!token) return; // No App, or the App is not installed on this repository
 
   const path = `/repos/${owner}/${repo}/statuses/${sha}`;
   await withGitHubTimeout(`POST ${path}`, async (signal) => {
@@ -971,7 +811,7 @@ export async function postOverdeckTestsStatus(
   /** PAN-3847 (FR-13): the stamp binds to the tested sha when the caller provides it. */
   sha?: string,
 ): Promise<void> {
-  if (!isGitHubAppConfigured()) return;
+  if (!(await appCoversRepo(owner, repo))) return;
   try {
     const resolvedSha = sha ?? await (async () => {
       const { stdout } = await execAsync('git rev-parse HEAD', {
@@ -997,14 +837,12 @@ export async function postOverdeckTestsStatus(
 async function refreshWorkspaceTokenBody(
   workspacePath: string,
 ): Promise<void> {
-  const config = loadGitHubAppConfig();
-  if (!config) throw new Error('GitHub App not configured');
-
-  const { token } = await Effect.runPromise(generateInstallationToken(config));
-  const { writeFileSync } = await import('fs');
   // Must resolve the SAME file configureWorkspaceForBot wrote (see
   // github-credentials.ts) — the old path threw ENOTDIR inside a worktree.
   const { owner, repo } = await resolveWorkspaceRemote(workspacePath);
+  const token = await getRepoInstallationToken(owner, repo);
+  if (!token) throw new Error(`GitHub App is not installed on ${owner}/${repo}`);
+  const { writeFileSync } = await import('fs');
   const credFile = ensureBotCredentialFile(owner, repo);
   writeFileSync(credFile, `https://x-access-token:${token}@github.com\n`, { mode: 0o600 });
 }
