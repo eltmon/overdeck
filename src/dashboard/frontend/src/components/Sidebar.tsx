@@ -24,6 +24,8 @@ import type { Issue } from '../types';
 import type { Tab } from './Header';
 import { OtherMachineProjects, ProjectMachineCount } from './sidebar/OtherMachineProjects';
 import { MachinesNavItem } from './sidebar/MachinesNavItem';
+import { OwnerGroupHeader } from './sidebar/OwnerGroupHeader';
+import { groupProjectsByOwner, OTHER_OWNER_KEY, useCollapsedOwners } from './sidebar/projectOwners';
 
 type PipelineIssuePhase = 'ship' | 'review' | 'work' | 'plan' | 'todo';
 const PIPELINE_PHASES: PipelineIssuePhase[] = ['todo', 'plan', 'work', 'review', 'ship'];
@@ -235,6 +237,8 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
     queryFn: fetchProjects,
     refetchInterval: 30000,
   });
+  const ownerGroups = useMemo(() => groupProjectsByOwner(projects), [projects]); // PAN-5153
+  const [collapsedOwners, toggleOwner] = useCollapsedOwners();
   const showPlannedBacklog = usePlannedBacklogVisibility((state) => state.showPlannedBacklog);
 
   // PAN-3527: share the throwing fetcher with the CommandDeck. Turning a failed
@@ -690,7 +694,13 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
               {projects.length === 0 ? (
                 <p className="px-3 py-1.5 text-xs text-muted-foreground/70">No projects</p>
               ) : (
-                projects.map((project) => {
+                ownerGroups.flatMap((group) => {
+                  const groupCollapsed = collapsedOwners.includes(group.owner ?? OTHER_OWNER_KEY);
+                  const header = ownerGroups.length > 1 && (
+                    <OwnerGroupHeader key={`owner-${group.owner ?? ''}`} owner={group.owner} collapsed={groupCollapsed} onToggle={toggleOwner}
+                      holdsActive={activeTab === 'command-deck' && group.projects.some((p) => p.name === selectedProject)} />
+                  );
+                  return [header, ...(groupCollapsed ? [] : group.projects).map((project) => {
                   const isActive = activeTab === 'command-deck' && selectedProject === project.name;
                   const visibleFeatures = filterSpecOnlyPlanned(project.features, showPlannedBacklog);
                   const hasActivity = visibleFeatures.length > 0;
@@ -723,6 +733,7 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
                       )}
                     </button>
                   );
+                })];
                 })
               )}
               {/* No-project bucket — always reachable (PAN-4280 FR-10; was
