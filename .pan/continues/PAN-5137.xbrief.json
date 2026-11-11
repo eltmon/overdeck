@@ -1,0 +1,205 @@
+{
+  "version": "1",
+  "issueId": "PAN-5137",
+  "created": "2026-11-11T18:41:59.017Z",
+  "updated": "2026-11-11T20:58:31.105Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-11T19:56:38.200Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-11T19:58Z] coderabbit → FINDINGS — seq 1",
+      "timestamp": "2026-11-11T19:58:46.117Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5-5",
+      "timestamp": "2026-11-11T20:21:43.146Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-11-11T20:58Z] coderabbit → FINDINGS — seq 2",
+      "timestamp": "2026-11-11T20:58:31.105Z"
+    }
+  ],
+  "items": {
+    "fold-module": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5137",
+      "claimedAt": "2026-11-11T18:41:59.017Z",
+      "doneAt": "2026-11-11T18:53:55.952Z"
+    },
+    "fold-module.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T18:53:55.952Z"
+    },
+    "fold-module.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T18:53:55.952Z"
+    },
+    "fold-module.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T18:53:55.952Z"
+    },
+    "fold-module.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T18:53:55.952Z"
+    },
+    "fold-module.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-11T18:53:55.952Z"
+    },
+    "release-wiring": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5137",
+      "claimedAt": "2026-11-11T18:54:09.241Z",
+      "doneAt": "2026-11-11T18:57:33.703Z"
+    },
+    "release-wiring.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T18:57:33.703Z"
+    },
+    "release-wiring.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T18:57:33.703Z"
+    },
+    "release-wiring.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T18:57:33.703Z"
+    },
+    "release-wiring.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T18:57:33.703Z"
+    },
+    "release-wiring.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-11T18:57:33.703Z"
+    },
+    "migrate-upcoming": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5137",
+      "claimedAt": "2026-11-11T18:57:57.283Z",
+      "doneAt": "2026-11-11T18:59:33.345Z"
+    },
+    "migrate-upcoming.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T18:59:33.345Z"
+    },
+    "migrate-upcoming.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T18:59:33.345Z"
+    },
+    "migrate-upcoming.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T18:59:33.345Z"
+    },
+    "migrate-upcoming.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T18:59:33.345Z"
+    },
+    "lint-guard": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5137",
+      "claimedAt": "2026-11-11T18:59:42.779Z",
+      "doneAt": "2026-11-11T19:02:22.373Z"
+    },
+    "lint-guard.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T19:02:22.373Z"
+    },
+    "lint-guard.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T19:02:22.373Z"
+    },
+    "lint-guard.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T19:02:22.373Z"
+    },
+    "lint-guard.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T19:02:22.373Z"
+    },
+    "merge-test": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5137",
+      "claimedAt": "2026-11-11T19:02:27.036Z",
+      "doneAt": "2026-11-11T19:03:54.793Z"
+    },
+    "merge-test.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T19:03:54.793Z"
+    },
+    "merge-test.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T19:03:54.793Z"
+    },
+    "docs-release": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5137",
+      "claimedAt": "2026-11-11T19:04:00.985Z",
+      "doneAt": "2026-11-11T19:06:31.131Z"
+    },
+    "docs-release.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T19:06:31.131Z"
+    },
+    "docs-release.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T19:06:31.131Z"
+    },
+    "docs-release.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T19:06:31.131Z"
+    },
+    "docs-release.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T19:06:31.131Z"
+    },
+    "docs-agent-pointers": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5137",
+      "claimedAt": "2026-11-11T19:06:36.480Z",
+      "doneAt": "2026-11-11T19:07:57.588Z"
+    },
+    "docs-agent-pointers.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T19:07:57.588Z"
+    },
+    "docs-agent-pointers.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T19:07:57.588Z"
+    },
+    "docs-agent-pointers.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T19:07:57.588Z"
+    },
+    "docs-agent-pointers.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T19:07:57.588Z"
+    }
+  },
+  "agentModel": "claude-opus-5-5",
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "coderabbit",
+      "outcome": "findings",
+      "timestamp": "2026-11-11T19:58:46Z",
+      "markdownBody": "# CodeRabbit findings for PAN-5137 (PR #5164)\n\nCodeRabbit posted 8 inline finding(s). CodeRabbit is advisory: nothing waits for these,\nbut each one gets an answer, either a fix or a reply with your reason.\n\n- Thread 4542651580 · .pan/drafts/PAN-5137.md:46 [Minor]: Give separate PRs separate entry filenames.\n  https://github.com/eltmon/overdeck/pull/5164#discussion_r4542651580\n- Thread 4542651586 · .pan/specs/2026-11-11-PAN-5137-changelog-upcoming-block-conflicts-on-every-concurrent-pr-per-pr-changelog-d-entries-folded-at-release.xbrief.json:384 [Minor]: Make the successful migration check exit successfully.\n  https://github.com/eltmon/overdeck/pull/5164#discussion_r4542651586\n- Thread 4542651592 · scripts/lint-docs.js:124 [Minor]: Check entry MDX safety without skipping indented fences.\n  https://github.com/eltmon/overdeck/pull/5164#discussion_r4542651592\n- Thread 4542651602 · scripts/lint-docs.js:134 [Minor]: Detect Upcoming blocks independently of quote style.\n  https://github.com/eltmon/overdeck/pull/5164#discussion_r4542651602\n- Thread 4542651614 · src/cli/commands/release.ts:596 [Major]: Check entry contents again before deleting them.\n  https://github.com/eltmon/overdeck/pull/5164#discussion_r4542651614\n- Thread 4542651619 · src/cli/commands/release.ts:716 [Major]: Do not restore entries that this release never changed.\n  https://github.com/eltmon/overdeck/pull/5164#discussion_r4542651619\n- Thread 4542651629 · sync-sources/skills/pan-release/SKILL.md:38 [Minor]: Allow stable releases that skip the changelog fold.\n  https://github.com/eltmon/overdeck/pull/5164#discussion_r4542651629\n- Thread 4542651637 · tests/unit/scripts/changelog-d-merge.test.ts:22 [Minor]: Disable signing for fixture commits.\n  https://github.com/eltmon/overdeck/pull/5164#discussion_r4542651637\n\n## What to do\n\n1. Read each thread (open its link, or the code at the path and line).\n2. If you agree with a finding, fix it.\n3. If you reject a finding, reply on its thread with your reason:\n   `gh api repos/eltmon/overdeck/pulls/5164/comments/<thread id>/replies -f body=\"<reason>\"`\n4. If you changed code: run the quality gates on what you touched, commit, push, then run `pan review request PAN-5137`.\n   If you only replied, you are done.\n5. If PR #5164 has already merged when you read this, nothing more lands on it: open a follow-up issue\n   for the findings you agree with instead of pushing."
+    },
+    {
+      "seq": 2,
+      "specialist": "coderabbit",
+      "outcome": "findings",
+      "timestamp": "2026-11-11T20:58:31Z",
+      "markdownBody": "# CodeRabbit findings for PAN-5137 (PR #5164)\n\nCodeRabbit posted 5 inline finding(s). CodeRabbit is advisory: nothing waits for these,\nbut each one gets an answer, either a fix or a reply with your reason.\n\n- Thread 4543136739 · .pan/drafts/PAN-5137.md:196 [Major]: Preserve untracked entries during rollback.\n  https://github.com/eltmon/overdeck/pull/5164#discussion_r4543136739\n- Thread 4543136746 · src/cli/commands/release.ts:600 [Major]: Check for entries added after planning.\n  https://github.com/eltmon/overdeck/pull/5164#discussion_r4543136746\n- Thread 4543136750 · src/cli/commands/release.ts:606 [Major]: Check `changelog.mdx` again before overwriting it.\n  https://github.com/eltmon/overdeck/pull/5164#discussion_r4543136750\n- Thread 4543136758 · src/lib/release/changelog-fold.ts:160 [Minor]: Detect Upcoming in a multi-value tags array.\n  https://github.com/eltmon/overdeck/pull/5164#discussion_r4543136758\n- Thread 4543136766 · src/lib/release/changelog-fold.ts:187 [Minor]: Read single-quoted release labels.\n  https://github.com/eltmon/overdeck/pull/5164#discussion_r4543136766\n\n## What to do\n\n1. Read each thread (open its link, or the code at the path and line).\n2. If you agree with a finding, fix it.\n3. If you reject a finding, reply on its thread with your reason:\n   `gh api repos/eltmon/overdeck/pulls/5164/comments/<thread id>/replies -f body=\"<reason>\"`\n4. If you changed code: run the quality gates on what you touched, commit, push, then run `pan review request PAN-5137`.\n   If you only replied, you are done.\n5. If PR #5164 has already merged when you read this, nothing more lands on it: open a follow-up issue\n   for the findings you agree with instead of pushing."
+    }
+  ]
+}

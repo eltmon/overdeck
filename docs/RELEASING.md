@@ -117,12 +117,13 @@ The generated notes use a structured format:
 
 ## Update the public changelog
 
-The public changelog is [`changelog.mdx`](../changelog.mdx) at the repo root, served by the Mintlify docs site at `/changelog` (the `Changelog` tab in `docs.json`). `pan release` does not edit it, so update it by hand on release day, **before** `pan release stable`. That command needs a clean tree and makes its own release commit.
+The public changelog is [`changelog.mdx`](../changelog.mdx) at the repo root, served by the Mintlify docs site at `/changelog` (the `Changelog` tab in `docs.json`). Each PR that changes something users notice adds its own entry file under [`changelog.d/`](../changelog.d/README.md) (format: `changelog.d/README.md`) instead of editing `changelog.mdx` directly, so two PRs in flight never conflict on the same lines.
 
-1. Draft the entries: `pan release notes v<previous> HEAD` lists the features and fixes since the last tag. Rewrite them as plain, user-facing sentences under `#### New`, `#### Improved` and `#### Fixed`, each linking its PR. Skip `chore(workspace)` commits and planning artifacts, and fold internal refactors into one line. Write every currency dollar as `&#36;` (for example `&#36;2/M input`) and every `<` before a digit as `&lt;`: Mintlify renders paired `$` as math (even escaped as `\$` on a line that also has inline code), and strict MDX rejects a bare `<` before a digit. `npm run lint:docs` (part of `npm run lint` and CI) fails on either.
-2. In the top `<Update label="vX.Y.Z" description="Unreleased" tags={["Upcoming"]}>` block, set `label` to the version you will pass to `--version`, set `description` to the release date (`YYYY-MM-DD`), delete the `tags` prop, the "Upcoming release" heading and the "Drafted from" line, and point the compare link at the new tag.
-3. Keep the `RELEASE STEP` comment above the newest block. Add the next `Unreleased` block only once it has entries; an empty one renders on the public page.
-4. Commit (`docs(infra): changelog for vX.Y.Z`), then run `pan release stable --version X.Y.Z` and push `main` and the tag. Mintlify redeploys from `main`.
+On release day:
+
+1. List the pending entries: `ls changelog.d`. Open each one and fix any wording you want to change, in a normal commit, before releasing. Write every currency dollar as `&#36;` (for example `&#36;2/M input`) and every `<` before a digit as `&lt;`: Mintlify renders paired `$` as math (even escaped as `\$` on a line that also has inline code), and strict MDX rejects a bare `<` before a digit. `npm run lint:docs` (part of `npm run lint` and CI) checks every entry file for both and fails on either.
+2. Run `pan release stable --version X.Y.Z`. It folds the pending entries into one `<Update label="vX.Y.Z" description="YYYY-MM-DD">` block at the top of `changelog.mdx`, with sections in the order New, Improved, Fixed, and a compare link from the previous block's label to the new tag, then deletes the folded entry files in the release commit. It refuses to proceed, before the minutes-long preflight runs, on a malformed entry, a misnamed file in `changelog.d/`, or a leftover Upcoming/Unreleased block: move that block's bullets into entry files first. `pan release canary` never folds; `changelog.d/` and `changelog.mdx` are its own concern only on `stable`. On a retag whose `vX.Y.Z` block already exists in `changelog.mdx`, it leaves the entry files in place for the next release. With no entry files, `changelog.mdx` is unchanged and the release still proceeds.
+3. Push `main` and the tag. Mintlify redeploys from `main`.
 
 ## Adding a model that needs a newer Claude Code
 

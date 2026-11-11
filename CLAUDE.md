@@ -77,3 +77,4 @@
 - **Issue creation from PRDs:** reference the PRD at the top of the issue body (`**PRD:** [link]`); summarize, don't duplicate — canonical PRD is `.pan/drafts/<issue>.md` in the project repo.
 - **Task enforcement:** work agents need a readable xBRIEF (start returns 422 otherwise); completion is gated on the checklist via `pan task`.
 - **OKF skill is vendored:** `sync-sources/skills/okf/` is a pinned copy of an `eltmon/okf` release tag (`.okf-skill-version`). Edit the skill in `eltmon/okf`, then re-vendor with `scripts/vendor-okf-skill.sh <tag>`; `okf-vendor-pin.yml` fails CI on in-place edits.
+- **Changelog entries:** a user-facing change adds `changelog.d/<issue>.md` (format: [changelog.d/README.md](changelog.d/README.md)); never edit the top of `changelog.mdx`. `pan release stable` folds the entries (PAN-5137).

@@ -2,10 +2,19 @@ import { exitCli } from '../exit.js';
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { execFileSync, execSync, spawn } from 'child_process';
-import { mkdirSync, readFileSync, rmSync, writeFileSync, type Dirent } from 'fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync, type Dirent } from 'fs';
 import { readdir, unlink } from 'fs/promises';
-import { dirname, join } from 'path';
+import { basename, dirname, join } from 'path';
 import { resolveBunBinary } from '../../lib/deploy/build-from-origin.js';
+import {
+  CHANGELOG_ENTRY_FILE_NAME,
+  ChangelogEntryError,
+  foldChangelogEntries,
+  formatReleaseDate,
+  hasUpcomingBlock,
+  hasVersionBlock,
+  parseChangelogEntry,
+} from '../../lib/release/changelog-fold.js';
 
 type ReleaseChannel = 'stable' | 'canary';
 
@@ -214,7 +223,10 @@ function getCurrentBranch(repoRoot: string): string {
 }
 
 function isWorkingTreeClean(repoRoot: string): boolean {
-  return run('git status --short', repoRoot) === '';
+  // --untracked-files=normal overrides a status.showUntrackedFiles=no config: without
+  // it, an untracked changelog.d entry (or any other untracked file) could pass this
+  // check, and applyChangelogFold would later delete it with no HEAD copy to restore.
+  return run('git status --short --untracked-files=normal', repoRoot) === '';
 }
 
 function getLatestTag(repoRoot: string): string | null {
@@ -527,6 +539,96 @@ async function releaseCheckCommand(): Promise<void> {
   }
 }
 
+export interface ChangelogFoldPlan {
+  changelogPath: string;
+  originalChangelog: string;
+  dir: string;
+  content: string;
+  entries: { path: string; content: string }[];
+}
+
+export type ChangelogFoldOutcome =
+  | { kind: 'fold'; plan: ChangelogFoldPlan }
+  | { kind: 'skip'; reason: 'canary' | 'no-entries' | 'block-exists'; message: string };
+
+// PAN-5137: reads and validates changelog.d/ and builds the new changelog.mdx text.
+// Writes nothing, so a malformed entry stops the release before preflight instead of
+// mid-write. Canary never folds.
+export function planChangelogFold(
+  repoRoot: string,
+  channel: ReleaseChannel,
+  version: string,
+  now: Date
+): ChangelogFoldOutcome {
+  if (channel !== 'stable') return { kind: 'skip', reason: 'canary', message: '' };
+
+  const changelogPath = join(repoRoot, 'changelog.mdx');
+  const changelog = readFileSync(changelogPath, 'utf8');
+  // Checked before either skip below, so a leftover Upcoming block can never survive a
+  // stable release, even on a retag whose target-version block already exists.
+  if (hasUpcomingBlock(changelog)) {
+    throw new Error('changelog.mdx still has an Upcoming/Unreleased block; move its bullets to changelog.d/<issue>.md first');
+  }
+
+  const dir = join(repoRoot, 'changelog.d');
+  const names = existsSync(dir) ? readdirSync(dir).filter((name) => name !== 'README.md').sort() : [];
+  for (const name of names) {
+    if (!CHANGELOG_ENTRY_FILE_NAME.test(name)) {
+      throw new ChangelogEntryError(name, null, 'file name must be lowercase kebab-case ending in .md, for example pan-5137.md');
+    }
+  }
+  if (names.length === 0) {
+    return { kind: 'skip', reason: 'no-entries', message: 'No changelog.d entries; changelog.mdx unchanged.' };
+  }
+
+  const entries = names.map((fileName) => ({ fileName, content: readFileSync(join(dir, fileName), 'utf8') }));
+  entries.forEach((entry) => parseChangelogEntry(entry)); // validate even when skipping below
+
+  if (hasVersionBlock(changelog, version)) {
+    const noun = names.length === 1 ? 'entry' : 'entries';
+    return {
+      kind: 'skip',
+      reason: 'block-exists',
+      message: `changelog.mdx already has a v${version} block (a retag?); left ${names.length} changelog.d ${noun} for the next release.`,
+    };
+  }
+
+  const content = foldChangelogEntries({ changelog, entries, version, date: formatReleaseDate(now) });
+  const planEntries = entries.map((entry) => ({ path: join(dir, entry.fileName), content: entry.content }));
+  return { kind: 'fold', plan: { changelogPath, originalChangelog: changelog, dir, content, entries: planEntries } };
+}
+
+// PAN-5137: re-checks everything this fold depends on immediately before writing or
+// deleting anything, in case an operator (or another process) touched it during the
+// minutes-long preflight that runs between planChangelogFold and this call: changelog.mdx
+// itself, the exact set of pending entries (none added, none removed), and each entry's
+// content. Throws before any write on any mismatch, so a late edit is never silently
+// folded over, omitted, or deleted with stale content.
+export function applyChangelogFold(plan: ChangelogFoldPlan): void {
+  const currentChangelog = readFileSync(plan.changelogPath, 'utf8');
+  if (currentChangelog !== plan.originalChangelog) {
+    throw new Error('changelog.mdx changed after planning; rerun pan release stable');
+  }
+
+  const currentNames = readdirSync(plan.dir)
+    .filter((name) => name !== 'README.md')
+    .sort();
+  const plannedNames = plan.entries.map((entry) => basename(entry.path)).sort();
+  if (currentNames.join('\n') !== plannedNames.join('\n')) {
+    throw new Error('changelog.d/ changed after planning (an entry was added or removed); rerun pan release stable');
+  }
+
+  for (const entry of plan.entries) {
+    const current = readFileSync(entry.path, 'utf8');
+    if (current !== entry.content) {
+      throw new Error(`changelog.d/${basename(entry.path)} changed after planning; rerun pan release stable`);
+    }
+  }
+
+  writeFileSync(plan.changelogPath, plan.content);
+  for (const entry of plan.entries) rmSync(entry.path);
+}
+
 async function releaseCreateCommand(
   channel: ReleaseChannel,
   version?: string,
@@ -544,6 +646,8 @@ async function releaseCreateCommand(
   ensureMainBranch(repoRoot);
   ensureCleanTree(repoRoot);
   ensureTagDoesNotExist(repoRoot, tagName);
+  // PAN-5137: validate changelog.d/ before the minutes-long preflight. Canary never folds.
+  const changelogFold = planChangelogFold(repoRoot, channel, resolvedVersion, new Date());
 
   console.log(chalk.bold(`Overdeck ${channel === 'stable' ? 'Stable' : 'Canary'} Release\n`));
   console.log(`Current version: ${chalk.cyan(currentVersion)}`);
@@ -570,6 +674,11 @@ async function releaseCreateCommand(
   const bunBinary = await resolveBunBinary(repoRoot);
 
   let committed = false;
+  // Tracks whether applyChangelogFold actually ran, not merely whether a fold was
+  // planned: the catch below must restore changelog.mdx/changelog.d only when this run
+  // wrote to them, never when it only planned to and failed before applying (PAN-5137
+  // review: an edit made to an untouched entry during preflight must survive rollback).
+  let changelogApplied = false;
   try {
     pkg.version = resolvedVersion;
     writePackageJson(repoRoot, pkg);
@@ -594,12 +703,29 @@ async function releaseCreateCommand(
 
     writeTextFile(releaseNotesPath, releaseNotes);
 
+    if (changelogFold.kind === 'fold') {
+      applyChangelogFold(changelogFold.plan);
+      changelogApplied = true;
+      const count = changelogFold.plan.entries.length;
+      console.log(chalk.dim(`Folded ${count} changelog.d entr${count === 1 ? 'y' : 'ies'} into changelog.mdx.`));
+    } else if (changelogFold.reason === 'no-entries') {
+      console.log(chalk.dim(changelogFold.message));
+    } else if (changelogFold.reason === 'block-exists') {
+      console.log(chalk.yellow(changelogFold.message));
+    }
+
     execFileSync(bunBinary, ['install'], { cwd: repoRoot, stdio: ['pipe', 'pipe', 'pipe'] });
 
     run(
       `git add package.json apps/desktop/package.json packages/contracts/package.json bun.lock ${releaseNotesPath}`,
       repoRoot
     );
+    if (changelogFold.kind === 'fold') {
+      // Exact paths, never -A: a changelog.d entry that appeared after planning (and so
+      // was never folded into changelog.mdx) must not ride along in this release commit.
+      const entryPaths = changelogFold.plan.entries.map((entry) => entry.path);
+      run(`git add -- changelog.mdx ${entryPaths.join(' ')}`, repoRoot);
+    }
     // Idempotent: when retagging the same version after a CI failure, the package
     // bumps and release notes are already on HEAD. Skip the commit if nothing
     // staged. Tagging is still meaningful because the tag may have been deleted.
@@ -628,6 +754,13 @@ async function releaseCreateCommand(
         run('git restore --source=HEAD --staged --worktree package.json apps/desktop/package.json packages/contracts/package.json bun.lock', repoRoot);
       } catch {
         // The restore is best-effort; the original error matters more.
+      }
+      if (changelogApplied) {
+        try {
+          run('git restore --source=HEAD --staged --worktree -- changelog.mdx changelog.d', repoRoot);
+        } catch {
+          // Best-effort, separate from the package restore so one failing never skips the other.
+        }
       }
       rmSync(releaseNotesPath, { force: true });
       console.error(chalk.red('Release creation failed — rolled back the version bumps and release notes.'));

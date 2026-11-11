@@ -24,6 +24,10 @@ scripts/frontend-test-subset.txt merge=union
 # with no conflict markers. New phone evidence goes in its own apps/mobile/acceptance/PAN-<n>.md,
 # so parallel PRs add different files. union is safe only for one-entry-per-line files.
 
+# changelog.mdx is deliberately NOT merge=union either (PAN-5137): its <Update> blocks share
+# lines. Each PR's changelog bullets go in changelog.d/<issue>.md and pan release stable folds
+# them.
+
 # WARNING: The single-JSON state files under .pan/specs/, .pan/continues/, and .pan/records/
 # must NOT receive a content-merge driver like `union`. union concatenates hunks into
 # invalid JSON. These files need a take-one-whole-side strategy, not line-level merging.
