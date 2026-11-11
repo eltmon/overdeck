@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5131",
   "created": "2026-11-11T08:19:14.972Z",
-  "updated": "2026-11-11T09:00:32.663Z",
+  "updated": "2026-11-11T09:00:36.168Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -340,6 +340,11 @@
     "single-ticker.ac2": {
       "status": "completed",
       "doneAt": "2026-11-11T09:00:32.663Z"
+    },
+    "field-guide-text": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5131",
+      "claimedAt": "2026-11-11T09:00:36.168Z"
     }
   }
 }
