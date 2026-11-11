@@ -8,6 +8,7 @@ import { existsSync } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { OVERDECK_HOME } from './paths.js';
+import { OVERDECK_DB_FILENAME } from './overdeck/paths.js';
 import { writeFileAtomic } from './model-presets/state.js';
 
 export type ClaudePermissionPinOutcome =
@@ -40,7 +41,7 @@ export async function pinClaudePermissionModeOnce(
   const marker = join(home, '.claude-permission-mode-pin.json');
   const yamlPath = join(home, 'config.yaml');
   const tomlPath = join(home, 'config.toml');
-  const dbPath = join(home, 'overdeck.db');
+  const dbPath = join(home, OVERDECK_DB_FILENAME);
 
   try {
     try {
