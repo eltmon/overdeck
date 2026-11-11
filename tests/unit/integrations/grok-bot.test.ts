@@ -2,7 +2,8 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { grokBotMcpJson, oauthIssueCommand, xaiExample, PUBLIC_MCP_PLACEHOLDER_URL } from '../../../src/dashboard/frontend/src/components/Settings/anywhere/botSnippets';
+import { connectMessage } from '../../../src/dashboard/frontend/src/components/Settings/anywhere/connectMessage';
+import { defaultBotName, grokBotMcpJson, oauthIssueCommand, xaiExample, PUBLIC_MCP_PLACEHOLDER_URL } from '../../../src/dashboard/frontend/src/components/Settings/anywhere/botSnippets';
 import { registrationFor, registrationLines } from '../../../src/lib/mcp/connector/connect-output.js';
 
 // PAN-4956 W-INT4 WI-2 (AC-2), WI-5 (AC-5): the Grok Bot plugin manifest, mcp.json, LICENSE,
@@ -57,6 +58,16 @@ describe('integrations/grok-bot README', () => {
     expect(readme).toContain(oauthIssueCommand({ name: 'xai-api', level: 'read' }));
     expect(readme).toContain('examples/xai-api.ts');
     expect(readme).toContain('examples/xai-api.py');
+  });
+
+  it('leads with the one-paste flow and its Copy message', () => {
+    const readme = readFileSync(readmePath, 'utf-8');
+
+    expect(readme.match(/^## .*/m)?.[0]).toBe('## Connect in one paste');
+    expect(readme).toContain(
+      connectMessage({ platform: 'grok-bot', botName: defaultBotName('grok-bot'), machineLabel: '<machine>', version: '<version>', pairingString: '<pairing string>' }),
+    );
+    expect(readme).toContain(readFileSync(mcpJsonPath, 'utf-8').trimEnd());
   });
 });
 
