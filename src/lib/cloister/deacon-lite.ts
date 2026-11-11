@@ -504,7 +504,9 @@ export async function recoverStalledReviews(now = Date.now()): Promise<string[]>
 
     // Cheapest first: relaunching missing lanes against the existing run reuses
     // the parent's own state.json, which survives a server restart, so nothing
-    // re-verifies. Only a parent with no run state at all needs the full door.
+    // re-verifies. Only a parent with no run state at all needs the full door,
+    // and it goes through the guarded route: deacon-lite runs in the deacon
+    // child, where no in-process review starter is registered (PAN-4623).
     let via = 'convoy-recovery';
     let outcome: string;
     let journalData: Record<string, unknown> = { reason };
@@ -513,15 +515,20 @@ export async function recoverStalledReviews(now = Date.now()): Promise<string[]>
       const recovery = await recoverMissingConvoyReviewers(issueId, { source: 'deacon-lite' });
       outcome = recovery.message;
       if (!recovery.success && /no review parent state|missing workspace\/runId/i.test(recovery.message)) {
-        const { getRequestReviewStarter } = await import('./request-review-pipeline.js');
-        const startReview = getRequestReviewStarter();
-        if (!startReview) continue;
-        via = 'request-review';
-        const started = await startReview(issueId, {
-          note: `deacon-lite: ${reason}`,
+        // The cooldown starts BEFORE the request so a refused or unreachable
+        // route is not retried every tick.
+        lastReviewRedispatchAt.set(issueId, now);
+        const { requestReviewThroughRoute } = await import('./review-request-route.js');
+        const requested = await requestReviewThroughRoute(issueId, {
+          message: `deacon-lite: ${reason}`,
           source: 'deacon-lite',
         });
-        if (!started.started) continue;
+        if (!requested.requested) {
+          if (requested.noReviewNeeded) console.log(`[deacon-lite] ${issueId}: stalled review not re-requested — ${requested.reason}`);
+          else console.warn(`[deacon-lite] ${issueId}: could not re-request the stalled review — ${requested.reason}`);
+          continue;
+        }
+        via = 'request-review';
         outcome = `re-requested review (${reason})`;
       } else if (!recovery.success) {
         // Nothing was launched: do not journal a re-dispatch that never happened.
