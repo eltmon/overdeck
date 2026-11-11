@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5131",
   "created": "2026-11-11T08:19:14.972Z",
-  "updated": "2026-11-11T08:52:34.750Z",
+  "updated": "2026-11-11T08:52:37.181Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -264,6 +264,11 @@
     "failed-orb-labels.ac5": {
       "status": "completed",
       "doneAt": "2026-11-11T08:52:34.750Z"
+    },
+    "lane-slots": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5131",
+      "claimedAt": "2026-11-11T08:52:37.181Z"
     }
   }
 }
