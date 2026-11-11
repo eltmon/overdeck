@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4374",
   "created": "2026-11-11T12:38:14.502Z",
-  "updated": "2026-11-11T12:50:40.507Z",
+  "updated": "2026-11-11T12:50:48.994Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,6 +34,11 @@
     "shared-claude-runner.ac5": {
       "status": "completed",
       "doneAt": "2026-11-11T12:50:40.506Z"
+    },
+    "claude-cli-provider": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-4374",
+      "claimedAt": "2026-11-11T12:50:48.994Z"
     }
   }
 }
