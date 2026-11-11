@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-5071",
+  "created": "2026-11-11T07:17:20.918Z",
+  "updated": "2026-11-11T07:17:20.918Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "grant-names-store": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5071",
+      "claimedAt": "2026-11-11T07:17:20.918Z"
+    }
+  }
+}
