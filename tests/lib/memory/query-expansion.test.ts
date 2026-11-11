@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from 'fs/promises';
+import { mkdtemp, readFile, rm, stat } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -283,5 +283,50 @@ describe('memory query expansion', () => {
       status: 'fallback',
       reason: 'malformed-response',
     });
+  });
+
+  it('never runs claude-cli for query expansion and falls back with provider-non-interactive', async () => {
+    const originalMemoryProviderEnv = process.env.OVERDECK_MEMORY_PROVIDER;
+    const originalMemoryModelEnv = process.env.OVERDECK_MEMORY_MODEL;
+    delete process.env.OVERDECK_MEMORY_PROVIDER;
+    delete process.env.OVERDECK_MEMORY_MODEL;
+
+    const runSpy = vi.fn(async () => ({ structured_output: { terms: ['should', 'never', 'run'] } }));
+    const { ClaudeCliExtractionProvider } = await import('../../../src/lib/memory/providers/claude-cli.js');
+    const { registerExtractionProvider } = await import('../../../src/lib/memory/providers/index.js');
+    registerExtractionProvider(new ClaudeCliExtractionProvider(runSpy));
+
+    try {
+      const logDecision = vi.fn(async () => undefined);
+      const result = await expandMemoryQuery({
+        prompt: 'raw search text',
+        identity,
+        now: new Date('2026-05-16T20:00:00.000Z'),
+        id: 'non-interactive-run',
+        settings: { provider: 'claude-cli', model: 'claude-haiku-5-5' },
+        logDecision,
+      });
+
+      expect(runSpy).not.toHaveBeenCalled();
+      expect(result).toMatchObject({
+        query: 'raw search text',
+        expandedTerms: [],
+        status: 'fallback',
+        reason: 'provider-non-interactive',
+      });
+      expect(logDecision).toHaveBeenCalledWith(expect.objectContaining({
+        outcome: 'expansion-failed',
+        reason: 'provider-non-interactive',
+      }));
+
+      const { getMemoryHealthPath } = await import('../../../src/lib/memory/health.js');
+      await expect(stat(getMemoryHealthPath(identity))).rejects.toMatchObject({ code: 'ENOENT' });
+    } finally {
+      registerExtractionProvider(new ClaudeCliExtractionProvider());
+      if (originalMemoryProviderEnv === undefined) delete process.env.OVERDECK_MEMORY_PROVIDER;
+      else process.env.OVERDECK_MEMORY_PROVIDER = originalMemoryProviderEnv;
+      if (originalMemoryModelEnv === undefined) delete process.env.OVERDECK_MEMORY_MODEL;
+      else process.env.OVERDECK_MEMORY_MODEL = originalMemoryModelEnv;
+    }
   });
 });

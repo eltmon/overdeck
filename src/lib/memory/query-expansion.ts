@@ -5,7 +5,10 @@ import type { MemoryIdentity, MemoryObservation } from '@overdeck/contracts';
 import { ensureParentDir, resolveRagRunsFile } from './paths.js';
 import {
   extractWithProviderPolicy,
+  interactiveExtractionSelection,
   isExtractionProviderAuthError,
+  resolveExtractionProviderSelection,
+  type ExtractionProviderSelection,
   type MemoryExtractionPolicyResult,
   type MemoryProviderSettings,
 } from './providers/index.js';
@@ -61,7 +64,7 @@ export interface QueryExpansionResult {
   expandedTerms: string[];
   cacheKey: string;
   status: 'expanded' | 'cache-hit' | 'fallback';
-  reason: null | 'cost-cap' | 'extraction-failed' | 'malformed-response' | 'provider-auth-failed' | 'timeout';
+  reason: null | 'cost-cap' | 'extraction-failed' | 'malformed-response' | 'provider-auth-failed' | 'timeout' | 'provider-non-interactive';
 }
 
 export interface QueryExpansionLogEntry {
@@ -90,16 +93,23 @@ export async function expandMemoryQuery(input: QueryExpansionInput): Promise<Que
     return result;
   }
 
-  const expand = input.expand ?? ((candidatePrompt, jsonSchema) => extractWithProviderPolicy(candidatePrompt, jsonSchema, {
-    identity: input.identity,
-    settings: input.settings,
-    perDayCostCapUsd: input.perDayCostCapUsd,
-    temperature: 0,
-    maxTokens: 200,
-    signal: input.signal,
-  }));
-
   try {
+    // PAN-4374: a background provider (process spawn, seconds) never serves
+    // query expansion on any surface, as primary or as fallback.
+    let selection: ExtractionProviderSelection | undefined;
+    if (!input.expand) {
+      const interactive = interactiveExtractionSelection(await resolveExtractionProviderSelection(input.settings ?? null));
+      if (!interactive) return await fallback(input, cacheKey, 'provider-non-interactive');
+      selection = interactive;
+    }
+    const expand = input.expand ?? ((candidatePrompt, jsonSchema) => extractWithProviderPolicy(candidatePrompt, jsonSchema, {
+      identity: input.identity,
+      settings: input.settings,
+      perDayCostCapUsd: input.perDayCostCapUsd,
+      temperature: 0,
+      maxTokens: 200,
+      signal: input.signal,
+    }, { selection }));
     const expanded = await expand(buildQueryExpansionPrompt(input), QUERY_EXPANSION_JSON_SCHEMA, { signal: input.signal });
     if (expanded.status === 'skipped') return await fallback(input, cacheKey, expanded.reason);
     if (expanded.status === 'dropped') return await fallback(input, cacheKey, classifyDroppedExpansion(expanded.error, input.signal));
