@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5071",
   "created": "2026-11-11T07:17:20.918Z",
-  "updated": "2026-11-11T07:24:36.564Z",
+  "updated": "2026-11-11T07:24:47.724Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -30,6 +30,11 @@
     "grant-names-store.ac4": {
       "status": "completed",
       "doneAt": "2026-11-11T07:24:36.564Z"
+    },
+    "confirm-step-names": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5071",
+      "claimedAt": "2026-11-11T07:24:47.724Z"
     }
   }
 }
