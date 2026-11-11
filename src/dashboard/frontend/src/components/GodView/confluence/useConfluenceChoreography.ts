@@ -15,7 +15,6 @@ export type ChoreographyCommand =
   | { type: 'ring'; issueId: string; color: string }
   | { type: 'ticker'; text: string; color: string }
   | { type: 'gate'; stage: Stage }
-  | { type: 'merge'; issueId: string }
   | { type: 'tide'; targetId: string }
   | { type: 'thaw'; issueId: string }
   | { type: 'sweep-tide' }
@@ -148,9 +147,6 @@ export function runConfluenceCommands(commands: readonly ChoreographyCommand[], 
         break;
       case 'gate':
         effects.gateFlash(command.stage);
-        break;
-      case 'merge':
-        effects.playMerge(command.issueId);
         break;
       case 'tide':
         effects.playTide(command.targetId);

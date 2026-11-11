@@ -108,7 +108,6 @@ export interface RiverEffectsApi {
   emitRing(issueId: string, color?: string): void;
   emitTicker(text: string, color?: string): void;
   playTide(targetId: string): void;
-  playMerge(issueId: string): void;
   playThaw(issueId: string): void;
   playSweep(): void;
   playFlare(issueId: string): void;
@@ -159,13 +158,17 @@ export function resolveMergeReconciliation(
 
 /** How the canvas removes an orb that left the cast. Shelf and Doldrums orbs drop
  * at once so the band caps (SHELF_ORB_LIMIT, STALE_ORB_LIMIT) hold on every frame. */
-export function evictionFor(state: ConfluenceOrb['state'], stage: Stage): 'merge' | 'drop' | 'fade' {
+export function evictionFor(
+  state: ConfluenceOrb['state'],
+  stage: Stage,
+  issueState: ConfluenceOrb['issueState'],
+): 'merge' | 'drop' | 'fade' {
   // State wins over stage: an operator-held merged issue (state 'shelf', stage
   // 'MERGE') must drop with the rest of the shelf cap, not animate through the
   // portal as a completed merge (PAN-4523 review) — only an active MERGE orb
-  // merges.
+  // merges. An orb that leaves MERGE without a `merged` issue state fades.
   if (state === 'shelf' || state === 'stale') return 'drop';
-  if (stage === 'MERGE') return 'merge';
+  if (stage === 'MERGE' && issueState === 'merged') return 'merge';
   return 'fade';
 }
 
@@ -346,7 +349,6 @@ function createEngine(
     emitRing(issueId, color = '#00d4ff') { const orb = orbAt(issueId); if (orb) ring(orb.x, orb.y, color, 70, 2.5); },
     emitTicker(text, color = '#00d4ff') { ticker(text, color); },
     playTide(targetId) { tide.active = true; tide.x = layout.padX - 40; tide.t = 0; tide.targetId = targetId; tide.ringed = false; },
-    playMerge(issueId) { const orb = orbAt(issueId); if (orb) startMerge(orb); },
     playThaw(issueId) { const orb = orbAt(issueId); if (orb) thaw(orb); },
     playSweep() {
       sweepBeam.active = true;
@@ -401,7 +403,7 @@ function createEngine(
     }
     for (const orb of list()) {
       if (live.has(orb.id) || orb.merging || orb.fading !== null) continue;
-      const eviction = evictionFor(orb.state, orb.stage);
+      const eviction = evictionFor(orb.state, orb.stage, orb.issueState);
       if (eviction === 'merge') startMerge(orb);
       else if (eviction === 'drop') renderOrbs.delete(orb.id);
       else orb.fading = 1;
@@ -752,7 +754,6 @@ export const RiverCanvas = forwardRef<RiverCanvasHandle, RiverCanvasProps>(funct
     emitRing: (...args) => engineRef.current?.api.emitRing(...args),
     emitTicker: (...args) => engineRef.current?.api.emitTicker(...args),
     playTide: (...args) => engineRef.current?.api.playTide(...args),
-    playMerge: (...args) => engineRef.current?.api.playMerge(...args),
     playThaw: (...args) => engineRef.current?.api.playThaw(...args),
     playSweep: () => engineRef.current?.api.playSweep(),
     playFlare: (...args) => engineRef.current?.api.playFlare(...args),

@@ -59,7 +59,6 @@ vi.mock('../RiverCanvas', async () => {
         emitRing: vi.fn(),
         emitTicker: vi.fn(),
         playTide: vi.fn(),
-        playMerge: vi.fn(),
         playThaw: vi.fn(),
         playSweep: vi.fn(),
         playFlare: vi.fn(),

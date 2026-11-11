@@ -67,7 +67,6 @@ function effects(): RiverEffectsApi {
     emitRing: vi.fn(),
     emitTicker: vi.fn(),
     playTide: vi.fn(),
-    playMerge: vi.fn(),
     playThaw: vi.fn(),
     playSweep: vi.fn(),
     playFlare: vi.fn(),
@@ -152,11 +151,12 @@ describe('Confluence choreography dispatch table', () => {
     expect(commands).toContainEqual({ type: 'ring', issueId: 'PAN-1', color: '#ffb800' });
     expect(commands).toContainEqual({ type: 'sparks', issueId: 'PAN-1', color: '#ffb800', heatBump: 0, specRateBump: 0 });
     expect(commands).toContainEqual({ type: 'gate', stage: 'REVIEW' });
-    expect(commands).not.toContainEqual({ type: 'merge', issueId: 'PAN-4' });
     expect(commands.filter((command) => command.type === 'tide')).toStrictEqual([{ type: 'tide', targetId: 'PAN-5' }]);
     expect(commands).toContainEqual({ type: 'ring', issueId: 'PAN-3', color: '#39ff14' });
     expect(commands).toContainEqual({ type: 'sun' });
     expect(commands).toContainEqual({ type: 'spawn', issueId: 'PAN-99' });
+    // ready → merged plans nothing: the canvas starts the portal comet itself from the merged issue state.
+    expect(commands.some((command) => 'issueId' in command && command.issueId === 'PAN-4')).toBe(false);
     expect(commands.some((command) => 'issueId' in command && command.issueId === 'PAN-6')).toBe(false);
 
     const api = effects();
@@ -165,7 +165,6 @@ describe('Confluence choreography dispatch table', () => {
     expect(api.emitSparks).toHaveBeenCalledWith('PAN-2', '#00d4ff', 'agent-pan-2', 0.06);
     expect(api.emitRing).toHaveBeenCalledWith('PAN-1', '#ffb800');
     expect(api.gateFlash).toHaveBeenCalledWith('REVIEW');
-    expect(api.playMerge).not.toHaveBeenCalled();
     expect(vi.mocked(api.playTide).mock.calls).toEqual([['PAN-5']]);
     expect(api.pulseSun).toHaveBeenCalledOnce();
     expect(api.spawnFromSun).toHaveBeenCalledWith('PAN-99');
@@ -306,15 +305,19 @@ describe('planSweepCommands', () => {
 });
 
 describe('evictionFor (PAN-4523 render-layer eviction)', () => {
-  it('drops shelf and stale orbs, fades other active orbs, and merges only an active MERGE orb', () => {
-    expect(evictionFor('shelf', 'WORK')).toBe('drop');
-    expect(evictionFor('stale', 'REVIEW')).toBe('drop');
-    expect(evictionFor('active', 'WORK')).toBe('fade');
-    expect(evictionFor('active', 'MERGE')).toBe('merge');
+  it('drops shelf and stale orbs, fades other active orbs, and merges only a merged MERGE orb', () => {
+    expect(evictionFor('shelf', 'WORK', null)).toBe('drop');
+    expect(evictionFor('stale', 'REVIEW', 'in-review')).toBe('drop');
+    expect(evictionFor('active', 'WORK', 'working')).toBe('fade');
+    expect(evictionFor('active', 'MERGE', 'merged')).toBe('merge');
+    // An orb that leaves MERGE before its issue merged did not merge: it fades.
+    expect(evictionFor('active', 'MERGE', 'ready')).toBe('fade');
+    expect(evictionFor('active', 'MERGE', null)).toBe('fade');
+    expect(evictionFor('active', 'WORK', 'merged')).toBe('fade');
     // An operator-held merged issue (state 'shelf') must drop with the shelf
     // cap, not animate through the portal as a completed merge (PAN-4523 review).
-    expect(evictionFor('shelf', 'MERGE')).toBe('drop');
-    expect(evictionFor('stale', 'MERGE')).toBe('drop');
+    expect(evictionFor('shelf', 'MERGE', 'merged')).toBe('drop');
+    expect(evictionFor('stale', 'MERGE', 'merged')).toBe('drop');
   });
 
   it('keeps exactly eight shelf orbs through an eight-to-eight replacement', () => {
@@ -324,7 +327,7 @@ describe('evictionFor (PAN-4523 render-layer eviction)', () => {
 
     for (const [id, existing] of live) {
       if (nextIds.has(id)) continue;
-      if (evictionFor(existing.state, existing.stage) === 'drop') live.delete(id);
+      if (evictionFor(existing.state, existing.stage, existing.issueState) === 'drop') live.delete(id);
     }
     live.set('PAN-99', orb('PAN-99', { state: 'shelf', stage: 'WORK' }));
 
