@@ -276,16 +276,43 @@ describe('Confluence model', () => {
     expect(toolToFamily('bash')).toBe('lifecycle');
   });
 
-  it('maps model families to their orb glyphs', () => {
-    expect(modelGlyph('claude-sonnet-5')).toBe('S');
-    expect(modelGlyph('gpt-5.6')).toBe('G');
-    expect(modelGlyph('claude-opus-5')).toBe('O');
-    expect(modelGlyph('claude-fable-5')).toBe('F');
-    expect(modelGlyph('k3')).toBe('K');
-    expect(modelGlyph('kimi-k2.5')).toBe('K');
+  it.each([
+    ['claude-sonnet-5', 'S'],
+    ['claude-opus-5-5', 'O'],
+    ['claude-haiku-5-5', 'H'],
+    ['claude-fable-5-2', 'F'],
+    ['gpt-5.6-sol', 'G'],
+    ['o3', 'G'],
+    ['o4-mini', 'G'],
+    ['gpt-oss-120b', 'G'],
+    ['openai/gpt-oss-20b', 'G'],
+    ['gemini-3.8-flash', 'E'],
+    ['grok-4.7', 'X'],
+    ['grok/grok-4.7-build-fast', 'X'],
+    ['glm-5.3', 'Z'],
+    ['qwen3.8-max', 'Q'],
+    ['qwen/qwen3.6-plus', 'Q'],
+    ['ql-reason-70b', 'L'],
+    ['muse-wonder-1.0', 'M'],
+    ['minimax-m2.7', 'N'],
+    ['MiniMax-M3', 'N'],
+    ['mimo-v2.6-pro', 'N'],
+    ['mistral-large-4-0', 'I'],
+    ['k3', 'K'],
+    ['kimi-k2.5', 'K'],
+    ['kimi-code/k3.1-pro', 'K'],
+    ['K2.6-code-preview', 'K'],
+    ['opencode/big-pickle', 'B'],
+    ['unknown-model', 'U'],
+  ])('maps the model %s to the glyph %s', (model, glyph) => {
+    expect(modelGlyph(model)).toBe(glyph);
+  });
+
+  it('gives no glyph when there is no model name to read', () => {
     expect(modelGlyph(null)).toBeNull();
+    expect(modelGlyph(undefined)).toBeNull();
     expect(modelGlyph('')).toBeNull();
-    expect(modelGlyph('unknown-model')).toBe('?');
+    expect(modelGlyph('--/')).toBeNull();
   });
 
   it('maps real idle minutes to frost', () => {

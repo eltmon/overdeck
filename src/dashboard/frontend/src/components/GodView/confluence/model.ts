@@ -403,15 +403,25 @@ export function toolToFamily(toolName: string): HookFamilyKey {
   return 'lifecycle';
 }
 
+/** One letter per model family (PAN-5131 FR-7). An unlisted family shows the first letter of its model name. */
 export function modelGlyph(model: string | null | undefined): string | null {
   if (!model) return null;
   const normalized = String(model).toLowerCase();
   if (normalized.includes('sonnet')) return 'S';
-  if (normalized.includes('gpt')) return 'G';
   if (normalized.includes('opus')) return 'O';
+  if (normalized.includes('haiku')) return 'H';
   if (normalized.includes('fable')) return 'F';
+  if (normalized.includes('gpt') || /(^|\/)o\d/.test(normalized)) return 'G';
+  if (normalized.includes('gemini')) return 'E';
+  if (normalized.includes('grok')) return 'X';
+  if (normalized.includes('glm')) return 'Z';
+  if (normalized.includes('qwen')) return 'Q';
+  if (/(^|\/)ql-/.test(normalized)) return 'L';
+  if (normalized.includes('muse')) return 'M';
+  if (normalized.includes('minimax') || normalized.includes('mimo')) return 'N';
+  if (normalized.includes('mistral')) return 'I';
   if (normalized.includes('k3') || normalized.includes('kimi')) return 'K';
-  return '?';
+  return normalized.slice(normalized.lastIndexOf('/') + 1).match(/[a-z0-9]/)?.[0]?.toUpperCase() ?? null;
 }
 
 export const FROST_START_MINUTES = 8;
