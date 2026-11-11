@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5072",
   "created": "2026-11-11T10:00:36.495Z",
-  "updated": "2026-11-11T10:05:46.552Z",
+  "updated": "2026-11-11T10:08:08.760Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -54,9 +54,26 @@
       "doneAt": "2026-11-11T10:05:34.091Z"
     },
     "w3-shared-skill": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5072",
-      "claimedAt": "2026-11-11T10:05:46.552Z"
+      "claimedAt": "2026-11-11T10:05:46.552Z",
+      "doneAt": "2026-11-11T10:08:08.760Z"
+    },
+    "w3-shared-skill.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T10:08:08.760Z"
+    },
+    "w3-shared-skill.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T10:08:08.760Z"
+    },
+    "w3-shared-skill.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T10:08:08.760Z"
+    },
+    "w3-shared-skill.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T10:08:08.760Z"
     }
   }
 }
