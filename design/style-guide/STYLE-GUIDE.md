@@ -1592,6 +1592,7 @@ FONT CODE:     font-mono → SF Mono (Ledger) / Geist Mono Variable (Broadsheet)
 FONT UI-MONO:  font-mono-ui → SF Mono both themes (Ledger) / tighter system ui-monospace stack (Broadsheet) — chrome that isn't code or eyebrows (F-10)
 DISPLAY SCALE: display-xl / display-lg (Broadsheet only; Ledger-safe fallback = text-xl|text-lg font-medium)
 BROADSHEET-ONLY: .chip / .soft-card / .keycap / .dot-metadata (F-11) — no Ledger fallback, authoring discipline only
+LISTS/SWITCHES: .list-group-bar / .list-row / .list-meta / .switch-track-on / .switch-track-locked — both themes; never bg-muted/<n> or bg-foreground/<n>, which compile to no CSS on these var()-based tokens
 BACKGROUND:    Ledger = fractal-noise film (body::after, 3.5% opacity); Broadsheet = ambient corner wash via --wash, noise suppressed (F-5)
 MOTION:        --ease-* / --duration-* token vocabulary exists (F-9); not yet wired into existing keyframes/animations
 SCROLLBAR:     6px wide, transparent track, 10-15% opacity thumb
