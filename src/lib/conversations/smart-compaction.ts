@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import * as self from './smart-compaction.js';
 import { buildSpawnEnvForModel, getProviderEnvForModel } from '../agents.js';
 import { getClaudePermissionFlags } from '../claude-permissions.js';
+import { prepareHarnessLaunch } from '../harness-binary.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { recordBackgroundAiCost } from '../background-ai/cost.js';
@@ -527,6 +528,9 @@ export async function runModelSummary(prompt: string, model?: string, timeoutMs?
     return summary;
   }
 
+  // PAN-5124 FR-5: the same minimum-version refusal a launch gets (D5-D7).
+  const { binaryPath: command } = await prepareHarnessLaunch('claude-code', { model: useModel });
+
   const args = [
     '-p',
     '--output-format', 'json',
@@ -545,7 +549,6 @@ export async function runModelSummary(prompt: string, model?: string, timeoutMs?
   // falls back to a heuristic summary.
   const spawnEnv = await buildSpawnEnvForModel(useModel);
   const injectedKeys = Object.keys(await getProviderEnvForModel(useModel));
-  const command = 'claude';
   if (injectedKeys.length > 0) {
     console.log(`[smart-compaction] Spawning ${command} for summary with model ${useModel}, injecting provider env: ${injectedKeys.join(', ')}`);
   } else {
