@@ -1,5 +1,5 @@
 import type { Agent } from '../../../types';
-import { STAGES, STAGE_COLORS, ROLE_COLORS, PROJECT_RING, fmtAge, orbIdleMinutes } from './model';
+import { STAGES, STAGE_COLORS, ROLE_COLORS, PROJECT_RING, failedReason, fmtAge, orbIdleMinutes } from './model';
 import type { ConfluenceOrb, HookStreamEntry } from './useConfluenceData';
 
 /** Operator-reopened D-3 (PAN-3447): clicking an orb slides this rail in over the
@@ -26,7 +26,7 @@ function stateLabel(orb: ConfluenceOrb): string {
   if (orb.state === 'stale') return 'stale ❄';
   if (orb.state === 'needs-you') return 'needs you ⚑';
   if (orb.state === 'shelf') return 'yielded ⏸';
-  if (orb.state === 'failed') return 'merge failed ✗';
+  if (orb.state === 'failed') return `${failedReason(orb.attention)} ✗`;
   return 'active';
 }
 
@@ -105,7 +105,7 @@ export function IssueRail({ orb, agents, entries, onClose, onOpenIssue }: IssueR
       {orb.yieldReason && <div className="confluence-rail-banner amber">⏸ {orb.yieldReason}</div>}
       {orb.warn && !orb.broken && <div className="confluence-rail-banner amber">⚠ {orb.warn}</div>}
       {orb.broken && <div className="confluence-rail-banner red">⚠ workspace stack broken underneath the agent</div>}
-      {orb.state === 'failed' && <div className="confluence-rail-banner pink">✗ merge to main failed — needs an operator</div>}
+      {orb.state === 'failed' && <div className="confluence-rail-banner pink">✗ {failedReason(orb.attention)} — needs an operator</div>}
       {orb.state === 'stale' && (
         <div className="confluence-rail-banner ice">❄ frozen — no hook activity for {fmtAge(orbIdleMinutes(orb, Date.now()))}</div>
       )}

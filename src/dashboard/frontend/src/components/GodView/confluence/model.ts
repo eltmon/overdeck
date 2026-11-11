@@ -299,13 +299,6 @@ export function positionOrb<T extends PositionableOrb>(
     return orb;
   }
 
-  if (orb.state === 'failed') {
-    orb.tx = layout.portalX - 52 - (hashStr(orb.id) % 3) * 34;
-    orb.ty = layout.riverTop + 50
-      + (hashStr(orb.id) % Math.max(40, layout.riverBottom - layout.riverTop - 120));
-    return orb;
-  }
-
   if (orb.state === 'shelf' || orb.state === 'needs-you') {
     const index = Math.max(0, orbs.filter((candidate) => candidate.state === 'shelf' || candidate.state === 'needs-you').indexOf(orb));
     const { startX, endX } = shelfSpreadRange(layout);
@@ -420,6 +413,11 @@ export const FROST_SPAN_MINUTES = 26;
 
 export function frostFromIdleMinutes(idleMinutes: number): number {
   return clamp((idleMinutes - FROST_START_MINUTES) / FROST_SPAN_MINUTES, 0, 1);
+}
+
+/** What a failed orb's attention means, in operator words (PAN-5131 FR-7). */
+export function failedReason(attention: IssueAttention | null | undefined): string {
+  return attention === 'api-error' ? 'API error' : 'stuck, unpushed work';
 }
 
 /** A landmark (sun, sequencer) pulses and spins only while its agent is live (PAN-5131 FR-6). */

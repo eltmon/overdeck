@@ -17,6 +17,7 @@ import {
   clamp,
   computeLayout,
   eventsPerMinuteByIssue,
+  failedReason,
   fitText,
   fmtAge,
   frostFromIdleMinutes,
@@ -560,7 +561,7 @@ function createEngine(
         fx.globalAlpha = 1; continue;
       }
       if (orb.state === 'failed') {
-        const blink = 0.5 + 0.5 * Math.sin(simT * 3 + orb.wobA); fx.fillStyle = 'rgba(96,22,48,.95)'; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 0.62, 0, 7); fx.fill(); fx.strokeStyle = `rgba(255,45,124,${0.35 + blink * 0.55})`; fx.lineWidth = 1.6; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 0.95, 0, 7); fx.stroke(); drawLabel(orb, `✗ ${orb.id} · merge failed`, 'rgba(255,120,165,.9)'); fx.globalAlpha = 1; continue;
+        const blink = 0.5 + 0.5 * Math.sin(simT * 3 + orb.wobA); fx.fillStyle = 'rgba(96,22,48,.95)'; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 0.62, 0, 7); fx.fill(); fx.strokeStyle = `rgba(255,45,124,${0.35 + blink * 0.55})`; fx.lineWidth = 1.6; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 0.95, 0, 7); fx.stroke(); drawLabel(orb, `✗ ${orb.id} · ${failedReason(orb.attention)}`, 'rgba(255,120,165,.9)'); fx.globalAlpha = 1; continue;
       }
       if (orb.state === 'needs-you') {
         // PAN-4383: the agent asked the operator (`pan ask`); a steady flare ring, not frost.
@@ -665,7 +666,7 @@ function createEngine(
         if (dwell.shouldStart) startMerge(orb);
       }
       if (orb.state === 'shelf' || orb.state === 'needs-you') { orb.y += (layout.shelfY - orb.y) * dt * 3; orb.x += (orb.tx - orb.x) * dt * 1.5; continue; }
-      if (orb.state === 'failed') { orb.y += Math.sin(simT * 0.5 + orb.wobA) * dt * 3; orb.x += Math.cos(simT * 0.4 + orb.wobB) * dt * 2; if (Math.random() < dt * 0.8) burst(orb.x, orb.y, '#ff2d7c', 1, 22, 1.2, 1.4); continue; }
+      if (orb.state === 'failed') { orb.x += (orb.tx + Math.cos(simT * 0.4 + orb.wobB) * 6 - orb.x) * dt * 1.2; orb.y += (orb.ty + Math.sin(simT * 0.5 + orb.wobA) * 4 - orb.y) * dt * 1.2; if (Math.random() < dt * 0.8) burst(orb.x, orb.y, '#ff2d7c', 1, 22, 1.2, 1.4); continue; }
       if (orb.state === 'stale') { orb.x += (orb.tx + Math.sin(simT * 0.3 + orb.wobA) * 8 - orb.x) * dt * 1.2; orb.y += (orb.ty + Math.cos(simT * 0.22 + orb.wobB) * 4 - orb.y) * dt * 1.2; if (Math.random() < dt * 0.5) frostMotes(orb.x, orb.y, 1); continue; }
       orb.frost = frostFromIdleMinutes(orbIdleMinutes(orb, nowMs)); if (orb.frost > 0.55 && Math.random() < dt * 5) snow(orb.x, orb.y);
       const orbitRadius = orb.heat * 26; orb.orbitA += dt * (1 + orb.heat * 4); const targetX = orb.tx + Math.cos(orb.orbitA) * orbitRadius + Math.sin(orb.wobA) * 10; const targetY = orb.ty + Math.sin(orb.orbitA) * orbitRadius * 0.7 + Math.cos(orb.wobB) * 8; orb.x += (targetX - orb.x) * dt * 3.2; orb.y += (targetY - orb.y) * dt * 3.2;

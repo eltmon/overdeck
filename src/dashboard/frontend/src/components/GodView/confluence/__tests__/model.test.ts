@@ -9,6 +9,7 @@ import {
   computeLayout,
   dropRadius,
   eventsPerMinuteByIssue,
+  failedReason,
   fmtAge,
   frostFromIdleMinutes,
   heatFromEventRate,
@@ -83,13 +84,18 @@ describe('Confluence model', () => {
       ]);
     });
 
-    it('clusters failed orbs to the left of the portal', () => {
+    it('places a failed orb inside its stage column', () => {
       const layout = computeLayout(1680, 945);
-      const orbs = ['PAN-1', 'PAN-2', 'PAN-3'].map((id) => orb(id, 'failed'));
+      const orbs = ['PAN-1', 'PAN-2', 'PAN-3'].map((id) => orb(id, 'failed', 'REVIEW'));
 
       for (const candidate of orbs) positionOrb(candidate, orbs, layout, 1, 1);
 
-      expect(orbs.every((candidate) => candidate.tx < layout.portalX)).toBe(true);
+      for (const candidate of orbs) {
+        expect(candidate.tx).toBeGreaterThan(layout.padX + 2 * layout.colW);
+        expect(candidate.tx).toBeLessThan(layout.padX + 3 * layout.colW);
+        expect(candidate.ty).toBeGreaterThan(layout.riverTop);
+        expect(candidate.ty).toBeLessThan(layout.riverBottom);
+      }
     });
 
     it('places a needs-you orb on the shelf row alongside shelf orbs (PAN-4383)', () => {
@@ -236,6 +242,11 @@ describe('Confluence model', () => {
     expect(frostFromIdleMinutes(8)).toBe(0);
     expect(frostFromIdleMinutes(21)).toBe(0.5);
     expect(frostFromIdleMinutes(34)).toBe(1);
+  });
+
+  it('names what a failed orb\'s attention means', () => {
+    expect(failedReason('api-error')).toBe('API error');
+    expect(failedReason('stuck')).toBe('stuck, unpushed work');
   });
 
   it('holds a landmark still and dim unless its agent is live', () => {

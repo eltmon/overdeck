@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useDashboardStore } from '../../../../lib/store';
 import { GodViewConfluence } from '../GodViewConfluence';
+import { computeLayout } from '../model';
 import type { ConfluenceData, ConfluenceOrb } from '../useConfluenceData';
 
 const FRAME_NOW = '2026-08-02T12:45:00.000Z';
@@ -251,5 +252,38 @@ describe('Confluence canvas smoke test', () => {
     expect(labels).toContain('stale 25m');
     expect(labels.filter((text) => text.startsWith('work ·'))).toEqual(['work · 7 ev/m']);
     expect(labels).toContain('❄ PAN-STALE · 45m idle');
+  });
+
+  it('labels a failed orb with its attention and eases it to its stage column', () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    queryClient.setQueryData(['god-view-activity'], []);
+    const failed = (stage: ConfluenceOrb['stage']) => (
+      <QueryClientProvider client={queryClient}>
+        <GodViewConfluence
+          data={{ ...data, orbs: [{ ...orb('PAN-FAIL', 'failed', stage), attention: 'api-error' as const }] }}
+          helpOpen={false}
+          onHelpOpenChange={vi.fn()}
+          onToggleFullscreen={vi.fn()}
+        />
+      </QueryClientProvider>
+    );
+    const layout = computeLayout(900, 600);
+    const labelX = () => {
+      const call = context.fillText.mock.calls.findLast(([text]) => text === '✗ PAN-FAIL · API error');
+      expect(call).toBeDefined();
+      return Number(call?.[1]);
+    };
+    const column = (index: number) => [layout.padX + index * layout.colW, layout.padX + (index + 1) * layout.colW];
+
+    const { rerender } = render(failed('REVIEW'));
+    act(() => advanceFrame(16));
+    expect(labelX()).toBeGreaterThan(column(2)[0]!);
+    expect(labelX()).toBeLessThan(column(2)[1]!);
+
+    // The data moves the orb to WORK; the canvas eases it there over the next frames.
+    rerender(failed('WORK'));
+    for (let frame = 2; frame <= 400; frame++) act(() => advanceFrame(frame * 16));
+    expect(labelX()).toBeGreaterThan(column(1)[0]!);
+    expect(labelX()).toBeLessThan(column(1)[1]!);
   });
 });
