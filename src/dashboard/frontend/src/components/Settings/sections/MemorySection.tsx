@@ -43,11 +43,12 @@ export function MemorySection({ formData, onSettingsChange }: MemorySectionProps
           </div>
           <select
             value={formData.memory?.provider || 'anthropic'}
-            onChange={(e) => updateMemorySettings({ provider: e.target.value as 'anthropic' | 'cliproxy' })}
+            onChange={(e) => updateMemorySettings({ provider: e.target.value as 'anthropic' | 'cliproxy' | 'claude-cli' })}
             className="bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
           >
             <option value="anthropic">Anthropic</option>
             <option value="cliproxy">cliproxy</option>
+            <option value="claude-cli">Claude Code (subscription)</option>
           </select>
         </div>
 
@@ -73,12 +74,13 @@ export function MemorySection({ formData, onSettingsChange }: MemorySectionProps
           <div className="flex items-center gap-2">
             <select
               value={formData.memory?.fallback_provider || ''}
-              onChange={(e) => updateMemorySettings({ fallback_provider: e.target.value as 'anthropic' | 'cliproxy' | '' })}
+              onChange={(e) => updateMemorySettings({ fallback_provider: e.target.value as 'anthropic' | 'cliproxy' | 'claude-cli' | '' })}
               className="bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
             >
               <option value="">None</option>
               <option value="anthropic">Anthropic</option>
               <option value="cliproxy">cliproxy</option>
+              <option value="claude-cli">Claude Code (subscription)</option>
             </select>
             <input
               type="text"
