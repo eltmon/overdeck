@@ -10,14 +10,16 @@ This page starts at v0.60.0, the release that removed Overdeck's state layer. Ol
 
 {/* RELEASE STEP: before tagging vX.Y.Z, add a new <Update label="vX.Y.Z" description="YYYY-MM-DD"> block at the top with the user-facing changes since the previous tag, and point its compare link at the new tag. See docs/RELEASING.md "Update the public changelog". If a new model needs a newer Claude Code, say so and confirm its minClaudeCodeVersion is set. */}
 
-<Update label="v0.79.0" description="Unreleased" tags={["Upcoming"]}>
-  ## Upcoming release
-
-  Drafted from the changes merged to `main` since v0.78.0. The date is set when the release is tagged.
-
+<Update label="v0.79.0" description="2026-11-11">
   #### New
 
-  - **Jira as an issue tracker:** projects with `tracker: jira` show Jira issues on the board and move them through the Jira workflow from start to close-out. See [Issue trackers](/configuration/issue-trackers).
+  - **Jira as an issue tracker:** a project with `tracker: jira` now works like a GitHub, Linear or Rally project. Jira Cloud and Jira Data Center are both supported. Jira issues show on the board, in the Command Deck and in search; `pan start`, `pan done`, `pan close` and `pan reopen` take a Jira key; and Overdeck moves the issue through your Jira workflow and links the pull request to it. Add the Jira token, email and site under Settings → Tracker Keys or in `~/.overdeck.env`, and `pan doctor` checks them. The code can still live on GitHub or GitLab. See [Jira Integration](/configuration/issue-trackers#jira-integration). ([#5160](https://github.com/eltmon/overdeck/pull/5160))
+
+  #### Fixed
+
+  - **A dashboard restart no longer re-runs passed verification:** when the dashboard restarted between a passed verification and the review dispatch, the full gate suite (25 to 45 minutes) could run again for the same commit. It now dispatches the review that was owed. ([#5150](https://github.com/eltmon/overdeck/pull/5150))
+
+  [Compare v0.78.0...v0.79.0](https://github.com/eltmon/overdeck/compare/v0.78.0...v0.79.0)
 </Update>
 
 <Update label="v0.78.0" description="2026-11-11">
