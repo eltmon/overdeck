@@ -1099,3 +1099,72 @@ describe('OpenRouter favorites', () => {
     });
   });
 });
+
+describe('Jira tracker keys (PAN-5152)', () => {
+  const jiraEnvKeys = ['JIRA_API_TOKEN', 'JIRA_EMAIL', 'JIRA_BASE_URL', 'OVERDECK_HOME'] as const;
+  let savedEnv: Record<string, string | undefined>;
+  let isolatedHome: string;
+
+  beforeEach(() => {
+    savedEnv = Object.fromEntries(jiraEnvKeys.map(key => [key, process.env[key]]));
+    isolatedHome = mkdtempSync(join(tmpdir(), 'pan-5152-jira-'));
+  });
+
+  afterEach(() => {
+    for (const key of jiraEnvKeys) {
+      if (savedEnv[key] === undefined) delete process.env[key];
+      else process.env[key] = savedEnv[key];
+    }
+    rmSync(isolatedHome, { recursive: true, force: true });
+    vi.resetModules();
+  });
+
+  it('fills trackerKeys.jira, jiraEmail and jiraBaseUrl from the environment', async () => {
+    const fakeToken = ['fake', 'jira', 'token'].join('-');
+    process.env.OVERDECK_HOME = isolatedHome;
+    process.env.JIRA_API_TOKEN = fakeToken;
+    process.env.JIRA_EMAIL = 'dev@example.com';
+    process.env.JIRA_BASE_URL = 'https://acme.atlassian.net';
+    vi.resetModules();
+    const actual = await vi.importActual<typeof import('../../src/lib/config-yaml.js')>('../../src/lib/config-yaml.js');
+    const { config } = actual.loadConfigSync();
+    expect(config.trackerKeys.jira).toBe(fakeToken);
+    expect(config.trackerKeys.jiraEmail).toBe('dev@example.com');
+    expect(config.trackerKeys.jiraBaseUrl).toBe('https://acme.atlassian.net');
+  });
+
+  it('round-trips tracker_keys.jira_email and jira_base_url from PUT to GET', async () => {
+    const { writeFile } = await import('fs/promises');
+    const { mergeConfigs } = await vi.importActual<typeof import('../../src/lib/config-yaml.js')>('../../src/lib/config-yaml.js');
+    const settings: ApiSettingsConfig = {
+      models: {
+        providers: {
+          anthropic: true,
+          openai: false,
+          google: false,
+          minimax: false,
+          zai: false,
+          kimi: false,
+          mimo: false,
+          openrouter: false,
+          nous: false,
+          dashscope: false,
+        },
+      },
+      api_keys: {},
+      tracker_keys: { jira_email: 'dev@example.com', jira_base_url: 'https://acme.atlassian.net' },
+    };
+    await saveSettingsApi(settings);
+    const yamlContent = vi.mocked(writeFile).mock.calls.at(-1)![1] as string;
+    const written = parseYaml(yamlContent);
+    expect(written.tracker_keys).toMatchObject({ jira_email: 'dev@example.com', jira_base_url: 'https://acme.atlassian.net' });
+
+    const { config: merged } = mergeConfigs(written);
+    const base = loadConfigSync();
+    vi.mocked(loadConfigSync).mockReturnValueOnce({ ...base, config: { ...base.config, trackerKeys: merged.trackerKeys } });
+    const readBack = loadSettingsApi();
+    expect(readBack.tracker_keys).toMatchObject({ jira_email: 'dev@example.com', jira_base_url: 'https://acme.atlassian.net' });
+    expect(readBack.tracker_keys).not.toHaveProperty('jiraEmail');
+    expect(readBack.tracker_keys).not.toHaveProperty('jiraBaseUrl');
+  });
+});
