@@ -34,7 +34,7 @@ export function observedLiveAgentIds(
 /**
  * Agent rows as the terminal backend sees them: a row that claims to be live
  * with no pane behind it reads `stopped`, so every downstream rule (orb
- * membership, primary agent, pause voters, heat, census) treats it exactly
+ * membership, primary agent, pause voters, census) treats it exactly
  * like the stopped row it is.
  */
 export function withObservedLiveness<T extends AgentSnapshot>(

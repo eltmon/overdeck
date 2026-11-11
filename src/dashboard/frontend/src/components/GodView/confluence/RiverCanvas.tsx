@@ -16,9 +16,11 @@ import {
   SWEEP_FLARE_COLOR,
   clamp,
   computeLayout,
+  eventsPerMinuteByIssue,
   fitText,
   fmtAge,
   frostFromIdleMinutes,
+  heatFromEventRate,
   hexA,
   modelGlyph,
   orbIdleMinutes,
@@ -69,6 +71,7 @@ interface RenderOrb extends ConfluenceOrb {
   mergeDwell: number;
   fading: number | null;
   frost: number;
+  heat: number; evPerMin: number;
   flashT: number;
   convoy: Satellite[] | null;
 }
@@ -291,7 +294,7 @@ function createEngine(
     gateFlashes.push({ x: layout.padX + Math.max(0, index) * layout.colW, t: 0 });
   };
 
-  const spawnOrb = (source: ConfluenceOrb, fromSun = false): RenderOrb => {
+  const spawnOrb = (source: ConfluenceOrb, evPerMin = 0, fromSun = false): RenderOrb => {
     const convoy = source.convoy?.map((member, index, members) => createSatellite(member, index, members.length)) ?? null;
     const orb: RenderOrb = {
       ...source,
@@ -308,7 +311,7 @@ function createEngine(
       mergeVx: 0,
       mergeDwell: source.stage === 'MERGE' ? 1.5 + Math.random() * 2 : 0,
       fading: null,
-      frost: 0,
+      frost: 0, evPerMin, heat: source.state === 'stale' ? 0.04 : heatFromEventRate(evPerMin),
       flashT: 0,
     };
     renderOrbs.set(orb.id, orb);
@@ -368,12 +371,12 @@ function createEngine(
       ring(orb.x, orb.y, SWEEP_FLARE_COLOR, 66, 2);
     },
     pulseSun() { ring(layout.sunX, layout.sunY, '#9d4edd', 90, 2.5); },
-    spawnFromSun(issueId) { const source = props.orbs.find((orb) => orb.id === issueId); if (source && !orbAt(issueId)) spawnOrb(source, true); },
+    spawnFromSun(issueId) { const source = props.orbs.find((orb) => orb.id === issueId); if (source && !orbAt(issueId)) spawnOrb(source, 0, true); },
     gateFlash: flashGate,
   };
 
   const reconcile = (next: RiverCanvasProps) => {
-    props = next;
+    props = next; const rates = eventsPerMinuteByIssue(next.hookStream.entries, Date.now());
     const live = new Set(next.orbs.map((orb) => orb.id));
     for (const source of next.orbs) {
       const current = orbAt(source.id);
@@ -384,7 +387,7 @@ function createEngine(
         current?.merging ?? false,
       );
       if (!mergeState.retired) retiredIds.delete(source.id);
-      if (!current) { if (mergeState.shouldSpawn) spawnOrb(source); continue; }
+      if (!current) { if (mergeState.shouldSpawn) spawnOrb(source, rates.get(source.id) ?? 0); continue; }
       if (mergeState.cancelMerge) {
         current.merging = false;
         current.mergeVx = 0;
@@ -398,7 +401,7 @@ function createEngine(
           ? Object.assign(existingSatellites.get(member.role)!, member)
           : createSatellite(member, index, members.length, true)) ?? null,
         compactT: Math.max(current.compactT, source.compactT),
-        fading: null,
+        fading: null, evPerMin: rates.get(source.id) ?? 0,
       });
       if (source.stage !== previousStage && source.stage === 'MERGE') {
         current.mergeDwell = 1.5 + Math.random() * 2;
@@ -600,7 +603,7 @@ function createEngine(
       if (orb.id === props.selectedId) { fx.save(); fx.translate(orb.x, orb.y); fx.rotate(simT * 1.4); fx.strokeStyle = 'rgba(255,255,255,.85)'; fx.setLineDash([6, 5]); fx.beginPath(); fx.arc(0, 0, radius + 9, 0, 7); fx.stroke(); fx.restore(); fx.setLineDash([]); }
       if (orb.flashT > simT) { const flash = clamp((orb.flashT - simT) / 0.8, 0, 1); fx.strokeStyle = `rgba(255,255,255,${flash * 0.9})`; fx.beginPath(); fx.arc(orb.x, orb.y, radius + 5 + (1 - flash) * 12, 0, 7); fx.stroke(); }
       drawLabel(orb, orb.broken || orb.warn ? `${orb.id} ⚠` : orb.id, orb.broken ? 'rgba(255,120,120,.95)' : orb.warn ? 'rgba(255,184,0,.95)' : orb.frost > 0.5 ? 'rgba(191,227,255,.9)' : 'rgba(232,237,248,.92)');
-      fx.font = '400 7px "JetBrains Mono"'; fx.textAlign = 'center'; const tag = orb.broken ? '⚠ stack broken' : orb.frost > 0.5 ? `stale ${fmtAge(orbIdleMinutes(orb, now))}` : orb.waitUntil > now ? 'waiting…' : orb.thinkUntil > now ? 'thinking…' : `${orb.role} · ~${Math.round(orb.heat * 34)} ev/m`; fx.fillStyle = orb.broken ? 'rgba(255,68,68,.85)' : 'rgba(122,138,170,.6)'; fx.fillText(tag, orb.x, orb.y + radius + 16); fx.textAlign = 'left'; fx.globalAlpha = 1;
+      fx.font = '400 7px "JetBrains Mono"'; fx.textAlign = 'center'; const tag = orb.broken ? '⚠ stack broken' : orb.frost > 0.5 ? `stale ${fmtAge(orbIdleMinutes(orb, now))}` : orb.waitUntil > now ? 'waiting…' : orb.thinkUntil > now ? 'thinking…' : orb.evPerMin > 0 ? `${orb.role} · ${orb.evPerMin} ev/m` : `${orb.role} · quiet`; fx.fillStyle = orb.broken ? 'rgba(255,68,68,.85)' : 'rgba(122,138,170,.6)'; fx.fillText(tag, orb.x, orb.y + radius + 16); fx.textAlign = 'left'; fx.globalAlpha = 1;
     }
   };
 
@@ -662,7 +665,7 @@ function createEngine(
   const advance = (dt: number) => {
     const nowMs = Date.now();
     for (const orb of list()) {
-      orb.heat = Math.max(orb.state === 'stale' ? 0.04 : 0.12, orb.heat * Math.pow(0.5, dt / 9));
+      const heatTarget = orb.state === 'stale' ? 0.04 : heatFromEventRate(orb.evPerMin); orb.heat += (heatTarget - orb.heat) * (1 - Math.pow(0.5, dt / 3));
       orb.wobA += dt * orb.wobSpeed * (1 + orb.heat * 2.2); orb.wobB += dt * orb.wobSpeed * 0.7; orb.compactT = Math.max(0, orb.compactT - dt);
       if (orb.fading !== null) { orb.fading -= dt; if (orb.fading <= 0) { renderOrbs.delete(orb.id); continue; } }
       if (orb.merging) { orb.mergeVx += dt * 260; orb.x += orb.mergeVx * dt; burst(orb.x, orb.y, '#e8edf8', 3, 40, 0.7, 2); if (orb.x > layout.portalX - 6) finishMerge(orb); continue; }

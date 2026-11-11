@@ -422,6 +422,25 @@ export function frostFromIdleMinutes(idleMinutes: number): number {
   return clamp((idleMinutes - FROST_START_MINUTES) / FROST_SPAN_MINUTES, 0, 1);
 }
 
+/** Real hook events per issue inside the trailing 60 s window (PAN-5131 FR-1). */
+export function eventsPerMinuteByIssue(
+  entries: readonly { issueId: string | null; ts: number }[],
+  now: number,
+): Map<string, number> {
+  const counts = new Map<string, number>();
+  const cutoff = now - 60_000;
+  for (const entry of entries) {
+    if (!entry.issueId || entry.ts < cutoff) continue;
+    counts.set(entry.issueId, (counts.get(entry.issueId) ?? 0) + 1);
+  }
+  return counts;
+}
+
+/** 0.12 (quiet) to 1 (40 or more events per minute), linear (PAN-5131 FR-2). */
+export function heatFromEventRate(eventsPerMin: number): number {
+  return 0.12 + 0.88 * clamp(eventsPerMin / 40, 0, 1);
+}
+
 /** Minutes since the orb last did anything, computed at call time (PAN-5131 FR-3).
  * A stale orb with a parked row counts from parkedAt; every other orb from lastActivity. 0 when unknown. */
 export function orbIdleMinutes(

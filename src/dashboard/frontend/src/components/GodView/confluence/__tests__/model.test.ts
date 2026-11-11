@@ -8,8 +8,10 @@ import {
   classifyOrb,
   computeLayout,
   dropRadius,
+  eventsPerMinuteByIssue,
   fmtAge,
   frostFromIdleMinutes,
+  heatFromEventRate,
   modelGlyph,
   orbIdleMinutes,
   pickOrb,
@@ -233,6 +235,28 @@ describe('Confluence model', () => {
     expect(frostFromIdleMinutes(8)).toBe(0);
     expect(frostFromIdleMinutes(21)).toBe(0.5);
     expect(frostFromIdleMinutes(34)).toBe(1);
+  });
+
+  it('counts real hook events per issue inside the trailing 60 seconds', () => {
+    const now = 1_000_000;
+    const rates = eventsPerMinuteByIssue([
+      ...Array.from({ length: 12 }, (_, index) => ({ issueId: 'PAN-1', ts: now - index * 5_000 })),
+      { issueId: 'PAN-1', ts: now - 61_000 },
+      { issueId: null, ts: now - 1_000 },
+      { issueId: 'PAN-3', ts: now - 61_000 },
+    ], now);
+
+    expect(rates.get('PAN-1')).toBe(12);
+    expect(rates.has('PAN-2')).toBe(false);
+    expect(rates.has('PAN-3')).toBe(false);
+    expect(rates.size).toBe(1);
+  });
+
+  it('maps an event rate to heat, linear from quiet to 40 events per minute', () => {
+    expect(heatFromEventRate(0)).toBe(0.12);
+    expect(heatFromEventRate(20)).toBeCloseTo(0.56, 10);
+    expect(heatFromEventRate(40)).toBe(1);
+    expect(heatFromEventRate(400)).toBe(1);
   });
 
   it('computes idle minutes from the timestamp the orb state selects', () => {

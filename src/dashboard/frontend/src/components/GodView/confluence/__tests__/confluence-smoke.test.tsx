@@ -19,7 +19,6 @@ function orb(
     role: 'work',
     stage,
     title: `${id} smoke test orb`,
-    heat: .7,
     state,
     convoy: null,
     yieldReason: state === 'shelf' ? 'yield: freeing a slot' : null,
@@ -191,6 +190,7 @@ describe('Confluence canvas smoke test', () => {
     const labels = context.fillText.mock.calls.map(([text]) => text);
     expect(labels).toContain('PLAN');
     expect(labels).toContain('MERGE');
+    expect(labels).toContain('work · quiet');
     const glCanvas = container.querySelector<HTMLCanvasElement>('.confluence-gl');
     expect(glCanvas?.style.background).toContain('radial-gradient');
 
@@ -209,7 +209,7 @@ describe('Confluence canvas smoke test', () => {
     expect(screen.getByText('PAN-ACTIVE')).toBeInTheDocument();
   });
 
-  it('draws ages and frost from the orb timestamps at frame time', () => {
+  it('draws ages, frost and the event rate from real timestamps and hook entries at frame time', () => {
     context.fillText.mockClear();
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     queryClient.setQueryData(['god-view-activity'], []);
@@ -218,6 +218,19 @@ describe('Confluence canvas smoke test', () => {
         <GodViewConfluence
           data={{
             ...data,
+            hookStream: {
+              ...data.hookStream,
+              entries: Array.from({ length: 7 }, (_, index) => ({
+                sequence: index + 1,
+                source: 'hook' as const,
+                agentId: 'agent-pan-fresh',
+                issueId: 'PAN-FRESH',
+                tool: 'Read',
+                hookName: 'PostToolUse',
+                family: 'tool_read' as const,
+                ts: Date.parse(FRAME_NOW) - index * 5_000,
+              })),
+            },
             orbs: [
               orb('PAN-FRESH', 'active', 'PLAN'),
               orb('PAN-COOLING', 'active', 'WORK', '2026-08-02T12:20:00.000Z'),
@@ -236,7 +249,7 @@ describe('Confluence canvas smoke test', () => {
     const labels = context.fillText.mock.calls.map(([text]) => String(text));
     // 25 idle minutes is a frost of 0.65, so the active tag reads the real age.
     expect(labels).toContain('stale 25m');
-    expect(labels.filter((text) => text.startsWith('work ·'))).toHaveLength(1);
+    expect(labels.filter((text) => text.startsWith('work ·'))).toEqual(['work · 7 ev/m']);
     expect(labels).toContain('❄ PAN-STALE · 45m idle');
   });
 });

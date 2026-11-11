@@ -24,7 +24,6 @@ function orb(id: string, overrides: Partial<ConfluenceOrb> = {}): ConfluenceOrb 
     role: 'work',
     stage: 'WORK',
     title: id,
-    heat: 0.4,
     state: 'active',
     convoy: null,
     yieldReason: null,

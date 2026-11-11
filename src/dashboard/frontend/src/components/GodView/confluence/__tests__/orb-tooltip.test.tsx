@@ -23,7 +23,6 @@ function orb(overrides: Partial<ConfluenceOrb> = {}): ConfluenceOrb {
     role: 'review',
     stage: 'REVIEW',
     title: 'God View Confluence',
-    heat: 0.8,
     state: 'stale',
     convoy: [
       { agentId: 'security', role: 'security', model: 'claude-sonnet-5', status: 'running' },

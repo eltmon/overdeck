@@ -43,7 +43,6 @@ export interface ConfluenceOrb {
   role: string;
   stage: Stage;
   title: string;
-  heat: number;
   state: OrbState;
   convoy: readonly ConfluenceConvoyMember[] | null;
   yieldReason: string | null;
@@ -595,7 +594,6 @@ function parkedOnlyOrb(row: ParkedRowView, issue: IssueRow | undefined): Conflue
     role: 'work',
     stage: 'WORK',
     title: issue?.title ?? row.issueId,
-    heat: 0.04,
     state: 'stale',
     convoy: null,
     yieldReason: null,
@@ -692,7 +690,6 @@ export function useConfluenceOrbs(
         role: stage === 'MERGE' ? 'ship' : (primary.role ?? 'work'),
         stage,
         title: issue?.title ?? id,
-        heat: Math.min(1, 0.25 + issueAgents.filter((agent) => activeStatus(agent.status)).length * 0.15),
         state: classifyOrb({
           paused: voters.some((agent) => agent.paused === true),
           yieldedByScheduler,
