@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5153",
   "created": "2026-11-11T14:43:19.840Z",
-  "updated": "2026-11-11T15:50:03.589Z",
+  "updated": "2026-11-11T15:51:43.864Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -388,6 +388,11 @@
     "settings-identities.ac4": {
       "status": "completed",
       "doneAt": "2026-11-11T15:50:03.589Z"
+    },
+    "sweep-final-check": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5153",
+      "claimedAt": "2026-11-11T15:51:42.995Z"
     }
   }
 }
