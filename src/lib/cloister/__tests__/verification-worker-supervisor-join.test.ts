@@ -8,7 +8,7 @@
  * checking head and tree at dispatch time instead.
  */
 import { execFile, execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
@@ -53,7 +53,7 @@ vi.mock('../verification-worker-launcher.js', () => ({
   launchVerificationWorker: ({ request }: { request: string }) => {
     const { resultPath } = JSON.parse(request) as { resultPath: string };
     mocks.launches.push({ resultPath });
-    writeFileSync(resultPath, JSON.stringify(mocks.results.shift() ?? { outcome: 'passed' }));
+    writeResult(resultPath, mocks.results.shift() ?? { outcome: 'passed' });
     return { pid: FRESH_PID, unref: () => undefined };
   },
 }));
@@ -67,6 +67,21 @@ import {
   readVerificationWorkerState,
   runSupervisedVerification,
 } from '../verification-worker-supervisor.js';
+
+/**
+ * Write a worker result. A pass is journalled first with the head it verified,
+ * as the runner does (PAN-4622 marks only a journalled head as owed).
+ */
+function writeResult(resultPath: string, outcome: Record<string, unknown>): void {
+  if (outcome['outcome'] === 'passed') {
+    const head8 = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: mocks.workspace, encoding: 'utf-8' }).trim().slice(0, 8);
+    mkdirSync(join(mocks.workspace, '.overdeck'), { recursive: true });
+    appendFileSync(join(mocks.workspace, '.overdeck', 'pipeline.jsonl'), `${JSON.stringify({
+      at: new Date().toISOString(), type: 'verification.passed', issueId: 'PAN-1', source: 'request-review', data: { head: head8 },
+    })}\n`);
+  }
+  writeFileSync(resultPath, JSON.stringify(outcome));
+}
 
 const LIVE_PID = 4_000_001;
 const FRESH_PID = 4_000_002;
@@ -117,7 +132,7 @@ function registerLiveWorker(headAnchor: string, extra: Record<string, unknown> =
 /** A request-review worker on `headAnchor` that exited after writing `outcome`, unconsumed. */
 function registerFinishedWorker(headAnchor: string, outcome: Record<string, unknown> = { outcome: 'passed' }): string {
   const resultPath = registerLiveWorker(headAnchor, { logPrefix: 'request-review', options: {} });
-  writeFileSync(resultPath, JSON.stringify(outcome));
+  writeResult(resultPath, outcome);
   alivePids.delete(LIVE_PID);
   return resultPath;
 }
@@ -132,7 +147,7 @@ async function joinAndFinish(resultPath: string, run: () => Promise<unknown>): P
   let waiting!: () => void;
   const sleeping = new Promise<void>((resolve) => { waiting = resolve; });
   onWaitProbe = () => {
-    writeFileSync(resultPath, JSON.stringify({ outcome: 'passed' }));
+    writeResult(resultPath, { outcome: 'passed' });
     waiting();
   };
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
@@ -381,7 +396,7 @@ describe('re-attaching on dashboard boot (PAN-4532)', () => {
     let waiting!: () => void;
     const sleeping = new Promise<void>((resolve) => { waiting = resolve; });
     onWaitProbe = () => {
-      writeFileSync(liveResult, JSON.stringify({ outcome: 'passed' }));
+      writeResult(liveResult, { outcome: 'passed' });
       waiting();
     };
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
@@ -500,6 +515,37 @@ describe('a review dispatch owed across a restart (PAN-4622)', () => {
     expect(readVerificationWorkerState('PAN-1')?.dispatchOwed?.head).toBe(headB);
   });
 
+  it('an agent commit between the pass and the take gets no marker: that head was never verified', async () => {
+    const liveResult = registerLiveWorker(commit('a'), { logPrefix: 'request-review', options: {} });
+    let waiting!: () => void;
+    const sleeping = new Promise<void>((resolve) => { waiting = resolve; });
+    onWaitProbe = () => {
+      writeResult(liveResult, { outcome: 'passed' });
+      commit('b');
+      waiting();
+    };
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const outcome = review();
+    await sleeping;
+    await vi.advanceTimersByTimeAsync(250);
+
+    expect(await outcome).toEqual({ outcome: 'passed' });
+    expect(readVerificationWorkerState('PAN-1')?.resultConsumedAt).toEqual(expect.any(String));
+    expect(readVerificationWorkerState('PAN-1')?.dispatchOwed).toBeUndefined();
+  });
+
+  it('a resume with no marker checks only the tree: clean dispatches, dirty declines with the current head', async () => {
+    const head = commit('a');
+    expect(await confirmResumedDispatch('PAN-1', mocks.workspace, dirtyError)).toBe(true);
+
+    writeFileSync(join(mocks.workspace, 'a'), 'installing');
+    expect(await confirmResumedDispatch('PAN-1', mocks.workspace, dirtyError)).toBe(false);
+    expect(journalTail()).toMatchObject({
+      type: 'review.resume-declined',
+      data: { reason: 'the working tree has uncommitted changes', head: head.slice(0, 8) },
+    });
+  });
+
   /** A live worker at boot with a tracked file modified; it writes `passed` while joined. */
   function liveWorkerWithDirtyTree(cleanBeforePass: boolean): void {
     const liveResult = registerLiveWorker(commit('a'), { logPrefix: 'request-review', options: {} });
@@ -508,7 +554,7 @@ describe('a review dispatch owed across a restart (PAN-4622)', () => {
     waitProbeAt = 3;
     onWaitProbe = () => {
       if (cleanBeforePass) git('checkout', '--', 'a');
-      writeFileSync(liveResult, JSON.stringify({ outcome: 'passed' }));
+      writeResult(liveResult, { outcome: 'passed' });
     };
   }
 

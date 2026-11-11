@@ -550,7 +550,10 @@ worker already ran:
   `request-review` waiter takes a `passed` result, the same atomic write that
   records `resultConsumedAt` records `dispatchOwed: { head, takenAt }`. `head`
   is the workspace head when the pass is taken, after the worker's own sync
-  merge, so it is the head the door pushes. The door clears the marker first
+  merge, so it is the head the door pushes. The marker is written only when
+  that head is the one the worker journalled in its `verification.passed`
+  (primary head8); an agent commit that landed between the pass and the take
+  gets no marker, because nothing verified it. The door clears the marker first
   thing after the review role spawns; a gated or failed spawn keeps it. While
   the marker is set, a `request-review` request on that exact head with the
   same options gets the pass back with no new worker, whoever sends it (boot
@@ -566,9 +569,10 @@ worker already ran:
   modified for a moment. Instead, after the pass and before the push,
   `cloister/verification-resume-dispatch.ts` checks that the head still equals
   `dispatchOwed.head` and that the tree is clean (an unreadable tree counts as
-  dirty). If either check fails, nothing is pushed or dispatched, the reason is
+  dirty). A pass with no marker has no head to compare, so only the tree is
+  checked, as the door did before. If either check fails, nothing is pushed or dispatched, the reason is
   journalled as `review.resume-declined` (with the verified primary head8 in
-  `data.head`), and `recoverUndispatchedReviews` treats that tail like an
+  `data.head`, or the current one when there is no marker), and `recoverUndispatchedReviews` treats that tail like an
   undispatched `verification.passed`: it re-requests the review through the
   normal door once the entry is 5 minutes old and the head still matches. The
   marker stays, so that request dispatches without re-running the gates.
@@ -1764,6 +1768,7 @@ One piece of stored pipeline state came back, and it is not a status.
 | `review.verdict-replay-gave-up` | deacon-lite's `recoverStalledReviews`, when a deferred verdict's replay stops: `superseded`, `cap` or `failed` |
 | `review.stalled` | deacon-lite's `recoverSilentReviewers`, before it re-dispatches a silent reviewer (`data.reviewer`, `runId`, `paneState`, `silentForMs`) |
 | `review.stall-escalated` | deacon-lite's `recoverSilentReviewers`, when a re-dispatched reviewer fails again or the re-dispatch itself fails; the issue needs you (`data.reviewer`, `runId`, `paneState`, `reason`) |
+| `review.resume-declined` | `cloister/verification-resume-dispatch.ts` `confirmResumedDispatch`, when a request boot adoption resumed (PAN-4622) reaches dispatch with a moved head or a dirty or unreadable tree; nothing was pushed or dispatched (`data.reason`, `data.head`), and `recoverUndispatchedReviews` re-requests it like an undispatched `verification.passed` |
 | `review.dispatch-failed` | `cloister/review-dispatch-failure.ts` `recordReviewDispatchFailure`, when the terminal backend rejected a review kickoff outright (`invalid_request`, e.g. a lone surrogate on the wire); the issue needs you (`data.reviewer`, `data.error`) — there was never a reviewer to recover, so no deacon-lite routine re-dispatches it |
 | `merge.attempted` | the MERGE door in `routes/workspaces/merge-ops.ts`, once the merge holds the project's merge slot |
 | `merge.failed` | merge-ops' own `setStatus`, the single funnel every failing exit of `triggerMerge` passes through |
@@ -2003,7 +2008,9 @@ observe and nudge — none reconciles a stored copy of anything:
    Its tail check requires the journal's LAST entry to itself be a
    `request-review` `verification.passed` (PAN-4506): a later
    `review.dispatch-failed` entry fails that check, so a kickoff the backend
-   rejected outright is left alone rather than re-requested.
+   rejected outright is left alone rather than re-requested. A
+   `review.resume-declined` tail (PAN-4622) passes it: boot adoption took the
+   pass but did not dispatch, so the review is still undispatched.
 8. `recoverSilentReviewers` (`cloister/silent-reviewer-recovery.ts`,
    PAN-4433) — re-dispatches, once per run, a reviewer that was dispatched but
    never produced output, and escalates a second failure to the operator.

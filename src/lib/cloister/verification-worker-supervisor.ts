@@ -4,6 +4,9 @@ import { join } from 'node:path';
 import { loadConfigSync } from '../config-yaml/load.js';
 import { getOverdeckHome, packageRoot } from '../paths.js';
 import { snapshotWorkspaceHeads, type HeadAnchor } from '../git-utils.js';
+import { resolveWorkspaceRepoRoots } from '../project-repos.js';
+import { lastPipelineEntry } from './pipeline-journal.js';
+import { primaryShaFromAnchor } from './verified-head.js';
 import { classifyWorkspaceVerificationHead, isSameVerificationHead } from './verification-head.js';
 import type { VerificationRunnerOptions, VerificationRunnerOutcome, WorkspaceInfo } from './verification-types.js';
 import { buildVerificationWorkerLaunch, launchVerificationWorker } from './verification-worker-launcher.js';
@@ -193,15 +196,15 @@ export function markVerificationWorkerAdmissionPhase(
  * state. Returns whether the consumption is on disk: adoption uses the result
  * only then, so a failed write can never let one result dispatch twice.
  * PAN-4622: a `request-review` pass also records `dispatchOwed` in the same
- * write, so no restart can land between the two. With no readable head there
- * is nothing to check a resume against, so no marker is written.
+ * write, so no restart can land between the two. The marker is written only
+ * for a head the worker verified (`verifiedOwedHead`).
  */
 async function markResultConsumed(
   state: Pick<WorkerState, 'issueId' | 'runId' | 'workspacePath' | 'logPrefix'>,
   result: VerificationRunnerOutcome,
 ): Promise<boolean> {
   const owesDispatch = result.outcome === 'passed' && state.logPrefix === 'request-review';
-  const head = owesDispatch ? await snapshotWorkspaceHeads(state.issueId, state.workspacePath).catch(() => undefined) : undefined;
+  const head = owesDispatch ? await verifiedOwedHead(state.issueId, state.workspacePath) : undefined;
   const current = readVerificationWorkerState(state.issueId);
   if (!current || current.runId !== state.runId) return false;
   const now = new Date().toISOString();
@@ -215,6 +218,21 @@ async function markResultConsumed(
   } catch {
     return false;
   }
+}
+
+/**
+ * PAN-4622: the workspace head, if it is the head the worker journalled in its
+ * `verification.passed` (primary head8). An agent commit that landed between
+ * the pass and the take is unverified, so it gets no marker, and neither does
+ * a head that cannot be read or a journal whose last verification entry is
+ * not a pass.
+ */
+async function verifiedOwedHead(issueId: string, workspacePath: string): Promise<HeadAnchor | undefined> {
+  const head = await snapshotWorkspaceHeads(issueId, workspacePath).catch(() => undefined);
+  const pass = lastPipelineEntry(workspacePath, 'verification.');
+  if (!head || pass?.type !== 'verification.passed') return undefined;
+  const sha = primaryShaFromAnchor(head, resolveWorkspaceRepoRoots(issueId, workspacePath)[0]?.repoKey);
+  return sha?.slice(0, 8) === pass.data?.['head'] ? head : undefined;
 }
 
 /**
