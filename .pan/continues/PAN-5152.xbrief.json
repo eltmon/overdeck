@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5152",
   "created": "2026-11-11T14:36:40.308Z",
-  "updated": "2026-11-11T16:06:05.158Z",
+  "updated": "2026-11-11T16:06:13.675Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -390,6 +390,11 @@
     "wi21-doctor-jira.ac3": {
       "status": "completed",
       "doneAt": "2026-11-11T16:06:05.158Z"
+    },
+    "wi22-cli-project-jira": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5152",
+      "claimedAt": "2026-11-11T16:06:13.675Z"
     }
   }
 }
