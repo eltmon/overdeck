@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5124",
   "created": "2026-11-11T07:40:41.890Z",
-  "updated": "2026-11-11T08:23:20.449Z",
+  "updated": "2026-11-11T08:25:34.846Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -158,9 +158,22 @@
       "doneAt": "2026-11-11T08:23:13.322Z"
     },
     "haiku-config-defaults": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5124",
-      "claimedAt": "2026-11-11T08:23:20.449Z"
+      "claimedAt": "2026-11-11T08:23:20.449Z",
+      "doneAt": "2026-11-11T08:25:34.846Z"
+    },
+    "haiku-config-defaults.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:25:34.846Z"
+    },
+    "haiku-config-defaults.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:25:34.846Z"
+    },
+    "haiku-config-defaults.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:25:34.846Z"
     }
   }
 }
