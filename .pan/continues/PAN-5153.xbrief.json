@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5153",
   "created": "2026-11-11T14:43:19.840Z",
-  "updated": "2026-11-11T15:24:38.649Z",
+  "updated": "2026-11-11T15:26:08.587Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -206,9 +206,18 @@
       "doneAt": "2026-11-11T15:24:32.670Z"
     },
     "check-run-per-repo": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5153",
-      "claimedAt": "2026-11-11T15:24:38.649Z"
+      "claimedAt": "2026-11-11T15:24:38.649Z",
+      "doneAt": "2026-11-11T15:26:08.587Z"
+    },
+    "check-run-per-repo.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:26:08.587Z"
+    },
+    "check-run-per-repo.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:26:08.587Z"
     }
   }
 }
