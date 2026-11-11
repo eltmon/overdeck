@@ -20,6 +20,7 @@ export const DEFAULT_TTLS: Record<string, number> = {
   github: 60,
   linear: 30,
   rally: 120,
+  jira: 120,
 };
 
 // L1 in-memory cache entry
@@ -389,7 +390,7 @@ export class CacheService {
   }> {
     const result: Record<string, any> = {};
 
-    for (const tracker of ['github', 'linear', 'rally']) {
+    for (const tracker of ['github', 'linear', 'rally', 'jira']) {
       const limit = this.getRateLimit(tracker);
       const countStmt = this.db.prepare(
         'SELECT COUNT(*) as cnt, MAX(last_fetched_at) as latest FROM api_cache WHERE tracker = ?'

@@ -252,7 +252,7 @@ export class IssueDataService {
     this.cache = cache;
     this.loadConfig = options?.loadConfig ?? loadConfigSync;
 
-    for (const tracker of ['github', 'linear', 'rally'] as const) {
+    for (const tracker of ['github', 'linear', 'rally', 'jira'] as const) {
       this.trackers[tracker] = {
         timer: null,
         currentInterval: POLL_INTERVALS[tracker].default,
@@ -303,6 +303,7 @@ export class IssueDataService {
       this.pollGitHub(),
       this.pollLinear(),
       this.pollRally(),
+      this.pollJira(),
     ]).then(() => {
       // Final snapshot push after all initial fetches complete
       this.pushSnapshot();
@@ -310,6 +311,7 @@ export class IssueDataService {
       this.scheduleNext('github');
       this.scheduleNext('linear');
       this.scheduleNext('rally');
+      this.scheduleNext('jira');
     });
   }
 
@@ -331,7 +333,7 @@ export class IssueDataService {
    */
   async clearCacheAndRefresh(): Promise<void> {
     // Clear SQLite + L1 cache for all trackers
-    for (const tracker of ['github', 'linear', 'rally']) {
+    for (const tracker of ['github', 'linear', 'rally', 'jira']) {
       this.cache.invalidate(tracker);
       this.trackers[tracker].lastFetchedIssues = [];
       this.trackers[tracker].lastFetchedAt = null;
@@ -343,9 +345,10 @@ export class IssueDataService {
       this.pollGitHub(),
       this.pollLinear(),
       this.pollRally(),
+      this.pollJira(),
     ]);
     this.pushSnapshot();
-    for (const tracker of ['github', 'linear', 'rally']) this.resetPollCadence(tracker);
+    for (const tracker of ['github', 'linear', 'rally', 'jira']) this.resetPollCadence(tracker);
   }
 
   /**
@@ -369,14 +372,14 @@ export class IssueDataService {
 
   /**
    * Look up which tracker an issue belongs to by its identifier.
-   * Returns 'github' | 'linear' | 'rally' | null.
+   * Returns 'github' | 'linear' | 'rally' | 'jira' | null.
    */
-  getIssueSource(identifier: string): 'github' | 'linear' | 'rally' | null {
+  getIssueSource(identifier: string): 'github' | 'linear' | 'rally' | 'jira' | null {
     const id = identifier.toLowerCase();
     for (const [trackerName, state] of Object.entries(this.trackers)) {
       for (const issue of state.lastFetchedIssues) {
         if ((issue.identifier || '').toLowerCase() === id) {
-          return trackerName as 'github' | 'linear' | 'rally';
+          return trackerName as 'github' | 'linear' | 'rally' | 'jira';
         }
       }
     }
@@ -426,6 +429,7 @@ export class IssueDataService {
       ...this.trackers.github.lastFetchedIssues,
       ...this.trackers.linear.lastFetchedIssues,
       ...this.trackers.rally.lastFetchedIssues,
+      ...this.trackers.jira.lastFetchedIssues,
     ];
 
     // Merge issues backfilled on demand (PAN-3659). Fetched rows win on
@@ -582,6 +586,7 @@ export class IssueDataService {
       case 'github': await this.pollGitHub(); break;
       case 'linear': await this.pollLinear(); break;
       case 'rally': await this.pollRally(); break;
+      case 'jira': await this.pollJira(); break;
     }
 
     this.pushSnapshot();
@@ -675,6 +680,7 @@ export class IssueDataService {
           }
           case 'linear': await this.pollLinear(); break;
           case 'rally': await this.pollRally(); break;
+          case 'jira': await this.pollJira(); break;
         }
       } catch (err: any) {
         console.error(`[IssueDataService] Error polling ${tracker}:`, err.message);
@@ -726,7 +732,7 @@ export class IssueDataService {
       }
     } catch { /* ignore */ }
 
-    for (const tracker of ['github', 'linear', 'rally']) {
+    for (const tracker of ['github', 'linear', 'rally', 'jira']) {
       const cached = this.cache.getStale(tracker, 'issues');
       if (cached?.data) {
         // Sanitize stale Rally cache: rawTrackerState may be an object from pre-PAN-201 data
@@ -820,7 +826,7 @@ export class IssueDataService {
 
   private hasIssueByIdentifier(uppercaseIdentifier: string): boolean {
     const lower = uppercaseIdentifier.toLowerCase();
-    for (const tracker of ['github', 'linear', 'rally'] as const) {
+    for (const tracker of ['github', 'linear', 'rally', 'jira'] as const) {
       if (this.trackers[tracker]?.lastFetchedIssues.some(
         (issue: any) => issue?.identifier?.toLowerCase() === lower,
       )) {
@@ -834,7 +840,7 @@ export class IssueDataService {
   private pruneBackfilledIssues(): void {
     if (this.backfilledIssues.size === 0) return;
     const fetched = new Set<string>();
-    for (const tracker of ['github', 'linear', 'rally'] as const) {
+    for (const tracker of ['github', 'linear', 'rally', 'jira'] as const) {
       for (const issue of this.trackers[tracker]?.lastFetchedIssues ?? []) {
         const identifier = issue?.identifier?.toLowerCase();
         if (identifier) fetched.add(identifier);
@@ -904,6 +910,7 @@ export class IssueDataService {
       ...this.trackers.github.lastFetchedIssues,
       ...this.trackers.linear.lastFetchedIssues,
       ...this.trackers.rally.lastFetchedIssues,
+      ...this.trackers.jira.lastFetchedIssues,
     ];
   }
 
@@ -1720,6 +1727,22 @@ export class IssueDataService {
         : err.message;
       console.error('[IssueDataService] Rally poll error:', errorMsg);
       this.trackers.rally.lastError = errorMsg;
+    }
+  }
+
+  /** Poll every `tracker: jira` project on the Rally cadence (PAN-5152). */
+  private async pollJira(): Promise<void> {
+    if (!this.cache.isStale('jira', 'issues') && this.trackers.jira.lastFetchedIssues.length > 0) return;
+    const { fetchJiraDashboardIssues } = await import('./jira-issue-poller.js');
+    const rows = await fetchJiraDashboardIssues();
+    const changed = issuesChanged(rows, this.trackers.jira.lastFetchedIssues);
+    this.trackers.jira.lastFetchedIssues = rows;
+    this.trackers.jira.lastFetchedAt = new Date().toISOString();
+    this.trackers.jira.lastError = null;
+    this.cache.set('jira', 'issues', rows, { ttlSeconds: DEFAULT_TTLS.jira });
+    if (changed) {
+      this.pushUpdated();
+      this.pushMeta();
     }
   }
 }
