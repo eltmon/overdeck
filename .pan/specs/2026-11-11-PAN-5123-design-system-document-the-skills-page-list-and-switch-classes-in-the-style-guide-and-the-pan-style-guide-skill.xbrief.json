@@ -4,17 +4,17 @@
     "created": "2026-11-11T07:28:34Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5123: Design system: document the Skills page list and switch classes in the style guide and the pan-style-guide skill",
-    "updated": "2026-11-11T07:29:55.649Z"
+    "updated": "2026-11-11T11:13:55.163Z"
   },
   "plan": {
     "id": "pan-5123",
     "title": "Design system: document the Skills page list and switch classes in the style guide and the pan-style-guide skill",
-    "status": "proposed",
+    "status": "running",
     "uid": "5a04674c-e741-42ad-9423-ab297c3de5d0",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-11-11T07:28:34Z",
-    "updated": "2026-11-11T07:29:55.649Z",
+    "updated": "2026-11-11T11:13:55.163Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5123",
@@ -399,5 +399,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
