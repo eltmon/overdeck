@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { modelSupportsSamplingParams } from '../../model-capabilities.js';
+import { getModelEffortLevels, modelSupportsSamplingParams } from '../../model-capabilities.js';
 import {
   buildJsonExtractionPrompt,
   calculateExtractionCost,
@@ -51,6 +51,9 @@ export class AnthropicExtractionProvider implements ExtractionProvider {
           max_tokens: options.maxTokens ?? 2048,
           // Sampling-restricted models (Sonnet 5+, Opus 4.7+, Fable) 400 on temperature (PAN-4327).
           ...(modelSupportsSamplingParams(model) ? { temperature: options.temperature ?? 0 } : {}),
+          // PAN-5124: Haiku 5.5 thinks at medium by default and thinking counts
+          // toward max_tokens; extraction needs the JSON, not the reasoning (D3).
+          ...(getModelEffortLevels(model)?.includes('low') ? { output_config: { effort: 'low' as const } } : {}),
           messages: [
             {
               role: 'user',

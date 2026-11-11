@@ -158,6 +158,33 @@ describe('memory extraction providers', () => {
     expect(create.mock.calls[0][0]).toMatchObject({ temperature: 0 });
   });
 
+  // PAN-5124: Haiku 5.5 thinks by default and thinking counts toward max_tokens.
+  it('sends output_config effort low for a model whose capability row lists low', async () => {
+    const create = vi.fn(async () => ({
+      id: 'msg-4',
+      content: [{ type: 'text', text: '{"summary":"ok"}' }],
+      usage: { input_tokens: 10, output_tokens: 4 },
+    }));
+    const provider = new AnthropicExtractionProvider({ messages: { create } } as never);
+
+    await provider.extract<ExtractedPayload>('summarize', { type: 'object' }, { model: 'claude-haiku-5-5' });
+
+    expect(create.mock.calls[0][0]).toMatchObject({ output_config: { effort: 'low' }, max_tokens: 2048 });
+  });
+
+  it('sends no output_config for Haiku 4.5, which has no effort control', async () => {
+    const create = vi.fn(async () => ({
+      id: 'msg-5',
+      content: [{ type: 'text', text: '{"summary":"ok"}' }],
+      usage: { input_tokens: 10, output_tokens: 4 },
+    }));
+    const provider = new AnthropicExtractionProvider({ messages: { create } } as never);
+
+    await provider.extract<ExtractedPayload>('summarize', { type: 'object' }, { model: 'claude-haiku-4-5' });
+
+    expect(create.mock.calls[0][0]).not.toHaveProperty('output_config');
+  });
+
   // PAN-4370 WI-3: the anthropic provider must not throw the SDK's generic
   // "Could not resolve authentication method" when no client is injected and
   // the environment has no credentials — it should raise a typed, actionable
