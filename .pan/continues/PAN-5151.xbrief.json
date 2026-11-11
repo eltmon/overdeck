@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5151",
   "created": "2026-11-11T14:34:32.001Z",
-  "updated": "2026-11-11T14:47:51.329Z",
+  "updated": "2026-11-11T14:50:24.545Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -74,6 +74,11 @@
     "pin-dashboard-boot.ac3": {
       "status": "completed",
       "doneAt": "2026-11-11T14:47:51.328Z"
+    },
+    "default-flip": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5151",
+      "claimedAt": "2026-11-11T14:50:24.545Z"
     }
   }
 }
