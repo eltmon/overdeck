@@ -40,6 +40,8 @@ const { resolveDashboardCredential } = await import('../routes/dashboard-auth.js
 const {
   connectorsRouteLayer,
   handleConnectorList,
+  handleConnectorNoticeDismiss,
+  handleConnectorNotices,
   handleConnectorRequestCancel,
   handleConnectorsExchange,
   handleConnectorPairing,
@@ -414,5 +416,69 @@ describe('POST /api/connectors/exchange (PAN-4949 D-8, D-17)', () => {
     expect(remoteGateRejection(request(undefined), pairing)).toBeNull();
     expect(remoteGateRejection(request('127.0.0.1'), null)).toEqual({ status: 401 });
     expect(remoteGateRejection(request(undefined), { mode: 'link', remoteKeyHex: CONNECTOR_KEY, pairingId: null })).toEqual({ status: 401 });
+  });
+});
+
+describe('GET /api/connectors/notices and POST /api/connectors/requests/:id/dismiss (PAN-5070 W-5)', () => {
+  it('lists a notice for a paired connector with no pairing-link text, drops it when the connector is revoked', async () => {
+    const { json } = await read(await handleConnectorsExchange(exchangeBody(), await connectorPairingMarker(CONNECTOR_KEY)));
+    const { status, json: noticesJson } = await read(await handleConnectorNotices('root-session'));
+    expect(status).toBe(200);
+    expect(noticesJson.notices).toMatchObject([{ connectorId: json.tokenId, name: 'bot:desk', scopes: ['read:state', 'tell'] }]);
+    expect((noticesJson.notices as Array<Record<string, unknown>>)[0]).toHaveProperty('id');
+    expect((noticesJson.notices as Array<Record<string, unknown>>)[0]).toHaveProperty('pairedAt');
+    expect(JSON.stringify(noticesJson)).not.toContain('overdeck-connector:');
+
+    await handleConnectorRevoke('internal-token', json.tokenId as string);
+    expect((await read(await handleConnectorNotices('root-session'))).json.notices).toEqual([]);
+  });
+
+  it('refuses a non-root credential kind for notices and dismiss', async () => {
+    expect((await read(await handleConnectorNotices('device'))).status).toBe(403);
+    expect((await read(await handleConnectorNoticeDismiss('device', 'whatever'))).status).toBe(403);
+  });
+
+  it('dismisses a notice once, then 404s for an unknown id', async () => {
+    const { json } = await read(await handleConnectorsExchange(exchangeBody(), await connectorPairingMarker(CONNECTOR_KEY)));
+    const { notices } = (await read(await handleConnectorNotices('root-session'))).json as { notices: Array<{ id: string }> };
+    const noticeId = notices[0]!.id;
+
+    const dismissed = await read(await handleConnectorNoticeDismiss('root-session', noticeId));
+    expect(dismissed.status).toBe(200);
+    expect(dismissed.json).toEqual({ ok: true });
+    expect((await read(await handleConnectorNotices('root-session'))).json.notices).toEqual([]);
+
+    const unknown = await read(await handleConnectorNoticeDismiss('root-session', 'no-such-id'));
+    expect(unknown.status).toBe(404);
+    expect(unknown.json.error).toBe('no connector notice with id no-such-id');
+  });
+
+  it('through the real routes with the internal token: empty notices, and dismiss of an unknown id is 404', async () => {
+    const INTERNAL_TOKEN = 'pan-5070-notices-internal-token-0123456789';
+    await writeFile(join(home, 'internal-token'), INTERNAL_TOKEN, { mode: 0o600 });
+    _resetInternalTokenCacheForTests();
+    cleanups.push(async () => {
+      await rm(join(home, 'internal-token'), { force: true });
+      _resetInternalTokenCacheForTests();
+    });
+
+    const headers = { [INTERNAL_TOKEN_HEADER]: INTERNAL_TOKEN };
+    const run = async (method: 'GET' | 'POST', path: string) => {
+      const init: RequestInit = { method, headers: method === 'POST' ? { 'Content-Type': 'application/json', ...headers } : headers };
+      const request = HttpServerRequest.fromWeb(new Request(`http://localhost${path}`, init)).modify({ remoteAddress: Option.some('127.0.0.1') });
+      const response = await Effect.runPromise(Effect.scoped(Effect.flatMap(
+        HttpRouter.toHttpEffect(connectorsRouteLayer),
+        (app) => Effect.provideService(app, HttpServerRequest.HttpServerRequest, request),
+      )));
+      return read(response);
+    };
+
+    const notices = await run('GET', '/api/connectors/notices');
+    expect(notices.status).toBe(200);
+    expect(notices.json).toEqual({ notices: [] });
+
+    const dismiss = await run('POST', '/api/connectors/requests/no-such-id/dismiss');
+    expect(dismiss.status).toBe(404);
+    expect(dismiss.json.error).toBe('no connector notice with id no-such-id');
   });
 });

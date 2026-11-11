@@ -480,6 +480,8 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/connectors',                         kind: 'http', disposition: 'READ',        door: 'access-tokens.listAccessTokens (kind connector) + connector-pairing.listConnectorRequests (PAN-4927, PAN-5070)' },
   { surface: 'DELETE /api/connectors/:id',                  kind: 'http', disposition: 'WRITE',       door: 'access-tokens.revokeAccessToken (connector) (PAN-4927)' },
   { surface: 'DELETE /api/connectors/requests/:id',         kind: 'http', disposition: 'WRITE',       door: 'connector-pairing.cancelConnectorRequest (PAN-5070, root only)' },
+  { surface: 'GET /api/connectors/notices',                 kind: 'http', disposition: 'READ',        door: 'connector-pairing.listConnectorNotices + access-tokens.listActiveRecordsOfKind (PAN-5070, root only)' },
+  { surface: 'POST /api/connectors/requests/:id/dismiss',   kind: 'http', disposition: 'WRITE',       door: 'connector-pairing.dismissConnectorNotice (PAN-5070, root only)' },
   { surface: 'DELETE /api/connectors/self',                 kind: 'http', disposition: 'WRITE',       door: 'access-tokens.revokeAccessToken (own connector token) (PAN-4927)' },
   { surface: 'GET /api/connectors/self',                    kind: 'http', disposition: 'READ',        door: 'access-tokens.listAccessTokens (own connector record) (PAN-5069)' },
   { surface: 'POST /api/connectors/exchange',              kind: 'http', disposition: 'WRITE',       door: 'access-tokens.createAccessToken (connector) (PAN-4927, pairing channel only)' },

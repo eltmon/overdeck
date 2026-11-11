@@ -46,7 +46,9 @@ import {
   cancelConnectorRequest,
   CONNECT_PLATFORMS,
   type ConnectPlatform,
+  dismissConnectorNotice,
   issueConnectorPairing,
+  listConnectorNotices,
   listConnectorRequests,
   markConnectorRequestPaired,
   takeConnectorIntent,
@@ -125,6 +127,23 @@ export async function handleConnectorPairing(credentialKind: CredentialKind, bod
     details: JSON.stringify({ expiresAt, scopes: body.scopes, platform: body.platform, requestId }),
   });
   return noStore(jsonResponse({ requestId, pairingString, expiresAt }));
+}
+
+/** Paired, undismissed connector notices for connectors that are still active (FR-15, root only). */
+export async function handleConnectorNotices(credentialKind: CredentialKind): Promise<HttpServerResponse.HttpServerResponse> {
+  const refused = rejectNonRoot(credentialKind);
+  if (refused) return refused;
+  const active = new Set(listActiveRecordsOfKind('connector').map((record) => record.id));
+  const notices = listConnectorNotices().filter((notice) => active.has(notice.connectorId));
+  return noStore(jsonResponse({ notices }));
+}
+
+/** Dismiss a paired connector's "connected" notice (FR-15, root only). */
+export async function handleConnectorNoticeDismiss(credentialKind: CredentialKind, id: string): Promise<HttpServerResponse.HttpServerResponse> {
+  const refused = rejectNonRoot(credentialKind);
+  if (refused) return refused;
+  if (!dismissConnectorNotice(id)) return noStore(jsonResponse({ error: `no connector notice with id ${id}` }, { status: 404 }));
+  return noStore(jsonResponse({ ok: true }));
 }
 
 export async function handleConnectorList(credentialKind: CredentialKind): Promise<HttpServerResponse.HttpServerResponse> {
@@ -347,4 +366,37 @@ const requestCancelRoute = HttpRouter.add(
   }),
 );
 
-export const connectorsRouteLayer = Layer.mergeAll(exchangeRoute, pairingRoute, listRoute, selfRoute, selfRevokeRoute, revokeRoute, requestCancelRoute);
+const noticesRoute = HttpRouter.add(
+  'GET',
+  '/api/connectors/notices',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnauthorizedDashboardRequest(request);
+    if (authError) return noStore(authError);
+    return yield* Effect.promise(() => handleConnectorNotices(resolveRequestCredential(request)?.kind));
+  }),
+);
+
+const noticeDismissRoute = HttpRouter.add(
+  'POST',
+  '/api/connectors/requests/:id/dismiss',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return noStore(authError);
+    const id = (yield* HttpRouter.params)['id'] ?? '';
+    return yield* Effect.promise(() => handleConnectorNoticeDismiss(resolveRequestCredential(request)?.kind, id));
+  }),
+);
+
+export const connectorsRouteLayer = Layer.mergeAll(
+  exchangeRoute,
+  pairingRoute,
+  listRoute,
+  selfRoute,
+  selfRevokeRoute,
+  revokeRoute,
+  requestCancelRoute,
+  noticesRoute,
+  noticeDismissRoute,
+);
