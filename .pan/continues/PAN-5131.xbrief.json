@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5131",
   "created": "2026-11-11T08:19:14.972Z",
-  "updated": "2026-11-11T08:46:41.992Z",
+  "updated": "2026-11-11T08:46:52.189Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -206,6 +206,11 @@
     "cast-tracker-ids.ac4": {
       "status": "completed",
       "doneAt": "2026-11-11T08:46:41.992Z"
+    },
+    "top-bar-dead-stats": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5131",
+      "claimedAt": "2026-11-11T08:46:52.189Z"
     }
   }
 }
