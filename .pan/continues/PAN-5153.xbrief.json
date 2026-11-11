@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5153",
   "created": "2026-11-11T14:43:19.840Z",
-  "updated": "2026-11-11T15:41:38.656Z",
+  "updated": "2026-11-11T15:41:50.761Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -326,6 +326,11 @@
     "cloister-status-bot-name.ac2": {
       "status": "completed",
       "doneAt": "2026-11-11T15:41:38.656Z"
+    },
+    "sidebar-owner-groups": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5153",
+      "claimedAt": "2026-11-11T15:41:50.761Z"
     }
   }
 }
