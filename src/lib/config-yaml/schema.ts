@@ -57,10 +57,10 @@ export interface TmuxConfig {
 
 export interface MemoryConfig {
   extraction?: {
-    provider?: 'anthropic' | 'cliproxy';
+    provider?: 'anthropic' | 'cliproxy' | 'claude-cli';
     model?: string;
     per_day_cost_cap_usd?: number;
-    fallback_chain?: Array<{ provider: 'anthropic' | 'cliproxy'; model: string }>;
+    fallback_chain?: Array<{ provider: 'anthropic' | 'cliproxy' | 'claude-cli'; model: string }>;
   };
   features?: {
     observations?: boolean;
@@ -923,10 +923,10 @@ export interface NormalizedConfig {
   /** Durable memory extraction and retrieval configuration */
   memory: {
     extraction: {
-      provider?: 'anthropic' | 'cliproxy';
+      provider?: 'anthropic' | 'cliproxy' | 'claude-cli';
       model?: string;
       perDayCostCapUsd?: number;
-      fallbackChain: Array<{ provider: 'anthropic' | 'cliproxy'; model: string }>;
+      fallbackChain: Array<{ provider: 'anthropic' | 'cliproxy' | 'claude-cli'; model: string }>;
     };
     observationsEnabled: boolean;
     promptTimeInjectionEnabled: boolean;

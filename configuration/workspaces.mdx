@@ -350,6 +350,19 @@ reads API keys and auth tokens from the environment, so a host with no key
 exported fails every extraction and every query expansion the same way,
 even though `claude` itself works fine interactively.
 
+A host with only a Claude subscription login — no `ANTHROPIC_API_KEY` or
+`ANTHROPIC_AUTH_TOKEN` exported anywhere — can instead set
+`memory.extraction.provider: claude-cli` in `~/.overdeck/config.yaml`, or
+pick **Claude Code (subscription)** in Settings → Memory → Extraction
+provider. This provider spawns `claude -p` and authenticates with the
+Claude Code login of the user that runs the dashboard: run `claude` as
+that user and complete `/login` once. It is a `background`-latency
+provider — a process spawn taking about 2-6 seconds, bounded by
+`memory.worker_concurrency` (default 4) — so query expansion always skips
+it (see `provider-non-interactive` below). Its notional per-call cost still
+counts toward `memory.extraction.per_day_cost_cap_usd`. Applying the
+Anthropic model preset resets the provider back to `anthropic`.
+
 `pan memory doctor` shows a `failures=<reason>:<count>` suffix per workspace
 and an indented `cause:` line once a failure has a detail; `pan doctor`
 reports one `Memory extraction` row for whichever workspace has the newest
@@ -359,17 +372,19 @@ catch a missing key even when your own `pan doctor` run happens to have one
 set locally.
 
 `health.json` and `pan memory doctor` use these reasons for a failed extraction
-or query-expansion call; `timeout` is specific to prompt-time query expansion
-and never appears in `health.json`, since a timed-out expansion still lets
-injection continue with the fallback keyword query rather than failing:
+or query-expansion call; `timeout` and `provider-non-interactive` are specific
+to prompt-time query expansion and never appear in `health.json`, since both
+still let injection continue with the fallback keyword query rather than
+failing:
 
 | Reason | Meaning | What to do |
 | --- | --- | --- |
-| `provider-auth-failed` | The configured provider has no working credentials (missing or rejected key/token). | Export `ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN` for the dashboard service and agent sessions, or point `memory.extraction.provider` at one that can authenticate on this host. |
+| `provider-auth-failed` | The configured provider has no working credentials (missing or rejected key/token). | With provider `anthropic`, export `ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN` for the dashboard service and agent sessions. With provider `claude-cli`, run `claude` as the dashboard's user and complete `/login`. Or point `memory.extraction.provider` at whichever one can authenticate on this host. |
 | `extraction-failed` | The provider call failed for a reason other than auth (network error, rate limit, unexpected response shape). | Check `pan memory doctor`'s `cause:` line for the provider's error text; retry once the underlying issue clears. |
 | `malformed-response` | The provider replied, but its output didn't parse as the expected JSON payload. | Usually transient (a truncated or off-schema completion); if it recurs for one model, that model may not follow the extraction schema reliably. |
 | `cost-cap` | Today's memory-extraction spend reached `memory.extraction.per_day_cost_cap_usd`. | Raise the cap, or wait for the next local day. |
 | `timeout` (query expansion only) | Prompt-time query expansion didn't return within its 750 ms budget. | Informational — prompt-time injection still runs, falling back to the raw prompt's keyword query (see below). No action needed unless it's constant, which usually means the provider itself is slow. |
+| `provider-non-interactive` (query expansion only) | The configured provider (and its fallback) is background-latency, such as `claude-cli`, so query expansion did not call it. | Informational. Injection still runs with the raw prompt's keyword query. Add an interactive fallback (`anthropic` or `cliproxy`) to `memory.extraction.fallback_chain` if you want expanded queries. |
 
 ### Reading RAG decision logs
 

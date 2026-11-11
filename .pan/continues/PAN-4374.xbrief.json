@@ -1,0 +1,153 @@
+{
+  "version": "1",
+  "issueId": "PAN-4374",
+  "created": "2026-11-11T12:38:14.502Z",
+  "updated": "2026-11-11T13:22:37.591Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "shared-claude-runner": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4374",
+      "claimedAt": "2026-11-11T12:38:14.502Z",
+      "doneAt": "2026-11-11T12:50:40.506Z"
+    },
+    "shared-claude-runner.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T12:50:40.506Z"
+    },
+    "shared-claude-runner.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T12:50:40.506Z"
+    },
+    "shared-claude-runner.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T12:50:40.506Z"
+    },
+    "shared-claude-runner.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T12:50:40.506Z"
+    },
+    "shared-claude-runner.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-11T12:50:40.506Z"
+    },
+    "claude-cli-provider": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4374",
+      "claimedAt": "2026-11-11T12:50:48.994Z",
+      "doneAt": "2026-11-11T13:10:11.915Z"
+    },
+    "claude-cli-provider.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T13:10:11.915Z"
+    },
+    "claude-cli-provider.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T13:10:11.915Z"
+    },
+    "claude-cli-provider.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T13:10:11.915Z"
+    },
+    "claude-cli-provider.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T13:10:11.915Z"
+    },
+    "claude-cli-extraction-e2e": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4374",
+      "claimedAt": "2026-11-11T13:10:47.670Z",
+      "doneAt": "2026-11-11T13:12:57.917Z"
+    },
+    "claude-cli-extraction-e2e.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T13:12:57.917Z"
+    },
+    "claude-cli-extraction-e2e.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T13:12:57.917Z"
+    },
+    "query-expansion-gate": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4374",
+      "claimedAt": "2026-11-11T13:13:01.891Z",
+      "doneAt": "2026-11-11T13:13:46.486Z"
+    },
+    "query-expansion-gate.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T13:13:46.486Z"
+    },
+    "query-expansion-gate.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T13:13:46.486Z"
+    },
+    "settings-config-union": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4374",
+      "claimedAt": "2026-11-11T13:13:54.489Z",
+      "doneAt": "2026-11-11T13:16:29.046Z"
+    },
+    "settings-config-union.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T13:16:29.046Z"
+    },
+    "settings-config-union.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T13:16:29.046Z"
+    },
+    "settings-ui-options": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4374",
+      "claimedAt": "2026-11-11T13:16:35.431Z",
+      "doneAt": "2026-11-11T13:19:00.578Z"
+    },
+    "settings-ui-options.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T13:19:00.578Z"
+    },
+    "settings-ui-options.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T13:19:00.578Z"
+    },
+    "doctor-fix-text": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4374",
+      "claimedAt": "2026-11-11T13:19:06.769Z",
+      "doneAt": "2026-11-11T13:20:16.414Z"
+    },
+    "doctor-fix-text.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T13:20:16.414Z"
+    },
+    "doctor-fix-text.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T13:20:16.414Z"
+    },
+    "docs-claude-cli-provider": {
+      "status": "completed",
+      "claimedBy": "agent-pan-4374",
+      "claimedAt": "2026-11-11T13:20:21.794Z",
+      "doneAt": "2026-11-11T13:22:37.590Z"
+    },
+    "docs-claude-cli-provider.ac0": {
+      "status": "completed",
+      "doneAt": "2026-11-11T13:22:37.590Z"
+    },
+    "docs-claude-cli-provider.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T13:22:37.590Z"
+    },
+    "docs-claude-cli-provider.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T13:22:37.590Z"
+    },
+    "docs-claude-cli-provider.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T13:22:37.590Z"
+    }
+  }
+}
