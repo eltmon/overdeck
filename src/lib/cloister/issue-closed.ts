@@ -6,7 +6,8 @@ import {
   resolveGitHubIssue,
   resolveTrackerType,
 } from '../tracker-utils.js';
-import { getIssueState, isGitHubAppConfigured } from '../github-app.js';
+import { getIssueState } from '../github-app.js';
+import { appCoversRepo } from '../github-app-installations.js';
 import { getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
 import { createTracker } from '../tracker/factory.js';
 import { LinearTracker } from '../tracker/linear.js';
@@ -36,7 +37,7 @@ export type LiveTrackerIssueState = 'open' | 'closed';
 export async function readLiveTrackerIssueState(issueId: string): Promise<LiveTrackerIssueState> {
   const resolved = resolveGitHubIssue(issueId);
   if (resolved.isGitHub) {
-    if (isGitHubAppConfigured()) {
+    if (await appCoversRepo(resolved.owner, resolved.repo)) {
       const issue = await getIssueState(resolved.owner, resolved.repo, resolved.number);
       return issue.state === 'closed' ? 'closed' : 'open';
     }
@@ -96,7 +97,7 @@ export async function isTrackerIssueClosed(issueId: string): Promise<boolean> {
   }
 
   try {
-    if (isGitHubAppConfigured()) {
+    if (await appCoversRepo(resolved.owner, resolved.repo)) {
       const issue = await getIssueState(resolved.owner, resolved.repo, resolved.number);
       const closed = issue.state === 'closed';
       trackerClosedCache.set(issueId, { closed, checkedAt: now });

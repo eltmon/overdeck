@@ -18,6 +18,8 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
+import { isGitHubAppConfigured } from '../github-app.js';
+import { appCoversRepo } from '../github-app-installations.js';
 import { listOpenGitLabMergeRequests, type GitLabMergeRequestRow } from '../gitlab-merge-requests.js';
 import { bumpIssuePrTabCacheGeneration } from '../../dashboard/server/services/pr-tab-cache.js';
 import { fetchIssuePullRequest, type IssuePullRequestData } from '../overdeck/pull-requests.js';
@@ -152,6 +154,10 @@ export interface PrFactsDeps {
    * (`markerApproversFor`).
    */
   appBotLogin?: () => Promise<string | null>;
+  /** PAN-5153: whether the App covers owner/repo; only there is the bot the sole marker approver. */
+  appCoversRepo?: (owner: string, repo: string) => Promise<boolean>;
+  /** PAN-5153: whether the App is configured on this machine (picks the trust warning). */
+  isAppConfigured?: () => boolean;
   /** #4066 review (R3-2): the account type of comment authors, by comment node id. */
   readAuthorKinds?: ReadAuthorKinds;
 }
@@ -581,6 +587,8 @@ export async function getPrFacts(
 }
 
 let warnedMarkerApprovalTrust = false;
+/** PAN-5153: uncovered repositories already warned about, by lowercase owner/repo. */
+const warnedUncoveredRepos = new Set<string>();
 
 /** Whether a marker comment's author is trusted only if it is one of Overdeck's identities. */
 function markerNeedsIdentity(comment: PrComment): boolean {
@@ -595,22 +603,35 @@ async function withCommentAuthorKinds(pr: IssuePullRequestData, deps: PrFactsDep
 }
 
 /**
- * #4066 review: agents hold the operator's `gh` credentials (`OWNER`), so with
- * the GitHub App configured only its bot approves by marker. Without it, any
- * trusted author does, logged once as operator-credential trust. A failed read
- * approves nothing. `CHANGES_REQUESTED` markers are unaffected.
+ * #4066 review: agents hold the operator's `gh` credentials (`OWNER`), so on a
+ * repository the GitHub App covers only its bot approves by marker. Without the
+ * App, or on a repository it does not cover (PAN-5153, where the verdict posts
+ * as the gh user), any trusted author does, logged once as operator-credential
+ * trust. A failed read approves nothing. `CHANGES_REQUESTED` markers are unaffected.
  */
 async function markerApproversFor(pr: IssuePullRequestData, deps: PrFactsDeps): Promise<MarkerApprovers> {
   const hasApprovalMarker = (pr.comments ?? []).some((comment) => parseVerdictMarker(comment.body) === 'APPROVED');
   if (!hasApprovalMarker) return new Set();
-  let bot: string | null;
-  try {
-    bot = await (deps.appBotLogin ?? defaultAppBotLogin)();
-  } catch {
-    // The App is configured but its bot is unknown: no marker approves.
-    return new Set();
+  const repo = pr.url?.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/\d+/);
+  const covered = repo ? await (deps.appCoversRepo ?? appCoversRepo)(repo[1]!, repo[2]!) : true;
+  let bot: string | null = null;
+  if (covered) {
+    try {
+      bot = await (deps.appBotLogin ?? defaultAppBotLogin)();
+    } catch {
+      // The App is configured but its bot is unknown: no marker approves.
+      return new Set();
+    }
   }
   if (bot) return new Set([normalizeLogin(bot)]);
+  if (repo && !covered && (deps.isAppConfigured ?? isGitHubAppConfigured)()) {
+    const key = `${repo[1]}/${repo[2]}`.toLowerCase();
+    if (!warnedUncoveredRepos.has(key)) {
+      warnedUncoveredRepos.add(key);
+      console.warn(`[pr-facts] GitHub App does not cover ${repo[1]}/${repo[2]}: an APPROVED verdict marker counts from any trusted author there. Install the App on ${repo[1]} to close this.`);
+    }
+    return 'any-trusted';
+  }
   if (!warnedMarkerApprovalTrust) {
     warnedMarkerApprovalTrust = true;
     console.warn('[pr-facts] No GitHub App configured: an APPROVED verdict marker counts from any trusted author, '

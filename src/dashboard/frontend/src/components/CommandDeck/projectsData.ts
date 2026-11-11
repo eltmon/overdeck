@@ -18,6 +18,8 @@ export interface RegisteredProjectLite {
   key: string;
   name?: string;
   path: string;
+  /** PAN-5153: "owner/repo" from projects.yaml `github_repo`, or null. */
+  githubRepo?: string | null;
 }
 
 /**
@@ -83,6 +85,8 @@ export interface ProjectData {
   key: string;
   name: string;
   path: string;
+  /** PAN-5153: "owner/repo" for registered projects; undefined for issue-only groups. */
+  githubRepo?: string | null;
   features: ProjectFeature[];
 }
 
@@ -237,7 +241,7 @@ export async function fetchProjects(): Promise<ProjectData[]> {
   if (!registeredRes.ok) throw new Error('Failed to fetch registered projects');
 
   const issues = await issuesRes.json() as ProjectFeature[];
-  const registered = await registeredRes.json() as { key: string; name: string; path: string }[];
+  const registered = await registeredRes.json() as { key: string; name: string; path: string; githubRepo?: string | null }[];
 
   // Start with projects that have qualifying issues
   const projectMap = new Map(groupProjects(issues).map(p => [p.name, p]));
@@ -247,8 +251,8 @@ export async function fetchProjects(): Promise<ProjectData[]> {
     const name = proj.name ?? proj.key;
     const existing = projectMap.get(name);
     projectMap.set(name, existing
-      ? { ...existing, key: proj.key, path: proj.path }
-      : { key: proj.key, name, path: proj.path, features: [] });
+      ? { ...existing, key: proj.key, path: proj.path, githubRepo: proj.githubRepo ?? null }
+      : { key: proj.key, name, path: proj.path, githubRepo: proj.githubRepo ?? null, features: [] });
   }
 
   return [...projectMap.values()].sort((a, b) => a.name.localeCompare(b.name));

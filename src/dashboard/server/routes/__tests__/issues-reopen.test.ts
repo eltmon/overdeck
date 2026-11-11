@@ -210,4 +210,24 @@ describe('POST /api/issues/:id/reopen', () => {
       },
     }));
   });
+
+  it('reopens the closed PR in the issue\'s own repository (PAN-5153)', async () => {
+    mockResolveGitHubIssue.mockReturnValue({ isGitHub: true, owner: 'acme', repo: 'web', prefix: 'WEB', number: 7 });
+    issueDataServiceMock.getIssues.mockReturnValue([{ identifier: 'WEB-7' }]);
+    mockExecAsync.mockImplementation(async (command: string, args?: string[]) => (
+      command === 'gh' && args?.[0] === 'pr' && args[1] === 'list'
+        ? { stdout: JSON.stringify([{ number: 42, mergedAt: null }]), stderr: '' }
+        : { stdout: '[]', stderr: '' }
+    ));
+
+    const result = await postReopen('WEB-7');
+
+    expect(result.status).toBe(200);
+    const ghCalls = mockExecAsync.mock.calls.filter((call) => call[0] === 'gh') as Array<[string, string[]]>;
+    const list = ghCalls.find(([, args]) => args[1] === 'list');
+    const reopen = ghCalls.find(([, args]) => args[1] === 'reopen');
+    expect(list?.[1]).toEqual(expect.arrayContaining(['--repo', 'acme/web', '--head', 'feature/web-7']));
+    expect(list?.[1][list[1].indexOf('--repo') + 1]).toBe('acme/web');
+    expect(reopen?.[1]).toEqual(['pr', 'reopen', '42', '--repo', 'acme/web']);
+  });
 });

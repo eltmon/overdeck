@@ -52,6 +52,7 @@ import { extractPrefix, parseIssueId } from '../../../lib/issue-id.js';
 import { resolveStatusReviewModel } from '../../../lib/status-review-model.js';
 import { getAgentCommand } from '../../../lib/settings.js';
 import { getGitHubConfig } from '../services/tracker-config.js';
+import { resolveGitHubIssue } from '../../../lib/tracker-utils.js';
 import { LinearClient } from '../services/linear-client.js';
 import { IssueDataService } from '../services/issue-data-service.js';
 import { loadConfigSync as loadYamlConfig } from '../../../lib/config-yaml.js';
@@ -1128,19 +1129,20 @@ const postMissionControlSyncDiscussionsRoute = HttpRouter.add(
     const syncedFiles: string[] = [];
 
     if (tracker === 'github') {
-      const ghConfig = getGitHubConfig();
-      if (!ghConfig) {
+      // PAN-5153: the issue's own repository, not the first tracked one.
+      const ghIssue = resolveGitHubIssue(issueId);
+      if (!ghIssue.isGitHub) {
         return jsonResponse({ error: 'GitHub not configured' }, { status: 400 });
       }
+      const ghRepoSlug = `${ghIssue.owner}/${ghIssue.repo}`;
 
       yield* Effect.promise(async () => {
         try {
-          const issueNum = issueId.replace(/^[A-Z]+-/, '');
           const { stdout } = await execFileAsync(
             'gh',
             [
-              'issue', 'view', issueNum,
-              '--repo', `${ghConfig.repos[0]!.owner}/${ghConfig.repos[0]!.repo}`,
+              'issue', 'view', String(ghIssue.number),
+              '--repo', ghRepoSlug,
               '--json', 'comments',
               '--jq', '.comments[] | "## " + .author.login + " (" + .createdAt + ")\n\n" + .body + "\n\n---\n"',
             ],
@@ -1158,7 +1160,7 @@ const postMissionControlSyncDiscussionsRoute = HttpRouter.add(
             'gh',
             [
               'pr', 'list',
-              '--repo', `${ghConfig.repos[0]!.owner}/${ghConfig.repos[0]!.repo}`,
+              '--repo', ghRepoSlug,
               '--head', `feature/${issueLower}`,
               '--json', 'number,title',
               '--jq', '.[].number',
@@ -1171,7 +1173,7 @@ const postMissionControlSyncDiscussionsRoute = HttpRouter.add(
                 'gh',
                 [
                   'pr', 'view', prNum,
-                  '--repo', `${ghConfig.repos[0]!.owner}/${ghConfig.repos[0]!.repo}`,
+                  '--repo', ghRepoSlug,
                   '--json', 'comments',
                   '--jq', '.comments[] | "## " + .author.login + " (" + .createdAt + ")\n\n" + .body + "\n\n---\n"',
                 ],
