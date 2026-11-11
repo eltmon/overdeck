@@ -4,17 +4,17 @@
     "created": "2026-11-11T07:32:09Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5124: Built-in defaults: mid workhorse to Opus 5.5; cheap workhorse and background calls to Haiku 5.5",
-    "updated": "2026-11-11T07:39:09.440Z"
+    "updated": "2026-11-11T07:40:33.869Z"
   },
   "plan": {
     "id": "pan-5124",
     "title": "Built-in defaults: mid workhorse to Opus 5.5; cheap workhorse and background calls to Haiku 5.5",
-    "status": "proposed",
+    "status": "running",
     "uid": "33580333-f809-4996-a8a8-7c44283f2317",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-11T07:32:09Z",
-    "updated": "2026-11-11T07:39:09.440Z",
+    "updated": "2026-11-11T07:40:33.869Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5124",
@@ -1216,5 +1216,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
