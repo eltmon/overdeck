@@ -132,6 +132,11 @@ function isHookConfigured(
   );
 }
 
+/** True when Overdeck's PreToolUse auto-approve hook is registered (PAN-5151). */
+export function isAutoApproveHookRegistered(settings: ClaudeSettings, binDir: string): boolean {
+  return isHookConfigured(settings, 'PreToolUse', binDir, 'auto-approve-hook');
+}
+
 /**
  * PAN-2530: Remove stale pre-rebrand hook entries that point at the old
  * `~/.panopticon/bin/<scriptName>` path.
