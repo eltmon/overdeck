@@ -204,7 +204,12 @@ jobs:
         run: npm run build
 
       - name: Install Playwright browsers (root) for vitest e2e
-        run: npx playwright install --with-deps chromium
+        run: |
+          for i in 1 2 3; do npx playwright install --with-deps chromium && exit 0; echo "playwright --with-deps attempt $i failed"; sleep 30; done
+          # PAN-5156: an Ubuntu mirror outage must not fail CI. The runner image ships
+          # Chrome and its libraries, so the browser alone is enough.
+          echo "::warning::apt dependencies unavailable; installing Chromium without --with-deps"
+          npx playwright install chromium
 
       # PAN-3847 (FR-13): CI runs vitest on every push. The overdeck/test commit
       # status only records that the verification gate passed; it is never read here.
@@ -259,7 +264,13 @@ jobs:
           VITEST_INCLUDE_SLOW=1 npx vitest run tests/integration/anywhere/two-machine-ac1.slow.test.ts
 
       - name: Install Playwright browsers
-        run: cd src/dashboard/frontend && npx playwright install --with-deps chromium
+        run: |
+          cd src/dashboard/frontend
+          for i in 1 2 3; do npx playwright install --with-deps chromium && exit 0; echo "playwright --with-deps attempt $i failed"; sleep 30; done
+          # PAN-5156: an Ubuntu mirror outage must not fail CI. The runner image ships
+          # Chrome and its libraries, so the browser alone is enough.
+          echo "::warning::apt dependencies unavailable; installing Chromium without --with-deps"
+          npx playwright install chromium
 
       - name: Start dashboard server
         run: |
@@ -428,7 +439,12 @@ jobs:
         run: npm run build
 
       - name: Install Playwright browsers for quarantined tests
-        run: npx playwright install --with-deps chromium
+        run: |
+          for i in 1 2 3; do npx playwright install --with-deps chromium && exit 0; echo "playwright --with-deps attempt $i failed"; sleep 30; done
+          # PAN-5156: an Ubuntu mirror outage must not fail CI. The runner image ships
+          # Chrome and its libraries, so the browser alone is enough.
+          echo "::warning::apt dependencies unavailable; installing Chromium without --with-deps"
+          npx playwright install chromium
 
       - name: Run quarantined tests (non-blocking)
         # Non-blocking: failures are logged but do not fail the job or block the PR.
