@@ -9,12 +9,14 @@ import { X } from 'lucide-react';
 
 import {
   ANYWHERE_ACCESS_TOKENS_QUERY_KEY,
+  ANYWHERE_ENVIRONMENT_QUERY_KEY,
   ANYWHERE_PUBLIC_MCP_QUERY_KEY,
   ANYWHERE_STATUS_QUERY_KEY,
   apiError,
   createAccessToken,
   isOk,
   loadAnywhereStatus,
+  loadEnvironment,
   loadPublicMcp,
 } from './anywhereApi';
 import {
@@ -34,6 +36,7 @@ import {
   botScopes,
   createConnectorPairing,
 } from './botsApi';
+import { connectMessageFor, connectPlatformFor, writeClipboard } from './connectMessage';
 import { ConnectBotOutput, type ConnectBotResult } from './ConnectBotOutput';
 import { requestSettingsSection } from '../../../lib/settingsSection';
 
@@ -64,6 +67,7 @@ export function ConnectBotDialog({ open, onClose }: ConnectBotDialogProps) {
 function ConnectBotDialogBody({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient();
   const { data: status } = useQuery({ queryKey: ANYWHERE_STATUS_QUERY_KEY, queryFn: loadAnywhereStatus });
+  const { data: environment } = useQuery({ queryKey: ANYWHERE_ENVIRONMENT_QUERY_KEY, queryFn: loadEnvironment });
 
   const [platform, setPlatform] = useState<BotPlatform>('hermes');
   const [reach, setReach] = useState<BotReach>(BOT_PLATFORMS[0]!.reaches[0]!);
@@ -108,7 +112,8 @@ function ConnectBotDialogBody({ onClose }: { onClose: () => void }) {
     setForbidden(false);
     try {
       if (reach === 'connector') {
-        const result = await createConnectorPairing(name.trim(), botScopes(ticked));
+        const connectPlatform = connectPlatformFor(platform);
+        const result = await createConnectorPairing(name.trim(), botScopes(ticked), connectPlatform);
         if (result.status === 403) {
           setForbidden(true);
           return;
@@ -117,7 +122,10 @@ function ConnectBotDialogBody({ onClose }: { onClose: () => void }) {
           setError(apiError(result));
           return;
         }
-        setOutput({ kind: 'connector', pairingString: result.body.pairingString, expiresAt: result.body.expiresAt });
+        const { pairingString, expiresAt } = result.body;
+        const message = connectMessageFor({ platform: connectPlatform, botName: name.trim(), pairingString, environment });
+        const copied = await writeClipboard(message);
+        setOutput({ kind: 'connector', pairingString, expiresAt, message, copied });
         void queryClient.invalidateQueries({ queryKey: BOTS_CONNECTORS_QUERY_KEY });
         return;
       }
@@ -288,7 +296,7 @@ function ConnectBotDialogBody({ onClose }: { onClose: () => void }) {
                   disabled={!canSubmit}
                   className="rounded-md bg-primary px-3 py-1.5 text-xs text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
                 >
-                  {reach === 'connector' ? 'Create pairing code' : 'Create token'}
+                  {reach === 'connector' ? `Copy for ${platformEntry.label}` : 'Create token'}
                 </button>
               )}
               {error && <p className="text-xs text-destructive">{error}</p>}
