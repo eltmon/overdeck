@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5131",
   "created": "2026-11-11T08:19:14.972Z",
-  "updated": "2026-11-11T09:06:54.393Z",
+  "updated": "2026-11-11T09:31:06.341Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -386,9 +386,30 @@
       "doneAt": "2026-11-11T09:06:51.770Z"
     },
     "e2e-honesty-spec": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5131",
-      "claimedAt": "2026-11-11T09:06:54.392Z"
+      "claimedAt": "2026-11-11T09:06:54.392Z",
+      "doneAt": "2026-11-11T09:31:06.341Z"
+    },
+    "e2e-honesty-spec.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T09:31:06.341Z"
+    },
+    "e2e-honesty-spec.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T09:31:06.341Z"
+    },
+    "e2e-honesty-spec.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T09:31:06.341Z"
+    },
+    "e2e-honesty-spec.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T09:31:06.341Z"
+    },
+    "e2e-honesty-spec.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-11T09:31:06.341Z"
     }
   }
 }
