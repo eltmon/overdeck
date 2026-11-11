@@ -215,13 +215,36 @@ export function addOverdeckHookIfMissing(
   // PAN-2530: drop any stale panopticon/bin/<scriptName> twin so the rebrand
   // never leaves two copies of this hook registered and firing together.
   pruneLegacyPanopticonHook(settings, hookType, scriptName);
-  if (isHookConfigured(settings, hookType, binDir, scriptName)) return false;
+  if (isHookConfigured(settings, hookType, binDir, scriptName)) {
+    // PAN-5151: auto-approve-hook gates every tool call under resolved mode
+    // auto, so a registration under a narrower matcher (e.g. a hand-edited
+    // 'Bash') is not configured for isAutoApproveHookRegistered's purposes.
+    // Widen it in place rather than report "already configured" and leave
+    // `pan sync` unable to fix what the launch guard refuses on.
+    if (scriptName === 'auto-approve-hook' && widenAutoApproveHookMatcher(settings, binDir)) return true;
+    return false;
+  }
   const list = (settings.hooks[hookType] ??= []);
   list.push({
     matcher,
     hooks: [{ type: 'command', command: join(binDir, scriptName) }],
   });
   return true;
+}
+
+function widenAutoApproveHookMatcher(settings: ClaudeSettings, binDir: string): boolean {
+  if (isAutoApproveHookRegistered(settings, binDir)) return false;
+  const list = settings.hooks?.PreToolUse ?? [];
+  for (const hookConfig of list) {
+    const matches = hookConfig.hooks?.some((hook) =>
+      (hook.command?.includes(join(binDir, 'auto-approve-hook')) ?? false) ||
+      (hook.command?.includes('overdeck/bin/auto-approve-hook') ?? false));
+    if (matches && hookConfig.matcher !== '.*') {
+      hookConfig.matcher = '.*';
+      return true;
+    }
+  }
+  return false;
 }
 
 /**

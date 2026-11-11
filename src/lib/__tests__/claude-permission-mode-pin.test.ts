@@ -31,6 +31,17 @@ describe('pinClaudePermissionModeOnce', () => {
     expect(existsSync(yamlPath())).toBe(false);
   });
 
+  it('a home directory that does not exist yet still returns new-install (fresh CLI install, PAN-5151)', async () => {
+    const freshHome = join(home, 'not-created-yet');
+    expect(existsSync(freshHome)).toBe(false);
+
+    const result = await pinClaudePermissionModeOnce({ overdeckHome: freshHome });
+
+    expect(result.outcome).toBe('new-install');
+    expect(existsSync(join(freshHome, '.claude-permission-mode-pin.json'))).toBe(true);
+    expect(existsSync(join(freshHome, 'config.yaml'))).toBe(false);
+  });
+
   it('a config.yaml with other keys and a comment but no claude.permissionMode gets pinned to bypass, preserving content', async () => {
     writeFileSync(yamlPath(), 'ui:\n  theme: broadsheet\n# keep me\n', { mode: 0o600 });
 

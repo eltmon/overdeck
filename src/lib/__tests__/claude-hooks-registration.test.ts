@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isAutoApproveHookRegistered, type ClaudeSettings } from '../claude-hooks-registration.js';
+import { addOverdeckHookIfMissing, isAutoApproveHookRegistered, type ClaudeSettings } from '../claude-hooks-registration.js';
 
 const BIN_DIR = '/home/op/.overdeck/bin';
 
@@ -30,5 +30,40 @@ describe('isAutoApproveHookRegistered (PAN-5151)', () => {
 
   it('returns false for empty or missing settings', () => {
     expect(isAutoApproveHookRegistered({}, BIN_DIR)).toBe(false);
+  });
+});
+
+describe('addOverdeckHookIfMissing widens a narrow auto-approve-hook matcher (PAN-5151)', () => {
+  it('widens an existing Bash-scoped registration to .* instead of reporting "already configured"', () => {
+    const settings: ClaudeSettings = {
+      hooks: { PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: `${BIN_DIR}/auto-approve-hook` }] }] },
+    };
+
+    const changed = addOverdeckHookIfMissing(settings, 'PreToolUse', BIN_DIR, 'auto-approve-hook');
+
+    expect(changed).toBe(true);
+    expect(settings.hooks!.PreToolUse).toHaveLength(1);
+    expect(isAutoApproveHookRegistered(settings, BIN_DIR)).toBe(true);
+  });
+
+  it('does not touch a narrow-matcher registration for a different hook', () => {
+    const settings: ClaudeSettings = {
+      hooks: { PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: `${BIN_DIR}/gh-issue-trailer-hook` }] }] },
+    };
+
+    const changed = addOverdeckHookIfMissing(settings, 'PreToolUse', BIN_DIR, 'gh-issue-trailer-hook', 'Bash');
+
+    expect(changed).toBe(false);
+    expect(settings.hooks!.PreToolUse![0]!.matcher).toBe('Bash');
+  });
+
+  it('is a no-op when auto-approve-hook is already registered with .*', () => {
+    const settings: ClaudeSettings = {
+      hooks: { PreToolUse: [{ matcher: '.*', hooks: [{ type: 'command', command: `${BIN_DIR}/auto-approve-hook` }] }] },
+    };
+
+    const changed = addOverdeckHookIfMissing(settings, 'PreToolUse', BIN_DIR, 'auto-approve-hook');
+
+    expect(changed).toBe(false);
   });
 });

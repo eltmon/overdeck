@@ -5,7 +5,7 @@
  * it explicitly into config.yaml. See PRD .pan/drafts/PAN-5151.md WI-1.
  */
 import { existsSync } from 'node:fs';
-import { readFile, stat } from 'node:fs/promises';
+import { mkdir, readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { OVERDECK_HOME } from './paths.js';
 import { OVERDECK_DB_FILENAME } from './overdeck/paths.js';
@@ -53,6 +53,17 @@ export async function pinClaudePermissionModeOnce(
     // pinning it to bypass instead of auto. Serialize the decision itself —
     // not just the marker write — and recheck the marker under the lock, so
     // only the process that actually wins the race decides anything.
+    //
+    // The CLI entry is the one caller that can reach this before `home`
+    // exists at all (dashboard boot already created it). withFileLock's
+    // open(lockPath, 'wx') has no directory to create the lock file in and
+    // rethrows ENOENT (it only recovers EEXIST), which used to fall through
+    // to skipped-error and leave a brand-new install unmarked — the next
+    // invocation then saw config.toml (written by `pan install` moments
+    // later) and misclassified the fresh install as existing. Creating the
+    // (empty) home is harmless: the pin still classifies by the three
+    // marker files, never by the directory's mere existence.
+    await mkdir(home, { recursive: true });
     return await withFileLock(lockPath, async () => {
       if (await markerExists(marker)) return { outcome: 'already-decided' };
 
