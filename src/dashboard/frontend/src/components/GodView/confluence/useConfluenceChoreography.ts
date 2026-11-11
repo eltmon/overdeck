@@ -127,9 +127,10 @@ export function planConfluenceChoreography({
     }
 
     // The honest thaw: the enrichment-confirmed snapshot says the agent is
-    // alive again (state flipped stale → anything else). One beat never
-    // reaches this — it takes sustained, poller-confirmed activity.
-    if (before.state === 'stale' && orb.state !== 'stale') {
+    // alive again (state flipped stale → active). A stale orb that moves to
+    // the shelf or to failed did not come back to life, so it plays no thaw.
+    // One beat never reaches this — it takes sustained, poller-confirmed activity.
+    if (before.state === 'stale' && orb.state === 'active') {
       commands.push({ type: 'thaw', issueId: orb.id });
     }
 

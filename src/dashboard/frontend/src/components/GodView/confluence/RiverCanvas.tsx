@@ -336,14 +336,9 @@ function createEngine(
     renderOrbs.delete(orb.id);
   };
   const thaw = (orb: RenderOrb) => {
-    orb.state = 'active';
-    orb.stage = 'WORK';
-    orb.frost = 0;
-    orb.heat = 0.8;
-    anchorAll();
     burst(orb.x, orb.y, ICE, 40, 90, 1.6, 2.4);
     ring(orb.x, orb.y, '#00d4ff', 80, 2.5);
-    ticker(`${orb.id} thawed`, '#00d4ff');
+    ticker(`${orb.id} active again`, '#00d4ff');
   };
 
   const api: RiverEffectsApi = {

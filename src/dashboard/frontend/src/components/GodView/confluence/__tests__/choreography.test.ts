@@ -334,4 +334,24 @@ describe('honest thaw semantics (PAN-3490 follow-up)', () => {
     expect(commands.filter((command) => command.type === 'thaw')).toHaveLength(0);
     expect(commands.some((command) => command.type === 'sparks' && command.issueId === 'PAN-2')).toBe(true);
   });
+
+  function thawsFor(next: Partial<ConfluenceOrb>) {
+    return planConfluenceChoreography({
+      previous: new Map([['PAN-2', orb('PAN-2', { state: 'stale' })]]),
+      current: new Map([['PAN-2', orb('PAN-2', next)]]),
+      hookEvents: [],
+    }).filter((command) => command.type === 'thaw');
+  }
+
+  it('plays no thaw when a stale orb moves to the shelf', () => {
+    expect(thawsFor({ state: 'shelf', yieldReason: 'operator hold' })).toEqual([]);
+  });
+
+  it('plays exactly one thaw when a stale orb becomes active', () => {
+    expect(thawsFor({ state: 'active' })).toEqual([{ type: 'thaw', issueId: 'PAN-2' }]);
+  });
+
+  it('plays no thaw when a stale orb becomes failed', () => {
+    expect(thawsFor({ state: 'failed', attention: 'stuck' })).toEqual([]);
+  });
 });
