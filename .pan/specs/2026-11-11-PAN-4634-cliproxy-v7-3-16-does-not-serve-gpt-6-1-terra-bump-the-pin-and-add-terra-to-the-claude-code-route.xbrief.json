@@ -4,17 +4,17 @@
     "created": "2026-11-11T12:20:30Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-4634: CLIProxy v7.3.16 does not serve gpt-6.1-terra: bump the pin and add Terra to the claude-code route",
-    "updated": "2026-11-11T12:24:42.718Z"
+    "updated": "2026-11-11T12:25:59.863Z"
   },
   "plan": {
     "id": "pan-4634",
     "title": "CLIProxy v7.3.16 does not serve gpt-6.1-terra: bump the pin and add Terra to the claude-code route",
-    "status": "proposed",
+    "status": "running",
     "uid": "8f1cd46b-945c-4f86-9c89-1ad102e6cb73",
     "author": "agent:claude-opus-5-5",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-11T12:20:30Z",
-    "updated": "2026-11-11T12:24:42.718Z",
+    "updated": "2026-11-11T12:25:59.863Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/4634",
@@ -264,5 +264,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
