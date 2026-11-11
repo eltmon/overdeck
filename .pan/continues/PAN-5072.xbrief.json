@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5072",
   "created": "2026-11-11T10:00:36.495Z",
-  "updated": "2026-11-11T10:24:56.585Z",
+  "updated": "2026-11-11T10:25:01.552Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -178,6 +178,11 @@
     "w9-cli-docs.ac2": {
       "status": "completed",
       "doneAt": "2026-11-11T10:24:56.584Z"
+    },
+    "w10-bots-docs": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5072",
+      "claimedAt": "2026-11-11T10:25:01.552Z"
     }
   }
 }
