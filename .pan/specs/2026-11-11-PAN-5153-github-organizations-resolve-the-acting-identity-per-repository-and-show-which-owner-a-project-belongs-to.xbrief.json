@@ -1,0 +1,1661 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-11T14:25:32Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5153: GitHub organizations: resolve the acting identity per repository and show which owner a project belongs to",
+    "updated": "2026-11-11T14:33:58.806Z"
+  },
+  "plan": {
+    "id": "pan-5153",
+    "title": "GitHub organizations: resolve the acting identity per repository and show which owner a project belongs to",
+    "status": "running",
+    "uid": "9c8c8f86-30eb-47e2-9c32-14b7b97dac69",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-11T14:25:32Z",
+    "updated": "2026-11-11T14:33:58.806Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5153",
+        "label": "PAN-5153",
+        "type": "issue"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-5153/.pan/drafts/pan-5153.md",
+        "label": "PRD draft (.pan/drafts/pan-5153.md)",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5154",
+        "label": "PAN-5154 (out of scope: per-owner gh accounts, GHES)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "github",
+      "github-app",
+      "identity",
+      "organizations",
+      "forge",
+      "dashboard",
+      "doctor"
+    ],
+    "metadata": {
+      "sizeJustification": "The operator authored the PRD as one issue with one npm release (highest priority, publish on merge) and asked that nothing be re-decided. The core (W1-W5 plus W13) cannot ship apart: W5 without W13 makes every uncovered repository unmergeable, and W13 without W5 weakens approval with no benefit. The remaining surface (route, doctor, sidebar, chip, settings, docs) all read the one identity resolver from W4 and are small leaves. Most of the file count is test files whose mocks must change with the call sites they cover, plus six doc files the docs gate requires.",
+      "canonicalFilename": "2026-11-11-PAN-5153-github-organizations-resolve-the-acting-identity-per-repository-and-show-which-owner-a-project-belongs-to.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Overdeck holds one GitHub App installation (the home installation) and treats it as valid for every repository. Sixteen branch points choose the App path with isGitHubAppConfigured(), which only checks that credential files exist, so a repository the App is not installed on (mindyournow/myn-cli, eltmon/krux) takes the App path and fails although the gh path would work. Spawn writes the home token and an HTTPS remote into every workspace; the verdict, check run and commit statuses use the home token; marker approvals count only from the bot when the App is configured, so an uncovered repository could never pass review once verdicts move to the gh user. Reopen and discussion sync call gh against the wrong repository. No UI or CLI shows a project's owner or the identity that acts there.",
+      "Proposal": "Ask GitHub which installation covers each repository (GET /repos/{owner}/{repo}/installation with the App JWT; positive answers cached in memory for 6h, 404s in repo notes), mint the token for that installation, and choose the App path per repository with appCoversRepo(owner, repo); uncovered repositories take the existing gh path as the signed-in user. A lookup failure other than 404 keeps today's behavior. One resolver (resolveRepoIdentity / collectGitHubIdentities) feeds spawn, GET /api/github/identities, pan doctor rows per owner, collapsible owner groups in the sidebar, an owner · login chip in the Command Deck and a read-only Settings section. On uncovered repositories an APPROVED marker counts from any trusted author, as on a machine without the App. Reopen and discussion sync pass --repo. Docs explain covering an organization (make the App public, install it on the org).",
+      "NonGoals": "- A separate gh account, token or host per owner (work account, Enterprise Managed User, GitHub Enterprise Server, ghe.com): PAN-5154.\n- A second GitHub App or per-owner App credential directories.\n- Storing an installation id per repository on disk or in projects.yaml.\n- Rewriting the origin remote or credential.helper of a repository an earlier spawn already changed; pan doctor only reports it with the fix.\n- Any change to the PAT paths (GitHubClient, issue poller, webhook allowlist).\n- Per-installation quota pools; all App calls stay in the single app pool, and the installation lookup is not metered.\n- Changing isGitHubAppConfigured(), getMergeBackendStatus(), verifyAppCanMerge(), getAppStatus(), the quota sampler, forge-identity.ts or githubPrLookupSource().\n- An owner picker in the Add-project dialog or an owner filter in the sidebar.\n- Refusing an agent spawn because the identity is user or none.\n- Raising any row in scripts/file-size-allowlist.txt, adding Effect wrappers, or a contracts package change."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Keep PAN-5153 as one issue and set plan.metadata.sizeJustification instead of filing sibling issues.",
+        "rationale": "The operator's PRD scopes one deliverable with one release and says nothing is to be re-decided; W5 and W13 must land together; filing new issues is outward-facing work the operator did not ask for."
+      },
+      {
+        "summary": "Took the amended PRD from origin/main (364e855f497) before lowering, per the operator's mid-session instruction.",
+        "rationale": "It adds F9, FR-14, W13 and decision 11, which close the marker-approval gap the planner had independently found."
+      },
+      {
+        "summary": "getRepoInstallationToken falls back to the home installation token when the lookup fails with a non-404 error.",
+        "rationale": "NFR-1 requires today's behavior under lookup failure for spawn, the verdict and commit statuses; this matches installationTokenForApiPath."
+      },
+      {
+        "summary": "RepoInstallationDeps gains loadConfig and makeJwt, and concurrent lookups for one repository share one request.",
+        "rationale": "Makes the 200/404 tests runnable without credentials on CI and keeps NFR-3's one-lookup-per-repo cost under concurrency."
+      },
+      {
+        "summary": "W5 is split into seven slices by source file group with disjoint test files; W6 into reopen and discussions; W8's cloister status rename into its own leaf; a final grep/lint item closes the sweep.",
+        "rationale": "Task granularity rule: each item reviewable alone, no test file shared between parallel items without an edge."
+      },
+      {
+        "summary": "Test locations fixed: route test in src/dashboard/server/routes/__tests__/, doctor test in tests/unit/cli/, chip test beside its source, check-run test new under tests/unit/lib/cloister/, reopen case in issues-reopen.test.ts.",
+        "rationale": "These match the neighboring tests; files_scope must be concrete."
+      }
+    ],
+    "items": [
+      {
+        "id": "app-auth-module",
+        "title": "Move the GitHub App auth primitives into github-app-auth.ts with per-installation tokens",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-11T14:25:32Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "refactor",
+          "issueLabel": "pan-5153",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/github-app-auth.ts",
+            "src/lib/github-app.ts",
+            "tests/unit/lib/github-app.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/github-app.test.ts",
+            "npm run typecheck",
+            "npm run lint:effect-facades",
+            "npm run lint:circular",
+            "wc -l src/lib/github-app.ts"
+          ],
+          "expected_outputs": [
+            "github-app.test.ts passes with no existing assertion changed",
+            "typecheck completes without errors",
+            "facade and circular lints pass",
+            "github-app.ts has at most 1083 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W1. Create src/lib/github-app-auth.ts and move APP_DIR, GITHUB_API_TIMEOUT_MS, GitHubRequestTimeoutError, withGitHubTimeout, GitHubAppConfig, InstallationToken, isGitHubAppConfigured, loadGitHubAppConfig, generateJWT (exported as generateAppJwt), generateInstallationTokenBody (new optional installationId parameter), the installation token memo (now a Map keyed by installation id), resetInstallationTokenCacheForTests and getInstallationAccessToken(installationId?) out of src/lib/github-app.ts. getInstallationAccessToken calls generateInstallationTokenBody directly (no Effect). github-app.ts imports from ./github-app-auth.js and re-exports the names other files import today. The Effect export generateInstallationToken stays in github-app.ts. Give github-app-auth.ts a header comment stating it owns the App's credentials, JWT and per-installation token memo. Plain async functions only (no Effect wrappers). github-app-auth.ts imports nothing from github-app.ts, github-app-installations.ts or github-repo-identity.ts."
+        },
+        "items": [
+          {
+            "id": "app-auth-module.ac1",
+            "title": "Given an App config with home installation 111, when getInstallationAccessToken('222') runs, then the mocked fetch receives a POST to https://api.github.com/app/installations/222/access_tokens.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "app-auth-module.ac2",
+            "title": "Given two calls to getInstallationAccessToken with ids '222' and '333', when both resolve, then two tokens are minted; given two calls with id '222', then one token is minted and the second call returns the memoized token.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "app-auth-module.ac3",
+            "title": "Given getInstallationAccessToken() with no argument, when it runs, then it mints for the home installation id read from installation-id, so every existing github-app.test.ts assertion still passes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "app-auth-module.ac4",
+            "title": "Given the refactor, when `wc -l src/lib/github-app.ts` runs, then it prints at most 1083, and `npm run lint:effect-facades` exits 0 with no new row for github-app-auth.ts.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "repo-installation-lookup",
+        "title": "Find the App installation that covers a repository (github-app-installations.ts)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-11T14:25:32Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-5153",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/lib/github-app-installations.ts",
+            "src/lib/github-quota/repo-notes.ts",
+            "tests/unit/lib/github-app-installations.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/github-app-installations.test.ts tests/unit/lib/pipeline-membership-app-fallback.test.ts tests/unit/cli/doctor-github-quota.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "all three test files pass",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1",
+            "NFR-3",
+            "NFR-5"
+          ],
+          "foundationFor": [
+            "api-token-per-repo",
+            "repo-identity",
+            "sweep-merge-ops",
+            "sweep-tracker-verification",
+            "sweep-forge",
+            "sweep-pr-lookup",
+            "verdict-per-repo",
+            "check-run-per-repo",
+            "marker-approver-per-repo"
+          ],
+          "parallelSafeReason": "It touches only new files plus repo-notes.ts, which no other item edits; its input (github-app-auth.ts) lands first through the app-auth-module edge."
+        },
+        "narrative": {
+          "Action": "PRD W2. In src/lib/github-quota/repo-notes.ts extract persistNotes(map), add clearAppNotInstalled(owner, repo) (never throws), and change the markAppNotInstalled warning to `[github-app] GitHub App is not installed on ${owner}/${repo}; Overdeck acts as the gh user there`. Create src/lib/github-app-installations.ts exporting APP_INSTALLATION_TTL_MS (6h), RepoInstallationDeps {isConfigured, fetchImpl, now, loadConfig, makeJwt}, repoFromApiPath, resolveRepoInstallationId, appCoversRepo, getRepoInstallationToken, installationTokenForApiPath and resetRepoInstallationCache, exactly as PRD W2 steps 2-7 describe. The in-memory map is keyed by lowercase owner/repo and stores the pending promise so concurrent callers share one request; a rejected lookup is deleted from the map. 200 caches String(id) for 6h; 404 calls markAppNotInstalled and returns null; any other status throws. appCoversRepo never throws (failure => isConfigured()). getRepoInstallationToken returns null without the App, the home installation token when the lookup throws (NFR-1), null when not installed, else getInstallationAccessToken(id). The lookup is not recorded in the quota ledger. Header comment states the module owns per-repository installation discovery. Imports only github-app-auth.ts and github-quota/repo-notes.ts from in-repo code."
+        },
+        "items": [
+          {
+            "id": "repo-installation-lookup.ac1",
+            "title": "Given an injected fetchImpl that returns 404 for a/b, when appCoversRepo('a','b') is called twice, then it resolves false both times, fetchImpl is called once, and repo-notes.json under the temporary OVERDECK_HOME lists a/b.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "repo-installation-lookup.ac2",
+            "title": "Given fetchImpl returns 200 {id: 222} for a/b, when resolveRepoInstallationId is called twice (including two concurrent calls), then it resolves '222' each time and fetchImpl is called once; after vi.advanceTimersByTimeAsync(APP_INSTALLATION_TTL_MS + 1) the next call fetches again.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "repo-installation-lookup.ac3",
+            "title": "Given fetchImpl returns 500, when resolveRepoInstallationId runs it rejects, appCoversRepo resolves true, and getRepoInstallationToken returns the home installation's token.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "repo-installation-lookup.ac4",
+            "title": "Given isConfigured returns false, when appCoversRepo and getRepoInstallationToken run, then they resolve false and null and fetchImpl is never called.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "repo-installation-lookup.ac5",
+            "title": "Given repoFromApiPath, when called with '/repos/a/b/pulls/1', '/rate_limit' and '/app', then it returns {owner:'a',repo:'b'}, null and null; and clearAppNotInstalled('a','b') makes the next resolve call fetch again.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "api-token-per-repo",
+        "title": "App REST calls in github-app.ts use the covering installation's token",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-11T14:25:32Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5153",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/github-app.ts",
+            "tests/unit/lib/github-app.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/github-app.test.ts",
+            "npm run typecheck",
+            "wc -l src/lib/github-app.ts"
+          ],
+          "expected_outputs": [
+            "github-app.test.ts passes including the new cases",
+            "typecheck completes without errors",
+            "github-app.ts has at most 1083 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W3. In src/lib/github-app.ts: githubApi, githubApiAllCheckRunPages and githubApiAllPages call installationTokenForApiPath(path); mergePullRequestWithApp calls installationTokenForApiPath(`/repos/${owner}/${repo}/pulls`); reportCommitStatus uses getRepoInstallationToken(owner, repo) and returns when null; postOverdeckTestsStatus returns early when !(await appCoversRepo(owner, repo)); refreshWorkspaceTokenBody resolves the remote first, then getRepoInstallationToken, throwing `GitHub App is not installed on ${owner}/${repo}` on null. Update the file header (lines 1-10) to say tokens are minted per installation and to name github-app-installations.ts. Tests in tests/unit/lib/github-app.test.ts mock ../../../src/lib/github-app-installations.js or inject fetch so no real lookup is sent."
+        },
+        "items": [
+          {
+            "id": "api-token-per-repo.ac1",
+            "title": "Given the lookup for a/b resolves installation 222, when getPullRequestState('a','b',1) runs, then the REST request carries the token minted for installation 222.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "api-token-per-repo.ac2",
+            "title": "Given the lookup for a/b returns 404, when getPullRequestState('a','b',1) runs, then the request carries the home installation's token (so the existing pipeline-membership 404 fallback still applies).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "api-token-per-repo.ac3",
+            "title": "Given the lookup for a/b returns 404, when reportCommitStatus('a','b',sha,...) runs, then no POST to /repos/a/b/statuses is sent.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "api-token-per-repo.ac4",
+            "title": "Given refreshWorkspaceToken for a workspace whose origin is an uncovered repository, when the Effect runs, then it fails with an FsError whose message is `refreshWorkspaceToken failed for <workspace>: GitHub App is not installed on <owner>/<repo>`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "repo-identity",
+        "title": "Add resolveRepoIdentity, collectGitHubIdentities and configureWorkspaceGitHubIdentity (github-repo-identity.ts)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-11T14:25:32Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5153",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/github-repo-identity.ts",
+            "tests/unit/lib/github-repo-identity.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/github-repo-identity.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "github-repo-identity.test.ts passes",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-5",
+            "FR-8"
+          ],
+          "foundationFor": [
+            "spawn-identity",
+            "identities-route",
+            "doctor-identity"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W4. Create src/lib/github-repo-identity.ts with the GitHubRepoIdentity, GitHubIdentityProject, GitHubIdentityOwner and GitHubIdentitiesSnapshot types and the three functions, with injectable RepoIdentityDeps (appCoversRepo, isAppConfigured, botName, ghLogin = getGitHubLogin from ./github-quota/identity.js, listProjects = listProjectsSync, getRepoToken = getRepoInstallationToken, configureBot = configureWorkspaceForBot). Decision order and detail strings exactly as PRD W4 step 2. collectGitHubIdentities skips projects without an owner/repo github_repo, with opts.fresh clears repo notes per repo and resetRepoInstallationCache() once, resolves with Promise.all, groups owners case-insensitively (first spelling shown), sorts owners and projects by localeCompare, and returns ghLogin and appSlug (bot name without [bot] when the App is configured, else null). configureWorkspaceGitHubIdentity calls configureBot only for mode app with a non-null token and otherwise only logs `[${agentId}] GitHub identity for ${owner}/${repo}: ... git remote and credentials left unchanged`. Header comment states it owns 'who acts on this repository'. If lint:circular reports a cycle through projects.js, import listProjectsSync dynamically inside the default."
+        },
+        "items": [
+          {
+            "id": "repo-identity.ac1",
+            "title": "Given appCoversRepo resolves true, when resolveRepoIdentity runs, then it returns mode 'app' with actor equal to botName() and detail 'GitHub App is installed on this repository'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "repo-identity.ac2",
+            "title": "Given appCoversRepo resolves false and ghLogin resolves 'eltmon', when resolveRepoIdentity runs, then it returns mode 'user' with actor 'eltmon', and the detail is 'GitHub App is not installed on this repository' with the App configured and 'No GitHub App is configured' without it.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "repo-identity.ac3",
+            "title": "Given ghLogin resolves null and the repo is uncovered, when resolveRepoIdentity runs, then it returns mode 'none' with actor null and detail 'gh is not signed in. Run: gh auth login'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "repo-identity.ac4",
+            "title": "Given projects Acme/a, acme/b, zeta/c and one project without github_repo, when collectGitHubIdentities runs, then it returns owners ['Acme','zeta'] in that order, Acme holds two projects, and the project without github_repo is absent.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "repo-identity.ac5",
+            "title": "Given configureWorkspaceGitHubIdentity, when the identity is mode 'app' then configureBot is called once with the repo token, and when it is mode 'user' or 'none' then configureBot is never called.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sweep-merge-ops",
+        "title": "merge-ops.ts branch points choose the App path per repository",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-11T14:25:32Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5153",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/workspaces/merge-ops.ts",
+            "src/dashboard/server/routes/workspaces/__tests__/merge-ops-clean-direct.test.ts",
+            "src/dashboard/server/routes/workspaces/__tests__/merge-ops-server-rebase.test.ts",
+            "src/dashboard/server/routes/workspaces/__tests__/merge-ops-stale-artifact.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/workspaces/__tests__/merge-ops-clean-direct.test.ts src/dashboard/server/routes/workspaces/__tests__/merge-ops-server-rebase.test.ts src/dashboard/server/routes/workspaces/__tests__/merge-ops-stale-artifact.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the three merge-ops test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W5 rows 1-5 in src/dashboard/server/routes/workspaces/merge-ops.ts (lines 131, 806, 997, 1073, 1108). Row 3 keeps the outer isGitHubAppConfigured() guard and changes only the inner `if (ref)` to `if (ref && await appCoversRepo(ref.owner, ref.repo))`. Import appCoversRepo dynamically from ../../../../lib/github-app-installations.js beside the existing dynamic github-app.js imports. Fix the three merge-ops-*.test.ts files: mock ../../../../../lib/github-app-installations.js with appCoversRepo mirroring each test's isGitHubAppConfigured value. merge-ops.ts must not grow past 1835 lines."
+        },
+        "items": [
+          {
+            "id": "sweep-merge-ops.ac1",
+            "title": "Given the App is configured and appCoversRepo resolves false for the PR's repository, when reconcileGitHubMergeStatus runs, then it returns false without calling getPullRequestState.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sweep-merge-ops.ac2",
+            "title": "Given `git grep -n \"isGitHubAppConfigured()\" src/dashboard/server/routes/workspaces/merge-ops.ts`, when it runs after the change, then it prints exactly one line (the outer guard of the CI check-run block, former row 3).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sweep-merge-ops.ac3",
+            "title": "Given appCoversRepo resolves true, when the merge route reports statuses (row 4), then reportCommitStatus is called for the PR's repository exactly as before.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sweep-tracker-verification",
+        "title": "issue-closed, merge-verification and merged-pr-verification choose the App path per repository",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-11T14:25:32Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5153",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/issue-closed.ts",
+            "src/lib/cloister/merge-verification.ts",
+            "src/lib/cloister/merged-pr-verification.ts",
+            "src/lib/cloister/__tests__/issue-closed.test.ts",
+            "tests/unit/lib/cloister/issue-closed-quota.test.ts",
+            "tests/unit/lib/cloister/merge-verification.test.ts",
+            "tests/unit/lib/cloister/merge-completeness-forge-error.test.ts",
+            "tests/unit/lib/cloister/postmerge-auto-retro.test.ts",
+            "tests/unit/lib/cloister/postmerge-cleanup-async.test.ts",
+            "tests/unit/lib/cloister/postmerge-merge-train.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/issue-closed.test.ts tests/unit/lib/cloister/issue-closed-quota.test.ts tests/unit/lib/cloister/merge-verification.test.ts tests/unit/lib/cloister/merge-completeness-forge-error.test.ts tests/unit/lib/cloister/postmerge-auto-retro.test.ts tests/unit/lib/cloister/postmerge-cleanup-async.test.ts tests/unit/lib/cloister/postmerge-merge-train.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "all seven test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W5 rows 6-9: src/lib/cloister/issue-closed.ts lines 39 and 99 use `await appCoversRepo(resolved.owner, resolved.repo)`; src/lib/cloister/merge-verification.ts line 178 and src/lib/cloister/merged-pr-verification.ts line 29 use `await appCoversRepo(owner, repo)`. Import appCoversRepo from ../github-app-installations.js. Fix the mocks in the seven test files in files_scope: add vi.mock of github-app-installations.js with appCoversRepo mirroring each test's isGitHubAppConfigured value (the postmerge files reach merge-verification.ts through merge-agent.ts)."
+        },
+        "items": [
+          {
+            "id": "sweep-tracker-verification.ac1",
+            "title": "Given the App is configured and appCoversRepo resolves false, when readLiveTrackerIssueState runs for a GitHub issue, then it reads the state through the gh CLI path and getIssueState (App REST) is not called.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sweep-tracker-verification.ac2",
+            "title": "Given appCoversRepo resolves false, when the merged-PR verification in merge-verification.ts runs, then listPullRequestsForHead is not called and the gh path decides.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sweep-tracker-verification.ac3",
+            "title": "Given `git grep -n \"isGitHubAppConfigured()\" src/lib/cloister/issue-closed.ts src/lib/cloister/merge-verification.ts src/lib/cloister/merged-pr-verification.ts`, when it runs, then it prints nothing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sweep-forge",
+        "title": "forge.ts PR lookups and mergeReviewArtifact choose the App path per repository",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-11T14:25:32Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5153",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/forge.ts",
+            "tests/unit/lib/forge.test.ts",
+            "tests/unit/lib/forge-merged-artifact.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/forge.test.ts tests/unit/lib/forge-merged-artifact.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both forge test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W5 rows 10-12 in src/lib/forge.ts: getExistingGitHubArtifact (line 164) and findMergedGitHubArtifact (line 255) use `if (parsedRepo && await appCoversRepo(parsedRepo.owner, parsedRepo.repo))`; mergeReviewArtifact (line 406) parses the ref first inside try/catch (`let ref: GitHubPullRequestRef | null`), takes the gh pr merge path when `!ref || !(await appCoversRepo(ref.owner, ref.repo))`, and deletes the later `const ref = parsePullRequestRef(input);`. Import the type GitHubPullRequestRef from ./github-app.js and appCoversRepo from ./github-app-installations.js. Update mocks in tests/unit/lib/forge.test.ts and tests/unit/lib/forge-merged-artifact.test.ts and add the PRD's new forge.test.ts case."
+        },
+        "items": [
+          {
+            "id": "sweep-forge.ac1",
+            "title": "Given the App is configured and appCoversRepo resolves false, when mergeReviewArtifact runs, then it executes `gh pr merge` and never calls mergePullRequestWithApp or getPullRequestState.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sweep-forge.ac2",
+            "title": "Given an input without a parseable URL or repository, when mergeReviewArtifact runs, then it takes the gh pr merge path instead of throwing from parsePullRequestRef.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sweep-forge.ac3",
+            "title": "Given appCoversRepo resolves true, when mergeReviewArtifact runs, then it polls getPullRequestState and merges through mergePullRequestWithApp as before.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sweep-pr-lookup",
+        "title": "lookupPullRequestForBranch chooses the App path per repository",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-11T14:25:32Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5153",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/github-pr-lookup.ts",
+            "tests/unit/lib/github-pr-lookup.test.ts",
+            "tests/unit/dashboard/server/routes/issue-pr.test.ts",
+            "tests/unit/dashboard/server/routes/issue-discussions.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/github-pr-lookup.test.ts tests/unit/dashboard/server/routes/issue-pr.test.ts tests/unit/dashboard/server/routes/issue-discussions.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the three test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W5 row 13 in src/lib/github-pr-lookup.ts line 28: `const prs = (await appCoversRepo(owner, repo)) ? ... : ...`. githubPrLookupSource() stays unchanged. Update mocks (add vi.mock of github-app-installations.js) in tests/unit/lib/github-pr-lookup.test.ts, tests/unit/dashboard/server/routes/issue-pr.test.ts and tests/unit/dashboard/server/routes/issue-discussions.test.ts (both routes reach lookupPullRequestForBranch through pull-requests.ts and discussions.ts), and add the PRD's github-pr-lookup case."
+        },
+        "items": [
+          {
+            "id": "sweep-pr-lookup.ac1",
+            "title": "Given the App is configured and appCoversRepo resolves false, when lookupPullRequestForBranch('o','r','feature/x') runs, then it runs `gh pr list` with `--repo o/r` and listPullRequestsForHead is not called.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sweep-pr-lookup.ac2",
+            "title": "Given appCoversRepo resolves true, when lookupPullRequestForBranch runs, then it calls listPullRequestsForHead and runs no gh command.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "spawn-identity",
+        "title": "Agent spawn configures the bot remote only for a covered repository",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-11T14:25:32Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5153",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/spawn.ts",
+            "src/lib/__tests__/agent-state-role.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/agent-state-role.test.ts",
+            "npm run typecheck",
+            "wc -l src/lib/agents/spawn.ts"
+          ],
+          "expected_outputs": [
+            "agent-state-role.test.ts passes",
+            "typecheck completes without errors",
+            "spawn.ts has at most 1088 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W5 step 14: in src/lib/agents/spawn.ts replace the block starting `// Configure workspace for GitHub App bot identity (PAN-536)` (lines 833-850) with the PRD's shorter block that calls configureWorkspaceGitHubIdentity(agentId, options.workspace, ghRepo) through dynamic imports and logs `GitHub identity setup failed (git remote left unchanged)` on error. Spawn never refuses on identity. Keep `import { Effect }` (spawn.ts still uses Effect elsewhere). spawn.ts must stay at or under 1088 lines. Update src/lib/__tests__/agent-state-role.test.ts if it mocks github-app.js for this block: mock ../github-repo-identity.js instead."
+        },
+        "items": [
+          {
+            "id": "spawn-identity.ac1",
+            "title": "Given `git grep -n \"generateInstallationToken\\|configureWorkspaceForBot\\|panopticon-agent\" src/lib/agents/spawn.ts`, when it runs after the change, then it prints nothing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-identity.ac2",
+            "title": "Given a project with github_repo, when spawn reaches the identity block, then it calls configureWorkspaceGitHubIdentity with the agent id, the workspace path and that owner/repo, and a thrown error produces a warning and spawn continues.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-identity.ac3",
+            "title": "Given the change, when `wc -l src/lib/agents/spawn.ts` runs, then it prints at most 1088.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "verdict-per-repo",
+        "title": "The review verdict uses an installation token only on a covered repository",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-11T14:25:32Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5153",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/pr-review-verdict.ts",
+            "src/lib/cloister/__tests__/pr-review-verdict.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/pr-review-verdict.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "pr-review-verdict.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W5 step 15 in src/lib/cloister/pr-review-verdict.ts: PostReviewVerdictDeps.getAppToken becomes `(owner, repo) => Promise<string | null>`; defaultAppToken calls getRepoInstallationToken(owner, repo); appTokenEnv(deps, repo) splits the `owner/repo` from githubRepoArg(facts.url) and returns undefined for a null token so gh runs as the gh user. Update the call site (search `const env = await appTokenEnv(deps)`). Remove the now-unused generateInstallationToken import and the Effect import if nothing else uses it. Update src/lib/cloister/__tests__/pr-review-verdict.test.ts fixtures (getAppToken signature) and add the PRD case."
+        },
+        "items": [
+          {
+            "id": "verdict-per-repo.ac1",
+            "title": "Given isAppConfigured true and getAppToken resolving null, when postReviewVerdict runs, then runGh is called without GH_TOKEN in its options env.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verdict-per-repo.ac2",
+            "title": "Given getAppToken resolving a token, when postReviewVerdict runs for https://github.com/acme/web/pull/7, then getAppToken receives ('acme','web') and runGh's env carries GH_TOKEN equal to that token.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "check-run-per-repo",
+        "title": "The verification check run uses the covering installation's token or is skipped",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-11T14:25:32Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5153",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/verification-check-run.ts",
+            "tests/unit/lib/cloister/verification-check-run.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/verification-check-run.test.ts tests/unit/lib/cloister/verification-tests-on-ci.test.ts tests/unit/lib/cloister/verification-runner-merged.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the three test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W5 step 16 in src/lib/cloister/verification-check-run.ts: VerificationCheckRunDeps.getToken becomes `(owner, repo) => Promise<string | null>`; defaultGetToken calls getRepoInstallationToken(owner, repo); postVerificationCheckRun uses `const token = await (deps.getToken ?? defaultGetToken)(input.owner, input.repo); if (!token) return false;`. Remove now-unused imports. Create tests/unit/lib/cloister/verification-check-run.test.ts with injected deps (build any fake token at runtime, e.g. ['gh','s_','test'].join(''))."
+        },
+        "items": [
+          {
+            "id": "check-run-per-repo.ac1",
+            "title": "Given isConfigured true and getToken resolving null, when postVerificationCheckRun runs, then it returns false and fetchImpl is never called.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "check-run-per-repo.ac2",
+            "title": "Given getToken resolving a token, when postVerificationCheckRun runs for owner acme and repo web, then getToken receives ('acme','web') and fetchImpl receives a POST to https://api.github.com/repos/acme/web/check-runs.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "marker-approver-per-repo",
+        "title": "APPROVED verdict markers count from any trusted author on a repository the App does not cover",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-11T14:25:32Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5153",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/lib/cloister/pr-facts.ts",
+            "src/lib/cloister/__tests__/pr-facts-verdict-marker.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/pr-facts-verdict-marker.test.ts",
+            "npm run typecheck",
+            "wc -l src/lib/cloister/pr-facts.ts"
+          ],
+          "expected_outputs": [
+            "pr-facts-verdict-marker.test.ts passes",
+            "typecheck completes without errors",
+            "pr-facts.ts has at most 1000 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-14"
+          ],
+          "foundationFor": [
+            "docs-identity"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W13 in src/lib/cloister/pr-facts.ts: add `appCoversRepo?: (owner, repo) => Promise<boolean>` to PrFactsDeps next to appBotLogin (default appCoversRepo from ../github-app-installations.js). In markerApproversFor (line 603), after `if (!hasApprovalMarker) return new Set();`, parse pr.url with /github\\.com\\/([^/]+)\\/([^/]+)\\/pull\\/\\d+/; when it matches and appCoversRepo resolves false, skip the bot lookup and return 'any-trusted'. Check isGitHubAppConfigured() to pick the warning: App not configured keeps the existing 'No GitHub App configured' warning; App configured and repo uncovered log once per repo (a Set next to warnedMarkerApprovalTrust): `[pr-facts] GitHub App does not cover <owner>/<repo>: an APPROVED verdict marker counts from any trusted author there. Install the App on <owner> to close this.` Existing tests in src/lib/cloister/__tests__/pr-facts-verdict-marker.test.ts that inject appBotLogin must also inject `appCoversRepo: async () => true` so they keep their meaning and send no real lookup. Must merge in the same PR as the W5 slices (it does: one issue PR)."
+        },
+        "items": [
+          {
+            "id": "marker-approver-per-repo.ac1",
+            "title": "Given appBotLogin resolves 'overdeck-agent[bot]' and appCoversRepo resolves false, when a trusted non-bot author's APPROVED marker for the head is read, then the PR facts report the PR as approved at head.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "marker-approver-per-repo.ac2",
+            "title": "Given appBotLogin resolves 'overdeck-agent[bot]' and appCoversRepo resolves true, when the same trusted non-bot APPROVED marker is read, then it does not approve, and an APPROVED marker from the Bot-typed overdeck-agent author does approve.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "marker-approver-per-repo.ac3",
+            "title": "Given the App is not configured (appBotLogin resolves null), when a trusted author's APPROVED marker is read, then it approves exactly as before ('any-trusted').",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "marker-approver-per-repo.ac4",
+            "title": "Given appCoversRepo resolves false for one repository on two reads, when markerApproversFor runs twice, then the uncovered-repository warning is logged once.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "reopen-repo",
+        "title": "Reopening an issue runs gh pr list and gh pr reopen against the issue's own repository",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-11T14:25:32Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5153",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/issue-transitions.ts",
+            "src/dashboard/server/routes/__tests__/issues-reopen.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/issues-reopen.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "issues-reopen.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W6 step 1 in src/lib/overdeck/issue-transitions.ts (search `gh pr list --head ${branchName} --state closed`): replace both execAsync shell strings with execFileAsync('gh', [...]) calls (execFileAsync already exists at line 22) that pass '--repo', `${githubCheck.owner}/${githubCheck.repo}`. Guard first: when !githubCheck.owner || !githubCheck.repo, log `[reopen] No GitHub repository for ${id}; not reopening a PR` and skip both calls. Add a case to src/dashboard/server/routes/__tests__/issues-reopen.test.ts."
+        },
+        "items": [
+          {
+            "id": "reopen-repo.ac1",
+            "title": "Given an issue whose prefix maps to acme/web, when the reopen transition runs, then the execFile argument arrays for `pr list` and `pr reopen` both contain '--repo' followed by 'acme/web'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reopen-repo.ac2",
+            "title": "Given `git grep -n \"gh pr reopen\\|gh pr list --head\" src/lib/overdeck/issue-transitions.ts`, when it runs after the change, then it prints nothing (no shell-string gh calls remain in the block).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "discussions-repo",
+        "title": "Discussion sync reads comments from the issue's own repository",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-11T14:25:32Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5153",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/command-deck.ts",
+            "tests/unit/dashboard/server/routes/issue-discussions.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/server/routes/issue-discussions.test.ts",
+            "npm run typecheck",
+            "wc -l src/dashboard/server/routes/command-deck.ts"
+          ],
+          "expected_outputs": [
+            "issue-discussions.test.ts passes",
+            "typecheck completes without errors",
+            "command-deck.ts has at most 1331 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W6 step 2 in src/dashboard/server/routes/command-deck.ts (lines 1130-1171, search `ghConfig.repos[0]!.owner`): replace the getGitHubConfig() lookup with resolveGitHubIssue(issueId) (import from ../../../lib/tracker-utils.js), return the same 400 when !isGitHub, use ghRepoSlug for all three --repo occurrences and String(ghIssue.number) instead of issueNum. Keep the getGitHubConfig import (line 144 uses it). command-deck.ts must stay at or under 1331 lines. Extend tests/unit/dashboard/server/routes/issue-discussions.test.ts with the two-repository case (its tracker-utils mock must resolve the second prefix to the second repository)."
+        },
+        "items": [
+          {
+            "id": "discussions-repo.ac1",
+            "title": "Given two tracked repositories acme/one (prefix ONE) and acme/two (prefix TWO), when discussions are synced for TWO-5, then every gh call (issue view, pr list, pr view) carries '--repo' 'acme/two' and `issue view` receives '5'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "discussions-repo.ac2",
+            "title": "Given `git grep -n \"ghConfig.repos\\[0\\]\" src/dashboard/server/routes/command-deck.ts`, when it runs after the change, then it prints nothing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "identities-route",
+        "title": "Add GET /api/github/identities",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-11T14:25:32Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-5153",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/github-identities.ts",
+            "src/dashboard/server/server.ts",
+            "src/dashboard/server/route-scopes.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts",
+            "src/dashboard/server/routes/__tests__/github-identities.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/github-identities.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts src/dashboard/server/__tests__/route-scopes.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the three test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W7: create src/dashboard/server/routes/github-identities.ts modeled on routes/github-quota.ts, returning jsonResponse(await collectGitHubIdentities()); register githubIdentitiesRouteLayer in src/dashboard/server/server.ts next to githubQuotaRouteLayer (import near line 148, layer list near line 447); add `{ method: 'GET', path: '/api/github/identities', scope: 'read:state' }` to ROUTE_SCOPES in route-scopes.ts next to /api/registered-projects (line 41); add the no-loss row from the PRD to tests/unit/lib/overdeck/no-loss-matrix.ts next to `GET /api/github-quota` (line 49). Test in src/dashboard/server/routes/__tests__/github-identities.test.ts with collectGitHubIdentities mocked."
+        },
+        "items": [
+          {
+            "id": "identities-route.ac1",
+            "title": "Given collectGitHubIdentities is mocked to return two owners (acme with two projects, eltmon with one), when GET /api/github/identities is requested, then the response has status 200 and that exact JSON body.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "identities-route.ac2",
+            "title": "Given ROUTE_SCOPES, when the route-scopes test runs, then GET /api/github/identities resolves to scope 'read:state'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "identities-route.ac3",
+            "title": "Given the no-loss matrix test, when it runs, then it finds a READ row for 'GET /api/github/identities' and passes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "doctor-identity",
+        "title": "pan doctor prints one GitHub identity row per owner with a fix",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-11T14:25:32Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5153",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/doctor-github-identity.ts",
+            "src/cli/commands/doctor.ts",
+            "src/cli/commands/doctor-github-quota.ts",
+            "tests/unit/cli/doctor-github-identity.test.ts",
+            "tests/unit/cli/doctor-github-quota.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/doctor-github-identity.test.ts tests/unit/cli/doctor-github-quota.test.ts",
+            "npm run typecheck",
+            "wc -l src/cli/commands/doctor.ts"
+          ],
+          "expected_outputs": [
+            "both doctor test files pass",
+            "typecheck completes without errors",
+            "doctor.ts has at most 1042 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W8 steps 1-5: create src/cli/commands/doctor-github-identity.ts exporting checkGitHubIdentities(deps?) with injectable collect (default collectGitHubIdentities({fresh:true})), canPush(repo) (runGh(['api', `repos/${repo}`, '--jq', '.permissions.push'])) and credentialHelper(projectPath) (git config --get credential.helper via execFile). Build one row `GitHub identity: <owner>` per owner with the problems, messages and fixes exactly as PRD W8 step 2 (SAML, push access/cannot read, not signed in, bot credential file under <OVERDECK_HOME>/credentials/). Empty snapshot gives no rows. In src/cli/commands/doctor.ts after the checkFirstRunLogins block (search `ghLogin: () => checkGhLogin(),`) push its rows, wrapping errors into one warn row named 'GitHub identity'. In src/cli/commands/doctor-github-quota.ts line 90 change `(issue listings use the gh user token until ...)` to `(Overdeck acts as the gh user there until ...)` and update tests/unit/cli/doctor-github-quota.test.ts if it asserts the old text. doctor.ts must stay at or under 1042 lines."
+        },
+        "items": [
+          {
+            "id": "doctor-identity.ac1",
+            "title": "Given an owner whose projects are all mode 'app', when checkGitHubIdentities runs, then it returns one row named 'GitHub identity: <owner>' with status 'ok' and a message listing the actors with repo counts.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-identity.ac2",
+            "title": "Given a mode 'user' project where canPush returns 'false', when checkGitHubIdentities runs, then the row has status 'warn' and fix 'Ask an owner of <owner> for write access, or install the GitHub App on <owner>'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-identity.ac3",
+            "title": "Given canPush fails with stderr containing 'SAML', when checkGitHubIdentities runs, then the fix is 'Run: gh auth refresh -h github.com, and authorize the organization in the browser'; given mode 'none', then the fix is 'Run: gh auth login'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-identity.ac4",
+            "title": "Given a mode 'user' project whose credential.helper points under <OVERDECK_HOME>/credentials/, when checkGitHubIdentities runs, then the row warns '<repo> still pushes with a bot credential file' with the `git config --unset credential.helper` fix.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-identity.ac5",
+            "title": "Given collect returns an empty snapshot, when checkGitHubIdentities runs, then it returns no rows; given collect throws, when doctor runs the check, then doctor emits one warn row named 'GitHub identity' and does not crash.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cloister-status-bot-name",
+        "title": "pan cloister status names the App's real bot instead of panopticon-agent",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T14:25:32Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "backend",
+          "issueLabel": "pan-5153",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/cloister/status.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "git grep -n panopticon-agent src/cli/commands/cloister/status.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the grep prints nothing"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W8 step 6: in src/cli/commands/cloister/status.ts lines 119-120 replace the two hardcoded `panopticon-agent` strings with the name from getBotIdentity().name (import from ../../../lib/github-app.js): `✓ <name without [bot]> (App ID: …)` and `agents push as <name> where the App is installed`."
+        },
+        "items": [
+          {
+            "id": "cloister-status-bot-name.ac1",
+            "title": "Given `git grep -n panopticon-agent src/cli/commands/cloister/status.ts`, when it runs after the change, then it prints nothing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cloister-status-bot-name.ac2",
+            "title": "Given the App is configured with slug overdeck-agent, when `pan cloister status` renders the GitHub App section, then it prints `✓ overdeck-agent (App ID: …)` and `agents push as overdeck-agent[bot] where the App is installed`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sidebar-owner-groups",
+        "title": "The sidebar groups projects under collapsible owner headers",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-11T14:25:32Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5153",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/projectsData.ts",
+            "src/dashboard/frontend/src/components/sidebar/projectOwners.ts",
+            "src/dashboard/frontend/src/components/sidebar/OwnerGroupHeader.tsx",
+            "src/dashboard/frontend/src/components/sidebar/__tests__/projectOwners.test.ts",
+            "src/dashboard/frontend/src/components/Sidebar.tsx",
+            "src/dashboard/frontend/src/components/__tests__/Sidebar.ownerGroups.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/sidebar/__tests__/projectOwners.test.ts src/components/__tests__/Sidebar.ownerGroups.test.tsx",
+            "npm run typecheck",
+            "wc -l src/dashboard/frontend/src/components/Sidebar.tsx"
+          ],
+          "expected_outputs": [
+            "projectOwners.test.ts and Sidebar.ownerGroups.test.tsx pass",
+            "typecheck completes without errors",
+            "Sidebar.tsx has at most 1019 lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W9. Load the pan-style-guide skill before writing JSX. projectsData.ts: add githubRepo?: string | null to RegisteredProjectLite (line 17) and ProjectData (line 82), widen the cast at line 240 and carry githubRepo into both projectMap.set branches. Create src/dashboard/frontend/src/components/sidebar/projectOwners.ts (COLLAPSED_OWNERS_KEY 'overdeck.sidebar.collapsedOwners', githubOwnerOf, groupProjectsByOwner, readCollapsedOwners, writeCollapsedOwners exactly as PRD W9 step 2). In Sidebar.tsx at line 693 (search `projects.map((project) => {`) loop over owner groups, render the header button (data-testid `sidebar-owner-${owner ?? 'other'}`, aria-expanded, toggles collapse, persists) only when there are two or more groups, keep the existing project buttons unchanged, keep the header in the active text color when a collapsed group holds the selected project, and style it like the existing Projects section label. Sidebar.tsx must stay at or under 1019 lines; if the edit needs more, put the header in sidebar/OwnerGroupHeader.tsx. Add a render test src/dashboard/frontend/src/components/__tests__/Sidebar.ownerGroups.test.tsx modeled on Sidebar.workspaces.test.tsx (stub fetch for /api/registered-projects with githubRepo values). Add both test paths to scripts/frontend-test-subset.txt in sorted position."
+        },
+        "items": [
+          {
+            "id": "sidebar-owner-groups.ac1",
+            "title": "Given githubOwnerOf, when called with 'a/b', null and 'nope', then it returns 'a', null and null.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sidebar-owner-groups.ac2",
+            "title": "Given projects under one owner, when groupProjectsByOwner runs, then it returns a single group with owner null holding every project; given projects under zeta and Acme plus one without a repository, then it returns groups Acme, zeta and a final null group, and Acme/x with acme/y share one group.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sidebar-owner-groups.ac3",
+            "title": "Given localStorage holds malformed JSON under overdeck.sidebar.collapsedOwners, when readCollapsedOwners runs, then it returns [] and does not throw.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sidebar-owner-groups.ac4",
+            "title": "Given /api/registered-projects returns projects under two owners, when Sidebar.ownerGroups.test.tsx renders the sidebar and clicks sidebar-owner-<owner>, then that owner's project buttons are hidden and the owner is stored under overdeck.sidebar.collapsedOwners; given one owner, then no sidebar-owner- element renders.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "identity-chip",
+        "title": "The Command Deck project header shows owner · acting login",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-11T14:25:32Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5153",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/useGitHubIdentities.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ProjectIdentityChip.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ProjectNode.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ProjectIdentityChip.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/CommandDeck/ProjectTree/ProjectIdentityChip.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ProjectIdentityChip.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W10. Load the pan-style-guide skill first. Create src/dashboard/frontend/src/components/CommandDeck/ProjectTree/useGitHubIdentities.ts (snapshot types redeclared from W4, useGitHubIdentities() useQuery with queryKey ['github-identities'], fetch '/api/github/identities' throwing on non-OK, staleTime 60_000, and findProjectIdentity(snapshot, projectKey)). Create ProjectIdentityChip.tsx ({projectKey}) rendering nothing without data or project, else `<span data-testid=\"project-identity-chip\" title={detail}>` with `<owner> · <actor>` or `<owner> · not signed in` for mode none, copying ProjectCiChip's markup and classes (failing-state text class for mode none). In ProjectNode.tsx line 291 render it right after <ProjectCiChip projectKey={projectKey} />. Test beside the source in ProjectTree/ProjectIdentityChip.test.tsx; add it to scripts/frontend-test-subset.txt in sorted position."
+        },
+        "items": [
+          {
+            "id": "identity-chip.ac1",
+            "title": "Given a mocked /api/github/identities response with project web under acme in mode 'app' acting as overdeck-agent[bot], when ProjectIdentityChip renders for 'web', then project-identity-chip shows 'acme · overdeck-agent[bot]' with the identity's detail as its title.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "identity-chip.ac2",
+            "title": "Given mode 'user' with actor eltmon, then the chip shows 'acme · eltmon'; given mode 'none', then it shows 'acme · not signed in'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "identity-chip.ac3",
+            "title": "Given a project key absent from the snapshot, when ProjectIdentityChip renders, then it renders nothing.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-identities",
+        "title": "Settings shows a read-only GitHub Identities section",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-11T14:25:32Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5153",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/sections/GitHubIdentitiesSection.tsx",
+            "src/dashboard/frontend/src/components/Settings/settingsPageConstants.ts",
+            "src/dashboard/frontend/src/components/Settings/SettingsPage.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/__tests__/GitHubIdentitiesSection.test.tsx",
+            "scripts/frontend-test-subset.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/Settings/sections/__tests__/GitHubIdentitiesSection.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "GitHubIdentitiesSection.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W11. Load the pan-style-guide skill first. Add `{ id: 'github-identities', label: 'GitHub Identities', icon: GitBranch }` to SETTINGS_NAV_ITEMS in settingsPageConstants.ts right after the tracker-keys entry (line 72). Create src/dashboard/frontend/src/components/Settings/sections/GitHubIdentitiesSection.tsx (section id github-identities, heading markup like TrackerKeysSection.tsx) using useGitHubIdentities() from ../../CommandDeck/ProjectTree/useGitHubIdentities: the gh account line, the GitHub App line, the Owner/Project/Repository/Acts as/Why table (owner cell on the first row of each owner only, data-testid github-identity-row-<project key>), the empty sentence, and the help text, all verbatim from PRD W11 step 2. Render it in SettingsPage.tsx right after <TrackerKeysSection … /> (line 647). Test in Settings/sections/__tests__/GitHubIdentitiesSection.test.tsx; add it to scripts/frontend-test-subset.txt in sorted position."
+        },
+        "items": [
+          {
+            "id": "settings-identities.ac1",
+            "title": "Given a snapshot with ghLogin eltmon and appSlug overdeck-agent, when the section renders, then it shows 'gh account: eltmon' and 'GitHub App: overdeck-agent'; given nulls, then 'gh account: not signed in' and 'GitHub App: not configured'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-identities.ac2",
+            "title": "Given an owner with two projects, when the section renders, then it renders one github-identity-row-<key> per project with that project's actor and shows the owner name in the first row only.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-identities.ac3",
+            "title": "Given an empty owners list, when the section renders, then it shows 'No registered project has a GitHub repository.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-identities.ac4",
+            "title": "Given SETTINGS_NAV_ITEMS, when the Settings nav renders, then it lists 'GitHub Identities' directly after 'Tracker Keys'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sweep-final-check",
+        "title": "Confirm the App-configured checks left in src are only the machine-wide ones",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T14:25:32Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-5153",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/github-pr-lookup.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "git grep -n \"isGitHubAppConfigured()\" -- src ':!*.test.ts' ':!**/__tests__/**'",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "the grep lists only the allowed files",
+            "typecheck completes without errors",
+            "npm run lint exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD acceptance criterion 5 and the final gate. After every W5 slice lands, run the grep and the full local gates. No source change is expected; if the grep lists a file outside the allowed set, fix that call site in the same style as its W5 row and record it in the commit message."
+        },
+        "items": [
+          {
+            "id": "sweep-final-check.ac1",
+            "title": "Given `git grep -n \"isGitHubAppConfigured()\" -- src ':!*.test.ts' ':!**/__tests__/**'`, when it runs after all sweep items, then every listed path is one of src/lib/github-app-auth.ts, src/lib/github-app.ts, src/lib/github-app-installations.ts, src/lib/github-repo-identity.ts, src/lib/github-pr-lookup.ts (githubPrLookupSource only), src/dashboard/server/routes/workspaces.ts, and one line of src/dashboard/server/routes/workspaces/merge-ops.ts.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sweep-final-check.ac2",
+            "title": "Given all sweep items and api-token-per-repo are done, when `npm run typecheck` and `npm run lint` run, then both exit 0 (file-size, effect-facades, circular, source-introspection and docs lints included).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-identity",
+        "title": "Docs describe per-repository identity, covering an organization, and the per-repository approval rule",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T14:25:32Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5153",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/issue-trackers.mdx",
+            "configuration/auto-merge.mdx",
+            "docs/PIPELINE-GATES.md",
+            "docs/REVIEW-AGENT-ARCHITECTURE.md",
+            "docs/USAGE.md",
+            "changelog.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n \"GitHub organizations and identities\" configuration/issue-trackers.mdx",
+            "tr '\\n' ' ' < docs/PIPELINE-GATES.md | tr -s ' ' | grep -o \"covers the PR's repository\""
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "the heading grep prints one line",
+            "the PIPELINE-GATES grep prints one line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13",
+            "FR-14"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W12 steps 1-6 and 8 (step 7's module headers live in the code items). configuration/issue-trackers.mdx: add the section 'GitHub organizations and identities' after the block at line 71 (search `# Authenticate with GitHub CLI (recommended)`) with the content listed in W12 step 1, linking https://github.com/eltmon/overdeck/issues/5154. configuration/auto-merge.mdx lines 73-80 and 200: bot-only marker approval and bot merges apply on covered repositories; elsewhere the gh user posts and any trusted author's APPROVED marker counts. docs/PIPELINE-GATES.md: the 'Who may approve by marker' sentences near line 970 and one quota-policy sentence (section at line 1618) as W12 step 3 states. docs/REVIEW-AGENT-ARCHITECTURE.md line 35 section: bot authors only on covered repos; uncovered repos accept any trusted author's marker, which is weaker; installing the App restores bot-only. docs/USAGE.md 'Issue Trackers' (line 133): one paragraph pointing to the new section. changelog.mdx: inside the v0.78.0 Unreleased block, the New and Fixed entries verbatim from W12 step 8."
+        },
+        "items": [
+          {
+            "id": "docs-identity.ac1",
+            "title": "Given configuration/issue-trackers.mdx, when grepped, then it contains the heading 'GitHub organizations and identities' and a link to https://github.com/eltmon/overdeck/issues/5154.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-identity.ac2",
+            "title": "Given docs/PIPELINE-GATES.md with line breaks joined into spaces (tr '\\n' ' '), when searched, then it contains 'covers the PR's repository' and 'on a repository it does not cover', and the sentence that an APPROVED marker counts only from the bot no longer says 'When the GitHub App is configured'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-identity.ac3",
+            "title": "Given changelog.mdx, when grepped, then the v0.78.0 block contains 'GitHub organizations: Overdeck picks the acting identity per repository' and 'Reopening an issue and syncing discussions now use the issue's own repository.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-identity.ac4",
+            "title": "Given the docs changes, when `npm run lint:docs` runs, then it exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "app-auth-module",
+        "to": "repo-installation-lookup",
+        "type": "blocks"
+      },
+      {
+        "from": "app-auth-module",
+        "to": "api-token-per-repo",
+        "type": "blocks"
+      },
+      {
+        "from": "repo-installation-lookup",
+        "to": "api-token-per-repo",
+        "type": "blocks"
+      },
+      {
+        "from": "repo-installation-lookup",
+        "to": "repo-identity",
+        "type": "blocks"
+      },
+      {
+        "from": "repo-installation-lookup",
+        "to": "sweep-merge-ops",
+        "type": "blocks"
+      },
+      {
+        "from": "repo-installation-lookup",
+        "to": "sweep-tracker-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "repo-installation-lookup",
+        "to": "sweep-forge",
+        "type": "blocks"
+      },
+      {
+        "from": "repo-installation-lookup",
+        "to": "sweep-pr-lookup",
+        "type": "blocks"
+      },
+      {
+        "from": "repo-installation-lookup",
+        "to": "verdict-per-repo",
+        "type": "blocks"
+      },
+      {
+        "from": "repo-installation-lookup",
+        "to": "check-run-per-repo",
+        "type": "blocks"
+      },
+      {
+        "from": "repo-installation-lookup",
+        "to": "marker-approver-per-repo",
+        "type": "blocks"
+      },
+      {
+        "from": "repo-identity",
+        "to": "spawn-identity",
+        "type": "blocks"
+      },
+      {
+        "from": "repo-identity",
+        "to": "identities-route",
+        "type": "blocks"
+      },
+      {
+        "from": "repo-identity",
+        "to": "doctor-identity",
+        "type": "blocks"
+      },
+      {
+        "from": "sweep-pr-lookup",
+        "to": "discussions-repo",
+        "type": "blocks"
+      },
+      {
+        "from": "identities-route",
+        "to": "identity-chip",
+        "type": "blocks"
+      },
+      {
+        "from": "identity-chip",
+        "to": "settings-identities",
+        "type": "blocks"
+      },
+      {
+        "from": "sweep-merge-ops",
+        "to": "sweep-final-check",
+        "type": "blocks"
+      },
+      {
+        "from": "sweep-tracker-verification",
+        "to": "sweep-final-check",
+        "type": "blocks"
+      },
+      {
+        "from": "sweep-forge",
+        "to": "sweep-final-check",
+        "type": "blocks"
+      },
+      {
+        "from": "sweep-pr-lookup",
+        "to": "sweep-final-check",
+        "type": "blocks"
+      },
+      {
+        "from": "spawn-identity",
+        "to": "sweep-final-check",
+        "type": "blocks"
+      },
+      {
+        "from": "verdict-per-repo",
+        "to": "sweep-final-check",
+        "type": "blocks"
+      },
+      {
+        "from": "check-run-per-repo",
+        "to": "sweep-final-check",
+        "type": "blocks"
+      },
+      {
+        "from": "api-token-per-repo",
+        "to": "sweep-final-check",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

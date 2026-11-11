@@ -21,6 +21,7 @@ describe('route-scope table (PAN-2351)', () => {
     expect(requiredScopeFor('GET', '/events/stream')).toBe('read:events');
     expect(requiredScopeFor('GET', '/api/issues')).toBe('read:state');
     expect(requiredScopeFor('GET', '/api/registered-projects')).toBe('read:state');
+    expect(requiredScopeFor('GET', '/api/github/identities')).toBe('read:state');
     expect(requiredScopeFor('POST', '/api/registered-projects')).toBe('admin');
     expect(requiredScopeFor('GET', '/api/conversations/abc')).toBe('read:conversations');
     expect(requiredScopeFor('GET', '/api/conversations/abc/messages')).toBe('read:conversations');

@@ -33,6 +33,7 @@ import { BackgroundAiSection } from './sections/BackgroundAiSection';
 import { TerminalSection } from './sections/TerminalSection';
 import { TtsConfigurationSection } from './sections/TtsConfigurationSection';
 import { TrackerKeysSection } from './sections/TrackerKeysSection';
+import { GitHubIdentitiesSection } from './sections/GitHubIdentitiesSection';
 import { AppearanceSection } from './sections/AppearanceSection';
 import { DiffSection } from './sections/DiffSection';
 import { MaintenanceSection } from './sections/MaintenanceSection';
@@ -648,6 +649,8 @@ export function SettingsPage() {
         formData={formData}
         onSettingsChange={applySettings}
       />
+
+      <GitHubIdentitiesSection />
 
       <AppearanceSection
         uiPrefs={uiPrefs}

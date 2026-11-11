@@ -16,6 +16,7 @@ src/components/Agents/live/live-model.test.ts
 src/components/CommandDeck/CommandDeck.test.tsx
 src/components/CommandDeck/ProjectTree/FeatureItem.linkedConversation.test.tsx
 src/components/CommandDeck/ProjectTree/FeatureItem.pullRequest.test.tsx
+src/components/CommandDeck/ProjectTree/ProjectIdentityChip.test.tsx
 src/components/CommandDeck/ProjectTree/featureStateBadge.test.ts
 src/components/CommandDeck/SessionView/SessionPanel.test.tsx
 src/components/CommandDeck/__tests__/CommandDeck.render-count.test.tsx
@@ -96,6 +97,7 @@ src/components/Settings/sections/__tests__/AccessTokensSection.test.tsx
 src/components/Settings/sections/__tests__/AutoSettleIdleRow.test.tsx
 src/components/Settings/sections/__tests__/AutoSettleOnMergeRow.test.tsx
 src/components/Settings/sections/__tests__/CloseOutSection.test.tsx
+src/components/Settings/sections/__tests__/GitHubIdentitiesSection.test.tsx
 src/components/Settings/sections/__tests__/ProviderManagementSection.test.tsx
 src/components/Settings/sections/__tests__/HarnessesSection.test.tsx
 src/components/Settings/sections/__tests__/PermissionsSection.test.tsx
@@ -119,6 +121,7 @@ src/components/__tests__/GitHubRateLimitBanner.test.tsx
 src/components/__tests__/HarnessUpdateCard.test.tsx
 src/components/__tests__/McpSignInCard.test.tsx
 src/components/__tests__/PanOpenInPicker.remote.test.tsx
+src/components/__tests__/Sidebar.ownerGroups.test.tsx
 src/components/__tests__/Sidebar.workspacePullRequest.test.tsx
 src/components/__tests__/palette-anywhere-actions.test.ts
 src/components/__tests__/palette-fleet-hits.test.tsx
@@ -225,6 +228,7 @@ src/components/shared/ModelPicker/__tests__/harnessRows.test.ts
 src/components/shared/__tests__/Modal.test.tsx
 src/components/sidebar/__tests__/AddProjectToMachineDialog.test.tsx
 src/components/sidebar/__tests__/MachinesNavItem.test.tsx
+src/components/sidebar/__tests__/projectOwners.test.ts
 src/components/simple/SimpleQuestionCard.test.tsx
 src/components/terminal/TerminalDrawer.pending.test.tsx
 src/components/terminal/terminalControlFrames.test.ts
