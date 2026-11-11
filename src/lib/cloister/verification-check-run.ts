@@ -15,13 +15,8 @@
  * PR page shows why verification failed without opening the dashboard. This is
  * the smallest function that does that; failures are non-fatal by design.
  */
-import { Effect } from 'effect';
-
-import {
-  generateInstallationToken,
-  isGitHubAppConfigured,
-  loadGitHubAppConfig,
-} from '../github-app.js';
+import { isGitHubAppConfigured } from '../github-app.js';
+import { getRepoInstallationToken } from '../github-app-installations.js';
 
 export type CheckRunConclusion = 'success' | 'failure' | 'neutral' | 'skipped';
 
@@ -40,16 +35,14 @@ export interface VerificationCheckRunInput {
 export interface VerificationCheckRunDeps {
   fetchImpl?: typeof fetch;
   isConfigured?: () => boolean;
-  getToken?: () => Promise<string>;
+  /** PAN-5153: the token of the installation that covers owner/repo; null where the App is not installed. */
+  getToken?: (owner: string, repo: string) => Promise<string | null>;
 }
 
 export const VERIFICATION_CHECK_RUN_NAME = 'overdeck/verification';
 
-async function defaultGetToken(): Promise<string> {
-  const config = loadGitHubAppConfig();
-  if (!config) throw new Error('GitHub App not configured');
-  const { token } = await Effect.runPromise(generateInstallationToken(config));
-  return token;
+function defaultGetToken(owner: string, repo: string): Promise<string | null> {
+  return getRepoInstallationToken(owner, repo);
 }
 
 /**
@@ -68,7 +61,8 @@ export async function postVerificationCheckRun(
   if (!input.headSha) return false;
 
   try {
-    const token = await (deps.getToken ?? defaultGetToken)();
+    const token = await (deps.getToken ?? defaultGetToken)(input.owner, input.repo);
+    if (!token) return false;
     const doFetch = deps.fetchImpl ?? fetch;
     const response = await doFetch(
       `https://api.github.com/repos/${input.owner}/${input.repo}/check-runs`,
