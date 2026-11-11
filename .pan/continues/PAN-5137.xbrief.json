@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-5137",
+  "created": "2026-11-11T18:41:59.017Z",
+  "updated": "2026-11-11T18:41:59.018Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "fold-module": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5137",
+      "claimedAt": "2026-11-11T18:41:59.017Z"
+    }
+  }
+}
