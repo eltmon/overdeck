@@ -438,6 +438,11 @@ export interface ProjectConfig {
   issue_prefix?: string;
   github_repo?: string;  // e.g. "owner/repo"
   gitlab_repo?: string;  // e.g. "group/repo"
+  /**
+   * PAN-5161: sidebar owner group label. Display only; it never changes which
+   * identity acts on a repository. Unset: the GitHub owner, then the GitLab group.
+   */
+  owner?: string;
   /** Tracker type for this project. Affects ID parsing and state management. */
   tracker?: 'linear' | 'github' | 'gitlab' | 'rally' | 'jira';
   /**
