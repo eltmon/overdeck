@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5122",
   "created": "2026-11-11T10:01:02.133Z",
-  "updated": "2026-11-11T10:48:23.760Z",
+  "updated": "2026-11-11T11:04:03.366Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -79,9 +79,26 @@
       "doneAt": "2026-11-11T10:48:16.824Z"
     },
     "lifecycle-herdr-test": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5122",
-      "claimedAt": "2026-11-11T10:48:23.760Z"
+      "claimedAt": "2026-11-11T10:48:23.760Z",
+      "doneAt": "2026-11-11T11:04:03.366Z"
+    },
+    "lifecycle-herdr-test.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T11:04:03.366Z"
+    },
+    "lifecycle-herdr-test.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T11:04:03.366Z"
+    },
+    "lifecycle-herdr-test.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T11:04:03.366Z"
+    },
+    "lifecycle-herdr-test.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T11:04:03.366Z"
     }
   }
 }
