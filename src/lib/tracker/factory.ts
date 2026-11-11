@@ -42,7 +42,7 @@ export interface TrackerConfig {
  * Get tracker API key from config.yaml (Settings page).
  * This is checked FIRST — env vars are the fallback, not the other way around.
  */
-function getTrackerKeyFromConfig(trackerType: TrackerType): string | undefined {
+function getTrackerKeyFromConfig(trackerType: Exclude<TrackerType, 'jira'>): string | undefined {
   try {
     const { config: yamlConfig } = loadYamlConfig();
     return yamlConfig.trackerKeys[trackerType];

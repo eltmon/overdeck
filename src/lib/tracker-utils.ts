@@ -113,7 +113,7 @@ export function isGitHubIssue(issueId: string): boolean {
   return resolveGitHubIssue(issueId).isGitHub;
 }
 
-export type TrackerTypeResolution = 'github' | 'rally' | 'linear' | 'gitlab';
+export type TrackerTypeResolution = 'github' | 'rally' | 'linear' | 'gitlab' | 'jira';
 
 /**
  * Resolve the tracker type for an issue ID by checking projects.yaml configuration.

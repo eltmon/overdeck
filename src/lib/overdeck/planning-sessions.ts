@@ -251,7 +251,7 @@ export function startPlanningForIssue(options: {
       title: string;
       description: string;
       url: string;
-      source: 'linear' | 'github' | 'rally';
+      source: 'linear' | 'github' | 'rally' | 'jira';
       comments?: Array<{ author: string; body: string; createdAt: string }>;
       artifactType?: string;
       childStories?: Array<{ ref: string; title: string; status: string; description: string }>;

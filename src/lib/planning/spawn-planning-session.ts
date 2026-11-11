@@ -105,7 +105,7 @@ export interface PlanningIssue {
   title: string;
   description: string;
   url: string;
-  source: 'linear' | 'github' | 'rally';
+  source: 'linear' | 'github' | 'rally' | 'jira';
   comments?: Array<{ author: string; body: string; createdAt: string }>;
   /** Rally artifact type (e.g. "PortfolioItem/Feature") */
   artifactType?: string;

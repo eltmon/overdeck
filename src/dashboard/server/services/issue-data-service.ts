@@ -1636,7 +1636,7 @@ export class IssueDataService {
 
     try {
       const { RallyTracker } = await import('../../../lib/tracker/rally.js');
-      const { findProjectsByRallyProject } = await import('../../../lib/projects.js');
+      const { findProjectsByRallyProject } = await import('../../../lib/tracker/tracker-projects.js');
 
       const rallyProjects = findProjectsByRallyProject();
       let allFormatted: any[] = [];

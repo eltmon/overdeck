@@ -439,7 +439,7 @@ export interface ProjectConfig {
   github_repo?: string;  // e.g. "owner/repo"
   gitlab_repo?: string;  // e.g. "group/repo"
   /** Tracker type for this project. Affects ID parsing and state management. */
-  tracker?: 'linear' | 'github' | 'gitlab' | 'rally';
+  tracker?: 'linear' | 'github' | 'gitlab' | 'rally' | 'jira';
   /**
    * Custom regex pattern for issue ID parsing. Must have two capture groups:
    * group 1 = prefix, group 2 = number. Example: "^(PROJ)-(\\d+)$"
@@ -462,6 +462,7 @@ export interface ProjectConfig {
   workspace_remove_command?: string;
   /** Rally project OID (e.g., "/project/822404704163") for per-project Rally scoping */
   rally_project?: string;
+  jira?: import('./tracker/jira-config.js').JiraProjectConfig; // PAN-5152
   /** Specialist agent configuration */
   specialists?: SpecialistConfig;
   /** Path to the project's OKF knowledge bundle. Relative paths resolve from the project path. */
@@ -1069,17 +1070,6 @@ projects:
     }
   });
   console.log(`Created example projects config at ${PROJECTS_CONFIG_FILE}`);
-}
-
-/**
- * Find all projects that have a rally_project configured.
- * Returns array of { key, config } for projects with Rally project OIDs.
- */
-export function findProjectsByRallyProject(): Array<{ key: string; config: ProjectConfig }> {
-  const config = loadProjectsConfigSync();
-  return Object.entries(config.projects)
-    .filter(([, projectConfig]) => !!projectConfig.rally_project)
-    .map(([key, projectConfig]) => ({ key, config: projectConfig }));
 }
 
 // ─── Effect API ───────────────────────────────────────────────────────────────
