@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-5131",
+  "created": "2026-11-11T08:19:14.972Z",
+  "updated": "2026-11-11T08:19:14.972Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "ages-read-time": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5131",
+      "claimedAt": "2026-11-11T08:19:14.972Z"
+    }
+  }
+}
