@@ -19,6 +19,7 @@ import { buildChildEnvWithoutTmux } from '../../../lib/child-env.js';
 import { findHerdrAgent } from '../../../lib/terminal-backends/herdr.js';
 import { controlTerminal, observeTerminal } from '../../../lib/terminal-backends/herdr-stream.js';
 import { resolveLaunchBackend } from '../../../lib/terminal-backends/launch.js';
+import { findHerdrCompanionTerminalId } from '../../../lib/overdeck/companion-terminal/herdr-host.js';
 import type { TerminalControl, TerminalObservation } from '../../../lib/terminal-backends/types.js';
 
 // ─── Runtime detection ────────────────────────────────────────────────────────
@@ -184,17 +185,35 @@ interface TerminalSessionState {
 
 // ─── Herdr terminal bridge (PAN-3917 FR-4) ───────────────────────────────────
 
+export interface ResolveHerdrTerminalIdDeps {
+  readonly backendName: () => Promise<string>;
+  readonly findAgent: (sessionName: string) => Promise<{ readonly terminalId: string } | null>;
+  readonly findCompanion: (sessionName: string) => Promise<string | null>;
+}
+
+const defaultResolveDeps: ResolveHerdrTerminalIdDeps = {
+  backendName: async () => (await resolveLaunchBackend()).name,
+  findAgent: (sessionName) => findHerdrAgent(sessionName),
+  findCompanion: (sessionName) => findHerdrCompanionTerminalId(sessionName),
+};
+
 /**
  * The Herdr terminal id behind an Overdeck session name, or null when this host
- * runs on tmux or the name is not a live Herdr agent. Herdr's live agent name
- * is the Overdeck agent id (the adapter binds it with `agent.rename`), so one
- * `agent.get` answers it.
+ * runs on tmux or the name is neither a live Herdr agent nor a companion. An
+ * agent's live Herdr name is the Overdeck agent id (the adapter binds it with
+ * `agent.rename`), so one `agent.get` answers it. A companion is not an agent
+ * (no `agentId` token — PAN-5122 D2), so it is found by its own `companion`
+ * token instead.
  */
-export async function resolveHerdrTerminalId(sessionName: string): Promise<string | null> {
+export async function resolveHerdrTerminalId(
+  sessionName: string,
+  deps: ResolveHerdrTerminalIdDeps = defaultResolveDeps,
+): Promise<string | null> {
   try {
-    const backend = await resolveLaunchBackend();
-    if (backend.name !== 'herdr') return null;
-    return (await findHerdrAgent(sessionName))?.terminalId ?? null;
+    if ((await deps.backendName()) !== 'herdr') return null;
+    const agent = await deps.findAgent(sessionName);
+    if (agent) return agent.terminalId;
+    return sessionName.startsWith('companion-') ? await deps.findCompanion(sessionName) : null;
   } catch {
     return null;
   }
