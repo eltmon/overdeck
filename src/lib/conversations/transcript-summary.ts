@@ -41,8 +41,8 @@ import { getModelEffortLevels } from '../model-capabilities.js';
 import { recordBackgroundAiCost } from '../background-ai/cost.js';
 import type { BackgroundAiFeature } from '../background-ai/registry.js';
 
-/** Haiku — fast/cheap, used for every conversation title and about-summary. */
-export const CONVERSATION_TITLE_MODEL = 'claude-haiku-4-5-20251001';
+/** Haiku 5.5 — fast/cheap, used for every conversation title and about-summary (PAN-5124). */
+export const CONVERSATION_TITLE_MODEL = 'claude-haiku-5-5';
 
 /** Total transcript characters allowed into a single prompt. */
 const TRANSCRIPT_BUDGET = 24_000;

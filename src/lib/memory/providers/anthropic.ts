@@ -12,7 +12,7 @@ import {
   type ExtractionUsage,
 } from './types.js';
 
-const DEFAULT_MODEL = 'claude-haiku-4-5-20251001';
+const DEFAULT_MODEL = 'claude-haiku-5-5';
 
 function hasAnthropicEnvCredentials(): boolean {
   return Boolean(process.env.ANTHROPIC_API_KEY?.trim() || process.env.ANTHROPIC_AUTH_TOKEN?.trim());

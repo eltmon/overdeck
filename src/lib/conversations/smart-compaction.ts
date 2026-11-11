@@ -37,7 +37,7 @@ function recordSummaryForkCost(model: string, envelope: Record<string, unknown>)
 
 const SUMMARY_TIMEOUT_MS = 60_000;
 const FORK_SUMMARY_TIMEOUT_MS = 300_000;
-const DEFAULT_SUMMARY_MODEL = 'claude-haiku-4-5-20251001';
+const DEFAULT_SUMMARY_MODEL = 'claude-haiku-5-5';
 
 export interface CompactionOptions {
   jsonlPath: string;

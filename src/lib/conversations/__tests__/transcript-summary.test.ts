@@ -345,6 +345,11 @@ describe('PAN-2657 background-AI spawn hardening', () => {
     expect(args[permIdx + 1]).toBe('dontAsk');
   });
 
+  it('defaults title and About calls to Haiku 5.5 (PAN-5124)', async () => {
+    const { CONVERSATION_TITLE_MODEL } = await import('../transcript-summary.js');
+    expect(CONVERSATION_TITLE_MODEL).toBe('claude-haiku-5-5');
+  });
+
   it('passes no --effort for Haiku 4.5, which has no effort control (PAN-5124)', async () => {
     const { buildStructuredClaudeArgs } = await import('../transcript-summary.js');
     expect(buildStructuredClaudeArgs({ type: 'object' }, 'claude-haiku-4-5')).not.toContain('--effort');

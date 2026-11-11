@@ -105,7 +105,8 @@ describe('getChunkBudgetChars (PAN-4327)', () => {
   // PAN-5124 FR-4: runModelSummary runs DEFAULT_SUMMARY_MODEL when no model is
   // passed, so a missing model must get that model's budget.
   it('sizes a missing model for the default summary model', () => {
-    expect(getChunkBudgetChars(undefined)).toBe(getChunkBudgetChars('claude-haiku-4-5-20251001'));
+    expect(getChunkBudgetChars(undefined)).toBe(getChunkBudgetChars('claude-haiku-5-5'));
+    expect(getChunkBudgetChars(undefined)).toBe(240_000);
   });
 
   it('gives Fable 5.2 the 1M-window budget', () => {
