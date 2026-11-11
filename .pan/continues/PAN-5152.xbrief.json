@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5152",
   "created": "2026-11-11T14:36:40.308Z",
-  "updated": "2026-11-11T16:46:40.380Z",
+  "updated": "2026-11-11T16:46:42.393Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -494,6 +494,11 @@
     "wi29-gate-autostart-text.ac2": {
       "status": "completed",
       "doneAt": "2026-11-11T16:46:40.379Z"
+    },
+    "wi26-docs-jira-section": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5152",
+      "claimedAt": "2026-11-11T16:46:42.393Z"
     }
   }
 }
