@@ -219,6 +219,9 @@ export interface ApiSettingsConfig {
     github?: string;
     gitlab?: string;
     rally?: string;
+    jira?: string;
+    jira_email?: string;
+    jira_base_url?: string;
   };
   experimental?: {
     /** Show experimental dashboard surfaces in navigation and direct routes. */
@@ -743,7 +746,7 @@ export function loadSettingsApi(): ApiSettingsConfig {
       cheap_mode: config.backgroundAi?.cheapMode ?? true,
       features: { ...defaultBackgroundAiFeatures(), ...config.backgroundAi?.features },
     },
-    tracker_keys: config.trackerKeys,
+    tracker_keys: config.trackerKeys && (({ jiraEmail, jiraBaseUrl, ...keys }) => ({ ...keys, ...(jiraEmail ? { jira_email: jiraEmail } : {}), ...(jiraBaseUrl ? { jira_base_url: jiraBaseUrl } : {}) }))(config.trackerKeys),
     experimental: {
       experimentalFeatures: config.experimental?.experimentalFeatures ?? false,
       claudeCodeChannels: config.experimental?.claudeCodeChannels ?? false,

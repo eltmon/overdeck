@@ -909,6 +909,8 @@ const postProjectsResolveRoute = HttpRouter.add(
       name?: unknown;
       issuePrefix?: unknown;
       repos?: unknown;
+      tracker?: unknown;
+      jiraSite?: unknown;
     };
 
     // Validate mode
@@ -929,6 +931,9 @@ const postProjectsResolveRoute = HttpRouter.add(
       parentDir: typeof body.parentDir === 'string' ? body.parentDir : undefined,
       name: typeof body.name === 'string' ? body.name : undefined,
       issuePrefix: typeof body.issuePrefix === 'string' ? body.issuePrefix : undefined,
+      // PAN-5152: the Add-project dialog's issue-tracker choice.
+      tracker: body.tracker === 'jira' ? 'jira' : undefined,
+      jiraSite: typeof body.jiraSite === 'string' ? body.jiraSite : undefined,
       repos:
         Array.isArray(body.repos) && body.repos.every((repo) => typeof repo === 'string')
           ? (body.repos as string[])

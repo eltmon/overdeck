@@ -15,7 +15,7 @@ export const ContextProjectSummary = Schema.Struct({
   name: Schema.String,
   path: Schema.String,
   issuePrefix: Schema.optional(Schema.String),
-  tracker: Schema.optional(Schema.Literals(["linear", "github", "gitlab", "rally"])),
+  tracker: Schema.optional(Schema.Literals(["linear", "github", "gitlab", "rally", "jira"])),
   workspaceRoot: Schema.optional(Schema.String),
 })
 export type ContextProjectSummary = typeof ContextProjectSummary.Type

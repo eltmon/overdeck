@@ -13,6 +13,7 @@ import { getTrackerContext } from '../../lib/cloister/work-agent-prompt.js';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
 import { resolveBareNumericId } from '../../lib/issue-id.js';
 import { resolveTrackerType, isGitHubIssue, resolveGitHubIssue } from '../../lib/tracker-utils.js';
+import { reopenJiraIssueCommand } from './reopen-jira.js';
 
 export interface ReopenOptions {
   json?: boolean;
@@ -302,12 +303,17 @@ export async function reopenCommand(id: string, options: ReopenOptions = {}): Pr
     await reopenGitHubIssueCommand(issueId, options);
   } else if (trackerType === 'linear') {
     await reopenLinearIssueCommand(issueId, options);
+  } else if (trackerType === 'jira') {
+    if (!(await reopenJiraIssueCommand(issueId, options))) return;
+    await resetWorkspaceState(issueId, options);
+    console.log(chalk.green(`\n✓ ${issueId.toUpperCase()} reopened and ready for re-work\n`));
+    await printNextSteps(issueId);
   } else {
     // rally and gitlab are not yet supported — fail fast rather than silently
     // falling through to the Linear SDK which could misroute the issue.
     console.log(chalk.red(`\nError: \`pan reopen\` does not support ${trackerType} tracker.`));
     console.log(`  Issue ${issueId} is tracked as ${trackerType} in your projects.yaml.`);
-    console.log(`  Currently supported trackers: github, linear.`);
+    console.log(`  Currently supported trackers: github, linear, jira.`);
     return exitCli(1);
   }
 }

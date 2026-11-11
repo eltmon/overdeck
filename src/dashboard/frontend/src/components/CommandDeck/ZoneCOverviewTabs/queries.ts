@@ -338,6 +338,7 @@ export function usePrDiffQuery(issueId: string): UseQueryResult<PrDiffResponse> 
 
 export type DiscussionSource =
   | 'linear'
+  | 'jira'
   | 'github-issue'
   | 'github-pr-conversation'
   | 'github-pr-review'

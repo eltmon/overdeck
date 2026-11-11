@@ -8,6 +8,8 @@ import { loadConfigSync as loadYamlConfig } from '../config-yaml.js';
 import type { RoleEffort } from '../config-yaml.js';
 import { createTrackerFromConfig, createTracker } from '../tracker/factory.js';
 import type { IssueState } from '../tracker/interface.js';
+import { transitionJiraIssue } from '../tracker/jira-lifecycle.js';
+import { trackerStateToJiraTarget } from '../tracker/jira-status.js';
 import { findProjectByPath, getIssuePrefix, resolveProjectFromIssueSync } from '../projects.js';
 import { generateLauncherScript } from '../launcher-generator.js';
 import { prepareClaudeOverdeckMcp, prepareCodexOverdeckMcp } from '../mcp/agent-injection.js';
@@ -580,6 +582,13 @@ async function transitionIssueState(issueId: string, state: IssueState, workspac
   const projectConfig = workspacePath ? findProjectByPath(workspacePath) : null;
   if (!projectConfig) {
     throw new Error(`Cannot transition ${issueId}: no project config found for workspace ${workspacePath || '(none)'}. Register the project in projects.yaml.`);
+  }
+
+  // PAN-5152: a Jira project's issues live in Jira even when its code is on GitHub.
+  if (projectConfig.tracker === 'jira') {
+    const outcome = await transitionJiraIssue(issueId, trackerStateToJiraTarget(state));
+    console.log(`[agents] ${issueId} → ${state} via Jira: ${outcome.kind}`);
+    return;
   }
 
   // Project has a GitHub repo — use GitHub Issues tracker.

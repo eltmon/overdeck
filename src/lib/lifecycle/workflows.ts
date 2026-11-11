@@ -33,6 +33,8 @@ import { recordFeatureRegistryLifecycle } from '../registry/feature-registry-pop
 import { getForgeAdapter } from '../forge.js';
 import { resolveProjectReposForIssue } from '../project-repos.js';
 import { isTrackerIssueClosed } from '../cloister/issue-closed.js';
+import { resolveTrackerType } from '../tracker-utils.js';
+import { transitionJiraIssue } from '../tracker/jira-lifecycle.js';
 import { clearAgentOperatorGatesForIssue } from '../agents/agent-state.js';
 import { evaluateDodGate, readCompletedCloseOut } from './dod-gate.js';
 import { closeResidueConventionPrs, extractGitHubCoordinates, extractGitLabProject } from './pr-residue.js';
@@ -1023,6 +1025,11 @@ async function resetIssueToTodoImpl(ctx: LifecycleContext): Promise<StepResult> 
       return stepOk(step, [`Reset GitHub issue #${number}: reopened and cleared labels`]);
     }
 
+    // PAN-5152: Jira moves through its workflow; the seam never rejects.
+    if (resolveTrackerType(ctx.issueId) === 'jira') {
+      return stepOk(step, [(await transitionJiraIssue(ctx.issueId, 'todo')).message]);
+    }
+
     // Linear: reopen to Todo
     const linearApiKey = await getLinearApiKey();
     if (linearApiKey) {
@@ -1077,6 +1084,8 @@ async function resetPostMergeStateForIssue(issueId: string): Promise<void> {
 export const __testInternals = {
   completeXBriefStep,
   verifyBranchMerged,
+  resetIssueToTodo,
+  resetIssueToCanceled,
 };
 
 function resetIssueToCanceled(ctx: LifecycleContext): Effect.Effect<StepResult> {
@@ -1100,6 +1109,10 @@ async function resetIssueToCanceledImpl(ctx: LifecycleContext): Promise<StepResu
         { encoding: 'utf-8' },
       ).catch(() => {});
       return stepOk(step, [`Marked GitHub issue #${number} as canceled/wontfix`]);
+    }
+
+    if (resolveTrackerType(ctx.issueId) === 'jira') {
+      return stepOk(step, [(await transitionJiraIssue(ctx.issueId, 'canceled')).message]);
     }
 
     const linearApiKey = await getLinearApiKey();

@@ -55,7 +55,7 @@ const CTA_LABEL: Record<ProjectCreateMode, string> = {
 };
 
 /** Fields that live behind the Options disclosure. */
-const OPTION_FIELDS: ReadonlyArray<ProjectIntentField> = ['name', 'issuePrefix', 'parentDir'];
+const OPTION_FIELDS: ReadonlyArray<ProjectIntentField> = ['name', 'issuePrefix', 'parentDir', 'jiraSite'];
 
 export const inputClass =
   'w-full rounded border border-border bg-surface px-3 py-2 text-sm text-foreground ' +
@@ -86,6 +86,8 @@ export function ProjectCreateForm({ create, titleId, banner, onChange, onCancel 
   const parentId = `${ids}-parent`;
   const nameId = `${ids}-name`;
   const prefixId = `${ids}-prefix`;
+  const trackerId = `${ids}-tracker`;
+  const jiraSiteId = `${ids}-jira-site`;
   const optionsId = `${ids}-options`;
   const statusId = `${ids}-status`;
 
@@ -102,6 +104,10 @@ export function ProjectCreateForm({ create, titleId, banner, onChange, onCancel 
     setName,
     issuePrefix,
     setIssuePrefix,
+    tracker,
+    setTracker,
+    jiraSite,
+    setJiraSite,
     hasOverrides,
     resetOverrides,
     intent,
@@ -400,6 +406,40 @@ export function ProjectCreateForm({ create, titleId, banner, onChange, onCancel 
               </p>
               <Findings findings={findingsFor('issuePrefix')} id={`${prefixId}-error`} />
             </div>
+            <div>
+              <label className={labelClass} htmlFor={trackerId}>
+                Issue tracker
+              </label>
+              <select
+                id={trackerId}
+                className={inputClass}
+                value={tracker}
+                onChange={(event) => setTracker(event.target.value === 'jira' ? 'jira' : '')}
+              >
+                <option value="">Detect from remote</option>
+                <option value="jira">Jira</option>
+              </select>
+            </div>
+            {tracker === 'jira' && (
+              <div>
+                <label className={labelClass} htmlFor={jiraSiteId}>
+                  Jira site URL
+                </label>
+                <input
+                  id={jiraSiteId}
+                  className={`${inputClass} font-mono`}
+                  value={jiraSite}
+                  placeholder="https://acme.atlassian.net"
+                  aria-invalid={findingsFor('jiraSite').length > 0}
+                  aria-describedby={findingsFor('jiraSite').length ? `${jiraSiteId}-error` : undefined}
+                  onChange={(event) => setJiraSite(event.target.value)}
+                />
+                <p className="mt-1 text-sm text-muted-foreground">
+                  The issue prefix is your Jira project key, for example ACME.
+                </p>
+                <Findings findings={findingsFor('jiraSite')} id={`${jiraSiteId}-error`} />
+              </div>
+            )}
             {hasOverrides && (
               <button type="button" className={buttonClass} onClick={resetOverrides}>
                 Reset to detected values

@@ -1,9 +1,12 @@
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 
+import { Effect } from 'effect';
+
 import { extractPrefix, parseIssueId } from '../issue-id.js';
 import { githubPrLookupSource, lookupPullRequestNumberForBranch } from '../github-pr-lookup.js';
-import { resolveGitHubIssue, resolveTrackerType } from '../tracker-utils.js';
+import { resolveGitHubIssue, resolveGitHubPullRequestRepo, resolveTrackerType } from '../tracker-utils.js';
+import { createJiraTrackerForIssue } from '../tracker/factory.js';
 import { getGitHubConfig } from '../../dashboard/server/services/tracker-config.js';
 import {
   getCachedIssuePrTabResponse,
@@ -28,6 +31,7 @@ function isGitHubIssue(issueId: string): {
 
 export type DiscussionSource =
   | 'linear'
+  | 'jira'
   | 'github-issue'
   | 'github-pr-conversation'
   | 'github-pr-review'
@@ -107,6 +111,24 @@ export async function fetchIssueDiscussions(
     return [] as DiscussionItem[];
   })();
 
+  const jiraTask = (async () => {
+    // 1b. Jira issue comments, converted to Markdown by the adapter (PAN-5152).
+    if (trackerType !== 'jira') return [] as DiscussionItem[];
+    try {
+      const comments = await Effect.runPromise(createJiraTrackerForIssue(issueId).getComments(issueId));
+      return comments.map((c, i): DiscussionItem => ({
+        id: `jira-${upper}-${i}`,
+        source: 'jira',
+        author: c.author,
+        body: c.body,
+        createdAt: c.createdAt,
+      }));
+    } catch (err: any) {
+      errors.push(`jira comments failed: ${err?.message ?? String(err)}`);
+      return [] as DiscussionItem[];
+    }
+  })();
+
   const ghIssueCommentsTask = (async () => {
     // 2. GitHub issue comments — only when the tracker resolves the issue to
     //    GitHub (not when we're in Linear and a PR happens to exist).
@@ -150,10 +172,12 @@ export async function fetchIssueDiscussions(
   let prRepoArg: string | null = null;
   let prOwner: string | null = null;
   let prRepo: string | null = null;
-  if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo) {
-    prRepoArg = `${githubCheck.owner}/${githubCheck.repo}`;
-    prOwner = githubCheck.owner;
-    prRepo = githubCheck.repo;
+  // PAN-5152: a Jira project's PRs live in its github_repo even though its issues do not.
+  const prRepoRef = resolveGitHubPullRequestRepo(issueId);
+  if (prRepoRef) {
+    prRepoArg = `${prRepoRef.owner}/${prRepoRef.repo}`;
+    prOwner = prRepoRef.owner;
+    prRepo = prRepoRef.repo;
   } else {
     // Try the project-resolved repo (Linear-tracked issues whose project maps
     // to a GitHub repo — common for Overdeck).
@@ -186,12 +210,13 @@ export async function fetchIssueDiscussions(
     return null;
   })();
 
-  const [linearItems, ghIssueItems, resolvedPrNumber] = await Promise.all([
+  const [linearItems, jiraItems, ghIssueItems, resolvedPrNumber] = await Promise.all([
     linearTask,
+    jiraTask,
     ghIssueCommentsTask,
     prNumberTask,
   ]);
-  items.push(...linearItems, ...ghIssueItems);
+  items.push(...linearItems, ...jiraItems, ...ghIssueItems);
   prNumber = resolvedPrNumber;
 
   if (prNumber !== null && prRepoArg && prOwner && prRepo) {

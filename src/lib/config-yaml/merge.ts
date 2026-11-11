@@ -735,6 +735,9 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       if (config.tracker_keys.rally) {
         result.trackerKeys.rally = resolveEnvVar(config.tracker_keys.rally);
       }
+      if (config.tracker_keys.jira) result.trackerKeys.jira = resolveEnvVar(config.tracker_keys.jira);
+      if (config.tracker_keys.jira_email) result.trackerKeys.jiraEmail = resolveEnvVar(config.tracker_keys.jira_email);
+      if (config.tracker_keys.jira_base_url) result.trackerKeys.jiraBaseUrl = resolveEnvVar(config.tracker_keys.jira_base_url);
     }
 
     // Merge shadow configuration

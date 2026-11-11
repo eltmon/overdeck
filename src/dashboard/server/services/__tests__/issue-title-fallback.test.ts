@@ -4,6 +4,7 @@ const mockResolveTrackerTypeSync = vi.fn();
 const mockResolveGitHubIssueSync = vi.fn();
 const mockGetIssue = vi.fn();
 const mockCreateTracker = vi.fn(() => ({ getIssue: mockGetIssue }));
+const mockCreateJiraTrackerForIssue = vi.fn((_id: string) => ({ getIssue: mockGetIssue }));
 
 vi.mock('../../../../lib/tracker-utils.js', () => ({
   resolveTrackerType: (id: string) => mockResolveTrackerTypeSync(id),
@@ -11,6 +12,7 @@ vi.mock('../../../../lib/tracker-utils.js', () => ({
 }));
 vi.mock('../../../../lib/tracker/factory.js', () => ({
   createTracker: (config: unknown) => mockCreateTracker(config),
+  createJiraTrackerForIssue: (id: string) => mockCreateJiraTrackerForIssue(id),
 }));
 
 // Import once at module scope; vi.mock hoisting ensures mocks are wired.
@@ -123,5 +125,16 @@ describe('resolveMissingIssue', () => {
     const second = await resolveMissingIssue('min-9999');
     expect(second).toBe(full);
     expect(mockGetIssue).toHaveBeenCalledTimes(1);
+  });
+
+  it('builds the issue project Jira tracker for an aged-out Jira issue (PAN-5152)', async () => {
+    mockResolveTrackerTypeSync.mockReturnValue('jira');
+    mockGetIssue.mockReturnValue(issueEffect('Add Jira support'));
+
+    const titles = await resolveMissingIssueTitles(['PROJ-41']);
+
+    expect(titles.get('PROJ-41')).toBe('Add Jira support');
+    expect(mockCreateJiraTrackerForIssue).toHaveBeenCalledWith('PROJ-41');
+    expect(mockCreateTracker).not.toHaveBeenCalled();
   });
 });

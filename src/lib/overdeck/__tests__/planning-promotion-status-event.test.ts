@@ -82,8 +82,12 @@ vi.mock('../../projects.js', () => ({
 vi.mock('../../remote/remote-agents.js', () => ({
   loadRemoteAgentState: () => null,
 }));
+const trackerRouting = vi.hoisted(() => ({ jira: false }));
 vi.mock('../../tracker-utils.js', () => ({
-  resolveGitHubIssue: () => ({ isGitHub: true, owner: 'eltmon', repo: 'overdeck', number: 3230 }),
+  resolveGitHubIssue: () => (trackerRouting.jira
+    ? { isGitHub: false }
+    : { isGitHub: true, owner: 'eltmon', repo: 'overdeck', number: 3230 }),
+  resolveTrackerType: () => (trackerRouting.jira ? 'jira' : 'github'),
 }));
 vi.mock('../../tmux.js', () => ({
   // Killing the session actually clears sessionAlive so the follow-up
@@ -390,6 +394,29 @@ describe('completePlanningForIssue status event (PAN-3338)', () => {
 
 // PAN-3953: `planned` means a finalized spec exists. Finalize applies the
 // label only after the spec is written, and never when the spec is missing.
+describe('completePlanningForIssue for a Jira issue (PAN-5152)', () => {
+  afterEach(() => {
+    trackerRouting.jira = false;
+  });
+
+  it('moves the issue back to To Do through the lifecycle and never asks Linear', async () => {
+    trackerRouting.jira = true;
+    createWorkspace();
+    const deps = {
+      ...serviceDependencies(),
+      linear: { getIssue: vi.fn(), getTeamStates: vi.fn() },
+      lifecycle: { removeLabel: vi.fn(() => Effect.void), addLabel: vi.fn(() => Effect.void), transitionTo: vi.fn(() => Effect.void) },
+    };
+
+    const response = await completePlanningForIssue(deps);
+
+    expect(response.status).toBe(200);
+    expect(deps.lifecycle.transitionTo).toHaveBeenCalledWith('PAN-3230', 'open');
+    expect(deps.linear.getIssue).not.toHaveBeenCalled();
+    expect(deps.lifecycle.addLabel).not.toHaveBeenCalled();
+  });
+});
+
 describe('completePlanningForIssue planned label (PAN-3953)', () => {
   it('applies the planned label once the spec is written to disk', async () => {
     createWorkspace();

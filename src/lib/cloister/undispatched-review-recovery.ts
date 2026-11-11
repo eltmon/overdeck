@@ -8,8 +8,10 @@
  * recovered — a green PR could sit forever (PAN-4198..4201 sat ~15 hours on
  * 2026-09-25). This routine recovers only a `verification.passed` tail whose
  * `source` is `request-review`: a `review` (dashboard /trigger) or
- * `merge-verify` pass belongs to a different door and is left alone. See
- * docs/PIPELINE-GATES.md.
+ * `merge-verify` pass belongs to a different door and is left alone.
+ * PAN-4622: a `review.resume-declined` tail (boot adoption took the pass but
+ * the head moved or the tree was dirty at dispatch) is the same undispatched
+ * review and is recovered the same way. See docs/PIPELINE-GATES.md.
  */
 import { existsSync } from 'node:fs';
 
@@ -82,7 +84,8 @@ export async function recoverUndispatchedReviews(now = Date.now()): Promise<stri
     if (!issueId || !workspace.path || !existsSync(workspace.path)) continue;
 
     const last = lastPipelineEntry(workspace.path);
-    if (!last || last.type !== 'verification.passed' || last.source !== 'request-review') continue;
+    const undispatchedPass = last?.type === 'verification.passed' && last.source === 'request-review';
+    if (!last || !(undispatchedPass || last.type === 'review.resume-declined')) continue;
 
     const at = Date.parse(last.at);
     if (Number.isNaN(at) || now - at < UNDISPATCHED_REVIEW_MIN_AGE_MS) continue;

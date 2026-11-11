@@ -558,6 +558,9 @@ export interface YamlConfig {
     github?: string;
     gitlab?: string;
     rally?: string;
+    jira?: string;
+    jira_email?: string;
+    jira_base_url?: string;
   };
 
   /** Shadow mode configuration */
@@ -886,6 +889,9 @@ export interface NormalizedConfig {
     github?: string;
     gitlab?: string;
     rally?: string;
+    jira?: string;
+    jiraEmail?: string;
+    jiraBaseUrl?: string;
   };
 
   /** Conversation-specific behavior */

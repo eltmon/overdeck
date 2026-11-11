@@ -12,6 +12,7 @@ export const POLL_INTERVALS = {
   github:  { default: 30_000, min: 15_000, max: 300_000 },
   linear:  { default: 30_000, min: 15_000, max: 300_000 },
   rally:   { default: 120_000, min: 60_000, max: 600_000 },
+  jira:    { default: 120_000, min: 60_000, max: 600_000 },
 };
 
 export type PollIntervals = { default: number; min: number; max: number };

@@ -1,13 +1,22 @@
+import { Effect } from 'effect';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createTracker, TrackerConfig } from '../../../src/lib/tracker/factory.js';
 import { LinearTracker } from '../../../src/lib/tracker/linear.js';
 import { GitHubTracker } from '../../../src/lib/tracker/github.js';
 import { GitLabTracker } from '../../../src/lib/tracker/gitlab.js';
 import { TrackerAuthError } from '../../../src/lib/tracker/interface.js';
+import { JiraTracker } from '../../../src/lib/tracker/jira.js';
+import { loadConfigSync } from '../../../src/lib/config-yaml.js';
+import { findProjectByTeam } from '../../../src/lib/projects.js';
 
 // Mock config-yaml to prevent filesystem reads
 vi.mock('../../../src/lib/config-yaml.js', () => ({
   loadConfigSync: vi.fn(() => ({ trackerKeys: {} })),
+}));
+
+vi.mock('../../../src/lib/projects.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../src/lib/projects.js')>()),
+  findProjectByTeam: vi.fn(() => null),
 }));
 
 describe('createTracker', () => {
@@ -18,6 +27,9 @@ describe('createTracker', () => {
     delete process.env.LINEAR_API_KEY;
     delete process.env.GITHUB_TOKEN;
     delete process.env.GITLAB_TOKEN;
+    delete process.env.JIRA_API_TOKEN;
+    delete process.env.JIRA_EMAIL;
+    delete process.env.JIRA_BASE_URL;
   });
 
   afterEach(() => {
@@ -123,13 +135,68 @@ describe('createTracker', () => {
     });
   });
 
+  describe('Jira tracker (PAN-5152)', () => {
+    // Built at runtime so push protection never sees a token-shaped literal (NFR-3).
+    const fakeToken = ['fake', 'jira', 'token'].join('-');
+    const withTrackerKeys = (trackerKeys: Record<string, string>) =>
+      vi.mocked(loadConfigSync).mockReturnValue({ config: { trackerKeys } } as unknown as ReturnType<typeof loadConfigSync>);
+
+    afterEach(() => {
+      vi.mocked(loadConfigSync).mockReset();
+      vi.mocked(findProjectByTeam).mockReset();
+      vi.mocked(findProjectByTeam).mockReturnValue(null);
+      vi.unstubAllGlobals();
+    });
+
+    it('throws TrackerAuthError naming JIRA_API_TOKEN when no token is configured', () => {
+      withTrackerKeys({});
+      expect(() => createTracker({ type: 'jira' })).toThrow(TrackerAuthError);
+      expect(() => createTracker({ type: 'jira' })).toThrow(/JIRA_API_TOKEN/);
+    });
+
+    it('throws when the project key is missing', () => {
+      withTrackerKeys({ jira: fakeToken, jiraEmail: 'dev@example.com', jiraBaseUrl: 'https://acme.atlassian.net' });
+      expect(() => createTracker({ type: 'jira' })).toThrow('Jira tracker requires the project key (issue_prefix)');
+    });
+
+    it('creates a JiraTracker from Settings credentials', () => {
+      withTrackerKeys({ jira: fakeToken, jiraEmail: 'dev@example.com', jiraBaseUrl: 'https://acme.atlassian.net' });
+      const tracker = createTracker({ type: 'jira', project: 'PROJ' });
+      expect(tracker).toBeInstanceOf(JiraTracker);
+      expect(tracker.name).toBe('jira');
+      expect((tracker as JiraTracker).site).toBe('https://acme.atlassian.net');
+    });
+
+    it('targets the registered project site when only the prefix is passed as team (D-22)', async () => {
+      withTrackerKeys({ jira: fakeToken, jiraBaseUrl: 'https://global.example' });
+      vi.mocked(findProjectByTeam).mockReturnValue({
+        name: 'Proj',
+        path: '/home/user/proj',
+        tracker: 'jira',
+        issue_prefix: 'PROJ',
+        jira: { site: 'https://p.example', deployment: 'datacenter' },
+      });
+      const requested: string[] = [];
+      vi.stubGlobal('fetch', vi.fn(async (input: unknown) => {
+        requested.push(String(input));
+        return new Response(JSON.stringify({ id: '1', key: 'PROJ-1', fields: { summary: 'x' } }), { status: 200 });
+      }));
+
+      const tracker = createTracker({ type: 'jira', team: 'PROJ' });
+      expect(findProjectByTeam).toHaveBeenCalledWith('PROJ');
+      await Effect.runPromise(tracker.getIssue('PROJ-1'));
+      expect(requested.length).toBeGreaterThan(0);
+      expect(requested.every(url => url.startsWith('https://p.example/'))).toBe(true);
+    });
+  });
+
   describe('Unknown tracker', () => {
     it('should throw Error for unknown tracker type', () => {
       const config = {
-        type: 'jira' as any,
+        type: 'trello' as any,
       };
 
-      expect(() => createTracker(config)).toThrow('Unknown tracker type: jira');
+      expect(() => createTracker(config)).toThrow('Unknown tracker type: trello');
     });
   });
 });

@@ -240,7 +240,7 @@ program
   .option('--all', 'Include closed issues')
   .option('--mine', 'Show only my assigned issues')
   .option('--json', 'Output as JSON')
-  .option('--tracker <type>', 'Query specific tracker (linear/github/gitlab)')
+  .option('--tracker <type>', 'Query specific tracker (linear/github/gitlab/rally/jira)')
   .option('--all-trackers', 'Query all configured trackers')
   .option('--triage', 'Show triage queue')
   .action(async (options) => {

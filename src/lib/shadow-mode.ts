@@ -71,8 +71,8 @@ export async function resolveShadowMode(options: ShadowModeOptions = {}): Promis
     source = 'env';
   }
 
-  // 5. Apply per-tracker override if specified
-  if (trackerType && config.shadow.trackers[trackerType] !== undefined) {
+  // 5. Apply per-tracker override if specified (Jira has no shadow mode, PAN-5152 D-19)
+  if (trackerType && trackerType !== 'jira' && config.shadow.trackers[trackerType] !== undefined) {
     enabled = config.shadow.trackers[trackerType];
     // If per-tracker is different from global, note that it's config-based
     if (enabled !== config.shadow.enabled) {

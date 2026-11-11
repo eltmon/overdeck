@@ -1,7 +1,7 @@
 import { Effect } from 'effect';
 import { ChildProcess, ChildProcessSpawner } from 'effect/unstable/process';
 import type { FlywheelPipelineItem } from '@overdeck/contracts';
-import { resolveGitHubIssue } from './tracker-utils.js';
+import { resolveGitHubPullRequestRepo } from './tracker-utils.js';
 import { compileGlob, type CompiledGlob } from './xbrief/dag.js';
 import { findProjectByPath, getProjectSwarmHotspots } from './projects.js';
 import type { ResolvedProjectRepo } from './project-repos.js';
@@ -177,8 +177,8 @@ export interface ComputeMergeQueueOptions {
  */
 export function resolveMergeQueuePrUrl(item: { issueId: string; pr?: number }): string | undefined {
   if (item.pr === undefined) return undefined;
-  const githubIssue = resolveGitHubIssue(item.issueId.toUpperCase());
-  if (!githubIssue.isGitHub) return undefined;
+  const githubIssue = resolveGitHubPullRequestRepo(item.issueId.toUpperCase());
+  if (!githubIssue) return undefined;
   return `https://github.com/${githubIssue.owner}/${githubIssue.repo}/pull/${item.pr}`;
 }
 

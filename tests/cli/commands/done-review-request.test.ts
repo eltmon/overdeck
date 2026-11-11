@@ -62,6 +62,13 @@ vi.mock('../../../src/lib/activity-logger.js', () => ({
 vi.mock('../../../src/lib/shadow-utils.js', () => ({
   getLinearApiKey: () => Effect.succeed(null),
 }));
+// The mocked existsSync reports every path as present, so the real tracker
+// resolver would try to read a ~/.overdeck.env that does not exist. MIN-1 is
+// a Linear issue; pin that (PAN-5152 routes the tracker step by tracker type).
+vi.mock('../../../src/lib/tracker-utils.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../src/lib/tracker-utils.js')>()),
+  resolveTrackerType: () => 'linear',
+}));
 // commitPendingIssueArtifacts (PAN-4225) runs before the rebase step; the
 // mocked fs (existsSync always true) makes it think .pan/continues and
 // .pan/specs exist under the fake workspace path, so the real implementation

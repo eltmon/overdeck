@@ -71,6 +71,9 @@ export interface TrackerKeysConfig {
   github?: string;
   gitlab?: string;
   rally?: string;
+  jira?: string;
+  jira_email?: string;
+  jira_base_url?: string;
 }
 
 export interface TtsConfig {

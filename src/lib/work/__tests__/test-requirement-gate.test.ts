@@ -13,7 +13,8 @@ import {
 } from '../test-requirement-gate.js';
 import { getLinearApiKey } from '../../shadow-utils.js';
 import { LinearClient } from '@linear/sdk';
-import { resolveGitHubIssue } from '../../tracker-utils.js';
+import { resolveGitHubIssue, resolveTrackerType } from '../../tracker-utils.js';
+import { createJiraTrackerForIssue } from '../../tracker/factory.js';
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -29,6 +30,11 @@ vi.mock('@linear/sdk', () => ({
 
 vi.mock('../../tracker-utils.js', () => ({
   resolveGitHubIssue: vi.fn(),
+  resolveTrackerType: vi.fn(),
+}));
+
+vi.mock('../../tracker/factory.js', () => ({
+  createJiraTrackerForIssue: vi.fn(),
 }));
 
 vi.mock('../../shadow-utils.js', () => ({
@@ -265,6 +271,30 @@ describe('fetchIssueBodyForGate', () => {
 
     const body = await Effect.runPromise(fetchIssueBodyForGate('MIN-123'));
     expect(body).toBeNull();
+  });
+
+  it('returns the Jira Markdown description without loading the Linear SDK (PAN-5152)', async () => {
+    vi.mocked(resolveGitHubIssue).mockReturnValue({ isGitHub: false } as ReturnType<typeof resolveGitHubIssue>);
+    vi.mocked(resolveTrackerType).mockReturnValue('jira');
+    vi.mocked(createJiraTrackerForIssue).mockReturnValue({
+      getIssue: () => Effect.succeed({ description: '## Tests\nAdd a unit test for the adapter.' }),
+    } as unknown as ReturnType<typeof createJiraTrackerForIssue>);
+
+    const body = await Effect.runPromise(fetchIssueBodyForGate('PROJ-4'));
+
+    expect(body).toBe('## Tests\nAdd a unit test for the adapter.');
+    expect(LinearClient).not.toHaveBeenCalled();
+    expect(getLinearApiKey).not.toHaveBeenCalled();
+  });
+
+  it('maps a Jira read failure to TrackerFetchError (PAN-5152)', async () => {
+    vi.mocked(resolveGitHubIssue).mockReturnValue({ isGitHub: false } as ReturnType<typeof resolveGitHubIssue>);
+    vi.mocked(resolveTrackerType).mockReturnValue('jira');
+    vi.mocked(createJiraTrackerForIssue).mockReturnValue({
+      getIssue: () => Effect.fail(new Error('Jira GET /rest/api/3/issue/PROJ-4 failed: 503')),
+    } as unknown as ReturnType<typeof createJiraTrackerForIssue>);
+
+    await expect(Effect.runPromise(fetchIssueBodyForGate('PROJ-4'))).rejects.toBeInstanceOf(TrackerFetchError);
   });
 
   it('fails with TrackerFetchError for an unparseable issue ID', async () => {
