@@ -1,0 +1,1587 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-11T07:48:22Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5131: God View honesty pass: remove simulated ages, rates and effects; fix mislabeled orbs; make the field guide match the code",
+    "updated": "2026-11-11T08:05:39.540Z"
+  },
+  "plan": {
+    "id": "pan-5131",
+    "title": "God View honesty pass: remove simulated ages, rates and effects; fix mislabeled orbs; make the field guide match the code",
+    "status": "proposed",
+    "uid": "5366b2ca-2f83-48ad-b013-ec48d6958791",
+    "author": "agent:claude-fable-5-2",
+    "sequence": 2,
+    "created": "2026-11-11T07:48:22Z",
+    "updated": "2026-11-11T08:05:39.540Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5131",
+        "label": "PAN-5131",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "god-view",
+      "frontend",
+      "honesty",
+      "cleanup"
+    ],
+    "narratives": {
+      "Problem": "The God View canvas at /god-view shows simulated, frozen, mislabeled or unattributable information. The per-orb event rate is a constant for the agent count. Idle ages freeze in a cached orb and a canvas time-lapse runs on top of them. The thaw, tide and merge effects write orb state on the canvas or guess a participant. A sequencer agent appears as an issue orb. Failed orbs are labeled \"merge failed\" although no merge-failure signal exists. Project rings are all cyan. The field guide and the docs describe behavior the code does not have.",
+      "Proposal": "Compute every age from a timestamp at read time (orbIdleMinutes plus a 30 s local clock tick) and every per-orb rate from the trailing 60 s of hook events. The canvas derives frost and heat and never writes an orb's state or stage. Effects decorate transitions the data already made: thaw only for stale to active, a tide with a target and no beneficiary, the portal comet only for a merged issue. Orbs exist only for tracker issue ids; the sun and the sequencer animate only while live. Failed orbs name their attention and sit in their stage column; rings differ per project prefix; glyphs cover every model family; every orb in a column has its own slot. Dead UI is removed, and the field guide and both docs pages are rewritten to match. The PRD at .pan/drafts/PAN-5131.md holds the exact code and copy for each of the 19 items.",
+      "NonGoals": "- No persistent on-canvas legend, no layout change and no new panel.\n- No new server route, no new domain event and no new server poll (a local clock tick is allowed).\n- The canvas must not write an orb's state or stage, and no age or rate may be stored on a cached orb.\n- No effect may guess a participant (no tide beneficiary, no fallback tide target).\n- Do not raise any row in scripts/file-size-allowlist.txt; RiverCanvas.tsx stays at or under 808 lines and useConfluenceData.ts at or under 902.\n- No test may read a source file as text, and no skipIf, .skip or .only may be added.\n- Do not change satellite orbit speed, the shelf-exit green ring, or the word \"stale\" in the active-orb tag.\n- Do not edit changelog.mdx, docs/god-view.md (lowercase) or design/style-guide/mockups/god-view-confluence.html.\n- Do not add a production store hook for the Playwright spec."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Sliced the work by requirement into 19 items instead of the issue's W1 to W7.",
+        "rationale": "RenderOrb extends ConfluenceOrb, so the issue's W1 (remove fields from the data shape) does not typecheck without its W2 (the canvas). Each item leaves the tree typechecking."
+      },
+      {
+        "summary": "orbIdleMinutes counts from parkedAt for a stale orb with a parseable parkedAt, and from lastActivity in every other case; unknown is 0.",
+        "rationale": "The issue gives two wordings; this one is computable from the helper's inputs and covers the parked-only case."
+      },
+      {
+        "summary": "useNowTick lives in confluence/useNowTick.ts and is called inside useConfluenceOrbs and inside useConfluenceMeta.",
+        "rationale": "NFR-2 forbids growing useConfluenceData.ts, and calling it inside each hook lets a direct renderHook test see the tick."
+      },
+      {
+        "summary": "heatFromEventRate is linear from 0.12 at 0 events to 1 at 40; stale orbs target 0.04; heat eases with a 3 s half-life.",
+        "rationale": "The issue fixes the range and leaves the curve and easing open; linear is the simplest curve and 3 s keeps a spark bump visible."
+      },
+      {
+        "summary": "flywheelLive reads the cached ['flywheel','status'] query with enabled:false and is exposed as meta.flywheelLive. The issue's implementation checkpoint is closed; there is no roleCounts.flywheel fallback.",
+        "rationale": "That query is the source of the sidebar badge (useFlywheelRunning, Sidebar.tsx line 339), the app sidebar is mounted on every page and already polls it, and a disabled observer never fetches, which NFR-1 requires."
+      },
+      {
+        "summary": "An agent group yields an orb when its id matches the issue's regex or the dashboard store has an issue with that id.",
+        "rationale": "Rally ids have no hyphen (US123), so the regex alone would remove real issues from the cast; sequencer-runner matches neither test."
+      },
+      {
+        "summary": "Lane slots include failed orbs, and advance() eases a failed orb to its slot.",
+        "rationale": "The issue moves failed orbs into the stage column but gives slots only to active orbs, which would give a failed orb index -1; advance() today never moves a failed orb to tx/ty."
+      },
+      {
+        "summary": "modelGlyph adds OpenAI o3/o4 ids (G) and QuantumLlama ql- ids (L), and takes the fallback letter from the last path segment.",
+        "rationale": "FR-7 requires every catalog family; with the issue's table alone o3 reads as Opus, ql-* as Qwen and opencode/<x> as Opus."
+      },
+      {
+        "summary": "The project ring palette is #00e5a8, #ff8fa3, #b388ff, #6d8bff, #e07aff, #d4b483, #c6ff7a, #ff9e6d; a hyphen-less id uses its letters as the prefix.",
+        "rationale": "The issue asks for a fixed eight-color palette without values; these eight avoid every color the canvas already uses for a state ring (amber, orange, red, yellow, white, ice)."
+      },
+      {
+        "summary": "Deleted pulseSun, the sun command, playMerge and the merge command.",
+        "rationale": "Nothing emits sun after the spawn effect is removed, nothing ever emitted merge, and playMerge would start a comet for a non-merged orb, which FR-5 forbids."
+      },
+      {
+        "summary": "The VEL tooltip lists only plan, work, review and merge.",
+        "rationale": "The velocity route returns only those four stages, so the test and verify counts are dead UI under FR-9."
+      },
+      {
+        "summary": "The footer test goes in GodViewConfluence.test.tsx, not GodView.test.tsx.",
+        "rationale": "GodView.test.tsx has no footer or top-bar assertions; the issue's AC-6 names the wrong file."
+      },
+      {
+        "summary": "reference/god-view.mdx is added to the docs item; docs/god-view.md (lowercase) is left alone.",
+        "rationale": "The Mintlify page repeats the VERIFY stage and the wreck row; the lowercase file describes the older agent-grid God View."
+      },
+      {
+        "summary": "The issue's AC-8 screenshot is produced by a Playwright spec on the isolated-dashboard fixture.",
+        "rationale": "A work agent cannot restart the shared dashboard, and tests/pan-4523-river-bands.spec.ts already runs the built branch on a private OVERDECK_HOME."
+      },
+      {
+        "summary": "Six God View test files are appended to scripts/frontend-test-subset.txt.",
+        "rationale": "CI runs only listed frontend tests; the files behind AC-4, AC-6 and AC-7 are not listed today and all pass on this branch."
+      },
+      {
+        "summary": "The stale label uses the park age for a stale parked orb; the active tag keeps the word stale; the shelf-exit green ring is unchanged.",
+        "rationale": "The issue specifies the first and does not ask to change the other two."
+      }
+    ],
+    "items": [
+      {
+        "id": "ages-read-time",
+        "title": "Readers compute idle and parked ages from timestamps",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T07:48:22Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5131",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "canvas-real-frost"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/src/components/GodView/confluence/model.ts",
+            "src/dashboard/frontend/src/components/GodView/confluence/useNowTick.ts",
+            "src/dashboard/frontend/src/components/GodView/confluence/useConfluenceData.ts",
+            "src/dashboard/frontend/src/components/GodView/confluence/OrbTooltip.tsx",
+            "src/dashboard/frontend/src/components/GodView/confluence/IssueRail.tsx",
+            "src/dashboard/frontend/src/components/GodView/confluence/__tests__/model.test.ts",
+            "src/dashboard/frontend/src/components/GodView/confluence/__tests__/useConfluenceData.test.ts",
+            "src/dashboard/frontend/src/components/GodView/confluence/__tests__/orb-tooltip.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/GodView/confluence/__tests__/model.test.ts src/components/GodView/confluence/__tests__/useConfluenceData.test.ts src/components/GodView/confluence/__tests__/orb-tooltip.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "the three named test files report 0 failed",
+            "frontend typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-5131.md work item W1 exactly. Add the pure helper orbIdleMinutes(orb, now) to confluence/model.ts using the PRD's code and decision table (state stale with a parseable parkedAt counts from parkedAt; every other case counts from lastActivity; unknown returns 0). Create confluence/useNowTick.ts with the PRD's code (a 30 s setInterval tick that fetches nothing). In confluence/useConfluenceData.ts add parkedAt: string | null to ConfluenceOrb (set from the parked row in both orb literals), call useNowTick() inside useConfluenceOrbs and inside useConfluenceMeta and add the tick to each useMemo dependency list, switch the two emissary sorts and meta.oldestIdle to orbIdleMinutes. Switch OrbTooltip.tsx (frost and stale age) and IssueRail.tsx (both fmtAge(orb.staleMin) calls) to orbIdleMinutes(orb, Date.now()). This item is additive on the data shape: idleMin, staleMin and parkedMin stay on ConfluenceOrb until the canvas-real-frost item, because RiverCanvas.tsx still reads them. useConfluenceData.ts may sit a few lines above 902 after this item; the canvas-real-frost item brings it back under and starts the wc -l check. Write the tests named in W1 with vi.useFakeTimers(); do not read source files as text in any test."
+        },
+        "items": [
+          {
+            "id": "ages-read-time.ac1",
+            "title": "Given a stale orb with a parseable parkedAt, when orbIdleMinutes is called, then it returns the minutes since parkedAt; for every other state it returns the minutes since lastActivity, and 0 when the chosen timestamp is missing or unparseable",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ages-read-time.ac2",
+            "title": "Given fake timers and no store change, when the clock advances 21 minutes past a 10-minute-old lastActivity, then useConfluenceOrbs returns that orb with state stale instead of active",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ages-read-time.ac3",
+            "title": "Given fake timers and no store change, when the clock advances 5 minutes, then useConfluenceData returns a meta.oldestIdle that is 5 minutes larger",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ages-read-time.ac4",
+            "title": "Given a stale orb whose lastActivity is 47 minutes before the fake clock, then OrbTooltip renders a stale age of 47m and a frost of 100%, both computed from the timestamp",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ages-read-time.ac5",
+            "title": "Given a parked row, then the orb returned by useConfluenceOrbs contains parkedAt equal to the row parkedAt, for a parked-only orb and for a live orb on a parked issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "canvas-real-frost",
+        "title": "The canvas stops simulating age and frost",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T07:48:22Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-5131",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/GodView/confluence/RiverCanvas.tsx",
+            "src/dashboard/frontend/src/components/GodView/confluence/model.ts",
+            "src/dashboard/frontend/src/components/GodView/confluence/useConfluenceData.ts",
+            "src/dashboard/frontend/src/components/GodView/confluence/__tests__/model.test.ts",
+            "src/dashboard/frontend/src/components/GodView/confluence/__tests__/useConfluenceData.test.ts",
+            "src/dashboard/frontend/src/components/GodView/confluence/__tests__/choreography.test.ts",
+            "src/dashboard/frontend/src/components/GodView/confluence/__tests__/orb-tooltip.test.tsx",
+            "src/dashboard/frontend/src/components/GodView/confluence/__tests__/rail-link.test.tsx",
+            "src/dashboard/frontend/src/components/GodView/confluence/__tests__/*"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/GodView/confluence/__tests__/model.test.ts src/components/GodView/confluence/__tests__/useConfluenceData.test.ts src/components/GodView/confluence/__tests__/choreography.test.ts src/components/GodView/confluence/__tests__/orb-tooltip.test.tsx src/components/GodView/confluence/__tests__/rail-link.test.tsx src/components/GodView/confluence/__tests__/feed-link.test.tsx src/components/GodView/confluence/__tests__/confluence-smoke.test.tsx",
+            "npm run typecheck:frontend",
+            "! grep -rnE \"\\\\b(idleMin|staleMin|parkedMin|frostHold)\\\\b|advanceFrostAccrual\" src/dashboard/frontend/src/components/GodView",
+            "test \"$(wc -l < src/dashboard/frontend/src/components/GodView/confluence/RiverCanvas.tsx)\" -le 808",
+            "test \"$(wc -l < src/dashboard/frontend/src/components/GodView/confluence/useConfluenceData.ts)\" -le 902"
+          ],
+          "expected_outputs": [
+            "the seven named test files report 0 failed",
+            "frontend typecheck completes without errors",
+            "the grep prints no line",
+            "both wc checks exit 0"
+          ],
+          "readiness": "ready",
+          "readinessReason": "Runs alone after ages-read-time; every later item that touches the same files is ordered behind it by a blocks edge.",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-5131.md work item W2 exactly. In confluence/model.ts delete FROST_IDLE_RATE, FROST_SINK_HOLD_SECONDS, FrostAccrual and advanceFrostAccrual; keep frostFromIdleMinutes. In confluence/RiverCanvas.tsx delete RenderOrb.frostHold, replace the frost-accrual line of advance() with orb.frost = frostFromIdleMinutes(orbIdleMinutes(orb, nowMs)) plus the existing snow call (nowMs = Date.now() at the top of advance), delete the local sink that sets orb.state = 'stale' with its '❄ frozen' ticker, delete orb.staleMin += dt * 2, delete the staleMin, idleMin and frostHold assignments from thaw(), make the stale, needs-you and active-tag labels call orbIdleMinutes(orb, now) at draw time, and guard the Doldrums frostMotes call in drawZones with staleShown > 0. In confluence/useConfluenceData.ts delete staleMin, idleMin and parkedMin from ConfluenceOrb and from both orb literals, and reduce orbSignature to JSON.stringify(orb). Remove the three fields from every fixture and assertion under confluence/__tests__/ (frontend typecheck does not cover test files, so the grep is the proof). Keep the dense one-statement-per-line style of RiverCanvas.tsx so the file stays at or under 808 lines."
+        },
+        "items": [
+          {
+            "id": "canvas-real-frost.ac1",
+            "title": "The whole-word grep for idleMin, staleMin, parkedMin, frostHold and advanceFrostAccrual under src/dashboard/frontend/src/components/GodView returns no line, in source and in tests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "canvas-real-frost.ac2",
+            "title": "Given an active render orb, when advance() runs, then its frost equals frostFromIdleMinutes(orbIdleMinutes(orb, Date.now())) and advance() contains no assignment to orb.state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "canvas-real-frost.ac3",
+            "title": "Given zero stale orbs on the canvas, when drawZones runs, then it spawns no Doldrums frost mote (the frostMotes call is guarded by staleShown > 0)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "canvas-real-frost.ac4",
+            "title": "model.test.ts passes with frostFromIdleMinutes(8) = 0, (21) = 0.5 and (34) = 1 and contains no advanceFrostAccrual import",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "canvas-real-frost.ac5",
+            "title": "wc -l returns at most 808 for confluence/RiverCanvas.tsx and at most 902 for confluence/useConfluenceData.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "real-event-rate-heat",
+        "title": "Orb tag and heat come from real hook events",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T07:48:22Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5131",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/GodView/confluence/model.ts",
+            "src/dashboard/frontend/src/components/GodView/confluence/RiverCanvas.tsx",
+            "src/dashboard/frontend/src/components/GodView/confluence/useConfluenceData.ts",
+            "src/dashboard/frontend/src/components/GodView/confluence/__tests__/model.test.ts",
+            "src/dashboard/frontend/src/components/GodView/confluence/__tests__/choreography.test.ts",
+            "src/dashboard/frontend/src/components/GodView/confluence/__tests__/orb-tooltip.test.tsx",
+            "src/dashboard/frontend/src/components/GodView/confluence/__tests__/*"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/GodView/confluence/__tests__/model.test.ts src/components/GodView/confluence/__tests__/choreography.test.ts src/components/GodView/confluence/__tests__/orb-tooltip.test.tsx src/components/GodView/confluence/__tests__/confluence-smoke.test.tsx src/components/GodView/confluence/__tests__/useConfluenceData.test.ts",
+            "npm run typecheck:frontend",
+            "! grep -n \"heat:\" src/dashboard/frontend/src/components/GodView/confluence/useConfluenceData.ts",
+            "! grep -n \"orb.heat \\* 34\" src/dashboard/frontend/src/components/GodView/confluence/RiverCanvas.tsx",
+            "! grep -rnE \"^\\s+heat: \" src/dashboard/frontend/src/components/GodView/confluence/__tests__",
+            "test \"$(wc -l < src/dashboard/frontend/src/components/GodView/confluence/RiverCanvas.tsx)\" -le 808",
+            "test \"$(wc -l < src/dashboard/frontend/src/components/GodView/confluence/useConfluenceData.ts)\" -le 902"
+          ],
+          "expected_outputs": [
+            "the five named test files report 0 failed",
+            "frontend typecheck completes without errors",
+            "the three greps print no line",
+            "both wc checks exit 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-5131.md work item W3 exactly. Add eventsPerMinuteByIssue(entries, now) and heatFromEventRate(eventsPerMin) to confluence/model.ts with the PRD's code (linear 0.12 at 0 events to 1 at 40 or more). Delete heat from ConfluenceOrb and from both orb literals in confluence/useConfluenceData.ts. In confluence/RiverCanvas.tsx add heat and evPerMin to RenderOrb; in reconcile() compute the rate map once from next.hookStream.entries, pass the issue's count into spawnOrb (heat starts at heatFromEventRate, or 0.04 for a stale orb) and set current.evPerMin after Object.assign; in advance() replace the decay line with an ease toward the target (0.04 for stale, else heatFromEventRate(orb.evPerMin)) with a 3 s half-life; keep the emitSparks heat bump; change the tag to '<role> · <n> ev/m' when evPerMin > 0 and '<role> · quiet' when it is 0. Remove heat from every ConfluenceOrb fixture under confluence/__tests__/."
+        },
+        "items": [
+          {
+            "id": "real-event-rate-heat.ac1",
+            "title": "Given 12 hook entries for PAN-1 inside the last 60 s and none for PAN-2, when eventsPerMinuteByIssue runs, then it returns 12 for PAN-1 and has no PAN-2 key; an entry older than 60 s and an entry with a null issueId are not counted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "real-event-rate-heat.ac2",
+            "title": "heatFromEventRate returns 0.12 for 0 events, 0.56 for 20, and 1 for 40 and for 400",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "real-event-rate-heat.ac3",
+            "title": "Given a render orb with evPerMin 7 the tag renders '<role> · 7 ev/m', and with evPerMin 0 it renders '<role> · quiet'; RiverCanvas.tsx contains no '~' rate and no orb.heat * 34",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "real-event-rate-heat.ac4",
+            "title": "ConfluenceOrb contains no heat field, so the Object.assign in reconcile() preserves the render orb heat between frames",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "real-event-rate-heat.ac5",
+            "title": "wc -l returns at most 808 for confluence/RiverCanvas.tsx and at most 902 for confluence/useConfluenceData.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "honest-thaw",
+        "title": "Thaw decorates a stale-to-active change and moves nothing",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T07:48:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5131",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/GodView/confluence/RiverCanvas.tsx",
+            "src/dashboard/frontend/src/components/GodView/confluence/useConfluenceChoreography.ts",
+            "src/dashboard/frontend/src/components/GodView/confluence/__tests__/choreography.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/GodView/confluence/__tests__/choreography.test.ts",
+            "npm run typecheck:frontend",
+            "test \"$(wc -l < src/dashboard/frontend/src/components/GodView/confluence/RiverCanvas.tsx)\" -le 808"
+          ],
+          "expected_outputs": [
+            "choreography.test.ts reports 0 failed",
+            "frontend typecheck completes without errors",
+            "the wc check exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-5131.md work item W4 exactly. In confluence/RiverCanvas.tsx reduce thaw() to its burst, its ring and a ticker with the text '<id> active again': delete every assignment to state, stage, frost and heat and the anchorAll() call. In confluence/useConfluenceChoreography.ts change the thaw condition from before.state === 'stale' && orb.state !== 'stale' to before.state === 'stale' && orb.state === 'active', and correct the comment above it. Add the three choreography tests named in W4."
+        },
+        "items": [
+          {
+            "id": "honest-thaw.ac1",
+            "title": "Given an orb that goes from stale to shelf, or from stale to failed, when planConfluenceChoreography runs, then it returns no thaw command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "honest-thaw.ac2",
+            "title": "Given an orb that goes from stale to active, then planConfluenceChoreography returns exactly one thaw command for that orb",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "honest-thaw.ac3",
+            "title": "thaw() in RiverCanvas.tsx contains no assignment to state, stage, frost or heat and no anchorAll() call, and its ticker shows '<id> active again'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "honest-tide",
+        "title": "The governor tide marks a scheduler yield and names no beneficiary",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T07:48:22Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5131",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/GodView/confluence/RiverCanvas.tsx",
+            "src/dashboard/frontend/src/components/GodView/confluence/useConfluenceChoreography.ts",
+            "src/dashboard/frontend/src/components/GodView/confluence/__tests__/choreography.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/GodView/confluence/__tests__/choreography.test.ts",
+            "npm run typecheck:frontend",
+            "! grep -rnE \"beneficiaryId|reviewBeneficiary|governorNamedBeneficiary|latestReviewOrb\" src/dashboard/frontend/src/components/GodView",
+            "! grep -n \"orb.state = 'shelf'\" src/dashboard/frontend/src/components/GodView/confluence/RiverCanvas.tsx",
+            "test \"$(wc -l < src/dashboard/frontend/src/components/GodView/confluence/RiverCanvas.tsx)\" -le 808"
+          ],
+          "expected_outputs": [
+            "choreography.test.ts reports 0 failed",
+            "frontend typecheck completes without errors",
+            "both greps print no line",
+            "the wc check exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-5131.md work item W5 exactly. In confluence/RiverCanvas.tsx change the Tide shape to { active, x, targetId, ringed, t }, make playTide(targetId: string) set the target and reset ringed with no fallback lookups, and replace the tide loop in advance() with the PRD's one-shot amber ring on the target orb when the tide front reaches it (tide.x >= target.x - 30, guarded by tide.ringed). Delete the local orb.state = 'shelf' write, the yieldReason ||= write and the beneficiary thaw. In confluence/useConfluenceChoreography.ts delete governorNamedBeneficiary, latestReviewOrb and the beneficiaryId field; emit { type: 'tide', targetId } when before.state !== 'shelf' && orb.state === 'shelf' && orb.yieldedByScheduler; leave the shelf-exit green ring branch unchanged. Rewrite the tests that pin the beneficiary; do not keep them alive with shims, and do not name the removed key in a test (PRD rule 9: assert the exact command with toEqual)."
+        },
+        "items": [
+          {
+            "id": "honest-tide.ac1",
+            "title": "Given an orb that goes from active to shelf with yieldedByScheduler true, then the plan contains a tide command that equals exactly { type: 'tide', targetId }, with no other key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "honest-tide.ac2",
+            "title": "Given an orb that goes from active to shelf with yieldedByScheduler false and an operator pause reason, then the plan contains no tide command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "honest-tide.ac3",
+            "title": "runConfluenceCommands sends exactly one argument, the target id, to playTide",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "honest-tide.ac4",
+            "title": "The grep for beneficiaryId, reviewBeneficiary, governorNamedBeneficiary and latestReviewOrb under GodView returns no line, and RiverCanvas.tsx contains no orb.state = 'shelf' assignment",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "merge-exit-merged-only",
+        "title": "The portal comet plays only for a merged issue",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T07:48:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5131",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/GodView/confluence/RiverCanvas.tsx",
+            "src/dashboard/frontend/src/components/GodView/confluence/useConfluenceChoreography.ts",
+            "src/dashboard/frontend/src/components/GodView/confluence/__tests__/choreography.test.ts",
+            "src/dashboard/frontend/src/components/GodView/confluence/__tests__/GodViewConfluence.test.tsx",
+            "src/dashboard/frontend/src/components/GodView/confluence/__tests__/*"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/GodView/confluence/__tests__/choreography.test.ts src/components/GodView/confluence/__tests__/GodViewConfluence.test.tsx src/components/GodView/confluence/__tests__/feed-link.test.tsx",
+            "npm run typecheck:frontend",
+            "! grep -rnE \"playMerge\" src/dashboard/frontend/src/components/GodView",
+            "test \"$(wc -l < src/dashboard/frontend/src/components/GodView/confluence/RiverCanvas.tsx)\" -le 808"
+          ],
+          "expected_outputs": [
+            "the three named test files report 0 failed",
+            "frontend typecheck completes without errors",
+            "the grep prints no line",
+            "the wc check exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-5131.md work item W6 exactly. Give evictionFor a third parameter issueState and return 'merge' only when stage === 'MERGE' && issueState === 'merged' (shelf and stale still return 'drop' first; everything else returns 'fade'); pass orb.issueState at the call site in reconcile(). Delete playMerge from RiverEffectsApi, the api object and useImperativeHandle, and delete the 'merge' command variant and its case from confluence/useConfluenceChoreography.ts: nothing ever emitted it and it would start a comet for any orb. Remove playMerge from the RiverEffectsApi mocks in choreography.test.ts, GodViewConfluence.test.tsx and feed-link.test.tsx. State the known consequence in the PR description: an issue that merges and closes inside one store update fades instead of flying through the portal."
+        },
+        "items": [
+          {
+            "id": "merge-exit-merged-only.ac1",
+            "title": "evictionFor('active', 'MERGE', 'ready') returns 'fade' and evictionFor('active', 'MERGE', 'merged') returns 'merge'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-exit-merged-only.ac2",
+            "title": "evictionFor('shelf', 'MERGE', 'merged') returns 'drop' and evictionFor('active', 'WORK', 'merged') returns 'fade'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-exit-merged-only.ac3",
+            "title": "The grep for playMerge under GodView returns no line and ChoreographyCommand contains no 'merge' variant",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "remove-sun-spawn",
+        "title": "Delete the sun pulse and the spawn-from-sun effect",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T07:48:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5131",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/GodView/confluence/RiverCanvas.tsx",
+            "src/dashboard/frontend/src/components/GodView/confluence/useConfluenceChoreography.ts",
+            "src/dashboard/frontend/src/components/GodView/confluence/__tests__/choreography.test.ts",
+            "src/dashboard/frontend/src/components/GodView/confluence/__tests__/GodViewConfluence.test.tsx",
+            "src/dashboard/frontend/src/components/GodView/confluence/__tests__/*"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/GodView/confluence/__tests__/choreography.test.ts src/components/GodView/confluence/__tests__/GodViewConfluence.test.tsx src/components/GodView/confluence/__tests__/feed-link.test.tsx",
+            "npm run typecheck:frontend",
+            "! grep -rnE \"pulseSun|spawnFromSun|fromSun\" src/dashboard/frontend/src/components/GodView",
+            "test \"$(wc -l < src/dashboard/frontend/src/components/GodView/confluence/RiverCanvas.tsx)\" -le 808"
+          ],
+          "expected_outputs": [
+            "the three named test files report 0 failed",
+            "frontend typecheck completes without errors",
+            "the grep prints no line",
+            "the wc check exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-5131.md work item W7 exactly. In confluence/useConfluenceChoreography.ts delete the 'sun' and 'spawn' command variants and their cases; a new orb (no entry in the previous cast) now plans nothing (if (!before) continue). In confluence/RiverCanvas.tsx delete pulseSun and spawnFromSun from RiverEffectsApi, the api object and useImperativeHandle, and remove the fromSun parameter of spawnOrb. Remove both names from every RiverEffectsApi mock under confluence/__tests__/ and replace the two sun assertions in choreography.test.ts with a test that a new plan-role orb plans no command."
+        },
+        "items": [
+          {
+            "id": "remove-sun-spawn.ac1",
+            "title": "Given a new plan-role orb that is absent from the previous cast, when planConfluenceChoreography runs, then it returns no command for that orb",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remove-sun-spawn.ac2",
+            "title": "The grep for pulseSun|spawnFromSun|fromSun under GodView returns no line, in source and in tests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "landmarks-live-only",
+        "title": "The Flywheel sun and the sequencer animate only while live",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T07:48:22Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5131",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/GodView/confluence/model.ts",
+            "src/dashboard/frontend/src/components/GodView/confluence/RiverCanvas.tsx",
+            "src/dashboard/frontend/src/components/GodView/confluence/useConfluenceData.ts",
+            "src/dashboard/frontend/src/components/GodView/confluence/GodViewConfluence.tsx",
+            "src/dashboard/frontend/src/components/GodView/confluence/__tests__/model.test.ts",
+            "src/dashboard/frontend/src/components/GodView/confluence/__tests__/useConfluenceData.test.ts",
+            "src/dashboard/frontend/src/components/GodView/confluence/__tests__/GodViewConfluence.test.tsx",
+            "src/dashboard/frontend/src/components/GodView/confluence/__tests__/*"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/GodView/confluence/__tests__/model.test.ts src/components/GodView/confluence/__tests__/useConfluenceData.test.ts src/components/GodView/confluence/__tests__/GodViewConfluence.test.tsx src/components/GodView/confluence/__tests__/confluence-smoke.test.tsx",
+            "npm run typecheck:frontend",
+            "! grep -n \"props.sequencer\\b\\|sequencer?: boolean\" src/dashboard/frontend/src/components/GodView/confluence/RiverCanvas.tsx",
+            "test \"$(wc -l < src/dashboard/frontend/src/components/GodView/confluence/RiverCanvas.tsx)\" -le 808",
+            "test \"$(wc -l < src/dashboard/frontend/src/components/GodView/confluence/useConfluenceData.ts)\" -le 902"
+          ],
+          "expected_outputs": [
+            "the four named test files report 0 failed",
+            "frontend typecheck completes without errors",
+            "the grep prints no line",
+            "both wc checks exit 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-5131.md work item W8 exactly. Add the pure helper landmarkMotion(live, simT, pulseRate, phase) to confluence/model.ts (live: sine pulse, spin = simT, alpha 1; not live: pulse 0, spin 0, alpha 0.35). In confluence/RiverCanvas.tsx replace the unused sequencer prop with flywheelLive: boolean and sequencerLive: boolean, and make drawSun and drawSequencer take pulse, spin and alpha from landmarkMotion (labels stay). In confluence/useConfluenceData.ts add flywheelLive: boolean to ConfluenceMeta, read from the cached ['flywheel','status'] query with useQuery({ queryKey: FLYWHEEL_STATUS_QUERY_KEY, enabled: false }) so no request is ever made (the app sidebar already polls that query; a second polling observer would break NFR-1). In confluence/GodViewConfluence.tsx pass flywheelLive={meta.flywheelLive === true} and sequencerLive={(meta.roleCounts.sequencer ?? 0) > 0}. If lint:circular reports a new cycle through lib/flywheelApi, write the key literal ['flywheel', 'status'] in useConfluenceData.ts instead of importing it. Pass the two new props in the confluence-smoke.test.tsx RiverCanvas render."
+        },
+        "items": [
+          {
+            "id": "landmarks-live-only.ac1",
+            "title": "landmarkMotion(false, t, rate) returns { pulse: 0, spin: 0, alpha: 0.35 } for any t, and landmarkMotion(true, 2, 1.8) returns spin 2 and alpha 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "landmarks-live-only.ac2",
+            "title": "Given roleCounts {} the RiverCanvas mock receives sequencerLive false, given roleCounts { sequencer: 1 } it receives true, and flywheelLive is passed from meta.flywheelLive",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "landmarks-live-only.ac3",
+            "title": "Given a cached ['flywheel','status'] of { run: 'running' }, useConfluenceData returns meta.flywheelLive true; with no cached status it returns false; the fetch mock records no request to /api/flywheel/status",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "landmarks-live-only.ac4",
+            "title": "RiverCanvasProps contains flywheelLive and sequencerLive and no sequencer prop, and drawSun and drawSequencer rotate by the spin value that landmarkMotion returns",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "landmarks-live-only.ac5",
+            "title": "wc -l returns at most 808 for confluence/RiverCanvas.tsx and at most 902 for confluence/useConfluenceData.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cast-tracker-ids",
+        "title": "Orbs exist only for tracker issue ids",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T07:48:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5131",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/GodView/confluence/useConfluenceData.ts",
+            "src/dashboard/frontend/src/components/GodView/confluence/__tests__/useConfluenceData.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/GodView/confluence/__tests__/useConfluenceData.test.ts",
+            "npm run typecheck:frontend",
+            "test \"$(wc -l < src/dashboard/frontend/src/components/GodView/confluence/useConfluenceData.ts)\" -le 902"
+          ],
+          "expected_outputs": [
+            "useConfluenceData.test.ts reports 0 failed",
+            "frontend typecheck completes without errors",
+            "the wc check exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-5131.md work item W9 exactly. In confluence/useConfluenceData.ts add the module constant TRACKER_ISSUE_ID = /^[A-Za-z][A-Za-z0-9]*-\\d+$/ and, as the first statement after the issue lookup inside the agentsByIssue loop of useConfluenceOrbs, skip the group when the store has no issue with that id and the id does not match the pattern (if (issue === undefined && !TRACKER_ISSUE_ID.test(id)) continue). The 'or the store knows the issue' half keeps hyphen-less Rally ids such as US123 in the cast. Add the four tests named in W9."
+        },
+        "items": [
+          {
+            "id": "cast-tracker-ids.ac1",
+            "title": "Given a hosted running agent whose issueId is 'sequencer-runner', then useConfluenceOrbs returns no orb with that id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cast-tracker-ids.ac2",
+            "title": "Given a hosted running agent whose issueId is 'US123' and a matching open issuesRaw row, then useConfluenceOrbs returns an orb for US123; with no issuesRaw row it returns none",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cast-tracker-ids.ac3",
+            "title": "Given a hosted running agent whose issueId is 'PAN-1' and no issuesRaw row, then useConfluenceOrbs still returns an orb for PAN-1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cast-tracker-ids.ac4",
+            "title": "wc -l returns at most 902 for confluence/useConfluenceData.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "top-bar-dead-stats",
+        "title": "Remove the beads stats and the dead VEL tooltip counts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T07:48:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5131",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/GodView/TopBar.tsx",
+            "src/dashboard/frontend/src/components/GodView/confluence/useConfluenceData.ts",
+            "src/dashboard/frontend/src/components/GodView/confluence/__tests__/topbar-enrichment.test.tsx",
+            "src/dashboard/frontend/src/components/GodView/confluence/__tests__/useConfluenceData.test.ts",
+            "src/dashboard/frontend/src/components/GodView/confluence/__tests__/GodViewConfluence.test.tsx",
+            "src/dashboard/frontend/src/components/GodView/confluence/__tests__/*"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/GodView/confluence/__tests__/topbar-enrichment.test.tsx src/components/GodView/confluence/__tests__/useConfluenceData.test.ts src/components/GodView/confluence/__tests__/GodViewConfluence.test.tsx src/components/GodView/confluence/__tests__/confluence-smoke.test.tsx",
+            "npm run typecheck:frontend",
+            "! grep -rnE \"beads|ConfluenceBeadCounts\" src/dashboard/frontend/src/components/GodView/TopBar.tsx src/dashboard/frontend/src/components/GodView/confluence/useConfluenceData.ts src/dashboard/frontend/src/components/GodView/confluence/__tests__",
+            "test \"$(wc -l < src/dashboard/frontend/src/components/GodView/confluence/useConfluenceData.ts)\" -le 902"
+          ],
+          "expected_outputs": [
+            "the four named test files report 0 failed",
+            "frontend typecheck completes without errors",
+            "the grep prints no line",
+            "the wc check exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-5131.md work item W10 exactly. In GodView/TopBar.tsx delete the WIP, BLOCKED and READY stats and the beads local, and delete the test and verify counts from the VEL stat title so it lists only plan, work, review and merge (the velocity route returns only those four). In confluence/useConfluenceData.ts delete the ConfluenceBeadCounts interface, the beads field of ConfluenceMeta and the beads: null line. Update topbar-enrichment.test.tsx (label order list, the three beads values, the dash list, the data() helper) and useConfluenceData.test.ts (the metadata fallback test), and remove beads from the meta fixtures in GodViewConfluence.test.tsx and confluence-smoke.test.tsx."
+        },
+        "items": [
+          {
+            "id": "top-bar-dead-stats.ac1",
+            "title": "The top bar renders the stat labels EV/S, EV/M, VEL, LOAD, MERGE Q, $/MIN, MERGES, TOKENS, ❄ STALE, 🧹 PARKED, OLDEST in that order and renders no WIP, BLOCKED or READY stat",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "top-bar-dead-stats.ac2",
+            "title": "The VEL stat title contains the plan, work, review and merge counts and contains neither 'test' nor 'verify'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "top-bar-dead-stats.ac3",
+            "title": "The grep for beads|ConfluenceBeadCounts in TopBar.tsx, useConfluenceData.ts and the confluence tests returns no line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "footer-from-stages",
+        "title": "The footer flow text is built from STAGES",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T07:48:22Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "frontend",
+          "issueLabel": "pan-5131",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/GodView/confluence/GodViewConfluence.tsx",
+            "src/dashboard/frontend/src/components/GodView/confluence/__tests__/GodViewConfluence.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/GodView/confluence/__tests__/GodViewConfluence.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "GodViewConfluence.test.tsx reports 0 failed",
+            "frontend typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-5131.md work item W11 exactly. In confluence/GodViewConfluence.tsx import STAGES from ./model and replace the hard-coded 'PLAN → WORK → REVIEW → TEST → VERIFY → MERGE' in the confluence-tag footer with {STAGES.join(' → ')}. Add a test to GodViewConfluence.test.tsx (not GodView.test.tsx, which has no footer assertions) that the rendered page shows the five-stage text and no VERIFY."
+        },
+        "items": [
+          {
+            "id": "footer-from-stages.ac1",
+            "title": "The God View page renders the footer text 'PLAN → WORK → REVIEW → TEST → MERGE', produced from STAGES.join",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "footer-from-stages.ac2",
+            "title": "No rendered element on the God View page contains the text VERIFY",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "failed-orb-labels",
+        "title": "A failed orb says what its attention is and sits in its stage column",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T07:48:22Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5131",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/GodView/confluence/model.ts",
+            "src/dashboard/frontend/src/components/GodView/confluence/RiverCanvas.tsx",
+            "src/dashboard/frontend/src/components/GodView/confluence/IssueRail.tsx",
+            "src/dashboard/frontend/src/components/GodView/confluence/__tests__/model.test.ts",
+            "src/dashboard/frontend/src/components/GodView/confluence/__tests__/rail-link.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/GodView/confluence/__tests__/model.test.ts src/components/GodView/confluence/__tests__/rail-link.test.tsx",
+            "npm run typecheck:frontend",
+            "! grep -rnE \"merge failed|merge to main failed\" src/dashboard/frontend/src/components/GodView",
+            "test \"$(wc -l < src/dashboard/frontend/src/components/GodView/confluence/RiverCanvas.tsx)\" -le 808"
+          ],
+          "expected_outputs": [
+            "the two named test files report 0 failed",
+            "frontend typecheck completes without errors",
+            "the grep prints no line",
+            "the wc check exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-5131.md work item W12 exactly. In confluence/model.ts delete the failed branch of positionOrb so a failed orb falls through to the stage-column code, and add failedReason(attention) returning 'API error' for api-error and 'stuck, unpushed work' otherwise. In confluence/RiverCanvas.tsx change the failed label to '✗ <id> · <failedReason>' (keep the red blinking ring) and change the failed branch of advance() from a free drift to an ease toward orb.tx / orb.ty with the PRD's expression (keep the pink sparks). In confluence/IssueRail.tsx use failedReason for the state chip ('<reason> ✗') and the banner ('✗ <reason> — needs an operator'). Replace the model.test.ts test 'clusters failed orbs to the left of the portal' with the in-column test and add the rail test. Do not write the old label text in any test under GodView (PRD rule 9); assert the new strings."
+        },
+        "items": [
+          {
+            "id": "failed-orb-labels.ac1",
+            "title": "Given a failed orb in REVIEW, when positionOrb runs, then its tx is inside the REVIEW column, between padX + 2·colW and padX + 3·colW",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "failed-orb-labels.ac2",
+            "title": "failedReason returns 'API error' for api-error and 'stuck, unpushed work' for stuck, and the canvas label shows '✗ <id> · <reason>'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "failed-orb-labels.ac3",
+            "title": "Given a failed orb with attention stuck, IssueRail renders 'stuck, unpushed work ✗' as the state chip and '✗ stuck, unpushed work — needs an operator' as the banner",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "failed-orb-labels.ac4",
+            "title": "The grep for 'merge failed' and 'merge to main failed' under GodView returns no line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "failed-orb-labels.ac5",
+            "title": "Given a failed render orb away from its slot, when advance() runs, then its x and y ease toward orb.tx and orb.ty instead of drifting freely",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "lane-slots",
+        "title": "Every orb in a stage column has its own vertical slot",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T07:48:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5131",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/GodView/confluence/model.ts",
+            "src/dashboard/frontend/src/components/GodView/confluence/__tests__/model.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/GodView/confluence/__tests__/model.test.ts",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "model.test.ts reports 0 failed",
+            "frontend typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-5131.md work item W13 exactly. In the stage-column branch of positionOrb in confluence/model.ts, build the lane as every orb of the same stage whose state is active or failed, sorted by id with a plain string comparison, and set ty = riverTop + 40 + ((slot + 0.5) / lane.length) * (riverBottom - riverTop - 80). Keep the hash x-jitter and the tx line. Do not touch the neighbor repulsion in RiverCanvas.tsx. Add the five tests named in W13 on computeLayout(1680, 912), which has a 600 px river."
+        },
+        "items": [
+          {
+            "id": "lane-slots.ac1",
+            "title": "Given three active orbs in WORK on a 600 px river, when positionOrb runs, then it produces three distinct ty values that are at least 24 px apart",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-slots.ac2",
+            "title": "Given two active orbs and one failed orb in WORK, then positionOrb produces three distinct ty values",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-slots.ac3",
+            "title": "Given 20 active orbs in WORK, then positionOrb produces 20 distinct ty values, and adding an orb in PLAN preserves every WORK ty",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "project-ring-colors",
+        "title": "One ring color per project prefix",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T07:48:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5131",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/GodView/confluence/model.ts",
+            "src/dashboard/frontend/src/components/GodView/confluence/RiverCanvas.tsx",
+            "src/dashboard/frontend/src/components/GodView/confluence/IssueRail.tsx",
+            "src/dashboard/frontend/src/components/GodView/confluence/__tests__/model.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/GodView/confluence/__tests__/model.test.ts src/components/GodView/confluence/__tests__/rail-link.test.tsx",
+            "npm run typecheck:frontend",
+            "! grep -rnE \"PROJECT_RING\" src/dashboard/frontend/src/components/GodView",
+            "test \"$(wc -l < src/dashboard/frontend/src/components/GodView/confluence/RiverCanvas.tsx)\" -le 808"
+          ],
+          "expected_outputs": [
+            "the two named test files report 0 failed",
+            "frontend typecheck completes without errors",
+            "the grep prints no line",
+            "the wc check exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-5131.md work item W14 exactly. In confluence/model.ts delete PROJECT_RING and add RING_PALETTE (the eight hex values in the PRD) and projectRingColor(issueId): prefix pan returns #00d4ff, prefix min returns #ff2d7c, any other prefix returns RING_PALETTE[hashStr(prefix) % 8]; the prefix is the text before the first '-', or the id without its trailing digits when it has no '-', lower-cased. In confluence/RiverCanvas.tsx delete the projectColor helper and draw the ring with projectRingColor(orb.id). In confluence/IssueRail.tsx use projectRingColor(orb.id). ConfluenceOrb.project and the tooltip chip stay. Use the PRD's eight palette values unchanged: they avoid the colors the canvas uses for state rings."
+        },
+        "items": [
+          {
+            "id": "project-ring-colors.ac1",
+            "title": "projectRingColor returns #00d4ff for PAN-1 and #ff2d7c for MIN-1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "project-ring-colors.ac2",
+            "title": "projectRingColor returns the same palette color for AUR-7 and AUR-900, and that color is neither #00d4ff nor #ff2d7c",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "project-ring-colors.ac3",
+            "title": "projectRingColor returns the same color for the hyphen-less ids US123 and US9",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "project-ring-colors.ac4",
+            "title": "The grep for PROJECT_RING under GodView returns no line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "model-glyphs",
+        "title": "A model glyph for every catalog family",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T07:48:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5131",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/GodView/confluence/model.ts",
+            "src/dashboard/frontend/src/components/GodView/confluence/__tests__/model.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/GodView/confluence/__tests__/model.test.ts",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "model.test.ts reports 0 failed",
+            "frontend typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-5131.md work item W15 exactly. Rewrite the body of modelGlyph in confluence/model.ts as the ordered table in the PRD: sonnet S, opus O, haiku H, fable F, gpt G, OpenAI o3/o4 ids G, gemini E, grok X, glm Z, qwen Q, QuantumLlama ql- ids L, muse M, minimax or mimo N, mistral I, k3 or kimi K; any other id returns the first alphanumeric character of the text after the last '/', upper-cased; null and '' return null; the function never returns '?'. Replace the glyph test in model.test.ts with the full id table from W15 (one id per ModelId family)."
+        },
+        "items": [
+          {
+            "id": "model-glyphs.ac1",
+            "title": "modelGlyph returns S, O, H, F, G, E, X, Z, Q, M, N, I and K for one id of each matching ModelId family listed in the PRD W15 test table",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "model-glyphs.ac2",
+            "title": "modelGlyph returns G for o3 and o4-mini and returns L for ql-reason-70b",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "model-glyphs.ac3",
+            "title": "modelGlyph returns B for opencode/big-pickle and U for unknown-model, and never returns '?'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "model-glyphs.ac4",
+            "title": "modelGlyph returns null for null and for an empty string",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "single-ticker",
+        "title": "One ticker per sampled hook event",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T07:48:22Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "frontend",
+          "issueLabel": "pan-5131",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/GodView/confluence/useConfluenceChoreography.ts",
+            "src/dashboard/frontend/src/components/GodView/confluence/model.ts",
+            "src/dashboard/frontend/src/components/GodView/confluence/__tests__/choreography.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/GodView/confluence/__tests__/choreography.test.ts src/components/GodView/confluence/__tests__/model.test.ts",
+            "npm run typecheck:frontend",
+            "! grep -rnE \"FEED_TICKER_CHANCE|pickWeighted\" src/dashboard/frontend/src/components/GodView"
+          ],
+          "expected_outputs": [
+            "the two named test files report 0 failed",
+            "frontend typecheck completes without errors",
+            "the grep prints no line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-5131.md work item W16 exactly. In confluence/useConfluenceChoreography.ts delete the FEED_TICKER_CHANCE constant and the second ticker block that samples the same hook event. In confluence/model.ts delete pickWeighted, which nothing imports. In choreography.test.ts remove the FEED_TICKER_CHANCE import and assertion and the 'PreToolUse · PAN-2' ticker assertion, and add a test that one hook event with random() returning 0 plans exactly one ticker."
+        },
+        "items": [
+          {
+            "id": "single-ticker.ac1",
+            "title": "Given one hook event and a random() that returns 0, then the plan contains exactly one ticker command, with the text '<id> · <tool>'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "single-ticker.ac2",
+            "title": "The grep for FEED_TICKER_CHANCE|pickWeighted under GodView returns no line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "field-guide-text",
+        "title": "The field guide describes what the code does",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T07:48:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5131",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/GodView/confluence/ConfluenceHelp.tsx",
+            "src/dashboard/frontend/src/components/GodView/confluence/__tests__/confluence-help.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/GodView/confluence/__tests__/confluence-help.test.tsx src/components/GodView/confluence/__tests__/GodViewConfluence.test.tsx",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "the two named test files report 0 failed",
+            "frontend typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-5131.md work item W17 exactly. In confluence/ConfluenceHelp.tsx replace the paragraph of the nine cards listed in W17 with the copy given there, word for word (Issue Orbs & Model Glyphs, Motion, The Shelf & Governor Tides, Frost & The Doldrums, The Stall Sweeper, Merge Portal & Red Rings (renamed from Merge Portal & Wrecks), Flywheel Sun & Sequencer, Top Bar, Data Honesty); keep each heading color and the bold marks; leave the other cards alone. Create confluence/__tests__/confluence-help.test.tsx that renders the component and asserts the absent and present phrases listed in W17. The test checks rendered text, never the source file."
+        },
+        "items": [
+          {
+            "id": "field-guide-text.ac1",
+            "title": "The rendered field guide contains none of the phrases 'merge-failed wrecks', 'floats it back to WORK', 'VERIFY', 'WIP', 'Mind Your Now' and 'amber stuck'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "field-guide-text.ac2",
+            "title": "The rendered field guide contains '60 seconds', 'stuck, unpushed work', 'API error', 'operator-gate', 'names no beneficiary', '8 idle minutes' and 'only while it is running'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "field-guide-text.ac3",
+            "title": "Given eventsPerMin 7, the Data Honesty card renders '7 events' and states that the canvas never writes an orb's state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "field-guide-text.ac4",
+            "title": "The merge card heading renders 'Merge Portal & Red Rings'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-god-view",
+        "title": "docs/GOD-VIEW.md and reference/god-view.mdx describe what the code does",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T07:48:22Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5131",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/GOD-VIEW.md",
+            "reference/god-view.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "! grep -n \"VERIFY\\|wreck\\|WIP\\|invariant-mismatch\" docs/GOD-VIEW.md reference/god-view.mdx",
+            "grep -c \"no displayed age or rate is stored\" docs/GOD-VIEW.md",
+            "grep -c \"Red blinking ring\" docs/GOD-VIEW.md reference/god-view.mdx"
+          ],
+          "expected_outputs": [
+            "the first grep prints no line",
+            "the second grep prints 1 or more",
+            "the third grep prints a count of 1 or more for each file"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-5131.md work item W18 exactly. Apply the twelve numbered corrections to docs/GOD-VIEW.md (five stages, real rate and ring colors, real frost and the tide wording, portal comet only for merged and the red-ring attention labels, thaw wording, landmarks lit only while live, click opens the in-canvas rail, top bar without the beads counts, the three parked orbits and no invariant-mismatch row, the glyph letters, the 'Nothing simulated' honesty bullet, the implementation map) and the six corrections to reference/god-view.mdx. Keep the phrase 'no displayed age or rate is stored' on one line in docs/GOD-VIEW.md and the phrase 'Red blinking ring' on one line in both files, because the verify commands grep for them. Do not edit changelog.mdx or docs/god-view.md (lowercase)."
+        },
+        "items": [
+          {
+            "id": "docs-god-view.ac1",
+            "title": "The grep for VERIFY, wreck, WIP and invariant-mismatch in docs/GOD-VIEW.md and reference/god-view.mdx returns no line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-god-view.ac2",
+            "title": "docs/GOD-VIEW.md contains the honesty rule that the canvas never writes an orb's state or stage and that no displayed age or rate is stored",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-god-view.ac3",
+            "title": "The docs/GOD-VIEW.md glyph table shows the three parked orbits operator-gate, zombie-session and idle-running, and states that the thaw effect decorates the orb without moving it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-god-view.ac4",
+            "title": "reference/god-view.mdx shows a 'Red blinking ring' row and states that a click opens the issue rail on the canvas",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "e2e-honesty-spec",
+        "title": "Browser proof, CI test coverage and the final sweep",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T07:48:22Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-5131",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/tests/pan-5131-god-view-honesty.spec.ts",
+            "src/dashboard/frontend/package.json",
+            "scripts/frontend-test-subset.txt",
+            "docs/screenshots/pan-5131/god-view-honesty.png"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run build",
+            "cd src/dashboard/frontend && npx playwright test tests/pan-5131-god-view-honesty.spec.ts",
+            "npm run test:frontend-subset -- --dry-run",
+            "! grep -rnE \"\\\\b(idleMin|staleMin|parkedMin|frostHold)\\\\b|advanceFrostAccrual|beads|spawnFromSun|pulseSun|playMerge|beneficiaryId|PROJECT_RING|FEED_TICKER_CHANCE|pickWeighted|merge failed\" src/dashboard/frontend/src/components/GodView",
+            "test \"$(wc -l < src/dashboard/frontend/src/components/GodView/confluence/RiverCanvas.tsx)\" -le 808",
+            "test \"$(wc -l < src/dashboard/frontend/src/components/GodView/confluence/useConfluenceData.ts)\" -le 902",
+            "! git diff origin/main...HEAD -- src | grep -nE \"^\\+.*(skipIf|\\.skip\\(|\\.only\\()\"",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "the build completes",
+            "the Playwright spec reports 1 passed and writes the screenshot",
+            "the dry run prints the six added God View test paths",
+            "the sweep grep prints no line",
+            "both wc checks exit 0",
+            "the skip grep prints no line",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-6",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow .pan/drafts/PAN-5131.md work item W19 exactly. Write src/dashboard/frontend/tests/pan-5131-god-view-honesty.spec.ts on the pattern of tests/pan-4523-river-bands.spec.ts: an isolated dashboard (its own OVERDECK_HOME and its own browser context, never the operator's dashboard on port 3011 and never another agent's Playwright session), a snapshot seeded through localStorage['pan-snapshot-cache-v1'], /ws/rpc closed, timestamps built from Date.now(). Seed three running work agents (PAN-99301, PAN-99302, MIN-99303) and a sequencer-runner agent, each with a backendPanes row; assert through window.__orbs that the three issue ids are present, sequencer-runner is absent, and no orb has an idleMin, staleMin, parkedMin or heat key; save a full-page screenshot to docs/screenshots/pan-5131/god-view-honesty.png. Follow the W19 implementation checkpoint and its fallback if the seeded orbs do not appear. Append the spec to test:playwright in src/dashboard/frontend/package.json. Add the six God View test paths named in W19 to scripts/frontend-test-subset.txt in sorted position. Run the final sweep commands, and put the screenshot and the three statements from W19 step 5 in the PR description."
+        },
+        "items": [
+          {
+            "id": "e2e-honesty-spec.ac1",
+            "title": "The Playwright spec passes against the built branch: window.__orbs contains PAN-99301, PAN-99302 and MIN-99303, contains no sequencer-runner, and no orb object contains an idleMin, staleMin, parkedMin or heat key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e2e-honesty-spec.ac2",
+            "title": "The spec saves docs/screenshots/pan-5131/god-view-honesty.png, the PR description shows it, and in it every orb tag shows an integer rate or 'quiet' and no orb is labeled sequencer-runner",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e2e-honesty-spec.ac3",
+            "title": "scripts/frontend-test-subset.txt contains the six added God View test paths in sorted position, and the subset dry run prints them",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e2e-honesty-spec.ac4",
+            "title": "The final sweep grep returns no line, wc -l returns at most 808 and 902 for the two capped files, and the branch diff contains no added skipIf, .skip( or .only(",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e2e-honesty-spec.ac5",
+            "title": "npm run typecheck and npm run lint each exits with code 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "ages-read-time",
+        "to": "canvas-real-frost",
+        "type": "blocks"
+      },
+      {
+        "from": "canvas-real-frost",
+        "to": "real-event-rate-heat",
+        "type": "blocks"
+      },
+      {
+        "from": "real-event-rate-heat",
+        "to": "honest-thaw",
+        "type": "blocks"
+      },
+      {
+        "from": "honest-thaw",
+        "to": "honest-tide",
+        "type": "blocks"
+      },
+      {
+        "from": "honest-tide",
+        "to": "merge-exit-merged-only",
+        "type": "blocks"
+      },
+      {
+        "from": "merge-exit-merged-only",
+        "to": "remove-sun-spawn",
+        "type": "blocks"
+      },
+      {
+        "from": "remove-sun-spawn",
+        "to": "landmarks-live-only",
+        "type": "blocks"
+      },
+      {
+        "from": "landmarks-live-only",
+        "to": "cast-tracker-ids",
+        "type": "blocks"
+      },
+      {
+        "from": "cast-tracker-ids",
+        "to": "top-bar-dead-stats",
+        "type": "blocks"
+      },
+      {
+        "from": "top-bar-dead-stats",
+        "to": "footer-from-stages",
+        "type": "blocks"
+      },
+      {
+        "from": "landmarks-live-only",
+        "to": "failed-orb-labels",
+        "type": "blocks"
+      },
+      {
+        "from": "failed-orb-labels",
+        "to": "lane-slots",
+        "type": "blocks"
+      },
+      {
+        "from": "lane-slots",
+        "to": "project-ring-colors",
+        "type": "blocks"
+      },
+      {
+        "from": "project-ring-colors",
+        "to": "model-glyphs",
+        "type": "blocks"
+      },
+      {
+        "from": "model-glyphs",
+        "to": "single-ticker",
+        "type": "blocks"
+      },
+      {
+        "from": "footer-from-stages",
+        "to": "e2e-honesty-spec",
+        "type": "blocks"
+      },
+      {
+        "from": "single-ticker",
+        "to": "e2e-honesty-spec",
+        "type": "blocks"
+      },
+      {
+        "from": "field-guide-text",
+        "to": "e2e-honesty-spec",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-11-PAN-5131-god-view-honesty-pass-remove-simulated-ages-rates-and-effects-fix-mislabeled-orbs-make-the-field-guide-match-the-code.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
