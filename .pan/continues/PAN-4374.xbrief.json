@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-4374",
   "created": "2026-11-11T12:38:14.502Z",
-  "updated": "2026-11-11T13:19:06.769Z",
+  "updated": "2026-11-11T13:20:16.414Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -114,9 +114,18 @@
       "doneAt": "2026-11-11T13:19:00.578Z"
     },
     "doctor-fix-text": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-4374",
-      "claimedAt": "2026-11-11T13:19:06.769Z"
+      "claimedAt": "2026-11-11T13:19:06.769Z",
+      "doneAt": "2026-11-11T13:20:16.414Z"
+    },
+    "doctor-fix-text.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T13:20:16.414Z"
+    },
+    "doctor-fix-text.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T13:20:16.414Z"
     }
   }
 }
