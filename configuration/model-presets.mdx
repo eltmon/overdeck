@@ -98,13 +98,13 @@ its next autosave can write some of them back over the preset.
 Every effort a preset sets is `high`, the recommended default. No preset sets
 `xhigh` or `max`.
 
-## Anthropic defaults (`anthropic`, v1, 2026-09-29)
+## Anthropic defaults (`anthropic`, v2, 2026-11-11)
 
 | Setting | Value | Why |
 | --- | --- | --- |
 | `workhorses.expensive` | `claude-opus-5-5` | The strongest evaluated Claude model. Fable 5.2 has no Overdeck eval and costs 2× Opus 5.5. |
 | `workhorses.mid` | `claude-opus-5-5` | `work`, `test`, `ship` and `worker` run on `mid`. The eval found no reason to move it: Sonnet 5.5 matched Opus only on single-turn, tool-less probes. |
-| `workhorses.cheap` | `claude-haiku-4-5` | Cheap slot for trivial tiers. Haiku 4.5 has no effort control, so the preset sets no effort where it runs. |
+| `workhorses.cheap` | `claude-haiku-5-5` | Cheap slot for trivial tiers. The preset sets no effort there, so Haiku 5.5 runs at its default (medium). |
 | `roles.review.model` | `workhorse:expensive` | E2 review recall, 2026-09-29: Opus 5.5 found the known blocker 30/60 times vs Sonnet 5.5's 10/60 (any severity, 3 reps × 20 cases). By majority per case, 11/20 vs 3/20; sign test 8–0, p ≈ 0.008. Review is pinned to the expensive slot so it stays on Opus even if you move `mid`. |
 | `roles.review.sub.<lane>.model` | `parent` | All four lanes (security, correctness, performance, requirements) inherit the review model. |
 | `roles.plan.model` | `workhorse:expensive` | E3 plan quality is one rep and `plan` is not a `mid` role, so the eval gives no reason to move it. |
@@ -113,9 +113,9 @@ Every effort a preset sets is `high`, the recommended default. No preset sets
 | `roles.<role>.effort`, `roles.review.sub.<lane>.effort` | `high` | The recommended effort for every model. |
 | `models.default_conversation_model` | `claude-sonnet-5-5` | Interactive conversations. |
 | `models.status_review_model`, `models.provider_fallback_model` | `claude-sonnet-5-5` | Background analysis and the Anthropic fallback. |
-| `conversations.compaction_model`, `conversations.title_model` | `claude-haiku-4-5` | Short, cheap background calls. |
+| `conversations.compaction_model`, `conversations.title_model` | `claude-haiku-5-5` | Short, cheap background calls. |
 | `conversations.fork_summary_model`, `conversations.handoff_author_model` | `claude-sonnet-5-5` | Fork summaries need a 1M-token window in one shot. |
-| `memory.extraction.provider` / `memory.extraction.model` | `anthropic` / `claude-haiku-4-5` | Written together because the provider and model are coupled. |
+| `memory.extraction.provider` / `memory.extraction.model` | `anthropic` / `claude-haiku-5-5` | Written together because the provider and model are coupled. |
 | Tiers | trivial → `workhorse:cheap`; simple/medium → `workhorse:mid`, `high`; complex/expert → `workhorse:expensive`, `high`; harness `claude-code` | See "Tiered execution structure" above. |
 | `models.providers.anthropic` | enabled | Only written if it is `false`. |
 
@@ -132,7 +132,13 @@ Every effort a preset sets is `high`, the recommended default. No preset sets
 - **Cost and speed:** Sonnet 5.5 cost about 45% of Opus 5.5 and was 25–45%
   faster.
 
-## Anthropic cost-saver (`anthropic-cost-saver`, v1, pilot)
+v2 (2026-11-11) moves the cheap slot and the title, compaction and memory
+values from Haiku 4.5 to Haiku 5.5. On 20 titles and 20 compactions, Haiku 5.5
+was at least as good on every call, at about 1/26 of the title cost and 1/3.5
+of the compaction cost
+([report](https://github.com/eltmon/overdeck/blob/main/docs/model-evals/2026-11-11-haiku-5-5-background-calls.md)).
+
+## Anthropic cost-saver (`anthropic-cost-saver`, v2, pilot)
 
 This preset is the Anthropic preset with one change: 30% of work issues run on
 Sonnet 5.5.

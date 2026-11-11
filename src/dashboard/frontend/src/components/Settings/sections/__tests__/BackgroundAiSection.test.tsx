@@ -1,6 +1,8 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { BackgroundAiSection } from '../BackgroundAiSection';
+import { ConversationSettingsSection } from '../ConversationSettingsSection';
 import type { JevFeatureUsage, JevSettingsView, JevUsageView, SettingsConfig } from '../../types';
 
 function settings(typesafe?: string): SettingsConfig {
@@ -221,5 +223,45 @@ describe('BackgroundAiSection Jev usage readout (PAN-4508)', () => {
       />,
     );
     expect(screen.queryByTestId('jev-usage-jevTurnEndAssessment')).toBeNull();
+  });
+});
+
+// PAN-5124: with no title_model or compaction_model saved, the selects show
+// the Haiku 5.5 built-in default.
+describe('background model select fallbacks (PAN-5124)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('defaults the Background AI title and compaction selects to Haiku 5.5', () => {
+    render(
+      <BackgroundAiSection
+        chatModelOptionEls={[
+          <option key="45" value="claude-haiku-4-5">Haiku 4.5</option>,
+          <option key="55" value="claude-haiku-5-5">Haiku 5.5</option>,
+        ]}
+        formData={settings()}
+        onSettingsChange={vi.fn()}
+      />,
+    );
+    // Title generation, title refinement and compaction each render one select.
+    const selects = (screen.getAllByRole('combobox') as HTMLSelectElement[]).filter((el) => el.value === 'claude-haiku-5-5');
+    expect(selects.length).toBe(3);
+  });
+
+  it('defaults the Conversation compaction and title selects to Haiku 5.5', () => {
+    // The section reads triage settings on mount; answer it without the network.
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 200 })));
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <ConversationSettingsSection formData={settings()} onSettingsChange={vi.fn()} openRouterFavoriteModels={[]}>
+          {null}
+        </ConversationSettingsSection>
+      </QueryClientProvider>,
+    );
+    const selects = screen.getAllByRole('combobox') as HTMLSelectElement[];
+    expect(selects.length).toBeGreaterThanOrEqual(2);
+    expect(selects[0].value).toBe('claude-haiku-5-5');
+    expect(selects[1].value).toBe('claude-haiku-5-5');
   });
 });

@@ -1,0 +1,317 @@
+{
+  "version": "1",
+  "issueId": "PAN-5124",
+  "created": "2026-11-11T07:40:41.890Z",
+  "updated": "2026-11-11T08:36:17.885Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "mid-workhorse-default": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5124",
+      "claimedAt": "2026-11-11T07:40:41.890Z",
+      "doneAt": "2026-11-11T07:43:07.824Z"
+    },
+    "mid-workhorse-default.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T07:43:07.824Z"
+    },
+    "mid-workhorse-default.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T07:43:07.824Z"
+    },
+    "mid-workhorse-default.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T07:43:07.824Z"
+    },
+    "title-effort-low": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5124",
+      "claimedAt": "2026-11-11T07:43:25.633Z",
+      "doneAt": "2026-11-11T07:44:39.784Z"
+    },
+    "title-effort-low.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T07:44:39.784Z"
+    },
+    "title-effort-low.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T07:44:39.784Z"
+    },
+    "title-effort-low.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T07:44:39.784Z"
+    },
+    "memory-effort-low": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5124",
+      "claimedAt": "2026-11-11T07:44:41.586Z",
+      "doneAt": "2026-11-11T07:45:36.469Z"
+    },
+    "memory-effort-low.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T07:45:36.469Z"
+    },
+    "memory-effort-low.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T07:45:36.469Z"
+    },
+    "memory-effort-low.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T07:45:36.469Z"
+    },
+    "requirements-background-models": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5124",
+      "claimedAt": "2026-11-11T07:45:38.526Z",
+      "doneAt": "2026-11-11T07:46:57.058Z"
+    },
+    "requirements-background-models.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T07:46:57.058Z"
+    },
+    "requirements-background-models.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T07:46:57.058Z"
+    },
+    "requirements-background-models.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T07:46:57.058Z"
+    },
+    "chunk-budget-default-model": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5124",
+      "claimedAt": "2026-11-11T07:46:58.708Z",
+      "doneAt": "2026-11-11T07:47:51.917Z"
+    },
+    "chunk-budget-default-model.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T07:47:51.917Z"
+    },
+    "chunk-budget-default-model.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T07:47:51.917Z"
+    },
+    "chunk-budget-default-model.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T07:47:51.917Z"
+    },
+    "title-preflight": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5124",
+      "claimedAt": "2026-11-11T07:48:00.941Z",
+      "doneAt": "2026-11-11T07:50:09.387Z"
+    },
+    "title-preflight.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T07:50:09.387Z"
+    },
+    "title-preflight.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T07:50:09.387Z"
+    },
+    "title-preflight.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T07:50:09.387Z"
+    },
+    "summary-preflight": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5124",
+      "claimedAt": "2026-11-11T07:50:11.416Z",
+      "doneAt": "2026-11-11T07:52:43.237Z"
+    },
+    "summary-preflight.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T07:52:43.237Z"
+    },
+    "summary-preflight.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T07:52:43.237Z"
+    },
+    "summary-preflight.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T07:52:43.237Z"
+    },
+    "haiku-checkpoint": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5124",
+      "claimedAt": "2026-11-11T07:52:51.606Z",
+      "doneAt": "2026-11-11T08:23:13.322Z"
+    },
+    "haiku-checkpoint.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:23:13.322Z"
+    },
+    "haiku-checkpoint.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:23:13.322Z"
+    },
+    "haiku-checkpoint.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:23:13.322Z"
+    },
+    "haiku-checkpoint.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:23:13.322Z"
+    },
+    "haiku-config-defaults": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5124",
+      "claimedAt": "2026-11-11T08:23:20.449Z",
+      "doneAt": "2026-11-11T08:25:34.846Z"
+    },
+    "haiku-config-defaults.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:25:34.846Z"
+    },
+    "haiku-config-defaults.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:25:34.846Z"
+    },
+    "haiku-config-defaults.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:25:34.846Z"
+    },
+    "haiku-module-constants": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5124",
+      "claimedAt": "2026-11-11T08:25:36.306Z",
+      "doneAt": "2026-11-11T08:27:51.641Z"
+    },
+    "haiku-module-constants.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:27:51.641Z"
+    },
+    "haiku-module-constants.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:27:51.641Z"
+    },
+    "haiku-module-constants.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:27:51.641Z"
+    },
+    "haiku-module-constants.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:27:51.641Z"
+    },
+    "haiku-preset-v2": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5124",
+      "claimedAt": "2026-11-11T08:27:53.394Z",
+      "doneAt": "2026-11-11T08:30:03.185Z"
+    },
+    "haiku-settings-fallbacks": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5124",
+      "claimedAt": "2026-11-11T08:29:32.131Z",
+      "doneAt": "2026-11-11T08:32:56.830Z"
+    },
+    "haiku-preset-v2.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:30:03.185Z"
+    },
+    "haiku-preset-v2.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:30:03.185Z"
+    },
+    "haiku-preset-v2.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:30:03.185Z"
+    },
+    "haiku-settings-fallbacks.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:32:56.830Z"
+    },
+    "haiku-settings-fallbacks.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:32:56.830Z"
+    },
+    "haiku-settings-fallbacks.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:32:56.830Z"
+    },
+    "docs-config-routing": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5124",
+      "claimedAt": "2026-11-11T08:32:58.336Z",
+      "doneAt": "2026-11-11T08:33:40.105Z"
+    },
+    "docs-config-routing.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:33:40.105Z"
+    },
+    "docs-config-routing.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:33:40.105Z"
+    },
+    "docs-config-routing.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:33:40.105Z"
+    },
+    "docs-model-calls": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5124",
+      "claimedAt": "2026-11-11T08:33:46.740Z",
+      "doneAt": "2026-11-11T08:34:46.342Z"
+    },
+    "docs-model-calls.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:34:46.342Z"
+    },
+    "docs-model-calls.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:34:46.342Z"
+    },
+    "docs-model-calls.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:34:46.342Z"
+    },
+    "docs-model-calls.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:34:46.342Z"
+    },
+    "docs-presets-harnesses": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5124",
+      "claimedAt": "2026-11-11T08:34:47.551Z",
+      "doneAt": "2026-11-11T08:35:41.085Z"
+    },
+    "docs-presets-harnesses.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:35:41.085Z"
+    },
+    "docs-presets-harnesses.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:35:41.085Z"
+    },
+    "docs-presets-harnesses.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:35:41.085Z"
+    },
+    "docs-presets-harnesses.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:35:41.085Z"
+    },
+    "changelog-entry": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5124",
+      "claimedAt": "2026-11-11T08:35:42.676Z",
+      "doneAt": "2026-11-11T08:36:17.884Z"
+    },
+    "changelog-entry.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:36:17.884Z"
+    },
+    "changelog-entry.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:36:17.884Z"
+    },
+    "changelog-entry.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T08:36:17.884Z"
+    }
+  }
+}
