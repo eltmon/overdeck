@@ -169,7 +169,7 @@ Before uploading the first build containing this telemetry change:
 
 - [ ] Update App Store Connect App Privacy: Other Diagnostic Data and Crash Data, linked to the
       user, not tracking, purpose Analytics.
-- [ ] Update the Play Console Data safety form: App activity and Crash logs, not shared, optional
+- [ ] Update the Play Console Data safety form: App info and performance > Diagnostics (failed routes, link failures) and Crash logs, purpose Analytics, not shared, optional
       per machine setting.
 - [ ] Update `overdeck.ai/privacy/app` in `eltmon/overdeck-landing`.
 
