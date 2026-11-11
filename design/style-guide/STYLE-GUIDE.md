@@ -1050,6 +1050,8 @@ Thumb:
   Translate on check
 ```
 
+New switches use the named track classes from "Grouped List and Switch Tracks" above — `.switch-track-on` for the checked state, `.switch-track-locked` for a checked switch the user can't uncheck — instead of a single solid `bg-primary` track, because that second, locked state has no equivalent in the original recipe. The `Checked: bg-primary` line above is the pre-PAN-5123 recipe: it still applies, unchanged, to any switch that has not migrated onto the named classes.
+
 In a modal's option rows (e.g. the New Conversation dialog's Context section), the whole row is a `role="switch"` button labelled by `aria-labelledby`/`aria-describedby`, with the consequence text written next to it rather than left to a separate hint (PAN-4755).
 
 ### Select / Dropdown
