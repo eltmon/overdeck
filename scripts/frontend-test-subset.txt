@@ -16,6 +16,7 @@ src/components/Agents/live/live-model.test.ts
 src/components/CommandDeck/CommandDeck.test.tsx
 src/components/CommandDeck/ProjectTree/FeatureItem.linkedConversation.test.tsx
 src/components/CommandDeck/ProjectTree/FeatureItem.pullRequest.test.tsx
+src/components/CommandDeck/ProjectTree/ProjectIdentityChip.test.tsx
 src/components/CommandDeck/ProjectTree/featureStateBadge.test.ts
 src/components/CommandDeck/SessionView/SessionPanel.test.tsx
 src/components/CommandDeck/__tests__/CommandDeck.render-count.test.tsx
