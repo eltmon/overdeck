@@ -10,13 +10,13 @@ own README, version, changelog and tests. All of them are MIT licensed
 | `hermes/` | Hermes Agent | Python package with `plugin.yaml` |
 | `openclaw/` | OpenClaw | npm package with `openclaw.plugin.json` |
 | `grok-build/` | Grok Build, xAI's local coding agent | `.grok-plugin/plugin.json` and `.mcp.json` |
-| `grok-bot/` | Grok Bot and the xAI API | `.cursor-plugin/plugin.json` and a remote `mcp.json` |
+| `grok-bot/` | Grok Bot and the xAI API | `.cursor-plugin/plugin.json` and an `mcp.json` that runs the connector over stdio |
 | `shared/` | all of them | the shared skill and its sync script |
 
 ## The shared skill
 
 Every plugin bundles the same `overdeck` skill: what Overdeck is, the tool
-groups, and the safety rules a bot must follow. The source is
+groups, how to connect, and the safety rules a bot must follow. The source is
 [`shared/SKILL.md`](shared/SKILL.md). Edit only that file, then run this
 from the repository root:
 

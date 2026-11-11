@@ -3,7 +3,9 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
-import { hermesConfig, CONNECTOR_LOCAL_URL, TAILSCALE_PLACEHOLDER_ORIGIN } from '../../../src/dashboard/frontend/src/components/Settings/anywhere/botSnippets';
+import { connectMessage } from '../../../src/dashboard/frontend/src/components/Settings/anywhere/connectMessage';
+import { defaultBotName, hermesConfig, CONNECTOR_LOCAL_URL, TAILSCALE_PLACEHOLDER_ORIGIN } from '../../../src/dashboard/frontend/src/components/Settings/anywhere/botSnippets';
+import { hermesRegistrationYaml, registrationFor } from '../../../src/lib/mcp/connector/connect-output.js';
 
 // PAN-4953 W-INT1 (AC-25): the Hermes plugin package files.
 const pluginYamlPath = new URL('../../../integrations/hermes/plugin.yaml', import.meta.url);
@@ -52,6 +54,16 @@ describe('integrations/hermes README', () => {
 
     expect(readme).toContain(hermesConfig({ reach: 'connector', url: CONNECTOR_LOCAL_URL }));
     expect(readme).toContain(hermesConfig({ reach: 'tailscale', url: `${TAILSCALE_PLACEHOLDER_ORIGIN}/mcp` }));
+  });
+
+  it('leads with the one-paste flow, its Copy message and the stdio entry', () => {
+    const readme = readFileSync(readmePath, 'utf-8');
+
+    expect(readme.match(/^## .*/m)?.[0]).toBe('## Connect in one paste');
+    expect(readme).toContain(
+      connectMessage({ platform: 'hermes', botName: defaultBotName('hermes'), machineLabel: '<machine>', version: '<version>', pairingString: '<pairing string>' }),
+    );
+    expect(readme).toContain(hermesRegistrationYaml(registrationFor({ version: '<version>', env: {} })));
   });
 });
 

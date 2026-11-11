@@ -1,0 +1,201 @@
+{
+  "version": "1",
+  "issueId": "PAN-5072",
+  "created": "2026-11-11T10:00:36.495Z",
+  "updated": "2026-11-11T10:27:15.146Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "w1-hermes-shape": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5072",
+      "claimedAt": "2026-11-11T10:00:36.495Z",
+      "doneAt": "2026-11-11T10:03:09.995Z"
+    },
+    "w1-hermes-shape.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T10:03:09.995Z"
+    },
+    "w1-hermes-shape.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T10:03:09.995Z"
+    },
+    "w1-hermes-shape.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T10:03:09.995Z"
+    },
+    "w1-hermes-shape.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T10:03:09.995Z"
+    },
+    "w2-openclaw-shape": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5072",
+      "claimedAt": "2026-11-11T10:03:19.255Z",
+      "doneAt": "2026-11-11T10:05:34.091Z"
+    },
+    "w2-openclaw-shape.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T10:05:34.091Z"
+    },
+    "w2-openclaw-shape.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T10:05:34.091Z"
+    },
+    "w2-openclaw-shape.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T10:05:34.091Z"
+    },
+    "w2-openclaw-shape.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T10:05:34.091Z"
+    },
+    "w3-shared-skill": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5072",
+      "claimedAt": "2026-11-11T10:05:46.552Z",
+      "doneAt": "2026-11-11T10:08:08.760Z"
+    },
+    "w3-shared-skill.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T10:08:08.760Z"
+    },
+    "w3-shared-skill.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T10:08:08.760Z"
+    },
+    "w3-shared-skill.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T10:08:08.760Z"
+    },
+    "w3-shared-skill.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T10:08:08.760Z"
+    },
+    "w4-grokbot-mcpjson": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5072",
+      "claimedAt": "2026-11-11T10:11:25.315Z",
+      "doneAt": "2026-11-11T10:13:21.892Z"
+    },
+    "w4-grokbot-mcpjson.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T10:13:21.892Z"
+    },
+    "w4-grokbot-mcpjson.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T10:13:21.892Z"
+    },
+    "w4-grokbot-mcpjson.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T10:13:21.892Z"
+    },
+    "w5-grokbot-readme": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5072",
+      "claimedAt": "2026-11-11T10:13:29.363Z",
+      "doneAt": "2026-11-11T10:17:04.347Z"
+    },
+    "w5-grokbot-readme.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T10:17:04.347Z"
+    },
+    "w5-grokbot-readme.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T10:17:04.347Z"
+    },
+    "w5-grokbot-readme.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T10:17:04.347Z"
+    },
+    "w6-hermes-readme": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5072",
+      "claimedAt": "2026-11-11T10:17:14.201Z",
+      "doneAt": "2026-11-11T10:19:42.674Z"
+    },
+    "w6-hermes-readme.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T10:19:42.674Z"
+    },
+    "w6-hermes-readme.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T10:19:42.674Z"
+    },
+    "w6-hermes-readme.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T10:19:42.674Z"
+    },
+    "w7-openclaw-readme": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5072",
+      "claimedAt": "2026-11-11T10:19:50.839Z",
+      "doneAt": "2026-11-11T10:21:51.915Z"
+    },
+    "w7-openclaw-readme.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T10:21:51.915Z"
+    },
+    "w7-openclaw-readme.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T10:21:51.915Z"
+    },
+    "w7-openclaw-readme.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T10:21:51.915Z"
+    },
+    "w8-grokbuild-readme": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5072",
+      "claimedAt": "2026-11-11T10:21:58.722Z",
+      "doneAt": "2026-11-11T10:23:53.360Z"
+    },
+    "w8-grokbuild-readme.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T10:23:53.360Z"
+    },
+    "w8-grokbuild-readme.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T10:23:53.360Z"
+    },
+    "w8-grokbuild-readme.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T10:23:53.360Z"
+    },
+    "w9-cli-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5072",
+      "claimedAt": "2026-11-11T10:24:02.873Z",
+      "doneAt": "2026-11-11T10:24:56.584Z"
+    },
+    "w9-cli-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T10:24:56.584Z"
+    },
+    "w9-cli-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T10:24:56.584Z"
+    },
+    "w10-bots-docs": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5072",
+      "claimedAt": "2026-11-11T10:25:01.552Z",
+      "doneAt": "2026-11-11T10:27:15.146Z"
+    },
+    "w10-bots-docs.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T10:27:15.146Z"
+    },
+    "w10-bots-docs.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T10:27:15.146Z"
+    },
+    "w10-bots-docs.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T10:27:15.146Z"
+    }
+  }
+}

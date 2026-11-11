@@ -6,8 +6,12 @@
  * `ready` (exit 0), `error` (exit 1), `authorize` (exit 3) or `retry` (exit 4); failures carry
  * a stable `code` and a `next` sentence written for the bot. `ready` carries the stdio MCP
  * registration the bot adds to its own config, and `registrationLines` shows it in the
- * platform's own config shape for a human reading the output.
+ * platform's own config shape for a human reading the output: the Grok Bot and Grok Build
+ * mcp.json shapes, the Hermes config.yaml shape, the OpenClaw `mcp set` command, and generic
+ * JSON for `other`.
  */
+import { shellQuote } from '../../shell-quote.js';
+
 export const CONNECT_STATUS_PREFIX = 'OVERDECK_CONNECT ';
 export const CONNECT_EXIT = { ready: 0, error: 1, authorize: 3, retry: 4 } as const;
 export const CONNECT_PLATFORMS = ['grok-bot', 'grok-build', 'hermes', 'openclaw', 'other'] as const;
@@ -114,6 +118,25 @@ function jsonLines(value: unknown): string[] {
   return JSON.stringify(value, null, 2).split('\n');
 }
 
+/** The `mcp_servers` entry for Hermes's config.yaml: JSON-quoted strings and a JSON flow list (valid YAML). */
+export function hermesRegistrationYaml(registration: ConnectRegistration): string {
+  const lines = [
+    'mcp_servers:',
+    `  ${registration.name}:`,
+    `    command: ${JSON.stringify(registration.command)}`,
+    `    args: [${registration.args.map((arg) => JSON.stringify(arg)).join(', ')}]`,
+  ];
+  if (registration.env) {
+    lines.push('    env:', ...Object.entries(registration.env).map(([key, value]) => `      ${key}: ${JSON.stringify(value)}`));
+  }
+  return lines.join('\n');
+}
+
+/** `openclaw mcp set overdeck '<json>'`: writes mcp.servers.overdeck without prompting. */
+export function openclawRegistrationCommand(registration: ConnectRegistration): string {
+  return `openclaw mcp set ${registration.name} ${shellQuote(JSON.stringify(stdioServer(registration)))}`;
+}
+
 /** Human lines that show the registration in the platform's own shape. */
 export function registrationLines(platform: ConnectPlatform, registration: ConnectRegistration): string[] {
   const server = stdioServer(registration);
@@ -125,6 +148,19 @@ export function registrationLines(platform: ConnectPlatform, registration: Conne
         "The Overdeck plugin's scripts/run-mcp.sh starts this connector on its own; nothing to register.",
         'Without the plugin, register this stdio server:',
         ...jsonLines(server),
+      ];
+    case 'hermes':
+      return [
+        "Add the overdeck entry to mcp_servers in Hermes's config.yaml (~/.hermes/config.yaml by default):",
+        ...hermesRegistrationYaml(registration).split('\n'),
+        'Then run /reload-mcp in Hermes, or start a new session, so the overdeck tools load.',
+        'The Overdeck Hermes plugin also needs plugins.entries.overdeck.mcp_allowlist: ["overdeck"] in the same file.',
+      ];
+    case 'openclaw':
+      return [
+        'Register it with OpenClaw (changes under mcp.servers apply without a restart):',
+        openclawRegistrationCommand(registration),
+        "The Overdeck OpenClaw plugin's summary and its overdeck_pending and overdeck_answer tools still need the connector's HTTP route (serve and localToken); see the plugin README.",
       ];
     default:
       return [`Register a stdio MCP server named "${registration.name}":`, ...jsonLines(server)];

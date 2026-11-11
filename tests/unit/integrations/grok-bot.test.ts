@@ -2,7 +2,9 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { grokBotMcpJson, oauthIssueCommand, xaiExample, PUBLIC_MCP_PLACEHOLDER_URL } from '../../../src/dashboard/frontend/src/components/Settings/anywhere/botSnippets';
+import { connectMessage } from '../../../src/dashboard/frontend/src/components/Settings/anywhere/connectMessage';
+import { defaultBotName, grokBotMcpJson, oauthIssueCommand, xaiExample, PUBLIC_MCP_PLACEHOLDER_URL } from '../../../src/dashboard/frontend/src/components/Settings/anywhere/botSnippets';
+import { registrationFor, registrationLines } from '../../../src/lib/mcp/connector/connect-output.js';
 
 // PAN-4956 W-INT4 WI-2 (AC-2), WI-5 (AC-5): the Grok Bot plugin manifest, mcp.json, LICENSE,
 // README, and a package-wide secret scan.
@@ -32,16 +34,14 @@ describe('integrations/grok-bot manifest', () => {
     expect(existsSync(skillPath)).toBe(true);
   });
 
-  it('mcp.json matches grokBotMcpJson with one https server', () => {
+  it('mcp.json is the connector registration connect prints for its pinned version', () => {
     const text = readFileSync(mcpJsonPath, 'utf-8');
-
-    expect(text).toBe(grokBotMcpJson({ url: PUBLIC_MCP_PLACEHOLDER_URL }) + '\n');
-
-    const parsed = JSON.parse(text);
-    const servers = Object.values(parsed.mcpServers) as Array<{ url: string }>;
-    expect(servers).toHaveLength(1);
-    expect(servers[0].url.startsWith('https://')).toBe(true);
-    expect(servers[0].url.endsWith(':8443/mcp')).toBe(true);
+    const pin = text.match(/@overdeck\/core@(\d+)\.(\d+)\.(\d+)"/);
+    expect(pin).not.toBeNull();
+    const [major, minor] = [Number(pin![1]), Number(pin![2])];
+    expect(major > 0 || minor >= 75).toBe(true); // 0.75.0 is the first release with `connect`
+    const version = `${pin![1]}.${pin![2]}.${pin![3]}`;
+    expect(text).toBe(registrationLines('grok-bot', registrationFor({ version, env: {} })).slice(1).join('\n') + '\n');
   });
 
   it('LICENSE is a byte copy of integrations/LICENSE', () => {
@@ -58,6 +58,16 @@ describe('integrations/grok-bot README', () => {
     expect(readme).toContain(oauthIssueCommand({ name: 'xai-api', level: 'read' }));
     expect(readme).toContain('examples/xai-api.ts');
     expect(readme).toContain('examples/xai-api.py');
+  });
+
+  it('leads with the one-paste flow and its Copy message', () => {
+    const readme = readFileSync(readmePath, 'utf-8');
+
+    expect(readme.match(/^## .*/m)?.[0]).toBe('## Connect in one paste');
+    expect(readme).toContain(
+      connectMessage({ platform: 'grok-bot', botName: defaultBotName('grok-bot'), machineLabel: '<machine>', version: '<version>', pairingString: '<pairing string>' }),
+    );
+    expect(readme).toContain(readFileSync(mcpJsonPath, 'utf-8').trimEnd());
   });
 });
 
