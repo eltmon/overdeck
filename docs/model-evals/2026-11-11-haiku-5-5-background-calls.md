@@ -21,7 +21,12 @@ PAN-5124 implementation checkpoint (PRD D12). It gates the Haiku 5.5 built-in de
 
 ### Deviation from the plan's input rule
 
-The PRD asked for compaction inputs of 200-600 KB. In Overdeck-managed sessions, most of a file's bytes are launch-context `attachment` records. A 200-600 KB file usually holds only 5,000 to 13,000 tokens of messages, which is under the 20,000 tokens that compaction keeps verbatim. So most such files return the no-model stub: 206 of the 210 candidates tried produced no model call. The 200 KB floor existed to make sure there is older history to summarize. I kept that intent and changed the rule. Compaction inputs are 200 KB to 2.5 MB with older history before the cut point, checked with a port of `findCutPoint`. The counted files are 438 KB to 2,440 KB, and 4 of them are under 600 KB. Titles keep the original 200-600 KB window.
+The PRD asked for compaction inputs of 200-600 KB. In Overdeck-managed sessions, most of a file's bytes are launch-context `attachment` records. A 200-600 KB file usually holds only 5,000 to 13,000 tokens of messages, which is under the 20,000 tokens that compaction keeps verbatim. So most such files return the no-model stub: 176 of the 180 candidates in that window produced no model call. The 200 KB floor existed to make sure there is older history to summarize, so I kept that intent and widened the selection in two steps.
+
+1. **Content filter:** 200 KB to 2.5 MB with at least 150,000 characters of message content. Of 26 candidates, 14 counted. The other 12 still returned the stub, mostly because they held a single very large message.
+2. **Cut-point check:** the last candidates were picked with a port of `findCutPoint`, so each had history before the cut. Both candidates tried counted.
+
+In all, 210 transcripts were tried and 20 counted; the other 190 produced no model call. The counted files are 438 KB to 2,440 KB, and 4 of them are under 600 KB. Titles keep the original 200-600 KB window.
 
 ## Results
 
@@ -88,7 +93,7 @@ The PRD asked for compaction inputs of 200-600 KB. In Overdeck-managed sessions,
 ## Caveats
 
 - One run per call. Effort, prompt-caching state and output length vary between runs, so treat the cost ratios as approximate. The quality gap is large enough that one run should not hide a regression.
-- The compaction quality judgment is one model's blinded rubric score, not a human review. The judge marked pairs 06, 09, 11 and 13 as less certain. Counting all four as ties would still give Haiku 5.5 20 of 20 at least as good.
+- The compaction quality judgment is one model's blinded rubric score, not a human review. The judge compared the two summaries with each other, never with the transcript, so the extra detail in Haiku 5.5's longer summaries was not checked for accuracy. The judge marked pairs 06, 09, 11 and 13 as less certain. Counting all four as ties would still give Haiku 5.5 20 of 20 at least as good.
 - Titles were judged by the author, without blinding.
 - The inputs are Overdeck pipeline sessions: work, review, planning and sequencer agents. Operator chat sessions in other projects were not sampled, so their generated titles stay out of this public doc.
 
