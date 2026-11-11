@@ -117,6 +117,9 @@ The plugin reads `summary` and `allow_answers` from `settings`; `mcp_allowlist`
 grants it the `overdeck` server. See `integrations/hermes/README.md` for the
 `/overdeck` commands.
 
+Connect in one paste registers the connector as a stdio server in
+`mcp_servers` instead of this HTTP entry; see `integrations/hermes/README.md`.
+
 ### OpenClaw
 
 The OpenClaw plugin lives in [`integrations/openclaw/`](https://github.com/eltmon/overdeck/tree/main/integrations/openclaw).
@@ -139,6 +142,10 @@ mcp: { servers: { overdeck: {
 } } },
 plugins: { entries: { overdeck: { config: { localToken: "${OVERDECK_CONNECTOR_LOCAL_TOKEN}" } } } },
 ```
+
+Connect in one paste registers the connector with `openclaw mcp set` as a
+stdio server, which gives the agents the Overdeck tools; the plugin's
+summary and chat tools still need the HTTP config below.
 
 ### Grok Build
 
@@ -169,9 +176,10 @@ click and **Authorize**, then reports it is ready.
 Grok Bot can use [Public MCP](/configuration/mcp#public-mcp-for-hosted-bots)
 instead: pick the Public MCP reach, then install the
 [Grok Bot plugin](https://github.com/eltmon/overdeck/tree/main/integrations/grok-bot)
-with your public URL (`https://<machine>.<tailnet>.ts.net:8443/mcp`) in its
-`mcp.json`. On first use Grok Bot opens an Overdeck sign-in page that shows an
-approval code. Approve it in your dashboard's Needs-you card, or run
+and replace its `mcp.json`, which runs the connector, with your public URL
+(`https://<machine>.<tailnet>.ts.net:8443/mcp`). On first use Grok Bot opens
+an Overdeck sign-in page that shows an approval code. Approve it in your
+dashboard's Needs-you card, or run
 `pan mcp oauth approve <code> --level read`, and choose the access level there
 (see [Sign in with OAuth](/configuration/mcp#sign-in-with-oauth)).
 

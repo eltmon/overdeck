@@ -396,8 +396,10 @@ Give the bot the public URL `https://<machine>.<tailnet>.ts.net:8443/mcp`.
 
 **Grok Bot and the xAI API.** The Grok Bot plugin and runnable xAI API
 examples live in [`integrations/grok-bot/`](https://github.com/eltmon/overdeck/tree/main/integrations/grok-bot).
-Grok Bot signs in with OAuth on first use. The xAI API cannot open a browser,
-so mint its token with `pan mcp oauth issue --name xai-api --level read` and
+Its `mcp.json` runs the connector over stdio; for Public MCP, replace it
+with the public URL. Grok Bot signs in with OAuth on first use. The xAI API
+cannot open a browser, so mint its token with
+`pan mcp oauth issue --name xai-api --level read` and
 pass the access token in the `authorization` field of an `mcp` tool, with
 `server_url` set to the public URL and `server_label` set to `overdeck`.
 
