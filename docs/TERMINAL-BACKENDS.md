@@ -836,24 +836,38 @@ socket, and so on). Adapters: OpenCode `opencode attach` (PAN-3974) and Codex
 | Shared vocabulary (`CompanionTerminalKind`, `CompanionTerminalState`, `companionTerminalKindFor`, body whitelists) | `packages/contracts/src/companion-terminal.ts` |
 | Lifecycle (open / close / owner teardown, per-owner lock, generation checks) | `src/lib/overdeck/companion-terminal/lifecycle.ts` |
 | Host port + tmux implementation (async `tmuxExecAsync` / `createSession`, no keystrokes) | `src/lib/overdeck/companion-terminal/host.ts` |
+| Herdr host implementation | `src/lib/overdeck/companion-terminal/herdr-host.ts` |
+| Host selection by terminal backend | `src/lib/overdeck/companion-terminal/select-host.ts` |
 | OpenCode adapter | `src/lib/overdeck/companion-terminal/opencode-adapter.ts` |
 | Codex adapter; host native endpoint and `prepare-terminal` | `src/lib/overdeck/companion-terminal/codex-adapter.ts`; `src/lib/codex/app-server-host.ts`, `app-server-transport.ts`, `native-endpoint.ts` |
 | Wiring + `closeCompanionTerminalForOwner` | `src/lib/overdeck/companion-terminal/index.ts` |
 | Routes | `src/dashboard/server/routes/conversation-companion-terminal.ts` |
 | UI | `src/dashboard/frontend/src/components/chat/ConversationTerminalView.tsx` |
 
-**Session.** One companion per owner, named `companion-<ownerSession>` on the managed tmux
-socket, on either host. The prefix is ignored by the
-backend inventory, `isAgentSessionName`, and every reaper. The pane runs
-`exec <absolute binary> …`, so the session ends when the native client exits. The dashboard
-streams it through the ordinary `/ws/terminal?session=` path; a browser disconnect only drops the
-PTY client, and no `destroy-unattached` is set, so the companion survives.
+**Session.** One companion per owner, named `companion-<ownerSession>`. The companion terminal
+works on both terminal backends (PAN-5122); the host is chosen per call from
+`hostTerminalBackendName()` (`select-host.ts`). On a tmux host it is the tmux session
+`companion-<ownerSession>` on the managed tmux socket; the prefix is ignored by the backend
+inventory, `isAgentSessionName`, and every reaper, and the pane runs `exec <absolute binary> …`,
+so the session ends when the native client exits. On a Herdr host it is a pane in its own tab of
+the `conversations` workspace (`herdr-host.ts`), stamped only with the `companion` and
+`companionGeneration` tokens and **no** agent tokens (`agentId`, `role`, `issue`, `harness`,
+`model`), so it never appears in `listHerdrAgents()` or Herdr `list()`; its text is
+`<quoted argv> ; exit` (never `exec`, so `paneProcessLiveness` reads it as running while the
+client runs, and the pane closes itself when `exit` runs). The dashboard streams it through the
+ordinary `/ws/terminal?session=` path — on Herdr, `resolveHerdrTerminalId` resolves it by the
+`companion` token when no agent answers to the name — and a browser disconnect only drops the PTY
+client, so the companion survives.
 
-**Generation.** `sha256(ownerSession, owner #{session_created}, adapter fingerprint)`, 24 hex. The
-OpenCode fingerprint is `<port>:<sessionId>`, so any owner respawn (new tmux session, new port)
-changes it. It is stamped on the companion at creation as the session env var
+**Generation.** `sha256(ownerSession, owner stamp, adapter fingerprint)`, 24 hex. The owner stamp
+is tmux `#{session_created}` on a tmux host and `herdr:<paneId>` on a Herdr host (Herdr pane ids
+are never reused, so a respawned owner always gets a new stamp). The OpenCode fingerprint is
+`<port>:<sessionId>`, so any owner respawn (new session, new port) changes it. On tmux the
+generation is stamped on the companion at creation as the session env var
 `OVERDECK_COMPANION_GENERATION` (`new-session -e`, atomic) and read back with `show-environment`;
-the tmux session is the authority and nothing else is stored. Rules:
+on Herdr it is stamped as the `companionGeneration` pane token (also exported into the pane's env
+as `OVERDECK_COMPANION_GENERATION`) and read back from that token. Either way the terminal session
+itself is the authority and nothing else is stored. Rules:
 
 - Every operation on one owner runs through a per-owner promise lock, so concurrent opens create
   one companion.
@@ -864,7 +878,10 @@ the tmux session is the authority and nothing else is stored. Rules:
   companion it created (only if the stamp is still its own) and answers `owner-changed` (409).
 - Close must carry the generation the browser was given; a mismatch answers `stale-generation`
   (409) and kills nothing.
-- An owner whose tmux session is gone makes open reap any companion (`owner-not-running`).
+- An owner whose session or pane is gone makes open reap any companion (`owner-not-running`). On a
+  Herdr host, an owner probe that is `exited` means not running, `absent` falls back to the tmux
+  host's stamp (an owner still running in tmux from before the host moved to Herdr), and Herdr not
+  answering (`indeterminate`) fails the open with an error instead of reaping anything.
 
 **Owner teardown.** `closeCompanionTerminalForOwner(ownerSession)` never throws and is called from
 `stopConversationRuntime` (stop, delete, archive, resume/restart failure, flywheel archive; after
@@ -880,7 +897,7 @@ asks `GET http://127.0.0.1:<port>/session/<id>` (2 s timeout) before handing out
 `opencode attach http://127.0.0.1:<port> --session <id> --dir <cwd>`. Attach only; never `--fork`,
 `--continue`, `serve`, or a second `acp`.
 
-| owner tmux | `opencode-port` | `acp-session-id` | `GET /session/<id>` | result |
+| owner session | `opencode-port` | `acp-session-id` | `GET /session/<id>` | result |
 | --- | --- | --- | --- | --- |
 | gone | – | – | – | `owner-not-running` |
 | alive | any | missing | – | `owner-starting` |
@@ -918,7 +935,7 @@ calls `closeCompanionTerminalForOwner`. The host kills its app-server on every e
 manager reaps an app-server orphaned by a SIGKILLed host (recorded in `codex-native/app.pid`,
 matched by `/proc/<pid>/cmdline`) before reusing the socket.
 
-| owner tmux | host answer | result |
+| owner session | host answer | result |
 | --- | --- | --- |
 | gone | – | `owner-not-running` |
 | alive | no token, `codex.transport: tui` | `unsupported` (the owner pane is the native TUI) |
