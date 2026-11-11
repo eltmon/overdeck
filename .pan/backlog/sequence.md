@@ -1,10 +1,11 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-11T07:17:10.973816Z · model: claude-opus-5-5 · open: 869_
+_Last sequenced: 2026-11-11T07:18:17.313162Z · model: claude-opus-5-5 · open: 870_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
+| 1 | PAN-5071 | S | medium | ok |  |  | In pipeline: device-flow /activate page becomes one Authorize click naming bot and machine; adds migration 0003 names. |
 | 3 | PAN-5013 | S | critical | ok |  |  | Liveness, parked route and read-model map a Herdr 'done' pane to stopped; finished-turn agents look dead and may be respawned. |
 | 4 | PAN-5090 | XS | critical | ok |  |  | Herdr unit lacks OOMPolicy=continue: one OOM-killed pane child stops the service and kills every conversation; seen twice. |
 | 5 | PAN-4995 | S | high | ok |  |  | pan review request verifies a half-adopted workspace; its main merge trips adoption's head check -> false Needs-you on handoff PRs |
@@ -877,6 +878,10 @@ _Last sequenced: 2026-11-11T07:17:10.973816Z · model: claude-opus-5-5 · open: 
 
 ## Rationale detail
 
+### PAN-5071 (rank 1)
+
+New in-pipeline issue since the prior run, pinned at the top free rank. It is a self-contained account-service change (migration, device-code fields, one-click confirm page) whose sibling PAN-5069 already supplies the connector side, so no open dependency blocks it.
+
 ### PAN-5013 (rank 3)
 
 Substrate bug in the same class as PAN-4666 (rank 10): three more readers treat Herdr's done state, which means the harness is alive and waiting, as no live agent. Derived issue state feeds pickup and respawn, so a wrong answer here can launch duplicate agents. Small, well-located fix, so it takes the rank-2 slot freed by the closure of PAN-4998.
@@ -1193,10 +1198,6 @@ Triage: verify whether blocking-choice-menu detection is wired to the current li
 
 New this pass. The deployment gate's queue message is unusually good — it names the holders, the queue age, and warns against forcing — and it promises a 'next verification boundary' trigger that does not exist. Every holder cleared and the deploy never fired; the live build stayed stale for 35 minutes until a manual reload. A correct-sounding instruction that cannot happen is worse than no message.
 
-### PAN-3118 (rank 82)
-
-Triage: verify "running at $0.00 with no capacity fallback" against the current liveness definition. Rank held.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1204,10 +1205,10 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-11T07:17:10.973816Z",
+  "generatedAt": "2026-11-11T07:18:17.313162Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 869,
+  "openCount": 870,
   "nodes": [
     {
       "issue": "PAN-5013",
@@ -12010,6 +12011,19 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "dependsOn": [],
       "why": "Docs only: add the five Skills-page named classes to STYLE-GUIDE.md and the pan-style-guide skill so new pages reuse them.",
       "rationale": "New issue; cosmetic design-system documentation with no pipeline impact, so it ranks at the tail.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-5071",
+      "rank": 1,
+      "size": "S",
+      "importance": "medium",
+      "score": 62,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "In pipeline: device-flow /activate page becomes one Authorize click naming bot and machine; adds migration 0003 names.",
+      "rationale": "New in-pipeline issue since the prior run, pinned at the top free rank. It is a self-contained account-service change (migration, device-code fields, one-click confirm page) whose sibling PAN-5069 already supplies the connector side, so no open dependency blocks it.",
       "gate": "auto",
       "planning": "auto"
     }
