@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5070",
   "created": "2026-11-11T07:26:39.792Z",
-  "updated": "2026-11-11T07:26:39.792Z",
+  "updated": "2026-11-11T07:37:20.463Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,26 @@
   "sessionHistory": [],
   "items": {
     "w1-connector-ttl": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5070",
-      "claimedAt": "2026-11-11T07:26:39.792Z"
+      "claimedAt": "2026-11-11T07:26:39.792Z",
+      "doneAt": "2026-11-11T07:37:20.463Z"
+    },
+    "w1-connector-ttl.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T07:37:20.463Z"
+    },
+    "w1-connector-ttl.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T07:37:20.463Z"
+    },
+    "w1-connector-ttl.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T07:37:20.463Z"
+    },
+    "w1-connector-ttl.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T07:37:20.463Z"
     }
   }
 }
