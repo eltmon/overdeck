@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5124",
   "created": "2026-11-11T07:40:41.890Z",
-  "updated": "2026-11-11T08:27:51.641Z",
+  "updated": "2026-11-11T08:27:53.394Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -196,6 +196,11 @@
     "haiku-module-constants.ac4": {
       "status": "completed",
       "doneAt": "2026-11-11T08:27:51.641Z"
+    },
+    "haiku-preset-v2": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5124",
+      "claimedAt": "2026-11-11T08:27:53.394Z"
     }
   }
 }
