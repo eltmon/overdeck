@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-11-11T07:11:54.278748Z · model: claude-opus-5-5 · open: 870_
+_Last sequenced: 2026-11-11T07:17:10.973816Z · model: claude-opus-5-5 · open: 869_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -680,7 +680,6 @@ _Last sequenced: 2026-11-11T07:11:54.278748Z · model: claude-opus-5-5 · open: 
 | 675 | PAN-1983 | L | low | ok |  |  | Remove all panopticon.db-supporting code (legacy SQLite layer + db↔db migration + seed-from-legacy) |
 | 676 | PAN-2672 | S | low | needs-refinement |  |  | Transcript half reported fixed; parent-stays-ended half moved to PAN-4485. Verify on current build, then close. |
 | 677 | PAN-1958 | M | low | ok |  |  | Source-tagged programmatic delivery into pi conversation agents (extension sendUserMessage + input.source) |
-| 678 | PAN-5071 | M | medium | ok |  |  | overdeck.ai activate link becomes one Authorize click that names the requesting bot and machine (device_grants migration). |
 | 679 | PAN-1907 | M | low | ok |  |  | Generalize ToS gate: block ALL non-Claude-Code harnesses from Anthropic-subscription models; gray out + non-selectable + validate every… |
 | 680 | PAN-1895 | M | low | ok |  |  | Spawn work agents from issue workspace slide-out |
 | 681 | PAN-1878 | M | low | ok |  |  | process: bake 'docs updated' into acceptance criteria / definition-of-done in role + planning prompts |
@@ -1205,10 +1204,10 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-11-11T07:11:54.278748Z",
+  "generatedAt": "2026-11-11T07:17:10.973816Z",
   "model": "claude-opus-5-5",
   "pass": "incremental",
-  "openCount": 870,
+  "openCount": 869,
   "nodes": [
     {
       "issue": "PAN-5013",
@@ -9605,18 +9604,6 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
       "condition": "ok",
       "dependsOn": [],
       "why": "Source-tagged programmatic delivery into pi conversation agents (extension sendUserMessage + input.source)",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-5071",
-      "rank": 678,
-      "size": "M",
-      "importance": "medium",
-      "score": 48,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "overdeck.ai activate link becomes one Authorize click that names the requesting bot and machine (device_grants migration).",
       "gate": "auto",
       "planning": "auto"
     },
