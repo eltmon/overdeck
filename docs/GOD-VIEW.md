@@ -10,13 +10,21 @@ and status grounded in dashboard state.
 ## What Confluence shows
 
 - **The river engine** places issue orbs in the `PLAN → WORK → REVIEW → TEST →
-  VERIFY → MERGE` flow. The WebGL aurora reacts to live hook energy, with a
-  canvas-only background when WebGL is unavailable. The PLAN, REVIEW, and TEST
-  column counts include only issues with a live (running or starting) agent of
-  that role — a stopped plan, review, or test agent cannot pin an issue's
-  displayed stage after a live work agent has already moved it on.
+  MERGE` flow. Each orb has its own vertical slot in its stage column, so
+  labels do not print over each other. The WebGL aurora reacts to live hook
+  energy, with a canvas-only background when WebGL is unavailable. The PLAN,
+  REVIEW, and TEST column counts include only issues with a live (running or
+  starting) agent of that role — a stopped plan, review, or test agent cannot
+  pin an issue's displayed stage after a live work agent has already moved it
+  on.
 - **Issue orbs** encode project, role, model glyph, stage, heat, and operational
-  state. Review convoys orbit one issue orb so parallel reviewers remain one
+  state. Heat (size, glow and orbit speed) is the issue's real hook-event rate
+  over the last 60 seconds. The tag under the id is `<role> · <n> ev/m`, or
+  `<role> · quiet` when there were none. The ring color follows the issue
+  prefix: PAN cyan, MIN magenta, and one fixed palette color for each other
+  prefix. The hook stream keeps at most 500 entries, so above 500 events per
+  minute a per-issue count can read low; the top-bar EV/M has the same limit.
+  Review convoys orbit one issue orb so parallel reviewers remain one
   pipeline unit rather than appearing as unrelated work.
 - **Agent micro-states** show waiting, thinking, compaction, cost pulses, stack
   warnings, and merge activity on the orb that owns the work.
@@ -31,27 +39,33 @@ and status grounded in dashboard state.
   A merged issue whose agents carry only the close-out pause
   (`awaiting close-out (verify on main)`) is not shelved: it stays `active` in
   MERGE and exits through the portal; any other pause on a merged issue still
-  shelves it. Frost accrues gradually from real idle time before an orb
-  settles into the Doldrums; governor tides move yielded work to the shelf.
+  shelves it. Frost on an active orb is computed from real idle minutes: it
+  starts at 8 and is full at 34. The data, not the canvas, moves an orb to the
+  Doldrums at 30 idle minutes. A governor tide marks a scheduler yield the
+  data already made: it rings the yielded orb and names no beneficiary.
   The Doldrums is also the parked population's home (see "The Stall Sweeper"
   below).
-- **The merge portal and wrecks** show the path into `main`, queued merge depth,
-  successful merge motion, and failed merge residue.
+- **The merge portal and red rings** show the path into `main` and the queued
+  merge depth. The portal comet plays only for an issue whose derived state is
+  `merged`; any other orb that leaves MERGE fades. A red blinking ring in a
+  stage column marks an issue whose attention is `stuck`
+  (label `stuck, unpushed work`) or `api-error` (label `API error`).
 - **The Stall Sweeper** (PAN-3490) renders the parked population and the
   sweeper's work: parked orbs settle in the Doldrums with orbit-tinted frost
-  and an orbit tag; an ice-blue lantern beam sweeps the band on every real
-  population change, glinting each orb the scan touched; a released orb thaws
-  back into the river; an operator-only release fires a slow-rising signal
-  flare. The 🧹 PARKED top-bar stat is the true census, and VEL/h shows real
+  and an orbit tag with the park age; an ice-blue lantern beam sweeps the band
+  on every real population change, glinting each frozen orb it passes; an orb
+  plays the thaw effect when its refreshed state is active again; an
+  operator-only release fires a slow-rising signal flare. The 🧹 PARKED top-bar stat is the true census, and VEL/h shows real
   stage-transition rate. An `idle-running` orb's parked row may carry a Jev
   turn-end reading — `details.turnEnd` and a "last message reads as: …"
   clause — when `jevTurnEndAssessment` is on (PAN-4371) — advisory only, it never selects or
   triggers a sweeper action. `runStallSweeperPatrol` currently has no
   scheduler caller (PAN-3917 W4), so this sweeper sentence only appears when
   the sweeper is run by hand.
-- **The Flywheel sun and sequencer** show orchestration activity. The
-  conversation constellation above the river shows the live conversation
-  count.
+- **The Flywheel sun and sequencer** are lit and animated only while the
+  Flywheel run or the sequencer agent is live; otherwise they are drawn dim
+  and still. The conversation constellation above the river shows the live
+  conversation count.
 - **The hook bus** renders the 21-entry contracts inventory in canonical order.
   Wired hooks receive event-driven LEDs and counters; unwired hooks remain dim
   dark fiber with an em dash rather than invented activity.
@@ -60,11 +74,11 @@ and status grounded in dashboard state.
   role-count box. No decorative event bands are generated.
 - **The activity feed and orbs are linked.** Hovering an issue-linked feed row
   opens its full provenance tooltip and flashes the matching orb; clicking the
-  row or orb opens `/issues/<id>` in the real issue drawer.
+  row or orb opens the in-canvas issue rail, and the rail's button opens
+  `/issues/<id>`.
 - **The enriched top bar** shows the clock, event rate and ECG, CPU, memory,
-  memory pressure (PSI), load, WIP, blocked and ready counts, merge queue, cost
-  rate, merges, tokens, stale count, oldest idle age, active count, help, and
-  fullscreen. Missing sources render `—` instead of a fabricated zero.
+  memory pressure (PSI), load, merge queue, cost rate, merges, tokens, stale
+  count, oldest idle age, active count, help, and fullscreen. Missing sources render `—` instead of a fabricated zero.
 - **Memory pressure is PSI, not swap fill.** The PSI meter (top bar and
   sidebar gauge) reads `/proc/pressure/memory` `some` avg10. It turns amber at
   `some` ≥ 5% and red at `full` ≥ 1%. Swap in/out adds amber at ≥ 64 MiB/min and
@@ -81,26 +95,30 @@ and status grounded in dashboard state.
 | Orbiting satellites | Review convoy members attached to the same issue |
 | Shelf | Paused, parked, or scheduler-yielded work that still belongs to the pipeline (operator holds included; close-out pauses on merged issues excluded) |
 | Frost / Doldrums | Increasing idle age and work that crossed the stale threshold |
-| Orbit-tinted frost | A parked issue — the frost color names its orbit (amber stuck, orange UAT, pink merge-failed, purple conflicts, ash zombie, ice idle) |
-| Mismatched frost | The `invariant-mismatch` orbit (PAN-3850): the report-only invariant checker saw the record, the review-status row, and liveness disagree — observation only, the tag names the repair door |
+| Orbit-tinted frost | A parked issue — the frost color names its orbit (slate `operator-gate`, ash `zombie-session`, ice `idle-running`) |
 | Sweeper beam | A real parked-population scan (sweep.scan) crossing the Doldrums |
-| Thaw | A stale orb whose refreshed state confirms it is active again, returning to the river |
+| Thaw | A stale orb whose refreshed state is active again; the effect decorates the orb and does not move it |
 | Signal flare | A parked orb only a human can release (sweep.escalated) |
 | Flare ring on the shelf | An issue whose agent asked the operator a decision with `pan ask` (needs you) |
-| Portal / wreck | Merge path into `main` and failed merge residue |
-| Flywheel sun / sequencer | Orchestration source and dispatch cadence |
+| Portal | Merge path into `main`; the comet plays only for a merged issue |
+| Red blinking ring | An issue that is stuck with unpushed work, or hit an API error |
+| Flywheel sun / sequencer | The Flywheel run and the sequencer agent; lit and animated only while live |
 | Hook bus LED | A real event from a wired harness hook |
 | Telemetry trace | Real wired-hook events over the latest 60 seconds |
 
 Model glyphs are compact labels inside active orbs. Their surrounding color
 still comes from the issue's role and project, so the glyph supplements the
-orb language rather than replacing it.
+orb language rather than replacing it. The letters are S sonnet, O opus,
+H haiku, F fable, G gpt, E gemini, X grok, Z glm, Q qwen, L quantum-llama,
+M muse, N minimax or mimo, I mistral and K kimi; any other model shows the
+first letter of its name.
 
 ## Interactions
 
 - Hover an orb for its issue, stage, role, project, state, model, harness, hook
   rate, frost, event count, stale age, yield reason, warning, and convoy data.
-- Click an orb or an issue-linked activity row to open the real issue drawer.
+- Click an orb or an issue-linked activity row to open the in-canvas issue
+  rail. The rail's button opens `/issues/<id>`.
 - Hover an issue-linked activity row to show the source, full message, and
   timestamp while flashing the matching orb.
 - Press `h` or `?` to toggle the field guide, `Escape` to close it, and `f` to
@@ -140,6 +158,11 @@ The contract is **cast real, motion real**:
   Hook sparks require hook events, frost requires idle time, governor tides
   require yielding, merge motion requires merge state, and trace marks require
   events in the visible window.
+- **Nothing simulated:** the canvas never writes an orb's state or stage, and
+  no displayed age or rate is stored. Ages are computed from `lastActivity` or
+  `parkedAt` when read. Per-issue rates are counted from the trailing 60
+  seconds of hook events. A 30-second local clock tick, which fetches nothing,
+  re-evaluates the 30-minute stale threshold on a quiet system.
 
 The center canvas is intentionally exempt from the normal dashboard style guide
 so the dense ambient visualization can preserve the approved Confluence visual
@@ -150,6 +173,8 @@ language. Dashboard controls and data-door rules still apply.
 - Page composition: `src/dashboard/frontend/src/components/GodView/index.tsx`
 - Shared live data: `src/dashboard/frontend/src/components/GodView/confluence/useConfluenceData.ts`
 - River and effects engine: `src/dashboard/frontend/src/components/GodView/confluence/RiverCanvas.tsx`
+- Pure derivations (ages, rates, layout, glyphs): `src/dashboard/frontend/src/components/GodView/confluence/model.ts`
+- Local clock tick: `src/dashboard/frontend/src/components/GodView/confluence/useNowTick.ts`
 - Hook rail: `src/dashboard/frontend/src/components/GodView/confluence/HookBus.tsx`
 - Telemetry strip: `src/dashboard/frontend/src/components/GodView/confluence/BottomStrip.tsx`
 - Field guide: `src/dashboard/frontend/src/components/GodView/confluence/ConfluenceHelp.tsx`

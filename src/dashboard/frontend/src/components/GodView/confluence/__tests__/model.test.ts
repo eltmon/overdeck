@@ -3,17 +3,22 @@ import {
   CLOSE_OUT_PAUSE_REASON,
   ROLE_COLORS,
   acquireRadius,
-  advanceFrostAccrual,
   aggregateTracePerSecond,
   bucketTraceRow,
   classifyOrb,
   computeLayout,
   dropRadius,
+  eventsPerMinuteByIssue,
+  failedReason,
   fmtAge,
   frostFromIdleMinutes,
+  heatFromEventRate,
+  landmarkMotion,
   modelGlyph,
+  orbIdleMinutes,
   pickOrb,
   positionOrb,
+  projectRingColor,
   pruneTraceEvents,
   shelfSlotWidth,
   toolToFamily,
@@ -80,13 +85,78 @@ describe('Confluence model', () => {
       ]);
     });
 
-    it('clusters failed orbs to the left of the portal', () => {
+    it('places a failed orb inside its stage column', () => {
       const layout = computeLayout(1680, 945);
-      const orbs = ['PAN-1', 'PAN-2', 'PAN-3'].map((id) => orb(id, 'failed'));
+      const orbs = ['PAN-1', 'PAN-2', 'PAN-3'].map((id) => orb(id, 'failed', 'REVIEW'));
 
       for (const candidate of orbs) positionOrb(candidate, orbs, layout, 1, 1);
 
-      expect(orbs.every((candidate) => candidate.tx < layout.portalX)).toBe(true);
+      for (const candidate of orbs) {
+        expect(candidate.tx).toBeGreaterThan(layout.padX + 2 * layout.colW);
+        expect(candidate.tx).toBeLessThan(layout.padX + 3 * layout.colW);
+        expect(candidate.ty).toBeGreaterThan(layout.riverTop);
+        expect(candidate.ty).toBeLessThan(layout.riverBottom);
+      }
+    });
+
+    describe('lane slots (PAN-5131 FR-8)', () => {
+      const layout = computeLayout(1680, 912);
+      const place = (orbs: PositionableOrb[]) => {
+        for (const candidate of orbs) positionOrb(candidate, orbs, layout, 1, 1);
+        return orbs.filter((candidate) => candidate.stage === 'WORK').map((candidate) => candidate.ty);
+      };
+      const gaps = (values: number[]) => {
+        const sorted = [...values].sort((a, b) => a - b);
+        return sorted.slice(1).map((value, index) => value - sorted[index]!);
+      };
+
+      it('gives three active orbs in one column three slots at least 24 px apart', () => {
+        expect(layout.riverBottom - layout.riverTop).toBe(600);
+        const ys = place([orb('PAN-3', 'active'), orb('PAN-1', 'active'), orb('PAN-2', 'active')]);
+
+        expect(new Set(ys).size).toBe(3);
+        expect(Math.min(...gaps(ys))).toBeGreaterThanOrEqual(24);
+        for (const y of ys) {
+          expect(y).toBeGreaterThan(layout.riverTop);
+          expect(y).toBeLessThan(layout.riverBottom);
+        }
+      });
+
+      it('gives a failed orb its own slot among the active orbs of its column', () => {
+        const ys = place([orb('PAN-1', 'active'), orb('PAN-2', 'failed'), orb('PAN-3', 'active')]);
+
+        expect(new Set(ys).size).toBe(3);
+        expect(Math.min(...gaps(ys))).toBeGreaterThanOrEqual(24);
+      });
+
+      it('gives 20 orbs in one column 20 distinct slots', () => {
+        const ys = place(Array.from({ length: 20 }, (_, index) => orb(`PAN-${index + 1}`, 'active')));
+
+        expect(new Set(ys).size).toBe(20);
+        expect(Math.min(...gaps(ys))).toBeGreaterThan(0);
+      });
+
+      it('keeps slots apart, in id order, on a canvas too short for a full river', () => {
+        const short = computeLayout(1280, 385);
+        expect(short.riverBottom - short.riverTop).toBeLessThan(80);
+        const orbs = [orb('PAN-3', 'active'), orb('PAN-1', 'active'), orb('PAN-2', 'active')];
+        for (const candidate of orbs) positionOrb(candidate, orbs, short, 1, 1);
+        const byId = [...orbs].sort((a, b) => a.id.localeCompare(b.id)).map((candidate) => candidate.ty);
+
+        expect(byId[1]! - byId[0]!).toBeGreaterThanOrEqual(20);
+        expect(byId[2]! - byId[1]!).toBeGreaterThanOrEqual(20);
+      });
+
+      it('keeps a column unchanged when another column gains an orb, and is stable across calls', () => {
+        const work = () => Array.from({ length: 20 }, (_, index) => orb(`PAN-${index + 1}`, 'active'));
+        const alone = place(work());
+        const withPlan = [...work(), orb('PAN-99', 'active', 'PLAN')];
+        const first = place(withPlan);
+        const second = place(withPlan);
+
+        expect(first).toEqual(alone);
+        expect(second).toEqual(first);
+      });
     });
 
     it('places a needs-you orb on the shelf row alongside shelf orbs (PAN-4383)', () => {
@@ -217,32 +287,117 @@ describe('Confluence model', () => {
     expect(toolToFamily('bash')).toBe('lifecycle');
   });
 
-  it('maps model families to their orb glyphs', () => {
-    expect(modelGlyph('claude-sonnet-5')).toBe('S');
-    expect(modelGlyph('gpt-5.6')).toBe('G');
-    expect(modelGlyph('claude-opus-5')).toBe('O');
-    expect(modelGlyph('claude-fable-5')).toBe('F');
-    expect(modelGlyph('k3')).toBe('K');
-    expect(modelGlyph('kimi-k2.5')).toBe('K');
-    expect(modelGlyph(null)).toBeNull();
-    expect(modelGlyph('')).toBeNull();
-    expect(modelGlyph('unknown-model')).toBe('?');
+  it.each([
+    ['claude-sonnet-5', 'S'],
+    ['claude-opus-5-5', 'O'],
+    ['claude-haiku-5-5', 'H'],
+    ['claude-fable-5-2', 'F'],
+    ['gpt-5.6-sol', 'G'],
+    ['o3', 'G'],
+    ['o4-mini', 'G'],
+    ['gpt-oss-120b', 'G'],
+    ['openai/gpt-oss-20b', 'G'],
+    ['gemini-3.8-flash', 'E'],
+    ['grok-4.7', 'X'],
+    ['grok/grok-4.7-build-fast', 'X'],
+    ['glm-5.3', 'Z'],
+    ['qwen3.8-max', 'Q'],
+    ['qwen/qwen3.6-plus', 'Q'],
+    ['ql-reason-70b', 'L'],
+    ['muse-wonder-1.0', 'M'],
+    ['minimax-m2.7', 'N'],
+    ['MiniMax-M3', 'N'],
+    ['mimo-v2.6-pro', 'N'],
+    ['mistral-large-4-0', 'I'],
+    ['k3', 'K'],
+    ['kimi-k2.5', 'K'],
+    ['kimi-code/k3.1-pro', 'K'],
+    ['K2.6-code-preview', 'K'],
+    ['opencode/big-pickle', 'B'],
+    ['unknown-model', 'U'],
+  ])('maps the model %s to the glyph %s', (model, glyph) => {
+    expect(modelGlyph(model)).toBe(glyph);
   });
 
-  it('accrues frost gradually and sinks only after the full-frost hold', () => {
+  it('gives no glyph when there is no model name to read', () => {
+    expect(modelGlyph(null)).toBeNull();
+    expect(modelGlyph(undefined)).toBeNull();
+    expect(modelGlyph('')).toBeNull();
+    expect(modelGlyph('--/')).toBeNull();
+  });
+
+  it('maps real idle minutes to frost', () => {
     expect(frostFromIdleMinutes(8)).toBe(0);
     expect(frostFromIdleMinutes(21)).toBe(0.5);
     expect(frostFromIdleMinutes(34)).toBe(1);
+  });
 
-    const fullyFrosted = advanceFrostAccrual(32, 5, 1);
-    expect(fullyFrosted).toEqual({
-      idleMinutes: 34,
-      frost: 1,
-      frostHoldSeconds: 6,
-      sinkToDoldrums: false,
-    });
-    expect(advanceFrostAccrual(34, 6, 0.1).sinkToDoldrums).toBe(true);
-    expect(advanceFrostAccrual(20, 3, 1).frostHoldSeconds).toBe(0);
+  it('gives each project prefix one ring color', () => {
+    const palette = ['#00e5a8', '#ff8fa3', '#b388ff', '#6d8bff', '#e07aff', '#d4b483', '#c6ff7a', '#ff9e6d'];
+
+    expect(projectRingColor('PAN-1')).toBe('#00d4ff');
+    expect(projectRingColor('MIN-1')).toBe('#ff2d7c');
+    expect(projectRingColor('AUR-7')).toBe(projectRingColor('AUR-900'));
+    expect(palette).toContain(projectRingColor('AUR-7'));
+    expect(projectRingColor('US123')).toBe(projectRingColor('US9'));
+    expect(palette).toContain(projectRingColor('US123'));
+    // Prefixes do not all land on one color.
+    expect(new Set(['AUR-1', 'KRUX-1', 'TIN-1', 'OKF-1', 'ELV-1', 'US1'].map(projectRingColor)).size).toBeGreaterThan(1);
+  });
+
+  it('names what a failed orb\'s attention means', () => {
+    expect(failedReason('api-error')).toBe('API error');
+    expect(failedReason('stuck')).toBe('stuck, unpushed work');
+  });
+
+  it('holds a landmark still and dim unless its agent is live', () => {
+    expect(landmarkMotion(false, 12.3, 1.8)).toEqual({ pulse: 0, spin: 0, alpha: 0.35 });
+    expect(landmarkMotion(false, 0, 1.1, 2)).toEqual({ pulse: 0, spin: 0, alpha: 0.35 });
+
+    const live = landmarkMotion(true, 2, 1.8);
+    expect(live.spin).toBe(2);
+    expect(live.alpha).toBe(1);
+    expect(live.pulse).toBeCloseTo(0.5 + 0.5 * Math.sin(3.6), 10);
+    expect(landmarkMotion(true, 2, 1.1, 2).pulse).toBeCloseTo(0.5 + 0.5 * Math.sin(4.2), 10);
+  });
+
+  it('counts real hook events per issue inside the trailing 60 seconds', () => {
+    const now = 1_000_000;
+    const rates = eventsPerMinuteByIssue([
+      ...Array.from({ length: 12 }, (_, index) => ({ issueId: 'PAN-1', ts: now - index * 5_000 })),
+      { issueId: 'PAN-1', ts: now - 61_000 },
+      { issueId: null, ts: now - 1_000 },
+      { issueId: 'PAN-3', ts: now - 61_000 },
+    ], now);
+
+    expect(rates.get('PAN-1')).toBe(12);
+    expect(rates.has('PAN-2')).toBe(false);
+    expect(rates.has('PAN-3')).toBe(false);
+    expect(rates.size).toBe(1);
+  });
+
+  it('maps an event rate to heat, linear from quiet to 40 events per minute', () => {
+    expect(heatFromEventRate(0)).toBe(0.12);
+    expect(heatFromEventRate(20)).toBeCloseTo(0.56, 10);
+    expect(heatFromEventRate(40)).toBe(1);
+    expect(heatFromEventRate(400)).toBe(1);
+  });
+
+  it('computes idle minutes from the timestamp the orb state selects', () => {
+    const now = Date.parse('2026-08-02T12:00:00.000Z');
+    const lastActivity = '2026-08-02T11:50:00.000Z';
+    const parkedAt = '2026-08-02T08:00:00.000Z';
+
+    expect(orbIdleMinutes({ state: 'stale', lastActivity, parkedAt }, now)).toBe(240);
+    expect(orbIdleMinutes({ state: 'stale', lastActivity, parkedAt: null }, now)).toBe(10);
+    expect(orbIdleMinutes({ state: 'stale', lastActivity, parkedAt: 'not a date' }, now)).toBe(10);
+    for (const state of ['active', 'shelf', 'needs-you', 'failed'] as const) {
+      expect(orbIdleMinutes({ state, lastActivity, parkedAt }, now)).toBe(10);
+    }
+    expect(orbIdleMinutes({ state: 'active', lastActivity: null, parkedAt }, now)).toBe(0);
+    expect(orbIdleMinutes({ state: 'active', lastActivity: 'not a date', parkedAt: null }, now)).toBe(0);
+    expect(orbIdleMinutes({ state: 'stale', lastActivity: null, parkedAt: null }, now)).toBe(0);
+    expect(orbIdleMinutes({ state: 'active', lastActivity: '2026-08-02T12:05:00.000Z', parkedAt: null }, now)).toBe(0);
   });
 
   describe('trace math', () => {

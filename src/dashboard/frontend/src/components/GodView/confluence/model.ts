@@ -26,11 +26,6 @@ export const ROLE_COLORS = {
   conversation: '#00d4ff',
 } as const;
 
-export const PROJECT_RING = {
-  overdeck: '#00d4ff',
-  myn: '#ff2d7c',
-} as const;
-
 export const HOOKS = {
   tool_read: { color: '#00d4ff', label: 'Read/Grep', tools: ['Read', 'Grep', 'Glob'] },
   tool_write: { color: '#ffb800', label: 'Edit/Write', tools: ['Edit', 'Write', 'NotebookEdit'] },
@@ -55,6 +50,16 @@ export function hashStr(value: string): number {
   return hash;
 }
 
+const RING_PALETTE = ['#00e5a8', '#ff8fa3', '#b388ff', '#6d8bff', '#e07aff', '#d4b483', '#c6ff7a', '#ff9e6d'] as const;
+
+/** Ring color for an issue's project (PAN-5131 FR-7): PAN cyan, MIN magenta, every other prefix a fixed palette color. */
+export function projectRingColor(issueId: string): string {
+  const prefix = (issueId.includes('-') ? issueId.split('-')[0]! : issueId.replace(/\d+$/, '')).toLowerCase();
+  if (prefix === 'pan') return '#00d4ff';
+  if (prefix === 'min') return '#ff2d7c';
+  return RING_PALETTE[hashStr(prefix) % RING_PALETTE.length]!;
+}
+
 export function hexA(hex: string, alpha: number): string {
   const value = Number.parseInt(hex.slice(1), 16);
   return `rgba(${(value >> 16) & 255},${(value >> 8) & 255},${value & 255},${alpha})`;
@@ -73,18 +78,6 @@ export function clamp(value: number, min: number, max: number): number {
 
 export function fmtTokens(tokens: number): string {
   return tokens >= 1e6 ? `${(tokens / 1e6).toFixed(1)}M` : `${Math.round(tokens / 1e3)}k`;
-}
-
-export function pickWeighted<T>(items: readonly T[], weight: (item: T) => number): T | undefined {
-  let total = 0;
-  for (const item of items) total += weight(item);
-
-  let remaining = Math.random() * total;
-  for (const item of items) {
-    remaining -= weight(item);
-    if (remaining <= 0) return item;
-  }
-  return items[items.length - 1];
 }
 
 export interface LayoutRect {
@@ -299,13 +292,6 @@ export function positionOrb<T extends PositionableOrb>(
     return orb;
   }
 
-  if (orb.state === 'failed') {
-    orb.tx = layout.portalX - 52 - (hashStr(orb.id) % 3) * 34;
-    orb.ty = layout.riverTop + 50
-      + (hashStr(orb.id) % Math.max(40, layout.riverBottom - layout.riverTop - 120));
-    return orb;
-  }
-
   if (orb.state === 'shelf' || orb.state === 'needs-you') {
     const index = Math.max(0, orbs.filter((candidate) => candidate.state === 'shelf' || candidate.state === 'needs-you').indexOf(orb));
     const { startX, endX } = shelfSpreadRange(layout);
@@ -317,11 +303,13 @@ export function positionOrb<T extends PositionableOrb>(
   const column = stageIdx(orb.stage);
   const jitter = ((hashStr(orb.id) % 100) / 100 - 0.5) * layout.colW * 0.45;
   orb.tx = layout.padX + (column + 0.5) * layout.colW + jitter;
-  const laneCount = orbs.filter(
-    (candidate) => candidate !== orb && candidate.stage === orb.stage && candidate.state === 'active',
-  ).length;
+  const lane = orbs
+    .filter((candidate) => candidate.stage === orb.stage && (candidate.state === 'active' || candidate.state === 'failed'))
+    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  const slot = Math.max(0, lane.indexOf(orb));
+  // The 60 px floor keeps slots apart on a short canvas, where the river is under 80 px tall.
   orb.ty = layout.riverTop + 40
-    + ((hashStr(orb.id) + laneCount * 53) % Math.max(60, layout.riverBottom - layout.riverTop - 80));
+    + ((slot + 0.5) / Math.max(1, lane.length)) * Math.max(60, layout.riverBottom - layout.riverTop - 80);
   return orb;
 }
 
@@ -404,47 +392,74 @@ export function toolToFamily(toolName: string): HookFamilyKey {
   return 'lifecycle';
 }
 
+/** One letter per model family (PAN-5131 FR-7). An unlisted family shows the first letter of its model name. */
 export function modelGlyph(model: string | null | undefined): string | null {
   if (!model) return null;
   const normalized = String(model).toLowerCase();
   if (normalized.includes('sonnet')) return 'S';
-  if (normalized.includes('gpt')) return 'G';
   if (normalized.includes('opus')) return 'O';
+  if (normalized.includes('haiku')) return 'H';
   if (normalized.includes('fable')) return 'F';
+  if (normalized.includes('gpt') || /(^|\/)o\d/.test(normalized)) return 'G';
+  if (normalized.includes('gemini')) return 'E';
+  if (normalized.includes('grok')) return 'X';
+  if (normalized.includes('glm')) return 'Z';
+  if (normalized.includes('qwen')) return 'Q';
+  if (/(^|\/)ql-/.test(normalized)) return 'L';
+  if (normalized.includes('muse')) return 'M';
+  if (normalized.includes('minimax') || normalized.includes('mimo')) return 'N';
+  if (normalized.includes('mistral')) return 'I';
   if (normalized.includes('k3') || normalized.includes('kimi')) return 'K';
-  return '?';
+  return normalized.slice(normalized.lastIndexOf('/') + 1).match(/[a-z0-9]/)?.[0]?.toUpperCase() ?? null;
 }
 
-export const FROST_IDLE_RATE = 2;
 export const FROST_START_MINUTES = 8;
 export const FROST_SPAN_MINUTES = 26;
-export const FROST_SINK_HOLD_SECONDS = 6;
 
 export function frostFromIdleMinutes(idleMinutes: number): number {
   return clamp((idleMinutes - FROST_START_MINUTES) / FROST_SPAN_MINUTES, 0, 1);
 }
 
-export interface FrostAccrual {
-  idleMinutes: number;
-  frost: number;
-  frostHoldSeconds: number;
-  sinkToDoldrums: boolean;
+/** What a failed orb's attention means, in operator words (PAN-5131 FR-7). */
+export function failedReason(attention: IssueAttention | null | undefined): string {
+  return attention === 'api-error' ? 'API error' : 'stuck, unpushed work';
 }
 
-export function advanceFrostAccrual(
-  idleMinutes: number,
-  frostHoldSeconds: number,
-  elapsedSeconds: number,
-): FrostAccrual {
-  const nextIdleMinutes = idleMinutes + elapsedSeconds * FROST_IDLE_RATE;
-  const frost = frostFromIdleMinutes(nextIdleMinutes);
-  const nextFrostHoldSeconds = frost >= 1 ? frostHoldSeconds + elapsedSeconds : 0;
-  return {
-    idleMinutes: nextIdleMinutes,
-    frost,
-    frostHoldSeconds: nextFrostHoldSeconds,
-    sinkToDoldrums: nextFrostHoldSeconds > FROST_SINK_HOLD_SECONDS,
-  };
+/** A landmark (sun, sequencer) pulses and spins only while its agent is live (PAN-5131 FR-6). */
+export function landmarkMotion(live: boolean, simT: number, pulseRate: number, phase = 0): { pulse: number; spin: number; alpha: number } {
+  return live
+    ? { pulse: 0.5 + 0.5 * Math.sin(simT * pulseRate + phase), spin: simT, alpha: 1 }
+    : { pulse: 0, spin: 0, alpha: 0.35 };
+}
+
+/** Real hook events per issue inside the trailing 60 s window (PAN-5131 FR-1). */
+export function eventsPerMinuteByIssue(
+  entries: readonly { issueId: string | null; ts: number }[],
+  now: number,
+): Map<string, number> {
+  const counts = new Map<string, number>();
+  const cutoff = now - 60_000;
+  for (const entry of entries) {
+    if (!entry.issueId || entry.ts < cutoff) continue;
+    counts.set(entry.issueId, (counts.get(entry.issueId) ?? 0) + 1);
+  }
+  return counts;
+}
+
+/** 0.12 (quiet) to 1 (40 or more events per minute), linear (PAN-5131 FR-2). */
+export function heatFromEventRate(eventsPerMin: number): number {
+  return 0.12 + 0.88 * clamp(eventsPerMin / 40, 0, 1);
+}
+
+/** Minutes since the orb last did anything, computed at call time (PAN-5131 FR-3).
+ * A stale orb with a parked row counts from parkedAt; every other orb from lastActivity. 0 when unknown. */
+export function orbIdleMinutes(
+  orb: { lastActivity: string | null; parkedAt: string | null; state: OrbState },
+  now: number,
+): number {
+  const parked = orb.state === 'stale' && orb.parkedAt ? Date.parse(orb.parkedAt) : Number.NaN;
+  const stamp = Number.isFinite(parked) ? parked : orb.lastActivity ? Date.parse(orb.lastActivity) : Number.NaN;
+  return Number.isFinite(stamp) ? Math.max(0, (now - stamp) / 60_000) : 0;
 }
 
 export const TRACE_WINDOW_MS = 60_000;

@@ -11,10 +11,11 @@ hooks are firing, what agents are waiting on, and where work has become stale.
 
 ## Read the river
 
-The center river runs from `PLAN` through `WORK`, `REVIEW`, `TEST`, `VERIFY`,
-and `MERGE`. Each orb is one issue. Its lane shows the current stage, its color
+The center river runs from `PLAN` through `WORK`, `REVIEW`, `TEST` and
+`MERGE`. Each orb is one issue. Its lane shows the current stage, its color
 shows the primary role, its inner glyph identifies the model family, and its
-motion and glow reflect real activity.
+motion and glow reflect real activity. The tag under an orb shows that issue's
+hook events in the last 60 seconds.
 
 | Visual | Meaning |
 | --- | --- |
@@ -22,8 +23,8 @@ motion and glow reflect real activity.
 | Shelf | Paused or scheduler-yielded work |
 | Frost and Doldrums | Increasing idle time and stale work |
 | Bright portal | The merge path into `main` |
-| Pink wreck | A failed merge that still needs attention |
-| Flywheel sun and sequencer | Orchestration and dispatch activity |
+| Red blinking ring | An issue that is stuck with unpushed work, or hit an API error |
+| Flywheel sun and sequencer | Lit and animated only while the Flywheel or the sequencer is running |
 | Conversation constellation | Live conversations connected to the system |
 
 The canvas uses a reactive WebGL aurora when available and falls back to the
@@ -41,7 +42,7 @@ channel in the same order and color as the bus. Closely timed events stack into
 brighter ticks, while the aggregate band shows current and peak events per
 second. The box beside it shows the live agent-role mix.
 
-The top bar combines event rate, event ECG, host health, queue and work counts,
+The top bar combines event rate, event ECG, host health, merge queue,
 cost, merges, tokens, stale work, and active agents. A `—` means the source is
 unavailable; it does not mean zero.
 
@@ -50,11 +51,12 @@ unavailable; it does not mean zero.
 - **Hover an orb** to see issue, stage, role, project, state, model, harness,
   hook rate, frost, event count, stale age, yield reason, warnings, and convoy
   members.
-- **Click an orb** to open that issue in the real issue drawer.
+- **Click an orb** to open the issue rail on the canvas. The rail's button
+  opens the issue page.
 - **Hover an issue-linked activity row** to see its source, full message, and
   timestamp while the matching orb flashes.
-- **Click an issue-linked activity row** to open the same issue drawer. Rows
-  without an issue do nothing.
+- **Click an issue-linked activity row** to open the same issue rail on the
+  canvas. Rows without an issue do nothing.
 
 ## Keyboard controls
 
@@ -79,4 +81,5 @@ sources and never create fake events.
 The honesty rule is simple: **the cast is real and the motion is real**. Missing
 data stays missing, hook marks require hook events, frost requires idle time,
 yield motion requires a scheduler state, and merge motion requires a merge
-transition.
+transition. No displayed age or rate is stored: ages are computed from
+timestamps and rates from the last 60 seconds of events.

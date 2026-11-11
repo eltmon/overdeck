@@ -121,7 +121,6 @@ export function GodViewTopBar({ data, onHelpToggle, onFullscreenToggle }: TopBar
   const system = meta.system;
   const pressure = readMemoryPressure(system);
   const load = system?.summary.loadAverage1m ?? null;
-  const beads = meta.beads;
 
   return (
     <div className="confluence-topbar gv-glass">
@@ -140,7 +139,7 @@ export function GodViewTopBar({ data, onHelpToggle, onFullscreenToggle }: TopBar
         label="VEL"
         value={meta.velocity ? `${meta.velocity.transitionsPerHour}/h` : '—'}
         title={meta.velocity
-          ? `real stage transitions in the last hour — plan ${meta.velocity.byStage['plan'] ?? 0} · work ${meta.velocity.byStage['work'] ?? 0} · review ${meta.velocity.byStage['review'] ?? 0} · test ${meta.velocity.byStage['test'] ?? 0} · verify ${meta.velocity.byStage['verify'] ?? 0} · merge ${meta.velocity.byStage['merge'] ?? 0}`
+          ? `real stage transitions in the last hour — plan ${meta.velocity.byStage['plan'] ?? 0} · work ${meta.velocity.byStage['work'] ?? 0} · review ${meta.velocity.byStage['review'] ?? 0} · merge ${meta.velocity.byStage['merge'] ?? 0}`
           : 'velocity unavailable'}
       />
       <span className="confluence-meters">
@@ -149,9 +148,6 @@ export function GodViewTopBar({ data, onHelpToggle, onFullscreenToggle }: TopBar
         <PressureMeter reading={pressure} />
       </span>
       <Stat label="LOAD" value={load == null ? '—' : load.toFixed(2)} />
-      <Stat label="WIP" value={beads?.wip ?? '—'} />
-      <Stat label="BLOCKED" value={beads?.blocked ?? '—'} />
-      <Stat label="READY" value={beads?.ready ?? '—'} />
       <Stat label="MERGE Q" value={meta.mergeQ} />
       <Stat label="$/MIN" value={meta.costPerMin == null ? '—' : `$${meta.costPerMin.toFixed(2)}`} />
       <Stat label="MERGES" value={meta.mergesToday} />

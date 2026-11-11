@@ -38,7 +38,6 @@ const data = {
     title: 'God View Confluence',
     state: 'active',
     labels: [],
-    staleMin: 0,
     yieldReason: null,
     warn: null,
     broken: false,
@@ -141,5 +140,31 @@ describe('Confluence issue rail state label (PAN-4383)', () => {
     );
 
     expect(screen.getByText('needs you ⚑')).toBeInTheDocument();
+  });
+
+  function failedRail(attention: ConfluenceOrb['attention']) {
+    return render(
+      <IssueRail
+        orb={{ ...data.orbs[0], state: 'failed', attention } as ConfluenceOrb}
+        agents={[]}
+        entries={[]}
+        onClose={vi.fn()}
+        onOpenIssue={vi.fn()}
+      />,
+    );
+  }
+
+  it('says a stuck failed orb is stuck with unpushed work, in the chip and the banner', () => {
+    failedRail('stuck');
+
+    expect(screen.getByText('stuck, unpushed work ✗')).toBeInTheDocument();
+    expect(screen.getByText('✗ stuck, unpushed work — needs an operator')).toBeInTheDocument();
+  });
+
+  it('says an api-error failed orb has an API error, in the chip and the banner', () => {
+    failedRail('api-error');
+
+    expect(screen.getByText('API error ✗')).toBeInTheDocument();
+    expect(screen.getByText('✗ API error — needs an operator')).toBeInTheDocument();
   });
 });

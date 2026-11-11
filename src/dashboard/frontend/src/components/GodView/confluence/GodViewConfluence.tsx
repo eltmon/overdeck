@@ -10,6 +10,7 @@ import { OrbTooltip } from './OrbTooltip';
 import { RiverCanvas, type RiverCanvasHandle } from './RiverCanvas';
 import { useConfluenceChoreography, useSweepChoreography } from './useConfluenceChoreography';
 import { isClaimedLiveStatus, withObservedLiveness } from './liveness';
+import { STAGES } from './model';
 import type { ConfluenceData, ConfluenceOrb } from './useConfluenceData';
 import './confluence.css';
 
@@ -142,6 +143,8 @@ export function GodViewConfluence({
             conversations={meta.conversations}
             mergeQueue={meta.mergeQ}
             parkedTotal={meta.parkedTotal}
+            flywheelLive={meta.flywheelLive === true}
+            sequencerLive={(meta.roleCounts.sequencer ?? 0) > 0}
             onHover={(orb, point) => setHover(orb && point ? { orb, ...point } : null)}
             onSelect={(orb) => setRailId(orb ? orb.id : null)}
           />
@@ -165,7 +168,7 @@ export function GodViewConfluence({
             />
           )}
 
-          <div className="confluence-tag">PIPELINE FLOW · <b>PLAN → WORK → REVIEW → TEST → VERIFY → MERGE</b> · frost = stale · shelf = paused / yielded</div>
+          <div className="confluence-tag">PIPELINE FLOW · <b>{STAGES.join(' → ')}</b> · frost = stale · shelf = paused / yielded</div>
           <div className="confluence-hint"><b>h / ?</b> field guide · <b>hover</b> orb · <b>click</b> issue drawer · <b>f</b> fullscreen</div>
         </section>
 

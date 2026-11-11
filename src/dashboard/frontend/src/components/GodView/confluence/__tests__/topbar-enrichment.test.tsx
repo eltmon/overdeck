@@ -9,7 +9,6 @@ function data(overrides: {
   eventsPerSec?: number;
   eventsPerMin?: number;
   system?: Record<string, unknown> | null;
-  beads?: { wip: number; blocked: number; ready: number } | null;
   costPerMin?: number | null;
   tokensToday?: number | null;
 } = {}): ConfluenceData {
@@ -48,11 +47,11 @@ function data(overrides: {
       conversations: 2,
       staleTotal: 5,
       oldestIdle: 47,
-      beads: overrides.beads === undefined ? { wip: 6, blocked: 2, ready: 8 } : overrides.beads,
       system,
       active: 7,
       total: 12,
       roleCounts: {},
+      velocity: { transitionsPerHour: 12, byStage: { plan: 1, work: 5, review: 4, merge: 2 } },
     },
   } as unknown as ConfluenceData;
 }
@@ -94,12 +93,19 @@ describe('God View enriched top bar', () => {
     expect(screen.getByText(/^\d{2}:34:56$/)).toBeInTheDocument();
     expect([...container.querySelectorAll('.confluence-stat em')].map((node) => node.textContent))
       .toEqual([
-        'EV/S', 'EV/M', 'VEL', 'LOAD', 'WIP', 'BLOCKED', 'READY', 'MERGE Q', '$/MIN',
+        'EV/S', 'EV/M', 'VEL', 'LOAD', 'MERGE Q', '$/MIN',
         'MERGES', 'TOKENS', '❄ STALE', '🧹 PARKED', 'OLDEST',
       ]);
-    for (const value of ['1.5', '90', '2.50', '6', '2', '8', '3', '$1.25', '4', '38.5M', '5', '47m', '7 active']) {
+    for (const value of ['1.5', '90', '12/h', '2.50', '3', '$1.25', '4', '38.5M', '5', '47m', '7 active']) {
       expect(screen.getByText(value)).toBeInTheDocument();
     }
+    const velocity = [...container.querySelectorAll('.confluence-stat')]
+      .find((node) => node.querySelector('em')?.textContent === 'VEL');
+    expect(velocity).toHaveAttribute(
+      'title',
+      'real stage transitions in the last hour — plan 1 · work 5 · review 4 · merge 2',
+    );
+    expect(velocity?.getAttribute('title')).not.toMatch(/test|verify/);
     expect(container.querySelector('[data-label="CPU"]')).toHaveTextContent('CPU 24%');
     expect(container.querySelector('[data-label="MEM"]')).toHaveTextContent('MEM 61%');
     expect(container.querySelector('[data-label="SWAP"]')).toBeNull();
@@ -114,10 +120,10 @@ describe('God View enriched top bar', () => {
     expect(onFullscreen).toHaveBeenCalledOnce();
   });
 
-  it('renders unavailable beads and cost slices as dashes without throwing', () => {
+  it('renders unavailable cost slices as dashes without throwing', () => {
     const { container } = render(
       <GodViewTopBar
-        data={data({ system: null, beads: null, costPerMin: null, tokensToday: null })}
+        data={data({ system: null, costPerMin: null, tokensToday: null })}
         onHelpToggle={vi.fn()}
         onFullscreenToggle={vi.fn()}
       />,
@@ -125,7 +131,7 @@ describe('God View enriched top bar', () => {
     for (const label of ['CPU', 'MEM', 'PSI']) {
       expect(container.querySelector(`[data-label="${label}"]`)).toHaveTextContent(`${label} —`);
     }
-    for (const label of ['LOAD', 'WIP', 'BLOCKED', 'READY', '$/MIN', 'TOKENS']) {
+    for (const label of ['LOAD', '$/MIN', 'TOKENS']) {
       const stat = [...container.querySelectorAll('.confluence-stat')]
         .find((node) => node.querySelector('em')?.textContent === label);
       expect(stat).toHaveTextContent(`${label}—`);
