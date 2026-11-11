@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5072",
   "created": "2026-11-11T10:00:36.495Z",
-  "updated": "2026-11-11T10:13:29.364Z",
+  "updated": "2026-11-11T10:17:04.347Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -94,9 +94,22 @@
       "doneAt": "2026-11-11T10:13:21.892Z"
     },
     "w5-grokbot-readme": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5072",
-      "claimedAt": "2026-11-11T10:13:29.363Z"
+      "claimedAt": "2026-11-11T10:13:29.363Z",
+      "doneAt": "2026-11-11T10:17:04.347Z"
+    },
+    "w5-grokbot-readme.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T10:17:04.347Z"
+    },
+    "w5-grokbot-readme.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T10:17:04.347Z"
+    },
+    "w5-grokbot-readme.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T10:17:04.347Z"
     }
   }
 }
