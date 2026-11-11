@@ -130,7 +130,15 @@ interface AddOptions {
   type?: 'standalone' | 'monorepo';
   linearTeam?: string;
   rallyProject?: string;
+  /** Issue tracker override (PAN-5152): only `jira`; the others are detected from the remote. */
+  tracker?: string;
+  jiraSite?: string;
   dryRun?: boolean;
+}
+
+/** The Jira line `pan project list/show` prints for a `tracker: jira` project. */
+function jiraSummary(config: ProjectConfig): string {
+  return `Jira: ${getIssuePrefix(config) ?? '(no issue_prefix)'} @ ${config.jira?.site ?? 'global site'}`;
 }
 
 export async function projectAddCommand(
@@ -138,6 +146,11 @@ export async function projectAddCommand(
   options: AddOptions = {}
 ): Promise<void> {
   const fullPath = resolve(projectPath);
+
+  if (options.tracker !== undefined && options.tracker !== 'jira') {
+    console.log(chalk.red('Only --tracker jira is supported; other trackers are detected from the remote.'));
+    return exitCli(1);
+  }
 
   if (!existsSync(fullPath)) {
     console.log(chalk.red(`Path does not exist: ${fullPath}`));
@@ -229,12 +242,14 @@ export async function projectAddCommand(
     throw err;
   }
 
-  // Apply CLI-only extras (linearTeam, rallyProject) to the already-written entry.
-  if (linearTeam || options.rallyProject) {
+  // Apply CLI-only extras (linearTeam, rallyProject, Jira) to the already-written entry.
+  if (linearTeam || options.rallyProject || options.tracker || options.jiraSite) {
     const { registerProject } = await import('../../lib/projects.js');
     const updated: ProjectConfig = { ...regResult.config };
     if (linearTeam) updated.issue_prefix = linearTeam.toUpperCase();
     if (options.rallyProject) updated.rally_project = options.rallyProject;
+    if (options.tracker === 'jira') updated.tracker = 'jira';
+    if (options.jiraSite) updated.jira = { ...updated.jira, site: options.jiraSite };
     registerProject(regResult.key, updated);
     regResult = { ...regResult, config: updated };
   }
@@ -254,6 +269,9 @@ export async function projectAddCommand(
   }
   if (options.rallyProject) {
     console.log(chalk.dim(`  Rally project: ${options.rallyProject}`));
+  }
+  if (regResult.config.tracker === 'jira') {
+    console.log(chalk.dim(`  ${jiraSummary(regResult.config)}`));
   }
   console.log('');
 
@@ -497,7 +515,9 @@ export async function projectListCommand(options: ListOptions = {}): Promise<voi
 
     console.log(`${statusIcon} ${chalk.bold(config.name)} ${chalk.dim(`(${key})`)}`);
     console.log(`  ${chalk.dim(config.path)}`);
-    if (getIssuePrefix(config)) {
+    if (config.tracker === 'jira') {
+      console.log(`  ${chalk.cyan(jiraSummary(config))}`);
+    } else if (getIssuePrefix(config)) {
       console.log(`  ${chalk.cyan(`Linear: ${getIssuePrefix(config)}`)}`);
     }
     if (config.rally_project) {
@@ -599,7 +619,9 @@ export async function projectShowCommand(keyOrName: string): Promise<void> {
   console.log(chalk.bold(`\nProject: ${foundKey}\n`));
   console.log(`  Name:   ${found.name}`);
   console.log(`  Path:   ${pathStatus} ${found.path}`);
-  if (getIssuePrefix(found)) {
+  if (found.tracker === 'jira') {
+    console.log(`  ${jiraSummary(found)}`);
+  } else if (getIssuePrefix(found)) {
     console.log(`  Team:   ${getIssuePrefix(found)}`);
   }
   if (found.rally_project) {
@@ -654,6 +676,8 @@ export function registerProjectCommands(command: Command): void {
     .option('--type <type>', 'Project type (standalone/monorepo)', 'standalone')
     .option('--linear-team <team>', 'Linear team prefix (e.g., MIN, PAN)')
     .option('--rally-project <oid>', 'Rally project OID (e.g., /project/822404704163)')
+    .option('--tracker <type>', 'Issue tracker for this project (jira; others are detected)')
+    .option('--jira-site <url>', 'Jira site URL, e.g. https://acme.atlassian.net')
     .option('--dry-run', 'Validate without creating (resolve-before-create pattern)')
     .action(projectAddCommand);
 
