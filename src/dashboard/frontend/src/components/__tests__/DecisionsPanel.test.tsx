@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactElement } from 'react';
@@ -8,10 +8,24 @@ import * as useDecisionsModule from '../../lib/useDecisions';
 import { useAskUserQuestionUiStore } from '../../lib/askUserQuestionUiStore';
 import { useDashboardStore } from '../../lib/store';
 import { isAwaitingInput } from '../../lib/pendingInput';
+import { DialogProvider } from '../DialogProvider';
+
+vi.mock('../../lib/wsTransport', () => ({
+  dashboardMutationJsonHeaders: vi.fn(async () => ({ 'Content-Type': 'application/json', 'x-overdeck-csrf-token': 'test' })),
+}));
 
 function renderWithQuery(ui: ReactElement) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+}
+
+function renderWithQueryAndDialogs(ui: ReactElement) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+  return render(
+    <QueryClientProvider client={client}>
+      <DialogProvider>{ui}</DialogProvider>
+    </QueryClientProvider>,
+  );
 }
 
 const agentDecision = {
@@ -394,5 +408,92 @@ describe('DecisionsCount', () => {
     vi.spyOn(useDecisionsModule, 'useDecisions').mockReturnValue([]);
     renderWithQuery(<DecisionsCount />);
     expect(screen.queryByTestId('decisions-count')).toBeNull();
+  });
+});
+
+describe('DecisionsPanel connector notice (PAN-5070 W-11)', () => {
+  const notice = {
+    id: 'notice-1',
+    connectorId: 'conn-1',
+    name: 'Grok Bot',
+    scopes: ['read:state', 'read:conversations', 'tell'],
+    pairedAt: '2026-11-10T00:00:00.000Z',
+  };
+  const connectorNoticeDecision = {
+    id: 'connector-notice:notice-1',
+    source: 'agent' as const,
+    label: 'Grok Bot connected',
+    kinds: ['connectorConnected'],
+    since: notice.pairedAt,
+    blocking: false,
+    connectorNotice: notice,
+  };
+
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  function jsonResponse(status: number, body: unknown): Response {
+    return { status, ok: status >= 200 && status < 300, json: () => Promise.resolve(body) } as Response;
+  }
+
+  function mockConnectorRoutes() {
+    fetchMock = vi.fn((input: string | URL | Request, init?: RequestInit) => {
+      const url = input.toString();
+      if (url === '/api/connectors/requests/notice-1/dismiss' && init?.method === 'POST') return Promise.resolve(jsonResponse(200, { ok: true }));
+      if (url === '/api/connectors/conn-1' && init?.method === 'DELETE') return Promise.resolve(jsonResponse(200, { ok: true }));
+      return Promise.resolve(jsonResponse(404, { error: 'not found' }));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('connectorNoticeDecisions returns a non-blocking row with kind connectorConnected', () => {
+    const decisions = useDecisionsModule.connectorNoticeDecisions([notice]);
+    expect(decisions).toEqual([{
+      id: 'connector-notice:notice-1',
+      source: 'agent',
+      label: 'Grok Bot connected',
+      kinds: ['connectorConnected'],
+      since: notice.pairedAt,
+      blocking: false,
+      connectorNotice: notice,
+    }]);
+  });
+
+  it('renders the card in the System group with "Grok Bot connected with Read + Tell"', () => {
+    mockConnectorRoutes();
+    vi.spyOn(useDecisionsModule, 'useDecisions').mockReturnValue([connectorNoticeDecision]);
+    renderWithQueryAndDialogs(<DecisionsPanel />);
+
+    expect(screen.getByTestId('connector-notice-card')).toBeTruthy();
+    const systemGroup = screen.getByText('System').closest('section');
+    expect(systemGroup?.textContent).toContain('Grok Bot connected with Read + Tell');
+    expect(screen.queryByText('Waiting')).toBeNull();
+  });
+
+  it('Dismiss POSTs /api/connectors/requests/notice-1/dismiss', async () => {
+    mockConnectorRoutes();
+    vi.spyOn(useDecisionsModule, 'useDecisions').mockReturnValue([connectorNoticeDecision]);
+    renderWithQueryAndDialogs(<DecisionsPanel />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+
+    expect(fetchMock.mock.calls.some(([input, init]) =>
+      input.toString() === '/api/connectors/requests/notice-1/dismiss' && (init as RequestInit | undefined)?.method === 'POST')).toBe(true);
+  });
+
+  it('Revoke, after confirming, sends DELETE /api/connectors/conn-1', async () => {
+    mockConnectorRoutes();
+    vi.spyOn(useDecisionsModule, 'useDecisions').mockReturnValue([connectorNoticeDecision]);
+    renderWithQueryAndDialogs(<DecisionsPanel />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Revoke' }));
+    const dialog = await screen.findByRole('alertdialog');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Remove' }));
+
+    expect(fetchMock.mock.calls.some(([input, init]) =>
+      input.toString() === '/api/connectors/conn-1' && (init as RequestInit | undefined)?.method === 'DELETE')).toBe(true);
   });
 });

@@ -1,11 +1,16 @@
+import { readFileSync, readdirSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { DEVICE_GRANT_TTL_MS, DEVICE_CONNECTED_MESSAGE, INVALID_CODE_MESSAGE, REQUEST_REJECTED_MESSAGE, TOO_MANY_WRONG_CODES_MESSAGE } from '../../../../services/account/src/device-flow.ts';
+import { DEVICE_GRANT_TTL_MS, DEVICE_CONNECTED_MESSAGE, DEVICE_NAME_MAX, deviceName, INVALID_CODE_MESSAGE, REQUEST_REJECTED_MESSAGE, TOO_MANY_WRONG_CODES_MESSAGE } from '../../../../services/account/src/device-flow.ts';
 import { verifyDeviceToken } from '../../../../services/account/src/devices.ts';
 import type { Env } from '../../../../services/account/src/env.ts';
 import type { GitHubIdentity } from '../../../../services/account/src/github.ts';
 import { addGrant, getPendingAttempt } from '../../../../services/account/src/grants.ts';
 import { githubMock } from './helpers/github-mock.ts';
 import { call, dbOf, form, makeDeps, makeEnv, makeRc, TEST_BASE_URL, TEST_OWNER_GITHUB_ID, type TestDeps } from './helpers/harness.ts';
+
+const ACCOUNT_SRC_DIR = join(dirname(fileURLToPath(import.meta.url)), '../../../../services/account/src');
 
 const ENV_ID = '11111111-2222-4333-8444-555555555555';
 const OWNER: GitHubIdentity = { githubId: TEST_OWNER_GITHUB_ID, login: 'owner' };
@@ -46,6 +51,18 @@ async function approveInBrowser(env: Env, deps: TestDeps, userCode: string) {
   const submit = await call('POST', '/activate', { env, deps, ip: BROWSER_IP, ...withOrigin(form({ user_code: userCode })) });
   expect(submit.status).toBe(200);
   const confirm = await call('POST', '/activate/confirm', { env, deps, ip: BROWSER_IP, ...withOrigin(form({ user_code: userCode })) });
+  expect(confirm.status).toBe(302);
+  expect(confirm.headers.get('Location')).toContain('https://github.com/login/oauth/authorize');
+  const state = /__Host-od_state=([0-9a-f]{64});/.exec(confirm.headers.get('Set-Cookie') ?? '')?.[1] ?? '';
+  return call('GET', `/auth/github/callback?code=gh&state=${state}`, { env, deps, ip: BROWSER_IP, headers: { Cookie: `__Host-od_state=${state}` } });
+}
+
+/** Follows the activate link itself (GET), never POST /activate, through the confirm step and the GitHub callback. */
+async function approveViaLink(env: Env, deps: TestDeps, userCode: string) {
+  const normalized = userCode.replace('-', '');
+  const page = await call('GET', `/activate?user_code=${normalized}`, { env, deps, ip: BROWSER_IP });
+  expect(page.status).toBe(200);
+  const confirm = await call('POST', '/activate/confirm', { env, deps, ip: BROWSER_IP, ...withOrigin(form({ user_code: normalized })) });
   expect(confirm.status).toBe(302);
   expect(confirm.headers.get('Location')).toContain('https://github.com/login/oauth/authorize');
   const state = /__Host-od_state=([0-9a-f]{64});/.exec(confirm.headers.get('Set-Cookie') ?? '')?.[1] ?? '';
@@ -95,9 +112,14 @@ describe('device flow (PAN-4293 account-device-flow, RFC 8628)', () => {
     const code = await issue(env, deps, 'win32-arm64');
     expect(await (await poll(env, deps, code.device_code)).json()).toEqual({ error: 'authorization_pending' });
 
-    const page = await call('GET', `/activate?user_code=${code.user_code.replace('-', '').toLowerCase()}`, { env, deps });
+    const normalized = code.user_code.replace('-', '');
+    const page = await call('GET', `/activate?user_code=${normalized.toLowerCase()}`, { env, deps });
     expect(page.status).toBe(200);
-    expect(await page.text()).toContain(`value="${code.user_code}"`);
+    const pageBody = await page.text();
+    expect(pageBody).toContain('>Authorize</button>');
+    expect(pageBody).toContain(`value="${normalized}"`);
+    expect(pageBody).toContain('action="/activate/confirm"');
+    expect(pageBody).not.toContain('autocomplete="off"');
 
     const submit = await call('POST', '/activate', { env, deps, ip: BROWSER_IP, ...withOrigin(form({ user_code: code.user_code })) });
     expect(await submit.text()).toContain('Connect a <strong>Windows device</strong>');
@@ -228,5 +250,168 @@ describe('device flow (PAN-4293 account-device-flow, RFC 8628)', () => {
     const failed = a.status === 400 ? a : b;
     expect(await failed.json()).toEqual({ error: 'invalid_grant' });
     expect(await dbOf(env).prepare('SELECT COUNT(*) AS n FROM devices').first<number>('n')).toBe(1);
+  });
+
+  describe('device grant names (PAN-5071)', () => {
+    it('cleans and stores client_name and target_name', async () => {
+      const { env, deps } = setup();
+      const res = await call('POST', '/oauth/device/code', { env, deps, ip: CLI_IP, ...form({ platform: 'linux-x64', environment_id: ENV_ID, client_name: '  grok-bot  ', target_name: 'eltmon-desktop' }) });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as CodeResponse;
+      expect(Object.keys(body).sort()).toEqual(['device_code', 'expires_in', 'interval', 'user_code', 'verification_uri', 'verification_uri_complete'].sort());
+      const row = await dbOf(env).prepare('SELECT client_name, target_name FROM device_grants').first<{ client_name: string | null; target_name: string | null }>();
+      expect(row).toEqual({ client_name: 'grok-bot', target_name: 'eltmon-desktop' });
+    });
+
+    it('cuts a client_name over 64 characters to the first 64', async () => {
+      const { env, deps } = setup();
+      const long = 'a'.repeat(70);
+      await call('POST', '/oauth/device/code', { env, deps, ip: CLI_IP, ...form({ platform: 'linux-x64', environment_id: ENV_ID, client_name: long, target_name: '' }) });
+      const row = await dbOf(env).prepare('SELECT client_name, target_name FROM device_grants').first<{ client_name: string | null; target_name: string | null }>();
+      expect(row).toEqual({ client_name: 'a'.repeat(64), target_name: null });
+    });
+
+    it('stores null for a whitespace-only client_name and an absent target_name', async () => {
+      const { env, deps } = setup();
+      await call('POST', '/oauth/device/code', { env, deps, ip: CLI_IP, ...form({ platform: 'linux-x64', environment_id: ENV_ID, client_name: '   ' }) });
+      const row = await dbOf(env).prepare('SELECT client_name, target_name FROM device_grants').first<{ client_name: string | null; target_name: string | null }>();
+      expect(row).toEqual({ client_name: null, target_name: null });
+    });
+
+    it('strips bidi controls and newlines from client_name', async () => {
+      const { env, deps } = setup();
+      await call('POST', '/oauth/device/code', { env, deps, ip: CLI_IP, ...form({ platform: 'linux-x64', environment_id: ENV_ID, client_name: 'grok‮bot\n' }) });
+      const row = await dbOf(env).prepare('SELECT client_name FROM device_grants').first<{ client_name: string | null }>();
+      expect(row).toEqual({ client_name: 'grokbot' });
+    });
+
+    it('deviceName(): null/undefined → null; over-length input is cut to DEVICE_NAME_MAX code points', () => {
+      expect(deviceName(null)).toBeNull();
+      expect(deviceName(undefined)).toBeNull();
+      const emoji = '\u{1F600}'.repeat(65);
+      const cut = deviceName(emoji);
+      expect(cut).not.toBeNull();
+      expect(Array.from(cut ?? '').length).toBe(DEVICE_NAME_MAX);
+    });
+  });
+
+  describe('confirm step names and Authorize button (PAN-5071)', () => {
+    async function issueNamed(env: Env, deps: TestDeps, platform: string, names: Record<string, string>): Promise<CodeResponse> {
+      const res = await call('POST', '/oauth/device/code', { env, deps, ip: CLI_IP, ...form({ platform, environment_id: ENV_ID, ...names }) });
+      expect(res.status).toBe(200);
+      return (await res.json()) as CodeResponse;
+    }
+
+    it('both names present: the lead sentence names bot and machine, the claims notice shows, and the button is Authorize', async () => {
+      const { env, deps } = setup();
+      const code = await issueNamed(env, deps, 'linux-x64', { client_name: 'grok-bot', target_name: 'eltmon-desktop' });
+      const res = await call('POST', '/activate', { env, deps, ip: BROWSER_IP, ...withOrigin(form({ user_code: code.user_code })) });
+      const body = await res.text();
+      expect(body).toContain('<strong>grok-bot</strong> (Linux device) wants to connect to your Overdeck account to reach <strong>eltmon-desktop</strong>.');
+      expect(body).toContain('These names come from the device that asked for this code. Overdeck does not verify them.');
+      expect(body).toContain('>Authorize</button>');
+    });
+
+    it('client-only and target-only grants render their FR-27 sentence; a no-name grant renders today\'s sentence without the claims notice', async () => {
+      const { env, deps } = setup();
+
+      const clientOnly = await issueNamed(env, deps, 'linux-x64', { client_name: 'grok-bot' });
+      const clientBody = await (await call('POST', '/activate', { env, deps, ip: BROWSER_IP, ...withOrigin(form({ user_code: clientOnly.user_code })) })).text();
+      expect(clientBody).toContain('<strong>grok-bot</strong> (Linux device) wants to connect to your Overdeck account.');
+
+      const targetOnly = await issueNamed(env, deps, 'linux-x64', { target_name: 'eltmon-desktop' });
+      const targetBody = await (await call('POST', '/activate', { env, deps, ip: BROWSER_IP, ...withOrigin(form({ user_code: targetOnly.user_code })) })).text();
+      expect(targetBody).toContain('This <strong>Linux device</strong> wants to connect to your Overdeck account to reach <strong>eltmon-desktop</strong>.');
+
+      const noName = await issue(env, deps, 'win32-arm64');
+      const noNameBody = await (await call('POST', '/activate', { env, deps, ip: BROWSER_IP, ...withOrigin(form({ user_code: noName.user_code })) })).text();
+      expect(noNameBody).toContain('Connect a <strong>Windows device</strong>');
+      expect(noNameBody).not.toContain('These names come from the device that asked for this code. Overdeck does not verify them.');
+    });
+
+    it('escapes a script-tag client_name and a quote in target_name', async () => {
+      const { env, deps } = setup();
+      const code = await issueNamed(env, deps, 'linux-x64', { client_name: '<script>alert(1)</script>', target_name: 'a"b' });
+      const body = await (await call('POST', '/activate', { env, deps, ip: BROWSER_IP, ...withOrigin(form({ user_code: code.user_code })) })).text();
+      expect(body).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
+      expect(body).toContain('a&quot;b');
+      expect(body).not.toContain('<script>');
+    });
+
+    it('"Continue with GitHub" no longer appears anywhere in services/account/src', () => {
+      const files = readdirSync(join(ACCOUNT_SRC_DIR), { recursive: true }) as string[];
+      for (const file of files) {
+        if (!file.endsWith('.ts')) continue;
+        expect(readFileSync(join(ACCOUNT_SRC_DIR, file), 'utf8'), file).not.toContain('Continue with GitHub');
+      }
+    });
+  });
+
+  describe('GET /activate renders the confirm step (PAN-5071 W-3)', () => {
+    it('GET with no user_code, or user_code=%20, renders the typed form and writes no rate_limits row', async () => {
+      const { env, deps } = setup();
+      for (const path of ['/activate', '/activate?user_code=%20']) {
+        const res = await call('GET', path, { env, deps });
+        expect(res.status, path).toBe(200);
+        expect(await res.text()).toContain('Enter the code shown in your terminal.');
+      }
+      expect(await dbOf(env).prepare("SELECT COUNT(*) AS n FROM rate_limits WHERE bucket = 'activate-fail'").first<number>('n')).toBe(0);
+    });
+
+    it('GET with a wrong code is 400 and counts against activate-fail; an expired grant is also 400', async () => {
+      const { env, deps } = setup();
+      const wrong = await call('GET', '/activate?user_code=BBBB-BBBB', { env, deps, ip: BROWSER_IP });
+      expect(wrong.status).toBe(400);
+      expect(await wrong.text()).toContain(INVALID_CODE_MESSAGE);
+      expect(await dbOf(env).prepare("SELECT COUNT(*) AS n FROM rate_limits WHERE bucket = 'activate-fail'").first<number>('n')).toBe(1);
+
+      const expiring = await issue(env, deps);
+      deps.clock.advance(DEVICE_GRANT_TTL_MS);
+      const expired = await call('GET', `/activate?user_code=${expiring.user_code}`, { env, deps, ip: '198.51.100.60' });
+      expect(expired.status).toBe(400);
+      expect(await expired.text()).toContain(INVALID_CODE_MESSAGE);
+    });
+
+    it('GETs and POSTs share one activate-fail window; the 11th wrong attempt of either kind is 429', async () => {
+      const { env, deps } = setup();
+      const wrongGet = () => call('GET', '/activate?user_code=BBBB-BBBB', { env, deps, ip: BROWSER_IP });
+      const wrongPost = () => call('POST', '/activate', { env, deps, ip: BROWSER_IP, ...withOrigin(form({ user_code: 'BBBB-BBBB' })) });
+      for (let i = 0; i < 5; i++) expect((await wrongGet()).status, `get ${i + 1}`).toBe(400);
+      for (let i = 0; i < 5; i++) expect((await wrongPost()).status, `post ${i + 1}`).toBe(400);
+      const eleventh = await wrongGet();
+      expect(eleventh.status).toBe(429);
+      expect(eleventh.headers.get('Retry-After')).toBeTruthy();
+
+      const real = await issue(env, deps);
+      const stillLimited = await call('GET', `/activate?user_code=${real.user_code}`, { env, deps, ip: BROWSER_IP });
+      expect(stillLimited.status).toBe(429);
+      const otherIp = await call('GET', `/activate?user_code=${real.user_code}`, { env, deps, ip: '198.51.100.61' });
+      expect(otherIp.status).toBe(200);
+      expect(await otherIp.text()).toContain('>Authorize</button>');
+    });
+
+    it('a GET with a valid code leaves the grant row unchanged and the next poll still authorization_pending', async () => {
+      const { env, deps } = setup();
+      const code = await issue(env, deps);
+      const before = await dbOf(env).prepare('SELECT * FROM device_grants').first<Record<string, unknown>>();
+      const page = await call('GET', `/activate?user_code=${code.user_code}`, { env, deps, ip: BROWSER_IP });
+      expect(page.status).toBe(200);
+      const after = await dbOf(env).prepare('SELECT * FROM device_grants').first<Record<string, unknown>>();
+      expect(after).toEqual(before);
+      expect(await (await poll(env, deps, code.device_code)).json()).toEqual({ error: 'authorization_pending' });
+    });
+
+    it('following the activate link end to end (GET → confirm → GitHub callback) yields a token with no POST /activate', async () => {
+      const { env, deps, rc } = setup();
+      const code = await issue(env, deps);
+      const done = await approveViaLink(env, deps, code.user_code);
+      expect(done.status).toBe(200);
+      expect(await done.text()).toContain(DEVICE_CONNECTED_MESSAGE);
+      deps.clock.advance(5_000);
+      const tokenRes = await poll(env, deps, code.device_code);
+      expect(tokenRes.status).toBe(200);
+      const body = (await tokenRes.json()) as { access_token: string };
+      expect(await verifyDeviceToken(rc, body.access_token)).toMatchObject({ ok: true });
+    });
   });
 });

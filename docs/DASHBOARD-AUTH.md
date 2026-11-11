@@ -227,9 +227,9 @@ does not list needs `admin` (D-6):
 | --- | --- |
 | `read:events` | `GET /events/stream`, `GET /events/version`, RPC `pan.replayEvents` (PAN-4835) |
 | `read:state` | `GET /api/issues`, `GET /api/agents`, `GET /api/agent-directory`, `GET /api/flywheel/status`, `GET /api/pipeline/membership`, `GET /api/registered-projects` (PAN-5045), `GET /api/versions/self`, `GET /api/activity` (PAN-4835), `GET /api/pull-requests`, `GET /api/pull-requests/conversations` (PAN-4943 W-PR1), RPC `pan.getSnapshot` (PAN-4835), `GET /api/lanes`, `GET /api/lanes/:name`, `GET /api/self/workers`, `GET /api/self/workers/:id`, `GET /api/self/workers/:id/wait`, `POST /api/self/lanes/wait` (PAN-4938) |
-| `read:conversations` | `GET /api/conversations`, `GET /api/conversations/:id`, `GET /api/conversations/:name/messages`, `GET /api/conversations/:name/about`, `GET /api/palette/search`, `GET /api/conversations/pending-input` (explicit row, PAN-4835), `GET /api/needs-you` (PAN-4944), `GET /api/conversations/:name/pull-requests` (PAN-4943 W-PR1) |
+| `read:conversations` | `GET /api/conversations`, `GET /api/conversations/:id`, `GET /api/conversations/:name/messages`, `GET /api/conversations/:name/about`, `GET /api/palette/search`, `GET /api/conversations/pending-input` (explicit row, PAN-4835), `GET /api/needs-you` (PAN-4944), `GET /api/conversations/:name/pull-requests` (PAN-4943 W-PR1), `GET /api/backend-restart-recovery` (PAN-5091) |
 | `tell` | `POST /api/agents/:id/message`, `POST /api/agents/:id/tell`, `POST /api/conversations/:name/message`, `POST /api/conversations/:name/delete-image` (the undo of `upload-image`, PAN-4835), `PUT /api/phones/self/push-key`, `PUT /api/phones/self/notification-preferences` (PAN-5019), `DELETE /api/phones/self` (PAN-4835), `POST /api/conversations/:name/pull-requests`, `DELETE /api/conversations/:name/pull-requests`, `POST /api/conversations/:name/pull-requests/sync` (PAN-4943 W-PR1), `POST /api/self/lanes/report` (PAN-4938) |
-| `operate` | WebSocket `/ws/terminal` (`WS_TERMINAL_SCOPE`), `POST /api/conversations`, `POST /api/workers`, `POST /api/versions/self/update`, `DELETE /api/versions/self/update`, `POST /api/self/workers`, `POST /api/self/lanes` (PAN-4938) |
+| `operate` | WebSocket `/ws/terminal` (`WS_TERMINAL_SCOPE`), `POST /api/conversations`, `POST /api/workers`, `POST /api/versions/self/update`, `DELETE /api/versions/self/update`, `POST /api/self/workers`, `POST /api/self/lanes` (PAN-4938), `POST /api/backend-restart-recovery/resume-all`, `POST /api/backend-restart-recovery/dismiss` (PAN-5091) |
 | `approve` | `POST /api/conversations/:id/permission`, `POST /api/conversations/:id/pane-choice`, `POST /api/conversations/:id/pi-ask-answer`, `POST /api/conversations/:id/codex-approval`, `POST /api/conversations/:name/plan-action`, `POST /api/agents/:id/answer-question`, `POST /api/agents/:id/plan-action`, `POST /api/agents/:id/permissions/:requestId/respond` |
 | `admin` | everything else, including `/ws/rpc`, `/ws/voice`, `/ws/autopreso` |
 
@@ -647,7 +647,8 @@ so neither can mint more devices (D-11). It returns an `odp_<64 hex>` credential
 (`src/dashboard/server/pairing-credentials.ts`) that:
 
 - is held only in the dashboard's memory, as a SHA-256 hash;
-- is single use and expires 10 minutes after issue;
+- is single use and expires 10 minutes after issue (30 minutes for a
+  connector code);
 - is lost on a dashboard restart;
 - travels only in the URL fragment: `<base>/#pair=<credential>`.
 
@@ -847,30 +848,51 @@ secure channel.
   connector credential joins the skip list in
   `rejectUnsafeDashboardMutationRequest`, like a phone's.
 - **`POST /api/connectors/pairing`** (root only: the internal token or the root
-  session; an `admin` device or token gets 403) takes `{ name, scopes? }`.
-  `name` is 1-64 characters; missing `scopes` means `BOT_DEFAULT_SCOPES`;
-  present `scopes` must be distinct values from `CONNECTOR_SCOPE_CHOICES`.
-  `read:state` is always added, so every connector can call
-  `DELETE /api/connectors/self`. The route issues an ordinary `odp_` pairing
-  code, stores the intent `{ name, scopes, expiresAt }` by the code's pairingId
-  for 10 minutes, and returns `{ pairingString, expiresAt }` with
+  session; an `admin` device or token gets 403) takes
+  `{ name, scopes?, platform? }`. `name` is 1-64 characters; missing `scopes`
+  means `BOT_DEFAULT_SCOPES`; present `scopes` must be distinct values from
+  `CONNECTOR_SCOPE_CHOICES`. `read:state` is always added, so every connector
+  can call `DELETE /api/connectors/self`. `platform` is one of
+  `CONNECT_PLATFORMS` (`grok-bot, grok-build, hermes, openclaw, other`; 400
+  naming the list otherwise) and defaults to `other`. The route issues an
+  ordinary `odp_` pairing code with a 30-minute TTL (`CONNECTOR_PAIRING_TTL_MS`,
+  longer than a plain `odp_` code's 10 minutes), opens a `ConnectorRequest`
+  (`connector-pairing.ts`) keyed by both a `randomUUID()` request id and the
+  code's pairingId, and returns `{ requestId, pairingString, expiresAt }` with
   `Cache-Control: no-store`.
 - **`POST /api/connectors/exchange`** is reachable only through a pairing-mode
   channel (`PAIRING_CHANNEL_ALLOWLIST`; 401 everywhere else). It takes the
-  intent of the channel's pairingId first, so any outcome burns it, and answers
-  403 `not-a-connector-code` when there is none. It then parses
-  `{ v: 1, clientId, label }` (400 on error), answers 409 `link-key-in-use` for
-  a key already bound to an active record, mints the connector record with the
-  intent's name and scopes, revokes an older active connector with the same
-  `clientId`, and returns `{ v: 1, token, tokenId, scopes, descriptor }` with
-  `Cache-Control: no-store`.
+  request of the channel's pairingId first (stamping it taken, never deleting
+  it), so any outcome burns the code, and answers 403 `not-a-connector-code`
+  when there is none. It then parses `{ v: 1, clientId, label }` (400 on
+  error), answers 409 `link-key-in-use` for a key already bound to an active
+  record, mints the connector record with the request's name and scopes,
+  marks the request paired (`markConnectorRequestPaired`, so it leaves the
+  waiting list and gains a "connected" notice), revokes an older active
+  connector with the same `clientId`, and returns
+  `{ v: 1, token, tokenId, scopes, descriptor }` with `Cache-Control: no-store`.
 - **`GET /api/connectors`** (root only) lists active connectors as
   `{ id, name, scopes, clientId, createdAt, lastUsedAt }`, with no key
-  material or hash. **`DELETE /api/connectors/:id`** (root only) revokes one
-  (404 for an unknown id). **`DELETE /api/connectors/self`** is the
-  connector's own logout: the scope table admits it with `read:state`, and the
-  handler requires a `connector` credential. The `:id` route hands `self` to
-  the same handler.
+  material or hash, plus `requests`: every pending `ConnectorRequest` as
+  `{ id, name, platform, scopes, createdAt, expiresAt, state, pairingString? }`
+  (`state` is `live`, `expired` or `used`; `pairingString` only when `live`).
+  **`DELETE /api/connectors/:id`** (root only) revokes one (404 for an unknown
+  id). **`DELETE /api/connectors/self`** is the connector's own logout: the
+  scope table admits it with `read:state`, and the handler requires a
+  `connector` credential. The `:id` route hands `self` to the same handler.
+- **`DELETE /api/connectors/requests/:id`** (root only) cancels a pending
+  request, revoking its code (`cancelConnectorRequest`) and removing the row;
+  404 `no pending connector request with id <id>` for an unknown or
+  already-paired id — never the `:id` route's `no connector with id` text, so
+  the two 404s are never confused.
+- **`GET /api/connectors/notices`** (root only) lists paired, undismissed
+  requests whose connector is still active as
+  `{ id, connectorId, name, scopes, pairedAt }`, never a pairing string.
+  **`POST /api/connectors/requests/:id/dismiss`** (root only) clears one; 404
+  `no connector notice with id <id>` for an unknown or unpaired id. Both
+  routes read `connector-pairing.ts`'s in-memory request store directly; a
+  request (pending or paired) is pruned 24 hours after its code expired or it
+  paired, whichever applies.
 - **Cross-refusal.** A code issued for a connector must never pair anything
   else, because the browser exchange would make it an `admin` device.
   `POST /api/pairing/exchange` refuses it with 403 `connector-code` before

@@ -21,6 +21,7 @@ import { archiveConversationByName, type ConversationArchiveDependencies } from 
 import { conversationHarnessAlive } from '../overdeck/conversation-liveness.js';
 import { stopConversationRuntime } from '../overdeck/conversation-runtime.js';
 import { getConversationByName, markConversationEnded, type LegacyConversation } from '../overdeck/conversations.js';
+import { recordConversationStop } from '../overdeck/conversation-stop-marks.js';
 import { resolveLaneConfig, type LaneConfig } from './config.js';
 
 const execFileAsync = promisify(execFile);
@@ -99,6 +100,7 @@ export async function reapLane(name: string, options: LaneReapOptions, deps: Lan
   const git = deps.git ?? runGit;
   const isAlive = deps.isAlive ?? ((tmuxSession: string) => conversationHarnessAlive(tmuxSession));
   const stop = deps.stop ?? (async (conv: LegacyConversation) => {
+    recordConversationStop(conv.name); // PAN-5091: a reaped lane is never offered for restart recovery
     await stopConversationRuntime(conv, conv.name);
     markConversationEnded(conv.name);
   });

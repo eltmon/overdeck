@@ -49,6 +49,9 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/github-quota',                         kind: 'http', disposition: 'READ',       door: 'refreshGitHubQuotaSnapshot (PAN-4264); the same snapshot as the read model githubQuota' },
   { surface: 'GET /api/disk-alert',                           kind: 'http', disposition: 'READ',       door: 'getDiskAlertSnapshot (PAN-5093): disk alert level, free bytes and space holders' },
   { surface: 'GET /api/harness-auto-update',                  kind: 'http', disposition: 'READ',       door: 'getHarnessAutoUpdateSnapshot (PAN-5108): background harness CLI updater state and failures' },
+  { surface: 'GET /api/backend-restart-recovery',              kind: 'http', disposition: 'READ',       door: 'getBackendRestartRecoverySnapshot (PAN-5091): conversations a terminal-backend restart left stopped, and the Resume all run' },
+  { surface: 'POST /api/backend-restart-recovery/resume-all',   kind: 'http', disposition: 'WRITE',      door: 'startBackendRestartResumeAll (PAN-5091): handleConversationResume one at a time, waiting under memory pressure' },
+  { surface: 'POST /api/backend-restart-recovery/dismiss',      kind: 'http', disposition: 'WRITE',      door: 'dismissBackendRestartRecovery (PAN-5091): drop the in-memory offer' },
   { surface: 'GET /api/telemetry/client-config',              kind: 'http', disposition: 'READ',       door: 'telemetryClientConfig (PAN-5100): the machine telemetry setting for the phone app' },
 
   // ── admin.ts ──────────────────────────────────────────────────────────────
@@ -477,8 +480,11 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'PUT /api/phones/self/push-key',               kind: 'http', disposition: 'WRITE',       door: 'access-tokens.setPhonePushKey (own phone token) (PAN-4835)' },
   { surface: 'PUT /api/phones/self/notification-preferences', kind: 'http', disposition: 'WRITE',     door: 'push/phone-preferences-store.setPhoneNotificationPreferences (own phone clientId) (PAN-5019)' },
   { surface: 'POST /api/connectors/pairing',               kind: 'http', disposition: 'WRITE',       door: 'connector-pairing.issueConnectorPairing (PAN-4927 W-CONN1, root only)' },
-  { surface: 'GET /api/connectors',                         kind: 'http', disposition: 'READ',        door: 'access-tokens.listAccessTokens (kind connector) (PAN-4927)' },
+  { surface: 'GET /api/connectors',                         kind: 'http', disposition: 'READ',        door: 'access-tokens.listAccessTokens (kind connector) + connector-pairing.listConnectorRequests (PAN-4927, PAN-5070)' },
   { surface: 'DELETE /api/connectors/:id',                  kind: 'http', disposition: 'WRITE',       door: 'access-tokens.revokeAccessToken (connector) (PAN-4927)' },
+  { surface: 'DELETE /api/connectors/requests/:id',         kind: 'http', disposition: 'WRITE',       door: 'connector-pairing.cancelConnectorRequest (PAN-5070, root only)' },
+  { surface: 'GET /api/connectors/notices',                 kind: 'http', disposition: 'READ',        door: 'connector-pairing.listConnectorNotices + access-tokens.listActiveRecordsOfKind (PAN-5070, root only)' },
+  { surface: 'POST /api/connectors/requests/:id/dismiss',   kind: 'http', disposition: 'WRITE',       door: 'connector-pairing.dismissConnectorNotice (PAN-5070, root only)' },
   { surface: 'DELETE /api/connectors/self',                 kind: 'http', disposition: 'WRITE',       door: 'access-tokens.revokeAccessToken (own connector token) (PAN-4927)' },
   { surface: 'GET /api/connectors/self',                    kind: 'http', disposition: 'READ',        door: 'access-tokens.listAccessTokens (own connector record) (PAN-5069)' },
   { surface: 'POST /api/connectors/exchange',              kind: 'http', disposition: 'WRITE',       door: 'access-tokens.createAccessToken (connector) (PAN-4927, pairing channel only)' },

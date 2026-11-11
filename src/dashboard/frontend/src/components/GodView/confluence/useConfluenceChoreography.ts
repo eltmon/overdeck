@@ -8,20 +8,16 @@ import type { ConfluenceOrb, HookStreamEntry } from './useConfluenceData';
 export const HOOK_HEAT_BUMP = 0.06;
 export const HOOK_RATE_BUMP = 0.13;
 export const TOOL_TICKER_CHANCE = 0.13;
-export const FEED_TICKER_CHANCE = 0.16;
 
 export type ChoreographyCommand =
   | { type: 'sparks'; issueId: string; color: string; agentId?: string; heatBump: number; specRateBump: number }
   | { type: 'ring'; issueId: string; color: string }
   | { type: 'ticker'; text: string; color: string }
   | { type: 'gate'; stage: Stage }
-  | { type: 'merge'; issueId: string }
-  | { type: 'tide'; targetId: string; beneficiaryId?: string }
+  | { type: 'tide'; targetId: string }
   | { type: 'thaw'; issueId: string }
   | { type: 'sweep-tide' }
-  | { type: 'flare'; issueId: string }
-  | { type: 'sun' }
-  | { type: 'spawn'; issueId: string };
+  | { type: 'flare'; issueId: string };
 
 /**
  * Sweep observation → visual command mapping (PAN-3490). Pure and fixture-tested.
@@ -55,18 +51,6 @@ interface ChoreographyFrame {
   random?: () => number;
 }
 
-function governorNamedBeneficiary(orb: ConfluenceOrb, current: ReadonlyMap<string, ConfluenceOrb>): string | undefined {
-  const named = orb.yieldReason?.match(/\b[A-Z][A-Z0-9]+-\d+\b/)?.[0];
-  if (!named || named === orb.id || !current.has(named)) return undefined;
-  return named;
-}
-
-function latestReviewOrb(current: ReadonlyMap<string, ConfluenceOrb>): ConfluenceOrb | undefined {
-  return [...current.values()]
-    .filter((orb) => orb.stage === 'REVIEW' && orb.state === 'active')
-    .sort((first, second) => Date.parse(second.lastActivity ?? '') - Date.parse(first.lastActivity ?? ''))[0];
-}
-
 function familyColor(family: HookFamilyKey): string {
   return HOOKS[family].color;
 }
@@ -78,7 +62,6 @@ export function planConfluenceChoreography({
   random = Math.random,
 }: ChoreographyFrame): ChoreographyCommand[] {
   const commands: ChoreographyCommand[] = [];
-  const reviewBeneficiary = latestReviewOrb(current)?.id;
 
   for (const event of hookEvents) {
     if (!event.issueId) continue;
@@ -103,19 +86,11 @@ export function planConfluenceChoreography({
     if (random() < TOOL_TICKER_CHANCE) {
       commands.push({ type: 'ticker', text: `${orb.id} · ${event.tool}`, color });
     }
-    if (random() < FEED_TICKER_CHANCE) {
-      commands.push({ type: 'ticker', text: `${event.hookName} · ${orb.id}`, color });
-    }
   }
 
   for (const orb of current.values()) {
     const before = previous.get(orb.id);
-    if (!before) {
-      if (orb.role === 'plan') {
-        commands.push({ type: 'sun' }, { type: 'spawn', issueId: orb.id });
-      }
-      continue;
-    }
+    if (!before) continue;
 
     if (orb.stage !== before.stage) {
       const color = STAGE_COLORS[orb.stage];
@@ -127,18 +102,15 @@ export function planConfluenceChoreography({
     }
 
     // The honest thaw: the enrichment-confirmed snapshot says the agent is
-    // alive again (state flipped stale → anything else). One beat never
-    // reaches this — it takes sustained, poller-confirmed activity.
-    if (before.state === 'stale' && orb.state !== 'stale') {
+    // alive again (state flipped stale → active). A stale orb that moves to
+    // the shelf or to failed did not come back to life, so it plays no thaw.
+    // One beat never reaches this — it takes sustained, poller-confirmed activity.
+    if (before.state === 'stale' && orb.state === 'active') {
       commands.push({ type: 'thaw', issueId: orb.id });
     }
 
-    const yielded = orb.state === 'shelf' && (
-      orb.yieldedByScheduler || orb.yieldReason?.toLowerCase().startsWith('yield:') === true
-    );
-    if (before.state !== 'shelf' && yielded) {
-      const beneficiaryId = governorNamedBeneficiary(orb, current) ?? reviewBeneficiary;
-      commands.push({ type: 'tide', targetId: orb.id, ...(beneficiaryId ? { beneficiaryId } : {}) });
+    if (before.state !== 'shelf' && orb.state === 'shelf' && orb.yieldedByScheduler) {
+      commands.push({ type: 'tide', targetId: orb.id });
     } else if (before.state === 'shelf' && orb.state !== 'shelf') {
       commands.push(
         { type: 'ring', issueId: orb.id, color: STAGE_COLORS.WORK },
@@ -165,11 +137,8 @@ export function runConfluenceCommands(commands: readonly ChoreographyCommand[], 
       case 'gate':
         effects.gateFlash(command.stage);
         break;
-      case 'merge':
-        effects.playMerge(command.issueId);
-        break;
       case 'tide':
-        effects.playTide(command.targetId, command.beneficiaryId);
+        effects.playTide(command.targetId);
         break;
       case 'sweep-tide':
         effects.playSweep();
@@ -179,12 +148,6 @@ export function runConfluenceCommands(commands: readonly ChoreographyCommand[], 
         break;
       case 'thaw':
         effects.playThaw(command.issueId);
-        break;
-      case 'sun':
-        effects.pulseSun();
-        break;
-      case 'spawn':
-        effects.spawnFromSun(command.issueId);
         break;
     }
   }

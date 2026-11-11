@@ -1,0 +1,1220 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-11T07:32:09Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5124: Built-in defaults: mid workhorse to Opus 5.5; cheap workhorse and background calls to Haiku 5.5",
+    "updated": "2026-11-11T07:40:33.869Z"
+  },
+  "plan": {
+    "id": "pan-5124",
+    "title": "Built-in defaults: mid workhorse to Opus 5.5; cheap workhorse and background calls to Haiku 5.5",
+    "status": "running",
+    "uid": "33580333-f809-4996-a8a8-7c44283f2317",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-11T07:32:09Z",
+    "updated": "2026-11-11T07:40:33.869Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5124",
+        "label": "PAN-5124",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5124.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "models",
+      "defaults",
+      "config",
+      "background-ai",
+      "claude-code"
+    ],
+    "metadata": {
+      "sizeJustification": "One operator decision (issue body) about built-in default model values, which are mirrored across config defaults, module constants, the Anthropic preset, four Settings fallbacks, two test trees and five docs. Most edits are one-line value changes; the issue mandates a single PR whose checkpoint fallback ships FR-1 alone, and the subsystem count is inflated because the lint counts each top-level doc file as its own subsystem.",
+      "canonicalFilename": "2026-11-11-PAN-5124-built-in-defaults-mid-workhorse-to-opus-5-5-cheap-workhorse-and-background-calls-to-haiku-5-5.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "The built-in mid workhorse is Sonnet 5.5 although the 2026-09-29 eval found Opus 5.5 caught 3x the review blockers, and the cheap workhorse and background calls run Haiku 4.5 at 10x Haiku 5.5's price. Moving background calls to Haiku 5.5 also exposes three gaps: Haiku 5.5 thinks by default (titles pay for it; memory extraction can run out of max_tokens), background calls never run the Claude Code 2.1.293 minimum-version check, and compaction sizes chunks for the wrong model when no model is passed.",
+      "Proposal": "Flip DEFAULT_WORKHORSES.mid to claude-opus-5-5 unconditionally. Add a low-effort pin (gated on the model's own effortLevels row) to title-family claude -p calls and Anthropic memory extraction, run prepareHarnessLaunch before both background claude spawns, list title/compaction models as Claude Code requirement sources, and resolve an empty compaction model to DEFAULT_SUMMARY_MODEL for chunk sizing. Then run the issue's 20+20 real-model checkpoint; on GO flip every cheap and background default (config, module constants, Anthropic preset v2, Settings fallbacks) to claude-haiku-5-5; on FALLBACK cancel those items. Update CONFIGURATION.md, MODEL_ROUTING.md, MODEL-CALLS.md, model-presets.mdx, harnesses.mdx and changelog.mdx to match.",
+      "NonGoals": "- Changing the claude-haiku-4-5 entries in src/lib/model-fallback.ts (cross-provider fallback targets and the L1 enrichment quick-model path).\n- Changing tiered-execution crew or supervisor defaults (CrewRow.tsx DEFAULT_CREW_MODEL, TieredExecutionSection.tsx DEFAULT_MODEL and its \"new crews start on Haiku 4.5\" text).\n- Removing Haiku 4.5 from providers.ts, settings.ts, model-capability-additions.ts, cost.ts or any picker; it stays selectable.\n- Changing the expensive, flywheel, default-conversation, status-review, fork-summary, handoff-author or provider-fallback defaults.\n- Pinning effort on smart compaction, fork summaries or handoff authoring.\n- Setting an effort on the Anthropic trivial tier band, or adding a config key for background effort.\n- Changing memory extraction max_tokens.\n- Rewriting any operator config file; installs that set these keys keep their values.\n- Changing the OpenAI preset.\n- Catching ClaudeCodeTooOldError to retry a background call on another model."
+    },
+    "autoDecisions": [
+      {
+        "summary": "FR-4: keep the existing claude-haiku-5-5 chunk row at 240,000 chars and fix the empty-model gap instead of resizing for the full 1M window (PRD D1).",
+        "rationale": "The row was added 2026-10-08 to stay under the 100K-token price tier; a 1M-token chunk would bill every token at 5x. The real defect is getChunkBudgetChars(undefined) sizing for a different model than runModelSummary runs."
+      },
+      {
+        "summary": "FR-3 \"classifier calls\": docs.classifier has no runtime caller, so only its default value moves; the effort pin covers the title family (title, refinement, About) and Anthropic memory extraction/query expansion (PRD D3).",
+        "rationale": "grep finds no reader of docs.classifier.* outside config/presets. Haiku 5.5 thinking counts toward memory extraction's 2048 max_tokens and query expansion has a 750 ms budget, so leaving it unpinned would regress the new default."
+      },
+      {
+        "summary": "Gate the low-effort pin on getModelEffortLevels(model)?.includes(\"low\"), not supportedEffortLevels (PRD D2).",
+        "rationale": "supportedEffortLevels treats a model without a row as supporting all levels; Haiku 4.5 has no effortLevels and the Messages API rejects effort for it, so operators who keep 4.5 must see unchanged requests."
+      },
+      {
+        "summary": "Background claude spawns call prepareHarnessLaunch(\"claude-code\", { model }) and spawn the resolved binaryPath; ClaudeCodeTooOldError propagates to existing failure handling and may trigger the PAN-5108 auto-update (PRD D5-D7).",
+        "rationale": "Reuses the one existing refusal path with its exact message, checks the binary actually spawned, and keeps auto-update under the single machine-wide switch. Heuristic-summary fallback is not another model, so FR-5 is met."
+      },
+      {
+        "summary": "listConfiguredModels also lists conversations.title_model and conversations.compaction_model (PRD D8).",
+        "rationale": "The dashboard banner and pan doctor then warn about an old Claude Code before the first background call fails; memory extraction uses the SDK and is excluded."
+      },
+      {
+        "summary": "Bump the Anthropic preset to version 2, date 2026-11-11; cost-saver inherits it (PRD D9).",
+        "rationale": "The preset values change, and version exists so installs that applied v1 see updateAvailable."
+      },
+      {
+        "summary": "Keep no effort on the Anthropic trivial tier band; change only the stale comment (PRD D10).",
+        "rationale": "presets.test.ts requires trivial effort undefined and any preset effort to be high; Haiku 5.5 then runs at its own default."
+      },
+      {
+        "summary": "Update RolesPanel, the four Settings select fallbacks, both memory placeholders and FALLBACK_COMPACTION_MODEL; leave tiered-execution crew defaults (PRD D11).",
+        "rationale": "The former mirror the defaults this issue changes; the crew defaults are a separate setting the issue does not list."
+      },
+      {
+        "summary": "The 20+20 checkpoint is its own item that gates every Haiku default flip and the docs; FR-1 never waits on it (PRD D12).",
+        "rationale": "The issue's fallback is \"ship FR-1 alone\"; encoding the gate as DAG edges with a stated GO/FALLBACK rule removes the judgment call from the executor."
+      },
+      {
+        "summary": "Changelog entry goes in a new v0.78.0 Unreleased block, or an existing Unreleased block if one appeared (PRD D13).",
+        "rationale": "docs/RELEASING.md says to add the next Unreleased block once it has entries."
+      }
+    ],
+    "items": [
+      {
+        "id": "mid-workhorse-default",
+        "title": "Default the mid workhorse slot to claude-opus-5-5",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-11T07:32:09Z",
+        "metadata": {
+          "issueLabel": "pan-5124",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "requiresInspection": false,
+          "difficulty": "simple",
+          "kind": "backend",
+          "traces": [
+            "FR-1",
+            "NFR-1"
+          ],
+          "files_scope": [
+            "src/lib/config-yaml/roles.ts",
+            "src/dashboard/frontend/src/components/Settings/RolesPanel.tsx",
+            "src/lib/__tests__/config-yaml-roles.test.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/config-yaml-roles.test.ts src/lib/__tests__/settings-api.test.ts tests/lib/settings-api.test.ts src/lib/claude-code/__tests__/claude-code.test.ts src/cli/commands/__tests__/doctor-claude-code.test.ts",
+            "cd src/dashboard/frontend && npx vitest run src/components/Settings/__tests__/RolesPanel.test.tsx src/components/Settings/__tests__/WorkhorsePanel.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "config-yaml-roles.test.ts passes including \"defaults the mid workhorse to Opus 5.5 (PAN-5124)\"",
+            "RolesPanel and WorkhorsePanel tests pass"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. In src/lib/config-yaml/roles.ts DEFAULT_WORKHORSES set mid: 'claude-opus-5-5' (leave expensive and cheap). Mirror it in RolesPanel.tsx DEFAULT_WORKHORSES. Add the named test to config-yaml-roles.test.ts asserting DEFAULT_WORKHORSES.mid and derefWorkhorse(DEFAULT_MODEL_REFS.work, { workhorses: DEFAULT_WORKHORSES }, 'roles.work.model') === 'claude-opus-5-5'. Update only tests that read the built-in mid default (git grep -n \"claude-sonnet-5-5\" -- '*.test.ts' '*.test.tsx'); leave tests that set workhorses.mid themselves."
+        },
+        "items": [
+          {
+            "id": "mid-workhorse-default.ac1",
+            "title": "Given no workhorses.mid in config, when the work role model is dereferenced, then it resolves to claude-opus-5-5",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mid-workhorse-default.ac2",
+            "title": "RolesPanel.tsx DEFAULT_WORKHORSES renders mid as claude-opus-5-5 and keeps cheap at its current value",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mid-workhorse-default.ac3",
+            "title": "Given workhorses.mid: claude-sonnet-5-5 set in config, when the work role model is dereferenced, then it preserves claude-sonnet-5-5",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "title-effort-low",
+        "title": "Pin --effort low on title-family claude -p calls for models that list low",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T07:32:09Z",
+        "metadata": {
+          "issueLabel": "pan-5124",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "requiresInspection": false,
+          "difficulty": "simple",
+          "kind": "backend",
+          "traces": [
+            "FR-3",
+            "NFR-2"
+          ],
+          "files_scope": [
+            "src/lib/conversations/transcript-summary.ts",
+            "src/lib/conversations/__tests__/transcript-summary.test.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint:effort",
+            "npx vitest run src/lib/conversations/__tests__/transcript-summary.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint:effort passes",
+            "transcript-summary.test.ts passes with the new --effort assertions"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2 and D2. In buildStructuredClaudeArgs append ...(getModelEffortLevels(model)?.includes('low') ? ['--effort', 'low'] : []) after '--model', model. Import getModelEffortLevels from ../model-capabilities.js. Never use supportedEffortLevels and never write an `effort ?? 'low'` fallback (lint:effort). Add assertions to the PAN-2657 hardening describe block."
+        },
+        "items": [
+          {
+            "id": "title-effort-low.ac1",
+            "title": "buildStructuredClaudeArgs(schema, \"claude-haiku-5-5\") returns args containing \"--effort\" immediately followed by \"low\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "title-effort-low.ac2",
+            "title": "buildStructuredClaudeArgs(schema, \"claude-haiku-4-5\") and (schema, \"claude-haiku-4-5-20251001\") each returns args with no \"--effort\" entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "title-effort-low.ac3",
+            "title": "The existing PAN-2657 hardening test passes: the args still contain --safe-mode, --tools '' and --permission-mode dontAsk",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "memory-effort-low",
+        "title": "Send output_config effort low on Anthropic memory extraction for models that list low",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T07:32:09Z",
+        "metadata": {
+          "issueLabel": "pan-5124",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "requiresInspection": false,
+          "difficulty": "simple",
+          "kind": "backend",
+          "traces": [
+            "FR-3",
+            "NFR-2"
+          ],
+          "files_scope": [
+            "src/lib/memory/providers/anthropic.ts",
+            "tests/lib/memory/providers.test.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint:effort",
+            "npx vitest run tests/lib/memory/providers.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint:effort passes",
+            "providers.test.ts passes with the new output_config assertions"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3 and D3. In AnthropicExtractionProvider.extract add ...(getModelEffortLevels(model)?.includes('low') ? { output_config: { effort: 'low' as const } } : {}) to the messages.create body. Do not change max_tokens. Add two tests with an injected fake client."
+        },
+        "items": [
+          {
+            "id": "memory-effort-low.ac1",
+            "title": "Given model claude-haiku-5-5, when extract runs, then messages.create receives output_config { effort: \"low\" }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "memory-effort-low.ac2",
+            "title": "Given model claude-haiku-4-5, when extract runs, then the messages.create body has no output_config key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "memory-effort-low.ac3",
+            "title": "max_tokens in the request body still defaults to 2048",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "title-preflight",
+        "title": "Run the Claude Code minimum-version check before title-family spawns",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T07:32:09Z",
+        "metadata": {
+          "issueLabel": "pan-5124",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "medium",
+          "readiness": "ready",
+          "requiresInspection": false,
+          "difficulty": "medium",
+          "kind": "backend",
+          "traces": [
+            "FR-5",
+            "NFR-1"
+          ],
+          "files_scope": [
+            "src/lib/conversations/transcript-summary.ts",
+            "src/lib/conversations/__tests__/transcript-summary-preflight.test.ts",
+            "tests/unit/lib/overdeck/title-refinement.test.ts",
+            "tests/unit/lib/overdeck/title-sources.test.ts",
+            "tests/unit/lib/overdeck/conversation-reads-compact-summary.test.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint:circular",
+            "npx vitest run src/lib/conversations/__tests__/transcript-summary-preflight.test.ts src/lib/conversations/__tests__/transcript-summary.test.ts tests/unit/lib/overdeck/title-refinement.test.ts tests/unit/lib/overdeck/title-sources.test.ts tests/unit/lib/overdeck/conversation-reads-compact-summary.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle",
+            "transcript-summary-preflight.test.ts passes"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4, D5, D6, D7. In invokeClaudeStructured, before building childEnv, do `const { prepareHarnessLaunch } = await import('../harness-binary.js'); const { binaryPath } = await prepareHarnessLaunch('claude-code', { model });` and spawn binaryPath instead of 'claude'. Do not catch ClaudeCodeTooOldError. Update the module header comment. New test file mocks node:child_process, ../../agents.js and ../../harness-binary.js. CI hazard: prepareHarnessLaunch throws when no claude binary is installed (CI runners may have none), so any existing test that reaches the real spawn with node:child_process mocked needs a harness-binary mock too; run the listed tests and find others with git grep -ln \"summarizeFirstMessageTitle\\|summarizeTranscriptTitle\\|summarizeTranscriptAbout\" -- '*.test.ts'."
+        },
+        "items": [
+          {
+            "id": "title-preflight.ac1",
+            "title": "Given prepareHarnessLaunch rejects with ClaudeCodeTooOldError, when summarizeFirstMessageTitle runs, then it rejects with a message containing \"needs Claude Code 2.1.293 or newer\" and spawn is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "title-preflight.ac2",
+            "title": "Given prepareHarnessLaunch resolves binaryPath /opt/claude/bin/claude, when a title call runs, then spawn receives /opt/claude/bin/claude as its command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "title-preflight.ac3",
+            "title": "Given the preflight throws ClaudeCodeTooOldError, when the title call fails, then the error propagates unchanged and no retry spawns a different model",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "summary-preflight",
+        "title": "Run the Claude Code minimum-version check before smart-compaction summary spawns",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T07:32:09Z",
+        "metadata": {
+          "issueLabel": "pan-5124",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "medium",
+          "readiness": "ready",
+          "requiresInspection": false,
+          "difficulty": "medium",
+          "kind": "backend",
+          "traces": [
+            "FR-5",
+            "NFR-1"
+          ],
+          "files_scope": [
+            "src/lib/conversations/smart-compaction.ts",
+            "tests/lib/conversations/smart-compaction-preflight.test.ts",
+            "src/lib/conversations/__tests__/summary-fork-handoff.test.ts",
+            "src/lib/conversations/__tests__/transcript-adapter.test.ts",
+            "tests/lib/agents-compact-session.test.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint:circular",
+            "npm run lint:file-size",
+            "npx vitest run tests/lib/conversations/smart-compaction-preflight.test.ts tests/lib/conversations/smart-compaction.test.ts src/lib/conversations/__tests__/summary-fork-handoff.test.ts src/lib/conversations/__tests__/transcript-adapter.test.ts tests/lib/agents-compact-session.test.ts src/dashboard/server/services/__tests__/conversation-compaction.test.ts src/dashboard/server/routes/__tests__/conversation-compaction.test.ts src/dashboard/server/routes/__tests__/conversations-switch-model.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint:circular and lint:file-size pass",
+            "smart-compaction-preflight.test.ts passes"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. In runModelSummary, on the non-rpc path, insert `const { binaryPath: command } = await prepareHarnessLaunch('claude-code', { model: useModel });` directly before `const args = [` and delete the later `const command = 'claude';`. The rpc-fifo (pi/omp) branch is unchanged. Do not catch ClaudeCodeTooOldError. Tests go in a NEW file so mocks do not leak into smart-compaction.test.ts. CI hazard: prepareHarnessLaunch throws when no claude binary is installed, so any existing test that reaches the real runModelSummary spawn with node:child_process mocked needs a harness-binary mock; run all listed test files."
+        },
+        "items": [
+          {
+            "id": "summary-preflight.ac1",
+            "title": "Given prepareHarnessLaunch rejects with ClaudeCodeTooOldError, when runModelSummary(\"prompt\", \"claude-haiku-5-5\") runs, then it rejects with that error message and spawn is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "summary-preflight.ac2",
+            "title": "Given prepareHarnessLaunch resolves a binaryPath, when runModelSummary runs on the claude-code harness, then spawn receives that binaryPath as its command",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "summary-preflight.ac3",
+            "title": "Given the rpc-fifo harness, when runModelSummary runs, then it routes to runPiModelSummary and never calls prepareHarnessLaunch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "requirements-background-models",
+        "title": "List title and compaction models in listConfiguredModels",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T07:32:09Z",
+        "metadata": {
+          "issueLabel": "pan-5124",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "requiresInspection": false,
+          "difficulty": "simple",
+          "kind": "backend",
+          "traces": [
+            "FR-5"
+          ],
+          "files_scope": [
+            "src/lib/claude-code/requirements.ts",
+            "src/lib/claude-code/__tests__/claude-code.test.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/claude-code/__tests__/claude-code.test.ts src/cli/commands/__tests__/doctor-claude-code.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "claude-code.test.ts and doctor-claude-code.test.ts pass"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6 and D8. Widen the listConfiguredModels Pick to include 'conversations' and record resolveModelId(conversations.titleModel) under source conversations.title_model and resolveModelId(conversations.compactionModel) under conversations.compaction_model. Memory extraction is not listed (it uses the Anthropic SDK). Update the JSDoc."
+        },
+        "items": [
+          {
+            "id": "requirements-background-models.ac1",
+            "title": "Given conversations.titleModel and compactionModel set to claude-haiku-5-5, listConfiguredModels returns one claude-haiku-5-5 entry whose sources include conversations.title_model and conversations.compaction_model",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "requirements-background-models.ac2",
+            "title": "evaluateClaudeCodeRequirements(\"2.1.280\", that list) returns a requirement with minVersion 2.1.293 and satisfied false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "requirements-background-models.ac3",
+            "title": "Given a config with no conversations block, listConfiguredModels returns the same entries it returned before",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "chunk-budget-default-model",
+        "title": "Size compaction chunks for DEFAULT_SUMMARY_MODEL when no model is passed",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T07:32:09Z",
+        "metadata": {
+          "issueLabel": "pan-5124",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "requiresInspection": false,
+          "difficulty": "simple",
+          "kind": "backend",
+          "traces": [
+            "FR-4"
+          ],
+          "files_scope": [
+            "src/lib/conversations/smart-compaction.ts",
+            "tests/lib/conversations/smart-compaction.test.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/lib/conversations/smart-compaction.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "smart-compaction.test.ts passes"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-7 and D1. getChunkBudgetChars resolves `model || DEFAULT_SUMMARY_MODEL` before the table lookup. Keep the claude-haiku-5-5: 240_000 row and append \"Kept by PAN-5124 D1.\" to its comment. In the getChunkBudgetChars describe, replace the undefined → 300_000 assertion with: an unmodeled id returns 300_000, and undefined equals the budget of the current DEFAULT_SUMMARY_MODEL literal."
+        },
+        "items": [
+          {
+            "id": "chunk-budget-default-model.ac1",
+            "title": "getChunkBudgetChars(\"claude-haiku-5-5\") returns 240000",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "chunk-budget-default-model.ac2",
+            "title": "getChunkBudgetChars(undefined) returns the same value as getChunkBudgetChars of the DEFAULT_SUMMARY_MODEL literal",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "chunk-budget-default-model.ac3",
+            "title": "getChunkBudgetChars(\"some-unmodeled-model\") returns 300000",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "haiku-checkpoint",
+        "title": "Implementation checkpoint: 20 title calls and 20 compactions, Haiku 5.5 vs Haiku 4.5",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-11T07:32:09Z",
+        "metadata": {
+          "issueLabel": "pan-5124",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "requiresInspection": true,
+          "difficulty": "medium",
+          "kind": "spike",
+          "traces": [
+            "FR-2",
+            "FR-3"
+          ],
+          "foundationFor": [
+            "haiku-config-defaults",
+            "haiku-module-constants",
+            "haiku-preset-v2",
+            "haiku-settings-fallbacks",
+            "docs-config-routing",
+            "docs-model-calls",
+            "docs-presets-harnesses",
+            "changelog-entry"
+          ],
+          "files_scope": [
+            "docs/model-evals/2026-11-11-haiku-5-5-background-calls.md"
+          ],
+          "verify_commands": [
+            "test -f docs/model-evals/2026-11-11-haiku-5-5-background-calls.md",
+            "grep -E \"^Decision: (GO|FALLBACK)$\" docs/model-evals/2026-11-11-haiku-5-5-background-calls.md"
+          ],
+          "expected_outputs": [
+            "the eval doc exists",
+            "grep prints exactly one Decision line"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-8 and D12. Write a throwaway npx tsx script in the session scratchpad (never committed). Follow PRD WI-8 steps 1-4 exactly: 20 transcripts from ~/.claude/projects/*/*.jsonl of 200,000-600,000 bytes from at least 5 project directories (read-only; never modify, truncate or delete a JSONL); title input = user/assistant text records -> serializeConversationTranscript(messages, { purpose: \"title\" }) -> summarizeTranscriptTitle(serialized, model); compaction = generateSmartSummary({ jsonlPath, model, mode: \"compact\" }), counting only rows with non-null summaryModel; cost per call = CostEvents appended to events.jsonl under getCostsDir() (background:titleRefinement, background:summaryFork) during that call. Run both claude-haiku-4-5 and claude-haiku-5-5. Write method, per-call table (file basename only, no transcript content beyond a <=12-word title), mean cost per call per model and call type, per-call quality judgment and one line \"Decision: GO\" or \"Decision: FALLBACK\" using the D12 rule. The PR-body copy happens at pan done time (D14), not here."
+        },
+        "items": [
+          {
+            "id": "haiku-checkpoint.ac1",
+            "title": "The eval doc records at least 20 title rows and 20 compaction rows for each of claude-haiku-4-5 and claude-haiku-5-5, and every counted compaction row records a non-null summaryModel",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "haiku-checkpoint.ac2",
+            "title": "The eval doc shows the mean cost per call for each model and each call type",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "haiku-checkpoint.ac3",
+            "title": "The eval doc contains exactly one line \"Decision: GO\" or \"Decision: FALLBACK\", and that decision applies the PRD D12 thresholds (>=18/20 titles and >=18/20 compactions at least as good, mean cost not higher)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "haiku-checkpoint.ac4",
+            "title": "The eval doc contains no transcript content beyond file basenames and generated titles",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "haiku-config-defaults",
+        "title": "Default the cheap slot, compaction, title and docs-classifier config to claude-haiku-5-5",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T07:32:09Z",
+        "metadata": {
+          "issueLabel": "pan-5124",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "requiresInspection": false,
+          "difficulty": "simple",
+          "kind": "backend",
+          "traces": [
+            "FR-2",
+            "NFR-1",
+            "NFR-2"
+          ],
+          "files_scope": [
+            "src/lib/config-yaml/roles.ts",
+            "src/dashboard/frontend/src/components/Settings/RolesPanel.tsx",
+            "src/lib/config-yaml/defaults.ts",
+            "src/lib/config-yaml/schema.ts",
+            "src/lib/__tests__/config-yaml-roles.test.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/config-yaml-roles.test.ts tests/lib/config-yaml.test.ts src/lib/__tests__/settings-api.test.ts tests/lib/settings-api.test.ts src/lib/claude-code/__tests__/claude-code.test.ts",
+            "cd src/dashboard/frontend && npx vitest run src/components/Settings/__tests__/RolesPanel.test.tsx src/components/Settings/__tests__/WorkhorsePanel.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "config-yaml-roles.test.ts passes including \"defaults the cheap workhorse and background config to Haiku 5.5 (PAN-5124)\"",
+            "frontend Settings tests pass"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-9. Runs only when the checkpoint doc (item haiku-checkpoint) ends with \"Decision: GO\"; on \"Decision: FALLBACK\" run `pan task cancel pan-5124 <item>` for this item AND for each of its <item>.acN ids, since cancel changes one id only (PRD D12). Set DEFAULT_WORKHORSES.cheap (roles.ts and the RolesPanel.tsx mirror), DEFAULT_CONFIG.conversations.compactionModel, .titleModel and docs.classifier.model (defaults.ts) to claude-haiku-5-5, and the schema.ts titleModel comment to \"(default: claude-haiku-5-5)\". Add the named test. Update tests that read the old built-in defaults only."
+        },
+        "items": [
+          {
+            "id": "haiku-config-defaults.ac1",
+            "title": "Given no workhorses.cheap in config, when workhorse:cheap is dereferenced, then it resolves to claude-haiku-5-5",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "haiku-config-defaults.ac2",
+            "title": "Given an empty config, when config loads, then conversations.compactionModel, conversations.titleModel and docs.classifier.model each defaults to claude-haiku-5-5",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "haiku-config-defaults.ac3",
+            "title": "Given conversations.title_model: claude-haiku-4-5 set in config, when config loads, then titleModel preserves claude-haiku-4-5",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "haiku-module-constants",
+        "title": "Move background module default constants to claude-haiku-5-5",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T07:32:09Z",
+        "metadata": {
+          "issueLabel": "pan-5124",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "medium",
+          "readiness": "ready",
+          "requiresInspection": false,
+          "difficulty": "medium",
+          "kind": "backend",
+          "traces": [
+            "FR-2",
+            "FR-4",
+            "NFR-1"
+          ],
+          "files_scope": [
+            "src/lib/conversations/transcript-summary.ts",
+            "src/lib/conversations/smart-compaction.ts",
+            "src/lib/memory/providers/anthropic.ts",
+            "src/lib/memory/providers/registry.ts",
+            "src/lib/conversations/__tests__/transcript-summary.test.ts",
+            "tests/lib/conversations/smart-compaction.test.ts",
+            "tests/lib/memory/providers.test.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/conversations/__tests__/transcript-summary.test.ts tests/lib/conversations/smart-compaction.test.ts tests/lib/memory/providers.test.ts tests/lib/memory/provider-policy.test.ts tests/lib/memory/health.test.ts tests/cli/commands/doctor-memory-provider.test.ts tests/cli/commands/memory-doctor-format.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "all listed test files pass"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-10. Runs only when the checkpoint doc (item haiku-checkpoint) ends with \"Decision: GO\"; on \"Decision: FALLBACK\" run `pan task cancel pan-5124 <item>` for this item AND for each of its <item>.acN ids, since cancel changes one id only (PRD D12). Set CONVERSATION_TITLE_MODEL, DEFAULT_SUMMARY_MODEL and both memory DEFAULT_MODEL constants to claude-haiku-5-5 (no date suffix). Update the chunk-budget test so getChunkBudgetChars(undefined) is 240000. Rename the \"keeps sending temperature for the default Anthropic model\" test to \"keeps sending temperature for a model that accepts it via the Anthropic SDK\" and pass { model: \"claude-haiku-4-5\" }. Update default-model expectations in the listed memory tests."
+        },
+        "items": [
+          {
+            "id": "haiku-module-constants.ac1",
+            "title": "CONVERSATION_TITLE_MODEL, DEFAULT_SUMMARY_MODEL and AnthropicExtractionProvider.defaultModel each defaults to claude-haiku-5-5",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "haiku-module-constants.ac2",
+            "title": "Given no OVERDECK_MEMORY_* env and no memory settings, resolveExtractionProviderSelection returns provider anthropic and model claude-haiku-5-5 with source default",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "haiku-module-constants.ac3",
+            "title": "getChunkBudgetChars(undefined) returns 240000",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "haiku-module-constants.ac4",
+            "title": "git grep -n \"claude-haiku-4-5\" over the four source files returns only the smart-compaction chunk-table row for claude-haiku-4-5-20251001",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "haiku-preset-v2",
+        "title": "Anthropic preset v2: cheap slot and background values to claude-haiku-5-5",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T07:32:09Z",
+        "metadata": {
+          "issueLabel": "pan-5124",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "requiresInspection": false,
+          "difficulty": "simple",
+          "kind": "backend",
+          "traces": [
+            "FR-2"
+          ],
+          "files_scope": [
+            "src/lib/model-presets/presets.ts",
+            "tests/unit/lib/model-presets/presets.test.ts"
+          ],
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/model-presets/presets.test.ts tests/unit/lib/model-presets/apply.test.ts tests/unit/lib/model-presets/plan.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the three model-presets test files pass"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-11, D9, D10. Runs only when the checkpoint doc (item haiku-checkpoint) ends with \"Decision: GO\"; on \"Decision: FALLBACK\" run `pan task cancel pan-5124 <item>` for this item AND for each of its <item>.acN ids, since cancel changes one id only (PRD D12). In presets.ts set ANTHROPIC_BACKGROUND conversations.compaction_model, conversations.title_model, memory.extraction.model and ANTHROPIC values workhorses.cheap to claude-haiku-5-5; ANTHROPIC version: 2, date: \"2026-11-11\"; replace the trivial-band comment. Do not add effort to the trivial band. The OpenAI preset is unchanged."
+        },
+        "items": [
+          {
+            "id": "haiku-preset-v2.ac1",
+            "title": "getPreset(\"anthropic\").version and getPreset(\"anthropic-cost-saver\").version each returns 2",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "haiku-preset-v2.ac2",
+            "title": "Applying the anthropic preset applies claude-haiku-5-5 to workhorses.cheap, conversations.compaction_model, conversations.title_model and memory.extraction.model",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "haiku-preset-v2.ac3",
+            "title": "getPreset(\"anthropic\").tierBands.trivial.effort stays undefined and the \"effort is high and valid\" test passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "haiku-settings-fallbacks",
+        "title": "Settings UI fallbacks and placeholders to claude-haiku-5-5",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T07:32:09Z",
+        "metadata": {
+          "issueLabel": "pan-5124",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "requiresInspection": false,
+          "difficulty": "simple",
+          "kind": "frontend",
+          "traces": [
+            "FR-2"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/sections/BackgroundAiSection.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/ConversationSettingsSection.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/MemorySection.tsx",
+            "src/dashboard/frontend/src/components/shared/ModelPicker/ModelPicker.tsx"
+          ],
+          "verify_commands": [
+            "npm run typecheck",
+            "cd src/dashboard/frontend && npx vitest run src/components/shared/ModelPicker/ModelPicker.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors (including the frontend ratchet)",
+            "ModelPicker.test.ts passes"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-12 and D11. Runs only when the checkpoint doc (item haiku-checkpoint) ends with \"Decision: GO\"; on \"Decision: FALLBACK\" run `pan task cancel pan-5124 <item>` for this item AND for each of its <item>.acN ids, since cancel changes one id only (PRD D12). Replace the four `|| 'claude-haiku-4-5'` select fallbacks, both memory-model placeholders and FALLBACK_COMPACTION_MODEL with claude-haiku-5-5. Leave CrewRow.tsx and TieredExecutionSection.tsx unchanged (non-goal). Update only test expectations of these fallbacks."
+        },
+        "items": [
+          {
+            "id": "haiku-settings-fallbacks.ac1",
+            "title": "git grep -n \"claude-haiku-4-5\" over the four files returns no matches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "haiku-settings-fallbacks.ac2",
+            "title": "With no title_model or compaction_model in settings, the Background AI and Conversation selects and FALLBACK_COMPACTION_MODEL each defaults to claude-haiku-5-5",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "haiku-settings-fallbacks.ac3",
+            "title": "CrewRow.tsx DEFAULT_CREW_MODEL and TieredExecutionSection.tsx DEFAULT_MODEL preserves claude-haiku-4-5 (non-goal)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-config-routing",
+        "title": "Docs: configuration and routing pages name the new slot defaults",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T07:32:09Z",
+        "metadata": {
+          "issueLabel": "pan-5124",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "requiresInspection": false,
+          "difficulty": "trivial",
+          "kind": "docs",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ],
+          "files_scope": [
+            "docs/CONFIGURATION.md",
+            "docs/MODEL_ROUTING.md"
+          ],
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n \"mid: claude-opus-5-5\" docs/CONFIGURATION.md docs/MODEL_ROUTING.md"
+          ],
+          "expected_outputs": [
+            "lint:docs passes",
+            "grep shows the mid line in both files"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-13. Runs after the checkpoint decision. docs/CONFIGURATION.md lines 27-28 and 68-69 and docs/MODEL_ROUTING.md line 221 show mid: claude-opus-5-5; line 235 example reads workhorse:mid → claude-opus-5-5. On GO also cheap: claude-haiku-5-5 and line 231 reads \"(except on the Anthropic cheap band, which leaves Haiku 5.5 at its default effort)\". On FALLBACK leave the cheap lines and line 231."
+        },
+        "items": [
+          {
+            "id": "docs-config-routing.ac1",
+            "title": "docs/CONFIGURATION.md shows mid: claude-opus-5-5 in both workhorses examples",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-config-routing.ac2",
+            "title": "docs/MODEL_ROUTING.md shows mid: claude-opus-5-5 at the workhorses example and workhorse:mid → claude-opus-5-5 in the tiers example",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-config-routing.ac3",
+            "title": "On GO, both files shows cheap: claude-haiku-5-5 and MODEL_ROUTING.md contains no claim that Haiku 4.5 has no effort control; on FALLBACK the cheap lines preserves claude-haiku-4-5",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-model-calls",
+        "title": "Docs: MODEL-CALLS.md audit rows name the new defaults and checks",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T07:32:09Z",
+        "metadata": {
+          "issueLabel": "pan-5124",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "requiresInspection": false,
+          "difficulty": "simple",
+          "kind": "docs",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-5"
+          ],
+          "files_scope": [
+            "docs/MODEL-CALLS.md"
+          ],
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n \"PAN-5124\" docs/MODEL-CALLS.md"
+          ],
+          "expected_outputs": [
+            "lint:docs passes",
+            "grep shows the PAN-5124 sentence"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-14. Runs after the checkpoint decision and after the code items so line numbers are final. Mid-backed rows (work, review.correctness/performance/requirements, test, ship, Remote (Fly) work agent, Default workhorse mid) read claude-opus-5-5; append the PAN-5124 sentence to the line-41 paragraph. On GO the cheap, title, refinement, About, memory extraction, memory query expansion and smart-compaction rows read claude-haiku-5-5 with updated line numbers. Add the preflight and effort notes to the title, smart-compaction and memoryExtraction rows. Leave conversationEnrichment L1."
+        },
+        "items": [
+          {
+            "id": "docs-model-calls.ac1",
+            "title": "Every mid-backed row in the role table shows claude-opus-5-5 as its default",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-model-calls.ac2",
+            "title": "The line-41 paragraph contains the sentence that PAN-5124 moved the built-in workhorses.mid default from claude-sonnet-5-5 to claude-opus-5-5",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-model-calls.ac3",
+            "title": "The conversationTitles and smart-compaction rows contains the Claude Code minimum-version check note, and the conversationTitles and memoryExtraction rows contains the low-effort pin note",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-model-calls.ac4",
+            "title": "On GO the background rows show claude-haiku-5-5; the conversationEnrichment L1 row still shows claude-haiku-4-5-20251001",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-presets-harnesses",
+        "title": "Docs: model-presets page v2 rows and harnesses background-check sentence",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T07:32:09Z",
+        "metadata": {
+          "issueLabel": "pan-5124",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "requiresInspection": false,
+          "difficulty": "trivial",
+          "kind": "docs",
+          "traces": [
+            "FR-2",
+            "FR-5"
+          ],
+          "files_scope": [
+            "configuration/model-presets.mdx",
+            "configuration/harnesses.mdx"
+          ],
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n \"Background calls that run through Claude Code\" configuration/harnesses.mdx"
+          ],
+          "expected_outputs": [
+            "lint:docs passes",
+            "grep finds the new sentence"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-15. harnesses.mdx (always): in the Sonnet 5.5 bullet (lines 83-85) drop workhorses.mid from \"It is the default for the Sonnet tier (...)\" and state Opus 5.5 is the built-in workhorses.mid default since PAN-5124; add the \"Background calls that run through Claude Code …\" sentence under \"Claude Code version requirements\". harnesses.mdx (GO only): the Haiku 5.5 bullet line \"Haiku 4.5 remains the default for the cheap slot and background calls.\" becomes \"It is the built-in default for the cheap slot and background calls (titles, compaction, memory extraction).\". model-presets.mdx (GO only): Anthropic headings read v2 (and 2026-11-11 for the anthropic heading); workhorses.cheap row reads claude-haiku-5-5 with the default-effort note; compaction/title and memory.extraction rows read claude-haiku-5-5."
+        },
+        "items": [
+          {
+            "id": "docs-presets-harnesses.ac1",
+            "title": "configuration/harnesses.mdx contains a sentence that titles, title refinement, the About summary and smart compaction run the same Claude Code check and fail with the same message instead of switching models",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-presets-harnesses.ac2",
+            "title": "configuration/harnesses.mdx contains no claim that Sonnet 5.5 is the workhorses.mid default and states Opus 5.5 is; on GO the Haiku 5.5 bullet contains the claim that it is the default for the cheap slot and background calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-presets-harnesses.ac3",
+            "title": "On GO, configuration/model-presets.mdx shows the anthropic preset heading as v2, 2026-11-11 and the cost-saver heading as v2",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-presets-harnesses.ac4",
+            "title": "On GO, model-presets.mdx shows claude-haiku-5-5 in the workhorses.cheap, compaction/title and memory.extraction rows and contains no claim that Haiku 4.5 has no effort control",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "changelog-entry",
+        "title": "Changelog: Unreleased entry for the new default models and their cost",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T07:32:09Z",
+        "metadata": {
+          "issueLabel": "pan-5124",
+          "inspectionDepth": "fast",
+          "files_scope_confidence": "high",
+          "readiness": "ready",
+          "requiresInspection": false,
+          "difficulty": "trivial",
+          "kind": "docs",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ],
+          "files_scope": [
+            "changelog.mdx"
+          ],
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n \"New default models\" changelog.mdx"
+          ],
+          "expected_outputs": [
+            "lint:docs passes",
+            "grep finds the entry"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-16 and D13. Add the v0.78.0 Unreleased block from the PRD above v0.77.0, below the RELEASE STEP comment (or add the entry to an existing Unreleased block). Write dollars as &#36;. Link the PR if it is open when this item runs, otherwise https://github.com/eltmon/overdeck/issues/5124 as #5124 (PRD D14). On FALLBACK drop the Haiku sentence."
+        },
+        "items": [
+          {
+            "id": "changelog-entry.ac1",
+            "title": "changelog.mdx contains an Unreleased block above v0.77.0 with a \"New default models\" entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "changelog-entry.ac2",
+            "title": "The entry contains the statement that agents on built-in defaults now run on Claude Opus 5.5 and that this roughly doubles their cost",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "changelog-entry.ac3",
+            "title": "On GO the entry states the Haiku 5.5 change, its per-MTok prices and the Claude Code 2.1.293 minimum; npm run lint:docs passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "title-effort-low",
+        "to": "title-preflight",
+        "type": "blocks"
+      },
+      {
+        "from": "title-effort-low",
+        "to": "haiku-checkpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "chunk-budget-default-model",
+        "to": "summary-preflight",
+        "type": "blocks"
+      },
+      {
+        "from": "mid-workhorse-default",
+        "to": "haiku-config-defaults",
+        "type": "blocks"
+      },
+      {
+        "from": "haiku-checkpoint",
+        "to": "haiku-config-defaults",
+        "type": "blocks"
+      },
+      {
+        "from": "haiku-checkpoint",
+        "to": "haiku-module-constants",
+        "type": "blocks"
+      },
+      {
+        "from": "haiku-checkpoint",
+        "to": "haiku-preset-v2",
+        "type": "blocks"
+      },
+      {
+        "from": "haiku-checkpoint",
+        "to": "haiku-settings-fallbacks",
+        "type": "blocks"
+      },
+      {
+        "from": "title-preflight",
+        "to": "haiku-module-constants",
+        "type": "blocks"
+      },
+      {
+        "from": "summary-preflight",
+        "to": "haiku-module-constants",
+        "type": "blocks"
+      },
+      {
+        "from": "memory-effort-low",
+        "to": "haiku-module-constants",
+        "type": "blocks"
+      },
+      {
+        "from": "haiku-checkpoint",
+        "to": "docs-config-routing",
+        "type": "blocks"
+      },
+      {
+        "from": "haiku-checkpoint",
+        "to": "docs-model-calls",
+        "type": "blocks"
+      },
+      {
+        "from": "haiku-module-constants",
+        "to": "docs-model-calls",
+        "type": "blocks"
+      },
+      {
+        "from": "haiku-checkpoint",
+        "to": "docs-presets-harnesses",
+        "type": "blocks"
+      },
+      {
+        "from": "haiku-checkpoint",
+        "to": "changelog-entry",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

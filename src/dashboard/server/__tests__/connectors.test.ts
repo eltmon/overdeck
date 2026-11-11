@@ -5,7 +5,7 @@
  */
 import { createRequire } from 'node:module';
 import { createServer } from 'node:http';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -18,6 +18,7 @@ vi.mock('../../../lib/activity-logger.js', () => ({ emitActivityEntry: vi.fn() }
 const { pairingSecrets } = await import('@overdeck/anywhere-channel');
 const { nodeCrypto } = await import('@overdeck/anywhere-channel/node');
 const { parseConnectorPairLink } = await import('@overdeck/contracts');
+const { UUID_V4 } = await import('../../../lib/access-token-records.js');
 const {
   _resetAccessTokensForTests,
   _settleAccessTokenWritesForTests,
@@ -31,11 +32,23 @@ const {
 } = await import('../../../lib/access-tokens.js');
 const { openChannel } = await import('../../../lib/anywhere/channel/open.js');
 const { _resetChannelListenerForTests, installChannelListener, liveChannelCount } = await import('../channel-listener.js');
-const { _resetConnectorPairingForTests, takeConnectorIntent } = await import('../connector-pairing.js');
+const { _resetConnectorPairingForTests, listConnectorNotices, listConnectorRequests, takeConnectorIntent } = await import('../connector-pairing.js');
+const { _resetInternalTokenCacheForTests, INTERNAL_TOKEN_HEADER } = await import('../../../lib/internal-token.js');
 const { _resetPairingCredentialsForTests, issuePairingCredential } = await import('../pairing-credentials.js');
 const { remoteGateRejection } = await import('../remote-request-gate.js');
 const { resolveDashboardCredential } = await import('../routes/dashboard-auth.js');
-const { connectorsRouteLayer, handleConnectorList, handleConnectorsExchange, handleConnectorPairing, handleConnectorRevoke, handleConnectorSelf, handleConnectorSelfRevoke } = await import('../routes/connectors.js');
+const {
+  connectorsRouteLayer,
+  handleConnectorList,
+  handleConnectorNoticeDismiss,
+  handleConnectorNotices,
+  handleConnectorRequestCancel,
+  handleConnectorsExchange,
+  handleConnectorPairing,
+  handleConnectorRevoke,
+  handleConnectorSelf,
+  handleConnectorSelfRevoke,
+} = await import('../routes/connectors.js');
 const { buildEnvironmentDescriptor } = await import('../routes/environment.js');
 type MachineKeyPair = import('../../../lib/anywhere/machine-key.js').MachineKeyPair;
 type ChannelMarker = import('../channel-peer.js').ChannelMarker;
@@ -109,6 +122,22 @@ describe('POST /api/connectors/pairing (PAN-4949 D-11, D-12, D-14)', () => {
     expect((await pairedIntent({ name: 'bot:defaults' }))?.scopes).toEqual([...BOT_DEFAULT_SCOPES]);
     expect((await pairedIntent({ name: 'bot:tell', scopes: ['tell'] }))?.scopes).toEqual(['read:state', 'tell']);
   });
+
+  it('accepts a platform in CONNECT_PLATFORMS and returns a UUID requestId; a body without platform still succeeds', async () => {
+    const withPlatform = await read(await handleConnectorPairing('internal-token', JSON.stringify({ name: 'bot:grok', platform: 'grok-bot' })));
+    expect(withPlatform.status).toBe(200);
+    expect(UUID_V4.test(withPlatform.json.requestId as string)).toBe(true);
+
+    const withoutPlatform = await read(await handleConnectorPairing('internal-token', JSON.stringify({ name: 'bot:other' })));
+    expect(withoutPlatform.status).toBe(200);
+    expect(UUID_V4.test(withoutPlatform.json.requestId as string)).toBe(true);
+  });
+
+  it('refuses a platform outside CONNECT_PLATFORMS with 400 naming the allowed list', async () => {
+    const { status, json } = await read(await handleConnectorPairing('internal-token', JSON.stringify({ name: 'bot:grok', platform: 'xai-api' })));
+    expect(status).toBe(400);
+    expect(json.error).toBe('platform must be one of grok-bot, grok-build, hermes, openclaw, other');
+  });
 });
 
 describe('GET /api/connectors (PAN-4949 D-15)', () => {
@@ -126,6 +155,61 @@ describe('GET /api/connectors (PAN-4949 D-15)', () => {
 
   it('refuses a non-root credential kind', async () => {
     expect((await read(await handleConnectorList('device'))).status).toBe(403);
+  });
+
+  it('lists a fresh pairing request as live, with a pairing string (PAN-5070 W-4)', async () => {
+    const { json: paired } = await read(await handleConnectorPairing('internal-token', JSON.stringify({ name: 'bot:waiting' })));
+    const { json } = await read(await handleConnectorList('root-session'));
+    const requests = json.requests as Array<Record<string, unknown>>;
+    expect(requests).toMatchObject([{ id: paired.requestId, name: 'bot:waiting', state: 'live', pairingString: paired.pairingString }]);
+  });
+});
+
+describe('DELETE /api/connectors/requests/:id (PAN-5070 W-4)', () => {
+  it('cancels a pending request once, then 404s on a second try', async () => {
+    const { json: paired } = await read(await handleConnectorPairing('internal-token', JSON.stringify({ name: 'bot:cancel' })));
+    const first = await read(await handleConnectorRequestCancel('root-session', paired.requestId as string));
+    expect(first.status).toBe(200);
+    expect(first.json).toEqual({ ok: true });
+
+    const second = await read(await handleConnectorRequestCancel('root-session', paired.requestId as string));
+    expect(second.status).toBe(404);
+    expect(second.json.error).toBe(`no pending connector request with id ${paired.requestId}`);
+  });
+
+  it('refuses a non-root credential kind', async () => {
+    expect((await read(await handleConnectorRequestCancel('device', 'whatever'))).status).toBe(403);
+  });
+
+  it('cancels through the real route with the internal token, and 404s with its own message on a second try', async () => {
+    const INTERNAL_TOKEN = 'pan-5070-connectors-internal-token-0123456789';
+    await writeFile(join(home, 'internal-token'), INTERNAL_TOKEN, { mode: 0o600 });
+    _resetInternalTokenCacheForTests();
+    cleanups.push(async () => {
+      await rm(join(home, 'internal-token'), { force: true });
+      _resetInternalTokenCacheForTests();
+    });
+
+    const { json: paired } = await read(await handleConnectorPairing('internal-token', JSON.stringify({ name: 'bot:route-cancel' })));
+    const runCancel = async () => {
+      const request = HttpServerRequest.fromWeb(new Request(`http://localhost/api/connectors/requests/${paired.requestId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', [INTERNAL_TOKEN_HEADER]: INTERNAL_TOKEN },
+      })).modify({ remoteAddress: Option.some('127.0.0.1') });
+      const response = await Effect.runPromise(Effect.scoped(Effect.flatMap(
+        HttpRouter.toHttpEffect(connectorsRouteLayer),
+        (app) => Effect.provideService(app, HttpServerRequest.HttpServerRequest, request),
+      )));
+      return read(response);
+    };
+
+    const first = await runCancel();
+    expect(first.status).toBe(200);
+
+    const second = await runCancel();
+    expect(second.status).toBe(404);
+    expect(second.json.error).toBe(`no pending connector request with id ${paired.requestId}`);
+    expect(second.json.error).not.toContain('no connector with id');
   });
 });
 
@@ -236,11 +320,11 @@ describe('GET /api/connectors/self (PAN-5069 FR-10)', () => {
   });
 });
 
-/** Issue a connector pairing as root and return a pairing marker for its code, as the handshake would produce. */
-async function connectorPairingMarker(remoteKeyHex: string, body: Record<string, unknown> = { name: 'bot:desk', scopes: ['tell'] }): Promise<ChannelMarker> {
+/** Issue a connector pairing as root and return a pairing marker and requestId for its code, as the handshake would produce. */
+async function connectorPairingMarker(remoteKeyHex: string, body: Record<string, unknown> = { name: 'bot:desk', scopes: ['tell'] }): Promise<ChannelMarker & { requestId: string }> {
   const { json } = await read(await handleConnectorPairing('internal-token', JSON.stringify(body)));
   const code = parseConnectorPairLink(json.pairingString as string)!.code;
-  return { mode: 'pairing', remoteKeyHex, pairingId: pairingSecrets(nodeCrypto, code).pairingId };
+  return { mode: 'pairing', remoteKeyHex, pairingId: pairingSecrets(nodeCrypto, code).pairingId, requestId: json.requestId as string };
 }
 
 function exchangeBody(overrides: Record<string, unknown> = {}): string {
@@ -301,6 +385,29 @@ describe('POST /api/connectors/exchange (PAN-4949 D-8, D-17)', () => {
     expect(listActiveRecordsOfKind('connector').map((record) => record.id)).toEqual([second.json.tokenId]);
   });
 
+  it('leaves one notice with the connectorId after a successful exchange', async () => {
+    const { json } = await read(await handleConnectorsExchange(exchangeBody(), await connectorPairingMarker(CONNECTOR_KEY)));
+    expect(listConnectorNotices()).toMatchObject([{ connectorId: json.tokenId }]);
+  });
+
+  it('shows the request as used after a 409 link-key-in-use or a 400 body, without pairing it', async () => {
+    await createAccessToken({ name: 'phone', kind: 'phone', scopes: [...PHONE_TOKEN_SCOPES], phoneKey: 'a1'.repeat(32), clientId: '55555555-5555-4555-8555-555555555555' });
+    const conflictMarker = await connectorPairingMarker('a1'.repeat(32));
+    const conflict = await read(await handleConnectorsExchange(exchangeBody(), conflictMarker));
+    expect(conflict.status).toBe(409);
+    const conflictView = listConnectorRequests().find((request) => request.id === conflictMarker.requestId);
+    expect(conflictView).toMatchObject({ state: 'used' });
+    expect(conflictView?.pairingString).toBeUndefined();
+
+    const badBodyMarker = await connectorPairingMarker(CONNECTOR_KEY);
+    const badBody = await read(await handleConnectorsExchange('not json', badBodyMarker));
+    expect(badBody.status).toBe(400);
+    const badBodyView = listConnectorRequests().find((request) => request.id === badBodyMarker.requestId);
+    expect(badBodyView).toMatchObject({ state: 'used' });
+    expect(badBodyView?.pairingString).toBeUndefined();
+    expect(listConnectorNotices()).toEqual([]);
+  });
+
   it('remoteGateRejection admits the exchange only from a pairing marker', async () => {
     const request = (peer: string | undefined) => HttpServerRequest
       .fromWeb(new Request('http://dashboard.test/api/connectors/exchange', { method: 'POST' }))
@@ -309,5 +416,69 @@ describe('POST /api/connectors/exchange (PAN-4949 D-8, D-17)', () => {
     expect(remoteGateRejection(request(undefined), pairing)).toBeNull();
     expect(remoteGateRejection(request('127.0.0.1'), null)).toEqual({ status: 401 });
     expect(remoteGateRejection(request(undefined), { mode: 'link', remoteKeyHex: CONNECTOR_KEY, pairingId: null })).toEqual({ status: 401 });
+  });
+});
+
+describe('GET /api/connectors/notices and POST /api/connectors/requests/:id/dismiss (PAN-5070 W-5)', () => {
+  it('lists a notice for a paired connector with no pairing-link text, drops it when the connector is revoked', async () => {
+    const { json } = await read(await handleConnectorsExchange(exchangeBody(), await connectorPairingMarker(CONNECTOR_KEY)));
+    const { status, json: noticesJson } = await read(await handleConnectorNotices('root-session'));
+    expect(status).toBe(200);
+    expect(noticesJson.notices).toMatchObject([{ connectorId: json.tokenId, name: 'bot:desk', scopes: ['read:state', 'tell'] }]);
+    expect((noticesJson.notices as Array<Record<string, unknown>>)[0]).toHaveProperty('id');
+    expect((noticesJson.notices as Array<Record<string, unknown>>)[0]).toHaveProperty('pairedAt');
+    expect(JSON.stringify(noticesJson)).not.toContain('overdeck-connector:');
+
+    await handleConnectorRevoke('internal-token', json.tokenId as string);
+    expect((await read(await handleConnectorNotices('root-session'))).json.notices).toEqual([]);
+  });
+
+  it('refuses a non-root credential kind for notices and dismiss', async () => {
+    expect((await read(await handleConnectorNotices('device'))).status).toBe(403);
+    expect((await read(await handleConnectorNoticeDismiss('device', 'whatever'))).status).toBe(403);
+  });
+
+  it('dismisses a notice once, then 404s for an unknown id', async () => {
+    const { json } = await read(await handleConnectorsExchange(exchangeBody(), await connectorPairingMarker(CONNECTOR_KEY)));
+    const { notices } = (await read(await handleConnectorNotices('root-session'))).json as { notices: Array<{ id: string }> };
+    const noticeId = notices[0]!.id;
+
+    const dismissed = await read(await handleConnectorNoticeDismiss('root-session', noticeId));
+    expect(dismissed.status).toBe(200);
+    expect(dismissed.json).toEqual({ ok: true });
+    expect((await read(await handleConnectorNotices('root-session'))).json.notices).toEqual([]);
+
+    const unknown = await read(await handleConnectorNoticeDismiss('root-session', 'no-such-id'));
+    expect(unknown.status).toBe(404);
+    expect(unknown.json.error).toBe('no connector notice with id no-such-id');
+  });
+
+  it('through the real routes with the internal token: empty notices, and dismiss of an unknown id is 404', async () => {
+    const INTERNAL_TOKEN = 'pan-5070-notices-internal-token-0123456789';
+    await writeFile(join(home, 'internal-token'), INTERNAL_TOKEN, { mode: 0o600 });
+    _resetInternalTokenCacheForTests();
+    cleanups.push(async () => {
+      await rm(join(home, 'internal-token'), { force: true });
+      _resetInternalTokenCacheForTests();
+    });
+
+    const headers = { [INTERNAL_TOKEN_HEADER]: INTERNAL_TOKEN };
+    const run = async (method: 'GET' | 'POST', path: string) => {
+      const init: RequestInit = { method, headers: method === 'POST' ? { 'Content-Type': 'application/json', ...headers } : headers };
+      const request = HttpServerRequest.fromWeb(new Request(`http://localhost${path}`, init)).modify({ remoteAddress: Option.some('127.0.0.1') });
+      const response = await Effect.runPromise(Effect.scoped(Effect.flatMap(
+        HttpRouter.toHttpEffect(connectorsRouteLayer),
+        (app) => Effect.provideService(app, HttpServerRequest.HttpServerRequest, request),
+      )));
+      return read(response);
+    };
+
+    const notices = await run('GET', '/api/connectors/notices');
+    expect(notices.status).toBe(200);
+    expect(notices.json).toEqual({ notices: [] });
+
+    const dismiss = await run('POST', '/api/connectors/requests/no-such-id/dismiss');
+    expect(dismiss.status).toBe(404);
+    expect(dismiss.json.error).toBe('no connector notice with id no-such-id');
   });
 });

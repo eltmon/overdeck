@@ -7,7 +7,6 @@ import {
   type RiverEffectsApi,
 } from '../RiverCanvas';
 import {
-  FEED_TICKER_CHANCE,
   HOOK_HEAT_BUMP,
   HOOK_RATE_BUMP,
   TOOL_TICKER_CHANCE,
@@ -24,8 +23,6 @@ function orb(id: string, overrides: Partial<ConfluenceOrb> = {}): ConfluenceOrb 
     role: 'work',
     stage: 'WORK',
     title: id,
-    heat: 0.4,
-    staleMin: 0,
     state: 'active',
     convoy: null,
     yieldReason: null,
@@ -37,7 +34,6 @@ function orb(id: string, overrides: Partial<ConfluenceOrb> = {}): ConfluenceOrb 
     labels: [],
     glyph: 'G',
     lastActivity: '2026-08-02T12:00:00.000Z',
-    idleMin: 0,
     waitUntil: 0,
     thinkUntil: 0,
     compactT: 0,
@@ -45,7 +41,7 @@ function orb(id: string, overrides: Partial<ConfluenceOrb> = {}): ConfluenceOrb 
     issueState: null,
     attention: null,
     parkedOrbit: null,
-    parkedMin: null,
+    parkedAt: null,
     orbitReason: null,
     ...overrides,
   };
@@ -70,12 +66,9 @@ function effects(): RiverEffectsApi {
     emitRing: vi.fn(),
     emitTicker: vi.fn(),
     playTide: vi.fn(),
-    playMerge: vi.fn(),
     playThaw: vi.fn(),
     playSweep: vi.fn(),
     playFlare: vi.fn(),
-    pulseSun: vi.fn(),
-    spawnFromSun: vi.fn(),
     gateFlash: vi.fn(),
   };
 }
@@ -110,11 +103,10 @@ describe('Confluence choreography dispatch table', () => {
     expect(HOOK_HEAT_BUMP).toBe(0.06);
     expect(HOOK_RATE_BUMP).toBe(0.13);
     expect(TOOL_TICKER_CHANCE).toBe(0.13);
-    expect(FEED_TICKER_CHANCE).toBe(0.16);
 
     const previous = new Map([
       ['PAN-1', orb('PAN-1')],
-      ['PAN-2', orb('PAN-2', { state: 'stale', staleMin: 42 })],
+      ['PAN-2', orb('PAN-2', { state: 'stale' })],
       ['PAN-3', orb('PAN-3', { state: 'shelf', yieldReason: 'yield: older' })],
       ['PAN-4', orb('PAN-4', { issueState: 'ready' })],
       ['PAN-5', orb('PAN-5')],
@@ -127,12 +119,12 @@ describe('Confluence choreography dispatch table', () => {
       ['PAN-2', orb('PAN-2', { state: 'active' })],
       ['PAN-3', orb('PAN-3')],
       ['PAN-4', orb('PAN-4', { issueState: 'merged' })],
-      ['PAN-5', orb('PAN-5', { state: 'shelf', yieldReason: 'yield: freeing a slot for PAN-50' })],
+      ['PAN-5', orb('PAN-5', { state: 'shelf', yieldedByScheduler: true, yieldReason: 'yield: freeing a slot for PAN-50' })],
       ['PAN-6', orb('PAN-6', { state: 'failed', attention: 'stuck' })],
       ['PAN-50', orb('PAN-50', { role: 'review', stage: 'REVIEW' })],
       ['PAN-99', orb('PAN-99', { role: 'plan', stage: 'PLAN' })],
     ]);
-    const rolls = [0.12, 0.15];
+    const rolls = [0.12];
     const commands = planConfluenceChoreography({
       previous,
       current,
@@ -151,15 +143,15 @@ describe('Confluence choreography dispatch table', () => {
       specRateBump: 0.13,
     });
     expect(commands).toContainEqual({ type: 'ticker', text: 'PAN-2 · Read', color: '#00d4ff' });
-    expect(commands).toContainEqual({ type: 'ticker', text: 'PreToolUse · PAN-2', color: '#00d4ff' });
     expect(commands).toContainEqual({ type: 'ring', issueId: 'PAN-1', color: '#ffb800' });
     expect(commands).toContainEqual({ type: 'sparks', issueId: 'PAN-1', color: '#ffb800', heatBump: 0, specRateBump: 0 });
     expect(commands).toContainEqual({ type: 'gate', stage: 'REVIEW' });
-    expect(commands).not.toContainEqual({ type: 'merge', issueId: 'PAN-4' });
-    expect(commands).toContainEqual({ type: 'tide', targetId: 'PAN-5', beneficiaryId: 'PAN-50' });
+    expect(commands.filter((command) => command.type === 'tide')).toStrictEqual([{ type: 'tide', targetId: 'PAN-5' }]);
     expect(commands).toContainEqual({ type: 'ring', issueId: 'PAN-3', color: '#39ff14' });
-    expect(commands).toContainEqual({ type: 'sun' });
-    expect(commands).toContainEqual({ type: 'spawn', issueId: 'PAN-99' });
+    // A new plan orb plans nothing: reconcile already drew it in its column.
+    expect(commands.some((command) => 'issueId' in command && command.issueId === 'PAN-99')).toBe(false);
+    // ready → merged plans nothing: the canvas starts the portal comet itself from the merged issue state.
+    expect(commands.some((command) => 'issueId' in command && command.issueId === 'PAN-4')).toBe(false);
     expect(commands.some((command) => 'issueId' in command && command.issueId === 'PAN-6')).toBe(false);
 
     const api = effects();
@@ -168,22 +160,56 @@ describe('Confluence choreography dispatch table', () => {
     expect(api.emitSparks).toHaveBeenCalledWith('PAN-2', '#00d4ff', 'agent-pan-2', 0.06);
     expect(api.emitRing).toHaveBeenCalledWith('PAN-1', '#ffb800');
     expect(api.gateFlash).toHaveBeenCalledWith('REVIEW');
-    expect(api.playMerge).not.toHaveBeenCalled();
-    expect(api.playTide).toHaveBeenCalledWith('PAN-5', 'PAN-50');
-    expect(api.pulseSun).toHaveBeenCalledOnce();
-    expect(api.spawnFromSun).toHaveBeenCalledWith('PAN-99');
+    expect(vi.mocked(api.playTide).mock.calls).toEqual([['PAN-5']]);
   });
 
-  it('uses the most recently active review orb when a yield reason names no beneficiary', () => {
+  it('plans at most one ticker for one hook event', () => {
+    const plan = (random: () => number) => planConfluenceChoreography({
+      previous: new Map([['PAN-1', orb('PAN-1')]]),
+      current: new Map([['PAN-1', orb('PAN-1')]]),
+      hookEvents: [hook('PAN-1')],
+      random,
+    }).filter((command) => command.type === 'ticker');
+
+    expect(plan(() => 0)).toEqual([{ type: 'ticker', text: 'PAN-1 · Read', color: '#00d4ff' }]);
+    expect(plan(() => 1)).toEqual([]);
+  });
+
+  it('plans no command for a new plan orb that the previous cast did not have', () => {
+    const commands = planConfluenceChoreography({
+      previous: new Map([['PAN-1', orb('PAN-1')]]),
+      current: new Map([
+        ['PAN-1', orb('PAN-1')],
+        ['PAN-99', orb('PAN-99', { role: 'plan', stage: 'PLAN' })],
+      ]),
+      hookEvents: [],
+    });
+
+    expect(commands).toEqual([]);
+  });
+
+  it('plays a tide that names only its target when the scheduler yields an orb', () => {
     const previous = new Map([['PAN-5', orb('PAN-5')]]);
     const current = new Map([
-      ['PAN-5', orb('PAN-5', { state: 'shelf', yieldReason: 'yield: freeing a slot' })],
-      ['PAN-10', orb('PAN-10', { role: 'review', stage: 'REVIEW', lastActivity: '2026-08-02T11:00:00.000Z' })],
-      ['PAN-11', orb('PAN-11', { role: 'review', stage: 'REVIEW', lastActivity: '2026-08-02T12:00:00.000Z' })],
+      ['PAN-5', orb('PAN-5', { state: 'shelf', yieldedByScheduler: true, yieldReason: 'yield: freeing a slot' })],
+      ['PAN-11', orb('PAN-11', { role: 'review', stage: 'REVIEW' })],
     ]);
 
-    expect(planConfluenceChoreography({ previous, current, hookEvents: [] }))
-      .toContainEqual({ type: 'tide', targetId: 'PAN-5', beneficiaryId: 'PAN-11' });
+    const commands = planConfluenceChoreography({ previous, current, hookEvents: [] });
+    expect(commands).toStrictEqual([{ type: 'tide', targetId: 'PAN-5' }]);
+
+    const api = effects();
+    runConfluenceCommands(commands, api);
+    expect(vi.mocked(api.playTide).mock.calls).toEqual([['PAN-5']]);
+  });
+
+  it('plays no tide for a pause the scheduler did not make', () => {
+    const previous = new Map([['PAN-5', orb('PAN-5')]]);
+    const current = new Map([
+      ['PAN-5', orb('PAN-5', { state: 'shelf', yieldedByScheduler: false, yieldReason: 'operator hold' })],
+    ]);
+
+    expect(planConfluenceChoreography({ previous, current, hookEvents: [] })).toEqual([]);
   });
 
   it('emits sparks for same-second events with distinct domain sequences', () => {
@@ -297,15 +323,19 @@ describe('planSweepCommands', () => {
 });
 
 describe('evictionFor (PAN-4523 render-layer eviction)', () => {
-  it('drops shelf and stale orbs, fades other active orbs, and merges only an active MERGE orb', () => {
-    expect(evictionFor('shelf', 'WORK')).toBe('drop');
-    expect(evictionFor('stale', 'REVIEW')).toBe('drop');
-    expect(evictionFor('active', 'WORK')).toBe('fade');
-    expect(evictionFor('active', 'MERGE')).toBe('merge');
+  it('drops shelf and stale orbs, fades other active orbs, and merges only a merged MERGE orb', () => {
+    expect(evictionFor('shelf', 'WORK', null)).toBe('drop');
+    expect(evictionFor('stale', 'REVIEW', 'in-review')).toBe('drop');
+    expect(evictionFor('active', 'WORK', 'working')).toBe('fade');
+    expect(evictionFor('active', 'MERGE', 'merged')).toBe('merge');
+    // An orb that leaves MERGE before its issue merged did not merge: it fades.
+    expect(evictionFor('active', 'MERGE', 'ready')).toBe('fade');
+    expect(evictionFor('active', 'MERGE', null)).toBe('fade');
+    expect(evictionFor('active', 'WORK', 'merged')).toBe('fade');
     // An operator-held merged issue (state 'shelf') must drop with the shelf
     // cap, not animate through the portal as a completed merge (PAN-4523 review).
-    expect(evictionFor('shelf', 'MERGE')).toBe('drop');
-    expect(evictionFor('stale', 'MERGE')).toBe('drop');
+    expect(evictionFor('shelf', 'MERGE', 'merged')).toBe('drop');
+    expect(evictionFor('stale', 'MERGE', 'merged')).toBe('drop');
   });
 
   it('keeps exactly eight shelf orbs through an eight-to-eight replacement', () => {
@@ -315,7 +345,7 @@ describe('evictionFor (PAN-4523 render-layer eviction)', () => {
 
     for (const [id, existing] of live) {
       if (nextIds.has(id)) continue;
-      if (evictionFor(existing.state, existing.stage) === 'drop') live.delete(id);
+      if (evictionFor(existing.state, existing.stage, existing.issueState) === 'drop') live.delete(id);
     }
     live.set('PAN-99', orb('PAN-99', { state: 'shelf', stage: 'WORK' }));
 
@@ -326,8 +356,8 @@ describe('evictionFor (PAN-4523 render-layer eviction)', () => {
 
 describe('honest thaw semantics (PAN-3490 follow-up)', () => {
   it('a hook beat on an orb that STAYS stale sparks but never thaws', () => {
-    const previous = new Map([['PAN-2', orb('PAN-2', { state: 'stale', staleMin: 42 })]]);
-    const current = new Map([['PAN-2', orb('PAN-2', { state: 'stale', staleMin: 43 })]]);
+    const previous = new Map([['PAN-2', orb('PAN-2', { state: 'stale' })]]);
+    const current = new Map([['PAN-2', orb('PAN-2', { state: 'stale' })]]);
     const commands = planConfluenceChoreography({
       previous,
       current,
@@ -336,5 +366,25 @@ describe('honest thaw semantics (PAN-3490 follow-up)', () => {
     });
     expect(commands.filter((command) => command.type === 'thaw')).toHaveLength(0);
     expect(commands.some((command) => command.type === 'sparks' && command.issueId === 'PAN-2')).toBe(true);
+  });
+
+  function thawsFor(next: Partial<ConfluenceOrb>) {
+    return planConfluenceChoreography({
+      previous: new Map([['PAN-2', orb('PAN-2', { state: 'stale' })]]),
+      current: new Map([['PAN-2', orb('PAN-2', next)]]),
+      hookEvents: [],
+    }).filter((command) => command.type === 'thaw');
+  }
+
+  it('plays no thaw when a stale orb moves to the shelf', () => {
+    expect(thawsFor({ state: 'shelf', yieldReason: 'operator hold' })).toEqual([]);
+  });
+
+  it('plays exactly one thaw when a stale orb becomes active', () => {
+    expect(thawsFor({ state: 'active' })).toEqual([{ type: 'thaw', issueId: 'PAN-2' }]);
+  });
+
+  it('plays no thaw when a stale orb becomes failed', () => {
+    expect(thawsFor({ state: 'failed', attention: 'stuck' })).toEqual([]);
   });
 });

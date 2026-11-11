@@ -24,8 +24,8 @@ Complete guide to configuring Overdeck's multi-model routing system.
    ```yaml
    workhorses:
      expensive: claude-opus-5-5
-     mid: claude-sonnet-5-5
-     cheap: claude-haiku-4-5
+     mid: claude-opus-5-5
+     cheap: claude-haiku-5-5
    ```
 
 2. **Add API keys** (in `~/.overdeck.env`):
@@ -65,8 +65,8 @@ models:
 # Model slots that roles reference as workhorse:<slot>
 workhorses:
   expensive: claude-opus-5-5
-  mid: claude-sonnet-5-5
-  cheap: claude-haiku-4-5
+  mid: claude-opus-5-5
+  cheap: claude-haiku-5-5
 
 # Per-role models (optional; see MODEL-CALLS.md for every role's default)
 roles:

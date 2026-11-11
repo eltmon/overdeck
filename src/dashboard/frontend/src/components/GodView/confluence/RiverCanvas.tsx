@@ -8,23 +8,28 @@ import {
 import { createAurora, type AuroraController } from './aurora';
 import { resolveHoverOrb } from './OrbTooltip';
 import {
-  PROJECT_RING,
   ROLE_COLORS,
   STAGES,
   STAGE_COLORS,
   SWEEP_BEAM_COLOR,
   SWEEP_FLARE_COLOR,
-  advanceFrostAccrual,
   clamp,
   computeLayout,
+  eventsPerMinuteByIssue,
+  failedReason,
   fitText,
   fmtAge,
+  frostFromIdleMinutes,
+  heatFromEventRate,
   hexA,
+  landmarkMotion,
   modelGlyph,
+  orbIdleMinutes,
   parkedOrbitColor,
   parkedOrbitTag,
   pickOrb,
   positionOrb,
+  projectRingColor,
   shelfSlotWidth,
   staleSlotWidth,
   type Stage,
@@ -68,7 +73,7 @@ interface RenderOrb extends ConfluenceOrb {
   mergeDwell: number;
   fading: number | null;
   frost: number;
-  frostHold: number;
+  heat: number; evPerMin: number;
   flashT: number;
   convoy: Satellite[] | null;
 }
@@ -88,7 +93,7 @@ interface Particle {
 interface Pulse { x: number; y: number; r: number; maxR: number; color: string; alpha: number; width: number }
 interface Ticker { text: string; color: string; x: number; y: number; life: number; maxLife: number }
 interface GateFlash { x: number; t: number }
-interface Tide { active: boolean; x: number; targetId: string | null; beneficiaryId: string | null; t: number }
+interface Tide { active: boolean; x: number; targetId: string | null; ringed: boolean; t: number }
 /** The sweeper's lantern beam (PAN-3490): an ice-blue light that travels the
  * Doldrums band on a real population change, glinting each frozen orb it
  * passes. Distinct from the governor tide (amber, river+shelf) in color,
@@ -104,13 +109,10 @@ export interface RiverEffectsApi {
   emitSparks(issueId: string, color?: string, agentId?: string, heatBump?: number): void;
   emitRing(issueId: string, color?: string): void;
   emitTicker(text: string, color?: string): void;
-  playTide(targetId?: string, beneficiaryId?: string): void;
-  playMerge(issueId: string): void;
+  playTide(targetId: string): void;
   playThaw(issueId: string): void;
   playSweep(): void;
   playFlare(issueId: string): void;
-  pulseSun(): void;
-  spawnFromSun(issueId: string): void;
   gateFlash(stage: Stage | number): void;
 }
 
@@ -124,7 +126,8 @@ export interface RiverCanvasProps {
   selectedId?: string | null;
   conversations?: number | null;
   mergeQueue?: number;
-  sequencer?: boolean;
+  flywheelLive: boolean;
+  sequencerLive: boolean;
   /** True parked census for the Doldrums label (null while /api/parked is unanswered). */
   parkedTotal?: number | null;
   onHover?: (orb: ConfluenceOrb | null, point: { x: number; y: number; canvasWidth: number } | null) => void;
@@ -156,13 +159,17 @@ export function resolveMergeReconciliation(
 
 /** How the canvas removes an orb that left the cast. Shelf and Doldrums orbs drop
  * at once so the band caps (SHELF_ORB_LIMIT, STALE_ORB_LIMIT) hold on every frame. */
-export function evictionFor(state: ConfluenceOrb['state'], stage: Stage): 'merge' | 'drop' | 'fade' {
+export function evictionFor(
+  state: ConfluenceOrb['state'],
+  stage: Stage,
+  issueState: ConfluenceOrb['issueState'],
+): 'merge' | 'drop' | 'fade' {
   // State wins over stage: an operator-held merged issue (state 'shelf', stage
   // 'MERGE') must drop with the rest of the shelf cap, not animate through the
   // portal as a completed merge (PAN-4523 review) — only an active MERGE orb
-  // merges.
+  // merges. An orb that leaves MERGE without a `merged` issue state fades.
   if (state === 'shelf' || state === 'stale') return 'drop';
-  if (stage === 'MERGE') return 'merge';
+  if (stage === 'MERGE' && issueState === 'merged') return 'merge';
   return 'fade';
 }
 
@@ -184,10 +191,6 @@ function mixColor(first: string, second: string, amount: number): string {
 
 function roleColor(role: string): string {
   return ROLE_COLORS[role as keyof typeof ROLE_COLORS] ?? STAGE_COLORS.WORK;
-}
-
-function projectColor(project: string): string {
-  return PROJECT_RING[project as keyof typeof PROJECT_RING] ?? STAGE_COLORS.PLAN;
 }
 
 function createSatellite(member: ConfluenceConvoyMember, index: number, total: number, arriving = false): Satellite {
@@ -226,7 +229,7 @@ function createEngine(
   const pulses: Pulse[] = [];
   const tickers: Ticker[] = [];
   const gateFlashes: GateFlash[] = [];
-  const tide: Tide = { active: false, x: 0, targetId: null, beneficiaryId: null, t: 0 };
+  const tide: Tide = { active: false, x: 0, targetId: null, ringed: false, t: 0 };
   const sweepBeam: SweepBeam = { active: false, x: 0, t: 0 };
   const flares: Flare[] = [];
   let props = initial;
@@ -291,7 +294,7 @@ function createEngine(
     gateFlashes.push({ x: layout.padX + Math.max(0, index) * layout.colW, t: 0 });
   };
 
-  const spawnOrb = (source: ConfluenceOrb, fromSun = false): RenderOrb => {
+  const spawnOrb = (source: ConfluenceOrb, evPerMin: number): RenderOrb => {
     const convoy = source.convoy?.map((member, index, members) => createSatellite(member, index, members.length)) ?? null;
     const orb: RenderOrb = {
       ...source,
@@ -308,14 +311,12 @@ function createEngine(
       mergeVx: 0,
       mergeDwell: source.stage === 'MERGE' ? 1.5 + Math.random() * 2 : 0,
       fading: null,
-      frost: 0,
-      frostHold: 0,
+      frost: 0, evPerMin, heat: source.state === 'stale' ? 0.04 : heatFromEventRate(evPerMin),
       flashT: 0,
     };
     renderOrbs.set(orb.id, orb);
     anchorAll();
-    orb.x = fromSun ? layout.sunX : orb.state === 'stale' || orb.state === 'failed' ? orb.tx : orb.tx - 60;
-    orb.y = fromSun ? layout.sunY : orb.ty;
+    orb.x = orb.state === 'stale' || orb.state === 'failed' ? orb.tx : orb.tx - 60; orb.y = orb.ty;
     return orb;
   };
 
@@ -334,29 +335,16 @@ function createEngine(
     renderOrbs.delete(orb.id);
   };
   const thaw = (orb: RenderOrb) => {
-    orb.state = 'active';
-    orb.stage = 'WORK';
-    orb.staleMin = 0;
-    orb.idleMin = 0;
-    orb.frost = 0;
-    orb.frostHold = 0;
-    orb.heat = 0.8;
-    anchorAll();
     burst(orb.x, orb.y, ICE, 40, 90, 1.6, 2.4);
     ring(orb.x, orb.y, '#00d4ff', 80, 2.5);
-    ticker(`${orb.id} thawed`, '#00d4ff');
+    ticker(`${orb.id} active again`, '#00d4ff');
   };
 
   const api: RiverEffectsApi = {
     emitSparks(issueId, color = '#00d4ff', agentId, heatBump = 0) { const orb = orbAt(issueId); if (orb) { orb.heat = Math.min(1, orb.heat + heatBump); orb.flashT = simT + 0.8; const satellite = orb.convoy?.find((member) => member.agentId === agentId); if (satellite) satellite.flash = 1; burst(orb.x, orb.y, color, 26, 90, 1.4, 2.6); } },
     emitRing(issueId, color = '#00d4ff') { const orb = orbAt(issueId); if (orb) ring(orb.x, orb.y, color, 70, 2.5); },
     emitTicker(text, color = '#00d4ff') { ticker(text, color); },
-    playTide(targetId, beneficiaryId) {
-      tide.active = true; tide.x = layout.padX - 40; tide.t = 0;
-      tide.targetId = targetId ?? list().find((orb) => orb.state === 'active' && orb.stage === 'WORK')?.id ?? null;
-      tide.beneficiaryId = beneficiaryId ?? list().find((orb) => orb.state === 'shelf')?.id ?? null;
-    },
-    playMerge(issueId) { const orb = orbAt(issueId); if (orb) startMerge(orb); },
+    playTide(targetId) { tide.active = true; tide.x = layout.padX - 40; tide.t = 0; tide.targetId = targetId; tide.ringed = false; },
     playThaw(issueId) { const orb = orbAt(issueId); if (orb) thaw(orb); },
     playSweep() {
       sweepBeam.active = true;
@@ -371,13 +359,11 @@ function createEngine(
       burst(orb.x, orb.y - orb.radius, SWEEP_FLARE_COLOR, 18, 60, 1.4, 2, Math.PI * 0.9, -Math.PI / 2);
       ring(orb.x, orb.y, SWEEP_FLARE_COLOR, 66, 2);
     },
-    pulseSun() { ring(layout.sunX, layout.sunY, '#9d4edd', 90, 2.5); },
-    spawnFromSun(issueId) { const source = props.orbs.find((orb) => orb.id === issueId); if (source && !orbAt(issueId)) spawnOrb(source, true); },
     gateFlash: flashGate,
   };
 
   const reconcile = (next: RiverCanvasProps) => {
-    props = next;
+    props = next; const rates = eventsPerMinuteByIssue(next.hookStream.entries, Date.now());
     const live = new Set(next.orbs.map((orb) => orb.id));
     for (const source of next.orbs) {
       const current = orbAt(source.id);
@@ -388,7 +374,7 @@ function createEngine(
         current?.merging ?? false,
       );
       if (!mergeState.retired) retiredIds.delete(source.id);
-      if (!current) { if (mergeState.shouldSpawn) spawnOrb(source); continue; }
+      if (!current) { if (mergeState.shouldSpawn) spawnOrb(source, rates.get(source.id) ?? 0); continue; }
       if (mergeState.cancelMerge) {
         current.merging = false;
         current.mergeVx = 0;
@@ -402,7 +388,7 @@ function createEngine(
           ? Object.assign(existingSatellites.get(member.role)!, member)
           : createSatellite(member, index, members.length, true)) ?? null,
         compactT: Math.max(current.compactT, source.compactT),
-        fading: null,
+        fading: null, evPerMin: rates.get(source.id) ?? 0,
       });
       if (source.stage !== previousStage && source.stage === 'MERGE') {
         current.mergeDwell = 1.5 + Math.random() * 2;
@@ -411,7 +397,7 @@ function createEngine(
     }
     for (const orb of list()) {
       if (live.has(orb.id) || orb.merging || orb.fading !== null) continue;
-      const eviction = evictionFor(orb.state, orb.stage);
+      const eviction = evictionFor(orb.state, orb.stage, orb.issueState);
       if (eviction === 'merge') startMerge(orb);
       else if (eviction === 'drop') renderOrbs.delete(orb.id);
       else orb.fading = 1;
@@ -492,7 +478,7 @@ function createEngine(
       ? `${props.parkedTotal} parked · showing ${staleShown}`
       : `${staleShown} frozen`;
     fx.fillStyle = 'rgba(159,199,255,0.55)'; fx.fillText(`❄ DOLDRUMS — stalled, nothing autonomous will advance · ${census}`, width - layout.padX - 8, layout.doldrumsHeaderY); fx.textAlign = 'left';
-    if (Math.random() < 0.12) frostMotes(layout.padX + Math.random() * (width - layout.padX * 2), layout.doldrumsY - 20, 1);
+    if (staleShown > 0 && Math.random() < 0.12) frostMotes(layout.padX + Math.random() * (width - layout.padX * 2), layout.doldrumsY - 20, 1);
   };
 
   const drawPortal = () => {
@@ -503,11 +489,11 @@ function createEngine(
   };
 
   const drawSun = () => {
-    const pulse = 0.5 + 0.5 * Math.sin(simT * 1.8); const radius = 16 + pulse * 3;
+    const { pulse, spin, alpha } = landmarkMotion(props.flywheelLive, simT, 1.8); const radius = 16 + pulse * 3; fx.globalAlpha = alpha;
     const glow = fx.createRadialGradient(layout.sunX, layout.sunY, 0, layout.sunX, layout.sunY, radius * 3.2); glow.addColorStop(0, 'rgba(157,78,221,.75)'); glow.addColorStop(0.35, 'rgba(157,78,221,.22)'); glow.addColorStop(1, 'rgba(157,78,221,0)');
     fx.fillStyle = glow; fx.beginPath(); fx.arc(layout.sunX, layout.sunY, radius * 3.2, 0, 7); fx.fill(); fx.fillStyle = '#cfa8ff'; fx.shadowColor = '#9d4edd'; fx.shadowBlur = 16; fx.beginPath(); fx.arc(layout.sunX, layout.sunY, radius * 0.55, 0, 7); fx.fill(); fx.shadowBlur = 0;
-    fx.save(); fx.translate(layout.sunX, layout.sunY); fx.rotate(simT * 0.5); fx.strokeStyle = 'rgba(157,78,221,.6)'; fx.setLineDash([3, 7]); fx.lineWidth = 1.4; fx.beginPath(); fx.arc(0, 0, radius + 7, 0, 7); fx.stroke(); fx.rotate(-simT * 0.9); fx.strokeStyle = 'rgba(157,78,221,.3)'; fx.setLineDash([2, 9]); fx.beginPath(); fx.arc(0, 0, radius + 14, 0, 7); fx.stroke(); fx.setLineDash([]); fx.restore();
-    fx.font = '600 9px "JetBrains Mono"'; fx.fillStyle = 'rgba(207,168,255,.85)'; fx.textAlign = 'center'; fx.fillText('FLYWHEEL', layout.sunX, layout.sunY + radius + 20); fx.textAlign = 'left';
+    fx.save(); fx.translate(layout.sunX, layout.sunY); fx.rotate(spin * 0.5); fx.strokeStyle = 'rgba(157,78,221,.6)'; fx.setLineDash([3, 7]); fx.lineWidth = 1.4; fx.beginPath(); fx.arc(0, 0, radius + 7, 0, 7); fx.stroke(); fx.rotate(-spin * 0.9); fx.strokeStyle = 'rgba(157,78,221,.3)'; fx.setLineDash([2, 9]); fx.beginPath(); fx.arc(0, 0, radius + 14, 0, 7); fx.stroke(); fx.setLineDash([]); fx.restore();
+    fx.font = '600 9px "JetBrains Mono"'; fx.fillStyle = 'rgba(207,168,255,.85)'; fx.textAlign = 'center'; fx.fillText('FLYWHEEL', layout.sunX, layout.sunY + radius + 20); fx.textAlign = 'left'; fx.globalAlpha = 1;
   };
 
   const drawStageHeaders = () => {
@@ -565,13 +551,13 @@ function createEngine(
         fx.fillStyle = 'rgba(70,90,130,.9)'; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 0.7, 0, 7); fx.fill(); fx.strokeStyle = hexA(tint, 0.75); fx.beginPath(); fx.arc(orb.x, orb.y, radius * 0.85, 0, 7); fx.stroke(); drawFrostCrown(orb, radius * 0.9, 1);
         const orbitTag = parkedOrbitTag(orb.parkedOrbit);
         const staleLabelY = orb.ty < layout.doldrumsY ? layout.doldrumsUpperLabelY : layout.doldrumsLowerLabelY;
-        const staleLabelText = orbitTag ? `❄ ${orb.id} · ${orbitTag} ${fmtAge(orb.staleMin)}` : `❄ ${orb.id} · ${fmtAge(orb.staleMin)} idle`;
+        const staleLabelText = orbitTag ? `❄ ${orb.id} · ${orbitTag} ${fmtAge(orbIdleMinutes(orb, now))}` : `❄ ${orb.id} · ${fmtAge(orbIdleMinutes(orb, now))} idle`;
         fx.font = '600 10px "JetBrains Mono"';
         drawLabel(orb, fitText(staleLabelText, staleSlotWidth(layout, staleCount), measureText), hexA(tint, 0.85), staleLabelY);
         fx.globalAlpha = 1; continue;
       }
       if (orb.state === 'failed') {
-        const blink = 0.5 + 0.5 * Math.sin(simT * 3 + orb.wobA); fx.fillStyle = 'rgba(96,22,48,.95)'; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 0.62, 0, 7); fx.fill(); fx.strokeStyle = `rgba(255,45,124,${0.35 + blink * 0.55})`; fx.lineWidth = 1.6; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 0.95, 0, 7); fx.stroke(); drawLabel(orb, `✗ ${orb.id} · merge failed`, 'rgba(255,120,165,.9)'); fx.globalAlpha = 1; continue;
+        const blink = 0.5 + 0.5 * Math.sin(simT * 3 + orb.wobA); fx.fillStyle = 'rgba(96,22,48,.95)'; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 0.62, 0, 7); fx.fill(); fx.strokeStyle = `rgba(255,45,124,${0.35 + blink * 0.55})`; fx.lineWidth = 1.6; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 0.95, 0, 7); fx.stroke(); drawLabel(orb, `✗ ${orb.id} · ${failedReason(orb.attention)}`, 'rgba(255,120,165,.9)'); fx.globalAlpha = 1; continue;
       }
       if (orb.state === 'needs-you') {
         // PAN-4383: the agent asked the operator (`pan ask`); a steady flare ring, not frost.
@@ -581,7 +567,7 @@ function createEngine(
         // risk overprinting its shelf-row neighbours.
         fx.fillStyle = hexA(SWEEP_FLARE_COLOR, 0.16); fx.beginPath(); fx.arc(orb.x, orb.y, radius * 1.5, 0, 7); fx.fill(); fx.fillStyle = 'rgba(40,34,14,.92)'; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 0.62, 0, 7); fx.fill(); fx.strokeStyle = hexA(SWEEP_FLARE_COLOR, 0.85); fx.lineWidth = 1.8; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 0.95, 0, 7); fx.stroke();
         fx.font = '600 10px "JetBrains Mono"';
-        drawLabel(orb, fitText(`⚑ ${orb.id} · needs you ${fmtAge(orb.staleMin)}`, shelfSlotWidth(layout, shelfCount), measureText), hexA(SWEEP_FLARE_COLOR, 0.9), layout.shelfLabelY); fx.globalAlpha = 1; continue;
+        drawLabel(orb, fitText(`⚑ ${orb.id} · needs you ${fmtAge(orbIdleMinutes(orb, now))}`, shelfSlotWidth(layout, shelfCount), measureText), hexA(SWEEP_FLARE_COLOR, 0.9), layout.shelfLabelY); fx.globalAlpha = 1; continue;
       }
       if (orb.state === 'shelf') {
         fx.fillStyle = 'rgba(255,184,0,.18)'; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 1.5, 0, 7); fx.fill(); fx.fillStyle = 'rgba(140,110,40,.9)'; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 0.62, 0, 7); fx.fill(); fx.strokeStyle = 'rgba(255,184,0,.55)'; fx.setLineDash([3, 3]); fx.beginPath(); fx.arc(orb.x, orb.y, radius * 0.95, 0, 7); fx.stroke(); fx.setLineDash([]); fx.fillStyle = 'rgba(10,14,26,.9)'; fx.font = '700 8px "JetBrains Mono"'; fx.textAlign = 'center'; fx.fillText('⏸', orb.x, orb.y + 2);
@@ -594,7 +580,7 @@ function createEngine(
       const glow = fx.createRadialGradient(orb.x, orb.y, 0, orb.x, orb.y, radius * 3); glow.addColorStop(0, hexA(baseRole, 0.45 * (0.3 + orb.heat) * (1 - orb.frost * 0.6))); glow.addColorStop(1, hexA(baseRole, 0)); fx.fillStyle = glow; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 3, 0, 7); fx.fill();
       fx.fillStyle = color; fx.shadowColor = baseRole; fx.shadowBlur = (14 + orb.heat * 22) * (1 - orb.frost * 0.7); fx.beginPath(); fx.arc(orb.x, orb.y, radius * 0.6, 0, 7); fx.fill(); fx.shadowBlur = 0; fx.fillStyle = `rgba(255,255,255,${0.35 + orb.heat * 0.5})`; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 0.28, 0, 7); fx.fill();
       if (orb.glyph) { fx.fillStyle = 'rgba(10,14,26,.92)'; fx.font = '700 8px "JetBrains Mono"'; fx.textAlign = 'center'; fx.fillText(orb.glyph, orb.x, orb.y + 2.5); }
-      fx.strokeStyle = hexA(projectColor(orb.project), 0.8); fx.lineWidth = 1.6; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 0.92, 0, 7); fx.stroke(); if (orb.frost > 0.25) drawFrostCrown(orb, radius, orb.frost);
+      fx.strokeStyle = hexA(projectRingColor(orb.id), 0.8); fx.lineWidth = 1.6; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 0.92, 0, 7); fx.stroke(); if (orb.frost > 0.25) drawFrostCrown(orb, radius, orb.frost);
       if (orb.waitUntil > now) { fx.save(); fx.translate(orb.x, orb.y); fx.rotate(simT * 1.8); fx.strokeStyle = 'rgba(255,184,0,.9)'; fx.setLineDash([5, 4]); fx.lineWidth = 1.8; fx.beginPath(); fx.arc(0, 0, radius * 1.18, 0, 7); fx.stroke(); fx.restore(); fx.setLineDash([]); }
       if (orb.thinkUntil > now) { fx.strokeStyle = 'rgba(255,255,255,.75)'; fx.lineWidth = 1.6; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 0.55, simT * 4, simT * 4 + 2.2); fx.stroke(); }
       if (orb.compactT > 0) { fx.strokeStyle = 'rgba(255,119,0,.9)'; fx.lineWidth = 2; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 1.15, 0, 7); fx.stroke(); }
@@ -604,7 +590,7 @@ function createEngine(
       if (orb.id === props.selectedId) { fx.save(); fx.translate(orb.x, orb.y); fx.rotate(simT * 1.4); fx.strokeStyle = 'rgba(255,255,255,.85)'; fx.setLineDash([6, 5]); fx.beginPath(); fx.arc(0, 0, radius + 9, 0, 7); fx.stroke(); fx.restore(); fx.setLineDash([]); }
       if (orb.flashT > simT) { const flash = clamp((orb.flashT - simT) / 0.8, 0, 1); fx.strokeStyle = `rgba(255,255,255,${flash * 0.9})`; fx.beginPath(); fx.arc(orb.x, orb.y, radius + 5 + (1 - flash) * 12, 0, 7); fx.stroke(); }
       drawLabel(orb, orb.broken || orb.warn ? `${orb.id} ⚠` : orb.id, orb.broken ? 'rgba(255,120,120,.95)' : orb.warn ? 'rgba(255,184,0,.95)' : orb.frost > 0.5 ? 'rgba(191,227,255,.9)' : 'rgba(232,237,248,.92)');
-      fx.font = '400 7px "JetBrains Mono"'; fx.textAlign = 'center'; const tag = orb.broken ? '⚠ stack broken' : orb.frost > 0.5 ? `stale ${fmtAge(orb.idleMin)}` : orb.waitUntil > now ? 'waiting…' : orb.thinkUntil > now ? 'thinking…' : `${orb.role} · ~${Math.round(orb.heat * 34)} ev/m`; fx.fillStyle = orb.broken ? 'rgba(255,68,68,.85)' : 'rgba(122,138,170,.6)'; fx.fillText(tag, orb.x, orb.y + radius + 16); fx.textAlign = 'left'; fx.globalAlpha = 1;
+      fx.font = '400 7px "JetBrains Mono"'; fx.textAlign = 'center'; const tag = orb.broken ? '⚠ stack broken' : orb.frost > 0.5 ? `stale ${fmtAge(orbIdleMinutes(orb, now))}` : orb.waitUntil > now ? 'waiting…' : orb.thinkUntil > now ? 'thinking…' : orb.evPerMin > 0 ? `${orb.role} · ${orb.evPerMin} ev/m` : `${orb.role} · quiet`; fx.fillStyle = orb.broken ? 'rgba(255,68,68,.85)' : 'rgba(122,138,170,.6)'; fx.fillText(tag, orb.x, orb.y + radius + 16); fx.textAlign = 'left'; fx.globalAlpha = 1;
     }
   };
 
@@ -661,11 +647,12 @@ function createEngine(
     }
   };
   const drawConstellation = () => { const count = props.conversations ?? 0; if (!count) return; const start = (width - (count * 14 + 150)) / 2; fx.font = '600 9px "JetBrains Mono"'; fx.fillStyle = 'rgba(0,212,255,.5)'; fx.fillText(`◈ ${count} CONVERSATIONS`, start, 33); for (let index = 0; index < count; index++) { const x = start + 130 + index * 14 + Math.sin(index * 3.7) * 3; const y = 30 + Math.sin(simT * 1.3 + index * 1.7) * 4; const twinkle = 0.4 + 0.6 * Math.abs(Math.sin(simT * 2 + index)); fx.fillStyle = `rgba(0,212,255,${0.2 + twinkle * 0.55})`; fx.beginPath(); fx.arc(x, y, 2 + twinkle * 1.2, 0, 7); fx.fill(); } };
-  const drawSequencer = () => { if (props.sequencer === false) return; const x = layout.sunX + 118; const y = layout.sunY - 2; const pulse = 0.5 + 0.5 * Math.sin(simT * 1.1 + 2); fx.save(); fx.translate(x, y); fx.rotate(simT * 0.7); fx.strokeStyle = `rgba(255,119,0,${0.3 + pulse * 0.3})`; fx.setLineDash([2, 4]); fx.beginPath(); fx.arc(0, 0, 10 + pulse * 2, 0, 7); fx.stroke(); fx.rotate(-simT * 1.3); fx.strokeStyle = `rgba(255,119,0,${0.16 + pulse * 0.18})`; fx.setLineDash([2, 7]); fx.beginPath(); fx.arc(0, 0, 16 + pulse * 2, 0, 7); fx.stroke(); fx.restore(); fx.setLineDash([]); fx.fillStyle = 'rgba(255,150,60,.9)'; fx.beginPath(); fx.arc(x, y, 5, 0, 7); fx.fill(); fx.font = '600 8.5px "JetBrains Mono"'; fx.fillStyle = 'rgba(255,150,60,.7)'; fx.fillText('SEQUENCER', x - 28, y + 28); };
+  const drawSequencer = () => { const x = layout.sunX + 118; const y = layout.sunY - 2; const { pulse, spin, alpha } = landmarkMotion(props.sequencerLive, simT, 1.1, 2); fx.globalAlpha = alpha; fx.save(); fx.translate(x, y); fx.rotate(spin * 0.7); fx.strokeStyle = `rgba(255,119,0,${0.3 + pulse * 0.3})`; fx.setLineDash([2, 4]); fx.beginPath(); fx.arc(0, 0, 10 + pulse * 2, 0, 7); fx.stroke(); fx.rotate(-spin * 1.3); fx.strokeStyle = `rgba(255,119,0,${0.16 + pulse * 0.18})`; fx.setLineDash([2, 7]); fx.beginPath(); fx.arc(0, 0, 16 + pulse * 2, 0, 7); fx.stroke(); fx.restore(); fx.setLineDash([]); fx.fillStyle = 'rgba(255,150,60,.9)'; fx.beginPath(); fx.arc(x, y, 5, 0, 7); fx.fill(); fx.font = '600 8.5px "JetBrains Mono"'; fx.fillStyle = 'rgba(255,150,60,.7)'; fx.fillText('SEQUENCER', x - 28, y + 28); fx.globalAlpha = 1; };
 
   const advance = (dt: number) => {
+    const nowMs = Date.now();
     for (const orb of list()) {
-      orb.heat = Math.max(orb.state === 'stale' ? 0.04 : 0.12, orb.heat * Math.pow(0.5, dt / 9));
+      const heatTarget = orb.state === 'stale' ? 0.04 : heatFromEventRate(orb.evPerMin); orb.heat += (heatTarget - orb.heat) * (1 - Math.pow(0.5, dt / 3));
       orb.wobA += dt * orb.wobSpeed * (1 + orb.heat * 2.2); orb.wobB += dt * orb.wobSpeed * 0.7; orb.compactT = Math.max(0, orb.compactT - dt);
       if (orb.fading !== null) { orb.fading -= dt; if (orb.fading <= 0) { renderOrbs.delete(orb.id); continue; } }
       if (orb.merging) { orb.mergeVx += dt * 260; orb.x += orb.mergeVx * dt; burst(orb.x, orb.y, '#e8edf8', 3, 40, 0.7, 2); if (orb.x > layout.portalX - 6) finishMerge(orb); continue; }
@@ -675,9 +662,9 @@ function createEngine(
         if (dwell.shouldStart) startMerge(orb);
       }
       if (orb.state === 'shelf' || orb.state === 'needs-you') { orb.y += (layout.shelfY - orb.y) * dt * 3; orb.x += (orb.tx - orb.x) * dt * 1.5; continue; }
-      if (orb.state === 'failed') { orb.y += Math.sin(simT * 0.5 + orb.wobA) * dt * 3; orb.x += Math.cos(simT * 0.4 + orb.wobB) * dt * 2; if (Math.random() < dt * 0.8) burst(orb.x, orb.y, '#ff2d7c', 1, 22, 1.2, 1.4); continue; }
-      if (orb.state === 'stale') { orb.staleMin += dt * 2; orb.x += (orb.tx + Math.sin(simT * 0.3 + orb.wobA) * 8 - orb.x) * dt * 1.2; orb.y += (orb.ty + Math.cos(simT * 0.22 + orb.wobB) * 4 - orb.y) * dt * 1.2; if (Math.random() < dt * 0.5) frostMotes(orb.x, orb.y, 1); continue; }
-      const frost = advanceFrostAccrual(orb.idleMin, orb.frostHold, dt); orb.idleMin = frost.idleMinutes; orb.frost = frost.frost; orb.frostHold = frost.frostHoldSeconds; if (orb.frost > 0.55 && Math.random() < dt * 5) snow(orb.x, orb.y); if (frost.sinkToDoldrums) { orb.state = 'stale'; orb.staleMin = Math.max(31, Math.round(orb.idleMin)); anchorAll(); ticker(`${orb.id} ❄ frozen`, ICE); continue; }
+      if (orb.state === 'failed') { orb.x += (orb.tx + Math.cos(simT * 0.4 + orb.wobB) * 6 - orb.x) * dt * 1.2; orb.y += (orb.ty + Math.sin(simT * 0.5 + orb.wobA) * 4 - orb.y) * dt * 1.2; if (Math.random() < dt * 0.8) burst(orb.x, orb.y, '#ff2d7c', 1, 22, 1.2, 1.4); continue; }
+      if (orb.state === 'stale') { orb.x += (orb.tx + Math.sin(simT * 0.3 + orb.wobA) * 8 - orb.x) * dt * 1.2; orb.y += (orb.ty + Math.cos(simT * 0.22 + orb.wobB) * 4 - orb.y) * dt * 1.2; if (Math.random() < dt * 0.5) frostMotes(orb.x, orb.y, 1); continue; }
+      orb.frost = frostFromIdleMinutes(orbIdleMinutes(orb, nowMs)); if (orb.frost > 0.55 && Math.random() < dt * 5) snow(orb.x, orb.y);
       const orbitRadius = orb.heat * 26; orb.orbitA += dt * (1 + orb.heat * 4); const targetX = orb.tx + Math.cos(orb.orbitA) * orbitRadius + Math.sin(orb.wobA) * 10; const targetY = orb.ty + Math.sin(orb.orbitA) * orbitRadius * 0.7 + Math.cos(orb.wobB) * 8; orb.x += (targetX - orb.x) * dt * 3.2; orb.y += (targetY - orb.y) * dt * 3.2;
       for (const neighbor of list()) { if (neighbor === orb || neighbor.state !== 'active' || neighbor.stage !== orb.stage || neighbor.merging) continue; const dx = orb.x - neighbor.x; const dy = orb.y - neighbor.y; const distanceSquared = dx * dx + dy * dy; if (distanceSquared > 1 && distanceSquared < 74 * 74) { const distance = Math.sqrt(distanceSquared); const push = (74 - distance) / 74 * 26 * dt; orb.x += dx / distance * push; orb.y += dy / distance * push; } }
       if (orb.convoy) for (const satellite of orb.convoy) { satellite.angle += dt * (0.6 + satellite.heat); satellite.flash = Math.max(0, satellite.flash - dt * 2); const baseRadius = 30 + orb.convoy.length * 3; if (satellite.arriving) { satellite.orbitR = Math.max(baseRadius, satellite.orbitR - dt * 36); if (satellite.orbitR <= baseRadius) { satellite.arriving = false; ring(orb.x, orb.y, '#ffb800', 60, 2); } } else satellite.orbitR = baseRadius; }
@@ -686,7 +673,7 @@ function createEngine(
     for (let index = pulses.length - 1; index >= 0; index--) { const pulse = pulses[index]!; pulse.r += dt * (pulse.maxR - 6) * 1.6; pulse.alpha -= dt * 1.1; if (pulse.alpha <= 0 || pulse.r >= pulse.maxR) pulses.splice(index, 1); }
     for (let index = tickers.length - 1; index >= 0; index--) { const item = tickers[index]!; item.life += dt; item.x += dt * 34; if (item.life > item.maxLife) tickers.splice(index, 1); }
     for (let index = gateFlashes.length - 1; index >= 0; index--) { gateFlashes[index]!.t += dt; if (gateFlashes[index]!.t > 0.8) gateFlashes.splice(index, 1); }
-    if (tide.active) { tide.t += dt; tide.x = layout.padX - 40 + tide.t / 1.6 * (width - layout.padX * 2 + 80); for (const orb of list()) { if (Math.abs(orb.x - tide.x) >= 30) continue; if (orb.id === tide.targetId && orb.state === 'active') { orb.state = 'shelf'; orb.yieldReason ||= 'yield: freeing a slot'; burst(orb.x, orb.y, '#ffb800', 20, 70, 1.2, 2.2); ring(orb.x, orb.y, '#ffb800', 60, 2); } if (orb.id === tide.beneficiaryId && orb.state === 'shelf') thaw(orb); } if (tide.x > width - layout.padX + 40) tide.active = false; }
+    if (tide.active) { tide.t += dt; tide.x = layout.padX - 40 + tide.t / 1.6 * (width - layout.padX * 2 + 80); const target = tide.ringed || !tide.targetId ? undefined : orbAt(tide.targetId); if (target && tide.x >= target.x - 30) { ring(target.x, target.y, '#ffb800', 60, 2); tide.ringed = true; } if (tide.x > width - layout.padX + 40) tide.active = false; }
     // Sweeper beam: crosses the Doldrums in ~1.8s; every frozen orb the light
     // touches glints — the scan visibly TOUCHES each parked issue it scanned.
     if (sweepBeam.active) {
@@ -761,12 +748,9 @@ export const RiverCanvas = forwardRef<RiverCanvasHandle, RiverCanvasProps>(funct
     emitRing: (...args) => engineRef.current?.api.emitRing(...args),
     emitTicker: (...args) => engineRef.current?.api.emitTicker(...args),
     playTide: (...args) => engineRef.current?.api.playTide(...args),
-    playMerge: (...args) => engineRef.current?.api.playMerge(...args),
     playThaw: (...args) => engineRef.current?.api.playThaw(...args),
     playSweep: () => engineRef.current?.api.playSweep(),
     playFlare: (...args) => engineRef.current?.api.playFlare(...args),
-    pulseSun: () => engineRef.current?.api.pulseSun(),
-    spawnFromSun: (...args) => engineRef.current?.api.spawnFromSun(...args),
     gateFlash: (...args) => engineRef.current?.api.gateFlash(...args),
     resize: () => engineRef.current?.resize(),
   }), []);

@@ -925,6 +925,51 @@ the row returns to normal. Both end the session; settling (above) does not
 — a settled conversation keeps running and can still be unsettled back to
 Inbox.
 
+## Resuming a stopped conversation
+
+A stopped conversation keeps its row and its transcript. Resume starts its
+agent session again on that transcript. Use the Resume button in the
+conversation, or resume it from a shell or an agent:
+
+```bash
+pan conv resume 20261106-0913        # prints "Resumed 20261106-0913."
+pan conv resume @desk/conv-a         # a conversation on a linked machine
+pan conv resume 20261106-0913 --json # the resumed conversation as JSON
+```
+
+The `resume_conversation` tool of the [Overdeck MCP server](/configuration/mcp)
+does the same. Both go through the dashboard's resume route and need the
+`operate` scope. A conversation that still runs is reattached, not started a
+second time. `pan conv resume` exits 1 on a refusal (for example, a
+conversation that continues on another machine) and 2 when no conversation
+has that name.
+
+### After a terminal-backend restart
+
+When the terminal backend restarts (a crash, an out-of-memory stop, or a
+service restart), every conversation that ran in it stops. Overdeck does not
+resume them by itself: relaunching many harnesses into a machine that just ran
+out of memory can cause the same out-of-memory stop again.
+
+Instead, Needs you shows one row in the System group: `<N> conversations
+stopped when the terminal backend restarted`, with their names and a **Resume
+all** button. Resume all resumes them one at a time. Before each one it waits
+while the memory governor reports memory or CPU pressure, and the row says so
+while it waits. Each resumed conversation is told that its process ended
+unexpectedly, so it takes a turn to restart its timers and loops; the
+flywheel resumes the way `pan flywheel resume` does. Resume all
+skips a conversation that you paused with `pan pause`, that holds an unsent
+`--hold` handoff kickoff, that continues on another machine, or that you
+stopped or archived after the restart. When it finishes, the row lists any
+conversation whose resume failed, so you can retry or resume it by hand.
+**Dismiss** drops the row without resuming anything; during Resume all it
+stops before the next conversation.
+
+The offer lives in the dashboard's memory. A dashboard restart forgets it; the
+conversations stay stopped and you can still resume each one. It covers
+Herdr hosts, where the dashboard sees the backend's event stream drop and come
+back. See [Terminal backends](https://github.com/eltmon/overdeck/blob/main/docs/TERMINAL-BACKENDS.md#after-a-session-server-restart-pan-5091) for the details.
+
 ## See also
 
 - [Mission Control](/features/mission-control) — the project tree and activity timeline around your conversations

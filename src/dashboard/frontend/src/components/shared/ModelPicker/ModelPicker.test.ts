@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  FALLBACK_COMPACTION_MODEL,
   FALLBACK_GROUPS,
   formatCost,
   PI_TOS_BLOCK_REASON,
@@ -122,4 +123,10 @@ it('lists Claude Haiku 5.5 in the offline fallback catalog before Haiku 4.5', ()
   const haiku45Index = anthropic!.models.findIndex(m => m.id === 'claude-haiku-4-5-20251001');
   expect(haiku55Index).toBeGreaterThanOrEqual(0);
   expect(haiku55Index).toBeLessThan(haiku45Index);
+});
+
+describe('FALLBACK_COMPACTION_MODEL (PAN-5124)', () => {
+  it('falls back to Haiku 5.5 when no compaction model is saved', () => {
+    expect(FALLBACK_COMPACTION_MODEL).toBe('claude-haiku-5-5');
+  });
 });

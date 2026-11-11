@@ -79,6 +79,14 @@ describe('memory extraction providers', () => {
     expect(resolved.model).toBe('stub-env-model');
   });
 
+  // PAN-5124: the built-in extraction default is Haiku 5.5.
+  it('defaults extraction to Anthropic Haiku 5.5 with no env and no settings', async () => {
+    expect(new AnthropicExtractionProvider().defaultModel).toBe('claude-haiku-5-5');
+
+    const selection = await resolveExtractionProviderSelection({});
+    expect(selection).toMatchObject({ provider: 'anthropic', model: 'claude-haiku-5-5', source: 'default' });
+  });
+
   it('routes cliproxy extraction through the local Anthropic-compatible messages endpoint', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const fetchFn = vi.fn(async () => new Response(JSON.stringify({
@@ -145,7 +153,7 @@ describe('memory extraction providers', () => {
     expect(create.mock.calls[0][0]).not.toHaveProperty('temperature');
   });
 
-  it('keeps sending temperature for the default Anthropic model', async () => {
+  it('keeps sending temperature for a model that accepts it via the Anthropic SDK', async () => {
     const create = vi.fn(async () => ({
       id: 'msg-3',
       content: [{ type: 'text', text: '{"summary":"ok"}' }],
@@ -153,9 +161,36 @@ describe('memory extraction providers', () => {
     }));
     const provider = new AnthropicExtractionProvider({ messages: { create } } as never);
 
-    await provider.extract<ExtractedPayload>('summarize', { type: 'object' });
+    await provider.extract<ExtractedPayload>('summarize', { type: 'object' }, { model: 'claude-haiku-4-5' });
 
     expect(create.mock.calls[0][0]).toMatchObject({ temperature: 0 });
+  });
+
+  // PAN-5124: Haiku 5.5 thinks by default and thinking counts toward max_tokens.
+  it('sends output_config effort low for a model whose capability row lists low', async () => {
+    const create = vi.fn(async () => ({
+      id: 'msg-4',
+      content: [{ type: 'text', text: '{"summary":"ok"}' }],
+      usage: { input_tokens: 10, output_tokens: 4 },
+    }));
+    const provider = new AnthropicExtractionProvider({ messages: { create } } as never);
+
+    await provider.extract<ExtractedPayload>('summarize', { type: 'object' }, { model: 'claude-haiku-5-5' });
+
+    expect(create.mock.calls[0][0]).toMatchObject({ output_config: { effort: 'low' }, max_tokens: 2048 });
+  });
+
+  it('sends no output_config for Haiku 4.5, which has no effort control', async () => {
+    const create = vi.fn(async () => ({
+      id: 'msg-5',
+      content: [{ type: 'text', text: '{"summary":"ok"}' }],
+      usage: { input_tokens: 10, output_tokens: 4 },
+    }));
+    const provider = new AnthropicExtractionProvider({ messages: { create } } as never);
+
+    await provider.extract<ExtractedPayload>('summarize', { type: 'object' }, { model: 'claude-haiku-4-5' });
+
+    expect(create.mock.calls[0][0]).not.toHaveProperty('output_config');
   });
 
   // PAN-4370 WI-3: the anthropic provider must not throw the SDK's generic

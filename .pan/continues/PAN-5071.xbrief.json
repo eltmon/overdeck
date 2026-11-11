@@ -1,0 +1,119 @@
+{
+  "version": "1",
+  "issueId": "PAN-5071",
+  "created": "2026-11-11T07:17:20.918Z",
+  "updated": "2026-11-11T07:36:36.085Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "grant-names-store": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5071",
+      "claimedAt": "2026-11-11T07:17:20.918Z",
+      "doneAt": "2026-11-11T07:24:36.564Z"
+    },
+    "grant-names-store.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T07:24:36.564Z"
+    },
+    "grant-names-store.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T07:24:36.564Z"
+    },
+    "grant-names-store.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T07:24:36.564Z"
+    },
+    "grant-names-store.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T07:24:36.564Z"
+    },
+    "confirm-step-names": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5071",
+      "claimedAt": "2026-11-11T07:24:47.724Z",
+      "doneAt": "2026-11-11T07:27:46.150Z"
+    },
+    "confirm-step-names.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T07:27:46.150Z"
+    },
+    "confirm-step-names.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T07:27:46.150Z"
+    },
+    "confirm-step-names.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T07:27:46.150Z"
+    },
+    "confirm-step-names.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T07:27:46.150Z"
+    },
+    "get-activate-confirm": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5071",
+      "claimedAt": "2026-11-11T07:27:58.414Z",
+      "doneAt": "2026-11-11T07:32:10.553Z"
+    },
+    "get-activate-confirm.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T07:32:10.553Z"
+    },
+    "get-activate-confirm.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T07:32:10.553Z"
+    },
+    "get-activate-confirm.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T07:32:10.553Z"
+    },
+    "get-activate-confirm.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T07:32:10.553Z"
+    },
+    "get-activate-confirm.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-11T07:32:10.553Z"
+    },
+    "miniflare-link-flow": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5071",
+      "claimedAt": "2026-11-11T07:32:20.152Z",
+      "doneAt": "2026-11-11T07:34:54.015Z"
+    },
+    "miniflare-link-flow.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T07:34:54.015Z"
+    },
+    "miniflare-link-flow.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T07:34:54.015Z"
+    },
+    "docs-account-service": {
+      "status": "completed",
+      "claimedBy": "agent-pan-5071",
+      "claimedAt": "2026-11-11T07:35:00.828Z",
+      "doneAt": "2026-11-11T07:36:36.084Z"
+    },
+    "docs-account-service.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T07:36:36.084Z"
+    },
+    "docs-account-service.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T07:36:36.084Z"
+    },
+    "docs-account-service.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T07:36:36.084Z"
+    },
+    "docs-account-service.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T07:36:36.084Z"
+    }
+  }
+}

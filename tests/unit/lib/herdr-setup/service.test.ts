@@ -76,12 +76,21 @@ describe('unit rendering (PAN-3956 W7)', () => {
     expect(herdrUnitName('overdeck-1a2b3c4d')).toBe('overdeck-1a2b3c4d-herdr.service');
   });
 
-  it('matches the hand-written host unit except for the quoted absolute ExecStart', () => {
+  it('matches the hand-written host unit except for the quoted absolute ExecStart and the OOM properties', () => {
     const rendered = renderHerdrUnit(BINARY, 'overdeck');
     expect(rendered).toBe(HAND_WRITTEN_UNIT.replace(
       'ExecStart=%h/.local/bin/herdr --session overdeck server',
-      `ExecStart="${BINARY}" --session overdeck server`,
+      `ExecStart="${BINARY}" --session overdeck server\nOOMPolicy=continue\nManagedOOMPreference=avoid`,
     ));
+  });
+
+  it('keeps the server and every other pane alive when one pane process is OOM-killed', () => {
+    // systemd's default OOMPolicy=stop turned one 660 MB OBS kill into a stop of
+    // the whole unit, and KillMode=control-group then killed every agent pane.
+    const service = renderHerdrUnit(BINARY, 'overdeck').split('[Install]')[0]!;
+    expect(service).toContain('\nOOMPolicy=continue\n');
+    expect(service).toContain('\nManagedOOMPreference=avoid\n');
+    expect(service).not.toMatch(/OOMPolicy=(stop|kill)/);
   });
 
   it('carries HERDR_CONFIG_PATH as Environment= only when given, with % doubled and $ literal', () => {

@@ -24,6 +24,7 @@ vi.mock('../../../dashboard/server/services/conversation-attachments.js', () => 
 const { closeOverdeckDatabase } = await import('../infra.js');
 const { createConversation, getConversationByName, markConversationEnded, setClearedToConvId, archiveConversation } = await import('../conversations.js');
 const { handleConversationStop } = await import('../conversation-runtime.js');
+const { conversationStoppedSince } = await import('../conversation-stop-marks.js');
 
 const CWD = join(TEST_HOME, 'projects', 'fixture');
 const PARENT_ENDED_AT_MS = 1_700_000_000_000;
@@ -89,5 +90,16 @@ describe('handleConversationStop clear-chain redirect', () => {
 
     expect(closeConversationPane).not.toHaveBeenCalled();
     expect(getConversationByName(parent.name)?.endedAt).toBe(new Date(PARENT_ENDED_AT_MS).toISOString());
+  });
+});
+
+describe('handleConversationStop records a deliberate stop (PAN-5091)', () => {
+  it('marks the stopped conversation, so restart recovery never offers it', async () => {
+    const conv = createConversation({ name: 'stop-mark-plain', tmuxSession: 'conv-stop-mark-plain', cwd: CWD, harness: 'claude-code' });
+    const before = Date.now();
+    expect(conversationStoppedSince(conv.name, before)).toBe(false);
+    await handleConversationStop(conv.name, {});
+    expect(conversationStoppedSince(conv.name, before)).toBe(true);
+    expect(getConversationByName(conv.name)?.status).toBe('ended');
   });
 });

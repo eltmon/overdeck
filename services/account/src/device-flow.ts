@@ -4,7 +4,8 @@
  * POST /oauth/device/code mints a device code and an 8-letter user code (both stored as hashes); the user types
  * the code at /activate, confirms, and completes the GitHub leg; the CLI polls POST /oauth/token with
  * grant_type=urn:ietf:params:oauth:grant-type:device_code and gets authorization_pending, slow_down,
- * access_denied, expired_token or the token.
+ * access_denied, expired_token or the token. The device-code request may also carry client_name/target_name
+ * (the bot and the machine, PAN-5071 FR-19); they are stored as display-only claims and shown on the confirm step.
  */
 import { randomHex, sha256Hex, userCode } from './crypto.ts';
 import { defaultLabel, isValidEnvironmentId, isValidPlatform, mintDevice } from './devices.ts';
@@ -24,6 +25,7 @@ export const CODE_EXPIRED_MESSAGE = 'This code expired. Run the sign-in command 
 export const DEVICE_CONNECTED_MESSAGE = 'Device connected. You can close this tab and return to your terminal.';
 export const ACCOUNT_DELETING_MESSAGE = 'This account is being deleted. Try again after deletion finishes.';
 export const REQUEST_REJECTED_MESSAGE = 'Request rejected.';
+export const NAMES_ARE_CLAIMS_MESSAGE = 'These names come from the device that asked for this code. Overdeck does not verify them.';
 
 /**
  * The /activate POSTs must come from the activate page itself: a cross-site form post could otherwise walk a
@@ -40,6 +42,8 @@ interface DeviceGrantRow {
   user_code_hash: string;
   platform: string;
   environment_id: string;
+  client_name: string | null;
+  target_name: string | null;
   status: GrantStatus;
   user_id: string | null;
   interval_s: number;
@@ -68,15 +72,17 @@ export const issueCode: Handler = async (req, rc) => {
   const deviceCode = `oddc_${randomHex(32)}`;
   const deviceCodeHash = await sha256Hex(deviceCode);
   const now = rc.deps.now();
+  const clientName = deviceName(form.get('client_name'));
+  const targetName = deviceName(form.get('target_name'));
   let code = '';
   for (let attempt = 0; attempt < 3; attempt++) {
     code = userCode();
     try {
       await rc.env.DB.prepare(
-        `INSERT INTO device_grants (device_code_hash, user_code_hash, platform, environment_id, status, interval_s, created_at, expires_at)
-         VALUES (?, ?, ?, ?, 'pending', ?, ?, ?)`,
+        `INSERT INTO device_grants (device_code_hash, user_code_hash, platform, environment_id, client_name, target_name, status, interval_s, created_at, expires_at)
+         VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)`,
       )
-        .bind(deviceCodeHash, await sha256Hex(code), platform, environmentId, DEVICE_POLL_INTERVAL_S, now, now + DEVICE_GRANT_TTL_MS)
+        .bind(deviceCodeHash, await sha256Hex(code), platform, environmentId, clientName, targetName, DEVICE_POLL_INTERVAL_S, now, now + DEVICE_GRANT_TTL_MS)
         .run();
       break;
     } catch (error) {
@@ -94,6 +100,16 @@ export const issueCode: Handler = async (req, rc) => {
   });
 };
 
+export const DEVICE_NAME_MAX = 64;
+const NAME_STRIP = /[\p{Cc}‎‏‪-‮⁦-⁩]/gu;
+
+/** A bot or machine name from a device-code request (PAN-5071 FR-25): a display-only claim, cleaned, at most 64 code points, else null. */
+export function deviceName(value: string | null | undefined): string | null {
+  if (value === null || value === undefined) return null;
+  const cleaned = Array.from(value.replace(NAME_STRIP, '').trim()).slice(0, DEVICE_NAME_MAX).join('').trim();
+  return cleaned === '' ? null : cleaned;
+}
+
 function activateForm(prefill: string, error: string | null): string {
   const notice = error ? `<p class="warn">${escapeHtml(error)}</p>` : '';
   return layout(
@@ -108,12 +124,30 @@ ${notice}
   );
 }
 
-/** GET /activate[?user_code=…] */
-export const activatePage: Handler = async (req, _rc) => {
-  const raw = new URL(req.url).searchParams.get('user_code') ?? '';
-  const normalized = normalizeUserCode(raw);
-  return html(activateForm(normalized.length === 8 ? formatUserCode(normalized) : raw, null));
-};
+/** The confirm step for a pending grant (PAN-5071 FR-26/FR-27); names are claims from the requesting device, always escaped. */
+function confirmStep(grant: DeviceGrantRow, normalized: string): string {
+  const device = escapeHtml(defaultLabel(grant.platform));
+  const client = grant.client_name === null ? null : escapeHtml(grant.client_name);
+  const target = grant.target_name === null ? null : escapeHtml(grant.target_name);
+  const reach = target === null ? '' : ` to reach <strong>${target}</strong>`;
+  const lead =
+    client !== null
+      ? `<strong>${client}</strong> (${device}) wants to connect to your Overdeck account${reach}.`
+      : target !== null
+        ? `This <strong>${device}</strong> wants to connect to your Overdeck account${reach}.`
+        : `Connect a <strong>${device}</strong> to your Overdeck account?`;
+  const claims = client !== null || target !== null ? `\n<p class="muted">${escapeHtml(NAMES_ARE_CLAIMS_MESSAGE)}</p>` : '';
+  return layout(
+    'Connect a device',
+    `<h1>Connect a device</h1>
+<p>${lead}</p>${claims}
+<p class="muted">Code ${escapeHtml(formatUserCode(normalized))}. If you did not start this sign-in, close this tab.</p>
+<form method="post" action="/activate/confirm">
+  <input type="hidden" name="user_code" value="${escapeHtml(normalized)}">
+  <button type="submit">Authorize</button>
+</form>`,
+  );
+}
 
 async function findPendingGrantByUserCode(rc: RequestContext, rawCode: string): Promise<DeviceGrantRow | null> {
   const normalized = normalizeUserCode(rawCode);
@@ -122,6 +156,24 @@ async function findPendingGrantByUserCode(rc: RequestContext, rawCode: string): 
     .bind(await sha256Hex(normalized), rc.deps.now())
     .first<DeviceGrantRow>();
 }
+
+/**
+ * GET /activate[?user_code=…]: a code of a pending grant renders the confirm step directly (PAN-5071 FR-18), so the
+ * device-flow link is one Authorize click. A code that does not resolve counts against `activate-fail` like POST /activate
+ * (FR-20). A GET never writes device_grants (FR-29): a link previewer's fetch approves nothing.
+ */
+export const activatePage: Handler = async (req, rc) => {
+  const raw = (new URL(req.url).searchParams.get('user_code') ?? '').trim();
+  if (raw === '') return html(activateForm('', null));
+  const exhausted = await peek(rc, 'activate-fail');
+  if (!exhausted.ok) return rateLimitedPage(exhausted.retryAfterS, TOO_MANY_WRONG_CODES_MESSAGE);
+  const grant = await findPendingGrantByUserCode(rc, raw);
+  if (grant) return html(confirmStep(grant, normalizeUserCode(raw)));
+  const verdict = await hit(rc, 'activate-fail');
+  if (!verdict.ok) return rateLimitedPage(verdict.retryAfterS, TOO_MANY_WRONG_CODES_MESSAGE);
+  const normalized = normalizeUserCode(raw);
+  return html(activateForm(normalized.length === 8 ? formatUserCode(normalized) : raw, INVALID_CODE_MESSAGE), 400);
+};
 
 /** POST /activate: look the code up; wrong codes count against `activate-fail` (D-12), and an exhausted window refuses before any lookup. */
 export const activateSubmit: Handler = async (req, rc) => {
@@ -136,19 +188,7 @@ export const activateSubmit: Handler = async (req, rc) => {
     if (!verdict.ok) return rateLimitedPage(verdict.retryAfterS, TOO_MANY_WRONG_CODES_MESSAGE);
     return html(activateForm(raw, INVALID_CODE_MESSAGE), 400);
   }
-  const normalized = normalizeUserCode(raw);
-  return html(
-    layout(
-      'Connect a device',
-      `<h1>Connect a device</h1>
-<p>Connect a <strong>${escapeHtml(defaultLabel(grant.platform))}</strong> to your Overdeck account?</p>
-<p class="muted">Code ${escapeHtml(formatUserCode(normalized))}. If you did not start this sign-in, close this tab.</p>
-<form method="post" action="/activate/confirm">
-  <input type="hidden" name="user_code" value="${escapeHtml(normalized)}">
-  <button type="submit">Continue with GitHub</button>
-</form>`,
-    ),
-  );
+  return html(confirmStep(grant, normalizeUserCode(raw)));
 };
 
 /** POST /activate/confirm: re-validate, then start the GitHub leg bound to this device code. */

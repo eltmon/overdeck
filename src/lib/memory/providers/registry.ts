@@ -9,7 +9,7 @@ import type {
 } from './types.js';
 
 const DEFAULT_PROVIDER = 'anthropic';
-const DEFAULT_MODEL = 'claude-haiku-4-5-20251001';
+const DEFAULT_MODEL = 'claude-haiku-5-5';
 
 const registry = new Map<string, ExtractionProvider>();
 

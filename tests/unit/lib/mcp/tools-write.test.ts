@@ -11,10 +11,38 @@ import { callTool, connectClient, fakeApi, resultJson, resultText } from './harn
 const SCOPES = ['read:state', 'read:conversations', 'operate'];
 
 describe('MCP write tools (PAN-4649 W-6)', () => {
-  it('the write tools are send_message, start_conversation, start_worker, start_issue, stop_conversation and interrupt_conversation', () => {
+  it('the write tools are send_message, start_conversation, start_worker, start_issue, stop_conversation, resume_conversation and interrupt_conversation', () => {
     expect(WRITE_TOOLS.map((tool) => tool.name)).toEqual([
-      'send_message', 'start_conversation', 'start_worker', 'start_issue', 'stop_conversation', 'interrupt_conversation',
+      'send_message', 'start_conversation', 'start_worker', 'start_issue', 'stop_conversation', 'resume_conversation', 'interrupt_conversation',
     ]);
+  });
+
+  it('PAN-5091: resume_conversation posts {} to the encoded conversation resume route', async () => {
+    const api = fakeApi({ 'POST /api/conversations/%40desk%2Fconv-a/resume': { status: 200, json: { name: 'conv-a', status: 'active', reattached: false } } });
+    const client = await connectClient(api, SCOPES);
+    const result = await callTool(client, 'resume_conversation', { conversation: '@desk/conv-a' });
+    expect(result.isError).toBeFalsy();
+    expect(resultJson(result)).toMatchObject({ name: 'conv-a', reattached: false });
+    expect(api.calls).toEqual([{ method: 'POST', path: '/api/conversations/%40desk%2Fconv-a/resume', body: {} }]);
+  });
+
+  it('PAN-5091: resume_conversation returns the route refusal as an error', async () => {
+    const api = fakeApi({ 'POST /api/conversations/conv-a/resume': { status: 404, json: { error: 'Conversation not found' } } });
+    const client = await connectClient(api, SCOPES);
+    const result = await callTool(client, 'resume_conversation', { conversation: 'conv-a' });
+    expect(result.isError).toBe(true);
+    expect(resultText(result)).toBe('HTTP 404: Conversation not found');
+  });
+
+  it('PAN-5091: resume_conversation needs the resume route\'s scope (operate), is listed to any token, and is hidden without it', async () => {
+    const resume = WRITE_TOOLS.find((candidate) => candidate.name === 'resume_conversation')!;
+    expect(resume.scope).toBe(requiredScopeFor('POST', '/api/conversations/c/resume'));
+    expect(resume.scope).toBe('operate');
+    expect(resume.audience).toBe('any');
+    const readOnly = await connectClient(fakeApi({}), ['read:state', 'read:conversations']);
+    expect((await readOnly.listTools()).tools.map((tool) => tool.name)).not.toContain('resume_conversation');
+    const operator = await connectClient(fakeApi({}), SCOPES);
+    expect((await operator.listTools()).tools.map((tool) => tool.name)).toContain('resume_conversation');
   });
 
   it('PAN-4938: stop_conversation posts {} to the encoded conversation stop route', async () => {

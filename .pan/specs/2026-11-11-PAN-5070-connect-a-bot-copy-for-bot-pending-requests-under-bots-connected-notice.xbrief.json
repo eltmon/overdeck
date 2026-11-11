@@ -1,0 +1,1020 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-11T07:14:20Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5070: Connect a bot: Copy for <bot>, pending requests under Bots, connected notice",
+    "updated": "2026-11-11T07:26:07.850Z"
+  },
+  "plan": {
+    "id": "pan-5070",
+    "title": "Connect a bot: Copy for <bot>, pending requests under Bots, connected notice",
+    "status": "running",
+    "uid": "2e864ad6-6abc-4ecd-88c7-729df0386023",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-11T07:14:20Z",
+    "updated": "2026-11-11T07:26:07.850Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5070",
+        "label": "PAN-5070",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5069",
+        "label": "PAN-5069 (Part A, bot side; parent PRD)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5071",
+        "label": "PAN-5071 (Part C, account page)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5072",
+        "label": "PAN-5072 (Part D, integrations; consumes connectMessage)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "anywhere",
+      "bots",
+      "connector",
+      "dashboard",
+      "needs-you"
+    ],
+    "narratives": {
+      "Problem": "Connecting a bot through the connector reach shows a pairing string plus four npx commands, an export and a config block; closing the dialog loses the code and Bots shows nothing pending; Grok Bot offers only Public MCP; nothing tells the operator when a bot pairs. PAN-5069 shipped the bot's one resumable command, so the dashboard side must now make it one paste and one approval.",
+      "Proposal": "Replace the connector intent map with an in-memory connector request store (30-minute codes, derived live/expired/used state, 24 h retention), add root-only routes for waiting requests, cancel, notices and dismiss, and on the frontend add connectMessage (pure, deterministic), a 'Copy for <bot>' button that mints and copies one message with a clipboard fallback, a 'Waiting to connect' list under Bots with Copy again / Copy new / Cancel, Grok Bot's connector reach first, a non-blocking Needs-you notice with Revoke and Dismiss, and docs. Full detail: .pan/drafts/PAN-5070.md.",
+      "NonGoals": "- A machine-side Approve/Deny card\n- Phone push for the connected notice\n- Persisting waiting requests or notices across a dashboard restart\n- Changing pan mcp connector connect/login/pair/serve or their output (PAN-5069)\n- The account activate page (PAN-5071)\n- Integration READMEs, SKILL.md and Grok Bot mcp.json (PAN-5072)\n- Removing the Tailscale, This computer or Public MCP reaches, or any botSnippets.ts export\n- Changing browser, machine or phone pairing-code lifetimes (they stay 10 minutes)\n- Adding route-scopes.ts rows for the new root-only routes\n- Editing docs/ANYWHERE-ARCHITECTURE.md"
+    },
+    "metadata": {
+      "canonicalFilename": "2026-11-11-PAN-5070-connect-a-bot-copy-for-bot-pending-requests-under-bots-connected-notice.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Cancel deletes the request and burns its code; no 'cancelled' status is stored",
+        "rationale": "Nothing reads a cancelled row; deleting is simpler and the burned code can no longer pair anything, so hasConnectorIntent answering false is safe."
+      },
+      {
+        "summary": "A code consumed at the handshake or taken without a finished exchange lists as 'used' and offers Copy new, never Copy again",
+        "rationale": "takePairingById burns the code on any outcome; Copy again would hand the bot a dead code that fails with pairing-code-refused."
+      },
+      {
+        "summary": "Waiting requests and notices are retained 24 h after expiry or pairing",
+        "rationale": "Matches the issue's 24 h notice window and keeps every request at least as long as its code, so the cross-refusal guard never lapses early."
+      },
+      {
+        "summary": "platform is optional in POST /api/connectors/pairing and defaults to 'other'",
+        "rationale": "Existing callers and tests post { name } only; the CLI's own default is 'other'."
+      },
+      {
+        "summary": "The button reads 'Copy for <platform label>' (e.g. 'Copy for Grok Bot')",
+        "rationale": "The parent PRD's flow says 'pick the bot … click Copy for <bot>'; the platform is the bot the operator picked."
+      },
+      {
+        "summary": "The manual pairing string and commands stay in the dialog under a collapsed 'Set up by hand instead'",
+        "rationale": "The parent PRD lists changing the manual login/pair/serve path as a non-goal; collapsing keeps it available without crowding the one-paste flow."
+      },
+      {
+        "summary": "The connected notice is a non-blocking row in Needs-you's System group, shown only to root viewers",
+        "rationale": "No agent waits on it (PAN-5108 harness-update precedent) and its routes are root only, like MCP sign-ins."
+      },
+      {
+        "summary": "No new frontend test files; tests extend botSnippets.test.ts and DecisionsPanel.test.tsx",
+        "rationale": "Both are already in scripts/frontend-test-subset.txt, and this keeps the plan within the 25-file finalize limit."
+      },
+      {
+        "summary": "docs/ANYWHERE-ARCHITECTURE.md is not edited",
+        "rationale": "Its intent-store bullet stays accurate at its level and defers detail to docs/DASHBOARD-AUTH.md, which this plan updates; editing it would exceed the file budget."
+      }
+    ],
+    "items": [
+      {
+        "id": "w1-connector-ttl",
+        "title": "Connector pairing codes live 30 minutes, with two non-consuming credential readers",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T07:14:20Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5070",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/pairing-credentials.ts",
+            "src/dashboard/server/connector-pairing.ts",
+            "src/dashboard/server/__tests__/connector-pairing.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/connector-pairing.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "connector-pairing.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13",
+            "FR-25"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD .pan/drafts/PAN-5070.md W-1. Give issuePairingCredential an optional { ttlMs } (default PAIRING_CREDENTIAL_TTL_MS, prune unchanged); export pairingCredentialState(pairingId) -> 'live'|'expired'|'gone' (never consumes) and revokePairingById(pairingId) -> boolean; add CONNECTOR_PAIRING_TTL_MS = 30 * 60_000 in connector-pairing.ts and issue connector codes with it. routes/pairing.ts keeps calling issuePairingCredential() with no argument (10 minutes). Tests use vi.useFakeTimers({ toFake: ['Date'] })."
+        },
+        "items": [
+          {
+            "id": "w1-connector-ttl.ac1",
+            "title": "Given fake Date, when issueConnectorPairing runs, then the returned expiresAt is exactly 30 minutes after the system time",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1-connector-ttl.ac2",
+            "title": "Given fake Date, when issuePairingCredential() runs with no argument, then its expiresAt is exactly 10 minutes after the system time",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1-connector-ttl.ac3",
+            "title": "pairingCredentialState returns 'live' for a fresh code, 'expired' 30 minutes + 1 ms later, and 'gone' after takePairingById consumes it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1-connector-ttl.ac4",
+            "title": "revokePairingById returns true once and false on a second call, and takePairingById then returns 'unknown'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w2-request-store",
+        "title": "Replace connector intents with an in-memory connector request store",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T07:14:20Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5070",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/connector-pairing.ts",
+            "src/dashboard/server/__tests__/connector-pairing.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/connector-pairing.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "connector-pairing.test.ts passes, including the unchanged W-7 cross-refusal tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-14",
+            "FR-25",
+            "FR-27"
+          ],
+          "foundationFor": [
+            "w3-pairing-platform-exchange",
+            "w4-waiting-requests-routes",
+            "w5-notice-routes"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-2: implement the exact API listed there (issueConnectorPairing({ name, scopes, platform? }) (platform defaults to 'other') -> { requestId, pairingString, expiresAt }; takeConnectorIntent stamps takenAt and never deletes; markConnectorRequestPaired; hasConnectorIntent true for any stored request; listConnectorRequests with derived state live/expired/used and pairingString only when live; cancelConnectorRequest burns the code via revokePairingById and deletes; listConnectorNotices; dismissConnectorNotice; prune at expiresAt + 24 h (pending) and pairedAt + 24 h (paired)). Import CONNECT_PLATFORMS/ConnectPlatform from src/lib/mcp/connector/connect-output.ts. Rewrite the 'hands out an intent once' and 'refuses an expired intent…prunes it' tests as the PRD describes. Do not edit routes/connectors.ts; it keeps compiling because platform is optional."
+        },
+        "items": [
+          {
+            "id": "w2-request-store.ac1",
+            "title": "Given an issued request, when takeConnectorIntent runs twice, then the first call returns { requestId, name, scopes }, the second returns null, and hasConnectorIntent still returns true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2-request-store.ac2",
+            "title": "Given a taken-but-unpaired request or one whose code takePairingById consumed, listConnectorRequests reports state 'used' and omits pairingString",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2-request-store.ac3",
+            "title": "Given fake Date, an untaken request lists as 'expired' 30 minutes + 1 ms after issue, and at expiresAt + 24 h + 1 ms the next listConnectorRequests drops it and hasConnectorIntent returns false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2-request-store.ac4",
+            "title": "cancelConnectorRequest burns the code (takePairingById returns 'unknown') and removes the row; a second cancel returns null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2-request-store.ac5",
+            "title": "After markConnectorRequestPaired, listConnectorRequests no longer returns the request and listConnectorNotices returns it; after dismissConnectorNotice, listConnectorNotices no longer returns it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w3-pairing-platform-exchange",
+        "title": "POST /api/connectors/pairing takes platform; the exchange marks the request paired",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T07:14:20Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-5070",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/connectors.ts",
+            "src/dashboard/server/__tests__/connectors.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/connectors.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "connectors.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-26",
+            "FR-15"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-3. parsePairingBody returns { name, scopes, platform } (absent -> 'other'; not in CONNECT_PLATFORMS -> 400 'platform must be one of grok-bot, grok-build, hermes, openclaw, other'); handleConnectorPairing answers { requestId, pairingString, expiresAt } with no-store and logs platform and requestId but never the pairing string; handleConnectorsExchange calls markConnectorRequestPaired(intent.requestId, record.id) right after createAccessToken."
+        },
+        "items": [
+          {
+            "id": "w3-pairing-platform-exchange.ac1",
+            "title": "POST /api/connectors/pairing with platform 'grok-bot' returns 200 with a UUID v4 requestId, a parseable pairingString and Cache-Control no-store",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w3-pairing-platform-exchange.ac2",
+            "title": "POST /api/connectors/pairing with platform 'xai-api' returns 400 whose error lists grok-bot, grok-build, hermes, openclaw, other; a body without platform still returns 200",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w3-pairing-platform-exchange.ac3",
+            "title": "Given a successful connector exchange, listConnectorNotices() returns one notice whose connectorId equals the minted tokenId",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w3-pairing-platform-exchange.ac4",
+            "title": "Given an exchange that answers 409 link-key-in-use, listConnectorRequests() reports that request as state 'used'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w4-waiting-requests-routes",
+        "title": "GET /api/connectors lists waiting requests; DELETE /api/connectors/requests/:id cancels one",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T07:14:20Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-5070",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/connectors.ts",
+            "src/dashboard/server/__tests__/connectors.test.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/connectors.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-14",
+            "FR-27",
+            "NFR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-4. handleConnectorList answers { connectors, requests: listConnectorRequests() }. Add handleConnectorRequestCancel (root only, 404 'no pending connector request with id <id>', activity log with the name, no pairing string) and the DELETE /api/connectors/requests/:id route (rejectUnsafeDashboardMutationRequest first) in connectorsRouteLayer. Add the no-loss row and update the GET /api/connectors row's door text exactly as the PRD gives them. Do not add route-scopes rows. The route-level test must pass the mutation gate with the internal token (write <OVERDECK_HOME>/internal-token, _resetInternalTokenCacheForTests(), send INTERNAL_TOKEN_HEADER and Content-Type: application/json, remoteAddress 127.0.0.1), as agent-requests-routes.test.ts does; an unauthenticated request gets the same rejection from both DELETE routes and proves nothing."
+        },
+        "items": [
+          {
+            "id": "w4-waiting-requests-routes.ac1",
+            "title": "GET /api/connectors as the internal token returns requests with one entry of state 'live' carrying a pairingString for a freshly issued request",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w4-waiting-requests-routes.ac2",
+            "title": "Cancelling a waiting request returns 200 { ok: true }, a second cancel returns 404 'no pending connector request with id …', and a device credential kind gets 403",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w4-waiting-requests-routes.ac3",
+            "title": "Given the internal-token header, a DELETE /api/connectors/requests/<uuid> request driven through connectorsRouteLayer returns 404 with error 'no pending connector request with id <uuid>' (the cancel handler), never 'no connector with id'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w4-waiting-requests-routes.ac4",
+            "title": "tests/unit/lib/overdeck/no-loss-matrix.test.ts passes with a row whose surface is 'DELETE /api/connectors/requests/:id'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w5-notice-routes",
+        "title": "GET /api/connectors/notices and POST /api/connectors/requests/:id/dismiss",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T07:14:20Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-5070",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/connectors.ts",
+            "src/dashboard/server/__tests__/connectors.test.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/connectors.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-15",
+            "FR-27",
+            "NFR-7",
+            "NFR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-5. handleConnectorNotices (root only, rejectUnauthorizedDashboardRequest on the route) returns { notices } filtered to connectorIds in listActiveRecordsOfKind('connector'); handleConnectorNoticeDismiss (root only, rejectUnsafeDashboardMutationRequest on the route) returns { ok: true } or 404 'no connector notice with id <id>'. Add both routes to connectorsRouteLayer and both no-loss rows. Route-level tests use the same internal-token setup as W-4."
+        },
+        "items": [
+          {
+            "id": "w5-notice-routes.ac1",
+            "title": "After a successful exchange, GET /api/connectors/notices returns one notice with id, connectorId, name, scopes and pairedAt, and its JSON contains no 'overdeck-connector:' text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w5-notice-routes.ac2",
+            "title": "After handleConnectorRevoke removes that connector, GET /api/connectors/notices returns an empty notices array",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w5-notice-routes.ac3",
+            "title": "POST /api/connectors/requests/<id>/dismiss returns 200 and the notice is gone; an unknown id returns 404 'no connector notice with id <id>' (also when driven through connectorsRouteLayer with the internal-token header); a device credential kind gets 403 on both routes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w5-notice-routes.ac4",
+            "title": "Given the internal-token header, GET /api/connectors/notices driven through connectorsRouteLayer returns 200 { notices: [] }, and no-loss-matrix.test.ts passes with rows for 'GET /api/connectors/notices' and 'POST /api/connectors/requests/:id/dismiss'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w6-connect-message",
+        "title": "connectMessage: the one copy message, pure and deterministic",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T07:14:20Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5070",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/anywhere/connectMessage.ts",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/botSnippets.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/Settings/anywhere/__tests__/botSnippets.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "botSnippets.test.ts passes including the new connectMessage describe block",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12",
+            "NFR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-6. Create connectMessage.ts with CONNECT_PLATFORM_IDS, ConnectPlatformId, CONNECT_PLATFORM_LABELS, connectPlatformFor, connectMessage (exact text in the PRD, shellQuote on pairing string and bot name), connectMessageFor (version serverVersion else 'latest'; machine label environment label, else parseConnectorPairLink(pairingString)?.machineLabel, else 'this machine') and writeClipboard (resolves false, never throws). Import only botSnippets.ts and @overdeck/contracts; never import botsApi.ts. Tests go in the existing botSnippets.test.ts (already in scripts/frontend-test-subset.txt)."
+        },
+        "items": [
+          {
+            "id": "w6-connect-message.ac1",
+            "title": "connectMessage with version 0.61.0, bot name 'Grok Bot' and platform grok-bot returns text containing the line npx -y @overdeck/core@0.61.0 mcp connector connect '<pairing string>' --name 'Grok Bot' --platform grok-bot",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w6-connect-message.ac2",
+            "title": "A bot name Ed's bot renders in the command as 'Ed'\\''s bot', and the output contains no 'token', 'export ' or 'mcp_servers' text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w6-connect-message.ac3",
+            "title": "Calling connectMessage twice with the same inputs returns byte-identical strings; connectPlatformFor('xai-api') returns 'other' and every other BotPlatform maps to itself",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w6-connect-message.ac4",
+            "title": "connectMessageFor with no environment uses @overdeck/core@latest and the pairing string's n label; writeClipboard resolves false when navigator.clipboard is undefined",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w7-grok-bot-connector-reach",
+        "title": "Grok Bot offers the Overdeck connector reach first",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T07:14:20Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5070",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/anywhere/botSnippets.ts",
+            "src/dashboard/frontend/src/components/Settings/anywhere/ConnectBotDialog.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/ConnectBotOutput.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/ConnectBotDialog.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/Settings/anywhere/__tests__/ConnectBotDialog.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ConnectBotDialog.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-16"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-7. BOT_PLATFORMS grok-bot reaches become ['connector', 'public']; the dialog's Access-step condition becomes platform === 'grok-bot' && reach === 'public' (never reach === 'public' alone: the xAI API is public-only and needs its scope checkboxes for oauthLevelForScopes); connectorConfigFor returns null for grok-bot and the config CopyField renders only when non-null. Rewrite 'renders only the Public MCP reach for Grok Bot' and make the Grok Bot Public MCP tests click 'Public MCP' first. Keep every botSnippets.ts export."
+        },
+        "items": [
+          {
+            "id": "w7-grok-bot-connector-reach.ac1",
+            "title": "Given the dialog, when the operator clicks Grok Bot, then the 'Overdeck connector' reach radio is checked and a 'Public MCP' radio is also rendered",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w7-grok-bot-connector-reach.ac2",
+            "title": "With Grok Bot on the connector reach the Access step renders the scope checkboxes; with Grok Bot on Public MCP it renders the OAuth approval note instead",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w7-grok-bot-connector-reach.ac3",
+            "title": "Given the xAI API platform (Public MCP), the Access step still renders the scope checkboxes and 'Show setup' with Operate ticked produces a token command containing '--level operate'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w7-grok-bot-connector-reach.ac4",
+            "title": "Given Grok Bot with Public MCP selected and Public MCP on, 'Show setup' renders a Grok Bot mcp.json containing the public URL",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w8-bots-client",
+        "title": "Bots API client: platform on pairing, cancel, notices, dismiss and the access label",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T07:14:20Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-5070",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/anywhere/botsApi.ts",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/botsApi.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/Settings/anywhere/__tests__/botsApi.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "botsApi.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-14",
+            "FR-15",
+            "FR-26"
+          ],
+          "foundationFor": [
+            "w9-copy-for-bot",
+            "w10-waiting-list",
+            "w11-connected-notice"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-8. Add ConnectorRequestRow, ConnectorNoticeRow, BOTS_CONNECTOR_NOTICES_QUERY_KEY, cancelConnectorRequest, dismissConnectorNotice, fetchConnectorNotices ([] on any failure or non-array body), connectorAccessLabel (decision 11), and an optional platform argument plus requestId result on createConnectorPairing. Shapes must match PRD W-2 to W-5 exactly (frontend tests mock fetch, so drift is invisible to tests). Import ConnectPlatformId as a type from connectMessage.ts. Do not change loadConnectors (W-10 does)."
+        },
+        "items": [
+          {
+            "id": "w8-bots-client.ac1",
+            "title": "createConnectorPairing('bot', scopes, 'grok-bot') sends a POST body with platform 'grok-bot', and without the third argument the sent body contains no platform key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w8-bots-client.ac2",
+            "title": "cancelConnectorRequest sends DELETE /api/connectors/requests/<encoded id> and dismissConnectorNotice sends POST /api/connectors/requests/<encoded id>/dismiss, both with the mutation headers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w8-bots-client.ac3",
+            "title": "fetchConnectorNotices returns [] for a 403 response and for a {} body, and the notices array for a 200 { notices } body",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w8-bots-client.ac4",
+            "title": "connectorAccessLabel returns 'Read + Tell' for read:state, read:conversations, tell; 'Read' for read:state alone; 'Read + Tell + Operate + Approve' for all five scopes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w9-copy-for-bot",
+        "title": "Copy for <bot>: one click mints the code and copies the message",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T07:14:20Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5070",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/anywhere/ConnectBotDialog.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/ConnectBotOutput.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/ConnectBotDialog.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/Settings/anywhere/__tests__/ConnectBotDialog.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ConnectBotDialog.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12",
+            "FR-28",
+            "FR-29"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-9. Connector-reach button text is `Copy for ${platformEntry.label}`; handleCreate posts platform via connectPlatformFor, builds the message with connectMessageFor and the environment query, calls writeClipboard, and sets output { kind: 'connector', pairingString, expiresAt, message, copied }. ConnectBotOutput's connector branch renders the copied/fallback sentence, the expiry, a 'Message' CopyField, the 'waits under Settings → Anywhere → Bots' sentence, and a <details> 'Set up by hand instead' holding today's pairing string, commands and config, then Done."
+        },
+        "items": [
+          {
+            "id": "w9-copy-for-bot.ac1",
+            "title": "Given the Hermes connector form, the submit button reads 'Copy for Hermes'; clicking it posts /api/connectors/pairing with platform 'hermes'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w9-copy-for-bot.ac2",
+            "title": "After the click the user-event clipboard holds text containing \"mcp connector connect '\" and '--platform hermes', and the dialog renders 'Copied — paste it into Hermes.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w9-copy-for-bot.ac3",
+            "title": "Given navigator.clipboard.writeText rejects, the dialog renders 'Could not copy automatically. Copy the message below.' and the Message field holds the same message text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w9-copy-for-bot.ac4",
+            "title": "The 'Set up by hand instead' details still renders a parseable pairing string and the connector pair command with the server version",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w10-waiting-list",
+        "title": "Waiting requests under Bots with Copy again, Copy new and Cancel",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T07:14:20Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5070",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/anywhere/botsApi.ts",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/botsApi.test.ts",
+            "src/dashboard/frontend/src/components/Settings/anywhere/BotsPanel.tsx",
+            "src/dashboard/frontend/src/components/Settings/anywhere/__tests__/BotsPanel.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/Settings/anywhere/__tests__/BotsPanel.test.tsx src/components/Settings/anywhere/__tests__/botsApi.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-14",
+            "FR-25",
+            "FR-28"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-10. loadConnectors returns { connectors, requests } (requests [] when absent). BotsPanel renders 'Waiting to connect' rows (name; platform label · access label · expiry text), with Copy again for live, Copy new for expired/used (create with the row's name/scopes/platform, then cancel the old id, then copy), Cancel for every row (no confirm), invalidating BOTS_CONNECTORS_QUERY_KEY after each; success toast 'Copied — paste it into <label>.'; a failed copy shows a 'Message' CopyField under the row. 'No bots connected.' only when both lists are empty."
+        },
+        "items": [
+          {
+            "id": "w10-waiting-list.ac1",
+            "title": "Given one live request, Bots renders the row with 'expires in' text and a Copy again button, and Copy again writes a message containing that row's pairing string to the clipboard",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w10-waiting-list.ac2",
+            "title": "Given an expired request, Copy new posts /api/connectors/pairing with the row's name, scopes and platform and then sends DELETE /api/connectors/requests/<old id>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w10-waiting-list.ac3",
+            "title": "Given a used request, the row renders 'code used' and offers Copy new, never Copy again",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w10-waiting-list.ac4",
+            "title": "Cancel sends DELETE /api/connectors/requests/<id>; with no connectors and one request the panel does not render 'No bots connected.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w11-connected-notice",
+        "title": "Needs-you shows '<name> connected with Read + Tell' with Revoke and Dismiss",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T07:14:20Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-5070",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/useDecisions.ts",
+            "src/dashboard/frontend/src/lib/pendingInput.ts",
+            "src/dashboard/frontend/src/components/ConnectorNoticeCard.tsx",
+            "src/dashboard/frontend/src/components/DecisionsPanel.tsx",
+            "src/dashboard/frontend/src/components/mobile/MobileNeedsYou.tsx",
+            "src/dashboard/frontend/src/components/__tests__/DecisionsPanel.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/components/__tests__/DecisionsPanel.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "DecisionsPanel.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-15"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-11. Add the connectorConnected kind and 'Bot connected' label; Decision.connectorNotice; connectorNoticeDecisions (non-blocking, id 'connector-notice:<id>'); a notices query gated on canSeeMcpSignIns and pushed only when it holds; ConnectorNoticeCard modelled on HarnessUpdateCard with Revoke (useConfirm, then removeConnector(connectorId)) and Dismiss (dismissConnectorNotice); DecisionsPanel dispatch before mcpSignIn and isSystem includes connectorNotice; MobileNeedsYou ReadOnlyAction line. Wrap card-rendering tests in DialogProvider."
+        },
+        "items": [
+          {
+            "id": "w11-connected-notice.ac1",
+            "title": "connectorNoticeDecisions returns rows with blocking false, kinds ['connectorConnected'] and since equal to pairedAt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w11-connected-notice.ac2",
+            "title": "Given a notice decision for Grok Bot with default scopes, DecisionsPanel renders 'Grok Bot connected with Read + Tell' inside the System group",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w11-connected-notice.ac3",
+            "title": "Clicking Dismiss sends POST /api/connectors/requests/<id>/dismiss",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w11-connected-notice.ac4",
+            "title": "Clicking Revoke and confirming sends DELETE /api/connectors/<connectorId>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w12-docs",
+        "title": "Docs: one-paste connect, waiting requests, connected notice and the new routes",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T07:14:20Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5070",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/bots.mdx",
+            "configuration/mcp.mdx",
+            "docs/DASHBOARD-AUTH.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'Connect in one paste' configuration/bots.mdx",
+            "grep -n 'connect-in-one-paste' configuration/mcp.mdx",
+            "grep -n 'connectors/notices' docs/DASHBOARD-AUTH.md"
+          ],
+          "expected_outputs": [
+            "grep prints the '## Connect in one paste' heading line of configuration/bots.mdx",
+            "grep prints the link line in configuration/mcp.mdx",
+            "grep prints at least one line of docs/DASHBOARD-AUTH.md naming /api/connectors/notices"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-17"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W-12. bots.mdx: intro names Grok Bot among bots that run the connector; new '## Connect in one paste', '### Waiting requests' (Copy again / Copy new / Cancel, restart drops them) and '### After the bot connects' (notice, Revoke, Dismiss, 24 h); dialog table Grok Bot row 'Overdeck connector (default), Public MCP'; connector code 30 minutes; manual commands under 'Set up by hand instead'; Grok Bot section leads with the connector. mcp.mdx '## Bots' links /configuration/bots#connect-in-one-paste. DASHBOARD-AUTH.md documents platform, requestId, 30-minute TTL, request store, exchange marking paired, requests in GET /api/connectors and the three new routes."
+        },
+        "items": [
+          {
+            "id": "w12-docs.ac1",
+            "title": "configuration/bots.mdx contains the headings '## Connect in one paste', '### Waiting requests' and '### After the bot connects', and its dialog table contains a Grok Bot row reading 'Overdeck connector (default), Public MCP'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w12-docs.ac2",
+            "title": "configuration/bots.mdx contains the text 'within 30 minutes' for the connector pairing code and no longer contains a 10-minute claim for it (grep -n '10 minutes' returns no connector-code line)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w12-docs.ac3",
+            "title": "configuration/mcp.mdx's '## Bots' section contains a link to /configuration/bots#connect-in-one-paste",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w12-docs.ac4",
+            "title": "docs/DASHBOARD-AUTH.md contains entries for DELETE /api/connectors/requests/:id, GET /api/connectors/notices and POST /api/connectors/requests/:id/dismiss, and contains the 30-minute connector-code lifetime",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "w1-connector-ttl",
+        "to": "w2-request-store",
+        "type": "blocks"
+      },
+      {
+        "from": "w2-request-store",
+        "to": "w3-pairing-platform-exchange",
+        "type": "blocks"
+      },
+      {
+        "from": "w3-pairing-platform-exchange",
+        "to": "w4-waiting-requests-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "w4-waiting-requests-routes",
+        "to": "w5-notice-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "w6-connect-message",
+        "to": "w8-bots-client",
+        "type": "blocks"
+      },
+      {
+        "from": "w6-connect-message",
+        "to": "w9-copy-for-bot",
+        "type": "blocks"
+      },
+      {
+        "from": "w6-connect-message",
+        "to": "w10-waiting-list",
+        "type": "blocks"
+      },
+      {
+        "from": "w7-grok-bot-connector-reach",
+        "to": "w9-copy-for-bot",
+        "type": "blocks"
+      },
+      {
+        "from": "w8-bots-client",
+        "to": "w9-copy-for-bot",
+        "type": "blocks"
+      },
+      {
+        "from": "w8-bots-client",
+        "to": "w10-waiting-list",
+        "type": "blocks"
+      },
+      {
+        "from": "w8-bots-client",
+        "to": "w11-connected-notice",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "active"
+}

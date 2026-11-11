@@ -374,6 +374,42 @@ function publishDelta(previous: BackendPaneCache | null, next: BackendPaneCache)
   }
 }
 
+/**
+ * PAN-5091: the backend's connection edges. `lost` fires when an event stream
+ * that was open ends (the server stopped, crashed or restarted). `restored`
+ * fires once after a `lost`, on the first fresh, non-degraded snapshot taken
+ * while a stream is open again (at the re-open, or at a later TTL refresh when
+ * the re-open's snapshot was degraded). A stream blip fires both; the listener
+ * decides what changed.
+ */
+export interface BackendConnectionListener {
+  lost(): void;
+  restored(): void;
+}
+
+let connectionListener: BackendConnectionListener | null = null;
+/** A `lost` fired and its `restored` has not. */
+let restorePending = false;
+
+export function onBackendConnectionChange(listener: BackendConnectionListener | null): void {
+  connectionListener = listener;
+}
+
+/** Fire `restored` when a loss is pending and the inventory is answering again. */
+function notifyRestoredIfPending(): void {
+  if (!restorePending || inventoryDegraded) return;
+  restorePending = false;
+  notifyConnection('restored');
+}
+
+function notifyConnection(edge: keyof BackendConnectionListener): void {
+  try {
+    connectionListener?.[edge]();
+  } catch (error) {
+    console.warn(`[backend-inventory] connection listener failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
 /** How long a snapshot is served before another `list()` is issued. */
 export const INVENTORY_TTL_MS = 5_000;
 
@@ -393,6 +429,8 @@ export async function getBackendPanes(deps: BackendInventoryDeps = {}): Promise<
       publishDelta(cache, next);
       cache = next;
       refreshedAt = now;
+      // A degraded snapshot at the re-open left the restore pending; this one may end it.
+      if (eventStreamClose) notifyRestoredIfPending();
       return panes;
     } finally {
       inFlight = null;
@@ -528,6 +566,7 @@ async function openEventStream(deps: BackendInventoryDeps, reopening: boolean): 
       stream.close();
       return;
     }
+    notifyRestoredIfPending();
   }
   const generation = ++streamGeneration;
   eventStreamClose = () => stream.close();
@@ -551,6 +590,8 @@ async function openEventStream(deps: BackendInventoryDeps, reopening: boolean): 
     // Stopped, or superseded by a newer stream: nothing to re-open.
     if (generation !== streamGeneration || !inventoryStarted) return;
     eventStreamClose = null;
+    restorePending = true;
+    notifyConnection('lost');
     if (Date.now() - openedAt >= EVENT_STREAM_STABLE_MS) {
       // A stream that held (even a quiet one) resets the backoff and the warning.
       retryDelayMs = EVENT_STREAM_RETRY_MIN_MS;
@@ -592,4 +633,6 @@ export function _resetBackendInventoryForTests(): void {
   inFlight = null;
   stopBackendInventory();
   paneListener = null;
+  connectionListener = null;
+  restorePending = false;
 }

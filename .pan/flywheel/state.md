@@ -702,3 +702,16 @@ learnings worth keeping. Append only. No pipeline status, run ids, or counters.
 - PAN-5069 (one-paste bot connect) was split into Parts A-D in `.pan/drafts/pan-5069.md`. Part A's PR #5080 carried the parent's id, so merging it closed PAN-5069 while Parts B, C and D (PAN-5070, 5071, 5072) stayed open and unplanned. A Nov 6 note then told the operator the flow was ready to test; Settings > Bots still showed the old Grok Bot snippet (`botSnippets.ts` reaches `['public']`).
 - Rule: before telling the operator a feature is ready, read its PRD's part table and confirm every sibling issue is merged and deployed, then run the PRD's end-to-end check.
 - Started PAN-5070 and PAN-5071 in parallel (PRD line 104). PAN-5072 waits for PAN-5070's `connectMessage`. PAN-5071 changes services/account: the Worker deploy after merge is the operator's.
+
+## 2026-11-11 — operator pacing under memory pressure
+- Operator order (via conv 3747, 08:00Z): start nothing new until memory PSI `some avg60` < 2 and disk >= 15 GB free; then at most four issues in flight, letting merges and close-outs free memory and disk before each start. Never pause or kill a mid-turn work agent. Stop workspace Docker stacks an agent does not need (`docker compose -p overdeck-feature-<id> stop`; the `dev` container only runs `sleep infinity`, the agent runs on the host).
+- A planned issue deferred by the disk guard keeps retrying in deacon-lite and cannot be held with `pan pause` (PAN-5133). Held PAN-5122 and PAN-5123 with a `handoff.abandoned` journal entry; restart each with `pan start <id>` when the pacing rule allows.
+- Re-homing an outside-branch PR: push its head to `feature/pan-<id>`, open a new PR, and close the old one; the PR webhook adopts it. A PR deleting tests of removed behavior fails test-skip and needs the operator's waiver (Flywheel identity is refused).
+- Do not hand-merge while the merge train is rebasing: the pinned head moves and the merge route refuses. The train merges approved PRs itself.
+
+## 2026-11-11 — reload refused: shim on the non-live generation (PAN-5139)
+- Symptom: `pan reload` refuses with "Both dashboard deployment generations are held by hard occupants", and one occupant is a `.../generation-X/dist/cli/index.js` pid that keeps changing. That pid is the reload (or the approve loop) itself: `~/.overdeck/cli-bin/pan` points at the generation the live server is NOT on.
+- Check: `head -2 ~/.overdeck/cli-bin/pan` vs the generation in `ps -o args= -p $(ss -ltnp | grep :3011 ...)`. Deploy by running the live generation's CLI directly: `node ~/.overdeck/deployments/dashboard/.pan-reload-generation-<live>/dist/cli/index.js reload`, and approve only after the log shows "Build complete".
+- Cause: a launch from a non-live-generation process rewrites the shim to its own bundle (pan-cli-shim D-3). Filed PAN-5139.
+- Handoff PRs have no work agent, so conflict repair escalates as `unreachable`; relay conflicts to the handoff conversation with `pan tell`. Check `git merge-tree` output before saying "changelog only".
+- Workspace Docker stacks keep a 1.9 GB `container-node-modules` volume each, not counted in the workspace folder size; `docker compose -p overdeck-feature-<id> down -v` frees it for an issue that no longer needs its stack.

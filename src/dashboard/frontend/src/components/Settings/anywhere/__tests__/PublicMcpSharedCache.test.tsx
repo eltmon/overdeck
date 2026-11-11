@@ -60,7 +60,9 @@ describe('Public MCP panel and Connect-a-bot dialog share one cache entry (PAN-4
     expect(await screen.findByText(COMMANDS[0] as string)).toBeInTheDocument();
 
     // Selecting a public-reach platform mounts the dialog's observer, which refetches the shared key.
+    // PAN-5070: Grok Bot defaults to the connector reach now, so Public MCP must be picked explicitly.
     await user.click(screen.getByLabelText('Grok Bot'));
+    await user.click(screen.getByLabelText('Public MCP'));
     await user.click(await screen.findByRole('button', { name: 'Show setup' }));
 
     const mcpJson = await screen.findByLabelText('Grok Bot mcp.json');

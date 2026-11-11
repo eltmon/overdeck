@@ -59,7 +59,7 @@ describe('docs RAG configuration', () => {
       classifier: {
         enabled: false,
         provider: 'anthropic',
-        model: 'claude-haiku-4-5',
+        model: 'claude-haiku-5-5',
         threshold: 0.85,
         timeoutMs: 1500,
       },
