@@ -4,17 +4,17 @@
     "created": "2026-11-11T07:48:22Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-5131: God View honesty pass: remove simulated ages, rates and effects; fix mislabeled orbs; make the field guide match the code",
-    "updated": "2026-11-11T08:05:39.540Z"
+    "updated": "2026-11-11T08:17:28.522Z"
   },
   "plan": {
     "id": "pan-5131",
     "title": "God View honesty pass: remove simulated ages, rates and effects; fix mislabeled orbs; make the field guide match the code",
-    "status": "proposed",
+    "status": "running",
     "uid": "5366b2ca-2f83-48ad-b013-ec48d6958791",
     "author": "agent:claude-fable-5-2",
-    "sequence": 2,
+    "sequence": 5,
     "created": "2026-11-11T07:48:22Z",
-    "updated": "2026-11-11T08:05:39.540Z",
+    "updated": "2026-11-11T08:17:28.522Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/5131",
@@ -1583,5 +1583,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
