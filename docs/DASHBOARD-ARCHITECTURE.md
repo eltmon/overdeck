@@ -98,7 +98,8 @@ Origin, then session cookie or internal token — see [DASHBOARD-AUTH.md](DASHBO
   `pty-hub-attach.ts` (`attachHubPty`, `subscribeToTmuxHub`, moved out of `ws-terminal.ts`); the
   viewer renders it in `SharedTerminalView.tsx`.
 - Companion terminals (PAN-3974, PAN-3835): an OpenCode or Codex conversation's TERMINAL
-  streams a separate `companion-<ownerSession>` tmux session running `opencode attach` or
+  streams a separate `companion-<ownerSession>` terminal (a tmux session on tmux, a
+  token-stamped Herdr pane on Herdr — PAN-5122) running `opencode attach` or
   `codex resume --remote` against the conversation's own runtime, opened through
   `POST /api/conversations/:name/companion-terminal/open|close`
   (`routes/conversation-companion-terminal.ts`) and rendered by `ConversationTerminalView.tsx`.

@@ -1,0 +1,520 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-11T07:29:41Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5122: Terminal tab says 'conversation is not running' for Codex and OpenCode conversations on Herdr: the companion-terminal owner check is tmux-only",
+    "updated": "2026-11-11T07:31:53.084Z"
+  },
+  "plan": {
+    "id": "pan-5122",
+    "title": "Terminal tab says 'conversation is not running' for Codex and OpenCode conversations on Herdr: the companion-terminal owner check is tmux-only",
+    "status": "proposed",
+    "uid": "9be366c3-686e-43ea-80aa-6bf572a6e83c",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 2,
+    "created": "2026-11-11T07:29:41Z",
+    "updated": "2026-11-11T07:31:53.084Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5122",
+        "label": "PAN-5122",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/pan-5122.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "herdr",
+      "companion-terminal",
+      "codex",
+      "opencode",
+      "terminal-backend",
+      "bug"
+    ],
+    "narratives": {
+      "Problem": "On a Herdr host every Codex or OpenCode conversation's Terminal tab (Native CLI) says 'The conversation is not running'. The companion-terminal host port only has a tmux implementation: createTmuxCompanionHost().ownerStamp runs `tmux has-session`, which never sees a Herdr pane, and index.ts wires that host unconditionally. Behind it, /ws/terminal on Herdr resolves terminals only by Herdr agent name or agentId token, so a Herdr companion would not attach either.",
+      "Proposal": "Add a Herdr CompanionTerminalHost (herdr-host.ts): owner stamp from the Herdr probe (alive -> herdr:<paneId>, exited -> null, absent -> tmux fallback, indeterminate -> throw); companion = a tab in the `conversations` Herdr workspace stamped with dedicated `companion` and `companionGeneration` tokens (no agentId/role, so it is never an agent), running `<argv> ; exit` (not exec, so pane process liveness reads it as running). A delegating host (select-host.ts) picks Herdr or the unchanged tmux host per call from hostTerminalBackendName(). resolveHerdrTerminalId gains a companion branch that finds the pane by its token. Docs state the companion works on both backends. Full detail, before/after code and test names in .pan/drafts/pan-5122.md.",
+      "NonGoals": "- Changing the tmux companion host, its generation formula, or any tmux-host behavior\n- Supporting a tmux host whose owner conversation runs on Herdr (rollback case)\n- Reaping tmux companions left behind on a Herdr host\n- Any change to packages/contracts, the companion-terminal routes, or the frontend ConversationTerminalView\n- Stamping agentId, role, issue, harness or model tokens on a companion pane, or calling agent.rename for it\n- Using launchAgentPane or TerminalBackend.startAgent for the companion\n- Adding lines to src/lib/terminal-backends/herdr.ts or raising any file-size allowlist row\n- Moving the ad-hoc terminal drawer onto Herdr\n- New harness adapters"
+    },
+    "autoDecisions": [
+      {
+        "summary": "On a Herdr host the companion is a Herdr pane, not a tmux session.",
+        "rationale": "The issue's Fix names a Herdr host implementation, and tmux is not a prerequisite under Herdr (system-prerequisites.ts:361), so a tmux companion would fail on a Herdr host without tmux."
+      },
+      {
+        "summary": "The companion pane carries only `companion` and `companionGeneration` tokens, no agentId/role/issue.",
+        "rationale": "Parity with tmux, where the companion- prefix is outside OVERDECK_SESSION_NAME and never an agent; an agentId token would put the companion in listHerdrAgents and the Agents Directory pane-only loop."
+      },
+      {
+        "summary": "The Herdr pane runs `<quoted argv> ; exit` instead of `exec <argv>`.",
+        "rationale": "With exec the client takes the shell's pid, paneProcessLiveness reads it as exited, and the residue reaper would close a live companion."
+      },
+      {
+        "summary": "Owner stamp: alive -> herdr:<paneId>; exited -> null; absent -> tmux stamp; indeterminate -> throw.",
+        "rationale": "Herdr pane ids are never reused; the absent fallback matches conversation-liveness.ts for pre-flip tmux owners; a null on a Herdr outage would reap a live companion and lie 'not running'."
+      },
+      {
+        "summary": "Companions open in the `conversations` Herdr workspace.",
+        "rationale": "It is the workspace operator conversations already use (launch.ts CONVERSATIONS_WORKSPACE); the companion is an operator tool and must not be swept by an issue workspace close."
+      },
+      {
+        "summary": "Host chosen per call from hostTerminalBackendName(); Herdr host loaded lazily.",
+        "rationale": "Keeps getCompanionTerminalLifecycle() synchronous, leaves the tmux path byte-for-byte unchanged, and avoids a static import edge that could trip lint:circular."
+      },
+      {
+        "summary": "The issue's Herdr-host live acceptance (AC1/AC2) is a live verification item plus test-role browser UAT.",
+        "rationale": "The work agent cannot deploy its branch to the operator dashboard; a library-level live script plus the test role's isolated-browser UAT covers both halves."
+      }
+    ],
+    "items": [
+      {
+        "id": "herdr-companion-host",
+        "title": "Add the Herdr CompanionTerminalHost (herdr-host.ts) with its unit tests",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-11T07:29:41Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-5122",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "select-host",
+            "attach-resolve-companion",
+            "lifecycle-herdr-test",
+            "live-verification"
+          ],
+          "files_scope": [
+            "src/lib/overdeck/companion-terminal/herdr-host.ts",
+            "src/lib/overdeck/companion-terminal/__tests__/herdr-host.test.ts",
+            "src/lib/terminal-backends/launch.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/companion-terminal/__tests__/herdr-host.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "herdr-host.test.ts passes all eleven named cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W1 exactly. Create src/lib/overdeck/companion-terminal/herdr-host.ts exporting COMPANION_NAME_TOKEN='companion', COMPANION_GENERATION_TOKEN='companionGeneration', herdrCompanionCommand(argv) (`${argv.map(shellQuoteArg).join(' ')} ; exit`, throws on empty argv), HerdrCompanionHostDeps, createHerdrCompanionHost(overrides) and findHerdrCompanionTerminalId(name, api?). ownerStamp per D4; readGeneration per D9; create per FR-3 (validateSessionName, ensureWorkspace -> 'conversations' Herdr workspace, openAgentTab with env {...spec.env, OVERDECK_COMPANION_GENERATION, TERM:'xterm-256color'} and label=name, then pane.report_metadata with source 'overdeck', tokens exactly {companion, companionGeneration}, title=name, then pane.send_input text=herdrCompanionCommand(argv) keys ['enter']; close the pane and rethrow on failure after the tab exists); kill per D8. All snapshot/process_info lookups use { timeoutMs: 2_000 }. Change `const CONVERSATIONS_WORKSPACE` to `export const` in launch.ts (no added lines). Do not add lines to herdr.ts. Write the eleven tests named in PRD W1 with an injected fake api (cast as unknown as HerdrApiClient), sizeTerminal and ensureWorkspace fakes.",
+          "Hazards": "Tests must inject sizeTerminal (openAgentTab otherwise spawns the herdr binary). Never stamp agentId/role/issue on the companion."
+        },
+        "items": [
+          {
+            "id": "herdr-companion-host.ac1",
+            "title": "Given a live Herdr owner probe for conv-x at pane w1:p3, when ownerStamp('conv-x') runs, then it returns 'herdr:w1:p3' and the tmux stamp fake is never called; given an indeterminate probe it rejects; given absent it returns the tmux fake's stamp",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "herdr-companion-host.ac2",
+            "title": "When create('companion-conv-x', {argv:['/bin/codex','resume','--remote','unix:///s/app.sock','thread-1'], generation:'g1', env:{OVERDECK_COMPANION_GENERATION:'forged'}}) runs, then pane.report_metadata receives tokens with exactly the keys companion and companionGeneration (values 'companion-conv-x' and 'g1'), tab.create env carries OVERDECK_COMPANION_GENERATION='g1' and TERM='xterm-256color', and pane.send_input text equals `'/bin/codex' 'resume' '--remote' 'unix:///s/app.sock' 'thread-1' ; exit`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "herdr-companion-host.ac3",
+            "title": "When pane.send_input rejects during create, then the host calls pane.close on the new pane and create rejects; when argv is empty, create rejects before any Herdr call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "herdr-companion-host.ac4",
+            "title": "readGeneration returns undefined when no pane carries the companion token, null when two panes carry it or the one pane's process liveness is exited, and the companionGeneration token when the pane is running; kill closes every pane carrying the token and returns false when none exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "herdr-companion-host.ac5",
+            "title": "findHerdrCompanionTerminalId returns the terminal_id of the running companion pane and returns null when session.snapshot rejects",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "select-host",
+        "title": "Select the companion host from the host terminal backend in getCompanionTerminalLifecycle",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-11T07:29:41Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5122",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/companion-terminal/select-host.ts",
+            "src/lib/overdeck/companion-terminal/__tests__/select-host.test.ts",
+            "src/lib/overdeck/companion-terminal/index.ts",
+            "src/lib/overdeck/companion-terminal/host.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/companion-terminal/__tests__/select-host.test.ts src/lib/overdeck/companion-terminal/__tests__/host.test.ts src/lib/overdeck/companion-terminal/__tests__/lifecycle.test.ts src/lib/overdeck/companion-terminal/__tests__/codex-adapter.test.ts src/lib/overdeck/companion-terminal/__tests__/opencode-adapter.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "select-host.test.ts passes and the four existing companion-terminal test files pass unmodified",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W2. Create select-host.ts exporting BackendCompanionHostDeps and createBackendCompanionHost(overrides): defaults backendName=hostTerminalBackendName, tmux=memoized createTmuxCompanionHost(), herdr=memoized lazy `(await import('./herdr-host.js')).createHerdrCompanionHost()`; each of ownerStamp/readGeneration/create/kill picks the host for that call (herdr when backendName() resolves 'herdr', tmux otherwise) and forwards. In index.ts replace `host: createTmuxCompanionHost()` with `host: createBackendCompanionHost()`, re-export createBackendCompanionHost, drop the now-unused value import, and update the index.ts and host.ts module headers as PRD W2 states (comment-only change in host.ts). Write the three tests named in PRD W2."
+        },
+        "items": [
+          {
+            "id": "select-host.ac1",
+            "title": "Given backendName resolves 'tmux', when each of the four operations is called, then the tmux fake receives the call and the herdr loader is never invoked",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "select-host.ac2",
+            "title": "Given backendName resolves 'herdr', when each of the four operations is called, then the herdr fake receives the call with the same arguments and returns its value",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "select-host.ac3",
+            "title": "When getCompanionTerminalLifecycle() is first called, it constructs the lifecycle with createBackendCompanionHost(); host.test.ts, lifecycle.test.ts, codex-adapter.test.ts and opencode-adapter.test.ts still pass with no edits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "attach-resolve-companion",
+        "title": "Resolve a Herdr companion pane in resolveHerdrTerminalId for /ws/terminal",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-11T07:29:41Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5122",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/terminal-service.ts",
+            "src/dashboard/server/services/__tests__/terminal-herdr-companion.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/terminal-herdr-companion.test.ts src/dashboard/server/services/__tests__/terminal-attach-target.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "both test files pass",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W3. In terminal-service.ts add ResolveHerdrTerminalIdDeps {backendName, findAgent, findCompanion} with production defaults, and give resolveHerdrTerminalId(sessionName, deps = defaultResolveDeps): non-herdr backend -> null; findAgent hit -> its terminalId; otherwise when sessionName starts with 'companion-' -> deps.findCompanion(sessionName); else null; any throw -> null. findCompanion defaults to findHerdrCompanionTerminalId imported directly from '../../../lib/overdeck/companion-terminal/herdr-host.js' (never index.js). Existing one-argument callers (ws-terminal.ts:359, sharing/terminal-bridge.ts:158, terminal-service.ts:402) stay unchanged. Update the doc comment. Write the three tests named in PRD W3 in a new test file."
+        },
+        "items": [
+          {
+            "id": "attach-resolve-companion.ac1",
+            "title": "Given backendName 'herdr', findAgent returning null and findCompanion returning 't-9', when resolveHerdrTerminalId('companion-conv-x', deps) runs, then it returns 't-9'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "attach-resolve-companion.ac2",
+            "title": "Given findAgent returning null, when resolveHerdrTerminalId('conv-x', deps) runs, then it returns null and findCompanion is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "attach-resolve-companion.ac3",
+            "title": "Given backendName 'tmux', when resolveHerdrTerminalId('companion-conv-x', deps) runs, then it returns null and neither findAgent nor findCompanion is called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "lifecycle-herdr-test",
+        "title": "Test the real lifecycle over the real Herdr host on a simulated Herdr session with no tmux",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-11T07:29:41Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-5122",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/companion-terminal/__tests__/lifecycle-herdr.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/companion-terminal/__tests__/lifecycle-herdr.test.ts"
+          ],
+          "expected_outputs": [
+            "lifecycle-herdr.test.ts passes all five named cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W4. Build a stateful fake Herdr API: tab.create adds a pane (pane_id, terminal_id, workspace_id) to the snapshot, pane.layout returns a rect, pane.report_metadata stores tokens on that pane, pane.send_input records the text, pane.close removes the pane, pane.process_info answers shell_pid 100 and a foreground pid 200 for live panes, agent.list answers { agents: [] }. Run the real createCompanionTerminalLifecycle with the real createHerdrCompanionHost({ api, probeOwner, tmuxOwnerStamp: vi.fn(() => { throw new Error('tmux must not be called') }), ensureWorkspace: async () => 'w2', sizeTerminal: async () => 'sized' }) and a stub codex adapter (kind 'codex-resume-remote'). Owner: conversationName '20261106-1898', ownerSession 'conv-20261106-1898', harness 'codex'. Write the five cases named in PRD W4."
+        },
+        "items": [
+          {
+            "id": "lifecycle-herdr-test.ac1",
+            "title": "Given an alive owner probe and a tmux stamp fake that throws when called, when open(owner) runs, then it resolves status 'attached' with sessionName 'companion-conv-20261106-1898' and reused false, and the tmux fake was never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lifecycle-herdr-test.ac2",
+            "title": "When open(owner) runs a second time with the same owner probe, then it resolves reused true and tab.create was called exactly once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lifecycle-herdr-test.ac3",
+            "title": "Given an existing companion pane and an exited owner probe, when open(owner) runs, then it resolves reason 'owner-not-running' and the companion pane is gone from the fake snapshot; given an indeterminate probe, open(owner) rejects and the companion pane still exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lifecycle-herdr-test.ac4",
+            "title": "After a successful open, listHerdrAgents(fakeApi) returns no entry whose agentId starts with 'companion-'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-companion-both-backends",
+        "title": "Document the companion terminal on both terminal backends",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T07:29:41Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-5122",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/TERMINAL-BACKENDS.md",
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "features/conversations.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -c 'on the managed tmux socket, on either host' docs/TERMINAL-BACKENDS.md || true",
+            "grep -n 'herdr-host.ts\\|companionGeneration\\|herdr:<paneId>' docs/TERMINAL-BACKENDS.md"
+          ],
+          "expected_outputs": [
+            "lint:docs completes without errors",
+            "the old 'on either host' phrase count is 0",
+            "TERMINAL-BACKENDS.md lines name herdr-host.ts, companionGeneration and herdr:<paneId>"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply the seven exact changes listed in PRD W5: in docs/TERMINAL-BACKENDS.md 'Companion terminals (PAN-3974)' add herdr-host.ts and select-host.ts rows to the piece table and reword the host.ts row; replace the Session paragraph so it states the companion works on both backends and describes the Herdr pane (conversations workspace, companion/companionGeneration tokens, no agent tokens, `<argv> ; exit`, resolved by token in resolveHerdrTerminalId, host chosen per call from hostTerminalBackendName()); extend the Generation paragraph with the herdr:<paneId> stamp and the D4 rules; rename the 'owner tmux' column to 'owner session' in both adapter tables; change 'An owner whose tmux session is gone' to 'An owner whose session or pane is gone'. In docs/DASHBOARD-ARCHITECTURE.md lines 100-105 reword 'tmux session' as PRD W5 step 6. In features/conversations.mdx add the sentence 'This works whichever terminal backend Overdeck uses (Herdr or tmux).' under both 'Native OpenCode CLI in Terminal' and 'Native Codex CLI in Terminal'."
+        },
+        "items": [
+          {
+            "id": "docs-companion-both-backends.ac1",
+            "title": "docs/TERMINAL-BACKENDS.md 'Companion terminals' states the companion terminal works on both backends, names herdr-host.ts, the companion and companionGeneration tokens and the herdr:<paneId> owner stamp, and no longer contains the phrase 'on the managed tmux socket, on either host'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-companion-both-backends.ac2",
+            "title": "Each of the two adapter tables in that section contains the column header 'owner session', and the section no longer contains 'owner tmux'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-companion-both-backends.ac3",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md describes the companion as a tmux session on tmux and a token-stamped Herdr pane on Herdr, and features/conversations.mdx shows the Herdr-or-tmux sentence under both Native CLI headings",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "live-verification",
+        "title": "Live-verify the Herdr companion on this host and append the verification record",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T07:29:41Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-5122",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/TERMINAL-BACKENDS.md"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "grep -n 'Live verification record — companion terminal on Herdr (PAN-5122)' docs/TERMINAL-BACKENDS.md",
+            "npm run lint:docs"
+          ],
+          "expected_outputs": [
+            "the record heading exists at the end of docs/TERMINAL-BACKENDS.md",
+            "lint:docs completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Implementation checkpoint from PRD W6. Find a running Codex conversation on this host. From the workspace, run a one-off `npx tsx` script (kept in the session scratchpad, not committed) that calls getCompanionTerminalLifecycle().open({ conversationName, ownerSession: 'conv-<name>', cwd, harness: 'codex' }), prints the result, checks `herdr pane list` for a pane titled companion-conv-<name>, calls resolveHerdrTerminalId('companion-conv-<name>') and prints the terminal id, then calls close(owner, generation) and confirms the pane is gone. Repeat for an OpenCode conversation if one runs. Never stop, resume, or message the owner conversation. Append a 'Live verification record — companion terminal on Herdr (PAN-5122)' section at the end of docs/TERMINAL-BACKENDS.md with the commands and outputs, in the style of the PAN-3974 record. Fallback: if no Codex/OpenCode conversation runs and none can be started on a scratch cwd under ~/Projects, the record states which checks could not run and why. Browser UAT is the test role's: isolated Playwright profile, on a Herdr host open a running Codex conversation -> Terminal -> Native CLI and confirm the Codex TUI renders with no 'not running' notice; same for OpenCode.",
+          "Hazards": "The live script creates a real pane in the operator's Herdr session; close it at the end. Do not commit the script. If `npx tsx` fails on a circular ESM import (Node strict ESM), run the same script with `bun <script>.ts`; Bun tolerates the cycles."
+        },
+        "items": [
+          {
+            "id": "live-verification.ac1",
+            "title": "Given a running Codex conversation on this Herdr host, when the live script calls open, then it prints status 'attached', `herdr pane list` shows a pane titled companion-conv-<name>, and resolveHerdrTerminalId returns a non-null terminal id; when it calls close with that generation, then the pane no longer appears (or the record states why the check could not run)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-verification.ac2",
+            "title": "docs/TERMINAL-BACKENDS.md ends with a 'Live verification record — companion terminal on Herdr (PAN-5122)' section that shows each command and its observed output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "live-verification.ac3",
+            "title": "Test-role browser UAT in an isolated Playwright profile: given a running Codex conversation on a Herdr host, when the operator opens Terminal -> Native CLI, then the native Codex TUI renders and no 'The conversation is not running' notice shows; the same holds for a running OpenCode conversation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "herdr-companion-host",
+        "to": "select-host",
+        "type": "blocks"
+      },
+      {
+        "from": "herdr-companion-host",
+        "to": "attach-resolve-companion",
+        "type": "blocks"
+      },
+      {
+        "from": "herdr-companion-host",
+        "to": "lifecycle-herdr-test",
+        "type": "blocks"
+      },
+      {
+        "from": "select-host",
+        "to": "live-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "attach-resolve-companion",
+        "to": "live-verification",
+        "type": "blocks"
+      },
+      {
+        "from": "docs-companion-both-backends",
+        "to": "live-verification",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-11-PAN-5122-terminal-tab-says-conversation-is-not-running-for-codex-and-opencode-conversations-on-herdr-the-companion-terminal-owner-check-is-tmux-only.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}

@@ -45,7 +45,7 @@ import {
 } from './types.js';
 
 /** Workspace that hosts operator conversations — panes with no `issue` token. */
-const CONVERSATIONS_WORKSPACE = 'conversations';
+export const CONVERSATIONS_WORKSPACE = 'conversations';
 
 /**
  * Per-harness detection policy (PAN-3917 W12).

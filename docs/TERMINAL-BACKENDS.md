@@ -836,24 +836,38 @@ socket, and so on). Adapters: OpenCode `opencode attach` (PAN-3974) and Codex
 | Shared vocabulary (`CompanionTerminalKind`, `CompanionTerminalState`, `companionTerminalKindFor`, body whitelists) | `packages/contracts/src/companion-terminal.ts` |
 | Lifecycle (open / close / owner teardown, per-owner lock, generation checks) | `src/lib/overdeck/companion-terminal/lifecycle.ts` |
 | Host port + tmux implementation (async `tmuxExecAsync` / `createSession`, no keystrokes) | `src/lib/overdeck/companion-terminal/host.ts` |
+| Herdr host implementation | `src/lib/overdeck/companion-terminal/herdr-host.ts` |
+| Host selection by terminal backend | `src/lib/overdeck/companion-terminal/select-host.ts` |
 | OpenCode adapter | `src/lib/overdeck/companion-terminal/opencode-adapter.ts` |
 | Codex adapter; host native endpoint and `prepare-terminal` | `src/lib/overdeck/companion-terminal/codex-adapter.ts`; `src/lib/codex/app-server-host.ts`, `app-server-transport.ts`, `native-endpoint.ts` |
 | Wiring + `closeCompanionTerminalForOwner` | `src/lib/overdeck/companion-terminal/index.ts` |
 | Routes | `src/dashboard/server/routes/conversation-companion-terminal.ts` |
 | UI | `src/dashboard/frontend/src/components/chat/ConversationTerminalView.tsx` |
 
-**Session.** One companion per owner, named `companion-<ownerSession>` on the managed tmux
-socket, on either host. The prefix is ignored by the
-backend inventory, `isAgentSessionName`, and every reaper. The pane runs
-`exec <absolute binary> …`, so the session ends when the native client exits. The dashboard
-streams it through the ordinary `/ws/terminal?session=` path; a browser disconnect only drops the
-PTY client, and no `destroy-unattached` is set, so the companion survives.
+**Session.** One companion per owner, named `companion-<ownerSession>`. The companion terminal
+works on both terminal backends (PAN-5122); the host is chosen per call from
+`hostTerminalBackendName()` (`select-host.ts`). On a tmux host it is the tmux session
+`companion-<ownerSession>` on the managed tmux socket; the prefix is ignored by the backend
+inventory, `isAgentSessionName`, and every reaper, and the pane runs `exec <absolute binary> …`,
+so the session ends when the native client exits. On a Herdr host it is a pane in its own tab of
+the `conversations` workspace (`herdr-host.ts`), stamped only with the `companion` and
+`companionGeneration` tokens and **no** agent tokens (`agentId`, `role`, `issue`, `harness`,
+`model`), so it never appears in `listHerdrAgents()` or Herdr `list()`; its text is
+`<quoted argv> ; exit` (never `exec`, so `paneProcessLiveness` reads it as running while the
+client runs, and the pane closes itself when `exit` runs). The dashboard streams it through the
+ordinary `/ws/terminal?session=` path — on Herdr, `resolveHerdrTerminalId` resolves it by the
+`companion` token when no agent answers to the name — and a browser disconnect only drops the PTY
+client, so the companion survives.
 
-**Generation.** `sha256(ownerSession, owner #{session_created}, adapter fingerprint)`, 24 hex. The
-OpenCode fingerprint is `<port>:<sessionId>`, so any owner respawn (new tmux session, new port)
-changes it. It is stamped on the companion at creation as the session env var
+**Generation.** `sha256(ownerSession, owner stamp, adapter fingerprint)`, 24 hex. The owner stamp
+is tmux `#{session_created}` on a tmux host and `herdr:<paneId>` on a Herdr host (Herdr pane ids
+are never reused, so a respawned owner always gets a new stamp). The OpenCode fingerprint is
+`<port>:<sessionId>`, so any owner respawn (new session, new port) changes it. On tmux the
+generation is stamped on the companion at creation as the session env var
 `OVERDECK_COMPANION_GENERATION` (`new-session -e`, atomic) and read back with `show-environment`;
-the tmux session is the authority and nothing else is stored. Rules:
+on Herdr it is stamped as the `companionGeneration` pane token (also exported into the pane's env
+as `OVERDECK_COMPANION_GENERATION`) and read back from that token. Either way the terminal session
+itself is the authority and nothing else is stored. Rules:
 
 - Every operation on one owner runs through a per-owner promise lock, so concurrent opens create
   one companion.
@@ -864,7 +878,10 @@ the tmux session is the authority and nothing else is stored. Rules:
   companion it created (only if the stamp is still its own) and answers `owner-changed` (409).
 - Close must carry the generation the browser was given; a mismatch answers `stale-generation`
   (409) and kills nothing.
-- An owner whose tmux session is gone makes open reap any companion (`owner-not-running`).
+- An owner whose session or pane is gone makes open reap any companion (`owner-not-running`). On a
+  Herdr host, an owner probe that is `exited` means not running, `absent` falls back to the tmux
+  host's stamp (an owner still running in tmux from before the host moved to Herdr), and Herdr not
+  answering (`indeterminate`) fails the open with an error instead of reaping anything.
 
 **Owner teardown.** `closeCompanionTerminalForOwner(ownerSession)` never throws and is called from
 `stopConversationRuntime` (stop, delete, archive, resume/restart failure, flywheel archive; after
@@ -880,7 +897,7 @@ asks `GET http://127.0.0.1:<port>/session/<id>` (2 s timeout) before handing out
 `opencode attach http://127.0.0.1:<port> --session <id> --dir <cwd>`. Attach only; never `--fork`,
 `--continue`, `serve`, or a second `acp`.
 
-| owner tmux | `opencode-port` | `acp-session-id` | `GET /session/<id>` | result |
+| owner session | `opencode-port` | `acp-session-id` | `GET /session/<id>` | result |
 | --- | --- | --- | --- | --- |
 | gone | – | – | – | `owner-not-running` |
 | alive | any | missing | – | `owner-starting` |
@@ -918,7 +935,7 @@ calls `closeCompanionTerminalForOwner`. The host kills its app-server on every e
 manager reaps an app-server orphaned by a SIGKILLed host (recorded in `codex-native/app.pid`,
 matched by `/proc/<pid>/cmdline`) before reusing the socket.
 
-| owner tmux | host answer | result |
+| owner session | host answer | result |
 | --- | --- | --- |
 | gone | – | `owner-not-running` |
 | alive | no token, `codex.transport: tui` | `unsupported` (the owner pane is the native TUI) |
@@ -1282,3 +1299,63 @@ opencode-port removed                   → restart-required; no companion creat
 ```
 
 Teardown: `tmux -L pan3974-test kill-server`; port 54333 no longer answers.
+
+## Live verification record — companion terminal on Herdr (PAN-5122)
+
+2026-11-11, Herdr the host terminal backend (default, no tmux session involved). Driven against a
+real, idle Codex conversation on this host (`conv-20261110-b6d6`, harness `codex`, cwd
+`~/Projects/dfai`) through a one-off `npx tsx` script calling the real
+`getCompanionTerminalLifecycle()` and `resolveHerdrTerminalId` from the workspace build — never
+`stop`, `resume`, or `pan tell` against the owner. No OpenCode conversation was live on this host
+at verification time, so only the Codex path was exercised end to end; every operation it
+exercises (`ownerStamp`, `create`, `readGeneration`, `kill`, `resolveHerdrTerminalId`) is
+harness-agnostic — only the adapter's `resolveTarget` differs by harness kind.
+
+```
+open(owner)                              → { status: 'attached', kind: 'codex-resume-remote',
+                                              sessionName: 'companion-conv-20261110-b6d6',
+                                              generation: '88cf5b329fb7aba5f42430cc', reused: false }
+herdr pane list (companion row)          → tokens { companion: 'companion-conv-20261110-b6d6',
+                                              companionGeneration: '88cf5b329fb7aba5f42430cc' } —
+                                              no agentId/role/issue/harness/model token
+resolveHerdrTerminalId('companion-…')    → term_65ffe384c666b2bc (non-null)
+herdr pane read <companion pane>, 3s in  → the real Codex TUI, attached to the owner's own thread
+                                              ("Working (31m 30s · esc to interrupt)",
+                                              "GPT-6.1-Sol high · ~/Projects/dfai",
+                                              the owner's own running turn, not a second session)
+close(owner, generation)                 → { status: 'closed', kind: 'codex-resume-remote' }
+resolveHerdrTerminalId('companion-…')     → null
+herdr pane list                          → no pane titled companion-conv-20261110-b6d6
+owner pane (conv-20261110-b6d6)          → unchanged: same pane_id, tokens, agent_status idle
+```
+
+The owner's own pane was never touched: before and after the run it is the same `w2:p8Q` with the
+same `agentId`/`harness`/`model` tokens and `idle` status. The companion carried only the
+`companion` and `companionGeneration` tokens, so it never appeared in `listHerdrAgents()` or as an
+Overdeck agent anywhere in the inventory.
+
+**Browser UAT, isolated Playwright profile.** The shared host dashboard (`:3011`) still ran
+pre-fix code and could not be reloaded from this role, so the browser check ran against an
+isolated dashboard instance built from this branch: `npm run build:dashboard`, then
+`API_PORT=3091 HOST=127.0.0.1 OVERDECK_HOME=<scratch home> node dist/dashboard/server.js`, backed
+by its own headless Herdr server (`herdr --session <scratch session> server`) — a second Herdr
+session entirely, so nothing here touched the real operator session or its conversations. Two
+throwaway conversations were created through the real UI (`Ask Codex: …`, and `Ask OpenCode: …`
+via an OpenCode Zen model), both cwd `~/Projects`:
+
+```
+Codex conversation (20261111-7698), Terminal → Native CLI
+  → "OpenAI Codex (v0.167.1)", "~/Projects", the sent prompt echoed, prompt box with
+    "claude-sonnet-5-5 high · ~/Projects" — no "conversation is not running" notice.
+
+OpenCode conversation (20261111-5776, Beam Free), Terminal → Native CLI
+  → "Build · Beam Free OpenCode · high", "OpenCode 1.18.31", "~/Projects",
+    "esc interrupt", "ctrl+p commands" — no "conversation is not running" notice.
+```
+
+Both Native CLI tabs attached at once, with no reload or retry needed. Teardown: both
+conversations stopped from the dashboard's own "Stop all agents", then the isolated dashboard
+server and its headless Herdr server were killed and the scratch `OVERDECK_HOME` and Herdr session
+directory were deleted. The real host dashboard (`:3011`) and its Herdr session were never
+restarted, stopped, or otherwise touched; `GET /api/health` against it before and after this check
+shows the same long-running `pid`.

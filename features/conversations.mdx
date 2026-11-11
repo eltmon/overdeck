@@ -143,7 +143,8 @@ CLI to the same running server and the same session, instead of showing the
 Overdeck host log. What you type there and what you send from the composer land
 in one session and one transcript; no second OpenCode server or session starts.
 Dashboard messages still travel over the structured ACP connection, never as
-keystrokes into this terminal.
+keystrokes into this terminal. This works whichever terminal backend Overdeck
+uses (Herdr or tmux).
 
 Terminal has two panes for OpenCode:
 
@@ -169,7 +170,8 @@ For a Codex conversation, **Terminal** attaches the real interactive Codex CLI
 to the conversation's own app-server and the same thread, with
 `codex resume --remote`. You can type in it, run slash commands, and answer
 approvals there, and the dashboard stays connected to the same thread over its
-structured app-server connection. No second app-server or thread starts.
+structured app-server connection. No second app-server or thread starts. This
+works whichever terminal backend Overdeck uses (Herdr or tmux).
 
 | Pane | What it shows |
 |:-----|:--------------|

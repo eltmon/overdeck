@@ -1,11 +1,12 @@
 /**
  * Companion terminals (PAN-3974): the process-wide lifecycle wired to the
- * managed tmux socket and the registered adapters, plus the owner-teardown
- * hook the conversation runtime calls. OpenCode (PAN-3974) and Codex (PAN-3835)
- * each register one adapter in `defaultAdapters()`; nothing else changes.
+ * host terminal backend (a Herdr pane on Herdr, the managed tmux socket on
+ * tmux) and the registered adapters, plus the owner-teardown hook the
+ * conversation runtime calls. OpenCode (PAN-3974) and Codex (PAN-3835) each
+ * register one adapter in `defaultAdapters()`; nothing else changes.
  */
 import type { CompanionTerminalKind } from '@overdeck/contracts';
-import { createTmuxCompanionHost } from './host.js';
+import { createBackendCompanionHost } from './select-host.js';
 import {
   createCompanionTerminalLifecycle,
   type CompanionTerminalAdapter,
@@ -24,7 +25,8 @@ export {
   type CompanionCloseOutcome,
   type CompanionTargetResolution,
 } from './lifecycle.js';
-export { createTmuxCompanionHost, type CompanionTerminalHost } from './host.js';
+export { type CompanionTerminalHost } from './host.js';
+export { createBackendCompanionHost } from './select-host.js';
 export { createOpenCodeCompanionAdapter } from './opencode-adapter.js';
 export { createCodexCompanionAdapter } from './codex-adapter.js';
 
@@ -38,7 +40,7 @@ function defaultAdapters(): Partial<Record<CompanionTerminalKind, CompanionTermi
 }
 
 export function getCompanionTerminalLifecycle(): CompanionTerminalLifecycle {
-  lifecycle ??= createCompanionTerminalLifecycle({ host: createTmuxCompanionHost(), adapters: defaultAdapters() });
+  lifecycle ??= createCompanionTerminalLifecycle({ host: createBackendCompanionHost(), adapters: defaultAdapters() });
   return lifecycle;
 }
 
