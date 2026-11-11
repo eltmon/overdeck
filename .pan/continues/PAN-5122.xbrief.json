@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5122",
   "created": "2026-11-11T10:01:02.133Z",
-  "updated": "2026-11-11T10:19:49.507Z",
+  "updated": "2026-11-11T10:19:59.366Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -41,6 +41,11 @@
     "herdr-companion-host.ac5": {
       "status": "completed",
       "doneAt": "2026-11-11T10:19:49.507Z"
+    },
+    "select-host": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5122",
+      "claimedAt": "2026-11-11T10:19:59.366Z"
     }
   }
 }
