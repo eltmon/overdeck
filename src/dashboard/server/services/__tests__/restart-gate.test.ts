@@ -279,6 +279,43 @@ describe('restart gate state machine', () => {
     expect(withdrawn.result).toEqual({ withdrawn: true, status: 'pending' });
     expect(withdrawn.state).toEqual(pruneRestartGateState(state, T0 + 1_000));
   });
+
+  it('refuses every claim while a hold is active and keeps the epoch approved (PAN-5057)', () => {
+    const hold: RestartHold = { reason: 'live check', who: 'operator', setAt: new Date(T0).toISOString() };
+    let state = upsertRestartRequest(emptyRestartGateState(), deployRequest('a', 'a'), T0).state;
+    state = approveRestartGate(state, T0).state;
+
+    const held = claimRestartGate(state, 'a', T0, hold);
+    expect(held.result).toEqual({ granted: false, status: 'approved', restartHold: hold });
+    expect(held.state.epoch?.requesterIds).toEqual(['a']);
+    expect(held.state.epoch?.claimedBy).toBeUndefined();
+
+    expect(claimRestartGate(state, 'a', T0, null).result.granted).toBe(true);
+  });
+
+  it("refuses a live claimant's re-claim under a hold and leaves its claim in place (PAN-5057)", () => {
+    const hold: RestartHold = { reason: 'live check', who: 'operator', setAt: new Date(T0).toISOString() };
+    let state = upsertRestartRequest(emptyRestartGateState(), deployRequest('a', 'a'), T0).state;
+    state = approveRestartGate(state, T0).state;
+    state = claimRestartGate(state, 'a', T0, null).state;
+
+    const reclaimed = claimRestartGate(state, 'a', T0, hold);
+    expect(reclaimed.result).toEqual({ granted: false, status: 'claimed', restartHold: hold });
+    expect(reclaimed.state.epoch?.claimedBy).toBe('a');
+  });
+
+  it('grants the claim when the hold has expired (PAN-5057)', () => {
+    const hold: RestartHold = {
+      reason: 'live check',
+      who: 'operator',
+      setAt: new Date(T0).toISOString(),
+      until: new Date(T0 + 1_000).toISOString(),
+    };
+    let state = upsertRestartRequest(emptyRestartGateState(), deployRequest('a', 'a'), T0).state;
+    state = approveRestartGate(state, T0).state;
+
+    expect(claimRestartGate(state, 'a', T0 + 1_000, hold).result.granted).toBe(true);
+  });
 });
 
 describe('restart gate service', () => {
@@ -339,7 +376,41 @@ describe('restart gate service', () => {
     vi.mocked(console.error).mockRestore();
   });
 
+  it('refuses a claim when the hold is set after approval, with no sweep in between (PAN-5057)', async () => {
+    const hold: RestartHold = { reason: 'live check', who: 'operator', setAt: new Date(T0).toISOString() };
+    const gate = makeGate();
+    await gate.request(deployRequest('reload:22', 'pan reload'));
+    await gate.approve();
 
+    readHold = async () => hold;
+    expect(await gate.claim('reload:22')).toEqual({ granted: false, status: 'approved', restartHold: hold });
+    expect(emitted.at(-1)?.restartHold).toEqual(hold);
+
+    readHold = async () => null;
+    await gate.request(deployRequest('reload:22', 'pan reload'));
+    expect(await gate.claim('reload:22')).toEqual({ granted: true, status: 'claimed' });
+  });
+
+  it('refuses the claim when reading the hold fails (PAN-5057)', async () => {
+    readHold = async () => null;
+    const gate = makeGate();
+    await gate.request(deployRequest('reload:22', 'pan reload'));
+    await gate.approve();
+
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    readHold = async () => { throw new Error('EACCES'); };
+    const refused = await gate.claim('reload:22');
+    expect(refused).toEqual({ granted: false, status: 'approved' });
+    expect(refused).not.toHaveProperty('restartHold');
+    expect(console.error).toHaveBeenCalledWith(
+      '[restart-gate] Reading the restart hold failed; refusing the claim:',
+      expect.any(Error),
+    );
+    vi.mocked(console.error).mockRestore();
+
+    readHold = async () => null;
+    expect((await gate.claim('reload:22')).granted).toBe(true);
+  });
 
   it('serializes concurrent claims so exactly one is granted', async () => {
     const gate = makeGate();
