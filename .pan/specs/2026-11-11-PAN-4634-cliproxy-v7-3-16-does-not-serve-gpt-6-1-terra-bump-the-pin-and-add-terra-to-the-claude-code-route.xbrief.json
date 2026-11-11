@@ -1,0 +1,268 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-11T12:20:30Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-4634: CLIProxy v7.3.16 does not serve gpt-6.1-terra: bump the pin and add Terra to the claude-code route",
+    "updated": "2026-11-11T12:25:59.863Z"
+  },
+  "plan": {
+    "id": "pan-4634",
+    "title": "CLIProxy v7.3.16 does not serve gpt-6.1-terra: bump the pin and add Terra to the claude-code route",
+    "status": "running",
+    "uid": "8f1cd46b-945c-4f86-9c89-1ad102e6cb73",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-11T12:20:30Z",
+    "updated": "2026-11-11T12:25:59.863Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4634",
+        "label": "PAN-4634",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/4633",
+        "label": "PAN-4633 (D8 origin)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "cliproxy",
+      "openai",
+      "gpt-6.1-terra",
+      "claude-code",
+      "models"
+    ],
+    "narratives": {
+      "Problem": "PAN-4633 left gpt-6.1-terra off the claude-code route because the pinned CLIProxy 7.3.16 answered 'unknown provider for model gpt-6.1-terra' on 2026-10-26. The code, the capability notes and the docs still say Terra is Codex-harness only and that a pin bump is pending.",
+      "Proposal": "A 2026-11-11 re-probe shows the same pinned 7.3.16 binary (no binary or config change) now lists and serves gpt-6.1-terra under ChatGPT sign-in: POST /v1/messages returned a completion and a claude --print tool round trip at the 272K pin succeeded. CLIProxy refreshes its model catalog every 3h from router-for-me/models models.json, which added Terra on 2026-10-26T23:15Z, after the PAN-4633 probe. So: keep the pin at v7.3.16, add gpt-6.1-terra to GPT_56_MODELS (behavior-neutral: the capability fallthrough already yields 272000/272000), replace the negative-probe notes in cliproxy.ts and model-capability-additions.ts with the dated positive probe, and update configuration/harnesses.mdx and the v0.78.0 Upcoming changelog block. See .pan/drafts/PAN-4634.md.",
+      "NonGoals": "- Bumping CLIPROXY_RELEASE_VERSION or evaluating CLIProxyAPI 8.x\n- Fixing gpt-6-sol or gpt-5.6-terra on the claude-code route (both return 'unknown provider' today) or removing them from GPT_56_MODELS\n- Changing the oauth-model-alias remaps (which rename gpt-5.6-luna, gpt-5.6-terra and gpt-6-sol to Claude ids and so hide the original ids) or adding fork to them\n- Adding gpt-6-rosalind, gpt-6-astra-law or gpt-6-chat-thinking to GPT_56_MODELS or any route\n- Adding a harness-policy gate that refuses claude-code + any OpenAI model\n- Adding a [372k] variant for Terra, or changing defaults, presets, tiers or role models\n- Adding a test that reads provider-env.ts or cliproxy.ts as source text\n- Editing the shipped Terra changelog entry near changelog.mdx:205 or .pan/backlog/sequence.md"
+    },
+    "autoDecisions": [
+      {
+        "summary": "No CLIProxy pin bump: CLIPROXY_RELEASE_VERSION stays 'v7.3.16'",
+        "rationale": "Probed 2026-11-11: the running process (/proc/21217/exe -> ~/.overdeck/bin/cliproxy, 'CLIProxyAPI Version: 7.3.16, Commit: c404af96') lists gpt-6.1-terra in GET /v1/models and POST /v1/messages returns a completion; config.yaml and config.extra.yaml contain no 6.1-terra mapping. cliproxy.log shows a 3-hourly refresh from https://raw.githubusercontent.com/router-for-me/models/refs/heads/main/models.json, which lists gpt-6.1-terra (added 2026-10-26T23:15:19Z). The issue scope allows 'the CLIProxy version (or config) that serves' Terra, and the issue itself suspected the model list did not come from a static per-version table. A 7.x to 8.x major jump would risk the version banner, oauth-model-alias and management API for no gain."
+      },
+      {
+        "summary": "Add gpt-6.1-terra to GPT_56_MODELS even though the launch env does not change",
+        "rationale": "Terra's capability contextWindow is already CLIPROXY_GPT56_CONTEXT_WINDOW, so the fallthrough already exports 272000/272000. Membership makes the route explicit and matches the issue's scope item 2. The existing model-capabilities.test.ts env-export case for gpt-6.1-terra proves the result; no source-reading test is added."
+      },
+      {
+        "summary": "List GPT-6.1 Sol alongside Terra in the harnesses.mdx 272K sentence",
+        "rationale": "gpt-6.1-sol is already in GPT_56_MODELS but missing from that sentence; adding only Terra would leave the sentence wrong in a new way."
+      },
+      {
+        "summary": "Add a v0.78.0 Upcoming changelog bullet and leave the shipped Terra entry unchanged",
+        "rationale": "The shipped entry is release history; the Upcoming block is where unreleased user-facing changes go per the RELEASE STEP comment in changelog.mdx."
+      },
+      {
+        "summary": "Keep gpt-6-rosalind and gpt-6-astra-law out of GPT_56_MODELS",
+        "rationale": "Neither appears in today's GET /v1/models list."
+      }
+    ],
+    "items": [
+      {
+        "id": "terra-route-set",
+        "title": "Add gpt-6.1-terra to GPT_56_MODELS with the 2026-11-11 probe comment",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T12:20:30Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "backend",
+          "issueLabel": "pan-4634",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/provider-env.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/model-capabilities.test.ts src/lib/__tests__/model-catalog-audit.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "both test files pass, including 'feeds the same window to the harness env exports and the capability table for gpt-6.1-terra'"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4634.md work item 1a. In src/lib/agents/provider-env.ts (anchor `const GPT_56_MODELS = new Set(`, line 142): insert 'gpt-6.1-terra' after 'gpt-6.1-sol' in the Set literal. Change the comment `The GPT-6 family (astra, sol, luna, 6.1 sol)` to `(astra, sol, luna, 6.1 sol, 6.1 terra)`. Replace the single comment line starting `// gpt-6.1-terra, gpt-6-rosalind and gpt-6-astra-law are deliberately absent` with the two lines given verbatim in the PRD: one saying gpt-6.1-terra joined after CLIProxy 7.3.16 served it under ChatGPT sign-in on 2026-11-11 (PAN-4634), one saying gpt-6-rosalind and gpt-6-astra-law are deliberately absent because CLIProxy does not list them (PAN-4826 D6, re-checked 2026-11-11) and that their policy still resolves to 272K through the capability fallthrough. Change nothing else in the file. Add no new test."
+        },
+        "items": [
+          {
+            "id": "terra-route-set.ac1",
+            "title": "Given provider-env.ts, when the GPT_56_MODELS Set literal is read, then it contains 'gpt-6.1-terra' and does not contain 'gpt-6-rosalind' or 'gpt-6-astra-law'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "terra-route-set.ac2",
+            "title": "Given the comments directly above GPT_56_MODELS, when read, then no line says gpt-6.1-terra is absent and one line names 2026-11-11 and PAN-4634",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "terra-route-set.ac3",
+            "title": "Given npx vitest run src/lib/__tests__/model-capabilities.test.ts src/lib/__tests__/model-catalog-audit.test.ts, when run, then it exits 0 and getClaudeCodeContextPolicyForModel('gpt-6.1-terra') returns maxContextTokens 272000 and autoCompactWindow 272000",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "terra-probe-notes",
+        "title": "Replace the Terra negative-probe notes with the 2026-11-11 positive probe",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T12:20:30Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "backend",
+          "issueLabel": "pan-4634",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cliproxy.ts",
+            "src/lib/model-capability-additions.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/__tests__/model-capabilities.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "model-capabilities.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4634.md work items 1b and 1c. In src/lib/cliproxy.ts (anchor `// PAN-4633: probed 2026-10-26, does NOT serve gpt-6.1-terra`, lines 61-63) put the PAN-4633 note in past tense (`did NOT serve`, `answered`), drop its final sentence `Terra is codex-harness only until PAN-4634 bumps the pin.`, and add the five-line PAN-4634 note from the PRD verbatim: re-probed 2026-11-11 with no binary or config change, the same 7.3.16 build lists and serves gpt-6.1-terra (POST /v1/messages and a claude --print tool round trip succeeded), and CLIProxy refreshes its catalog every 3h from router-for-me/models models.json, which added Terra on 2026-10-26 after the PAN-4633 probe, so no pin bump was needed. Do NOT change `const CLIPROXY_RELEASE_VERSION = 'v7.3.16';`. In src/lib/model-capability-additions.ts (anchor `CLIProxy 7.3.16 does not serve it (PAN-4634).`, line 476, inside the gpt-6.1-terra notes string) replace that sentence with `The claude-code route through CLIProxy 7.3.16 was verified on 2026-11-11 (PAN-4634).`. Leave the gpt-6-rosalind and gpt-6-astra-law notes unchanged."
+        },
+        "items": [
+          {
+            "id": "terra-probe-notes.ac1",
+            "title": "Given src/lib/cliproxy.ts, when the comments above CLIPROXY_RELEASE_VERSION are read, then one comment names gpt-6.1-terra, 2026-11-11 and PAN-4634, and the text 'codex-harness only until PAN-4634 bumps the pin' no longer exists in the file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "terra-probe-notes.ac2",
+            "title": "Given src/lib/cliproxy.ts, when CLIPROXY_RELEASE_VERSION is read, then it still equals 'v7.3.16' and git diff origin/main...HEAD -- src/lib/cliproxy.ts shows no change to that line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "terra-probe-notes.ac3",
+            "title": "Given src/lib/model-capability-additions.ts, when the gpt-6.1-terra notes string is read, then it no longer contains 'does not serve it' and contains '2026-11-11 (PAN-4634)'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "terra-docs",
+        "title": "Document Terra on the claude-code route in harnesses.mdx and the v0.78.0 changelog",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T12:20:30Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-4634",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/harnesses.mdx",
+            "changelog.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'GPT-6.1 Sol and Terra' configuration/harnesses.mdx",
+            "! grep -q 'until \\[PAN-4634\\]' configuration/harnesses.mdx",
+            "git diff origin/main...HEAD -- changelog.mdx"
+          ],
+          "expected_outputs": [
+            "the first grep prints one matching line in the claude-code context-policy paragraph",
+            "the negated grep exits 0 (no match)",
+            "the changelog diff adds exactly one bullet inside the v0.78.0 Update block and removes no lines"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "See .pan/drafts/PAN-4634.md work item 2. In configuration/harnesses.mdx: (a) at anchor `GPT-6 Astra, Sol, and Luna and` (near line 110) rewrite the sentence so it reads `GPT-6 Astra, Sol, and Luna, GPT-6.1 Sol and Terra, and GPT-5.6 Sol, Terra, and Luna default to a `272000`-token pin for both`, keeping the rest of the paragraph and keeping the exact phrase `GPT-6.1 Sol and Terra` on one line; (b) at anchor `It does not serve `gpt-6.1-terra` (probed 2026-10-26)` (line 329) replace the text from `It does not serve` to the end of that sentence with the PRD's after-text: the same version served gpt-6.1-terra on the claude-code harness on 2026-11-11 (PAN-4634 link), on 2026-10-26 it did not, CLIProxy refreshes its model list from a remote catalog every three hours so served models can change without a version change, and it does not list gpt-6-rosalind or gpt-6-astra-law so use those on the Codex harness. Keep the dated 2026-09-29 clause before it unchanged. In changelog.mdx, inside `<Update label=\"v0.78.0\" description=\"Unreleased\"`, under `#### Improved` after the existing bullets and before the `[Compare v0.77.0...v0.78.0]` line, add the PRD's GPT-6.1 Terra bullet verbatim. Do not edit the shipped Terra bullet near changelog.mdx:205. Escape any dollar sign as &#36;."
+        },
+        "items": [
+          {
+            "id": "terra-docs.ac1",
+            "title": "Given configuration/harnesses.mdx, when the claude-code context-policy paragraph is read, then the 272000-token pin sentence names GPT-6.1 Sol and Terra",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "terra-docs.ac2",
+            "title": "Given configuration/harnesses.mdx, when the Codex section's CLIProxy sentence is read, then it names gpt-6.1-terra, 2026-11-11 and PAN-4634, says CLIProxy refreshes its model list from a remote catalog, and grep for 'until [PAN-4634]' returns no match",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "terra-docs.ac3",
+            "title": "Given changelog.mdx, when the v0.78.0 Update block is read, then its Improved section contains a GPT-6.1 Terra bullet that says it runs on the Claude Code harness at the 272K pin and links PAN-4634",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "terra-docs.ac4",
+            "title": "Given git diff origin/main...HEAD -- changelog.mdx, when read, then it removes no lines, so the shipped Terra bullet near line 205 is preserved",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [],
+    "metadata": {
+      "canonicalFilename": "2026-11-11-PAN-4634-cliproxy-v7-3-16-does-not-serve-gpt-6-1-terra-bump-the-pin-and-add-terra-to-the-claude-code-route.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}

@@ -58,9 +58,14 @@ export const CLIPROXY_BASE_URL = `http://${CLIPROXY_HOST}:${CLIPROXY_PORT}`;
 // ChatGPT sign-in (no client-version 400).
 // PAN-4422: verified 2026-09-29 to serve gpt-6.1-sol (GET /v1/models lists it;
 // POST /v1/messages returned a completion) under ChatGPT sign-in.
-// PAN-4633: probed 2026-10-26, does NOT serve gpt-6.1-terra (absent from
-// GET /v1/models; POST /v1/messages answers "unknown provider for model
-// gpt-6.1-terra"). Terra is codex-harness only until PAN-4634 bumps the pin.
+// PAN-4633: probed 2026-10-26, did NOT serve gpt-6.1-terra (absent from
+// GET /v1/models; POST /v1/messages answered "unknown provider for model
+// gpt-6.1-terra").
+// PAN-4634: re-probed 2026-11-11 with no binary or config change; the same
+// 7.3.16 build lists and serves gpt-6.1-terra (POST /v1/messages and a
+// claude --print tool round trip succeeded). CLIProxy refreshes its model
+// catalog every 3h from router-for-me/models models.json, which added Terra
+// on 2026-10-26 after the PAN-4633 probe, so no pin bump was needed.
 const CLIPROXY_RELEASE_VERSION = 'v7.3.16';
 
 function getCliproxyDir(): string {

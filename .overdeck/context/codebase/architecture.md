@@ -81,7 +81,9 @@ terminal backend (Herdr by default, tmux when `terminal.backend: tmux`).
   `model-capabilities.ts` is at its file-size cap. Adding a `ModelId` also needs rows in
   `model-fallback.ts` `MODEL_PROVIDERS`, `providers.ts`, `cost.ts` and the dashboard pickers.
   OpenAI ids may also need a ChatGPT-sign-in Codex floor (`codex/model-floors.ts`), and they
-  join `GPT_56_MODELS` (`agents/provider-env.ts`) only when the pinned CLIProxy serves them.
+  join `GPT_56_MODELS` (`agents/provider-env.ts`) only when a live probe shows CLIProxy serves
+  them. CLIProxy refreshes its model catalog every 3h from `router-for-me/models` `models.json`,
+  so the served list can change without a pin change (PAN-4634).
   Kimi ids on the Claude Code route get their wire id from `getClaudeCodeLaunchModel`
   (`kimi-claude-routing.ts`, a narrow id set) and `resolveKimiModelForEndpoint` (`providers.ts`,
   coding vs platform endpoint); native `kimi-code/*` aliases need rows in both
