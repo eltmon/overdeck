@@ -77,7 +77,7 @@ interface RoleDefinition {
 
 const DEFAULT_WORKHORSES: Required<Record<WorkhorseSlot, ModelRef>> = {
   expensive: 'claude-opus-5-5',
-  mid: 'claude-sonnet-5-5',
+  mid: 'claude-opus-5-5',
   cheap: 'claude-haiku-4-5',
 };
 

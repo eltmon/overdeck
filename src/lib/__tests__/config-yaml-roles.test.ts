@@ -74,6 +74,21 @@ describe('role model configuration', () => {
     }
   });
 
+  it('defaults the mid workhorse to Opus 5.5 (PAN-5124)', () => {
+    expect(DEFAULT_WORKHORSES.mid).toBe('claude-opus-5-5');
+    expect(derefWorkhorse(DEFAULT_MODEL_REFS.work, { workhorses: DEFAULT_WORKHORSES }, 'roles.work.model')).toBe('claude-opus-5-5');
+
+    const { config } = mergeConfigs({});
+    expect(resolveModel('work', undefined, config)).toBe('claude-opus-5-5');
+  });
+
+  it('keeps a configured workhorses.mid over the Opus 5.5 default (PAN-5124)', () => {
+    const { config } = mergeConfigs({ workhorses: { mid: 'claude-sonnet-5-5' } });
+
+    expect(derefWorkhorse(DEFAULT_MODEL_REFS.work, config, 'roles.work.model')).toBe('claude-sonnet-5-5');
+    expect(resolveModel('work', undefined, config)).toBe('claude-sonnet-5-5');
+  });
+
   it('honors configured roles.plan.model through the configured expensive workhorse', () => {
     const { config } = mergeConfigs({
       workhorses: {
