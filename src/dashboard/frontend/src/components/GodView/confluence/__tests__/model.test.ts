@@ -136,6 +136,17 @@ describe('Confluence model', () => {
         expect(Math.min(...gaps(ys))).toBeGreaterThan(0);
       });
 
+      it('keeps slots apart, in id order, on a canvas too short for a full river', () => {
+        const short = computeLayout(1280, 385);
+        expect(short.riverBottom - short.riverTop).toBeLessThan(80);
+        const orbs = [orb('PAN-3', 'active'), orb('PAN-1', 'active'), orb('PAN-2', 'active')];
+        for (const candidate of orbs) positionOrb(candidate, orbs, short, 1, 1);
+        const byId = [...orbs].sort((a, b) => a.id.localeCompare(b.id)).map((candidate) => candidate.ty);
+
+        expect(byId[1]! - byId[0]!).toBeGreaterThanOrEqual(20);
+        expect(byId[2]! - byId[1]!).toBeGreaterThanOrEqual(20);
+      });
+
       it('keeps a column unchanged when another column gains an orb, and is stable across calls', () => {
         const work = () => Array.from({ length: 20 }, (_, index) => orb(`PAN-${index + 1}`, 'active'));
         const alone = place(work());

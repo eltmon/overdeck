@@ -307,8 +307,9 @@ export function positionOrb<T extends PositionableOrb>(
     .filter((candidate) => candidate.stage === orb.stage && (candidate.state === 'active' || candidate.state === 'failed'))
     .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   const slot = Math.max(0, lane.indexOf(orb));
+  // The 60 px floor keeps slots apart on a short canvas, where the river is under 80 px tall.
   orb.ty = layout.riverTop + 40
-    + ((slot + 0.5) / Math.max(1, lane.length)) * (layout.riverBottom - layout.riverTop - 80);
+    + ((slot + 0.5) / Math.max(1, lane.length)) * Math.max(60, layout.riverBottom - layout.riverTop - 80);
   return orb;
 }
 
