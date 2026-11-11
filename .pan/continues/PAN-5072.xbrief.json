@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5072",
   "created": "2026-11-11T10:00:36.495Z",
-  "updated": "2026-11-11T10:19:42.674Z",
+  "updated": "2026-11-11T10:19:50.839Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -128,6 +128,11 @@
     "w6-hermes-readme.ac3": {
       "status": "completed",
       "doneAt": "2026-11-11T10:19:42.674Z"
+    },
+    "w7-openclaw-readme": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5072",
+      "claimedAt": "2026-11-11T10:19:50.839Z"
     }
   }
 }
