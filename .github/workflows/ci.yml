@@ -205,8 +205,8 @@ jobs:
 
       - name: Install Playwright browsers (root) for vitest e2e
         run: |
-          for i in 1 2 3; do npx playwright install --with-deps chromium && exit 0; echo "playwright --with-deps attempt $i failed"; sleep 30; done
-          # PAN-5156: an Ubuntu mirror outage must not fail CI. The runner image ships
+          for i in 1 2; do timeout 300 npx playwright install --with-deps chromium && exit 0; echo "playwright --with-deps attempt $i failed or timed out"; sleep 20; done
+          # PAN-5156: an Ubuntu mirror outage (failing or hanging apt) must not fail CI. The runner image ships
           # Chrome and its libraries, so the browser alone is enough.
           echo "::warning::apt dependencies unavailable; installing Chromium without --with-deps"
           npx playwright install chromium
@@ -266,8 +266,8 @@ jobs:
       - name: Install Playwright browsers
         run: |
           cd src/dashboard/frontend
-          for i in 1 2 3; do npx playwright install --with-deps chromium && exit 0; echo "playwright --with-deps attempt $i failed"; sleep 30; done
-          # PAN-5156: an Ubuntu mirror outage must not fail CI. The runner image ships
+          for i in 1 2; do timeout 300 npx playwright install --with-deps chromium && exit 0; echo "playwright --with-deps attempt $i failed or timed out"; sleep 20; done
+          # PAN-5156: an Ubuntu mirror outage (failing or hanging apt) must not fail CI. The runner image ships
           # Chrome and its libraries, so the browser alone is enough.
           echo "::warning::apt dependencies unavailable; installing Chromium without --with-deps"
           npx playwright install chromium
@@ -440,8 +440,8 @@ jobs:
 
       - name: Install Playwright browsers for quarantined tests
         run: |
-          for i in 1 2 3; do npx playwright install --with-deps chromium && exit 0; echo "playwright --with-deps attempt $i failed"; sleep 30; done
-          # PAN-5156: an Ubuntu mirror outage must not fail CI. The runner image ships
+          for i in 1 2; do timeout 300 npx playwright install --with-deps chromium && exit 0; echo "playwright --with-deps attempt $i failed or timed out"; sleep 20; done
+          # PAN-5156: an Ubuntu mirror outage (failing or hanging apt) must not fail CI. The runner image ships
           # Chrome and its libraries, so the browser alone is enough.
           echo "::warning::apt dependencies unavailable; installing Chromium without --with-deps"
           npx playwright install chromium
