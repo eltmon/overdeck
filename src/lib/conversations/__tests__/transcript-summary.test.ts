@@ -332,6 +332,25 @@ describe('PAN-2657 background-AI spawn hardening', () => {
     expect(args[permIdx + 1]).toBe('dontAsk');
   });
 
+  it('pins --effort low for models whose capability row lists it (PAN-5124)', async () => {
+    const { buildStructuredClaudeArgs } = await import('../transcript-summary.js');
+    const args = buildStructuredClaudeArgs({ type: 'object' }, 'claude-haiku-5-5');
+    const effortIdx = args.indexOf('--effort');
+    expect(effortIdx).toBeGreaterThan(-1);
+    expect(args[effortIdx + 1]).toBe('low');
+    expect(args).toContain('--safe-mode');
+    const toolsIdx = args.indexOf('--tools');
+    expect(args[toolsIdx + 1]).toBe('');
+    const permIdx = args.indexOf('--permission-mode');
+    expect(args[permIdx + 1]).toBe('dontAsk');
+  });
+
+  it('passes no --effort for Haiku 4.5, which has no effort control (PAN-5124)', async () => {
+    const { buildStructuredClaudeArgs } = await import('../transcript-summary.js');
+    expect(buildStructuredClaudeArgs({ type: 'object' }, 'claude-haiku-4-5')).not.toContain('--effort');
+    expect(buildStructuredClaudeArgs({ type: 'object' }, 'claude-haiku-4-5-20251001')).not.toContain('--effort');
+  });
+
   it('spawns in a scratch cwd under OVERDECK_HOME, never a repository', async () => {
     const { backgroundAiScratchCwd } = await import('../transcript-summary.js');
     const { getOverdeckHome } = await import('../../paths.js');

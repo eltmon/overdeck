@@ -33,6 +33,7 @@ import type { ChatMessage } from '@overdeck/contracts';
 import { buildChildEnv } from '../child-env.js';
 import { getProviderEnvForModel } from '../agents.js';
 import { getOverdeckHome } from '../paths.js';
+import { getModelEffortLevels } from '../model-capabilities.js';
 import { recordBackgroundAiCost } from '../background-ai/cost.js';
 import type { BackgroundAiFeature } from '../background-ai/registry.js';
 
@@ -338,6 +339,9 @@ export function buildStructuredClaudeArgs(schema: Record<string, unknown>, model
     '--output-format', 'json',
     '--json-schema', JSON.stringify(schema),
     '--model', model,
+    // PAN-5124 FR-3: titles and the About summary need no reasoning. Pin low
+    // effort only for models whose own row lists it (D2); Haiku 4.5 has none.
+    ...(getModelEffortLevels(model)?.includes('low') ? ['--effort', 'low'] : []),
   ];
 }
 
