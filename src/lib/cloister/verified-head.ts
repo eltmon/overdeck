@@ -4,6 +4,7 @@
  * sha — slicing it directly yields garbage).
  */
 import { parseCompositeSnapshot, type HeadAnchor } from '../git-utils.js';
+import type { WorkspaceRepoRoot } from '../project-repos.js';
 
 export function primaryShaFromAnchor(anchor: HeadAnchor | string | undefined, primaryRepoKey: string | undefined): string | undefined {
   if (!anchor) return undefined;
@@ -23,4 +24,20 @@ export async function readPrimaryHead8(issueId: string, workspacePath: string): 
   } catch {
     return undefined;
   }
+}
+
+/**
+ * PAN-4624: the eight-char head a CI test verdict is stored under. CI records
+ * its result under the PR head, so in a polyrepo that is the primary member
+ * repo's sha in `anchor` (the wrapper repo's HEAD never matches a PR). A
+ * standalone workspace, or a polyrepo anchor with no primary sha, gets
+ * `fallback`, today's workspace HEAD.
+ */
+export function ciVerdictHead8(
+  repoRoots: WorkspaceRepoRoot[],
+  anchor: HeadAnchor | undefined,
+  fallback: string | undefined,
+): string | undefined {
+  if (!repoRoots.some((root) => root.isPolyrepo)) return fallback;
+  return primaryShaFromAnchor(anchor, repoRoots[0]?.repoKey)?.slice(0, 8) ?? fallback;
 }
