@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5152",
   "created": "2026-11-11T14:36:40.308Z",
-  "updated": "2026-11-11T15:00:27.787Z",
+  "updated": "2026-11-11T15:00:29.540Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -84,6 +84,11 @@
     "wi4-prefix-collision-message.ac2": {
       "status": "completed",
       "doneAt": "2026-11-11T15:00:27.786Z"
+    },
+    "wi5-jira-http-client": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5152",
+      "claimedAt": "2026-11-11T15:00:29.540Z"
     }
   }
 }
