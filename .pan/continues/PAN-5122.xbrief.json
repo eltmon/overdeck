@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5122",
   "created": "2026-11-11T10:01:02.133Z",
-  "updated": "2026-11-11T10:01:02.133Z",
+  "updated": "2026-11-11T10:02:09.363Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -14,5 +14,12 @@
       "timestamp": "2026-11-11T10:01:02.132Z"
     }
   ],
-  "agentModel": "claude-opus-5-5"
+  "agentModel": "claude-opus-5-5",
+  "items": {
+    "herdr-companion-host": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5122",
+      "claimedAt": "2026-11-11T10:02:09.363Z"
+    }
+  }
 }
