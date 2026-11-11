@@ -1,0 +1,288 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-11T10:50:34Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5057: Restart hold: gate claim step ignores a hold set after approval",
+    "updated": "2026-11-11T10:56:09.563Z"
+  },
+  "plan": {
+    "id": "pan-5057",
+    "title": "Restart hold: gate claim step ignores a hold set after approval",
+    "status": "running",
+    "uid": "29ca3e0d-a63d-495d-b3cc-2ebbbeffc2b9",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-11T10:50:34Z",
+    "updated": "2026-11-11T10:56:09.563Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5057",
+        "label": "PAN-5057",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/pull/5056",
+        "label": "PR #5056 (PAN-5007 restart hold)",
+        "type": "pr"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5057.md",
+        "label": "PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "restart-gate",
+      "restart-hold",
+      "dashboard-server",
+      "cli"
+    ],
+    "narratives": {
+      "Problem": "The PAN-5007 restart hold is enforced at pan reload, pan restart, pan restart approve, POST /api/restart-gate/approve and POST /api/system/restart-dashboard, but not at POST /api/restart-gate/claim. A requester claims an approved epoch on its next 5s poll, so a hold set in the window between approval and that poll is ignored and one restart goes through the hold.",
+      "Proposal": "The gate service's claim reads the hold file fresh on every call (failing closed on a read error) and passes it to the pure claimRestartGate state machine, which refuses every claim while the hold is active with HTTP 200 { granted: false, status, restartHold } and leaves the epoch untouched. The requester keeps polling, which keeps the epoch alive, and claims after pan restart release with no second approval. The CLI requester logs that its approved restart is held instead of claiming to wait for approval. Docs in docs/MERGE-WORKFLOW.md and the pan-restart / pan-reload skills describe the new behavior.",
+      "NonGoals": "- No change to pan restart --now, which ignores the claim result (src/cli/commands/restart.ts line 515) but is already refused by the CLI hold check before it registers\n- No change to the approve route, POST /api/system/restart-dashboard, pan reload's up-front hold check, or the supervisor-watchdog exemption\n- No 409 status on the claim route; refusal stays HTTP 200 with granted: false\n- No change to RestartApprovalBanner.tsx (it already shows the hold when status is approved)\n- No change to changelog.mdx (written by hand on release day per docs/RELEASING.md)\n- No change to epoch, request TTL, claim lapse or satisfied-expiry rules\n- No new wire fields other than the optional restartHold on the claim response"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Enforce the hold in the gate service (claim) rather than the route, with the decision in the pure claimRestartGate function via a 4th optional activeHold parameter.",
+        "rationale": "The issue allows either and asks for tests next to the PAN-5007 cases in the service test file; the service already has an injectable readHold dep, and keeping the decision in the pure state machine keeps the check and the transition in one synchronous step."
+      },
+      {
+        "summary": "Read the hold file fresh on every claim instead of using the cached hold.",
+        "rationale": "The cached hold is refreshed only every 5s sweep, which is the exact window the issue describes; checking it would leave the bug in place."
+      },
+      {
+        "summary": "Fail closed: a hold-read error refuses the claim.",
+        "rationale": "restart-hold.ts already treats an unreadable hold file as active ('failing open would let a restart through that the operator asked to stop') and the approve route answers 500 on the same error; the requester keeps polling and claims once the read works."
+      },
+      {
+        "summary": "Refuse a live claimant's re-claim under a hold too, leaving its existing claim to lapse normally.",
+        "rationale": "One rule ('while held, claim never grants') is simpler than an exception, and a live claim already outranks the hold in the banner because a restart is under way."
+      },
+      {
+        "summary": "Include a small client change so a held, approved requester says it is held rather than 'Still waiting for operator approval'.",
+        "rationale": "Before this fix an approved requester waited at most ~5s; now it can wait as long as the hold lasts, and the old heartbeat would be false. Operator-facing messages must stand alone (repo rule)."
+      },
+      {
+        "summary": "No frontend change and no changelog edit.",
+        "rationale": "RestartApprovalBanner already shows 'Restarts on hold' whenever status is not claimed; docs/RELEASING.md says changelog.mdx is drafted by hand on release day."
+      }
+    ],
+    "items": [
+      {
+        "id": "claim-refuses-under-hold",
+        "title": "Gate service refuses every claim while the restart hold is active",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-11T10:50:34Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5057",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/restart-gate.ts",
+            "src/dashboard/server/services/__tests__/restart-gate.test.ts",
+            "src/dashboard/server/routes/restart-gate.ts",
+            "src/lib/restart-hold.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/restart-gate.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "restart-gate.test.ts passes, including the five new (PAN-5057) tests and the unchanged 'serializes concurrent claims so exactly one is granted'",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD Work item 1 exactly. (1) Add optional `restartHold?: RestartHold` to `RestartGateClaimResult` in src/dashboard/server/services/restart-gate.ts. (2) Give the pure `claimRestartGate(state, requesterId, nowMs, activeHold: RestartHold | null = null)` a 4th parameter; right after pruning, if `activeHold && isRestartHoldActive(activeHold, nowMs)` return `{ state: pruned, result: { granted: false, status: deriveRestartGateStatus(pruned, nowMs), restartHold: activeHold } }` before any membership or live-claim check. (3) In `createRestartGate`, replace the one-line `claim` with an async function that awaits `readHold()` fresh, stores the result in the cached `hold` variable, then calls `mutate((current, nowMs) => claimRestartGate(current, requesterId, nowMs, claimHold))`; if `readHold()` throws, log `console.error('[restart-gate] Reading the restart hold failed; refusing the claim:', error)` and return `mutate` of the pruned state with `{ granted: false, status }` (no restartHold key). The await must happen before `mutate` so the check and transition stay one synchronous step. (4) Update the three header comments named in the PRD (service header hold paragraph, route header claim line, restart-hold.ts header). (5) Add the five tests named in PRD Work item 1 step 5 to src/dashboard/server/services/__tests__/restart-gate.test.ts: three in 'restart gate state machine', two in 'restart gate service' after the PAN-5007 hold-read-failure test. The claim route keeps answering HTTP 200."
+        },
+        "items": [
+          {
+            "id": "claim-refuses-under-hold.ac1",
+            "title": "Given an approved epoch and readHold switched to return a hold after approve() with no sweep() or read() in between, when claim('reload:22') runs, then it returns { granted: false, status: 'approved', restartHold: hold }, the epoch keeps requesterIds ['reload:22'] with no claimedBy, and the last emitted snapshot carries restartHold",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "claim-refuses-under-hold.ac2",
+            "title": "Given that held epoch, when readHold returns null and the requester polls then claims again, then the claim returns granted: true with no second approve() call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "claim-refuses-under-hold.ac3",
+            "title": "Given readHold throws at claim time, when claim runs, then it returns granted: false with no restartHold key and console.error is called with '[restart-gate] Reading the restart hold failed; refusing the claim:'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "claim-refuses-under-hold.ac4",
+            "title": "The pure claimRestartGate rejects a live claimant's re-claim under an active hold with status 'claimed' and preserves epoch.claimedBy, and accepts the claim when the hold's until equals the claim time (expired)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "claim-refuses-under-hold.ac5",
+            "title": "The existing test 'serializes concurrent claims so exactly one is granted' passes with its body unchanged and npm run typecheck exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "client-reports-held-claim",
+        "title": "Requester logs that its approved restart is held, not waiting for approval",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T10:50:34Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-5057",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/restart-gate-client.ts",
+            "tests/unit/lib/restart-gate-client.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/restart-gate-client.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "restart-gate-client.test.ts passes, including the two new (PAN-5057) tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD Work item 2 exactly. The wire field is `restartHold` on the claim response, shaped like `RestartHold` from src/lib/restart-hold.ts (reason, who, setAt, optional until). In src/lib/restart-gate-client.ts `waitForRestartApproval`: import `describeRestartHold` and `type RestartHold` from './restart-hold.js'; widen the claim payload type to `{ granted?: boolean; restartHold?: RestartHold }`; add `let heldText: string | null = null;` beside `let inEpoch = false;`; directly after `registered = true;` add `let claimHeldText: string | null = null;`, and directly before the `if (!announced) {` block add `heldText = claimHeldText;` (so every successful poll recomputes it); inside the claim branch after the granted===true return, when the claim payload carries restartHold set `claimHeldText = describeRestartHold(hold)` and, if it differs from the previous `heldText`, log `The restart is approved, but the operator restart hold is active: ${claimHeldText}. This command restarts the dashboard after \\`pan restart release\\` (or the hold's expiry), with no second approval.` (exact snippet in PRD Work item 2 step 3); while heldText is set the 60s heartbeat logs `Still waiting for the operator restart hold to be released before restarting the dashboard (${waitedMin}m so far).` instead of the approval text. Nothing else in the loop changes: a refused claim still falls through to sleep and re-poll. In tests/unit/lib/restart-gate-client.test.ts extend createGate() with `held: null as RestartHold | null` and make the claim handler answer `{ granted: false, status: 'approved', restartHold: state.held }` while held; add the two tests named in the PRD. Fake timers are already enabled in that file's beforeEach; never use real delays."
+        },
+        "items": [
+          {
+            "id": "client-reports-held-claim.ac1",
+            "title": "Given an approved gate whose claim answers granted: false with restartHold for 3 polls, when waitForRestartApproval runs, then it logs the 'operator restart hold is active' line exactly once and claimedBy stays null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "client-reports-held-claim.ac2",
+            "title": "Given that held gate, when held is cleared, then the next poll claims and the promise resolves { proceed: true, reason: 'claimed' } with no request to /api/restart-gate/approve after the start",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "client-reports-held-claim.ac3",
+            "title": "Given the claim stays held for 13 polls (65s of fake time), then a log call contains 'Still waiting for the operator restart hold to be released' and no log call contains 'Still waiting for operator approval'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-held-claim",
+        "title": "Document that a hold set after approval holds the claim and release restarts it",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T10:50:34Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-5057",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/MERGE-WORKFLOW.md",
+            "sync-sources/skills/pan-restart/SKILL.md",
+            "sync-sources/skills/pan-reload/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n 'PAN-5057' docs/MERGE-WORKFLOW.md sync-sources/skills/pan-restart/SKILL.md sync-sources/skills/pan-reload/SKILL.md"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "grep prints at least one PAN-5057 line for each of the three files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD Work item 3 exactly, using its quoted replacement text. docs/MERGE-WORKFLOW.md is hard-wrapped: find the first sentence with the single-line grep anchor 'reload that was already waiting at the gate keeps waiting until the hold is' (lines ~697-699) and the second with '5-second sweep and publishes it as' (lines ~702-703), then re-wrap the edited paragraphs to ~78 columns. In docs/MERGE-WORKFLOW.md section '### Operator restart hold (PAN-5007)': replace the sentence 'A reload that was already waiting at the gate keeps waiting until the hold is released and somebody approves it.' with the PRD's paragraph distinguishing a still-pending request (waits for release and an approval) from an approved-but-unclaimed one (claim answers granted: false with restartHold, approval stays open, restarts within about 5 seconds of pan restart release or the --until expiry with no second approval, claim reads the hold fresh and refuses on a read error); and change 'The gate reads the hold file on every read and every 5-second sweep' to 'The gate reads the hold file on every read, every 5-second sweep and every claim'. In sync-sources/skills/pan-restart/SKILL.md and sync-sources/skills/pan-reload/SKILL.md insert the one sentence each that the PRD gives, in their '## Operator restart hold (PAN-5007)' paragraphs."
+        },
+        "items": [
+          {
+            "id": "docs-held-claim.ac1",
+            "title": "When grep runs for 'no second approval' and 'every claim' in docs/MERGE-WORKFLOW.md, then it prints the restart-hold section lines saying an approved request whose claim the hold refuses restarts within about 5 seconds of pan restart release, and that every claim reads the hold file fresh",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-held-claim.ac2",
+            "title": "When grep runs for 'PAN-5057' in sync-sources/skills/pan-restart/SKILL.md and sync-sources/skills/pan-reload/SKILL.md, then each file returns a sentence saying an already-approved restart or reload runs by itself after the release",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-held-claim.ac3",
+            "title": "npm run lint:docs exits 0 after the edits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [],
+    "metadata": {
+      "canonicalFilename": "2026-11-11-PAN-5057-restart-hold-gate-claim-step-ignores-a-hold-set-after-approval.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}

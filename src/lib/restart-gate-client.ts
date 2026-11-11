@@ -32,6 +32,7 @@
  */
 
 import { getDashboardApiUrl } from './config.js';
+import { describeRestartHold, type RestartHold } from './restart-hold.js';
 
 /** Poll/TTL-refresh cadence. The server expires a request not refreshed for 20s. */
 export const RESTART_GATE_POLL_INTERVAL_MS = 5_000;
@@ -241,6 +242,7 @@ export async function waitForRestartApproval(
   const waitStartedAt = Date.now();
   let registered = false;
   let inEpoch = false;
+  let heldText: string | null = null;
 
   while (true) {
     if (options.shouldYield && !inEpoch) {
@@ -288,6 +290,7 @@ export async function waitForRestartApproval(
 
     unhealthySince = null;
     registered = true;
+    let claimHeldText: string | null = null;
     inEpoch = poll.payload.status === 'approved' || poll.payload.status === 'claimed';
 
     if (poll.payload.status === 'satisfied') {
@@ -299,7 +302,7 @@ export async function waitForRestartApproval(
     }
 
     if (poll.payload.status === 'approved' && poll.payload.mayClaim) {
-      const claim = await gatePost<{ granted?: boolean }>(
+      const claim = await gatePost<{ granted?: boolean; restartHold?: RestartHold }>(
         '/api/restart-gate/claim',
         { requesterId: request.requesterId },
         options,
@@ -312,9 +315,20 @@ export async function waitForRestartApproval(
         log('Operator approved the restart — proceeding.');
         return { proceed: true, reason: 'claimed', detail: 'operator approved and this requester holds the claim' };
       }
+      const claimHold = claim.kind === 'ok' ? claim.payload.restartHold : undefined;
+      if (claimHold) {
+        // PAN-5057: approved, but the operator restart hold refused the claim.
+        // Keep polling; the claim is granted after `pan restart release`.
+        claimHeldText = describeRestartHold(claimHold);
+        if (claimHeldText !== heldText) {
+          log(`The restart is approved, but the operator restart hold is active: ${claimHeldText}. This command restarts the dashboard after \`pan restart release\` (or the hold's expiry), with no second approval.`);
+        }
+      }
       // Another requester holds the claim for this approval. Keep polling: its
       // restart satisfies this request, and a lapsed claim frees the next poll.
     }
+
+    heldText = claimHeldText;
 
     if (!announced) {
       announced = true;
@@ -322,7 +336,11 @@ export async function waitForRestartApproval(
     } else if (Date.now() - lastHeartbeatAt >= WAIT_HEARTBEAT_MS) {
       lastHeartbeatAt = Date.now();
       const waitedMin = Math.round((Date.now() - waitStartedAt) / 60_000);
-      log(`Still waiting for operator approval of the dashboard restart (${waitedMin}m so far).`);
+      if (heldText) {
+        log(`Still waiting for the operator restart hold to be released before restarting the dashboard (${waitedMin}m so far).`);
+      } else {
+        log(`Still waiting for operator approval of the dashboard restart (${waitedMin}m so far).`);
+      }
     }
 
     await sleep(pollIntervalMs);

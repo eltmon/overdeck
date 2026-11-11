@@ -4,6 +4,7 @@
  *
  *   POST /api/restart-gate/requests  upsert + poll + TTL refresh (every 5s)
  *   POST /api/restart-gate/claim     take the exclusive right to restart
+ *                                    granted: false while the restart hold is active (PAN-5057)
  *   POST /api/restart-gate/withdraw  leave the gate while outside an epoch (PAN-4888)
  *   POST /api/restart-gate/approve   operator approval (banner, `pan restart approve`);
  *                                    409 while the operator restart hold is active (PAN-5007)

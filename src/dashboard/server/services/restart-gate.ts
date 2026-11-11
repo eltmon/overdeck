@@ -29,9 +29,11 @@
  * to the event log.
  *
  * The operator restart hold (PAN-5007) is not gate state: it is a file the CLI
- * owns (`src/lib/restart-hold.ts`). The gate only reads it on every read and
- * sweep and adds it to the published snapshot as `restartHold`, so the banner
- * learns of a new hold or a release within one 5s sweep.
+ * owns (`src/lib/restart-hold.ts`). The gate reads it on every read and sweep
+ * and adds it to the published snapshot as `restartHold`, so the banner learns
+ * of a new hold or a release within one 5s sweep. Every claim reads it fresh
+ * and is refused while it is active, so a hold set after an approval still
+ * stops that restart (PAN-5057).
  *
  * ── Expiry rules ───────────────────────────────────────────────────────────
  * - A pending request not refreshed for 20s expires (a poll IS the refresh).
@@ -114,6 +116,8 @@ export interface RestartGatePollResult {
 export interface RestartGateClaimResult {
   granted: boolean;
   status: RestartGateStatus;
+  /** Set when the claim was refused because the operator restart hold is active (PAN-5057). */
+  restartHold?: RestartHold;
 }
 
 export interface RestartGateWithdrawResult {
@@ -297,15 +301,27 @@ export function approveRestartGate(
  * Atomic by construction: the state transition is synchronous, so two
  * concurrent claims are serialized by the event loop and exactly one wins.
  * A claimant re-claiming its own live claim is granted again, so a retry after
- * a dropped response is safe.
+ * a dropped response is safe. While the operator restart hold is active
+ * (PAN-5057) every claim is refused and the state is left as pruned.
  */
 export function claimRestartGate(
   state: RestartGateState,
   requesterId: string,
   nowMs: number,
+  activeHold: RestartHold | null = null,
 ): { state: RestartGateState; result: RestartGateClaimResult } {
   const pruned = pruneRestartGateState(state, nowMs);
   const epoch = pruned.epoch;
+
+  // PAN-5057: a hold set after approval must stop the restart too. Refuse
+  // without touching the epoch, so the requester keeps polling and claims
+  // after `pan restart release` with no second approval.
+  if (activeHold && isRestartHoldActive(activeHold, nowMs)) {
+    return {
+      state: pruned,
+      result: { granted: false, status: deriveRestartGateStatus(pruned, nowMs), restartHold: activeHold },
+    };
+  }
 
   if (!epoch || !epoch.requesterIds.includes(requesterId)) {
     return { state: pruned, result: { granted: false, status: deriveRestartGateStatus(pruned, nowMs) } };
@@ -451,7 +467,22 @@ export function createRestartGate(deps: RestartGateDeps = {}): RestartGate {
 
   return {
     request: async (input) => mutate((current, nowMs) => upsertRestartRequest(current, input, nowMs)),
-    claim: async (requesterId) => mutate((current, nowMs) => claimRestartGate(current, requesterId, nowMs)),
+    claim: async (requesterId) => {
+      // PAN-5057: read the hold fresh — the cached one can be 5s old, which is
+      // exactly the window this check closes. A failed read refuses (fails closed).
+      let claimHold: RestartHold | null;
+      try {
+        claimHold = await readHold();
+        hold = claimHold;
+      } catch (error) {
+        console.error('[restart-gate] Reading the restart hold failed; refusing the claim:', error);
+        return mutate((current, nowMs) => {
+          const pruned = pruneRestartGateState(current, nowMs);
+          return { state: pruned, result: { granted: false, status: deriveRestartGateStatus(pruned, nowMs) } };
+        });
+      }
+      return mutate((current, nowMs) => claimRestartGate(current, requesterId, nowMs, claimHold));
+    },
     withdraw: async (requesterId) => mutate((current, nowMs) => withdrawRestartRequest(current, requesterId, nowMs)),
     approve: async () => mutate((current, nowMs) => approveRestartGate(current, nowMs)),
     read: async () => {

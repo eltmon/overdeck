@@ -5,10 +5,11 @@
  * `pan restart hold --reason <text> [--until <when>]` writes
  * `~/.overdeck/restart-hold.json`; `pan restart release` deletes it. While it is
  * active, `pan reload`, `pan restart` (dashboard and full scope, `--now`
- * included) and every restart-gate approval refuse. An expired hold reads as
- * released, and reads never delete the file. A file that exists but cannot be
- * parsed (for example one a crash truncated) reads as an active hold: failing
- * open would let a restart through that the operator asked to stop.
+ * included), every restart-gate approval and every restart-gate claim refuse.
+ * An expired hold reads as released, and reads never delete the file. A file
+ * that exists but cannot be parsed (for example one a crash truncated) reads
+ * as an active hold: failing open would let a restart through that the
+ * operator asked to stop.
  *
  * This is not the restart lock (`restart-lock.ts`): that lock is transient and
  * belongs to one live process, while the hold has no owner process and lasts

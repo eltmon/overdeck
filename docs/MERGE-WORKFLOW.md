@@ -695,13 +695,20 @@ While the hold is active:
 - `pan restart approve` refuses with exit 1, and the server enforces the same
   rule: `POST /api/restart-gate/approve` and
   `POST /api/system/restart-dashboard` answer 409 while the hold is active. A
-  reload that was already waiting at the gate keeps waiting until the hold is
-  released and somebody approves it.
+  request that was still waiting for approval when the hold was set keeps
+  waiting until the hold is released and somebody approves it. A request that
+  was already approved but had not yet claimed its restart is held too:
+  `POST /api/restart-gate/claim` answers `granted: false` with the hold as
+  `restartHold`, the approval stays open, and the requester keeps polling and
+  prints the hold. Within about 5 seconds of `pan restart release`, or of the
+  hold's `--until` expiry, it claims and restarts the dashboard with no second
+  approval (PAN-5057). Every claim reads the hold file fresh; if the file
+  cannot be read, the claim is refused.
 
 The restart banner shows `Restarts on hold — <reason>` in place of the
-"Restart now" button. The gate reads the hold file on every read and every
-5-second sweep and publishes it as `restartHold` on the restart-gate snapshot
-(`GET /api/restart-gate`, `restart_gate.changed`).
+"Restart now" button. The gate reads the hold file on every read, every
+5-second sweep and every claim and publishes it as `restartHold` on the
+restart-gate snapshot (`GET /api/restart-gate`, `restart_gate.changed`).
 
 Anyone who can run `pan` as this user can set or release a hold; it is one
 shared lock, not per-conversation memory. An agent must never release a hold
