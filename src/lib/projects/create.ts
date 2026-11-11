@@ -822,16 +822,16 @@ export async function resolveProjectCreateIntent(
     } else {
       intent.proposedIssuePrefix = proposed;
       const projectConfigs = await listProjectsAsync();
-      const taken = projectConfigs.some(
+      const other = projectConfigs.find(
         ({ key: otherKey, config }) =>
           otherKey !== key &&
           (config.issue_prefix === proposed || config.issue_prefixes?.includes(proposed)),
       );
-      if (taken) {
+      if (other) {
         findings.push({
           field: 'issuePrefix',
           code: 'issue-prefix-taken',
-          message: `Issue prefix '${proposed}' is already used by another project.`,
+          message: `Issue prefix '${proposed}' is already used by project '${other.key}'; project '${key}' needs a different prefix.`,
           detail: proposed,
         });
       }

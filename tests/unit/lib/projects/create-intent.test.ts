@@ -565,6 +565,39 @@ describe('resolveProjectCreateIntent', () => {
     );
   });
 
+  it('names both projects when the issue prefix is already taken (PAN-5152)', async () => {
+    const alphaDir = makeProjectDir('alpha');
+    writeFileSync(
+      PROJECTS_CONFIG_FILE,
+      `projects:\n  alpha:\n    name: alpha\n    path: ${alphaDir}\n    issue_prefix: ACME\n`,
+    );
+    invalidateProjectsConfigCache();
+
+    const intent = await resolveProjectCreateIntent({
+      mode: 'new',
+      name: 'beta',
+      issuePrefix: 'ACME',
+      homeBoundary: true,
+      homeDir: TEST_HOME,
+    });
+
+    const taken = intent.findings.find(finding => finding.code === 'issue-prefix-taken');
+    expect(taken?.message).toContain("'alpha'");
+    expect(taken?.message).toContain("'beta'");
+  });
+
+  it('emits no issue-prefix-taken finding when no other project owns the prefix', async () => {
+    const intent = await resolveProjectCreateIntent({
+      mode: 'new',
+      name: 'beta',
+      issuePrefix: 'ACME',
+      homeBoundary: true,
+      homeDir: TEST_HOME,
+    });
+
+    expect(intent.findings.some(finding => finding.code === 'issue-prefix-taken')).toBe(false);
+  });
+
   it('returns path-outside-home finding when homeBoundary=true and path escapes $HOME', async () => {
     const outsideDir = join(tmpdir(), `proj-outside-${process.pid}`);
     mkdirSync(outsideDir, { recursive: true });
