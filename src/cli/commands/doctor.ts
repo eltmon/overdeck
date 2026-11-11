@@ -29,6 +29,7 @@ import { checkInotify } from './doctor-inotify.js';
 import { checkAgentTmp } from './doctor-agent-tmp.js';
 import { checkTraefikPortBinding } from './doctor-traefik.js';
 import { checkProjectTrackerConfig } from './doctor-project-config.js';
+import { checkJiraCredentials } from './doctor-jira.js';
 import { checkHerdr } from './doctor-herdr.js';
 import { checkPrimeAgent } from './doctor-prime-agent.js';
 import { checkClaudeCode } from './doctor-claude-code.js';
@@ -326,7 +327,7 @@ function countItems(path: string): number {
 function getCachedIssueRowsForDoctor(): unknown[] {
   try {
     const cache = new CacheService();
-    return ['github', 'linear', 'rally'].flatMap((tracker) => {
+    return ['github', 'linear', 'rally', 'jira'].flatMap((tracker) => {
       const entry = cache.getStale(tracker, 'issues');
       return Array.isArray(entry?.data) ? entry.data : [];
     });
@@ -339,7 +340,7 @@ export function checkTrackerRateLimits(): CheckResult {
   let cache: CacheService | undefined;
   try {
     cache = new CacheService();
-    const trackers = ['github', 'linear', 'rally'] as const;
+    const trackers = ['github', 'linear', 'rally', 'jira'] as const;
     const warnings: string[] = [];
 
     for (const tracker of trackers) {
@@ -841,6 +842,7 @@ export async function collectDoctorChecks(options: DoctorOptions = {}): Promise<
   checks.push(await checkClosedIssueOrphanAgentDirs(getCachedIssueRowsForDoctor()));
   checks.push(checkTrackerRateLimits());
   checks.push(checkProjectTrackerConfig());
+  checks.push(...(await checkJiraCredentials()));
   checks.push(checkStoppedListClassification({
     dashboardAgents: await getDashboardAgentRowsForDoctor(),
   }));
