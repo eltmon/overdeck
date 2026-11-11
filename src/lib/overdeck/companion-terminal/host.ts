@@ -1,5 +1,7 @@
 /**
- * Terminal host port for companion terminals (PAN-3974).
+ * Terminal host port for companion terminals (PAN-3974). Two implementations:
+ * the tmux one below, and the Herdr one in `herdr-host.ts` (PAN-5122);
+ * `select-host.ts` picks between them per call by the host terminal backend.
  *
  * The lifecycle only needs five facts from the terminal host: is the owner
  * session there (and which incarnation of it), is a companion there, which
