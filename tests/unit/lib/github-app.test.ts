@@ -35,6 +35,45 @@ vi.mock('child_process', async (importOriginal) => {
   return { ...actual, execFile };
 });
 
+// PAN-5153 W3: the per-repository installation lookup is replaced by
+// `repoLookupMock`. Its default rejects, which keeps today's behavior (the
+// home installation's token, coverage assumed), so no test here sends a real
+// `/repos/{owner}/{repo}/installation` request. The lookup's own behavior is
+// covered in github-app-installations.test.ts.
+const { repoLookupMock, resolveWorkspaceRemoteMock } = vi.hoisted(() => ({
+  repoLookupMock: vi.fn<(owner: string, repo: string) => Promise<string | null>>(),
+  resolveWorkspaceRemoteMock: vi.fn<(workspacePath: string) => Promise<{ owner: string; repo: string }>>(),
+}));
+
+vi.mock('../../../src/lib/github-app-installations.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/lib/github-app-installations.js')>();
+  const auth = await import('../../../src/lib/github-app-auth.js');
+  const lookup = (owner: string, repo: string) => repoLookupMock(owner, repo);
+  return {
+    ...actual,
+    resolveRepoInstallationId: lookup,
+    appCoversRepo: async (owner: string, repo: string) => {
+      try { return (await lookup(owner, repo)) !== null; } catch { return auth.isGitHubAppConfigured(); }
+    },
+    getRepoInstallationToken: async (owner: string, repo: string) => {
+      if (!auth.isGitHubAppConfigured()) return null;
+      let id: string | null;
+      try { id = await lookup(owner, repo); } catch { return auth.getInstallationAccessToken(); }
+      return id === null ? null : auth.getInstallationAccessToken(id);
+    },
+    installationTokenForApiPath: async (path: string) => {
+      const target = actual.repoFromApiPath(path);
+      const id = target ? await lookup(target.owner, target.repo).catch(() => null) : null;
+      return auth.getInstallationAccessToken(id ?? undefined);
+    },
+  };
+});
+
+vi.mock('../../../src/lib/github-credentials.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/lib/github-credentials.js')>();
+  return { ...actual, resolveWorkspaceRemote: resolveWorkspaceRemoteMock };
+});
+
 import {
   GITHUB_API_TIMEOUT_MS,
   GitHubRequestTimeoutError,
@@ -49,6 +88,8 @@ import {
   listPullRequestsForHead,
   mergePullRequestWithApp,
   postOverdeckTestsStatus,
+  refreshWorkspaceToken,
+  reportCommitStatus,
   resetAppBotLoginCache,
   resetInstallationTokenCacheForTests,
   resolveAppBotLogin,
@@ -59,6 +100,9 @@ import { getInstallationAccessToken } from '../../../src/lib/github-app-auth.js'
 // PAN-4264: installation tokens are memoized per process; every test starts
 // without one so its fetch mock sees the mint it expects.
 beforeEach(() => {
+  repoLookupMock.mockReset();
+  repoLookupMock.mockRejectedValue(new Error('no installation lookup in this test'));
+  resolveWorkspaceRemoteMock.mockReset();
   resetInstallationTokenCacheForTests();
 });
 
@@ -861,5 +905,86 @@ describe('per-installation tokens (PAN-5153)', () => {
   it('mints for the home installation when no id is given', async () => {
     await expect(getInstallationAccessToken()).resolves.toBe('token-67890');
     expect(mintUrls()).toEqual(['https://api.github.com/app/installations/67890/access_tokens']);
+  });
+});
+
+// PAN-5153 W3: App REST calls use the token of the installation that covers
+// the repository; an uncovered repository gets no status and no workspace token.
+describe('per-repository App tokens (PAN-5153)', () => {
+  const fetchMock = vi.fn();
+
+  beforeEach(() => {
+    vi.stubGlobal('fetch', fetchMock);
+    fetchMock.mockReset();
+    fetchMock.mockImplementation(async (input: unknown) => {
+      const url = String(input);
+      const minted = /\/app\/installations\/(\d+)\/access_tokens$/.exec(url);
+      if (minted) {
+        const expiresAt = new Date(Date.now() + 60 * 60_000).toISOString();
+        return new Response(JSON.stringify({ token: `token-${minted[1]}`, expires_at: expiresAt }), { status: 201 });
+      }
+      if (url.endsWith('/repos/a/b/pulls/1')) {
+        return new Response(JSON.stringify({
+          state: 'open',
+          mergeable: true,
+          mergeable_state: 'clean',
+          draft: false,
+          head: { sha: 'abc123', ref: 'feature/x' },
+          base: { ref: 'main' },
+        }), { status: 200 });
+      }
+      if (url.endsWith('/repos/a/b/commits/abc123/status')) {
+        return new Response(JSON.stringify({ state: 'success', statuses: [] }), { status: 200 });
+      }
+      if (url.includes('/repos/a/b/commits/abc123/check-runs')) {
+        return new Response(JSON.stringify({ check_runs: [] }), { status: 200 });
+      }
+      return new Response('{}', { status: 201 });
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function authorizationFor(urlSuffix: string): string | undefined {
+    const call = fetchMock.mock.calls.find((c) => String(c[0]).endsWith(urlSuffix));
+    return (call?.[1] as RequestInit | undefined)?.headers
+      ? ((call![1] as RequestInit).headers as Record<string, string>).Authorization
+      : undefined;
+  }
+
+  it('sends the covering installation\'s token for a covered repository', async () => {
+    repoLookupMock.mockResolvedValue('222');
+    await getPullRequestState('a', 'b', 1);
+    expect(repoLookupMock).toHaveBeenCalledWith('a', 'b');
+    expect(authorizationFor('/repos/a/b/pulls/1')).toBe('token token-222');
+  });
+
+  it('sends the home installation\'s token when the App is not installed on the repository', async () => {
+    repoLookupMock.mockResolvedValue(null);
+    await getPullRequestState('a', 'b', 1);
+    expect(authorizationFor('/repos/a/b/pulls/1')).toBe('token token-67890');
+  });
+
+  it('posts no commit status on an uncovered repository', async () => {
+    repoLookupMock.mockResolvedValue(null);
+    await reportCommitStatus('a', 'b', 'abc123', 'success', 'overdeck/test', 'ok');
+    expect(fetchMock.mock.calls.some((c) => String(c[0]).includes('/repos/a/b/statuses/'))).toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('posts the commit status with the covering installation\'s token', async () => {
+    repoLookupMock.mockResolvedValue('222');
+    await reportCommitStatus('a', 'b', 'abc123', 'success', 'overdeck/test', 'ok');
+    expect(authorizationFor('/repos/a/b/statuses/abc123')).toBe('token token-222');
+  });
+
+  it('fails refreshWorkspaceToken with an FsError on an uncovered repository', async () => {
+    resolveWorkspaceRemoteMock.mockResolvedValue({ owner: 'a', repo: 'b' });
+    repoLookupMock.mockResolvedValue(null);
+    const error = await Effect.runPromise(Effect.flip(refreshWorkspaceToken('/workspaces/feature-x')));
+    expect(error._tag).toBe('FsError');
+    expect(error.message).toBe('refreshWorkspaceToken failed for /workspaces/feature-x: GitHub App is not installed on a/b');
   });
 });

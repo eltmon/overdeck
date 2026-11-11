@@ -5,6 +5,12 @@
  * Agents push via HTTPS with these tokens instead of the user's SSH key, so commits
  * show as the App's bot (`<app-slug>[bot]`, e.g. `overdeck-agent[bot]`) with a verified badge.
  *
+ * PAN-5153: tokens are minted per installation. A repository's App REST calls
+ * use the token of the installation that covers it, found by
+ * github-app-installations.ts; credentials and the token memo live in
+ * github-app-auth.ts. A repository the App is not installed on gets no status
+ * and no workspace token here; Overdeck acts as the gh user there.
+ *
  * Credentials stored at: ~/.overdeck/github-app/
  *   - app-id, private-key.pem, installation-id, app-slug
  */
@@ -23,13 +29,17 @@ import {
   APP_DIR,
   generateAppJwt,
   generateInstallationTokenBody,
-  getInstallationAccessToken,
   isGitHubAppConfigured,
   loadGitHubAppConfig,
   withGitHubTimeout,
   type GitHubAppConfig,
   type InstallationToken,
 } from './github-app-auth.js';
+import {
+  appCoversRepo,
+  getRepoInstallationToken,
+  installationTokenForApiPath,
+} from './github-app-installations.js';
 
 export {
   GITHUB_API_TIMEOUT_MS,
@@ -276,7 +286,7 @@ async function githubApi<T>(
   init: RequestInit = {},
   extraHeaders: Record<string, string> = {}
 ): Promise<T> {
-  const token = await getInstallationAccessToken();
+  const token = await installationTokenForApiPath(path);
   const { data } = await githubApiWithToken<T>(token, path, init, extraHeaders);
   return data;
 }
@@ -298,7 +308,7 @@ function nextPathFromLinkHeader(linkHeader: string | null): string | null {
 }
 
 async function githubApiAllCheckRunPages(path: string): Promise<NonNullable<GitHubCheckRunApiResponse['check_runs']>> {
-  const token = await getInstallationAccessToken();
+  const token = await installationTokenForApiPath(path);
   const allRuns: NonNullable<GitHubCheckRunApiResponse['check_runs']> = [];
   let nextPath: string | null = withPerPage(path, 100);
 
@@ -312,7 +322,7 @@ async function githubApiAllCheckRunPages(path: string): Promise<NonNullable<GitH
 }
 
 async function githubApiAllPages<T>(path: string): Promise<T[]> {
-  const token = await getInstallationAccessToken();
+  const token = await installationTokenForApiPath(path);
   const allItems: T[] = [];
   let nextPath: string | null = withPerPage(path, 100);
 
@@ -571,7 +581,7 @@ export async function mergePullRequestWithApp(
   method: 'merge' | 'squash' | 'rebase' = 'squash',
   sha?: string,
 ): Promise<{ merged: boolean; message?: string }> {
-  const token = await getInstallationAccessToken();
+  const token = await installationTokenForApiPath(`/repos/${owner}/${repo}/pulls`);
   const path = `/repos/${owner}/${repo}/pulls/${number}/merge`;
   return withGitHubTimeout(`PUT ${path}`, async (signal) => {
     const response = await fetch(
@@ -749,10 +759,8 @@ export async function reportCommitStatus(
   context: string,
   description: string,
 ): Promise<void> {
-  const config = loadGitHubAppConfig();
-  if (!config) return; // Silently skip in fallback mode
-
-  const { token } = await Effect.runPromise(generateInstallationToken(config));
+  const token = await getRepoInstallationToken(owner, repo);
+  if (!token) return; // No App, or the App is not installed on this repository
 
   const path = `/repos/${owner}/${repo}/statuses/${sha}`;
   await withGitHubTimeout(`POST ${path}`, async (signal) => {
@@ -803,7 +811,7 @@ export async function postOverdeckTestsStatus(
   /** PAN-3847 (FR-13): the stamp binds to the tested sha when the caller provides it. */
   sha?: string,
 ): Promise<void> {
-  if (!isGitHubAppConfigured()) return;
+  if (!(await appCoversRepo(owner, repo))) return;
   try {
     const resolvedSha = sha ?? await (async () => {
       const { stdout } = await execAsync('git rev-parse HEAD', {
@@ -829,14 +837,12 @@ export async function postOverdeckTestsStatus(
 async function refreshWorkspaceTokenBody(
   workspacePath: string,
 ): Promise<void> {
-  const config = loadGitHubAppConfig();
-  if (!config) throw new Error('GitHub App not configured');
-
-  const { token } = await Effect.runPromise(generateInstallationToken(config));
-  const { writeFileSync } = await import('fs');
   // Must resolve the SAME file configureWorkspaceForBot wrote (see
   // github-credentials.ts) — the old path threw ENOTDIR inside a worktree.
   const { owner, repo } = await resolveWorkspaceRemote(workspacePath);
+  const token = await getRepoInstallationToken(owner, repo);
+  if (!token) throw new Error(`GitHub App is not installed on ${owner}/${repo}`);
+  const { writeFileSync } = await import('fs');
   const credFile = ensureBotCredentialFile(owner, repo);
   writeFileSync(credFile, `https://x-access-token:${token}@github.com\n`, { mode: 0o600 });
 }
