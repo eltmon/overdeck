@@ -18,9 +18,7 @@ export type ChoreographyCommand =
   | { type: 'tide'; targetId: string }
   | { type: 'thaw'; issueId: string }
   | { type: 'sweep-tide' }
-  | { type: 'flare'; issueId: string }
-  | { type: 'sun' }
-  | { type: 'spawn'; issueId: string };
+  | { type: 'flare'; issueId: string };
 
 /**
  * Sweep observation → visual command mapping (PAN-3490). Pure and fixture-tested.
@@ -96,12 +94,7 @@ export function planConfluenceChoreography({
 
   for (const orb of current.values()) {
     const before = previous.get(orb.id);
-    if (!before) {
-      if (orb.role === 'plan') {
-        commands.push({ type: 'sun' }, { type: 'spawn', issueId: orb.id });
-      }
-      continue;
-    }
+    if (!before) continue;
 
     if (orb.stage !== before.stage) {
       const color = STAGE_COLORS[orb.stage];
@@ -159,12 +152,6 @@ export function runConfluenceCommands(commands: readonly ChoreographyCommand[], 
         break;
       case 'thaw':
         effects.playThaw(command.issueId);
-        break;
-      case 'sun':
-        effects.pulseSun();
-        break;
-      case 'spawn':
-        effects.spawnFromSun(command.issueId);
         break;
     }
   }

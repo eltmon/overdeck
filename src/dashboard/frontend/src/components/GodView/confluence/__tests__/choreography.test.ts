@@ -70,8 +70,6 @@ function effects(): RiverEffectsApi {
     playThaw: vi.fn(),
     playSweep: vi.fn(),
     playFlare: vi.fn(),
-    pulseSun: vi.fn(),
-    spawnFromSun: vi.fn(),
     gateFlash: vi.fn(),
   };
 }
@@ -153,8 +151,8 @@ describe('Confluence choreography dispatch table', () => {
     expect(commands).toContainEqual({ type: 'gate', stage: 'REVIEW' });
     expect(commands.filter((command) => command.type === 'tide')).toStrictEqual([{ type: 'tide', targetId: 'PAN-5' }]);
     expect(commands).toContainEqual({ type: 'ring', issueId: 'PAN-3', color: '#39ff14' });
-    expect(commands).toContainEqual({ type: 'sun' });
-    expect(commands).toContainEqual({ type: 'spawn', issueId: 'PAN-99' });
+    // A new plan orb plans nothing: reconcile already drew it in its column.
+    expect(commands.some((command) => 'issueId' in command && command.issueId === 'PAN-99')).toBe(false);
     // ready → merged plans nothing: the canvas starts the portal comet itself from the merged issue state.
     expect(commands.some((command) => 'issueId' in command && command.issueId === 'PAN-4')).toBe(false);
     expect(commands.some((command) => 'issueId' in command && command.issueId === 'PAN-6')).toBe(false);
@@ -166,8 +164,19 @@ describe('Confluence choreography dispatch table', () => {
     expect(api.emitRing).toHaveBeenCalledWith('PAN-1', '#ffb800');
     expect(api.gateFlash).toHaveBeenCalledWith('REVIEW');
     expect(vi.mocked(api.playTide).mock.calls).toEqual([['PAN-5']]);
-    expect(api.pulseSun).toHaveBeenCalledOnce();
-    expect(api.spawnFromSun).toHaveBeenCalledWith('PAN-99');
+  });
+
+  it('plans no command for a new plan orb that the previous cast did not have', () => {
+    const commands = planConfluenceChoreography({
+      previous: new Map([['PAN-1', orb('PAN-1')]]),
+      current: new Map([
+        ['PAN-1', orb('PAN-1')],
+        ['PAN-99', orb('PAN-99', { role: 'plan', stage: 'PLAN' })],
+      ]),
+      hookEvents: [],
+    });
+
+    expect(commands).toEqual([]);
   });
 
   it('plays a tide that names only its target when the scheduler yields an orb', () => {

@@ -111,8 +111,6 @@ export interface RiverEffectsApi {
   playThaw(issueId: string): void;
   playSweep(): void;
   playFlare(issueId: string): void;
-  pulseSun(): void;
-  spawnFromSun(issueId: string): void;
   gateFlash(stage: Stage | number): void;
 }
 
@@ -297,7 +295,7 @@ function createEngine(
     gateFlashes.push({ x: layout.padX + Math.max(0, index) * layout.colW, t: 0 });
   };
 
-  const spawnOrb = (source: ConfluenceOrb, evPerMin = 0, fromSun = false): RenderOrb => {
+  const spawnOrb = (source: ConfluenceOrb, evPerMin: number): RenderOrb => {
     const convoy = source.convoy?.map((member, index, members) => createSatellite(member, index, members.length)) ?? null;
     const orb: RenderOrb = {
       ...source,
@@ -319,8 +317,7 @@ function createEngine(
     };
     renderOrbs.set(orb.id, orb);
     anchorAll();
-    orb.x = fromSun ? layout.sunX : orb.state === 'stale' || orb.state === 'failed' ? orb.tx : orb.tx - 60;
-    orb.y = fromSun ? layout.sunY : orb.ty;
+    orb.x = orb.state === 'stale' || orb.state === 'failed' ? orb.tx : orb.tx - 60; orb.y = orb.ty;
     return orb;
   };
 
@@ -363,8 +360,6 @@ function createEngine(
       burst(orb.x, orb.y - orb.radius, SWEEP_FLARE_COLOR, 18, 60, 1.4, 2, Math.PI * 0.9, -Math.PI / 2);
       ring(orb.x, orb.y, SWEEP_FLARE_COLOR, 66, 2);
     },
-    pulseSun() { ring(layout.sunX, layout.sunY, '#9d4edd', 90, 2.5); },
-    spawnFromSun(issueId) { const source = props.orbs.find((orb) => orb.id === issueId); if (source && !orbAt(issueId)) spawnOrb(source, 0, true); },
     gateFlash: flashGate,
   };
 
@@ -757,8 +752,6 @@ export const RiverCanvas = forwardRef<RiverCanvasHandle, RiverCanvasProps>(funct
     playThaw: (...args) => engineRef.current?.api.playThaw(...args),
     playSweep: () => engineRef.current?.api.playSweep(),
     playFlare: (...args) => engineRef.current?.api.playFlare(...args),
-    pulseSun: () => engineRef.current?.api.pulseSun(),
-    spawnFromSun: (...args) => engineRef.current?.api.spawnFromSun(...args),
     gateFlash: (...args) => engineRef.current?.api.gateFlash(...args),
     resize: () => engineRef.current?.resize(),
   }), []);

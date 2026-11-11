@@ -62,8 +62,6 @@ vi.mock('../RiverCanvas', async () => {
         playThaw: vi.fn(),
         playSweep: vi.fn(),
         playFlare: vi.fn(),
-        pulseSun: vi.fn(),
-        spawnFromSun: vi.fn(),
         gateFlash: vi.fn(),
         resize: mocks.resize,
       }));
