@@ -31,8 +31,8 @@ export class ChangelogEntryError extends Error {
 
 export const CHANGELOG_ENTRY_FILE_NAME = /^[a-z0-9][a-z0-9-]*\.md$/;
 
-const DOLLAR_MESSAGE = 'dollar sign in prose renders as math on Mintlify — write &#36; instead';
-const LT_DIGIT_MESSAGE = 'bare "<" before a digit breaks strict MDX — write &lt; instead';
+const DOLLAR_MESSAGE = 'dollar sign in prose renders as math on Mintlify; write &#36; instead';
+const LT_DIGIT_MESSAGE = 'bare "<" before a digit breaks strict MDX; write &lt; instead';
 
 // Ported from scripts/lint-docs.js (PAN-4509): remove inline code spans so the dollar
 // and bare-"<"-before-a-digit checks below never fire inside `` `code` ``. Keep the two
