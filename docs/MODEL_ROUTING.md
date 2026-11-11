@@ -218,7 +218,7 @@ With `tiered_execution.enabled`, a planned issue's work agent takes the model of
 A tier `model`, a `distribution[].model` entry, and `supervisor.model` accept the same `workhorse:<slot>` refs as `roles.*`. They resolve through `derefWorkhorse` (`src/lib/config-yaml/roles.ts`), so re-pointing a workhorse slot re-points every tier that uses it:
 
 ```yaml
-workhorses: { expensive: claude-opus-5-5, mid: claude-sonnet-5-5, cheap: claude-haiku-4-5 }
+workhorses: { expensive: claude-opus-5-5, mid: claude-opus-5-5, cheap: claude-haiku-5-5 }
 tiered_execution:
   enabled: true
   tiers:
@@ -228,11 +228,11 @@ tiered_execution:
   supervisor: { model: workhorse:expensive, harness: claude-code, subscribe: flagged }
 ```
 
-A [model preset](../configuration/model-presets.mdx) sets tier models by band and never creates or deletes tiers. For each existing tier it picks the band from the tier's hardest difficulty: `trivial` → `workhorse:cheap`; `simple` or `medium` → `workhorse:mid`; `complex` or `expert` → `workhorse:expensive`. It also sets the tier's `harness` to the preset's harness and its `effort` to `high` (except on the Anthropic cheap band, because Haiku 4.5 has no effort control). It removes a tier `distribution`, which undo restores. An existing `supervisor` gets `workhorse:expensive` and the preset's harness.
+A [model preset](../configuration/model-presets.mdx) sets tier models by band and never creates or deletes tiers. For each existing tier it picks the band from the tier's hardest difficulty: `trivial` → `workhorse:cheap`; `simple` or `medium` → `workhorse:mid`; `complex` or `expert` → `workhorse:expensive`. It also sets the tier's `harness` to the preset's harness and its `effort` to `high` (except on the Anthropic cheap band, which leaves Haiku 5.5 at its default effort). It removes a tier `distribution`, which undo restores. An existing `supervisor` gets `workhorse:expensive` and the preset's harness.
 
 A ref to an undefined slot, or the `parent` sentinel, is invalid. The Settings save refuses it. On config load it disables tiered staffing and reports the reason through `pan doctor`. A Settings save writes the ref back to `config.yaml`, never the model the slot currently holds.
 
-To see the effective model per tier, run `pan admin config tiers`. It prints `roles.work`'s model and each tier's declared ref with its resolved model (`workhorse:mid → claude-sonnet-5-5`), and marks each tier that `[overrides roles.work]` while tiered execution is on. Settings › Tiered Execution shows the same information: crew labels show the resolved model, and a crew is tagged `overrides roles.work (<model>)` when it launches a different model than `roles.work`.
+To see the effective model per tier, run `pan admin config tiers`. It prints `roles.work`'s model and each tier's declared ref with its resolved model (`workhorse:mid → claude-opus-5-5`), and marks each tier that `[overrides roles.work]` while tiered execution is on. Settings › Tiered Execution shows the same information: crew labels show the resolved model, and a crew is tagged `overrides roles.work (<model>)` when it launches a different model than `roles.work`.
 
 ## Capability classes
 
