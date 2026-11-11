@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5152",
   "created": "2026-11-11T14:36:40.308Z",
-  "updated": "2026-11-11T15:19:37.195Z",
+  "updated": "2026-11-11T15:21:54.507Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -182,6 +182,22 @@
     "wi8-jira-adapter.ac5": {
       "status": "completed",
       "doneAt": "2026-11-11T15:19:37.195Z"
+    },
+    "wi9-jira-write-seam": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:21:54.507Z"
+    },
+    "wi9-jira-write-seam.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:21:54.507Z"
+    },
+    "wi9-jira-write-seam.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:21:54.507Z"
+    },
+    "wi9-jira-write-seam.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:21:54.507Z"
     }
   }
 }
