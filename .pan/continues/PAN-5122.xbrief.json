@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5122",
   "created": "2026-11-11T10:01:02.133Z",
-  "updated": "2026-11-11T11:06:39.039Z",
+  "updated": "2026-11-11T11:06:49.830Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -117,6 +117,11 @@
     "docs-companion-both-backends.ac3": {
       "status": "completed",
       "doneAt": "2026-11-11T11:06:39.039Z"
+    },
+    "live-verification": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5122",
+      "claimedAt": "2026-11-11T11:06:49.830Z"
     }
   }
 }
