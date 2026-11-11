@@ -31,6 +31,17 @@ vi.mock('../../../src/lib/projects.js', () => ({
   getIssuePrefix: (config: any) => config?.issue_prefix,
 }));
 
+const jiraReopen = vi.hoisted(() => ({
+  reopenJiraIssueCommand: vi.fn(async () => false),
+  linearClient: vi.fn(),
+}));
+
+vi.mock('../../../src/cli/commands/reopen-jira.js', () => ({
+  reopenJiraIssueCommand: jiraReopen.reopenJiraIssueCommand,
+}));
+
+vi.mock('@linear/sdk', () => ({ LinearClient: jiraReopen.linearClient }));
+
 import { resolveTrackerType } from '../../../src/lib/tracker-utils.js';
 import { loadProjectsConfigSync, resolveProjectFromIssueSync } from '../../../src/lib/projects.js';
 
@@ -169,5 +180,27 @@ describe('pan reopen tracker routing parity with pan start', () => {
         expect(trackerType).toBe('linear');
       }
     }
+  });
+});
+
+describe('pan reopen routes Jira issues to the Jira reopen (PAN-5152)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(existsSync).mockReturnValue(false);
+  });
+
+  it('calls the Jira reopen and never the Linear client', async () => {
+    mockLoadProjectsConfig.mockReturnValue({
+      projects: {
+        acme: { name: 'Acme', path: '/home/user/acme', tracker: 'jira', issue_prefix: 'ACME', github_repo: 'o/acme' },
+      },
+    });
+    expect(resolveTrackerType('ACME-12')).toBe('jira');
+
+    const { reopenCommand } = await import('../../../src/cli/commands/reopen.js');
+    await reopenCommand('ACME-12', { force: true });
+
+    expect(jiraReopen.reopenJiraIssueCommand).toHaveBeenCalledWith('ACME-12', { force: true });
+    expect(jiraReopen.linearClient).not.toHaveBeenCalled();
   });
 });

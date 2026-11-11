@@ -12,7 +12,8 @@ import { getSharedIssueService } from '../../dashboard/server/services/issue-ser
 import { getGitHubConfig, getRallyConfig } from '../../dashboard/server/services/tracker-config.js';
 import { saveAgentStateAndEmitEvent, saveAgentStateAndEmitEventProgram } from '../../dashboard/server/services/agent-projection.js';
 import { extractTeamPrefix, findProjectByTeam, resolveProjectFromIssueSync } from '../projects.js';
-import { resolveGitHubIssue } from '../tracker-utils.js';
+import { resolveGitHubIssue, resolveTrackerType } from '../tracker-utils.js';
+import { transitionJiraIssue } from '../tracker/jira-lifecycle.js';
 import { getAgentState } from '../agents.js';
 import { extractPrefix } from '../issue-id.js';
 import { reopenWorkspaceState } from '../reopen.js';
@@ -103,6 +104,11 @@ async function closeIssuePullRequest(issueId: string, reason = 'Canceled via Ove
   } catch (err: any) {
     return [`PR close warning: ${err.message}`];
   }
+}
+
+/** The dashboard's issue source, falling back to a `tracker: jira` project for uncached Jira issues (PAN-5152). */
+function issueSourceFor(issueDataService: { getIssueSource(id: string): string | null }, id: string): string | null {
+  return issueDataService.getIssueSource(id) ?? (resolveTrackerType(id) === 'jira' ? 'jira' : null);
 }
 
 function buildLifecycleContext(id: string, issueSource: string | undefined) {
@@ -257,6 +263,7 @@ export async function runDestructiveIssueLifecycle(
   issueDataServiceAfter.invalidateTracker('github').catch(() => {});
   issueDataServiceAfter.invalidateTracker('linear').catch(() => {});
   issueDataServiceAfter.invalidateTracker('rally').catch(() => {});
+  issueDataServiceAfter.invalidateTracker('jira').catch(() => {});
 
   return {
     success: result.success,
@@ -280,7 +287,7 @@ export function closeIssueTransition(options: {
     const githubCheck = isGitHubIssue(issueId);
 
     const issueDataService = getIssueDataService();
-    const issueSource = issueDataService.getIssueSource(issueId);
+    const issueSource = issueSourceFor(issueDataService, issueId);
 
     const ctx: any = {
       issueId,
@@ -313,6 +320,8 @@ export function closeIssueTransition(options: {
       issueDataService.invalidateTracker('github').catch(() => {});
     } else if (issueSource === 'rally') {
       issueDataService.invalidateTracker('rally').catch(() => {});
+    } else if (issueSource === 'jira') {
+      issueDataService.invalidateTracker('jira').catch(() => {});
     } else {
       issueDataService.invalidateTracker('linear').catch(() => {});
     }
@@ -523,7 +532,7 @@ export function reopenIssueTransition(options: {
     const githubCheck = isGitHubIssue(id);
 
     const issueDataService = getIssueDataService();
-    const issueSource = issueDataService.getIssueSource(id);
+    const issueSource = issueSourceFor(issueDataService, id);
 
     // PAN-3917: "already merged" is the pull request's own state, not a stored copy.
     const mergedPr = yield* Effect.promise(async () => {
@@ -541,9 +550,17 @@ export function reopenIssueTransition(options: {
     let newState = reopenToVerifying ? 'Verifying on Main' : 'In Progress';
     let issueIdentifier = id;
 
-    yield* lifecycle.transitionTo(id, targetState).pipe(Effect.catch(() => Effect.void));
+    // PAN-5152: a reopened Jira issue goes back to To Do (or Verifying on Main after a merge).
+    if (issueSource !== 'jira') {
+      yield* lifecycle.transitionTo(id, targetState).pipe(Effect.catch(() => Effect.void));
+    }
 
-    if (issueSource === 'rally') {
+    if (issueSource === 'jira') {
+      yield* Effect.promise(() => transitionJiraIssue(id, reopenToVerifying ? 'verifying_on_main' : 'todo'));
+      issueDataService.invalidateTracker('jira').catch(() => {});
+      if (!reopenToVerifying) newState = 'To Do';
+
+    } else if (issueSource === 'rally') {
       issueDataService.invalidateTracker('rally').catch(() => {});
       if (!reopenToVerifying) newState = 'Open';
 
@@ -675,7 +692,7 @@ export function moveIssueStatus(options: {
     // Refresh the in-memory shadow-state cache so subsequent getIssues() calls
     // see this drag-drop change without hitting the disk.
     yield* Effect.promise(() => issueDataService.refreshShadowStatesCache());
-    const issueSource = issueDataService.getIssueSource(id);
+    const issueSource = issueSourceFor(issueDataService, id);
     const githubCheck = isGitHubIssue(id);
 
     if (syncToTracker) {
@@ -699,6 +716,8 @@ export function moveIssueStatus(options: {
       issueDataService.invalidateTracker('github').catch(() => {});
     } else if (issueSource === 'rally') {
       issueDataService.invalidateTracker('rally').catch(() => {});
+    } else if (issueSource === 'jira') {
+      issueDataService.invalidateTracker('jira').catch(() => {});
     } else {
       issueDataService.invalidateTracker('linear').catch(() => {});
     }
