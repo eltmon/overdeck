@@ -80,6 +80,11 @@ vi.mock('../../../../../src/lib/briefing-freshness.js', () => ({
 
 vi.mock('../../../../../src/lib/claude-permissions.js', () => ({
   getClaudePermissionFlagsString: () => '--permission-mode auto',
+  // PAN-5151: ensureAutoApproveHookReady() resolves the mode via this module;
+  // 'bypass' keeps it a no-op so these tests, which exercise planner
+  // relaunch/launch-window coordination rather than permission mode, are
+  // unaffected by the auto-approve hook guard.
+  resolvePermissionMode: () => 'bypass',
 }));
 
 vi.mock('../../../../../src/lib/settings.js', async (importOriginal) => {

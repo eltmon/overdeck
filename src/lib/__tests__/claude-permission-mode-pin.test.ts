@@ -105,6 +105,26 @@ describe('pinClaudePermissionModeOnce', () => {
     expect(parseDocument(readFileSync(yamlPath(), 'utf8')).getIn(['claude', 'permissionMode'])).toBe('bypass');
   });
 
+  it('a scalar claude: value names that scalar as the replaced value', async () => {
+    writeFileSync(yamlPath(), 'claude: bypassPermissions\n', 'utf8');
+
+    const result = await pinClaudePermissionModeOnce({ overdeckHome: home });
+
+    expect(result.outcome).toBe('pinned-bypass');
+    expect(result.replacedValue).toBe('bypassPermissions');
+    expect(result.notice).toContain('bypassPermissions');
+    const { parseDocument } = await import('yaml');
+    expect(parseDocument(readFileSync(yamlPath(), 'utf8')).getIn(['claude', 'permissionMode'])).toBe('bypass');
+  });
+
+  it('the notice names the actual config.yaml path, not a hardcoded one', async () => {
+    writeFileSync(yamlPath(), 'ui:\n  theme: broadsheet\n', 'utf8');
+
+    const result = await pinClaudePermissionModeOnce({ overdeckHome: home });
+
+    expect(result.notice).toContain(yamlPath());
+  });
+
   it('an unparseable config.yaml is skipped, left unchanged, with no marker written', async () => {
     const text = 'claude: [unclosed';
     writeFileSync(yamlPath(), text, 'utf8');

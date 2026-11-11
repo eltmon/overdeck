@@ -26,10 +26,6 @@ export interface ClaudePermissionPinResult {
   notice?: string;
 }
 
-const NOTICE = 'Overdeck: kept this installation on claude.permissionMode: bypass '
-  + '(written to ~/.overdeck/config.yaml). New installations now default to auto; '
-  + 'change it in Settings → Permissions.';
-
 /** Never throws. Decides once per Overdeck home (marker), see PRD PAN-5151. */
 export async function pinClaudePermissionModeOnce(
   opts: { overdeckHome?: string } = {},
@@ -75,18 +71,26 @@ export async function pinClaudePermissionModeOnce(
       return { outcome: 'already-set' };
     }
 
+    // A non-map `claude:` (e.g. `claude: bypassPermissions`, a scalar) makes
+    // `getIn(['claude', 'permissionMode'])` read as undefined even though the
+    // key held a value — name that scalar as the replaced value instead of
+    // reporting "absent".
     const claudeNode = doc.getIn(['claude']);
+    const replacedValue = current !== undefined
+      ? current
+      : (claudeNode !== undefined && !isMap(claudeNode) ? claudeNode : undefined);
     if (claudeNode !== undefined && !isMap(claudeNode)) {
       doc.setIn(['claude'], doc.createNode({}));
     }
     doc.setIn(['claude', 'permissionMode'], 'bypass');
     await writeFileAtomic(yamlPath, doc.toString({ lineWidth: 120 }), 0o600);
 
-    const notice = current === undefined
-      ? NOTICE
-      : `${NOTICE} (replaced invalid value ${JSON.stringify(current)})`;
-    await writeMarker(marker, 'pinned-bypass', current);
-    return { outcome: 'pinned-bypass', replacedValue: current, notice };
+    const notice = `Overdeck: kept this installation on claude.permissionMode: bypass `
+      + `(written to ${yamlPath}). New installations now default to auto; `
+      + `change it in Settings → Permissions.`
+      + (replacedValue === undefined ? '' : ` (replaced invalid value ${JSON.stringify(replacedValue)})`);
+    await writeMarker(marker, 'pinned-bypass', replacedValue);
+    return { outcome: 'pinned-bypass', replacedValue, notice };
   } catch {
     return { outcome: 'skipped-error' };
   }
