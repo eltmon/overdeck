@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { dropRadius, fmtAge, frostFromIdleMinutes, pickOrb, type PickableOrb } from './model';
+import { dropRadius, fmtAge, frostFromIdleMinutes, orbIdleMinutes, pickOrb, type PickableOrb } from './model';
 import type { ConfluenceOrb } from './useConfluenceData';
 
 export interface TooltipAnchor {
@@ -50,7 +50,8 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 
 export function OrbTooltip({ orb, anchor, hookRate, eventsFired }: OrbTooltipProps) {
   const position = tooltipPosition(anchor);
-  const frost = Math.round(frostFromIdleMinutes(orb.idleMin) * 100);
+  const idle = orbIdleMinutes(orb, Date.now());
+  const frost = Math.round(frostFromIdleMinutes(idle) * 100);
 
   return (
     <div
@@ -69,7 +70,7 @@ export function OrbTooltip({ orb, anchor, hookRate, eventsFired }: OrbTooltipPro
       <Field label="Hook rate">{hookRate} ev/m</Field>
       <Field label="Frost">{frost}%</Field>
       <Field label="Events fired">{eventsFired}</Field>
-      <Field label="Stale age">{orb.state === 'stale' ? fmtAge(orb.staleMin) : '—'}</Field>
+      <Field label="Stale age">{orb.state === 'stale' ? fmtAge(idle) : '—'}</Field>
       <Field label="Yield reason">{orb.yieldReason ?? '—'}</Field>
       <Field label="Warning">{orb.warn ?? (orb.broken ? 'stack broken' : '—')}</Field>
       <div className="confluence-tooltip-convoy">

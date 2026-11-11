@@ -14,12 +14,14 @@ import {
   HOOK_KEYS,
   classifyOrb,
   modelGlyph,
+  orbIdleMinutes,
   toolToFamily,
   type HookFamilyKey,
   type OrbState,
   type Stage,
 } from './model';
 import { isClaimedLiveStatus, withObservedLiveness } from './liveness';
+import { useNowTick } from './useNowTick';
 
 const HOOK_STREAM_LIMIT = 500;
 const EVENT_WINDOW_MS = 60_000;
@@ -67,6 +69,8 @@ export interface ConfluenceOrb {
   parkedOrbit: string | null;
   /** Minutes since the park began (parkedAt age), null when not parked. */
   parkedMin: number | null;
+  /** The parked row's parkedAt, null when not parked. */
+  parkedAt: string | null;
   /** Operator sentence — why the issue is parked (tooltip/rail copy). */
   orbitReason: string | null;
 }
@@ -621,6 +625,7 @@ function parkedOnlyOrb(row: ParkedRowView, issue: IssueRow | undefined, now: num
     attention: null,
     parkedOrbit: row.orbit,
     parkedMin,
+    parkedAt: row.parkedAt,
     orbitReason: row.parkReason,
   };
 }
@@ -634,6 +639,7 @@ export function useConfluenceOrbs(
   const derivedIssueStateByIssueId = useDashboardStore((state) => state.derivedIssueStateByIssueId);
   const backendPanesById = useDashboardStore((state) => state.backendPanesById);
   const parked = useParked();
+  const nowTick = useNowTick();
   const agents = useMemo(
     () => withObservedLiveness(Object.values(agentsById), backendPanesById),
     [agentsById, backendPanesById],
@@ -729,6 +735,7 @@ export function useConfluenceOrbs(
         attention: derived?.attention ?? null,
         parkedOrbit: parkedRow?.orbit ?? null,
         parkedMin,
+        parkedAt: parkedRow?.parkedAt ?? null,
         orbitReason: parkedRow?.parkReason ?? null,
       };
       const signature = orbSignature(orb);
@@ -766,16 +773,16 @@ export function useConfluenceOrbs(
     // (a graveyard reads oldest-first), capped so a large census never
     // becomes a label wall. The Doldrums label counts the true total.
     const staleOrbs = next.filter((orb) => orb.state === 'stale')
-      .sort((a, b) => b.staleMin - a.staleMin)
+      .sort((a, b) => orbIdleMinutes(b, now) - orbIdleMinutes(a, now))
       .slice(0, STALE_ORB_LIMIT);
     const shelfOrbs = next.filter((orb) => orb.state === 'shelf')
-      .sort((a, b) => b.idleMin - a.idleMin)
+      .sort((a, b) => orbIdleMinutes(b, now) - orbIdleMinutes(a, now))
       .slice(0, SHELF_ORB_LIMIT);
     const keep = new Set([...staleOrbs, ...shelfOrbs].map((orb) => orb.id));
     return next
       .filter((orb) => (orb.state !== 'stale' && orb.state !== 'shelf') || keep.has(orb.id))
       .sort((a, b) => a.id.localeCompare(b.id));
-  }, [agents, issuesRaw, microStatesByAgentId, derivedIssueStateByIssueId, workspaceHealth, parked, agentRuntimeById]);
+  }, [agents, issuesRaw, microStatesByAgentId, derivedIssueStateByIssueId, workspaceHealth, parked, agentRuntimeById, nowTick]);
 }
 
 type CostSummaryResponse = { today?: { totalTokens?: number } };
@@ -837,6 +844,7 @@ export function useConfluenceMeta(
     refetchInterval: 10_000,
   });
   const parked = useParked();
+  const nowTick = useNowTick();
   const { data: velocity } = useQuery({
     queryKey: ['pipeline-velocity'],
     queryFn: fetchVelocity,
@@ -875,7 +883,7 @@ export function useConfluenceMeta(
       ).length,
       conversations: liveConversations,
       staleTotal: orbs.filter((orb) => orb.state === 'stale').length,
-      oldestIdle: orbs.reduce((oldest, orb) => Math.max(oldest, orb.idleMin), 0),
+      oldestIdle: orbs.reduce((oldest, orb) => Math.max(oldest, orbIdleMinutes(orb, now.getTime())), 0),
       beads: null,
       system,
       // The operator's definition: an agent counts as active only while it is
@@ -891,7 +899,7 @@ export function useConfluenceMeta(
         ? { transitionsPerHour: velocity.transitionsPerHour, byStage: velocity.byStage ?? {} }
         : null,
     };
-  }, [agentsById, agentRuntimeById, backendPanesById, conversations, costSummary, hookStream.costEvents, orbs, recentActivity, derivedIssueStateByIssueId, system, parked, velocity]);
+  }, [agentsById, agentRuntimeById, backendPanesById, conversations, costSummary, hookStream.costEvents, orbs, recentActivity, derivedIssueStateByIssueId, system, parked, velocity, nowTick]);
 }
 
 export function useConfluenceData(): ConfluenceData {

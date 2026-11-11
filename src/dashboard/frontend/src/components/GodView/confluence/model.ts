@@ -424,6 +424,17 @@ export function frostFromIdleMinutes(idleMinutes: number): number {
   return clamp((idleMinutes - FROST_START_MINUTES) / FROST_SPAN_MINUTES, 0, 1);
 }
 
+/** Minutes since the orb last did anything, computed at call time (PAN-5131 FR-3).
+ * A stale orb with a parked row counts from parkedAt; every other orb from lastActivity. 0 when unknown. */
+export function orbIdleMinutes(
+  orb: { lastActivity: string | null; parkedAt: string | null; state: OrbState },
+  now: number,
+): number {
+  const parked = orb.state === 'stale' && orb.parkedAt ? Date.parse(orb.parkedAt) : Number.NaN;
+  const stamp = Number.isFinite(parked) ? parked : orb.lastActivity ? Date.parse(orb.lastActivity) : Number.NaN;
+  return Number.isFinite(stamp) ? Math.max(0, (now - stamp) / 60_000) : 0;
+}
+
 export interface FrostAccrual {
   idleMinutes: number;
   frost: number;

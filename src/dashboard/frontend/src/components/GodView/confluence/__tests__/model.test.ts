@@ -12,6 +12,7 @@ import {
   fmtAge,
   frostFromIdleMinutes,
   modelGlyph,
+  orbIdleMinutes,
   pickOrb,
   positionOrb,
   pruneTraceEvents,
@@ -243,6 +244,23 @@ describe('Confluence model', () => {
     });
     expect(advanceFrostAccrual(34, 6, 0.1).sinkToDoldrums).toBe(true);
     expect(advanceFrostAccrual(20, 3, 1).frostHoldSeconds).toBe(0);
+  });
+
+  it('computes idle minutes from the timestamp the orb state selects', () => {
+    const now = Date.parse('2026-08-02T12:00:00.000Z');
+    const lastActivity = '2026-08-02T11:50:00.000Z';
+    const parkedAt = '2026-08-02T08:00:00.000Z';
+
+    expect(orbIdleMinutes({ state: 'stale', lastActivity, parkedAt }, now)).toBe(240);
+    expect(orbIdleMinutes({ state: 'stale', lastActivity, parkedAt: null }, now)).toBe(10);
+    expect(orbIdleMinutes({ state: 'stale', lastActivity, parkedAt: 'not a date' }, now)).toBe(10);
+    for (const state of ['active', 'shelf', 'needs-you', 'failed'] as const) {
+      expect(orbIdleMinutes({ state, lastActivity, parkedAt }, now)).toBe(10);
+    }
+    expect(orbIdleMinutes({ state: 'active', lastActivity: null, parkedAt }, now)).toBe(0);
+    expect(orbIdleMinutes({ state: 'active', lastActivity: 'not a date', parkedAt: null }, now)).toBe(0);
+    expect(orbIdleMinutes({ state: 'stale', lastActivity: null, parkedAt: null }, now)).toBe(0);
+    expect(orbIdleMinutes({ state: 'active', lastActivity: '2026-08-02T12:05:00.000Z', parkedAt: null }, now)).toBe(0);
   });
 
   describe('trace math', () => {

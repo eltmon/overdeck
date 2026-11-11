@@ -1,5 +1,5 @@
 import type { Agent } from '../../../types';
-import { STAGES, STAGE_COLORS, ROLE_COLORS, PROJECT_RING, fmtAge } from './model';
+import { STAGES, STAGE_COLORS, ROLE_COLORS, PROJECT_RING, fmtAge, orbIdleMinutes } from './model';
 import type { ConfluenceOrb, HookStreamEntry } from './useConfluenceData';
 
 /** Operator-reopened D-3 (PAN-3447): clicking an orb slides this rail in over the
@@ -96,7 +96,7 @@ export function IssueRail({ orb, agents, entries, onClose, onOpenIssue }: IssueR
         </div>
         <div className="confluence-rail-stat">
           <div className="confluence-rail-stat-value" style={{ color: orb.state === 'stale' ? '#9fc7ff' : 'var(--gv-green)' }}>
-            {orb.state === 'stale' ? `❄ ${fmtAge(orb.staleMin)}` : 'live'}
+            {orb.state === 'stale' ? `❄ ${fmtAge(orbIdleMinutes(orb, Date.now()))}` : 'live'}
           </div>
           <div className="confluence-rail-stat-key">freshness</div>
         </div>
@@ -107,7 +107,7 @@ export function IssueRail({ orb, agents, entries, onClose, onOpenIssue }: IssueR
       {orb.broken && <div className="confluence-rail-banner red">⚠ workspace stack broken underneath the agent</div>}
       {orb.state === 'failed' && <div className="confluence-rail-banner pink">✗ merge to main failed — needs an operator</div>}
       {orb.state === 'stale' && (
-        <div className="confluence-rail-banner ice">❄ frozen — no hook activity for {fmtAge(orb.staleMin)}</div>
+        <div className="confluence-rail-banner ice">❄ frozen — no hook activity for {fmtAge(orbIdleMinutes(orb, Date.now()))}</div>
       )}
 
       <h4>recent events</h4>
