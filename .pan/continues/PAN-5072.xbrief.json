@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5072",
   "created": "2026-11-11T10:00:36.495Z",
-  "updated": "2026-11-11T10:00:36.495Z",
+  "updated": "2026-11-11T10:03:09.996Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,26 @@
   "sessionHistory": [],
   "items": {
     "w1-hermes-shape": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5072",
-      "claimedAt": "2026-11-11T10:00:36.495Z"
+      "claimedAt": "2026-11-11T10:00:36.495Z",
+      "doneAt": "2026-11-11T10:03:09.995Z"
+    },
+    "w1-hermes-shape.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T10:03:09.995Z"
+    },
+    "w1-hermes-shape.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T10:03:09.995Z"
+    },
+    "w1-hermes-shape.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T10:03:09.995Z"
+    },
+    "w1-hermes-shape.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T10:03:09.995Z"
     }
   }
 }
