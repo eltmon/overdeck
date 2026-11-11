@@ -605,8 +605,8 @@ re-attached nor adopted. A pass taken before PAN-4622 deployed has no
 `dispatchOwed` marker, so its owed dispatch is not resumed on that restart.
 deacon-lite still recovers it: `recoverUndispatchedReviews` for a
 `verification.passed` tail, and `recoverStalledReviews` for a
-`review.requested` tail, whose re-request fallback does not run in the deacon
-child yet ([PAN-4623](https://github.com/eltmon/overdeck/issues/4623)).
+`review.requested` tail, whose fallback re-requests it through the guarded
+review route ([PAN-4623](https://github.com/eltmon/overdeck/issues/4623)).
 
 ### Review dispatch touches neither the stack nor tracked files (PAN-4690)
 
@@ -2028,7 +2028,11 @@ observe and nudge — none reconciles a stored copy of anything:
 4. `reapClosedIssueAgents` — reaps agents for issues the tracker has closed.
 5. `recoverStalledReviews` — re-dispatches a review convoy whose reviewers
    are all gone, and replays a deferred review verdict
-   (`cloister/deferred-verdict-replay.ts`, PAN-4263).
+   (`cloister/deferred-verdict-replay.ts`, PAN-4263). When the review has no
+   parent run state, its fallback re-requests the review through the guarded
+   route (`requestReviewThroughRoute`, `POST /api/review/:id/request`, source
+   `deacon-lite`), because the deacon child has no in-process review starter
+   (PAN-4623).
 6. `retryDeferredHandoffs` (`cloister/deferred-handoff.ts`, PAN-4155) —
    re-sends a planning hand-off a spawn guardrail refused.
 7. `recoverUndispatchedReviews` (`cloister/undispatched-review-recovery.ts`,
@@ -2072,7 +2076,11 @@ PAN-3939 wedge this routine exists to clear.
 It then relaunches the missing lanes against the existing run
 (`recoverMissingConvoyReviewers`), which reuses the parent's own `state.json` and
 so re-verifies nothing; only a parent with no run state at all falls back to the
-full review door. At most one re-dispatch per issue per hour: the cooldown is
+full review door. That fallback goes through the guarded review route
+(`requestReviewThroughRoute`, source `deacon-lite`), never the in-process
+review starter, which the deacon child never registers (PAN-4623). Its
+cooldown starts before the request, so a refused or unreachable route is not
+retried every tick, and a refusal journals nothing. At most one re-dispatch per issue per hour: the cooldown is
 held in memory and, because the deacon child's memory dies on restart, also read
 back from the routine's own `review.redispatched` entry. A recovery that launches
 nothing journals and reports nothing, so the routine never claims a re-dispatch
