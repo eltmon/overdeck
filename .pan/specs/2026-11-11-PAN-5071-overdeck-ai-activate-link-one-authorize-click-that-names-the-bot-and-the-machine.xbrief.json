@@ -1,0 +1,459 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-11-11T07:11:22Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-5071: overdeck.ai activate link: one Authorize click that names the bot and the machine",
+    "updated": "2026-11-11T07:16:46.251Z"
+  },
+  "plan": {
+    "id": "pan-5071",
+    "title": "overdeck.ai activate link: one Authorize click that names the bot and the machine",
+    "status": "running",
+    "uid": "6d9be57e-e5b6-47e1-8339-bc1159e0b6a9",
+    "author": "agent:claude-opus-5-5",
+    "sequence": 5,
+    "created": "2026-11-11T07:11:22Z",
+    "updated": "2026-11-11T07:16:46.251Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/5071",
+        "label": "PAN-5071",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-5071.md",
+        "label": "PRD draft (.pan/drafts/PAN-5071.md)",
+        "type": "prd"
+      },
+      {
+        "uri": ".pan/drafts/pan-5069.md",
+        "label": "Parent design, Part C (PAN-5069)",
+        "type": "prd"
+      }
+    ],
+    "tags": [
+      "account-service",
+      "device-flow",
+      "cloudflare-worker",
+      "d1-migration",
+      "anywhere",
+      "connector"
+    ],
+    "narratives": {
+      "Problem": "The device-flow activate link a bot shows the operator (https://account.overdeck.ai/activate?user_code=...) opens a typed-code form: the operator clicks Continue, then Continue with GitHub, and the page names only the platform. PAN-5069 decision 3 requires one Authorize click on a page that names the bot and the machine. Part A (the connector) already sends client_name and target_name; the account service ignores them.",
+      "Proposal": "Add migration 0003 with nullable client_name/target_name on device_grants; issueCode stores them cleaned by deviceName (controls and bidi removed, trimmed, cut to 64 code points, blank -> NULL). One confirmStep renderer names the bot and machine as claims with one Authorize button, used by POST /activate and by GET /activate when user_code resolves to a pending grant. A GET with a code that does not resolve renders the form with the error at 400 and counts against activate-fail (peek before lookup, hit on a miss). GET never writes device_grants. A Miniflare test proves the migration and link on real workerd. docs/ACCOUNT-SERVICE.md documents the fields, the GET confirm step, the GET rate-limit counting and the migrate-before-deploy order.",
+      "NonGoals": "- Deploying the Worker, applying migrations remotely, or running wrangler deploy (operator-only)\n- Any change to POST /activate/confirm, its same-origin Origin check, startGitHubLeg or the GitHub leg\n- Showing client_name/target_name on the Device connected page, in devices.label, in the token response or in GET /v1/devices\n- Adding a route-level rate-limit bucket to GET /activate (routes.ts does not change)\n- Verifying the names against the directory or the machine; they are claims by design\n- Changing src/lib/account/client.ts or pan mcp connector connect (Part A shipped)\n- Defending the per-IP activate-fail window against cross-site GETs that fill it (accepted risk in the PRD)\n- Any GET /activate request mutating device_grants (status, user_id or last_polled_at)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "A GET whose user_code does not resolve renders the typed form with INVALID_CODE_MESSAGE at status 400, prefilled with the formatted code",
+        "rationale": "Matches POST /activate; a silent prefilled form would make the human resubmit and burn a second activate-fail hit."
+      },
+      {
+        "summary": "GET gates only non-empty codes: peek activate-fail before the lookup, hit on a miss; no route-level bucket is added",
+        "rationale": "Mirrors POST /activate order; activate-fail already caps guessing, and a route bucket would also cap valid reloads without adding safety."
+      },
+      {
+        "summary": "GET and POST /activate share one confirmStep renderer whose button reads Authorize",
+        "rationale": "Otherwise the typed-code path keeps \"Continue with GitHub\" and two confirm pages diverge."
+      },
+      {
+        "summary": "Over-long names are cut to 64 code points (never a 400); control and bidi characters are stripped; blank stores NULL",
+        "rationale": "The issue says trimmed, at most 64 characters; the client already cuts at 64; stripping bidi/control characters prevents visual spoofing on a page a human approves from."
+      },
+      {
+        "summary": "When client_name is absent the device type (defaultLabel) stands in; the no-name sentence stays exactly as today",
+        "rationale": "Keeps old clients and pan account login unchanged and avoids \"unknown\" on the page."
+      },
+      {
+        "summary": "Names stay off devices.label and every API response",
+        "rationale": "D-17 keeps device labels free of hostnames; the names are unverified claims meant only for the approval page."
+      },
+      {
+        "summary": "Docs state the deploy order: apply 0003 before deploying the new Worker",
+        "rationale": "The new INSERT names the new columns, so the new Worker on the old schema 500s every device-code request; the old Worker on the new schema works."
+      }
+    ],
+    "items": [
+      {
+        "id": "grant-names-store",
+        "title": "Migration 0003 adds client_name/target_name and issueCode stores cleaned names",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-11T07:11:22Z",
+        "metadata": {
+          "issueLabel": "pan-5071",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "confirm-step-names",
+            "get-activate-confirm",
+            "miniflare-link-flow"
+          ],
+          "files_scope": [
+            "services/account/migrations/0003_device_grant_names.sql",
+            "services/account/src/device-flow.ts",
+            "tests/unit/services/account/schema.test.ts",
+            "tests/unit/services/account/device-flow.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:account",
+            "npx vitest run tests/unit/services/account"
+          ],
+          "expected_outputs": [
+            "typecheck:account completes with no errors",
+            "every test file under tests/unit/services/account passes, including the new \"device grant names (PAN-5071)\" cases and the unchanged maintenance.test.ts"
+          ],
+          "traces": [
+            "FR-19",
+            "FR-25",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W-1 exactly: create services/account/migrations/0003_device_grant_names.sql with two ALTER TABLE device_grants ADD COLUMN statements (client_name TEXT, target_name TEXT), no semicolons in comments; add client_name/target_name (string | null) to DeviceGrantRow; add exported DEVICE_NAME_MAX = 64 and deviceName() (strip \\p{Cc} and bidi controls U+200E, U+200F, U+202A-U+202E, U+2066-U+2069, trim, cut to 64 code points, trim, empty -> null); make issueCode INSERT the cleaned client_name and target_name form fields; update the device-flow.ts header comment; update schema.test.ts migration list and add the PRD W-1 tests."
+        },
+        "items": [
+          {
+            "id": "grant-names-store.ac1",
+            "title": "Given an empty test D1, when applyMigrations runs, then schema.test.ts returns the list [0001_init.sql, 0002_account_page.sql, 0003_device_grant_names.sql] and a device_grants row inserted without the new columns reads client_name and target_name as null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "grant-names-store.ac2",
+            "title": "When POST /oauth/device/code receives client_name \"  grok-bot  \" and target_name \"eltmon-desktop\", then the device_grants row stores \"grok-bot\" and \"eltmon-desktop\" and the JSON response contains exactly the six RFC 8628 fields",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "grant-names-store.ac3",
+            "title": "When client_name is 70 characters, then the stored value contains its first 64 characters; when client_name is whitespace-only and target_name is absent, then both columns store null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "grant-names-store.ac4",
+            "title": "When client_name is \"grok\\u202Ebot\\n\", then deviceName returns and the row stores \"grokbot\"; deviceName(undefined) returns null and a 65-emoji input returns 64 code points",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "confirm-step-names",
+        "title": "One confirmStep renderer names the bot and machine with an Authorize button for POST /activate",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-11T07:11:22Z",
+        "metadata": {
+          "issueLabel": "pan-5071",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "backend",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "services/account/src/device-flow.ts",
+            "tests/unit/services/account/device-flow.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:account",
+            "npx vitest run tests/unit/services/account/device-flow.test.ts",
+            "grep -rn \"Continue with GitHub\" services/account/src || echo none"
+          ],
+          "expected_outputs": [
+            "typecheck:account completes with no errors",
+            "device-flow.test.ts passes including the FR-27 wording and escaping cases",
+            "the grep prints \"none\""
+          ],
+          "traces": [
+            "FR-26",
+            "FR-27",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W-2 exactly: add exported NAMES_ARE_CLAIMS_MESSAGE and a confirmStep(grant, normalized) function after activateForm that escapes every name, chooses the FR-27 lead sentence by which names are present (both, client only, target only, neither = today's sentence), adds the muted claims line only when a name is present, keeps the existing muted \"Code XXXX-XXXX. If you did not start this sign-in, close this tab.\" line, and renders one button labelled Authorize posting the normalized code to /activate/confirm; replace the inline confirm page in activateSubmit with html(confirmStep(grant, normalizeUserCode(raw))); add the W-2 tests."
+        },
+        "items": [
+          {
+            "id": "confirm-step-names.ac1",
+            "title": "Given a grant with client_name grok-bot and target_name eltmon-desktop on linux-x64, when POST /activate submits its code, then the 200 body contains \"<strong>grok-bot</strong> (Linux device) wants to connect to your Overdeck account to reach <strong>eltmon-desktop</strong>.\", NAMES_ARE_CLAIMS_MESSAGE and \">Authorize</button>\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "confirm-step-names.ac2",
+            "title": "Given client-only, target-only and no-name grants, when POST /activate submits each code, then each page renders its FR-27 sentence and the no-name page still contains \"Connect a <strong>Windows device</strong>\" (win32) and does not contain NAMES_ARE_CLAIMS_MESSAGE",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "confirm-step-names.ac3",
+            "title": "Given client_name \"<script>alert(1)</script>\" and target_name a\"b, when the confirm step renders, then the body contains \"&lt;script&gt;alert(1)&lt;/script&gt;\" and \"a&quot;b\" and contains no \"<script>\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "confirm-step-names.ac4",
+            "title": "When grep -rn \"Continue with GitHub\" services/account/src runs, then it returns no match, and approveInBrowser in device-flow.test.ts still produces a token on the next poll",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "get-activate-confirm",
+        "title": "GET /activate with a pending code renders the confirm step; wrong codes count against activate-fail",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-11-11T07:11:22Z",
+        "metadata": {
+          "issueLabel": "pan-5071",
+          "readiness": "ready",
+          "difficulty": "medium",
+          "kind": "backend",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "miniflare-link-flow",
+            "docs-account-service"
+          ],
+          "files_scope": [
+            "services/account/src/device-flow.ts",
+            "tests/unit/services/account/device-flow.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:account",
+            "npx vitest run tests/unit/services/account/device-flow.test.ts tests/unit/services/account/routes.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck:account completes with no errors",
+            "device-flow.test.ts and routes.test.ts pass including the GET confirm, rate-limit, no-mutation and link-flow cases"
+          ],
+          "traces": [
+            "FR-18",
+            "FR-20",
+            "FR-28",
+            "FR-29"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W-3 exactly: replace activatePage with the \"After\" handler (trim user_code; empty -> bare form 200 with no rate_limits access; else peek activate-fail and return rateLimitedPage when exhausted; a pending grant -> html(confirmStep(...)); otherwise hit activate-fail, 429 when the window fills, else the typed form prefilled with the formatted code and INVALID_CODE_MESSAGE at status 400); do not change routes.ts; replace the old GET prefill assertion at device-flow.test.ts lines 98-100 and add every W-3 test, including the full GET -> confirm -> callback -> token flow with no POST /activate."
+        },
+        "items": [
+          {
+            "id": "get-activate-confirm.ac1",
+            "title": "Given a pending grant, when GET /activate?user_code=<lowercase undashed code> runs, then it returns 200 containing \">Authorize</button>\", action=\"/activate/confirm\" and the normalized hidden code, and the body does not contain autocomplete=\"off\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "get-activate-confirm.ac2",
+            "title": "When GET /activate has no user_code or user_code=%20, then it renders the typed form with status 200 and SELECT COUNT(*) FROM rate_limits WHERE bucket = 'activate-fail' returns 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "get-activate-confirm.ac3",
+            "title": "When GET /activate?user_code=BBBB-BBBB (no grant) or an expired code runs, then it returns 400 containing INVALID_CODE_MESSAGE and records one activate-fail hit; the 11th wrong code from one IP (GETs and POSTs share the window) returns 429 with Retry-After, and a valid code from that IP then returns 429 while another IP returns 200",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "get-activate-confirm.ac4",
+            "title": "Given a pending grant, when GET /activate with its code runs, then SELECT * FROM device_grants returns a row equal to the row before the GET and the next poll returns authorization_pending",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "get-activate-confirm.ac5",
+            "title": "When the test follows the link (GET /activate?user_code, then POST /activate/confirm with the hidden code and same-origin Origin, then the GitHub callback), then the next poll returns an access_token with no POST /activate request made",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "miniflare-link-flow",
+        "title": "Miniflare integration test opens the named activate link on real workerd and D1",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T07:11:22Z",
+        "metadata": {
+          "issueLabel": "pan-5071",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "test",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/integration/services/account/miniflare.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/integration/services/account/miniflare.test.ts"
+          ],
+          "expected_outputs": [
+            "miniflare.test.ts passes, including \"the device flow approves in the browser and the poll returns a token\" with the named GET step"
+          ],
+          "traces": [
+            "FR-18",
+            "FR-19",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W-4 exactly: in tests/integration/services/account/miniflare.test.ts, in the test \"the device flow approves in the browser and the poll returns a token\", add client_name grok-bot and target_name eltmon-desktop to the /oauth/device/code form, then before the crossSite request GET /activate?user_code=<code without dash> and assert the named confirm step; keep the existing POST /activate and confirm steps unchanged."
+        },
+        "items": [
+          {
+            "id": "miniflare-link-flow.ac1",
+            "title": "Given Miniflare applies migrations 0001-0003 through the semicolon-at-line-end splitter, when the device-code request carries client_name grok-bot and target_name eltmon-desktop on darwin-arm64, then GET /activate?user_code returns 200 containing \"<strong>grok-bot</strong> (macOS device)\", \"eltmon-desktop\" and \">Authorize</button>\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "miniflare-link-flow.ac2",
+            "title": "When the existing POST /activate, /activate/confirm and GitHub callback steps run afterwards, then the poll still returns a token whose label is \"macOS device\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-account-service",
+        "title": "docs/ACCOUNT-SERVICE.md describes the name fields, the one-click GET confirm step and the migrate-before-deploy order",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-11-11T07:11:22Z",
+        "metadata": {
+          "issueLabel": "pan-5071",
+          "readiness": "ready",
+          "difficulty": "simple",
+          "kind": "docs",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/ACCOUNT-SERVICE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:docs",
+            "grep -n \"client_name\\|0003_device_grant_names\\|GET /activate?user_code=\" docs/ACCOUNT-SERVICE.md"
+          ],
+          "expected_outputs": [
+            "lint:docs exits 0",
+            "grep prints matches in the device-flow paragraph, the rate-limit table, the route table and deploy step 4"
+          ],
+          "traces": [
+            "FR-18",
+            "FR-19",
+            "FR-20",
+            "FR-25",
+            "FR-27",
+            "FR-29",
+            "FR-30"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD W-5 exactly: edit docs/ACCOUNT-SERVICE.md at the device-flow paragraph (line 25: optional client_name/target_name cleaned and cut to 64 and stored as display-only claims; verification_uri_complete opens the confirm step at once with one Authorize button; bare /activate types the code first; a GET never changes a grant), the activate-fail rate-limit row (line 56), the /oauth/device/code and GET /activate route rows (lines 73-74), and deploy step 4 (line 217: list 0003_device_grant_names.sql and state that it must be applied before deploying the Worker that writes the columns, and that the previous Worker runs on the migrated schema); add one sentence that the names live only on the device_grants row, which is deleted at token exchange or denial and purged one hour past expiry."
+        },
+        "items": [
+          {
+            "id": "docs-account-service.ac1",
+            "title": "When a reader opens docs/ACCOUNT-SERVICE.md, then the device-flow paragraph contains client_name, target_name, the 64-character cut, \"Authorize\", and a sentence that a GET never changes a grant",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-account-service.ac2",
+            "title": "Then the activate-fail row contains \"GET /activate?user_code=\" and the GET /activate route row describes the confirm step for a pending code, the 400 error form for a wrong code and the plain form for no code",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-account-service.ac3",
+            "title": "Then deploy step 4 lists 0003_device_grant_names.sql and contains the instruction to apply it before deploying the Worker, and npm run lint:docs exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-account-service.ac4",
+            "title": "Then the document contains a sentence that the names live only on the device_grants row, which is deleted at token exchange or denial and purged one hour past expiry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "grant-names-store",
+        "to": "confirm-step-names",
+        "type": "blocks"
+      },
+      {
+        "from": "confirm-step-names",
+        "to": "get-activate-confirm",
+        "type": "blocks"
+      },
+      {
+        "from": "get-activate-confirm",
+        "to": "miniflare-link-flow",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-11-11-PAN-5071-overdeck-ai-activate-link-one-authorize-click-that-names-the-bot-and-the-machine.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "active"
+}
