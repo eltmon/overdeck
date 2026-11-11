@@ -49,8 +49,12 @@ import {
   requestReviewPipeline,
   type GuardedReviewRequestOutcome,
   type RequestReviewSource,
+  type RequestReviewStartOptions,
   type StartRequestReviewOutcome,
 } from '../../../../lib/cloister/request-review-pipeline.js';
+import { clearVerificationDispatchOwed } from '../../../../lib/cloister/verification-worker-supervisor.js';
+import { confirmResumedDispatch } from '../../../../lib/cloister/verification-resume-dispatch.js';
+import { parseRequestedReviewMode } from './review-mode-param.js';
 import { appendPipelineEntry } from '../../../../lib/cloister/pipeline-journal.js';
 import { isDeftPipelineIssue } from '../../../../lib/deft/issue-pipeline.js';
 import { refreshIssuePullRequestStateNow } from '../../services/issue-pr-refresh.js';
@@ -105,22 +109,6 @@ export function _resetAutoRequeueCountsForTests(): void {
 /** Safe `.message` read for caught values of unknown shape. */
 const errorMessage = (e: unknown): string | undefined => e instanceof Error ? e.message : undefined;
 
-export function parseRequestedReviewMode(body: unknown):
-  | { ok: true; mode?: 'quick' | 'full' | 'none' }
-  | { ok: false; error: string } {
-  const reviewMode = typeof body === 'object' && body !== null
-    ? (body as { reviewMode?: unknown }).reviewMode
-    : undefined;
-
-  if (reviewMode === undefined || reviewMode === null) {
-    return { ok: true };
-  }
-  if (reviewMode === 'quick' || reviewMode === 'full' || reviewMode === 'none') {
-    return { ok: true, mode: reviewMode };
-  }
-  return { ok: false, error: 'reviewMode must be quick, full, or none' };
-}
-
 /**
  * Push the feature branch of every repo in the workspace (PAN-2948).
  *
@@ -161,9 +149,11 @@ export function getDirtyWorkspaceErrorForReviewRequestStatus(
   return `Workspace has uncommitted changes. Commit the changes, explicitly discard them, or surface them to the operator before requesting review:\ncd ${workspacePath}\ngit status`;
 }
 
+/** `failClosed` (PAN-4622): an unreadable tree is an error, not a clean tree. */
 async function getDirtyWorkspaceErrorForReviewRequest(
   workspacePath: string,
   workspaceInfo: WorkspaceInfo,
+  failClosed = false,
 ): Promise<string | null> {
   try {
     const statusCmd = 'git status --porcelain -uno';
@@ -175,8 +165,8 @@ async function getDirtyWorkspaceErrorForReviewRequest(
       : (await execAsync(statusCmd, { cwd: workspacePath, encoding: 'utf-8' })).stdout;
 
     return getDirtyWorkspaceErrorForReviewRequestStatus(status, workspacePath);
-  } catch {
-    return null;
+  } catch (err) {
+    return failClosed ? `Could not read the working tree: ${errorMessage(err) ?? String(err)}` : null;
   }
 }
 
@@ -216,14 +206,15 @@ export async function reReviewGuardError(
  * gets reviewed whoever opened it. `requestReviewPipeline` coalesces, so two
  * callers for the same issue cost one run.
  *
- * It resolves the workspace, refuses a dirty tree, and hands the verification
+ * It resolves the workspace, refuses a dirty tree (a boot-adoption `resume`
+ * checks it at dispatch instead, PAN-4622), and hands the verification
  * continuation to the host-side pipeline; the circuit breaker and the
  * already-approved branches stay with the HTTP route, which owns agent
  * re-request semantics.
  */
 export async function startRequestReviewPipeline(
   issueId: string,
-  options: { note?: string; source?: RequestReviewSource; onReviewSpawned?: () => void } = {},
+  options: RequestReviewStartOptions = {},
 ): Promise<StartRequestReviewOutcome> {
   const canonicalIssueId = issueId.toUpperCase();
   const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
@@ -238,7 +229,8 @@ export async function startRequestReviewPipeline(
 
   if (!workspaceInfo.exists) return { started: false, reason: 'no-workspace' };
 
-  const dirtyWorkspaceError = await getDirtyWorkspaceErrorForReviewRequest(workspacePath, workspaceInfo);
+  // PAN-4622: a resumed request was accepted already; its tree is checked at dispatch.
+  const dirtyWorkspaceError = options.resume ? null : await getDirtyWorkspaceErrorForReviewRequest(workspacePath, workspaceInfo);
   if (dirtyWorkspaceError) return { started: false, reason: 'dirty-workspace', error: dirtyWorkspaceError };
 
   if (requestReviewPipeline.isInFlight(canonicalIssueId)) {
@@ -293,6 +285,9 @@ export async function startRequestReviewPipeline(
       console.log(`[request-review] Verification deferred for ${issueId}: ${outcome.reason}`);
       completePendingOperation(issueId, outcome.reason);
     },
+    confirmDispatch: options.resume
+      ? () => confirmResumedDispatch(issueId, workspacePath, () => getDirtyWorkspaceErrorForReviewRequest(workspacePath, workspaceInfo, true))
+      : undefined,
     pushBranch: async () => {
       await pushReviewBranch(issueId, workspacePath, workspaceInfo, branchName);
       console.log(`[request-review] Pushed verified branch ${branchName} for ${issueId}`);
@@ -307,6 +302,7 @@ export async function startRequestReviewPipeline(
       }));
 
       if (result.success) {
+        clearVerificationDispatchOwed(issueId); // PAN-4622: first, before anything that can stall
         console.log(`[request-review] Review role spawned for ${issueId}`);
         options.onReviewSpawned?.();
         try {
