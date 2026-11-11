@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5152",
   "created": "2026-11-11T14:36:40.308Z",
-  "updated": "2026-11-11T14:59:08.329Z",
+  "updated": "2026-11-11T15:00:27.787Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -72,9 +72,18 @@
       "doneAt": "2026-11-11T14:59:06.130Z"
     },
     "wi4-prefix-collision-message": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5152",
-      "claimedAt": "2026-11-11T14:59:08.329Z"
+      "claimedAt": "2026-11-11T14:59:08.329Z",
+      "doneAt": "2026-11-11T15:00:27.786Z"
+    },
+    "wi4-prefix-collision-message.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:00:27.786Z"
+    },
+    "wi4-prefix-collision-message.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T15:00:27.786Z"
     }
   }
 }
