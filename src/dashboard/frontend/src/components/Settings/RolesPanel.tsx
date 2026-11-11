@@ -77,8 +77,8 @@ interface RoleDefinition {
 
 const DEFAULT_WORKHORSES: Required<Record<WorkhorseSlot, ModelRef>> = {
   expensive: 'claude-opus-5-5',
-  mid: 'claude-sonnet-5-5',
-  cheap: 'claude-haiku-4-5',
+  mid: 'claude-opus-5-5',
+  cheap: 'claude-haiku-5-5',
 };
 
 const WORKHORSE_SLOTS: Array<{ id: WorkhorseSlot; label: string }> = [

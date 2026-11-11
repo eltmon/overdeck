@@ -134,12 +134,12 @@ const ANTHROPIC_BACKGROUND: Record<string, PresetValue> = {
   'models.default_conversation_model': { set: 'claude-sonnet-5-5' },
   'models.status_review_model': { set: 'claude-sonnet-5-5' },
   'models.provider_fallback_model': { set: 'claude-sonnet-5-5' },
-  'conversations.compaction_model': { set: 'claude-haiku-4-5' },
-  'conversations.title_model': { set: 'claude-haiku-4-5' },
+  'conversations.compaction_model': { set: 'claude-haiku-5-5' },
+  'conversations.title_model': { set: 'claude-haiku-5-5' },
   'conversations.fork_summary_model': { set: 'claude-sonnet-5-5' },
   'conversations.handoff_author_model': { set: 'claude-sonnet-5-5' },
   'memory.extraction.provider': { set: 'anthropic' },
-  'memory.extraction.model': { set: 'claude-haiku-4-5' },
+  'memory.extraction.model': { set: 'claude-haiku-5-5' },
 };
 
 const OPENAI_BACKGROUND_KEEP =
@@ -162,7 +162,7 @@ const OPENAI_BACKGROUND: Record<string, PresetValue> = {
 const ANTHROPIC_EVAL_REPORT = 'docs/model-evals/2026-09-29-opus-5-5-vs-sonnet-5-5.md';
 
 const ANTHROPIC_TIER_BANDS: ModelPreset['tierBands'] = {
-  // Haiku 4.5 has no effort control, so the cheap band sets no effort.
+  // Haiku 5.5 runs the trivial band at its own default effort (medium); presets only ever set high.
   trivial: { model: WORKHORSE.cheap },
   'simple-medium': { model: WORKHORSE.mid, effort: HIGH },
   // D16: expert uses the expensive slot too; no eval covers Fable 5.2.
@@ -174,8 +174,8 @@ const ANTHROPIC: ModelPreset = {
   label: 'Anthropic defaults',
   provider: 'anthropic',
   harness: 'claude-code',
-  version: 1,
-  date: '2026-09-29',
+  version: 2,
+  date: '2026-11-11',
   pilot: false,
   evidence: {
     status: 'eval',
@@ -185,7 +185,7 @@ const ANTHROPIC: ModelPreset = {
   values: {
     'workhorses.expensive': { set: 'claude-opus-5-5' },
     'workhorses.mid': { set: 'claude-opus-5-5' },
-    'workhorses.cheap': { set: 'claude-haiku-4-5' },
+    'workhorses.cheap': { set: 'claude-haiku-5-5' },
     ...roleValues(WORKHORSE.mid),
     ...ANTHROPIC_BACKGROUND,
     ...SHARED_KEEPS,

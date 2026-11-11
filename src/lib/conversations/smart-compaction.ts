@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import * as self from './smart-compaction.js';
 import { buildSpawnEnvForModel, getProviderEnvForModel } from '../agents.js';
 import { getClaudePermissionFlags } from '../claude-permissions.js';
+import { prepareHarnessLaunch } from '../harness-binary.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { recordBackgroundAiCost } from '../background-ai/cost.js';
@@ -36,7 +37,7 @@ function recordSummaryForkCost(model: string, envelope: Record<string, unknown>)
 
 const SUMMARY_TIMEOUT_MS = 60_000;
 const FORK_SUMMARY_TIMEOUT_MS = 300_000;
-const DEFAULT_SUMMARY_MODEL = 'claude-haiku-4-5-20251001';
+const DEFAULT_SUMMARY_MODEL = 'claude-haiku-5-5';
 
 export interface CompactionOptions {
   jsonlPath: string;
@@ -527,6 +528,9 @@ export async function runModelSummary(prompt: string, model?: string, timeoutMs?
     return summary;
   }
 
+  // PAN-5124 FR-5: the same minimum-version refusal a launch gets (D5-D7).
+  const { binaryPath: command } = await prepareHarnessLaunch('claude-code', { model: useModel });
+
   const args = [
     '-p',
     '--output-format', 'json',
@@ -545,7 +549,6 @@ export async function runModelSummary(prompt: string, model?: string, timeoutMs?
   // falls back to a heuristic summary.
   const spawnEnv = await buildSpawnEnvForModel(useModel);
   const injectedKeys = Object.keys(await getProviderEnvForModel(useModel));
-  const command = 'claude';
   if (injectedKeys.length > 0) {
     console.log(`[smart-compaction] Spawning ${command} for summary with model ${useModel}, injecting provider env: ${injectedKeys.join(', ')}`);
   } else {
@@ -668,6 +671,7 @@ const CHUNK_BUDGET_CHARS_BY_MODEL: Record<string, number> = {
   'claude-haiku-4-5-20251001': 300_000,   // ~75k tokens content, 200k window
   // Haiku 5.5 has a 1M window, but prompts over 100K tokens cost 5x, and its
   // tokenizer yields ~30% more tokens per char: keep each chunk under 100K.
+  // Kept by PAN-5124 D1.
   'claude-haiku-5-5': 240_000,
   'claude-sonnet-5-5': 1_200_000,         // ~300k tokens content, 1M window
   'claude-sonnet-5': 1_200_000,           // ~300k tokens content, 1M window
@@ -682,8 +686,9 @@ const CHUNK_BUDGET_CHARS_BY_MODEL: Record<string, number> = {
 const DEFAULT_CHUNK_BUDGET_CHARS = 300_000;
 
 export function getChunkBudgetChars(model: string | undefined): number {
-  if (!model) return DEFAULT_CHUNK_BUDGET_CHARS;
-  return CHUNK_BUDGET_CHARS_BY_MODEL[model === 'claude-opus-5-5' ? 'claude-opus-5' : model] ?? DEFAULT_CHUNK_BUDGET_CHARS;
+  // Size chunks for the model runModelSummary will actually run (PAN-5124 FR-4).
+  const effective = model || DEFAULT_SUMMARY_MODEL;
+  return CHUNK_BUDGET_CHARS_BY_MODEL[effective === 'claude-opus-5-5' ? 'claude-opus-5' : effective] ?? DEFAULT_CHUNK_BUDGET_CHARS;
 }
 
 function chunkEntriesByBudget(entries: any[], budgetChars: number): any[][] {

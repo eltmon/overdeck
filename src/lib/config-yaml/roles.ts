@@ -32,8 +32,8 @@ export const DEFAULT_MODEL_REFS: Record<Role, ModelRef> = {
 
 export const DEFAULT_WORKHORSES: Required<WorkhorsesConfig> = {
   expensive: 'claude-opus-5-5',
-  mid: 'claude-sonnet-5-5',
-  cheap: 'claude-haiku-4-5',
+  mid: 'claude-opus-5-5',
+  cheap: 'claude-haiku-5-5',
 };
 
 export const DEFAULT_ROLES: Record<Role, RoleConfig> = {

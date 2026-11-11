@@ -113,14 +113,17 @@ describe('applyPreset', () => {
 
     const parsed = parse(text);
     expect(parsed.custom_block).toEqual({ a: 1 });
-    expect(parsed.workhorses).toEqual({ expensive: 'claude-opus-5-5', mid: 'claude-opus-5-5', cheap: 'claude-haiku-4-5' });
+    expect(parsed.workhorses).toEqual({ expensive: 'claude-opus-5-5', mid: 'claude-opus-5-5', cheap: 'claude-haiku-5-5' });
+    // PAN-5124: preset v2 moves the cheap slot and background calls to Haiku 5.5.
+    expect(parsed.conversations).toMatchObject({ compaction_model: 'claude-haiku-5-5', title_model: 'claude-haiku-5-5' });
+    expect(parsed.memory.extraction.model).toBe('claude-haiku-5-5');
     expect(parsed.roles.work).toEqual({ harness: 'claude-code', model: 'workhorse:mid', effort: 'high' });
     expect(parsed.tts.summarizer.model).toBe('gpt-5.4-mini');
     expect(result.applied.length).toBeGreaterThan(0);
     expect(result.applied.every((row) => row.status === 'change')).toBe(true);
 
     const state = await readPresetState();
-    expect(state.lastApplied).toMatchObject({ presetId: 'anthropic', version: 1 });
+    expect(state.lastApplied).toMatchObject({ presetId: 'anthropic', version: 2 });
     expect(state.undo?.changes.map((change) => change.path)).toEqual(result.applied.map((row) => row.path));
 
     // A second plan against the written file has nothing left to change.

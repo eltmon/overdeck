@@ -109,6 +109,18 @@ describe('model presets', () => {
     expect(getPreset('anthropic-cost-saver')!.tierBands.trivial.effort).toBeUndefined();
   });
 
+  // PAN-5124 D9: v2 moves the cheap slot and background calls to Haiku 5.5.
+  it('anthropic presets are v2 with the cheap and background values on Haiku 5.5', () => {
+    for (const id of ['anthropic', 'anthropic-cost-saver']) {
+      const preset = getPreset(id)!;
+      expect(preset.version, id).toBe(2);
+      for (const path of ['workhorses.cheap', 'conversations.compaction_model', 'conversations.title_model', 'memory.extraction.model']) {
+        expect(setValue(preset, path), `${id} ${path}`).toBe('claude-haiku-5-5');
+      }
+    }
+    expect(getPreset('openai')!.version).toBe(1);
+  });
+
   it('no preset is a hardcoded fallback', () => {
     for (const preset of MODEL_PRESETS) {
       for (const slot of ['expensive', 'mid', 'cheap']) {

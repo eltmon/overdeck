@@ -41,7 +41,7 @@ export interface ClaudeCodeStatus {
 export interface ClaudeCodeStatusDeps {
   readonly resolveBinary: () => Promise<string | null>;
   readonly readVersion: typeof readClaudeCodeVersion;
-  readonly loadConfig: () => Pick<NormalizedConfig, 'roles' | 'workhorses' | 'tieredExecution' | 'defaultConversationModel'>;
+  readonly loadConfig: () => Pick<NormalizedConfig, 'roles' | 'workhorses' | 'tieredExecution' | 'defaultConversationModel' | 'conversations'>;
   readonly listBinaries: typeof listClaudeBinariesOnPath;
   readonly upgradePlan: typeof claudeCodeUpgradePlan;
   readonly detectInstall: typeof detectClaudeInstall;
