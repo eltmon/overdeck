@@ -11,11 +11,12 @@
  * 1. **Lost.** When the backend's event stream ends (`backend-inventory.ts`
  *    `onBackendConnectionChange`), record the operator conversations (`conv-`
  *    sessions, owned by this machine) whose row is `active`, or ended within
- *    the last minute. The window covers an OOM stop: the kernel kills the
- *    largest process (a harness) first, the conversation lifecycle poll can end
- *    that row, and only then does systemd stop the whole Herdr unit. The poll
- *    ends nothing while the backend is unreadable, so the rows still say which
- *    conversations were live.
+ *    the last minute. The window covers a harness that died moments before the
+ *    server went down, whose row the conversation lifecycle poll ended in
+ *    between (on a unit still on `OOMPolicy=stop`, the kernel OOM-kills one pane
+ *    process and then systemd stops the whole unit). The poll ends nothing
+ *    while the backend is unreadable, so the rows still say which conversations
+ *    were live.
  * 2. **Restored.** When the stream is back on a fresh snapshot, keep only the
  *    recorded conversations whose harness the backend does not run now. A
  *    stream blip leaves every conversation live, so it offers nothing.

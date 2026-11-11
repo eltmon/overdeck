@@ -149,7 +149,8 @@ Overdeck does when one restarts anyway.
 
 ### After a session-server restart (PAN-5091)
 
-A Herdr session server can still restart on its own: a crash, an OOM stop, a unit restart. Because
+A Herdr session server can still go down: a crash, an OOM stop on a unit without
+`OOMPolicy=continue`, a unit restart. Because
 `resume_agents_on_restore = false`, no harness comes back, and every agent and conversation pane is
 gone. Overdeck never resumes them automatically: relaunching about 40 harnesses into a host that just
 ran out of memory can cause the same OOM again. It offers a supervised resume of the conversations
@@ -158,10 +159,11 @@ instead (`src/dashboard/server/services/backend-restart-recovery.ts`, primary da
 1. **Lost.** `backend-inventory.ts` fires `lost` (`onBackendConnectionChange`) when an event stream
    that was open ends. The service records the operator conversations this machine owns (`conv-`
    sessions, not the backfilled `agent-*` rows, Session Vault copies or released rows) whose row is
-   `active`, or ended within the last 60 s (`RESTART_EXIT_WINDOW_MS`). The window covers an OOM stop:
-   the kernel kills the largest process, a harness, first; the conversation lifecycle poll can end
-   that row; then systemd stops the whole unit. The poll ends no row while the backend is unreadable,
-   so the rows still say which conversations were live.
+   `active`, or ended within the last 60 s (`RESTART_EXIT_WINDOW_MS`). The window covers a harness that
+   died moments before the server went down, whose row the conversation lifecycle poll ended in
+   between: on a unit still on the default `OOMPolicy=stop`, the kernel OOM-kills one pane process and
+   then systemd stops the whole unit. The poll ends no row while the backend is unreadable, so the
+   rows still say which conversations were live.
 2. **Restored.** `restored` fires when a re-opened stream is up on a fresh, non-degraded snapshot. The
    service keeps only the recorded conversations whose harness `listLiveConversationSessions` does not
    report, so a stream blip offers nothing. The list only shrinks after this, so a conversation that
