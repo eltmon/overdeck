@@ -11,9 +11,13 @@
  *  - `summarizeTranscriptAbout()` — a few-sentence description of what the
  *    conversation has been about, used by the conversation "About" drawer.
  *
- * All three call the Claude CLI with a hardcoded Haiku model — fast and cheap
- * for short structured outputs. There is no fallback: callers log the failure
- * and keep whatever artifact already exists.
+ * All three call the Claude CLI with the model from
+ * `conversations.title_model`, or `CONVERSATION_TITLE_MODEL` when unset — fast
+ * and cheap for short structured outputs. Each call first runs the Claude Code
+ * minimum-version check for that model (PAN-5124 FR-5), so a too-old Claude
+ * Code fails with the standard upgrade message before any process starts.
+ * There is no fallback: callers log the failure and keep whatever artifact
+ * already exists.
  *
  * This module deliberately reads no files itself. Callers pass already-parsed
  * `ChatMessage[]` (via `serializeConversationTranscript`) so it stays a pure
@@ -359,12 +363,18 @@ async function invokeClaudeStructured(
   timeoutMs = 30_000,
   feature: BackgroundAiFeature = 'conversationTitles',
 ): Promise<Record<string, unknown>> {
+  // PAN-5124 FR-5: refuse a model this Claude Code is too old for, with the
+  // standard upgrade message, before any process starts (D5-D7). The dynamic
+  // import keeps this leaf module free of a static harness-binary cycle.
+  const { prepareHarnessLaunch } = await import('../harness-binary.js');
+  const { binaryPath } = await prepareHarnessLaunch('claude-code', { model });
+
   const providerEnv = await getProviderEnvForModel(model);
   const childEnv = { ...buildChildEnv(), ...providerEnv };
 
   const stdout = await new Promise<string>((resolve, reject) => {
     const child = spawn(
-      'claude',
+      binaryPath,
       buildStructuredClaudeArgs(schema, model),
       { env: childEnv, cwd: backgroundAiScratchCwd() },
     );
