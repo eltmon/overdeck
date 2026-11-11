@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5122",
   "created": "2026-11-11T10:01:02.133Z",
-  "updated": "2026-11-11T11:16:44.876Z",
+  "updated": "2026-11-11T11:26:40.273Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -136,6 +136,10 @@
     "live-verification.ac2": {
       "status": "completed",
       "doneAt": "2026-11-11T11:10:22.797Z"
+    },
+    "live-verification.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T11:26:40.272Z"
     }
   },
   "feedback": [
