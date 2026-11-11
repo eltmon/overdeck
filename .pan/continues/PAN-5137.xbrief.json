@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5137",
   "created": "2026-11-11T18:41:59.017Z",
-  "updated": "2026-11-11T19:02:22.374Z",
+  "updated": "2026-11-11T19:02:27.036Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -104,6 +104,11 @@
     "lint-guard.ac4": {
       "status": "completed",
       "doneAt": "2026-11-11T19:02:22.373Z"
+    },
+    "merge-test": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5137",
+      "claimedAt": "2026-11-11T19:02:27.036Z"
     }
   }
 }
