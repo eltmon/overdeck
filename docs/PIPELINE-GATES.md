@@ -1635,7 +1635,9 @@ App pool's usage, which has no separate GraphQL source wired up.
 which installation covers the repository (`GET /repos/{owner}/{repo}/installation`
 with the App JWT) and caches the answer for 6 hours: a positive answer in
 memory, a 404 in `repo-notes.json`. The lookup is not recorded in the quota
-ledger. `pan doctor` forgets the cached answers and asks again.
+ledger. `pan doctor` forgets the cached answers and asks again. Every
+process re-reads `repo-notes.json` when the file changes, so a running
+dashboard sees a note that `pan doctor` cleared on its next lookup.
 
 **The ledger.** Every metered call and every `/rate_limit` sample appends one
 JSON line to `~/.overdeck/github-quota/ledger-<YYYYMMDDHH>.jsonl` (UTC hour):

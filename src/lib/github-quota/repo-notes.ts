@@ -9,7 +9,7 @@
  * per TTL logs one warning; `pan doctor github-quota` lists the repo.
  */
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, statSync } from 'node:fs';
 import { mkdir, rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { getGitHubQuotaDir } from './ledger.js';
@@ -32,17 +32,35 @@ interface RepoNote {
 
 let notes: Map<string, RepoNote> | null = null;
 let notesDir: string | null = null;
+/** mtime and size of the file the in-memory notes were read from ('missing' when absent). */
+let notesStamp: string | null = null;
 
 function repoNotesFile(): string {
   return join(getGitHubQuotaDir(), 'repo-notes.json');
 }
 
-/** The in-memory notes, loaded once from disk (per quota directory). */
+function fileStamp(file: string): string {
+  try {
+    const stat = statSync(file);
+    return `${stat.mtimeMs}:${stat.size}`;
+  } catch {
+    return 'missing';
+  }
+}
+
+/**
+ * The in-memory notes, read from disk again whenever the file changes
+ * (PAN-5153): `pan doctor` clears a note in its own process, and the
+ * dashboard must pick that up instead of waiting out the 6-hour TTL. The
+ * check is one stat call.
+ */
 function loadNotes(): Map<string, RepoNote> {
   const dir = getGitHubQuotaDir();
-  if (notes && notesDir === dir) return notes;
+  const stamp = fileStamp(repoNotesFile());
+  if (notes && notesDir === dir && notesStamp === stamp) return notes;
   notes = new Map();
   notesDir = dir;
+  notesStamp = stamp;
   try {
     const parsed = JSON.parse(readFileSync(repoNotesFile(), 'utf8')) as { repos?: Record<string, RepoNote> };
     for (const [repo, note] of Object.entries(parsed.repos ?? {})) {
@@ -127,4 +145,5 @@ export function readAppMissingRepos(nowMs: number = Date.now()): AppMissingRepo[
 export function resetRepoNotesForTests(): void {
   notes = null;
   notesDir = null;
+  notesStamp = null;
 }
