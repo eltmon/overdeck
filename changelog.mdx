@@ -17,6 +17,7 @@ This page starts at v0.60.0, the release that removed Overdeck's state layer. Ol
 
   #### New
 
+  - **Jira as an issue tracker:** projects with `tracker: jira` show Jira issues on the board and move them through the Jira workflow from start to close-out. See [Issue trackers](/configuration/issue-trackers).
   - **Resume conversations after a terminal-backend restart:** when the terminal backend restarts (a crash, an out-of-memory stop, a service restart), Needs you shows one row, `<N> conversations stopped when the terminal backend restarted`, with a **Resume all** button. Overdeck never resumes them by itself. Resume all starts them one at a time, waits while memory or CPU pressure is high, and skips conversations that are paused, held, or stopped on purpose. See [Conversations](/features/conversations#after-a-terminal-backend-restart). ([#5134](https://github.com/eltmon/overdeck/pull/5134))
   - **Resume a conversation from a shell or an agent:** `pan conversations resume <name>` and the `resume_conversation` MCP tool resume a stopped conversation, as the dashboard's Resume button does. ([#5134](https://github.com/eltmon/overdeck/pull/5134))
 

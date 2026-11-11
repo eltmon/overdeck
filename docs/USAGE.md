@@ -128,6 +128,7 @@ Create `~/.overdeck.env`:
 LINEAR_API_KEY=lin_api_xxxxx
 GITHUB_TOKEN=ghp_xxxxx  # Optional: for GitHub-tracked projects
 RALLY_API_KEY=_xxxxx    # Optional: for Rally as secondary tracker
+JIRA_API_TOKEN=xxxxx    # Optional: for tracker: jira projects (plus JIRA_EMAIL on Cloud and JIRA_BASE_URL)
 ```
 
 ### Issue Trackers
@@ -140,6 +141,7 @@ Overdeck supports multiple issue trackers:
 | **GitHub Issues** | Secondary tracker | `GITHUB_TOKEN` or `gh auth login` |
 | **GitLab Issues** | Secondary tracker | `glab auth login` |
 | **Rally** | Secondary tracker | `RALLY_API_KEY` in `.overdeck.env` |
+| **Jira** | Per-project tracker (`tracker: jira`) | `JIRA_API_TOKEN`, `JIRA_EMAIL`, `JIRA_BASE_URL` in `.overdeck.env`, or Settings → Tracker Keys |
 
 Secondary trackers sync issues to the dashboard alongside Linear issues, allowing unified project management.
 
