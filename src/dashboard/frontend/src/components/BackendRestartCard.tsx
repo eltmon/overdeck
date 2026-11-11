@@ -3,8 +3,9 @@
  * stopped, in Needs you (PAN-5091). Non-blocking and in the "System" group:
  * Overdeck never resumes them by itself, because relaunching many harnesses
  * into a host that just ran out of memory can cause the same OOM again.
- * Resume all resumes them one at a time and waits while memory pressure is
- * high; the server skips any conversation paused, held, or stopped on purpose.
+ * Resume all resumes them one at a time and waits while memory or CPU pressure
+ * is high; the server skips any conversation paused, held, or stopped on
+ * purpose. Dismiss drops the row and stops a running Resume all.
  */
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -13,12 +14,9 @@ import type { Decision } from '../lib/useDecisions';
 import { BACKEND_RESTART_RECOVERY_QUERY_KEY, postBackendRestartRecovery } from '../lib/backendRestartRecovery';
 import styles from './styles/decisions.module.css';
 
-/** The card lists this many conversations by name, then a count of the rest. */
-const LISTED_CONVERSATIONS = 8;
-
 function runLine(run: NonNullable<NonNullable<Decision['backendRestart']>['run']>): string {
   if (run.state === 'running') {
-    if (run.waitingForMemory) return 'Waiting for memory pressure to fall before the next resume.';
+    if (run.waitingForPressure) return 'Waiting for memory and CPU pressure to fall before the next resume.';
     return run.current ? `Resuming ${run.current} (${run.results.length + 1} so far).` : 'Resuming…';
   }
   const count = (outcome: string) => run.results.filter((result) => result.outcome === outcome).length;
@@ -37,8 +35,6 @@ export function BackendRestartCard({ decision }: { decision: Decision }) {
   if (!snapshot) return null;
   const running = snapshot.run?.state === 'running';
   const failures = snapshot.run?.results.filter((result) => result.outcome === 'failed') ?? [];
-  const listed = snapshot.conversations.slice(0, LISTED_CONVERSATIONS);
-  const unlisted = snapshot.conversations.length - listed.length;
 
   async function act(action: 'resume-all' | 'dismiss') {
     setSending(true);
@@ -53,10 +49,9 @@ export function BackendRestartCard({ decision }: { decision: Decision }) {
         <div className={styles.rowTop}>
           <span className={styles.badge}>{decision.label}</span>
         </div>
-        {listed.length > 0 && (
-          <p className={styles.prompt}>
-            {listed.map((conv) => conv.title || conv.name).join(', ')}
-            {unlisted > 0 ? `, and ${unlisted} more` : ''}
+        {snapshot.conversations.length > 0 && (
+          <p className={styles.prompt} data-testid="backend-restart-list">
+            {snapshot.conversations.map((conv) => conv.title || conv.name).join(', ')}
           </p>
         )}
         {snapshot.run && <p className={styles.meta} data-testid="backend-restart-run">{runLine(snapshot.run)}</p>}
@@ -67,7 +62,8 @@ export function BackendRestartCard({ decision }: { decision: Decision }) {
         ))}
         <p className={styles.meta}>
           Overdeck does not resume these by itself. Resume all starts them one at a time and waits while memory
-          pressure is high. It skips conversations that are paused, held, or stopped on purpose.
+          or CPU pressure is high. It skips conversations that are paused, held, or stopped on purpose. Dismiss
+          drops this row; during Resume all it stops before the next conversation.
         </p>
         <div className={styles.secretForm}>
           <button
@@ -78,7 +74,7 @@ export function BackendRestartCard({ decision }: { decision: Decision }) {
           >
             Resume all
           </button>
-          <button type="button" className={styles.answer} disabled={sending || running} onClick={() => void act('dismiss')}>
+          <button type="button" className={styles.answer} disabled={sending} onClick={() => void act('dismiss')}>
             Dismiss
           </button>
         </div>

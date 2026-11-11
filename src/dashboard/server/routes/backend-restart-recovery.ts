@@ -7,8 +7,8 @@
  * - `POST /api/backend-restart-recovery/resume-all` (`operate`): resume them
  *   one at a time in the background; 202, or 409 while a run is in progress or
  *   when there is nothing to resume.
- * - `POST /api/backend-restart-recovery/dismiss` (`operate`): drop the offer;
- *   409 while Resume all runs.
+ * - `POST /api/backend-restart-recovery/dismiss` (`operate`): drop the offer.
+ *   A running Resume all stops before its next resume.
  *
  * Kept off `/api/conversations/:name` so no path segment reads as a name.
  */
@@ -53,8 +53,8 @@ const dismissRoute = HttpRouter.add(
     const request = yield* HttpServerRequest.HttpServerRequest;
     const originCheck = validateOrigin(request);
     if (!originCheck.ok) return jsonResponse({ error: originCheck.error }, { status: 403 });
-    if (dismissBackendRestartRecovery()) return jsonResponse({ dismissed: true });
-    return jsonResponse({ error: 'Resume all is running; dismiss it when it finishes', code: 'running' }, { status: 409 });
+    dismissBackendRestartRecovery();
+    return jsonResponse({ dismissed: true });
   })),
 );
 

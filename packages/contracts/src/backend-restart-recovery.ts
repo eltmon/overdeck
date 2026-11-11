@@ -25,8 +25,8 @@ export interface BackendRestartResumeRun {
   readonly finishedAt: string | null // ISO
   // The conversation being resumed now; null between conversations or when done.
   readonly current: string | null
-  // True while the run waits for memory pressure to fall before the next resume.
-  readonly waitingForMemory: boolean
+  // True while the run waits for the resource governor (memory, PSI, CPU) to admit the next resume.
+  readonly waitingForPressure: boolean
   readonly results: readonly BackendRestartResumeResult[]
 }
 

@@ -464,7 +464,7 @@ describe('backendRestartDecisions (PAN-5091)', () => {
   });
 
   it('stays while Resume all runs, even after the last conversation left the offer', () => {
-    const run = { state: 'running' as const, startedAt: '2026-11-06T09:20:00.000Z', finishedAt: null, current: 'b', waitingForMemory: false, results: [] };
+    const run = { state: 'running' as const, startedAt: '2026-11-06T09:20:00.000Z', finishedAt: null, current: 'b', waitingForPressure: false, results: [] };
     const [decision] = backendRestartDecisions(offer({ lostAt: null, conversations: [], run }));
     expect(decision).toMatchObject({ label: 'Resuming conversations after a terminal-backend restart', since: run.startedAt });
   });

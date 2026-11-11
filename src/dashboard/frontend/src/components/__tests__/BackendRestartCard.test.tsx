@@ -45,7 +45,7 @@ describe('BackendRestartCard', () => {
     renderCard(OFFER);
 
     expect(screen.getByText('2 conversations stopped when the terminal backend restarted')).toBeTruthy();
-    expect(screen.getByText('Fernkite deploy, b')).toBeTruthy();
+    expect(screen.getByTestId('backend-restart-list').textContent).toBe('Fernkite deploy, b');
     fireEvent.click(screen.getByRole('button', { name: 'Resume all' }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/backend-restart-recovery/resume-all', { method: 'POST' }));
   });
@@ -53,18 +53,18 @@ describe('BackendRestartCard', () => {
   it('shows a refusal from the route', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ error: 'Resume all is already running' }), { status: 409 }));
     renderCard(OFFER);
-    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Resume all' }));
     expect(await screen.findByRole('alert')).toHaveProperty('textContent', 'Resume all is already running');
   });
 
-  it('disables both buttons and says it is waiting while memory pressure is high', () => {
+  it('disables Resume all but keeps Dismiss while a run waits on pressure', () => {
     renderCard({
       ...OFFER,
-      run: { state: 'running', startedAt: '2026-11-06T09:20:00.000Z', finishedAt: null, current: null, waitingForMemory: true, results: [] },
+      run: { state: 'running', startedAt: '2026-11-06T09:20:00.000Z', finishedAt: null, current: null, waitingForPressure: true, results: [] },
     });
-    expect(screen.getByTestId('backend-restart-run').textContent).toBe('Waiting for memory pressure to fall before the next resume.');
+    expect(screen.getByTestId('backend-restart-run').textContent).toBe('Waiting for memory and CPU pressure to fall before the next resume.');
     expect((screen.getByRole('button', { name: 'Resume all' }) as HTMLButtonElement).disabled).toBe(true);
-    expect((screen.getByRole('button', { name: 'Dismiss' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: 'Dismiss' }) as HTMLButtonElement).disabled).toBe(false);
   });
 
   it('summarizes a finished run and lists each failure with its reason', () => {
@@ -76,7 +76,7 @@ describe('BackendRestartCard', () => {
         startedAt: '2026-11-06T09:20:00.000Z',
         finishedAt: '2026-11-06T09:21:00.000Z',
         current: null,
-        waitingForMemory: false,
+        waitingForPressure: false,
         results: [
           { name: 'a', outcome: 'failed', reason: 'Invalid cwd' },
           { name: 'b', outcome: 'resumed' },
