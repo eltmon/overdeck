@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5124",
   "created": "2026-11-11T07:40:41.890Z",
-  "updated": "2026-11-11T08:32:56.830Z",
+  "updated": "2026-11-11T08:32:58.336Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -232,6 +232,11 @@
     "haiku-settings-fallbacks.ac3": {
       "status": "completed",
       "doneAt": "2026-11-11T08:32:56.830Z"
+    },
+    "docs-config-routing": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-5124",
+      "claimedAt": "2026-11-11T08:32:58.336Z"
     }
   }
 }
