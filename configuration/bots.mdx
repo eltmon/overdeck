@@ -13,14 +13,48 @@ you can scope and revoke.
 There are two ways in, and both keep the traffic encrypted until it reaches
 hardware you control:
 
-- **A self-hosted bot** runs the Overdeck connector next to it. The connector
-  pairs with one machine and reaches it over an end-to-end encrypted channel,
-  directly or through the relay. You can use Tailscale instead.
-- **A hosted bot** (Grok Bot, the xAI API) cannot run a process near you, so it
-  signs in with OAuth through [Public MCP](/configuration/mcp#public-mcp-for-hosted-bots),
-  which Tailscale Funnel publishes from this machine.
+- **A bot with a shell** — Hermes, OpenClaw, Grok Build, Grok Bot — runs the
+  Overdeck connector next to it. The connector pairs with one machine and
+  reaches it over an end-to-end encrypted channel, directly or through the
+  relay. You can use Tailscale instead.
+- **The xAI API** cannot run a process near you, so it signs in with OAuth
+  through [Public MCP](/configuration/mcp#public-mcp-for-hosted-bots), which
+  Tailscale Funnel publishes from this machine. Grok Bot can use Public MCP
+  too, as an alternative to the connector.
 
 Nothing on overdeck.ai ever sees a tool call in plain text.
+
+## Connect in one paste
+
+Pick the bot in **Connect a bot**, pick its access (default Read + Tell), and
+click **Copy for &lt;bot&gt;**. Paste the copied message into the bot's chat.
+The bot runs the command inside it, shows you one link, and you click it and
+**Authorize**; the bot runs the command again and reports it is ready.
+
+The pairing code in the message works once and expires within 30 minutes. If
+it is refused or expires before the bot finishes, click **Copy again** (or
+**Copy new** once it has expired) under **Settings → Anywhere → Bots** →
+"Waiting to connect" and paste the new message.
+
+The copied message runs [`pan mcp connector connect`](/cli/mcp#connect), the
+one-command path a bot can run again after any result.
+
+### Waiting requests
+
+Every copied request appears under **Settings → Anywhere → Bots** → "Waiting
+to connect" until the bot pairs, with its expiry: **Copy again** while the
+code is still live; **Copy new** once it has expired or the code was used
+(burns the old code, issues a new one, and copies its message); **Cancel**
+burns the code and removes the request. A dashboard restart drops every
+waiting request and its code; "Connect a bot" issues a fresh one.
+
+### After the bot connects
+
+A paired bot shows a non-blocking Needs-you notice: "&lt;name&gt; connected
+with &lt;access&gt;" (for example "Read + Tell"), with **Revoke** (removes
+the connector at once) and **Dismiss** (clears the notice; the connector
+stays paired). The notice disappears on its own 24 hours after the bot
+connects, when dismissed, or when the connector is removed.
 
 ## The Connect a bot dialog
 
@@ -34,7 +68,8 @@ The dialog picks a reach by platform:
 | --- | --- |
 | Hermes, OpenClaw | Overdeck connector (default), Tailscale |
 | Grok Build | This computer (default), Overdeck connector, Tailscale |
-| Grok Bot, xAI API | Public MCP |
+| Grok Bot | Overdeck connector (default), Public MCP |
+| xAI API | Public MCP |
 
 Access defaults to `read:state`, `read:conversations` and `tell`; `read:state`
 is always on. `operate` and `approve` are off by default. A bot never gets
@@ -43,10 +78,11 @@ ticked.
 
 Each reach produces a different setup:
 
-- **Overdeck connector** — a pairing string that works once, within 10
-  minutes, plus the commands that pair and run the connector:
-  `npx -y @overdeck/core@<version> mcp connector login`, `... pair <string>`
-  and `... serve`.
+- **Overdeck connector** — a message to paste into the bot, built around a
+  pairing code that works once, within 30 minutes. It runs
+  `pan mcp connector connect` for you; the manual pairing string and commands
+  (`login`, `pair`, `serve`) live under "Set up by hand instead" in the
+  dialog's output.
 - **Tailscale, This computer** — an access token, shown once. The config
   snippet never carries it: it goes only into the one-time "Token setup"
   field, kept out of the config through `OVERDECK_MCP_TOKEN` or
@@ -125,13 +161,17 @@ plugin's own `overdeck` server also loads into those sessions.
 
 ### Grok Bot
 
-The Grok Bot plugin lives in
-[`integrations/grok-bot/`](https://github.com/eltmon/overdeck/tree/main/integrations/grok-bot).
-Turn on [Public MCP](/configuration/mcp#public-mcp-for-hosted-bots) first,
-then install the plugin with your public URL
-(`https://<machine>.<tailnet>.ts.net:8443/mcp`) in its `mcp.json`. On first use
-Grok Bot opens an Overdeck sign-in page that shows an approval code. Approve it
-in your dashboard's Needs-you card, or run
+Pick **Grok Bot** in Connect a bot and click **Copy for Grok Bot** — see
+[Connect in one paste](#connect-in-one-paste). Paste the message into Grok
+Bot's chat; it runs `pan mcp connector connect` itself, shows you a link to
+click and **Authorize**, then reports it is ready.
+
+Grok Bot can use [Public MCP](/configuration/mcp#public-mcp-for-hosted-bots)
+instead: pick the Public MCP reach, then install the
+[Grok Bot plugin](https://github.com/eltmon/overdeck/tree/main/integrations/grok-bot)
+with your public URL (`https://<machine>.<tailnet>.ts.net:8443/mcp`) in its
+`mcp.json`. On first use Grok Bot opens an Overdeck sign-in page that shows an
+approval code. Approve it in your dashboard's Needs-you card, or run
 `pan mcp oauth approve <code> --level read`, and choose the access level there
 (see [Sign in with OAuth](/configuration/mcp#sign-in-with-oauth)).
 

@@ -4,7 +4,11 @@ import {
   BOT_DEFAULT_SCOPES,
   BotsForbiddenError,
   botScopes,
+  cancelConnectorRequest,
+  connectorAccessLabel,
   createConnectorPairing,
+  dismissConnectorNotice,
+  fetchConnectorNotices,
   loadConnectors,
   removeConnector,
 } from '../botsApi';
@@ -48,22 +52,40 @@ describe('loadConnectors', () => {
     await expect(loadConnectors()).rejects.toBeInstanceOf(BotsForbiddenError);
   });
 
-  it('resolves the connector rows on success', async () => {
+  it('resolves the connector rows and requests on success', async () => {
+    const connectors = [{ id: 'c1', name: 'Hermes bot', scopes: ['read:state'], createdAt: '2026-11-03T00:00:00Z', lastUsedAt: null }];
+    const requests = [{ id: 'r1', name: 'bot', platform: 'hermes', scopes: ['read:state'], createdAt: '2026-11-03T00:00:00Z', expiresAt: '2026-11-03T00:30:00Z', state: 'live' }];
+    fetchMock.mockResolvedValue(jsonResponse({ connectors, requests }));
+    await expect(loadConnectors()).resolves.toEqual({ connectors, requests });
+  });
+
+  it('resolves requests as [] when an older server sends none', async () => {
     const connectors = [{ id: 'c1', name: 'Hermes bot', scopes: ['read:state'], createdAt: '2026-11-03T00:00:00Z', lastUsedAt: null }];
     fetchMock.mockResolvedValue(jsonResponse({ connectors }));
-    await expect(loadConnectors()).resolves.toEqual(connectors);
+    await expect(loadConnectors()).resolves.toEqual({ connectors, requests: [] });
   });
 });
 
 describe('createConnectorPairing', () => {
-  it('sends a POST with the name and scopes', async () => {
-    fetchMock.mockResolvedValue(jsonResponse({ pairingString: 'overdeck-connector:/pair#v=1', expiresAt: '2026-11-03T00:10:00Z' }));
+  it('sends a POST with the name and scopes, and no platform key when not given', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ requestId: 'req-1', pairingString: 'overdeck-connector:/pair#v=1', expiresAt: '2026-11-03T00:10:00Z' }));
 
     await createConnectorPairing('Hermes bot', ['read:state', 'tell']);
 
     expect(fetchMock).toHaveBeenCalledWith('/api/connectors/pairing', expect.objectContaining({
       method: 'POST',
       body: JSON.stringify({ name: 'Hermes bot', scopes: ['read:state', 'tell'] }),
+    }));
+  });
+
+  it('sends platform when given', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ requestId: 'req-1', pairingString: 'overdeck-connector:/pair#v=1', expiresAt: '2026-11-03T00:10:00Z' }));
+
+    await createConnectorPairing('Grok Bot', ['read:state'], 'grok-bot');
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/connectors/pairing', expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({ name: 'Grok Bot', scopes: ['read:state'], platform: 'grok-bot' }),
     }));
   });
 });
@@ -75,5 +97,57 @@ describe('removeConnector', () => {
     await removeConnector('conn/1');
 
     expect(fetchMock).toHaveBeenCalledWith('/api/connectors/conn%2F1', expect.objectContaining({ method: 'DELETE' }));
+  });
+});
+
+describe('cancelConnectorRequest', () => {
+  it('sends a DELETE to the encoded request id', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ ok: true }));
+
+    await cancelConnectorRequest('req/1');
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/connectors/requests/req%2F1', expect.objectContaining({ method: 'DELETE' }));
+  });
+});
+
+describe('dismissConnectorNotice', () => {
+  it('sends a POST to the dismiss route for the encoded notice id', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ ok: true }));
+
+    await dismissConnectorNotice('notice/1');
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/connectors/requests/notice%2F1/dismiss', expect.objectContaining({ method: 'POST' }));
+  });
+});
+
+describe('fetchConnectorNotices', () => {
+  it('returns [] on a 403', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ error: 'root only' }, 403));
+    await expect(fetchConnectorNotices()).resolves.toEqual([]);
+  });
+
+  it('returns [] on a body without a notices array (older server)', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({}));
+    await expect(fetchConnectorNotices()).resolves.toEqual([]);
+  });
+
+  it('resolves the notices array on success', async () => {
+    const notices = [{ id: 'n1', connectorId: 'c1', name: 'Grok Bot', scopes: ['read:state'], pairedAt: '2026-11-03T00:00:00Z' }];
+    fetchMock.mockResolvedValue(jsonResponse({ notices }));
+    await expect(fetchConnectorNotices()).resolves.toEqual(notices);
+  });
+});
+
+describe('connectorAccessLabel', () => {
+  it('is Read + Tell for read:state, read:conversations and tell', () => {
+    expect(connectorAccessLabel(['read:state', 'read:conversations', 'tell'])).toBe('Read + Tell');
+  });
+
+  it('is Read for read:state alone', () => {
+    expect(connectorAccessLabel(['read:state'])).toBe('Read');
+  });
+
+  it('is Read + Tell + Operate + Approve for all five scopes', () => {
+    expect(connectorAccessLabel(['read:state', 'read:conversations', 'tell', 'operate', 'approve'])).toBe('Read + Tell + Operate + Approve');
   });
 });

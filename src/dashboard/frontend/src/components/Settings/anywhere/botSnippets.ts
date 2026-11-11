@@ -18,7 +18,7 @@ export const BOT_PLATFORMS: ReadonlyArray<{ id: BotPlatform; label: string; reac
   { id: 'hermes', label: 'Hermes', reaches: ['connector', 'tailscale'] },
   { id: 'openclaw', label: 'OpenClaw', reaches: ['connector', 'tailscale'] },
   { id: 'grok-build', label: 'Grok Build', reaches: ['this-computer', 'connector', 'tailscale'] },
-  { id: 'grok-bot', label: 'Grok Bot', reaches: ['public'] },
+  { id: 'grok-bot', label: 'Grok Bot', reaches: ['connector', 'public'] },
   { id: 'xai-api', label: 'xAI API', reaches: ['public'] },
 ];
 

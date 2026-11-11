@@ -41,6 +41,7 @@ function renderWithRows<T>(hook: () => T, rows: ConversationPendingInputRow[]) {
   queryClient.setQueryData(['agent-requests'], []); // PAN-4941
   queryClient.setQueryData(['anywhere-status'], { viewer: { kind: 'root-session' } }); // PAN-4946
   queryClient.setQueryData(['mcp-oauth-approvals'], []); // PAN-4946
+  queryClient.setQueryData(['anywhere-connector-notices'], []); // PAN-5070
   queryClient.setQueryData(DISK_ALERT_QUERY_KEY, null); // PAN-5093
   queryClient.setQueryData(HARNESS_AUTO_UPDATE_QUERY_KEY, null); // PAN-5108
   return renderHook(hook, {

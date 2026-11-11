@@ -26,23 +26,34 @@ import { handlePhonesExchange } from '../routes/phones.js';
 
 import {
   _resetConnectorPairingForTests,
+  cancelConnectorRequest,
+  dismissConnectorNotice,
   hasConnectorIntent,
   isConnectorCode,
   issueConnectorPairing,
+  listConnectorNotices,
+  listConnectorRequests,
+  markConnectorRequestPaired,
   takeConnectorIntent,
 } from '../connector-pairing.js';
-import { _resetPairingCredentialsForTests, issuePairingCredential } from '../pairing-credentials.js';
+import {
+  _resetPairingCredentialsForTests,
+  issuePairingCredential,
+  pairingCredentialState,
+  revokePairingById,
+  takePairingById,
+} from '../pairing-credentials.js';
 import { buildEnvironmentDescriptor } from '../routes/environment.js';
 
 const MINUTE_MS = 60_000;
 const originalHome = process.env.OVERDECK_HOME;
 let home: string;
 
-/** Issue a connector pairing and return its raw code and pairingId. */
-async function issue(name = 'bot:desk'): Promise<{ code: string; pairingId: string }> {
-  const { pairingString } = await issueConnectorPairing({ name, scopes: ['read:state', 'tell'] });
+/** Issue a connector pairing and return its raw code, pairingId and requestId. */
+async function issue(name = 'bot:desk'): Promise<{ code: string; pairingId: string; requestId: string }> {
+  const { pairingString, requestId } = await issueConnectorPairing({ name, scopes: ['read:state', 'tell'] });
   const code = parseConnectorPairLink(pairingString)!.code;
-  return { code, pairingId: pairingSecrets(nodeCrypto, code).pairingId };
+  return { code, pairingId: pairingSecrets(nodeCrypto, code).pairingId, requestId };
 }
 
 beforeEach(async () => {
@@ -85,30 +96,104 @@ describe('connector pairing intents (PAN-4949 D-6, D-7)', () => {
     expect(isConnectorCode(issuePairingCredential().credential)).toBe(false);
   });
 
-  it('hands out an intent once and then forgets it', async () => {
-    const { pairingId } = await issue('bot:once');
-    expect(takeConnectorIntent(pairingId)).toMatchObject({ name: 'bot:once', scopes: ['read:state', 'tell'] });
+  it('hands out an intent once and keeps the request', async () => {
+    const { pairingId, requestId } = await issue('bot:once');
+    expect(takeConnectorIntent(pairingId)).toEqual({ requestId, name: 'bot:once', scopes: ['read:state', 'tell'] });
     expect(takeConnectorIntent(pairingId)).toBeNull();
-    expect(hasConnectorIntent(pairingId)).toBe(false);
+    expect(hasConnectorIntent(pairingId)).toBe(true);
   });
 
-  it('refuses an expired intent but keeps marking its code until a later issue prunes it', async () => {
+  it('lists an untaken request as live, then expired 30 min + 1 ms later, then drops it at retention', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
-    vi.setSystemTime(new Date('2026-11-04T00:00:00.000Z'));
+    const issuedAt = Date.parse('2026-11-04T00:00:00.000Z');
+    vi.setSystemTime(new Date(issuedAt));
     const lapsed = await issue();
-    const taken = await issue();
+    expect(listConnectorRequests()).toMatchObject([{ id: lapsed.requestId, state: 'live' }]);
 
-    vi.setSystemTime(new Date(Date.now() + 10 * MINUTE_MS + 1));
-    expect(takeConnectorIntent(taken.pairingId)).toBeNull();
+    vi.setSystemTime(new Date(issuedAt + 30 * MINUTE_MS + 1));
+    expect(listConnectorRequests()).toMatchObject([{ id: lapsed.requestId, state: 'expired' }]);
     expect(hasConnectorIntent(lapsed.pairingId)).toBe(true);
 
-    vi.setSystemTime(new Date(Date.parse('2026-11-04T00:00:00.000Z') + 20 * MINUTE_MS));
-    await issue();
-    expect(hasConnectorIntent(lapsed.pairingId)).toBe(true);
-
-    vi.setSystemTime(new Date(Date.now() + 1));
-    await issue();
+    vi.setSystemTime(new Date(issuedAt + 30 * MINUTE_MS + 24 * 60 * MINUTE_MS + 1));
+    expect(listConnectorRequests()).toEqual([]);
     expect(hasConnectorIntent(lapsed.pairingId)).toBe(false);
+  });
+
+  it('lists a taken-but-unpaired request, and one whose code was consumed, as used with no pairing string', async () => {
+    const taken = await issue('bot:taken');
+    takeConnectorIntent(taken.pairingId);
+    const takenView = listConnectorRequests().find((view) => view.id === taken.requestId);
+    expect(takenView).toMatchObject({ state: 'used' });
+    expect(takenView?.pairingString).toBeUndefined();
+
+    const consumed = await issue('bot:consumed');
+    takePairingById(consumed.pairingId);
+    const consumedView = listConnectorRequests().find((view) => view.id === consumed.requestId);
+    expect(consumedView).toMatchObject({ state: 'used' });
+    expect(consumedView?.pairingString).toBeUndefined();
+  });
+
+  it('cancelConnectorRequest burns the code and removes the row; a second cancel returns null', async () => {
+    const { pairingId, requestId } = await issue('bot:cancel');
+    expect(cancelConnectorRequest(requestId)).toEqual({ name: 'bot:cancel' });
+    expect(takePairingById(pairingId)).toBe('unknown');
+    expect(listConnectorRequests()).toEqual([]);
+    expect(cancelConnectorRequest(requestId)).toBeNull();
+  });
+
+  it('moves a paired request from requests to notices, dismisses it, and drops it 24 h after pairing', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const pairedAt = Date.parse('2026-11-04T00:00:00.000Z');
+    vi.setSystemTime(new Date(pairedAt));
+    const { pairingId, requestId } = await issue('bot:paired');
+    takeConnectorIntent(pairingId);
+    markConnectorRequestPaired(requestId, 'connector-1');
+
+    expect(listConnectorRequests()).toEqual([]);
+    expect(listConnectorNotices()).toMatchObject([{ id: requestId, connectorId: 'connector-1', name: 'bot:paired' }]);
+
+    expect(dismissConnectorNotice(requestId)).toBe(true);
+    expect(listConnectorNotices()).toEqual([]);
+
+    const other = await issue('bot:paired-2');
+    takeConnectorIntent(other.pairingId);
+    markConnectorRequestPaired(other.requestId, 'connector-2');
+    vi.setSystemTime(new Date(pairedAt + 24 * 60 * MINUTE_MS + 1));
+    expect(listConnectorNotices()).toEqual([]);
+  });
+
+  it('issues a connector pairing whose expiresAt is exactly 30 minutes after issue (PAN-5070 FR-13)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-11T00:00:00.000Z'));
+    const { expiresAt } = await issueConnectorPairing({ name: 'bot:desk', scopes: ['read:state'] });
+    expect(Date.parse(expiresAt)).toBe(Date.parse('2026-11-11T00:00:00.000Z') + 30 * MINUTE_MS);
+  });
+
+  it('leaves the plain pairing credential at a 10-minute expiry (PAN-5070 FR-25)', () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-11T00:00:00.000Z'));
+    const { expiresAt } = issuePairingCredential();
+    expect(Date.parse(expiresAt)).toBe(Date.parse('2026-11-11T00:00:00.000Z') + 10 * MINUTE_MS);
+  });
+
+  it('pairingCredentialState tracks live, expired, then gone without consuming (PAN-5070 FR-25)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-11T00:00:00.000Z'));
+    const { pairingId } = await issue();
+    expect(pairingCredentialState(pairingId)).toBe('live');
+
+    vi.setSystemTime(new Date(Date.now() + 30 * MINUTE_MS + 1));
+    expect(pairingCredentialState(pairingId)).toBe('expired');
+
+    expect(takePairingById(pairingId)).not.toBe('unknown');
+    expect(pairingCredentialState(pairingId)).toBe('gone');
+  });
+
+  it('revokePairingById burns a credential once and leaves a second call a no-op (PAN-5070 FR-25)', async () => {
+    const { pairingId } = await issue();
+    expect(revokePairingById(pairingId)).toBe(true);
+    expect(revokePairingById(pairingId)).toBe(false);
+    expect(takePairingById(pairingId)).toBe('unknown');
   });
 });
 

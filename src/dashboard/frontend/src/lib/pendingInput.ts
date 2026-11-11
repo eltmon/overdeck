@@ -34,7 +34,9 @@ export type PendingInputKind =
   /** PAN-5111 — this machine could not fetch a linked machine's Needs-You. */
   | 'machineUnreachable'
   /** PAN-5108 — the daily background update of a coding-agent CLI failed. */
-  | 'harnessUpdateFailed';
+  | 'harnessUpdateFailed'
+  /** PAN-5070 — a bot connector just paired with this machine. */
+  | 'connectorConnected';
 
 /** Short label for a single kind (used in tooltips, joined by comma). */
 export const PENDING_INPUT_KIND_LABEL: Record<string, string> = {
@@ -55,6 +57,7 @@ export const PENDING_INPUT_KIND_LABEL: Record<string, string> = {
   diskCritical: 'Disk space critical',
   machineUnreachable: "Can't reach machine",
   harnessUpdateFailed: 'Coding agent update failed',
+  connectorConnected: 'Bot connected',
 };
 
 /** PAN-4371 — replaces "Answer the agent" when Jev read the turn end with confidence. */
