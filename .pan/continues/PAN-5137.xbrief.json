@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-5137",
   "created": "2026-11-11T18:41:59.017Z",
-  "updated": "2026-11-11T18:54:09.241Z",
+  "updated": "2026-11-11T18:57:33.703Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -36,9 +36,30 @@
       "doneAt": "2026-11-11T18:53:55.952Z"
     },
     "release-wiring": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-5137",
-      "claimedAt": "2026-11-11T18:54:09.241Z"
+      "claimedAt": "2026-11-11T18:54:09.241Z",
+      "doneAt": "2026-11-11T18:57:33.703Z"
+    },
+    "release-wiring.ac1": {
+      "status": "completed",
+      "doneAt": "2026-11-11T18:57:33.703Z"
+    },
+    "release-wiring.ac2": {
+      "status": "completed",
+      "doneAt": "2026-11-11T18:57:33.703Z"
+    },
+    "release-wiring.ac3": {
+      "status": "completed",
+      "doneAt": "2026-11-11T18:57:33.703Z"
+    },
+    "release-wiring.ac4": {
+      "status": "completed",
+      "doneAt": "2026-11-11T18:57:33.703Z"
+    },
+    "release-wiring.ac5": {
+      "status": "completed",
+      "doneAt": "2026-11-11T18:57:33.703Z"
     }
   }
 }
