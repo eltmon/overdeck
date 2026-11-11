@@ -523,7 +523,7 @@ With CI passed or unknown, every gate runs as before.
 
 The worker outlives a dashboard restart, but the request-review continuation
 that waits for its result (push the verified branch, dispatch review) lived in
-the old process. Two mechanisms carry it over, and neither re-runs a gate the
+the old process. These mechanisms carry it over, and none re-runs a gate the
 worker already ran:
 
 - **Results are adopted, not re-run.** The worker state
@@ -533,8 +533,9 @@ worker already ran:
   finished with a result nobody consumed, the supervisor returns that result
   instead of starting a fresh worker, provided the head is the same or synced
   head (above), the options match, and the outcome is not `error`. A result is
-  consumed at most once, so a second request on the same head is a real
-  re-run and still counts against the attempt budget. A live worker is joined
+  consumed at most once, so once its review is dispatched (below), a second
+  request on the same head is a real re-run and still counts against the
+  attempt budget. A live worker is joined
   under the same rule: same head and same options. A live worker running with
   other options (for example `skipPlanChecklist`, PAN-4786) is stopped and a
   fresh worker starts.
@@ -545,22 +546,48 @@ worker already ran:
   the live worker or adopts its result, then pushes and dispatches review as
   the original request would have. A `review` (`/trigger`) or `merge-verify`
   worker is not re-attached; its door owns the retry.
+- **An owed dispatch is kept until review spawns (PAN-4622).** When a
+  `request-review` waiter takes a `passed` result, the same atomic write that
+  records `resultConsumedAt` records `dispatchOwed: { head, takenAt }`. `head`
+  is the workspace head when the pass is taken, after the worker's own sync
+  merge, so it is the head the door pushes. The marker is written only when
+  that head is the one the worker journalled in its `verification.passed`
+  (primary head8); an agent commit that landed between the pass and the take
+  gets no marker, because nothing verified it. The door clears the marker first
+  thing after the review role spawns; a gated or failed spawn keeps it. While
+  the marker is set, a `request-review` request on that exact head with the
+  same options gets the pass back with no new worker, whoever sends it (boot
+  adoption, deacon-lite, the agent). A head that moved is a new request: the
+  marker is cleared and the gates run. So "consumed at most once" means a
+  second request on the same head re-runs the gates only after review was
+  dispatched for the first. The marker is cache state about one run, not
+  pipeline status; the pipeline journal stays the record.
+- **A resumed request skips the dirty-tree refusal.** Boot adoption also
+  re-enters the door for a consumed pass whose dispatch is still owed, and it
+  passes `resume`, so the door does not refuse a dirty tree at the start. A
+  worker that is installing dependencies at boot can leave a tracked file
+  modified for a moment. Instead, after the pass and before the push,
+  `cloister/verification-resume-dispatch.ts` checks that the head still equals
+  `dispatchOwed.head` and that the tree is clean (an unreadable tree counts as
+  dirty). A pass with no marker has no head to compare, so only the tree is
+  checked, as the door did before. If either check fails, nothing is pushed or dispatched, the reason is
+  journalled as `review.resume-declined` (with the verified primary head8 in
+  `data.head`, or the current one when there is no marker), and `recoverUndispatchedReviews` treats that tail like an
+  undispatched `verification.passed`: it re-requests the review through the
+  normal door once the entry is 5 minutes old and the head still matches. The
+  marker stays, so that request dispatches without re-running the gates.
 
-When either mechanism cannot apply, the old recovery still runs, and it re-runs
-the gates. A result whose consumption cannot be written to the state file is
-never used: adoption skips it, and a waiter returns an `error` outcome instead,
-so one result never dispatches twice. A worker
-started by a dashboard older than PAN-4532 has no `logPrefix` or `options`, so
-it is neither re-attached nor adopted on the restart that deploys this change.
-If boot adoption is refused (for example, the workspace is dirty), the worker
-still writes `verification.passed`, and `recoverUndispatchedReviews` re-requests
-the review. If the dashboard dies between taking an already-finished result and
-dispatching review, the journal tail is `review.requested`, and only
-`recoverStalledReviews` re-requests it, through the guarded review route once
-the tail is 15 minutes old
-([PAN-4623](https://github.com/eltmon/overdeck/issues/4623)).
-[PAN-4622](https://github.com/eltmon/overdeck/issues/4622) tracks closing this
-window.
+When none of these mechanisms applies, the old recovery still runs, and it
+re-runs the gates. A result whose consumption cannot be written to the state
+file is never used: adoption skips it, and a waiter returns an `error` outcome
+instead, so one result never dispatches twice. A worker started by a dashboard
+older than PAN-4532 has no `logPrefix` or `options`, so it is neither
+re-attached nor adopted. A pass taken before PAN-4622 deployed has no
+`dispatchOwed` marker, so its owed dispatch is not resumed on that restart.
+deacon-lite still recovers it: `recoverUndispatchedReviews` for a
+`verification.passed` tail, and `recoverStalledReviews` for a
+`review.requested` tail, whose fallback re-requests it through the guarded
+review route ([PAN-4623](https://github.com/eltmon/overdeck/issues/4623)).
 
 ### Review dispatch touches neither the stack nor tracked files (PAN-4690)
 
@@ -968,17 +995,18 @@ declares nothing.
 
 **Who may approve by marker** (#4066 review). Agents run with the operator's
 `gh` credentials, which GitHub reports as `OWNER`, so any agent can post an
-`overdeck-verdict: APPROVED sha=<head>` comment. When the GitHub App is
-configured, an `APPROVED` review marker therefore counts only when the App's
+`overdeck-verdict: APPROVED sha=<head>` comment. When the GitHub App covers
+the PR's repository, an `APPROVED` review marker therefore counts only when the App's
 bot posted it (a `Bot`-typed author with the App's slug, above); a marker
 from any other author, the owner included, is skipped as if it were not
 there. The review agent's verdict is normally a real review under the App's
 token, so this costs the normal path nothing; the one approval it loses is a
 verdict that fell back to a marker because the App token failed, which then
 needs a fresh review. A `CHANGES_REQUESTED` marker still counts from every
-trusted author: it can only hold a merge back. Without the App, any trusted
-author's `APPROVED` marker counts, which is trust in the operator's
-credentials; the server logs that once per process.
+trusted author: it can only hold a merge back. Without the App, or on a
+repository it does not cover, any trusted author's `APPROVED` marker counts,
+which is trust in the operator's credentials; the server logs that once per
+process, and once per uncovered repository (PAN-5153).
 
 **Failed UAT.** The newest trusted UAT marker that applies to the current
 head decides. A marker applies when its commit is the head (an abbreviated SHA
@@ -1630,6 +1658,14 @@ count does not track what `/graphql` actually charges (PAN-4291). REST
 `/rate_limit` remains the source for the `rest` (`core`) bucket and for the
 App pool's usage, which has no separate GraphQL source wired up.
 
+**Installation lookup (PAN-5153).** Before an App call, Overdeck looks up
+which installation covers the repository (`GET /repos/{owner}/{repo}/installation`
+with the App JWT) and caches the answer for 6 hours: a positive answer in
+memory, a 404 in `repo-notes.json`. The lookup is not recorded in the quota
+ledger. `pan doctor` forgets the cached answers and asks again. Every
+process re-reads `repo-notes.json` when the file changes, so a running
+dashboard sees a note that `pan doctor` cleared on its next lookup.
+
 **The ledger.** Every metered call and every `/rate_limit` sample appends one
 JSON line to `~/.overdeck/github-quota/ledger-<YYYYMMDDHH>.jsonl` (UTC hour):
 `{ ts, pid, kind: 'call' | 'sample', caller, pool, bucket, cost, estimated,
@@ -1741,6 +1777,7 @@ One piece of stored pipeline state came back, and it is not a status.
 | `review.verdict-replay-gave-up` | deacon-lite's `recoverStalledReviews`, when a deferred verdict's replay stops: `superseded`, `cap` or `failed` |
 | `review.stalled` | deacon-lite's `recoverSilentReviewers`, before it re-dispatches a silent reviewer (`data.reviewer`, `runId`, `paneState`, `silentForMs`) |
 | `review.stall-escalated` | deacon-lite's `recoverSilentReviewers`, when a re-dispatched reviewer fails again or the re-dispatch itself fails; the issue needs you (`data.reviewer`, `runId`, `paneState`, `reason`) |
+| `review.resume-declined` | `cloister/verification-resume-dispatch.ts` `confirmResumedDispatch`, when a request boot adoption resumed (PAN-4622) reaches dispatch with a moved head or a dirty or unreadable tree; nothing was pushed or dispatched (`data.reason`, `data.head`), and `recoverUndispatchedReviews` re-requests it like an undispatched `verification.passed` |
 | `review.dispatch-failed` | `cloister/review-dispatch-failure.ts` `recordReviewDispatchFailure`, when the terminal backend rejected a review kickoff outright (`invalid_request`, e.g. a lone surrogate on the wire); the issue needs you (`data.reviewer`, `data.error`) — there was never a reviewer to recover, so no deacon-lite routine re-dispatches it |
 | `merge.attempted` | the MERGE door in `routes/workspaces/merge-ops.ts`, once the merge holds the project's merge slot |
 | `merge.failed` | merge-ops' own `setStatus`, the single funnel every failing exit of `triggerMerge` passes through |
@@ -1984,7 +2021,9 @@ observe and nudge — none reconciles a stored copy of anything:
    Its tail check requires the journal's LAST entry to itself be a
    `request-review` `verification.passed` (PAN-4506): a later
    `review.dispatch-failed` entry fails that check, so a kickoff the backend
-   rejected outright is left alone rather than re-requested.
+   rejected outright is left alone rather than re-requested. A
+   `review.resume-declined` tail (PAN-4622) passes it: boot adoption took the
+   pass but did not dispatch, so the review is still undispatched.
 8. `recoverSilentReviewers` (`cloister/silent-reviewer-recovery.ts`,
    PAN-4433) — re-dispatches, once per run, a reviewer that was dispatched but
    never produced output, and escalates a second failure to the operator.

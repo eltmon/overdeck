@@ -73,10 +73,11 @@ operator merges it (PAN-3973). For each one it checks, in order:
    as. The App's bot is the installed App's own (`<slug>[bot]`, from the
    `app-slug` file beside its credentials in `~/.overdeck/github-app/`, else
    `GET /app`), matched as a GitHub `Bot` account, never by login alone. Its
-   reviews arrive as `CONTRIBUTOR` and count through that match. With the
-   GitHub App configured, an approving marker counts only from the App's bot:
-   agents hold the operator's `gh` credentials and could post one as the
-   owner. If the App's slug cannot be read, no bot approval counts. A review from any other account never counts, and each reviewer's
+   reviews arrive as `CONTRIBUTOR` and count through that match. On a
+   repository the GitHub App covers, an approving marker counts only from the
+   App's bot: agents hold the operator's `gh` credentials and could post one
+   as the owner. On other repositories the verdict is posted as the `gh` user,
+   and an approving marker counts from any trusted author. If the App's slug cannot be read, no bot approval counts. A review from any other account never counts, and each reviewer's
    latest review stands: a later "Request changes" or a dismissal withdraws an
    approval. An approval of an older commit, or a marker without `sha=`, never
    counts. A GitLab MR needs a named approver in `approved_by` (what
@@ -197,7 +198,7 @@ only when **all** of these are true:
 - The PR is open (not closed, not a draft, not already merged)
 - The PR is approved on its exact head commit (a trusted reviewer's standing
   GitHub review of that commit, or a trusted verdict marker whose `sha=` names
-  it, posted by the GitHub App's bot when the App is configured; on GitLab, a named approver in `approved_by`), and no review or marker
+  it, posted by the GitHub App's bot when the App covers the repository; on GitLab, a named approver in `approved_by`), and no review or marker
   requests changes
 - The forge reports CI checks on the PR head, and all of them passed. Pending
   checks, failing checks, and no reported checks each make the PR ineligible.

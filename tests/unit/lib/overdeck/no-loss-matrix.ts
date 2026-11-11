@@ -47,6 +47,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/restart-gate/approve',                kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'RestartGate service; operator approval, outside 8 remodel domains' },
   { surface: 'GET /api/restart-gate',                         kind: 'http', disposition: 'OUT_OF_SCOPE', door: 'RestartGate service; read door for the current gate, outside 8 remodel domains' },
   { surface: 'GET /api/github-quota',                         kind: 'http', disposition: 'READ',       door: 'refreshGitHubQuotaSnapshot (PAN-4264); the same snapshot as the read model githubQuota' },
+  { surface: 'GET /api/github/identities',                   kind: 'http', disposition: 'READ',       door: 'collectGitHubIdentities (PAN-5153); derived per request from projects.yaml, the App installation lookup and the gh login' },
   { surface: 'GET /api/disk-alert',                           kind: 'http', disposition: 'READ',       door: 'getDiskAlertSnapshot (PAN-5093): disk alert level, free bytes and space holders' },
   { surface: 'GET /api/harness-auto-update',                  kind: 'http', disposition: 'READ',       door: 'getHarnessAutoUpdateSnapshot (PAN-5108): background harness CLI updater state and failures' },
   { surface: 'GET /api/backend-restart-recovery',              kind: 'http', disposition: 'READ',       door: 'getBackendRestartRecoverySnapshot (PAN-5091): conversations a terminal-backend restart left stopped, and the Resume all run' },

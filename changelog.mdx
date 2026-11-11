@@ -10,13 +10,26 @@ This page starts at v0.60.0, the release that removed Overdeck's state layer. Ol
 
 {/* RELEASE STEP: before tagging vX.Y.Z, add a new <Update label="vX.Y.Z" description="YYYY-MM-DD"> block at the top with the user-facing changes since the previous tag, and point its compare link at the new tag. See docs/RELEASING.md "Update the public changelog". If a new model needs a newer Claude Code, say so and confirm its minClaudeCodeVersion is set. */}
 
-<Update label="v0.78.0" description="Unreleased" tags={["Upcoming"]}>
+<Update label="v0.79.0" description="Unreleased" tags={["Upcoming"]}>
   ## Upcoming release
 
-  Drafted from the changes merged to `main` since v0.77.0. The date is set when the release is tagged.
+  Drafted from the changes merged to `main` since v0.78.0. The date is set when the release is tagged.
 
+  #### Fixed
+
+  - **A stranded review request is re-requested again:** when a review was requested but never dispatched, and the review had no run state yet, the background patrol's recovery did nothing, so the review stayed stuck until someone requested it again. The patrol now re-requests it through the same guarded review route that `pan review request` uses, 15 minutes after the request. ([#4623](https://github.com/eltmon/overdeck/issues/4623))
+
+  [Compare v0.78.0...v0.79.0](https://github.com/eltmon/overdeck/compare/v0.78.0...v0.79.0)
+</Update>
+
+<Update label="v0.78.0" description="2026-11-11">
   #### New
 
+  - **GitHub organizations:** Overdeck now picks the acting identity per repository: the GitHub App's bot where the App is installed, and your `gh` account everywhere else. Before, a machine with the App used the bot's token on every repository, including ones the App could not reach. The sidebar groups projects by owner, the Command Deck header shows the owner and the acting login, Settings has a GitHub Identities section, and `pan doctor` prints one row per owner with the fix when an identity cannot push. See [GitHub organizations and identities](/configuration/issue-trackers#github-organizations-and-identities). ([#5159](https://github.com/eltmon/overdeck/pull/5159))
+  - **Memory extraction on subscription-only hosts:** a `claude-cli` provider lets a host with a Claude subscription and no API key extract memory observations. ([#5148](https://github.com/eltmon/overdeck/pull/5148))
+  - **One-paste connector setup:** Integrations gives one block of text to paste for Grok Bot, Grok Build, Hermes and OpenClaw, with pairing status guidance, and Grok Bot is on the connector. ([#5140](https://github.com/eltmon/overdeck/pull/5140))
+  - **Connect a bot:** each bot has its own copy button, pending requests are listed under Bots, and a notice confirms when a bot is connected. ([#5136](https://github.com/eltmon/overdeck/pull/5136))
+  - **One-click activation:** the overdeck.ai activate link is now a single Authorize click on a page that names the bot and the machine. ([#5132](https://github.com/eltmon/overdeck/pull/5132))
   - **Resume conversations after a terminal-backend restart:** when the terminal backend restarts (a crash, an out-of-memory stop, a service restart), Needs you shows one row, `<N> conversations stopped when the terminal backend restarted`, with a **Resume all** button. Overdeck never resumes them by itself. Resume all starts them one at a time, waits while memory or CPU pressure is high, and skips conversations that are paused, held, or stopped on purpose. See [Conversations](/features/conversations#after-a-terminal-backend-restart). ([#5134](https://github.com/eltmon/overdeck/pull/5134))
   - **Resume a conversation from a shell or an agent:** `pan conversations resume <name>` and the `resume_conversation` MCP tool resume a stopped conversation, as the dashboard's Resume button does. ([#5134](https://github.com/eltmon/overdeck/pull/5134))
 
@@ -25,10 +38,18 @@ This page starts at v0.60.0, the release that removed Overdeck's state layer. Ol
   - **New default models:** on built-in defaults, work, test, ship and worker agents and three review lanes now run on Claude Opus 5.5 instead of Sonnet 5.5 (the mid workhorse), which roughly doubles what those agents cost; the Anthropic cost-saver preset keeps Sonnet 5.5 for 30% of work. The cheap workhorse, conversation titles, compaction and memory extraction now use Claude Haiku 5.5 instead of Haiku 4.5 (&#36;0.10/&#36;0.50 per MTok against &#36;1/&#36;5), which needs Claude Code 2.1.293 or newer. Installs that set these models in config keep them. ([#5124](https://github.com/eltmon/overdeck/issues/5124))
   - **GPT-6.1 Terra on the Claude Code harness:** `gpt-6.1-terra` now runs on the Claude Code harness through CLIProxy as well as on the Codex harness, with the same 272K context pin as the other GPT-6 models. CLIProxy 7.3.16 picked it up from its remote model catalog; no CLIProxy upgrade is needed. ([PAN-4634](https://github.com/eltmon/overdeck/issues/4634))
 
+  - **God View shows only real data:** simulated ages, rates and effects are gone, mislabeled orbs are fixed, and the field guide matches what the canvas draws. ([#5138](https://github.com/eltmon/overdeck/pull/5138))
+
   #### Fixed
 
-  - **A stranded review request is re-requested again:** when a review was requested but never dispatched, and the review had no run state yet, the background patrol's recovery did nothing, so the review stayed stuck until someone requested it again. The patrol now re-requests it through the same guarded review route that `pan review request` uses, 15 minutes after the request. ([#4623](https://github.com/eltmon/overdeck/issues/4623))
+  - **Reopen and discussion sync use the right repository:** reopening an issue and syncing its discussions now run against the issue's own repository. Before, they could read another project's repository. ([#5159](https://github.com/eltmon/overdeck/pull/5159))
+  - **Terminal tab for Codex and OpenCode conversations on Herdr:** the tab no longer says the conversation is not running when it is. ([#5142](https://github.com/eltmon/overdeck/pull/5142))
+  - **Restart hold set after approval:** a hold placed after a restart was approved now stops that restart. ([#5143](https://github.com/eltmon/overdeck/pull/5143))
+  - **Out-of-memory kill no longer stops every pane:** when the kernel kills one pane process for memory, the Herdr server and the other conversations keep running. ([#5126](https://github.com/eltmon/overdeck/pull/5126))
+  - **Long failed message no longer hides the timeline:** the failed-message box scrolls, so the timeline and the Retry and Discard buttons stay visible. ([#5128](https://github.com/eltmon/overdeck/pull/5128))
+  - **Runaway text-to-speech takes:** `pan-tts` retries a Qwen3-TTS take that runs far too long, and trims it if the retry runs away too. ([#5129](https://github.com/eltmon/overdeck/pull/5129))
   - **`pan review request` no longer races PR adoption:** when a PR opened outside a pipeline workspace is still being adopted into one, `pan review request` now answers that adoption is in progress and starts nothing. Before, it could start a second verification on the half-built workspace, which made adoption refuse with `workspace-head-mismatch` and showed a false Needs you. ([#4995](https://github.com/eltmon/overdeck/issues/4995))
+  - **A dashboard restart no longer re-runs passed verification:** if the dashboard restarts after verification passed but before review started, review now starts on the next boot without running the gates again, as long as the head has not moved. A request that a restart interrupted while a dependency install had a tracked file modified also resumes, and Overdeck checks that the tree is clean only when it dispatches review. Before, both cases ran every gate again (25 to 45 minutes) on a head that had already passed. ([#4622](https://github.com/eltmon/overdeck/issues/4622))
 
   [Compare v0.77.0...v0.78.0](https://github.com/eltmon/overdeck/compare/v0.77.0...v0.78.0)
 </Update>

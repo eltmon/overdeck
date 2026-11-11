@@ -7,6 +7,8 @@ const PR_URL = 'https://github.com/eltmon/overdeck/pull/3102';
 const HEAD_SHA = 'a'.repeat(40);
 
 const mocks = vi.hoisted(() => ({
+  // PAN-5153: the App covers the PR's repository unless a test says otherwise.
+  appCoversRepo: vi.fn(async (..._args: unknown[]) => true),
   completePendingOperation: vi.fn(),
   ensureAgentReadyForMerge: vi.fn(),
   exec: vi.fn<[string, any?], Promise<{ stdout: string; stderr: string }>>(),
@@ -70,6 +72,9 @@ vi.mock('../../../../../lib/cloister/verification-runner.js', () => ({
   runVerificationForIssue: (...args: unknown[]) => mocks.runVerificationForIssue(...args),
 }));
 
+vi.mock('../../../../../lib/github-app-installations.js', () => ({
+  appCoversRepo: (...args: unknown[]) => mocks.appCoversRepo(...args),
+}));
 vi.mock('../../../../../lib/github-app.js', () => ({
   getCiCheckRunsState: vi.fn(async () => ({
     green: true,
@@ -197,7 +202,7 @@ vi.mock('../../../services/merge-queue-service.js', () => ({
   clearMergeRun: vi.fn(),
 }));
 
-import { triggerMerge } from '../merge-ops.js';
+import { reconcileGitHubMergeStatus, triggerMerge } from '../merge-ops.js';
 
 function pullRequestState(overrides: Partial<GitHubPullRequestState> = {}): GitHubPullRequestState {
   return {
@@ -443,5 +448,17 @@ describe('triggerMerge clean PR direct merge', () => {
 
     expect(result).toEqual(expect.objectContaining({ success: false, error: 'Already merged' }));
     expect(mocks.mergeGate).not.toHaveBeenCalled();
+  });
+});
+
+// PAN-5153: on a repository the App does not cover, reconciliation asks
+// nothing of the App and reports "not merged".
+describe('reconcileGitHubMergeStatus on an uncovered repository (PAN-5153)', () => {
+  it('returns false without reading the PR through the App', async () => {
+    mocks.getPullRequestState.mockClear();
+    mocks.appCoversRepo.mockResolvedValueOnce(false);
+    await expect(reconcileGitHubMergeStatus('PAN-3102', PR_URL)).resolves.toBe(false);
+    expect(mocks.appCoversRepo).toHaveBeenCalledWith('eltmon', 'overdeck');
+    expect(mocks.getPullRequestState).not.toHaveBeenCalled();
   });
 });

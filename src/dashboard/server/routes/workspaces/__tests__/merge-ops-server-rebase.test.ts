@@ -6,6 +6,8 @@ const PR_URL = 'https://github.com/eltmon/overdeck/pull/3102';
 const HEAD_SHA = 'b'.repeat(40);
 
 const mocks = vi.hoisted(() => ({
+  // PAN-5153: the App covers the PR's repository unless a test says otherwise.
+  appCoversRepo: vi.fn(async (..._args: unknown[]) => true),
   completePendingOperation: vi.fn(),
   evaluateIssueMergeGate: vi.fn(),
   exec: vi.fn<[string, any?], Promise<{ stdout: string; stderr: string }>>(),
@@ -77,6 +79,9 @@ vi.mock('../../../../../lib/cloister/merge-agent.js', () => ({
   syncMainIntoWorkspace: vi.fn(),
 }));
 vi.mock('../../../../../lib/cloister/ship-log.js', () => ({ appendShipLog: vi.fn(), beginShipLog: vi.fn() }));
+vi.mock('../../../../../lib/github-app-installations.js', () => ({
+  appCoversRepo: (...args: unknown[]) => mocks.appCoversRepo(...args),
+}));
 vi.mock('../../../../../lib/github-app.js', () => ({
   getCiCheckRunsState: vi.fn(async () => ({ green: true, total: 2, successCount: 2, verdict: 'success' })),
   getPullRequestState: (...args: unknown[]) => mocks.getPullRequestState(...args),
@@ -310,6 +315,10 @@ describe('triggerMerge server rebase escalation', () => {
         expect.any(String), 'feature/pan-3110', 'main', 'PAN-3110', { expectedHead: HEAD_SHA },
       );
       expect(mocks.mergeReviewArtifact).toHaveBeenCalledWith(expect.objectContaining({ matchHeadCommit: REBASED }));
+      // PAN-5153: a covered repository gets the review and test statuses as before.
+      expect(mocks.appCoversRepo).toHaveBeenCalledWith('eltmon', 'overdeck');
+      expect(mocks.reportCommitStatus).toHaveBeenCalledWith('eltmon', 'overdeck', REBASED, 'success', 'overdeck/review', 'Review passed');
+      expect(mocks.reportCommitStatus).toHaveBeenCalledWith('eltmon', 'overdeck', REBASED, 'success', 'overdeck/test', 'Merge path: CI green');
     });
 
     it('never verifies or pins a push that lands after the start check on an up-to-date branch (#4066 review, R3-1)', async () => {

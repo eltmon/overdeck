@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
+  appCoversRepoMock,
   assessMergeCompletenessMock,
   execMock,
   getMergeSetMock,
@@ -9,6 +10,7 @@ const {
   resolveGitHubIssueMock,
   resolveProjectMock,
 } = vi.hoisted(() => ({
+  appCoversRepoMock: vi.fn<(owner: string, repo: string) => Promise<boolean | undefined>>(),
   assessMergeCompletenessMock: vi.fn(),
   execMock: vi.fn<[string, any?], Promise<{ stdout: string; stderr: string }>>(),
   getMergeSetMock: vi.fn(),
@@ -31,6 +33,11 @@ vi.mock('child_process', () => {
   (exec as any)[kCustom] = execMock;
   return { exec };
 });
+
+vi.mock('../../../../src/lib/github-app-installations.js', () => ({
+  // PAN-5153: coverage follows isGitHubAppConfigured() unless a test overrides it.
+  appCoversRepo: async (owner: string, repo: string) => (await appCoversRepoMock(owner, repo)) ?? isGitHubAppConfiguredMock(),
+}));
 
 vi.mock('../../../../src/lib/github-app.js', () => ({
   isGitHubAppConfigured: isGitHubAppConfiguredMock,
@@ -68,6 +75,7 @@ function mergeSet(repoCount: number) {
 describe('verifyMergedBeforeLifecycle', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    appCoversRepoMock.mockReset();
     isGitHubAppConfiguredMock.mockReturnValue(true);
     resolveGitHubIssueMock.mockReturnValue({ isGitHub: true, owner: 'eltmon', repo: 'overdeck' });
     listPullRequestsForHeadMock.mockResolvedValue([
@@ -199,6 +207,22 @@ describe('verifyMergedBeforeLifecycle', () => {
 
     expect(result).toEqual({ merged: true, reason: 'GitHub PR #2467 is merged' });
     expect(assessMergeCompletenessMock).toHaveBeenCalledWith('PAN-2467');
+  });
+
+  it('decides through gh, not the App, on an uncovered repository (PAN-5153)', async () => {
+    appCoversRepoMock.mockResolvedValue(false);
+    getMergeSetMock.mockReturnValue(mergeSet(1));
+    execMock.mockResolvedValue({
+      stdout: '[{"number":2467,"state":"MERGED","mergedAt":"2026-07-25T12:00:00Z"}]',
+      stderr: '',
+    });
+
+    const result = await verifyMergedBeforeLifecycle('PAN-2467', '/projects/overdeck');
+
+    expect(result).toEqual({ merged: true, reason: 'GitHub PR #2467 is merged' });
+    expect(appCoversRepoMock).toHaveBeenCalledWith('eltmon', 'overdeck');
+    expect(listPullRequestsForHeadMock).not.toHaveBeenCalled();
+    expect(execMock).toHaveBeenCalledWith(expect.stringContaining('gh pr list'), expect.anything());
   });
 
   it('does not invoke the completeness assessor for a monorepo', async () => {

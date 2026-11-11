@@ -131,6 +131,27 @@ describe('recoverUndispatchedReviews', () => {
     expect(mocks.requestReviewThroughRoute).not.toHaveBeenCalled();
   });
 
+  // PAN-4622: boot adoption took the pass but declined to dispatch (dirty tree
+  // or moved head). That is the same undispatched review, recovered the same way.
+  it('re-requests review for an aged review.resume-declined tail on the verified head', async () => {
+    journal([
+      { type: 'verification.passed', minutesAgo: 30, source: 'request-review', data: { head: HEAD } },
+      { type: 'review.requested', minutesAgo: 20, source: 'verification-adoption' },
+      { type: 'review.resume-declined', minutesAgo: 10, source: 'verification-adoption', data: { reason: 'the working tree has uncommitted changes', head: HEAD } },
+    ]);
+
+    expect(await recoverUndispatchedReviews(NOW)).toHaveLength(1);
+    expect(mocks.requestReviewThroughRoute).toHaveBeenCalledWith('PAN-4221', { message: expect.any(String), source: 'deacon-lite' });
+  });
+
+  it('leaves a review.resume-declined tail alone once the head moved past the verified head', async () => {
+    journal([{ type: 'review.resume-declined', minutesAgo: 10, source: 'verification-adoption', data: { reason: 'the head moved after verification passed', head: HEAD } }]);
+    mocks.readPrimaryHead8.mockResolvedValue('def67890');
+
+    expect(await recoverUndispatchedReviews(NOW)).toEqual([]);
+    expect(mocks.requestReviewThroughRoute).not.toHaveBeenCalled();
+  });
+
   it('never calls the route for a verification.passed tail sourced from merge-verify', async () => {
     passedTail(10, { source: 'merge-verify' });
 

@@ -46,7 +46,12 @@ decision. `postReviewVerdict` therefore tries two identities, in order:
    review is authored by the App's bot (`<app-slug>[bot]`, e.g.
    `overdeck-agent[bot]`), which is never the PR author and whose review
    GitHub accepts. The merge gate trusts that review only from an author
-   GitHub types `Bot` with the installed App's slug (#4066 review).
+   GitHub types `Bot` with the installed App's slug (#4066 review). This
+   applies only on a repository the App is installed on (PAN-5153). On an
+   uncovered repository the token is null, the verdict posts as the `gh`
+   user, and an `APPROVED` marker there counts from any trusted author. That
+   is weaker than bot-only approval; installing the App on the owner restores
+   it.
 2. **A marker comment.** If the forge still refuses a self-review (no app
    installed, or the bot opened the PR), the verdict is posted as a PR comment
    whose first line is a machine marker:

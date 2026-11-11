@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { isGitHubAppConfigured, listPullRequestsForHead, type GitHubPullRequestForHead } from './github-app.js';
+import { appCoversRepo } from './github-app-installations.js';
 import { selectPullRequestForHead } from './github-pr-selection.js';
 
 const execFileAsync = promisify(execFile);
@@ -25,7 +26,7 @@ export async function lookupPullRequestForBranch(
   repo: string,
   branchName: string,
 ): Promise<BranchPullRequest | null> {
-  const prs = isGitHubAppConfigured()
+  const prs = (await appCoversRepo(owner, repo))
     ? await listPullRequestsForHead(owner, repo, branchName, 'all')
     : await listPullRequestsWithGh(owner, repo, branchName);
   const pr = selectPullRequestForHead(prs, { includeClosed: true });

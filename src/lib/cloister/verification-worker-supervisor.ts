@@ -4,6 +4,9 @@ import { join } from 'node:path';
 import { loadConfigSync } from '../config-yaml/load.js';
 import { getOverdeckHome, packageRoot } from '../paths.js';
 import { snapshotWorkspaceHeads, type HeadAnchor } from '../git-utils.js';
+import { resolveWorkspaceRepoRoots } from '../project-repos.js';
+import { lastPipelineEntry } from './pipeline-journal.js';
+import { primaryShaFromAnchor } from './verified-head.js';
 import { classifyWorkspaceVerificationHead, isSameVerificationHead } from './verification-head.js';
 import type { VerificationRunnerOptions, VerificationRunnerOutcome, WorkspaceInfo } from './verification-types.js';
 import { buildVerificationWorkerLaunch, launchVerificationWorker } from './verification-worker-launcher.js';
@@ -29,6 +32,12 @@ export type WorkerState = {
   options?: SupervisedOptions;
   /** PAN-4532: when a waiter took this run's result. A result is consumed at most once. */
   resultConsumedAt?: string;
+  /**
+   * PAN-4622: a `request-review` pass was taken but review is not dispatched
+   * yet. `head` is the workspace head when the pass was taken, the head the
+   * door pushes. Written with `resultConsumedAt`, cleared once review spawns.
+   */
+  dispatchOwed?: { head: HeadAnchor; takenAt: string };
 };
 
 const POLL_MS = 250;
@@ -115,7 +124,8 @@ export function isVerificationWorkerActive(issueId: string): boolean {
 /**
  * PAN-4532: workers launched by `logPrefix` that a restarted dashboard should
  * re-attach to — still running with no result, or finished with a result no
- * waiter consumed. An `error` result is never adopted.
+ * waiter consumed. An `error` result is never adopted. PAN-4622: a consumed
+ * pass whose review dispatch is still owed is listed too.
  */
 export function listAdoptableVerificationWorkers(logPrefix: string): WorkerState[] {
   const root = join(getOverdeckHome(), 'verification-workers');
@@ -142,6 +152,8 @@ export function listAdoptableVerificationWorkers(logPrefix: string): WorkerState
     } else if (finished && !state.resultConsumedAt) {
       const result = readResult(state.resultPath);
       if (result && result.outcome !== 'error') adoptable.push(state);
+    } else if (finished && state.dispatchOwed && readResult(state.resultPath)?.outcome === 'passed') {
+      adoptable.push(state);
     }
   }
   return adoptable;
@@ -183,16 +195,65 @@ export function markVerificationWorkerAdmissionPhase(
  * Record that `runId`'s result has a consumer, unless a newer run replaced the
  * state. Returns whether the consumption is on disk: adoption uses the result
  * only then, so a failed write can never let one result dispatch twice.
+ * PAN-4622: a `request-review` pass also records `dispatchOwed` in the same
+ * write, so no restart can land between the two. The marker is written only
+ * for a head the worker verified (`verifiedOwedHead`).
  */
-function markResultConsumed(issueId: string, runId: string): boolean {
-  const state = readVerificationWorkerState(issueId);
-  if (!state || state.runId !== runId) return false;
+async function markResultConsumed(
+  state: Pick<WorkerState, 'issueId' | 'runId' | 'workspacePath' | 'logPrefix'>,
+  result: VerificationRunnerOutcome,
+): Promise<boolean> {
+  const owesDispatch = result.outcome === 'passed' && state.logPrefix === 'request-review';
+  const head = owesDispatch ? await verifiedOwedHead(state.issueId, state.workspacePath) : undefined;
+  const current = readVerificationWorkerState(state.issueId);
+  if (!current || current.runId !== state.runId) return false;
+  const now = new Date().toISOString();
   try {
-    writeJsonAtomic(statePath(issueId), { ...state, resultConsumedAt: new Date().toISOString() });
+    writeJsonAtomic(statePath(state.issueId), {
+      ...current,
+      resultConsumedAt: now,
+      ...(head ? { dispatchOwed: { head, takenAt: now } } : {}),
+    });
     return true;
   } catch {
     return false;
   }
+}
+
+/**
+ * PAN-4622: the workspace head, if it is the head the worker journalled in its
+ * `verification.passed` (primary head8). An agent commit that landed between
+ * the pass and the take is unverified, so it gets no marker, and neither does
+ * a head that cannot be read or a journal whose last verification entry is
+ * not a pass.
+ */
+async function verifiedOwedHead(issueId: string, workspacePath: string): Promise<HeadAnchor | undefined> {
+  const head = await snapshotWorkspaceHeads(issueId, workspacePath).catch(() => undefined);
+  const pass = lastPipelineEntry(workspacePath, 'verification.');
+  if (!head || pass?.type !== 'verification.passed') return undefined;
+  const sha = primaryShaFromAnchor(head, resolveWorkspaceRepoRoots(issueId, workspacePath)[0]?.repoKey);
+  return sha?.slice(0, 8) === pass.data?.['head'] ? head : undefined;
+}
+
+/**
+ * PAN-4622: review for the owed pass has spawned, so a restart owes nothing.
+ * Called first thing after a successful spawn: a marker left behind would make
+ * the next boot dispatch the same head again.
+ */
+export function clearVerificationDispatchOwed(issueId: string): void {
+  const state = readVerificationWorkerState(issueId);
+  if (!state?.dispatchOwed) return;
+  const { dispatchOwed: _cleared, ...rest } = state;
+  try {
+    writeJsonAtomic(statePath(issueId), rest);
+  } catch (err) {
+    console.warn(`[verification-supervisor] ${issueId}: could not clear the owed review dispatch:`, err);
+  }
+}
+
+/** PAN-4622: the head of a pass whose review dispatch is still owed, if any. */
+export function readVerificationDispatchOwed(issueId: string): WorkerState['dispatchOwed'] | null {
+  return readVerificationWorkerState(issueId)?.dispatchOwed ?? null;
 }
 
 function readResult(path: string): VerificationRunnerOutcome | null {
@@ -211,7 +272,7 @@ async function waitForResult(state: WorkerState): Promise<VerificationRunnerOutc
       // adopted again after a restart, so this waiter does not use it. The
       // next request adopts it once the write succeeds. A newer run that
       // replaced the state owns the issue now, and this result is not adoptable.
-      if (!markResultConsumed(state.issueId, state.runId) && readVerificationWorkerState(state.issueId)?.runId === state.runId) {
+      if (!await markResultConsumed(state, result) && readVerificationWorkerState(state.issueId)?.runId === state.runId) {
         return { outcome: 'error', message: `Verification worker ${state.pid} finished, but its result could not be recorded as consumed; re-request review to use it` };
       }
       return result;
@@ -275,7 +336,28 @@ async function adoptUnconsumedResult(
   if (!result || result.outcome === 'error') return null;
   if (!await workerVerifiesHead(existing, issueId, workspacePath, headAnchor, options)) return null;
   // An unrecorded consumption falls back to a fresh run, never a second use.
-  return markResultConsumed(issueId, existing.runId) ? result : null;
+  return await markResultConsumed(existing, result) ? result : null;
+}
+
+/**
+ * PAN-4622: a pass was taken but its review never dispatched (the dashboard
+ * died in between, or the spawn did not happen). On the same head with the
+ * same options, the pass is still the answer, so no gate runs again. A head
+ * that moved is a new request: the marker is cleared and the normal path runs.
+ */
+async function resumeOwedDispatch(
+  existing: WorkerState,
+  workspacePath: string,
+  headAnchor: HeadAnchor | undefined,
+  options: SupervisedOptions,
+): Promise<VerificationRunnerOutcome | null> {
+  const owed = existing.dispatchOwed;
+  if (!owed || existing.workspacePath !== workspacePath || !sameOptions(existing.options, options)) return null;
+  const result = readResult(existing.resultPath);
+  if (result?.outcome !== 'passed') return null;
+  if (headAnchor === owed.head) return result;
+  clearVerificationDispatchOwed(existing.issueId);
+  return null;
 }
 
 /** PAN-4531: fresh workers started for a head that moved under verification, before giving up. */
@@ -320,6 +402,13 @@ async function runSupervisedVerificationOnce(
   if (adopted) {
     console.log(`[${logPrefix}] Adopting the unconsumed ${adopted.outcome} result of verification worker ${existing!.pid} for ${issueId}`);
     return adopted;
+  }
+  const owed = existing && logPrefix === 'request-review'
+    ? await resumeOwedDispatch(existing, workspacePath, headAnchor, options)
+    : null;
+  if (owed) {
+    console.log(`[${logPrefix}] ${issueId}: verification already passed on this head and review is still owed — dispatching without re-running the gates`);
+    return owed;
   }
   // Never join a worker past its deadline: its result (if it ever lands) is
   // for a stale gate run, and waitForResult would re-fail on the same deadline
