@@ -60,7 +60,7 @@ import { capturePipelineStageForIssue } from '../telemetry/pipeline.js';
 import { toFeatureIdent, type TemplatePlaceholders } from '../workspace-config.js';
 import { loadWorkspaceEnvForProject } from '../workspace-env.js';
 import { snapshotWorkspaceHeads, type HeadAnchor } from '../git-utils.js';
-import { primaryShaFromAnchor } from './verified-head.js';
+import { ciVerdictHead8, primaryShaFromAnchor } from './verified-head.js';
 import { createDecidedStopCheck, readVerifiedHead, readWorkspaceHeadShort } from './verification-decided-stop.js';
 
 const execAsync = promisify(exec);
@@ -430,8 +430,11 @@ export async function runVerificationForIssueInProcess(
     }
 
     // PAN-4531: a decided run (merged, superseded, CI red) starts no further gate.
+    // PAN-4624: CI verdicts are stored under the PR head, which in a polyrepo
+    // is the primary member repo's sha, not the wrapper's HEAD.
+    const launchCiHeadShort = ciVerdictHead8(repoRoots, launchHead, headShort);
     const decided = createDecidedStopCheck({
-      issueId, workspacePath, logPrefix, repoRoots, launchHead, launchHeadShort: headShort, testsMode,
+      issueId, workspacePath, logPrefix, repoRoots, launchHead, launchHeadShort: launchCiHeadShort, testsMode,
       checkSuperseded: options.syncTargetBranch !== false,
     });
     const decidedBeforeGates = await decided.isDecided();
@@ -550,10 +553,10 @@ export async function runVerificationForIssueInProcess(
     const decidedStop = decided.stop?.kind === 'ci-red' && localFailed ? undefined : decided.stop;
     if (decidedStop?.kind === 'merged') return decidedStop.outcome;
     if (decidedStop?.kind === 'superseded') {
-      const reason = `HEAD moved from ${headShort ?? 'the launch head'} to ${decidedStop.head ?? 'a new commit'} during verification`;
+      const reason = `HEAD moved from ${launchCiHeadShort ?? 'the launch head'} to ${decidedStop.head ?? 'a new commit'} during verification`;
       try { markRunningVerificationArtifactSkipped(workspacePath, reason); } catch { /* best-effort */ }
       console.log(`[${logPrefix}] Verification of ${issueId} superseded: ${reason}`);
-      return { outcome: 'deferred', reason, superseded: { from: headShort, to: decidedStop.head } };
+      return { outcome: 'deferred', reason, superseded: { from: launchCiHeadShort, to: decidedStop.head } };
     }
     const notRun = decidedStop?.kind === 'ci-red'
       ? Object.entries(gates)
@@ -572,7 +575,7 @@ export async function runVerificationForIssueInProcess(
     // sync merge keeps the launch head (CI never sees that local merge commit);
     // an agent commit since launch makes the new commit the verified head.
     const verifiedHeadShort = testsMode === 'ci'
-      ? (await readVerifiedHead(repoRoots, launchHead, headShort, issueId, workspacePath)).short
+      ? (await readVerifiedHead(repoRoots, launchHead, launchCiHeadShort, issueId, workspacePath)).short
       : headShort;
     const ciTestRed = decidedStop?.kind === 'ci-red' || (testsMode === 'ci'
       && !localGateResults.some((r) => !r.passed && r.required !== false)

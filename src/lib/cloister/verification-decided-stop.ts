@@ -20,6 +20,7 @@ import { readLatestCiTestResult } from './verification-cycles.js';
 import { skipMergedVerification } from './verification-escalation.js';
 import { classifyVerificationHead, isSameVerificationHead, type VerificationHeadRelation } from './verification-head.js';
 import type { VerificationRunnerOutcome } from './verification-types.js';
+import { ciVerdictHead8 } from './verified-head.js';
 
 const execAsync = promisify(exec);
 
@@ -36,7 +37,8 @@ export async function readWorkspaceHeadShort(workspacePath: string): Promise<str
 /**
  * PAN-4527: where HEAD stands against the launch head, and the eight-char head
  * a verdict belongs to: the launch head while HEAD is still that head or the
- * worker's own sync merge of it, otherwise the workspace's current HEAD.
+ * worker's own sync merge of it, otherwise the workspace's current HEAD (in a
+ * polyrepo, the primary member repo's current head, PAN-4624).
  */
 export async function readVerifiedHead(
   repoRoots: WorkspaceRepoRoot[],
@@ -45,9 +47,10 @@ export async function readVerifiedHead(
   issueId: string,
   workspacePath: string,
 ): Promise<{ relation: VerificationHeadRelation; short: string | undefined }> {
-  const relation = await classifyVerificationHead(repoRoots, launchHead, await snapshotWorkspaceHeads(issueId, workspacePath));
+  const current = await snapshotWorkspaceHeads(issueId, workspacePath);
+  const relation = await classifyVerificationHead(repoRoots, launchHead, current);
   if (isSameVerificationHead(relation)) return { relation, short: launchHeadShort };
-  return { relation, short: (await readWorkspaceHeadShort(workspacePath)) ?? launchHeadShort };
+  return { relation, short: ciVerdictHead8(repoRoots, current, await readWorkspaceHeadShort(workspacePath)) ?? launchHeadShort };
 }
 
 /** Why a run stopped before its remaining local gates. */
